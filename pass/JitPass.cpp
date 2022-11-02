@@ -35,6 +35,8 @@
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 
+#include "llvm/Analysis/MemorySSA.h"
+
 #include <iostream>
 
 //#define ENABLE_RECURSIVE_JIT
@@ -50,7 +52,6 @@ namespace {
 
 struct JitFunctionInfo {
   Function *Fn;
-  SmallVector<int, 8> ConstantArgs;
   std::string ModuleIR;
 };
 
@@ -88,33 +89,15 @@ void parseAnnotations(Module &M) {
       JitFunctionInfo JFI;
       JFI.Fn = Fn;
 
-      if (Entry->getOperand(4)->isNullValue())
-        JFI.ConstantArgs = {};
-      else {
-        dbgs() << "AnnotArgs " << *Entry->getOperand(4)->getOperand(0) << "\n";
-        dbgs() << "Type AnnotArgs " << *Entry->getOperand(4)->getOperand(0)->getType() << "\n";
-        auto AnnotArgs =
-            cast<ConstantStruct>(Entry->getOperand(4)->getOperand(0));
-
-        for (int I = 0; I < AnnotArgs->getNumOperands(); ++I) {
-          auto *Index = cast<ConstantInt>(AnnotArgs->getOperand(I));
-          // TODO: think about types, check within function arguments bounds, -1
-          // to convert to 0-start index.
-          JFI.ConstantArgs.push_back(Index->getValue().getZExtValue() - 1);
-        }
-      }
-
       JitFunctionInfoList.push_back(JFI);
     }
   }
 }
 
-void getReachableFunctions(Module &M, Function &F,
+void getReachableFunctions(CallGraph &CG, Module &M, Function &F,
                            SmallPtrSetImpl<Function *> &ReachableFunctions) {
   SmallVector<Function *, 8> ToVisit;
   ToVisit.push_back(&F);
-  CallGraphWrapperPass CG;
-  CG.runOnModule(M);
   while (!ToVisit.empty()) {
     Function *VisitF = ToVisit.pop_back_val();
     CallGraphNode *CGNode = CG[VisitF];
@@ -145,11 +128,11 @@ void getReachableFunctions(Module &M, Function &F,
 }
 
 // This method implements what the pass does
-void visitor(Module &M, CallGraph &CG) {
-
+bool visitor(Module &M, CallGraph &CG,
+             function_ref<MemorySSAAnalysis::Result &(Function &)> GetMSSAResult) {
   if (JitFunctionInfoList.empty()) {
     //dbgs() << "=== Empty Begin Mod\n" << M << "=== End Mod\n";
-    return;
+    return false;
   }
 
   //dbgs() << "=== Pre M\n" << M << "=== End of Pre M\n";
@@ -159,7 +142,7 @@ void visitor(Module &M, CallGraph &CG) {
     Function *F = JFI.Fn;
 
     SmallPtrSet<Function *, 16> ReachableFunctions;
-    getReachableFunctions(M, *F, ReachableFunctions);
+    getReachableFunctions(CG, M, *F, ReachableFunctions);
     ReachableFunctions.insert(F);
 
     ValueToValueMapTy VMap;
@@ -253,7 +236,7 @@ void visitor(Module &M, CallGraph &CG) {
     WriteBitcodeToFile(*JitMod, OS);
     OS.flush();
 
-    dbgs() << "=== StrIR\n" << *JitMod << "=== End of StrIR\n";
+    //dbgs() << "=== StrIR\n" << *JitMod << "=== End of StrIR\n";
     //dbgs() << "=== Post M\n" << M << "=== End of Post M\n";
   }
 
@@ -262,8 +245,14 @@ void visitor(Module &M, CallGraph &CG) {
   Type *Int32Ty = Type::getInt32Ty(M.getContext());
   Type *Int64Ty = Type::getInt64Ty(M.getContext());
   // Use Int64 type for the Value, big enough to hold primitives.
+  /* struct {
+    int64_t Value;
+    TODO: have a common header file?
+  }
+  Must be kept aligned with libjit.
+  */
   StructType *RuntimeConstantTy =
-      StructType::create({Int32Ty, Int64Ty}, "struct.args");
+      StructType::create({Int64Ty}, "struct.args");
 
   // TODO: This works by embedding the jit.bc library.
   // Function *JitEntryFn = M.getFunction("__jit_entry");
@@ -282,13 +271,63 @@ void visitor(Module &M, CallGraph &CG) {
   for (JitFunctionInfo &JFI : JitFunctionInfoList) {
     Function *F = JFI.Fn;
 
+    auto GetAnnotatedIntrinsics = [](Function &F) {
+      SmallVector<CallBase *> AnnotatedIntrinsics;
+      for (auto &BB : F)
+        for (auto &I : BB)
+          if (CallBase *CB = dyn_cast<CallBase>(&I))
+            if ((CB->getIntrinsicID() == Intrinsic::var_annotation) ||
+                (CB->getIntrinsicID() == Intrinsic::ptr_annotation))
+              AnnotatedIntrinsics.push_back(CB);
+      return AnnotatedIntrinsics;
+    };
+
+    SmallVector<Instruction *> RuntimeConstants;
+    auto &MSSA = GetMSSAResult(*F).getMSSA();
+    MSSA.ensureOptimizedUses();
+    //dbgs() << "=== MSSA\n";
+    //MSSA.print(dbgs());
+    //dbgs() << "=== End of MSSA\n";
+    SmallVector<CallBase *> AnnotatedInstrinsics = GetAnnotatedIntrinsics(*F);
+
+    // TODO: check using MemorySSA that values are indeed runtime constants.
+    for (auto *CB : AnnotatedInstrinsics) {
+      if (CB->getIntrinsicID() == Intrinsic::var_annotation) {
+        Value *Ptr = CB->getArgOperand(0);
+        MemoryDef *MA = cast<MemoryDef>(MSSA.getMemoryAccess(CB));
+        MemoryDef *Clobber = cast<MemoryDef>(MA->getDefiningAccess());
+
+        StoreInst *Store = dyn_cast<StoreInst>(Clobber->getMemoryInst());
+        assert(Store &&
+               "Expected store instruction to llvm.var.annotation value");
+        Argument *Arg = dyn_cast<Argument>(Store->getValueOperand());
+        assert(Arg && "Expected memory dependency on function argument");
+
+        RuntimeConstants.push_back(Store->clone());
+      }
+      if (CB->getIntrinsicID() == Intrinsic::ptr_annotation) {
+        Value *Ptr = CB->getArgOperand(0);
+        GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(Ptr);
+        assert(GEP && "Expected GEP for llvm.ptr.annotation");
+        Argument *Arg = dyn_cast<Argument>(GEP->getPointerOperand());
+        assert(Arg &&
+               "Expected GEP with a pointer operation to a function argument");
+
+        RuntimeConstants.push_back(GEP->clone());
+      }
+    }
+
     // Replace jit'ed function with a stub function.
     std::string FnName = F->getName().str();
     F->setName("");
     Function *StubFn =
         Function::Create(F->getFunctionType(), F->getLinkage(), FnName, M);
-    F->replaceAllUsesWith(StubFn);
-    F->eraseFromParent();
+    ValueToValueMapTy VMap;
+    for (size_t I = 0; I < F->arg_size(); ++I) {
+      VMap[F->getArg(I)] = StubFn->getArg(I);
+      // Name arguments for readability.
+      StubFn->getArg(I)->setName(F->getArg(I)->getName());
+    }
 
     // Replace the body of the jit'ed function to call the jit entry, grab the
     // address of the specialized jit version and execute it.
@@ -297,7 +336,7 @@ void visitor(Module &M, CallGraph &CG) {
     // Create the runtime constant array type for the runtime constants passed
     // to the jit entry function.
     ArrayType *RuntimeConstantArrayTy =
-        ArrayType::get(RuntimeConstantTy, JFI.ConstantArgs.size());
+        ArrayType::get(RuntimeConstantTy, RuntimeConstants.size());
 
     // Create globals for the function name and string IR passed to the jit
     // entry.
@@ -306,25 +345,47 @@ void visitor(Module &M, CallGraph &CG) {
 
     // Create the runtime constants data structure passed to the jit entry.
     Value *RuntimeConstantsAlloca = nullptr;
-    if (JFI.ConstantArgs.size() > 0) {
+    if (RuntimeConstants.size() > 0) {
       RuntimeConstantsAlloca = Builder.CreateAlloca(RuntimeConstantArrayTy);
       // Zero-initialize the alloca to avoid stack garbage for caching.
       Builder.CreateStore(Constant::getNullValue(RuntimeConstantArrayTy),
                           RuntimeConstantsAlloca);
-      for (int ArgI = 0; ArgI < JFI.ConstantArgs.size(); ++ArgI) {
+      constexpr int ValueIdx = 0;
+      for (int ArgI = 0; ArgI < RuntimeConstants.size(); ++ArgI) {
         auto *GEP = Builder.CreateInBoundsGEP(
             RuntimeConstantArrayTy, RuntimeConstantsAlloca,
             {Builder.getInt32(0), Builder.getInt32(ArgI)});
-        auto *GEPArgNo = Builder.CreateStructGEP(RuntimeConstantTy, GEP, 0);
 
-        int ArgNo = JFI.ConstantArgs[ArgI];
-        Builder.CreateStore(Builder.getInt32(ArgNo), GEPArgNo);
+        auto *GEPValue =
+            Builder.CreateStructGEP(RuntimeConstantTy, GEP, ValueIdx);
 
-        auto *GEPValue = Builder.CreateStructGEP(RuntimeConstantTy, GEP, 1);
-        Builder.CreateStore(StubFn->getArg(ArgNo), GEPValue);
+        if (auto *Store = dyn_cast<StoreInst>(RuntimeConstants[ArgI])) {
+          VMap[Store->getPointerOperand()] = GEPValue;
+          RemapInstruction(Store, VMap);
+          Store->dropUnknownNonDebugMetadata();
+          Builder.Insert(Store);
+        }
+        else if (auto *GEPI = dyn_cast<GetElementPtrInst>(RuntimeConstants[ArgI])) {
+          RemapInstruction(GEPI, VMap);
+          GEPI->dropUnknownNonDebugMetadata();
+          Builder.Insert(GEPI);
+
+          SmallVector<Value *> Operands;
+          for (auto &Op : GEPI->operands())
+            Operands.push_back(Op.get());
+
+          ArrayRef<Value *> IdxList = ArrayRef<Value *>(Operands).slice(1);
+          Type *IdxTy =
+              GEPI->getIndexedType(GEPI->getSourceElementType(), IdxList);
+
+
+          auto *Load = Builder.CreateLoad(IdxTy, GEPI);
+          Builder.CreateStore(Load, GEPValue);
+        }
+        else
+          assert(false && "Expected store or GEP instruction");
       }
-    }
-    else
+    } else
       RuntimeConstantsAlloca =
           Constant::getNullValue(RuntimeConstantArrayTy->getPointerTo());
 
@@ -333,7 +394,7 @@ void visitor(Module &M, CallGraph &CG) {
     auto *JitFnPtr = Builder.CreateCall(
         JitEntryFnTy, JitEntryFn,
         {FnNameGlobal, StrIRGlobal, Builder.getInt32(JFI.ModuleIR.size()),
-         RuntimeConstantsAlloca, Builder.getInt32(JFI.ConstantArgs.size())});
+         RuntimeConstantsAlloca, Builder.getInt32(RuntimeConstants.size())});
     SmallVector<Value *, 8> Args;
     for (auto &Arg : StubFn->args())
       Args.push_back(&Arg);
@@ -344,8 +405,11 @@ void visitor(Module &M, CallGraph &CG) {
     else
       Builder.CreateRet(RetVal);
 
-    // dbgs() << "=== StubFn " << *StubFn << "=== End of StubFn\n";
-    // getchar();
+    //dbgs() << "=== Begin OrigFn\n" << *F << "=== End of OrigFn\n";
+    //dbgs() << "=== Begin StubFn\n" << *StubFn << "=== End of StubFn\n";
+
+    F->replaceAllUsesWith(StubFn);
+    F->eraseFromParent();
   }
 
   //dbgs() << "=== Begin Mod\n" << M << "=== End Mod\n";
@@ -353,6 +417,8 @@ void visitor(Module &M, CallGraph &CG) {
     report_fatal_error("Broken module found, compilation aborted!", false);
   else
     dbgs() << "Module verified!\n";
+
+  return true;
 }
 
 // New PM implementation
@@ -362,10 +428,17 @@ struct JitPass : PassInfoMixin<JitPass> {
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
     parseAnnotations(M);
     CallGraph &CG = AM.getResult<CallGraphAnalysis>(M);
-    visitor(M, CG);
-    // TODO: is anything preserved?
-    return PreservedAnalyses::none();
-    //return PreservedAnalyses::all();
+    FunctionAnalysisManager &FAM =
+        AM.getResult<FunctionAnalysisManagerModuleProxy>(M).getManager();
+    auto GetMSSAResult = [&FAM](Function &F) -> MemorySSAAnalysis::Result & {
+      return FAM.getResult<MemorySSAAnalysis>(F);
+    };
+    bool Changed = visitor(M, CG, GetMSSAResult);
+
+    if (Changed)
+      return PreservedAnalyses::none();
+    else
+      return PreservedAnalyses::all();
   }
 
   // Without isRequired returning true, this pass will be skipped for functions
@@ -380,14 +453,15 @@ struct LegacyJitPass : public ModulePass {
   LegacyJitPass() : ModulePass(ID) {}
   // Main entry point - the name conveys what unit of IR this is to be run on.
   bool runOnModule(Module &M) override {
+    assert(false && "Should never reach");
+    return false;
+  #if 0
     parseAnnotations(M);
     CallGraph &CG = getAnalysis<CallGraphWrapperPass>().getCallGraph();
-    visitor(M, CG);
+    bool Changed = visitor(M, CG);
 
-    // TODO: what is preserved?
-    return true;
-    // Doesn't modify the input unit of IR, hence 'false'
-    //return false;
+    return Changed;
+  #endif
   }
 };
 } // namespace

@@ -44,6 +44,9 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Vectorize.h"
 
+#include "llvm/IR/Intrinsics.h"
+#include "llvm/IR/Instructions.h"
+
 #include <iostream>
 
 #define ENABLE_TIME_PROFILING
@@ -93,6 +96,7 @@ static TargetMachine* GetTargetMachine(Triple TheTriple, StringRef CPUStr,
   return TheTarget->createTargetMachine(
       TheTriple.getTriple(), codegen::getCPUStr(), codegen::getFeaturesStr(),
       Options, codegen::getExplicitRelocModel(),
+      // TODO: Experiment with other CodeGenOpt options besides Aggresive?
       codegen::getExplicitCodeModel(), CodeGenOpt::Aggressive);
 }
 
@@ -190,7 +194,6 @@ public:
 };
 
 struct RuntimeConstant {
-  int ArgNo;
   union {
     int32_t Int32Val;
     int64_t Int64Val;
@@ -264,37 +267,96 @@ public:
       //dbgs() << "=== Parsed Module\n" << *M << "=== End of Parsed Module\n";
       Function *F = M->getFunction(FnName);
 
+      auto GetConstant = [](RuntimeConstant &RC, Type *ArgTy) {
+        Constant *C = nullptr;
+        if (ArgTy->isIntegerTy(32)) {
+           //dbgs() << "RC is Int32\n";
+          C = ConstantInt::get(ArgTy, RC.Int32Val);
+        } else if (ArgTy->isIntegerTy(64)) {
+           //dbgs() << "RC is Int64\n";
+          C = ConstantInt::get(ArgTy, RC.Int64Val);
+        } else if (ArgTy->isFloatTy()) {
+           //dbgs() << "RC is Float\n";
+          C = ConstantFP::get(ArgTy, RC.FloatVal);
+        } else if (ArgTy->isDoubleTy()) {
+           //dbgs() << "RC is Double\n";
+          C = ConstantFP::get(ArgTy, RC.DoubleVal);
+#if 0
+        } else if (ArgTy->isPointerTy()) {
+          auto *IntC = ConstantInt::get(Type::getInt64Ty(*Ctx), RC.Int64Val);
+          C = ConstantExpr::getIntToPtr(IntC, ArgTy);
+#endif
+        } else
+          report_fatal_error("JIT Incompatible type in runtime constant");
+
+        return C;
+      };
+
+      auto GetAnnotatedIntrinsics = [](Function &F) {
+        SmallVector<CallBase *> AnnotatedIntrinsics;
+        for (auto &BB : F)
+          for (auto &I : BB)
+            if (CallBase *CB = dyn_cast<CallBase>(&I))
+              if ((CB->getIntrinsicID() == Intrinsic::var_annotation) ||
+                  (CB->getIntrinsicID() == Intrinsic::ptr_annotation))
+                AnnotatedIntrinsics.push_back(CB);
+        return AnnotatedIntrinsics;
+      };
+
+      auto GetGEPOperands = [](GetElementPtrInst *GEP) {
+        SmallVector<Value *> Operands;
+          for (auto &Op : GEP->operands()) {
+            Operands.push_back(Op.get());
+            dbgs() << "Pushed Op " << *Op.get() << "\n";
+          }
+
+          return Operands;
+      };
       // Clone the function and replace argument uses with runtime constants.
       ValueToValueMapTy VMap;
       F->setName("");
       Function *NewF = CloneFunction(F, VMap);
       NewF->setName(FnName);
-      for (int I = 0; I < NumRuntimeConstants; ++I) {
-        int ArgNo = RC[I].ArgNo;
-        Value *Arg = NewF->getArg(ArgNo);
-        // TODO: add constant creation for FP types too.
-        Type *ArgType = Arg->getType();
-        Constant *C = nullptr;
-        if (ArgType->isIntegerTy(32)) {
-          // dbgs() << "RC is Int32\n";
-          C = ConstantInt::get(ArgType, RC[I].Int32Val);
-        } else if (ArgType->isIntegerTy(64)) {
-          // dbgs() << "RC is Int64\n";
-          C = ConstantInt::get(ArgType, RC[I].Int64Val);
-        } else if (ArgType->isFloatTy()) {
-          // dbgs() << "RC is Float\n";
-          C = ConstantFP::get(ArgType, RC[I].FloatVal);
-        } else if (ArgType->isDoubleTy()) {
-          // dbgs() << "RC is Double\n";
-          C = ConstantFP::get(ArgType, RC[I].DoubleVal);
-        } else if (ArgType->isPointerTy()) {
-          auto *IntC = ConstantInt::get(Type::getInt64Ty(*Ctx), RC[I].Int64Val);
-          C = ConstantExpr::getIntToPtr(IntC, ArgType);
-        } else
-          report_fatal_error("JIT Incompatible type in runtime constant");
+      int RCIdx = 0;
 
-        Arg->replaceAllUsesWith(C);
+      auto AnnotatedIntrinsics = GetAnnotatedIntrinsics(*NewF);
+
+      for (CallBase *CB : AnnotatedIntrinsics) {
+        if (CB->getIntrinsicID() == Intrinsic::var_annotation) {
+          Value *Ptr = CB->getArgOperand(0);
+          AllocaInst *PtrAlloca = dyn_cast<AllocaInst>(Ptr);
+          assert(PtrAlloca && "Expected alloca for llvm.var.annotation");
+          Constant *C = GetConstant(RC[RCIdx],
+                                    PtrAlloca->getAllocatedType());
+          assert(C && "Expected non-null constant");
+          auto *Store = new StoreInst(C, Ptr, CB);
+          CB->eraseFromParent();
+        } else if (CB->getIntrinsicID() == Intrinsic::ptr_annotation) {
+          Value *Ptr = CB->getArgOperand(0);
+          auto *GEP = dyn_cast<GetElementPtrInst>(Ptr);
+          assert(GEP && "Expected GEP for llvm.ptr.annotation");
+          ArrayRef<Value *> IdxList =
+              ArrayRef<Value *>(GetGEPOperands(GEP)).slice(1);
+          for (auto *V : IdxList)
+            dbgs() << "IdxList " << *V << "\n";
+          Type *IdxTy =
+              GEP->getIndexedType(GEP->getSourceElementType(), IdxList);
+          Constant *C = GetConstant(RC[RCIdx], IdxTy);
+          assert(C && "Expected non-null constant");
+          // TODO: fix addres space.
+          auto *Alloca =
+              new AllocaInst(C->getType(), 0, GEP->getName() + ".rc",
+                             &*NewF->getEntryBlock().getFirstInsertionPt());
+          auto *Store = new StoreInst(C, Alloca, CB);
+          CB->replaceAllUsesWith(Alloca);
+          CB->eraseFromParent();
+        }
+
+        RCIdx++;
       }
+
+      assert(RCIdx == NumRuntimeConstants && "Expected to use all runtime constants");
+
       F->replaceAllUsesWith(NewF);
       F->eraseFromParent();
 
