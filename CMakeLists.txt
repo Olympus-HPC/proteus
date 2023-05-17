@@ -10,3 +10,5 @@ include(cmake/SetupLLVM.cmake)
 
 add_subdirectory(lib)
 add_subdirectory(pass)
+
+add_subdirectory(tests)
