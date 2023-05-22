@@ -4,7 +4,7 @@ project(ApolloJIT
   VERSION 0.1.0
   LANGUAGES C CXX)
 
-set(CMAKE_CXX_STANDARD 14 CACHE STRING "")
+set(CMAKE_CXX_STANDARD 20 CACHE STRING "")
 
 include(cmake/SetupLLVM.cmake)
 

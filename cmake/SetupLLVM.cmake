@@ -1,4 +1,4 @@
-set(LT_LLVM_INSTALL_DIR "" CACHE PATH "LLVM installation directory")
+set(LT_LLVM_INSTALL_DIR "/usr/workspace/wsa/ukbeck/builds/llvm-15.0.7" CACHE PATH "LLVM installation directory")
 
 # Add the location of LLVMConfig.cmake to CMake search paths (so that
 # find_package can locate it)

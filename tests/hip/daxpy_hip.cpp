@@ -42,7 +42,6 @@ int main(int argc, char** argv) {
     hipDeviceSynchronize();
     std::cout << y[10] << std::endl;
 
-
     hipFree(x);
     hipFree(y);
 }
