@@ -229,11 +229,12 @@ inline hash_code hash_value(const RuntimeConstant &RC) {
 
 
 static codegen::RegisterCodeGenFlags CFG;
-std::unique_ptr<LLJIT> J;
+
 // TODO: make it a singleton?
 class JitEngine {
 public:
 
+  std::unique_ptr<LLJIT> LLJITPtr;
   ExitOnError ExitOnErr;
 
   struct JitCacheEntry {
@@ -305,7 +306,7 @@ public:
     // TODO: Fix support for debugging jitted code. This appears to be
     // the correct interface (see orcv2 examples) but it does not work.
     // By dumpSymbolInfo() the debug sections are not populated. Why?
-    J = ExitOnErr(LLJITBuilder()
+    LLJITPtr = ExitOnErr(LLJITBuilder()
                       .setObjectLinkingLayerCreator([&](ExecutionSession &ES,
                                                         const Triple &TT) {
                         auto GetMemMgr = []() {
@@ -330,17 +331,18 @@ public:
                       })
                       .create());
     // (2) Resolve symbols in the main process.
-    orc::MangleAndInterner Mangle(J->getExecutionSession(), J->getDataLayout());
-    J->getMainJITDylib().addGenerator(
+    orc::MangleAndInterner Mangle(LLJITPtr->getExecutionSession(),
+                                  LLJITPtr->getDataLayout());
+    LLJITPtr->getMainJITDylib().addGenerator(
         ExitOnErr(orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
-            J->getDataLayout().getGlobalPrefix(),
+            LLJITPtr->getDataLayout().getGlobalPrefix(),
             [MainName = Mangle("main")](const orc::SymbolStringPtr &Name) {
               // dbgs() << "Search name " << Name << "\n";
               return Name != MainName;
             })));
 
     // (3) Install transform to optimize modules when they're materialized.
-    J->getIRTransformLayer().setTransform(OptimizationTransform());
+    LLJITPtr->getIRTransformLayer().setTransform(OptimizationTransform());
 
     //dbgs() << "JIT inited\n";
     //getchar();
@@ -447,14 +449,14 @@ public:
 
     StringRef StrIR(IR, IRSize);
     // (3) Add modules.
-    ExitOnErr(J->addIRModule(
+    ExitOnErr(LLJITPtr->addIRModule(
         ExitOnErr(parseSource(FnName, Suffix, StrIR, RC, NumRuntimeConstants))));
 
-    DBG(dbgs() << "===\n" << *J->getExecutionSession().getSymbolStringPool() << "===\n");
+    DBG(dbgs() << "===\n" << *LLJITPtr->getExecutionSession().getSymbolStringPool() << "===\n");
 
     // (4) Look up the JIT'd function.
     DBG(dbgs() << "Lookup FnName " << FnName << " mangled as " << MangledFnName << "\n");
-    auto EntryAddr = ExitOnErr(J->lookup(MangledFnName));
+    auto EntryAddr = ExitOnErr(LLJITPtr->lookup(MangledFnName));
 
     JitFnPtr = (void *)EntryAddr.getValue();
     DBG(dbgs() << "FnName " << FnName << " Mangled " << MangledFnName << " address " << JitFnPtr << "\n");
