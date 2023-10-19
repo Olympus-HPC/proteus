@@ -15,26 +15,30 @@
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/CodeGen/CommandFlags.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
+#include "llvm/ExecutionEngine/JITEventListener.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
+#include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
-#include "llvm/IR/LLVMContext.h"
+#include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/MC/TargetRegistry.h"
+#include "llvm/Object/SymbolSize.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/Process.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/TimeProfiler.h"
-#include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
 #include "llvm/Transforms/IPO.h"
@@ -47,16 +51,12 @@
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Vectorize.h"
-#include "llvm/ExecutionEngine/SectionMemoryManager.h"
-#include "llvm/ExecutionEngine/JITEventListener.h"
-#include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
-#include "llvm/Object/SymbolSize.h"
 
 #include <iostream>
 
-//#define ENABLE_TIME_PROFILING
-//#define ENABLE_PERFMAP
-//#define ENABLE_DEBUG
+// #define ENABLE_TIME_PROFILING
+// #define ENABLE_PERFMAP
+// #define ENABLE_DEBUG
 
 #define ENABLE_RUNTIME_CONSTPROP
 
@@ -97,7 +97,7 @@ inline Error createSMDiagnosticError(llvm::SMDiagnostic &Diag) {
   return make_error<StringError>(std::move(Msg), inconvertibleErrorCode());
 }
 // Returns the TargetMachine instance or zero if no triple is provided.
-static TargetMachine* GetTargetMachine(Triple TheTriple, StringRef CPUStr,
+static TargetMachine *GetTargetMachine(Triple TheTriple, StringRef CPUStr,
                                        StringRef FeaturesStr,
                                        const TargetOptions &Options) {
   std::string Error;
@@ -132,7 +132,8 @@ public:
   Expected<ThreadSafeModule> operator()(ThreadSafeModule TSM,
                                         MaterializationResponsibility &R) {
     TSM.withModuleDo([this](Module &M) {
-      DBG(dbgs() << "=== Begin Before Optimization\n" << M << "=== End Before\n");
+      DBG(dbgs() << "=== Begin Before Optimization\n"
+                 << M << "=== End Before\n");
       TIMESCOPE("OptimizationTransform");
       Triple ModuleTriple(M.getTargetTriple());
       std::string CPUStr, FeaturesStr;
@@ -179,8 +180,8 @@ public:
         Builder.OptLevel = OptLevel;
         Builder.SizeLevel = 0;
         Builder.Inliner = nullptr;
-        //Builder.Inliner = createAlwaysInlinerLegacyPass();
-        //Builder.Inliner = createFunctionInliningPass(OptLevel, 0, false);
+        // Builder.Inliner = createAlwaysInlinerLegacyPass();
+        // Builder.Inliner = createFunctionInliningPass(OptLevel, 0, false);
         Builder.DisableUnrollLoops = false;
         Builder.LoopVectorize = true;
         Builder.SLPVectorize = true;
@@ -199,7 +200,8 @@ public:
         }
         MPasses.run(M);
       }
-      DBG(dbgs() << "=== Begin After Optimization\n" << M << "=== End After Optimization\n");
+      DBG(dbgs() << "=== Begin After Optimization\n"
+                 << M << "=== End After Optimization\n");
 #ifdef ENABLE_DEBUG
       if (verifyModule(M, &errs()))
         report_fatal_error(
@@ -208,7 +210,6 @@ public:
       else
         dbgs() << "Module after optimization verified!\n";
 #endif
-
     });
     return std::move(TSM);
   }
@@ -227,15 +228,18 @@ inline hash_code hash_value(const RuntimeConstant &RC) {
   return hash_value(RC.Int64Val);
 }
 
-
+// TODO: check if this global is needed.
 static codegen::RegisterCodeGenFlags CFG;
 
-// TODO: make it a singleton?
 class JitEngine {
 public:
-
   std::unique_ptr<LLJIT> LLJITPtr;
   ExitOnError ExitOnErr;
+
+  static JitEngine &instance() {
+    static JitEngine Jit(0, (char *[]){nullptr});
+    return Jit;
+  }
 
   struct JitCacheEntry {
     void *Ptr;
@@ -290,62 +294,9 @@ public:
     ofd.close();
   }
   static void notifyLoaded(MaterializationResponsibility &R,
-                    const object::ObjectFile &Obj,
-                    const RuntimeDyld::LoadedObjectInfo &LOI) {
+                           const object::ObjectFile &Obj,
+                           const RuntimeDyld::LoadedObjectInfo &LOI) {
     dumpSymbolInfo(Obj, LOI);
-  }
-
-  JitEngine(int argc, char *argv[]) {
-    InitLLVM X(argc, argv);
-
-    InitializeNativeTarget();
-    InitializeNativeTargetAsmPrinter();
-
-    ExitOnErr.setBanner("JIT: ");
-    // Create the LLJIT instance.
-    // TODO: Fix support for debugging jitted code. This appears to be
-    // the correct interface (see orcv2 examples) but it does not work.
-    // By dumpSymbolInfo() the debug sections are not populated. Why?
-    LLJITPtr = ExitOnErr(LLJITBuilder()
-                      .setObjectLinkingLayerCreator([&](ExecutionSession &ES,
-                                                        const Triple &TT) {
-                        auto GetMemMgr = []() {
-                          return std::make_unique<SectionMemoryManager>();
-                        };
-                        auto ObjLinkingLayer =
-                            std::make_unique<RTDyldObjectLinkingLayer>(
-                                ES, std::move(GetMemMgr));
-
-                        // Register the event listener.
-                        ObjLinkingLayer->registerJITEventListener(
-                            *JITEventListener::createGDBRegistrationListener());
-
-                        // Make sure the debug info sections aren't stripped.
-                        ObjLinkingLayer->setProcessAllSections(true);
-
-#if defined(ENABLE_DEBUG) || defined(ENABLE_PERFMAP)
-                        ObjLinkingLayer->setNotifyLoaded(notifyLoaded);
-#endif
-
-                        return ObjLinkingLayer;
-                      })
-                      .create());
-    // (2) Resolve symbols in the main process.
-    orc::MangleAndInterner Mangle(LLJITPtr->getExecutionSession(),
-                                  LLJITPtr->getDataLayout());
-    LLJITPtr->getMainJITDylib().addGenerator(
-        ExitOnErr(orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
-            LLJITPtr->getDataLayout().getGlobalPrefix(),
-            [MainName = Mangle("main")](const orc::SymbolStringPtr &Name) {
-              // dbgs() << "Search name " << Name << "\n";
-              return Name != MainName;
-            })));
-
-    // (3) Install transform to optimize modules when they're materialized.
-    LLJITPtr->getIRTransformLayer().setTransform(OptimizationTransform());
-
-    //dbgs() << "JIT inited\n";
-    //getchar();
   }
 
   ~JitEngine() {
@@ -372,13 +323,14 @@ public:
     TIMESCOPE("parseSource");
     auto Ctx = std::make_unique<LLVMContext>();
     SMDiagnostic Err;
-    if (auto M =
-            parseIR(MemoryBufferRef(IR, ("Mod-" + FnName + Suffix).str()), Err, *Ctx)) {
-      //dbgs() << "=== Parsed Module\n" << *M << "=== End of Parsed Module\n";
+    if (auto M = parseIR(MemoryBufferRef(IR, ("Mod-" + FnName + Suffix).str()),
+                         Err, *Ctx)) {
+      // dbgs() << "=== Parsed Module\n" << *M << "=== End of Parsed Module\n";
       Function *F = M->getFunction(FnName);
       assert(F && "Expected non-null function!");
       MDNode *Node = F->getMetadata("jit_arg_nos");
-      DBG(dbgs() << "Metadata jit for F " << F->getName() << " = " << *Node << "\n");
+      DBG(dbgs() << "Metadata jit for F " << F->getName() << " = " << *Node
+                 << "\n");
 
       // Replace argument uses with runtime constants.
 #ifdef ENABLE_RUNTIME_CONSTPROP
@@ -412,7 +364,7 @@ public:
       }
 #endif
 
-      //dbgs() << "=== JIT Module\n" << *M << "=== End of JIT Module\n";
+      // dbgs() << "=== JIT Module\n" << *M << "=== End of JIT Module\n";
 
       F->setName(FnName + Suffix);
 
@@ -425,7 +377,8 @@ public:
 #ifdef ENABLE_DEBUG
       dbgs() << "=== Final Module\n" << *M << "=== End Final Module\n";
       if (verifyModule(*M, &errs()))
-        report_fatal_error("Broken module found, JIT compilation aborted!", false);
+        report_fatal_error("Broken module found, JIT compilation aborted!",
+                           false);
       else
         dbgs() << "Module verified!\n";
 #endif
@@ -435,8 +388,8 @@ public:
     return createSMDiagnosticError(Err);
   }
 
-  void *compileAndLink(StringRef FnName, char *IR, int IRSize, RuntimeConstant *RC,
-                      int NumRuntimeConstants) {
+  void *compileAndLink(StringRef FnName, char *IR, int IRSize,
+                       RuntimeConstant *RC, int NumRuntimeConstants) {
     TIMESCOPE("compileAndLink");
 
     uint64_t HashValue = hash(FnName, RC, NumRuntimeConstants);
@@ -449,17 +402,21 @@ public:
 
     StringRef StrIR(IR, IRSize);
     // (3) Add modules.
-    ExitOnErr(LLJITPtr->addIRModule(
-        ExitOnErr(parseSource(FnName, Suffix, StrIR, RC, NumRuntimeConstants))));
+    ExitOnErr(LLJITPtr->addIRModule(ExitOnErr(
+        parseSource(FnName, Suffix, StrIR, RC, NumRuntimeConstants))));
 
-    DBG(dbgs() << "===\n" << *LLJITPtr->getExecutionSession().getSymbolStringPool() << "===\n");
+    DBG(dbgs() << "===\n"
+               << *LLJITPtr->getExecutionSession().getSymbolStringPool()
+               << "===\n");
 
     // (4) Look up the JIT'd function.
-    DBG(dbgs() << "Lookup FnName " << FnName << " mangled as " << MangledFnName << "\n");
+    DBG(dbgs() << "Lookup FnName " << FnName << " mangled as " << MangledFnName
+               << "\n");
     auto EntryAddr = ExitOnErr(LLJITPtr->lookup(MangledFnName));
 
     JitFnPtr = (void *)EntryAddr.getValue();
-    DBG(dbgs() << "FnName " << FnName << " Mangled " << MangledFnName << " address " << JitFnPtr << "\n");
+    DBG(dbgs() << "FnName " << FnName << " Mangled " << MangledFnName
+               << " address " << JitFnPtr << "\n");
     assert(JitFnPtr && "Expected non-null JIT function pointer");
     insertCache(HashValue, JitFnPtr
 #ifdef ENABLE_DEBUG
@@ -473,7 +430,8 @@ public:
     return JitFnPtr;
   }
 
-  uint64_t hash(StringRef FnName, RuntimeConstant *RC, int NumRuntimeConstants) {
+  uint64_t hash(StringRef FnName, RuntimeConstant *RC,
+                int NumRuntimeConstants) {
     ArrayRef<RuntimeConstant> Data(RC, NumRuntimeConstants);
     auto HashValue = hash_combine(FnName, Data);
     return HashValue;
@@ -515,27 +473,83 @@ public:
       JitCache[HashValue].RCVector.push_back(RC[I]);
 #endif
   }
-};
 
-JitEngine Jit(0, (char *[]){ nullptr });
+private:
+  JitEngine(int argc, char *argv[]) {
+    InitLLVM X(argc, argv);
+
+    InitializeNativeTarget();
+    InitializeNativeTargetAsmPrinter();
+
+    ExitOnErr.setBanner("JIT: ");
+    // Create the LLJIT instance.
+    // TODO: Fix support for debugging jitted code. This appears to be
+    // the correct interface (see orcv2 examples) but it does not work.
+    // By dumpSymbolInfo() the debug sections are not populated. Why?
+    LLJITPtr =
+        ExitOnErr(LLJITBuilder()
+                      .setObjectLinkingLayerCreator([&](ExecutionSession &ES,
+                                                        const Triple &TT) {
+                        auto GetMemMgr = []() {
+                          return std::make_unique<SectionMemoryManager>();
+                        };
+                        auto ObjLinkingLayer =
+                            std::make_unique<RTDyldObjectLinkingLayer>(
+                                ES, std::move(GetMemMgr));
+
+                        // Register the event listener.
+                        ObjLinkingLayer->registerJITEventListener(
+                            *JITEventListener::createGDBRegistrationListener());
+
+                        // Make sure the debug info sections aren't stripped.
+                        ObjLinkingLayer->setProcessAllSections(true);
+
+#if defined(ENABLE_DEBUG) || defined(ENABLE_PERFMAP)
+                        ObjLinkingLayer->setNotifyLoaded(notifyLoaded);
+#endif
+
+                        return ObjLinkingLayer;
+                      })
+                      .create());
+    // (2) Resolve symbols in the main process.
+    orc::MangleAndInterner Mangle(LLJITPtr->getExecutionSession(),
+                                  LLJITPtr->getDataLayout());
+    LLJITPtr->getMainJITDylib().addGenerator(
+        ExitOnErr(orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
+            LLJITPtr->getDataLayout().getGlobalPrefix(),
+            [MainName = Mangle("main")](const orc::SymbolStringPtr &Name) {
+              // dbgs() << "Search name " << Name << "\n";
+              return Name != MainName;
+            })));
+
+    // (3) Install transform to optimize modules when they're materialized.
+    LLJITPtr->getIRTransformLayer().setTransform(OptimizationTransform());
+
+    // dbgs() << "JIT inited\n";
+    // getchar();
+  }
+};
 
 extern "C" {
 __attribute__((used)) void *__jit_entry(char *FnName, char *IR, int IRSize,
                                         RuntimeConstant *RC,
                                         int NumRuntimeConstants) {
   TIMESCOPE("__jit_entry");
+  JitEngine &Jit = JitEngine::instance();
+  // JitEngi(0, (char *[]){ nullptr });
 #if 0
-  dbgs() << "FnName " << FnName << " NumRuntimeConstants "
-         << NumRuntimeConstants << "\n";
-  for (int I = 0; I < NumRuntimeConstants; ++I)
-    dbgs() << " Value Int32=" << RC[I].Int32Val
-           << " Value Int64=" << RC[I].Int64Val
-           << " Value Float=" << RC[I].FloatVal
-           << " Value Double=" << RC[I].DoubleVal << "\n";
+    dbgs() << "FnName " << FnName << " NumRuntimeConstants "
+      << NumRuntimeConstants << "\n";
+    for (int I = 0; I < NumRuntimeConstants; ++I)
+      dbgs() << " Value Int32=" << RC[I].Int32Val
+        << " Value Int64=" << RC[I].Int64Val
+        << " Value Float=" << RC[I].FloatVal
+        << " Value Double=" << RC[I].DoubleVal << "\n";
 #endif
 
-  //dbgs() << "JIT Entry " << FnName << "\n";
-  void *JitFnPtr = Jit.compileAndLink(FnName, IR, IRSize, RC, NumRuntimeConstants);
+  // dbgs() << "JIT Entry " << FnName << "\n";
+  void *JitFnPtr =
+      Jit.compileAndLink(FnName, IR, IRSize, RC, NumRuntimeConstants);
 
   return JitFnPtr;
 }
