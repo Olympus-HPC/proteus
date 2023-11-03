@@ -5,12 +5,13 @@
 #include <hip/hip_runtime.h>
 
 __global__
-__attribute__((annotate("jit", 4)))
+__attribute__((annotate("jit", 4),noinline))
 void 
 daxpy_impl(double a, double* x, double* y, int N)
 {
     std::size_t i = blockIdx.x * 256 + threadIdx.x;
     if (i < N) {
+        for(int j = 0; j < N; ++j)
          y[i] += x[i]*a; 
     }
 }
