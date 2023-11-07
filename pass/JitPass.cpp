@@ -21,35 +21,41 @@
 //
 // License: MIT
 //=============================================================================
+#include "llvm/Analysis/CallGraph.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
+#include "llvm/ExecutionEngine/Orc/IndirectionUtils.h"
 #include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Object/ELF.h"
+#include "llvm/Pass.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
-#include "llvm/IR/InstIterator.h"
-#include "llvm/ExecutionEngine/Orc/IndirectionUtils.h"
-#include "llvm/Pass.h"
-#include "llvm/Analysis/CallGraph.h"
-#include "llvm/Bitcode/BitcodeWriter.h"
-#include "llvm/IR/Module.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
+#include <llvm/ADT/StringRef.h>
+#include <llvm/CodeGen/Register.h>
+#include <llvm/IR/CallingConv.h>
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/GlobalValue.h>
-#include "llvm/Object/ELF.h"
 
 #include <iostream>
+#include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/InstrTypes.h>
+#include <llvm/IR/Instructions.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/ErrorHandling.h>
 #include <llvm/Support/MemoryBuffer.h>
+#include <string>
 
-//#define ENABLE_RECURSIVE_JIT
+// #define ENABLE_RECURSIVE_JIT
 #define DEBUG_TYPE "jitpass"
 
 using namespace llvm;
@@ -87,7 +93,7 @@ static bool IsDeviceKernel(Module &M, Function &Fn, CallBase **LaunchKernelCall,
   if (!LaunchKernelFn)
     return false;
 
-  for(User *Usr : LaunchKernelFn->users())
+  for (User *Usr : LaunchKernelFn->users())
     if (CallBase *CB = dyn_cast<CallBase>(Usr))
       if (CB->getFunction() == &Fn) {
         dbgs() << "Found kernel stub " << Fn.getName() << "\n";
@@ -99,8 +105,17 @@ static bool IsDeviceKernel(Module &M, Function &Fn, CallBase **LaunchKernelCall,
   return false;
 }
 
+static bool HasDeviceKernels(Module &M) {
+  // TODO: generalize to CUDA.
+  Function *LaunchKernelFn = M.getFunction("hipLaunchKernel");
+  if (!LaunchKernelFn)
+    return false;
+
+  return true;
+}
+
 ArrayRef<uint8_t> extractDeviceBitcode(Module &M, Function &F,
-                                              StringRef KernelName) {
+                                       StringRef KernelName) {
   constexpr char OFFLOAD_BUNDLER_MAGIC_STR[] = "__CLANG_OFFLOAD_BUNDLE__";
   // TODO: Generalize for CUDA.
   auto *HipBinWrapper =
@@ -185,7 +200,7 @@ ArrayRef<uint8_t> extractDeviceBitcode(Module &M, Function &F,
   if (DeviceBitcode.empty())
     report_fatal_error("Error finding the device function LLVM IR");
 
-  //return createStringError(inconvertibleErrorCode(), "Error extracting bc");
+  // return createStringError(inconvertibleErrorCode(), "Error extracting bc");
   return DeviceBitcode;
 }
 
@@ -193,7 +208,7 @@ void parseAnnotations(Module &M) {
   auto GlobalAnnotations = M.getNamedGlobal("llvm.global.annotations");
   if (GlobalAnnotations) {
     dbgs() << "IsDevice " << IsDeviceCompilation(M) << "\n";
-    //getchar();
+    // getchar();
     auto Array = cast<ConstantArray>(GlobalAnnotations->getOperand(0));
     dbgs() << "Array " << *Array << "\n";
     for (int i = 0; i < Array->getNumOperands(); i++) {
@@ -211,7 +226,8 @@ void parseAnnotations(Module &M) {
 
       dbgs() << "JIT Function " << Fn->getName() << "\n";
 
-      auto Annotation = cast<ConstantDataArray>(Entry->getOperand(1)->getOperand(0));
+      auto Annotation =
+          cast<ConstantDataArray>(Entry->getOperand(1)->getOperand(0));
 
       dbgs() << "Annotation " << Annotation->getAsCString() << "\n";
 
@@ -226,7 +242,8 @@ void parseAnnotations(Module &M) {
         JFI.ConstantArgs = {};
       else {
         dbgs() << "AnnotArgs " << *Entry->getOperand(4)->getOperand(0) << "\n";
-        dbgs() << "Type AnnotArgs " << *Entry->getOperand(4)->getOperand(0)->getType() << "\n";
+        dbgs() << "Type AnnotArgs "
+               << *Entry->getOperand(4)->getOperand(0)->getType() << "\n";
         auto AnnotArgs =
             cast<ConstantStruct>(Entry->getOperand(4)->getOperand(0));
 
@@ -243,8 +260,9 @@ void parseAnnotations(Module &M) {
   }
 }
 
-static void getReachableFunctions(Module &M, Function &F,
-                           SmallPtrSetImpl<Function *> &ReachableFunctions) {
+static void
+getReachableFunctions(Module &M, Function &F,
+                      SmallPtrSetImpl<Function *> &ReachableFunctions) {
   SmallVector<Function *, 8> ToVisit;
   ToVisit.push_back(&F);
   CallGraphWrapperPass CG;
@@ -278,7 +296,7 @@ static void getReachableFunctions(Module &M, Function &F,
   }
 }
 
-static void CreateJITModule(Module &M, JitFunctionInfo &JFI) {
+static void createJITModule(Module &M, JitFunctionInfo &JFI) {
   SmallPtrSet<Function *, 16> ReachableFunctions;
   getReachableFunctions(M, *JFI.Fn, ReachableFunctions);
   ReachableFunctions.insert(JFI.Fn);
@@ -461,19 +479,31 @@ static void CreateJITModule(Module &M, JitFunctionInfo &JFI) {
          << *JitMod << "=== End of Post DCE JIT IR\n";
 }
 
-static void CreateJITModuleDevice(Module &M, JitFunctionInfo &JFI) {
-  //SmallPtrSet<Function *, 16> ReachableFunctions;
-  //getReachableFunctions(M, *JFI.Fn, ReachableFunctions);
-  //ReachableFunctions.insert(JFI.Fn);
-
+static void createJITModuleSectionsDevice(Module &M, JitFunctionInfo &JFI) {
   ValueToValueMapTy VMap;
   // TODO: We clone everything, use ReachableFunctions to prune. What happens if
   // there are cross-kernel globals?
-  auto JitMod = CloneModule(M, VMap);
+  // Need to remove all other __global__ functions in the module,
+  // hipModuleLoadData expects a single kernel (__global__) in the image.
+  auto JitMod = CloneModule(M, VMap, [&JFI](const GlobalValue *GV) {
+    // Do not clone JIT bitcodes of other kernels.
+    if (GV->getSection().starts_with(".jit."))
+      return false;
+
+    if (const Function *F = dyn_cast<Function>(GV)) {
+      if (F == JFI.Fn)
+        return true;
+      // Do not clone other host-callable kernels.
+      // TODO: Is this necessary when using hiprtc? In any case it reduces the
+      // JITted code which should reduce compilation time.
+      if (F->getCallingConv() == CallingConv::AMDGPU_KERNEL)
+        return false;
+    }
+
+    return true;
+  });
 
   Function *JitF = cast<Function>(VMap[JFI.Fn]);
-  // TODO: is external linkage necessary?
-  //JitF->setLinkage(GlobalValue::ExternalLinkage);
   // Run a global DCE pass on the JIT module IR to remove
   // unnecessary symbols and reduce the IR to JIT at runtime.
   dbgs() << "=== Pre DCE JIT IR\n" << *JitMod << "=== End of Pre DCE JIT IR\n";
@@ -500,8 +530,6 @@ static void CreateJITModuleDevice(Module &M, JitFunctionInfo &JFI) {
          << *JitMod << "=== End of Pre Passes JIT R\n";
 
   legacy::PassManager Passes;
-  // Using pass for extraction (to remove?)
-  // Passes.add(createGVExtractionPass(GlobalsToExtract));
   Passes.add(createAlwaysInlinerLegacyPass());
   Passes.add(createGlobalDCEPass());
   Passes.add(createStripDeadDebugInfoPass());
@@ -510,10 +538,6 @@ static void CreateJITModuleDevice(Module &M, JitFunctionInfo &JFI) {
 
   dbgs() << "=== Post Passes JIT IR\n"
          << *JitMod << "=== End of Post Passes JIT R\n";
-
-  // Update linkage and visibility in the original module only for
-  // globals included in the JIT module required for external
-  // linking.
 
   // TODO: Do we want to keep debug info to use for GDB/LLDB
   // interfaces for debugging jitted code?
@@ -543,30 +567,25 @@ static void CreateJITModuleDevice(Module &M, JitFunctionInfo &JFI) {
 
   dbgs() << "=== Post DCE JIT IR\n"
          << *JitMod << "=== End of Post DCE JIT IR\n";
-}
 
-static void CodeGenDevice(Module &M) {
-  dbgs() << "CodeGenDevice\n";
-  for (JitFunctionInfo &JFI : JitFunctionInfoList) {
-    Constant *JitModule = ConstantDataArray::get(
-        M.getContext(), ArrayRef<uint8_t>((const uint8_t *)JFI.ModuleIR.data(),
-                                          JFI.ModuleIR.size()));
-    auto *GV = new GlobalVariable(
-        M, JitModule->getType(), /* isConstant */ true,
-        GlobalValue::PrivateLinkage, JitModule, ".jit.bc." + JFI.Fn->getName());
-    appendToUsed(M, {GV});
-    GV->setSection(Twine(".jit." + JFI.Fn->getName()).str());
-    std::error_code EC;
-    raw_fd_ostream Output(Twine("jit-" + JFI.Fn->getName() + ".bc").str(), EC);
-    Output << JFI.ModuleIR;
-    Output.close();
-  }
+  dbgs() << "Create JIT sections\n";
+  Constant *JitModule = ConstantDataArray::get(
+      M.getContext(), ArrayRef<uint8_t>((const uint8_t *)JFI.ModuleIR.data(),
+                                        JFI.ModuleIR.size()));
+  auto *GV = new GlobalVariable(M, JitModule->getType(), /* isConstant */ true,
+                                GlobalValue::PrivateLinkage, JitModule,
+                                ".jit.bc." + JFI.Fn->getName());
+  appendToUsed(M, {GV});
+  GV->setSection(Twine(".jit." + JFI.Fn->getName()).str());
+  std::error_code EC;
+  raw_fd_ostream Output(Twine("jit-" + JFI.Fn->getName() + ".bc").str(), EC);
+  Output << JFI.ModuleIR;
+  Output.close();
 
-  dbgs() << "Check device.bc\n";
   return;
 }
 
-static void CodeGenKernelStub(Module &M, JitFunctionInfo &JFI,
+static void emitJITKernelStub(Module &M, JitFunctionInfo &JFI,
                               StringRef KernelName,
                               CallBase *LaunchKernelCall) {
   // Create jit entry runtime function.
@@ -587,7 +606,7 @@ static void CodeGenKernelStub(Module &M, JitFunctionInfo &JFI,
   // Insert before the launch kernel call instruction.
   IRBuilder<> Builder(LaunchKernelCall);
 
-    // Create globals for the function name and string IR passed to the jit
+  // Create globals for the function name and string IR passed to the jit
   // entry.
   auto *FnNameGlobal = Builder.CreateGlobalString(KernelName);
   auto *StrIRGlobal = Builder.CreateGlobalString(JFI.ModuleIR);
@@ -634,11 +653,34 @@ static void CodeGenKernelStub(Module &M, JitFunctionInfo &JFI,
   LaunchKernelCall->replaceAllUsesWith(Ret);
   LaunchKernelCall->eraseFromParent();
 
-   dbgs() << "=== StubFn " << *JFI.Fn << "=== End of StubFn\n";
-   //getchar();
+  dbgs() << "=== StubFn " << *JFI.Fn << "=== End of StubFn\n";
+  // getchar();
 }
 
-static void CodeGen(Module &M) {
+static void instrumentRegisterVar(Module &M) {
+  Function *RegisterVarFn = M.getFunction("__hipRegisterVar");
+  if (!RegisterVarFn)
+    return;
+
+  // Create jit entry runtime function.
+  Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
+
+  // The prototype is __jit_register_var(void *HostAddr, const char *VarName).
+  FunctionType *JitRegisterVarFnTy =
+      FunctionType::get(VoidPtrTy, {VoidPtrTy, VoidPtrTy},
+                        /* isVarArg=*/false);
+  FunctionCallee JitRegisterVarFn =
+      M.getOrInsertFunction("__jit_register_var", JitRegisterVarFnTy);
+
+  for (User *Usr : RegisterVarFn->users())
+    if (CallBase *CB = dyn_cast<CallBase>(Usr)) {
+      IRBuilder<> Builder(CB->getNextNode());
+      Builder.CreateCall(JitRegisterVarFn,
+                         {CB->getArgOperand(1), CB->getArgOperand(2)});
+    }
+}
+
+static void emitJITFunctionStub(Module &M, JitFunctionInfo &JFI) {
   // Create jit entry runtime function.
   Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
   Type *Int32Ty = Type::getInt32Ty(M.getContext());
@@ -654,88 +696,100 @@ static void CodeGen(Module &M) {
   FunctionCallee JitEntryFn =
       M.getOrInsertFunction("__jit_entry", JitEntryFnTy);
 
-  // Second pass replaces jit'ed functions in the original module with stubs to
-  // call the runtime entry point that compiles and links.
-  for (JitFunctionInfo &JFI : JitFunctionInfoList) {
-    Function *F = JFI.Fn;
+  // Replaces jit'ed functions in the original module with stubs to call the
+  // runtime entry point that compiles and links.
+  Function *F = JFI.Fn;
 
-    // Replace jit'ed function with a stub function.
-    std::string FnName = F->getName().str();
-    F->setName("");
-    Function *StubFn =
-        Function::Create(F->getFunctionType(), F->getLinkage(), FnName, M);
-    F->replaceAllUsesWith(StubFn);
-    F->eraseFromParent();
+  // Replace jit'ed function with a stub function.
+  std::string FnName = F->getName().str();
+  F->setName("");
+  Function *StubFn =
+      Function::Create(F->getFunctionType(), F->getLinkage(), FnName, M);
+  F->replaceAllUsesWith(StubFn);
+  F->eraseFromParent();
 
-    // Replace the body of the jit'ed function to call the jit entry, grab the
-    // address of the specialized jit version and execute it.
-    IRBuilder<> Builder(BasicBlock::Create(M.getContext(), "entry", StubFn));
+  // Replace the body of the jit'ed function to call the jit entry, grab the
+  // address of the specialized jit version and execute it.
+  IRBuilder<> Builder(BasicBlock::Create(M.getContext(), "entry", StubFn));
 
-    // Create the runtime constant array type for the runtime constants passed
-    // to the jit entry function.
-    ArrayType *RuntimeConstantArrayTy =
-        ArrayType::get(RuntimeConstantTy, JFI.ConstantArgs.size());
+  // Create the runtime constant array type for the runtime constants passed
+  // to the jit entry function.
+  ArrayType *RuntimeConstantArrayTy =
+      ArrayType::get(RuntimeConstantTy, JFI.ConstantArgs.size());
 
-    // Create globals for the function name and string IR passed to the jit
-    // entry.
-    auto *FnNameGlobal = Builder.CreateGlobalString(StubFn->getName());
-    auto *StrIRGlobal = Builder.CreateGlobalString(JFI.ModuleIR);
+  // Create globals for the function name and string IR passed to the jit
+  // entry.
+  auto *FnNameGlobal = Builder.CreateGlobalString(StubFn->getName());
+  auto *StrIRGlobal = Builder.CreateGlobalString(JFI.ModuleIR);
 
-    // Create the runtime constants data structure passed to the jit entry.
-    Value *RuntimeConstantsAlloca = nullptr;
-    if (JFI.ConstantArgs.size() > 0) {
-      // auto *GV = RuntimeConstantsAlloca =
-      //     new GlobalVariable(M, RuntimeConstantArrayTy, /* isConstant */
-      //     false,
-      //                        GlobalValue::InternalLinkage,
-      //                        Constant::getNullValue(RuntimeConstantArrayTy),
-      //                        StubFn->getName() + ".rconsts");
-      RuntimeConstantsAlloca = Builder.CreateAlloca(RuntimeConstantArrayTy);
-      // Zero-initialize the alloca to avoid stack garbage for caching.
-      Builder.CreateStore(Constant::getNullValue(RuntimeConstantArrayTy),
-                          RuntimeConstantsAlloca);
-      for (int ArgI = 0; ArgI < JFI.ConstantArgs.size(); ++ArgI) {
-        auto *GEP = Builder.CreateInBoundsGEP(
-            RuntimeConstantArrayTy, RuntimeConstantsAlloca,
-            {Builder.getInt32(0), Builder.getInt32(ArgI)});
-        int ArgNo = JFI.ConstantArgs[ArgI];
-        Builder.CreateStore(StubFn->getArg(ArgNo), GEP);
-      }
-    } else
-      RuntimeConstantsAlloca =
-          Constant::getNullValue(RuntimeConstantArrayTy->getPointerTo());
+  // Create the runtime constants data structure passed to the jit entry.
+  Value *RuntimeConstantsAlloca = nullptr;
+  if (JFI.ConstantArgs.size() > 0) {
+    // auto *GV = RuntimeConstantsAlloca =
+    //     new GlobalVariable(M, RuntimeConstantArrayTy, /* isConstant */
+    //     false,
+    //                        GlobalValue::InternalLinkage,
+    //                        Constant::getNullValue(RuntimeConstantArrayTy),
+    //                        StubFn->getName() + ".rconsts");
+    RuntimeConstantsAlloca = Builder.CreateAlloca(RuntimeConstantArrayTy);
+    // Zero-initialize the alloca to avoid stack garbage for caching.
+    Builder.CreateStore(Constant::getNullValue(RuntimeConstantArrayTy),
+                        RuntimeConstantsAlloca);
+    for (int ArgI = 0; ArgI < JFI.ConstantArgs.size(); ++ArgI) {
+      auto *GEP = Builder.CreateInBoundsGEP(
+          RuntimeConstantArrayTy, RuntimeConstantsAlloca,
+          {Builder.getInt32(0), Builder.getInt32(ArgI)});
+      int ArgNo = JFI.ConstantArgs[ArgI];
+      Builder.CreateStore(StubFn->getArg(ArgNo), GEP);
+    }
+  } else
+    RuntimeConstantsAlloca =
+        Constant::getNullValue(RuntimeConstantArrayTy->getPointerTo());
 
-    assert(RuntimeConstantsAlloca &&
-           "Expected non-null runtime constants alloca");
+  assert(RuntimeConstantsAlloca &&
+         "Expected non-null runtime constants alloca");
 
-    auto *JitFnPtr = Builder.CreateCall(
-        JitEntryFn,
-        {FnNameGlobal, StrIRGlobal, Builder.getInt32(JFI.ModuleIR.size()),
-         RuntimeConstantsAlloca, Builder.getInt32(JFI.ConstantArgs.size())});
-    SmallVector<Value *, 8> Args;
-    for (auto &Arg : StubFn->args())
-      Args.push_back(&Arg);
-    auto *RetVal =
-        Builder.CreateCall(StubFn->getFunctionType(), JitFnPtr, Args);
-    if (StubFn->getReturnType()->isVoidTy())
-      Builder.CreateRetVoid();
-    else
-      Builder.CreateRet(RetVal);
+  auto *JitFnPtr = Builder.CreateCall(
+      JitEntryFn,
+      {FnNameGlobal, StrIRGlobal, Builder.getInt32(JFI.ModuleIR.size()),
+       RuntimeConstantsAlloca, Builder.getInt32(JFI.ConstantArgs.size())});
+  SmallVector<Value *, 8> Args;
+  for (auto &Arg : StubFn->args())
+    Args.push_back(&Arg);
+  auto *RetVal = Builder.CreateCall(StubFn->getFunctionType(), JitFnPtr, Args);
+  if (StubFn->getReturnType()->isVoidTy())
+    Builder.CreateRetVoid();
+  else
+    Builder.CreateRet(RetVal);
 
-    // dbgs() << "=== StubFn " << *StubFn << "=== End of StubFn\n";
-    // getchar();
-  }
+  // dbgs() << "=== StubFn " << *StubFn << "=== End of StubFn\n";
+  // getchar();
 }
 
 // This method implements what the pass does
 void visitor(Module &M, CallGraph &CG) {
 
   if (JitFunctionInfoList.empty()) {
-    //dbgs() << "=== Empty Begin Mod\n" << M << "=== End Mod\n";
+    // dbgs() << "=== Empty Begin Mod\n" << M << "=== End Mod\n";
     return;
   }
 
   dbgs() << "=== Pre M\n" << M << "=== End of Pre M\n";
+  // TODO: Supporting -fgpu-rdc compilation is tricky because clang compiles
+  // first for the host and then for the device. The method here will not work.
+  // It assumes that device compilation runs first to output JIT section
+  // bitcodes that the host compilation ingests. One possibility is to let the
+  // runtime library extract the JIT section bitcodes to perform preprocessing
+  // and jit compilation.
+  if (IsDeviceCompilation(M)) {
+    for (JitFunctionInfo &JFI : JitFunctionInfoList)
+      createJITModuleSectionsDevice(M, JFI);
+
+    return;
+  }
+
+  if (HasDeviceKernels(M))
+    instrumentRegisterVar(M);
 
   // First pass creates the string Module IR per jit'ed function.
   for (JitFunctionInfo &JFI : JitFunctionInfoList) {
@@ -748,36 +802,24 @@ void visitor(Module &M, CallGraph &CG) {
       // find the name by the argument global.
       assert(Kernel != nullptr && "Expected non-null kernel");
       auto DeviceBitcode = extractDeviceBitcode(M, *JFI.Fn, Kernel->getName());
-      std::error_code EC;
-      raw_fd_ostream Output("testfile.bc", EC);
-      StringRef S(reinterpret_cast<const char *>(DeviceBitcode.data()),
-                  DeviceBitcode.size());
-      Output << S;
-      Output.close();
+      JFI.ModuleIR =
+          StringRef(reinterpret_cast<const char *>(DeviceBitcode.data()),
+                    DeviceBitcode.size());
 
-      JFI.ModuleIR = S;
-
-      CodeGenKernelStub(M,  JFI, Kernel->getName(), LaunchKernelCall);
+      emitJITKernelStub(M, JFI, Kernel->getName(), LaunchKernelCall);
       dbgs() << "DONE!\n";
 
-      // TODO: This does not work if there are mulitple jit kernel functions.
-      return;
+      continue;
     }
 
-    if (IsDeviceCompilation(M))
-      CreateJITModuleDevice(M, JFI);
-    else
-      CreateJITModule(M, JFI);
+    createJITModule(M, JFI);
+    emitJITFunctionStub(M, JFI);
   }
-
-  if (IsDeviceCompilation(M))
-    CodeGenDevice(M);
-  else
-    CodeGen(M);
 
   dbgs() << "=== Post M\n" << M << "=== End Post M\n";
   if (verifyModule(M, &errs()))
-    report_fatal_error("Broken original module found, compilation aborted!", false);
+    report_fatal_error("Broken original module found, compilation aborted!",
+                       false);
   else
     dbgs() << "Module verified!\n";
 }
@@ -792,7 +834,7 @@ struct JitPass : PassInfoMixin<JitPass> {
     visitor(M, CG);
     // TODO: is anything preserved?
     return PreservedAnalyses::none();
-    //return PreservedAnalyses::all();
+    // return PreservedAnalyses::all();
   }
 
   // Without isRequired returning true, this pass will be skipped for functions
@@ -814,7 +856,7 @@ struct LegacyJitPass : public ModulePass {
     // TODO: what is preserved?
     return true;
     // Doesn't modify the input unit of IR, hence 'false'
-    //return false;
+    // return false;
   }
 };
 } // namespace
@@ -824,13 +866,19 @@ struct LegacyJitPass : public ModulePass {
 //-----------------------------------------------------------------------------
 llvm::PassPluginLibraryInfo getJitPassPluginInfo() {
   const auto callback = [](PassBuilder &PB) {
-    // TODO: decide where to insert it in the pipeline. Early avoids
-    // inlining jit function (which disables jit'ing) but may require more
-    // optimization, hence overhead, at runtime.
-    //PB.registerPipelineStartEPCallback([&](ModulePassManager &MPM, auto) {
-    PB.registerPipelineEarlySimplificationEPCallback([&](ModulePassManager &MPM, auto) {
-    // XXX: LastEP can break jit'ing, jit function is inlined!
-    //PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM, auto) {
+  // TODO: decide where to insert it in the pipeline. Early avoids
+  // inlining jit function (which disables jit'ing) but may require more
+  // optimization, hence overhead, at runtime.
+  // PB.registerPipelineStartEPCallback([&](ModulePassManager &MPM, auto) {
+#if ENABLE_HIP
+    // NOTE:: For device jitting register the pass late, reduces compilation
+    // time and does not have risks of losing the kernel due to inlining.
+    PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM, auto) {
+#else
+    // NOTE: For host jitting register the pass earlier.
+    PB.registerPipelineEarlySimplificationEPCallback(
+        [&](ModulePassManager &MPM, auto) {
+#endif
       MPM.addPass(JitPass());
       return true;
     });
@@ -861,5 +909,5 @@ char LegacyJitPass::ID = 0;
 static RegisterPass<LegacyJitPass>
     X("legacy-jit-pass", "Jit Pass",
       false, // This pass doesn't modify the CFG => false
-      false // This pass is not a pure analysis pass => false
+      false  // This pass is not a pure analysis pass => false
     );

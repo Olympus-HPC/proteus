@@ -57,24 +57,42 @@
 
 #include <iostream>
 #include <llvm/ExecutionEngine/Orc/Core.h>
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Instructions.h>
 #include <llvm/Support/ErrorHandling.h>
+#include <llvm/Transforms/Utils/ModuleUtils.h>
 
 #if ENABLE_HIP
 #include <hip/hip_runtime.h>
+#include <hip/hip_runtime_api.h>
+#include <hip/hiprtc.h>
 
-#define hipErrCheck(CALL) \
-{\
-    hipError_t err = CALL;\
-    if (err != hipSuccess) {\
-        printf("ERROR @ %s:%d ->  %s\n", __FILE__, __LINE__, hipGetErrorString(err));\
-        abort();\
-    }\
-}
+#define hipErrCheck(CALL)                                                      \
+  {                                                                            \
+    hipError_t err = CALL;                                                     \
+    if (err != hipSuccess) {                                                   \
+      printf("ERROR @ %s:%d ->  %s\n", __FILE__, __LINE__,                     \
+             hipGetErrorString(err));                                          \
+      abort();                                                                 \
+    }                                                                          \
+  }
+
+#define hiprtcErrCheck(CALL)                                                   \
+  {                                                                            \
+    hiprtcResult err = CALL;                                                   \
+    if (err != HIPRTC_SUCCESS) {                                               \
+      printf("ERROR @ %s:%d ->  %s\n", __FILE__, __LINE__,                     \
+             hiprtcGetErrorString(err));                                       \
+      abort();                                                                 \
+    }                                                                          \
+  }
+
 #endif
 
 // #define ENABLE_TIME_PROFILING
 // #define ENABLE_PERFMAP
-#define ENABLE_DEBUG
+// #define ENABLE_DEBUG
 
 #define ENABLE_RUNTIME_CONSTPROP
 
@@ -205,7 +223,7 @@ public:
         Builder.LoopVectorize = true;
         Builder.SLPVectorize = true;
         // TODO: This is unsupported in llvm 16 as unneeded, check.
-        //TM->adjustPassManager(Builder);
+        // TM->adjustPassManager(Builder);
         Builder.populateFunctionPassManager(*FPasses);
         Builder.populateModulePassManager(MPasses);
       }
@@ -425,7 +443,7 @@ public:
 
   Expected<llvm::orc::ThreadSafeModule>
   parseBitcode(StringRef FnName, StringRef Suffix, StringRef IR,
-              RuntimeConstant *RC, int NumRuntimeConstants) {
+               RuntimeConstant *RC, int NumRuntimeConstants) {
 
     TIMESCOPE("parseBitcode");
     auto Ctx = std::make_unique<LLVMContext>();
@@ -661,10 +679,16 @@ __attribute__((used)) void *__jit_entry(char *FnName, char *IR, int IRSize,
   return JitFnPtr;
 }
 
+int __hipRegisterFunction(void *, void *, void *, void *, int, void *, void *,
+                          void *, void *, void *);
+void *__hipRegisterFatBinary(void *);
+void __hipRegisterVar(void *, void *, const char *, const char *, int32_t,
+                      int64_t, int32_t, int32_t);
+
 class JitEngineDevice {
 public:
   static JitEngineDevice &instance() {
-    static JitEngineDevice Jit(0, (char *[]){nullptr});
+    static JitEngineDevice Jit{};
     return Jit;
   }
 
@@ -672,21 +696,53 @@ public:
 
   Expected<llvm::orc::ThreadSafeModule>
   parseBitcode(StringRef FnName, StringRef Suffix, StringRef IR,
-              RuntimeConstant *RC, int NumRuntimeConstants) {
+               RuntimeConstant *RC, int NumRuntimeConstants) {
 
     TIMESCOPE("parseBitcode");
     auto Ctx = std::make_unique<LLVMContext>();
     SMDiagnostic Err;
     if (auto M = parseIR(MemoryBufferRef(IR, ("Mod-" + FnName + Suffix).str()),
                          Err, *Ctx)) {
-      DBG(dbgs() << "=== Parsed Module\n" << *M << "=== End of Parsed Module\n");
+      DBG(dbgs() << "=== Parsed Module\n"
+                 << *M << "=== End of Parsed Module\n");
       Function *F = M->getFunction(FnName);
       assert(F && "Expected non-null function!");
       MDNode *Node = F->getMetadata("jit_arg_nos");
       DBG(dbgs() << "Metadata jit for F " << F->getName() << " = " << *Node
                  << "\n");
 
-      // Replace argument uses with runtime constants.
+      // Re-link globals to fixed addresses provided by registered variables.
+      for (auto RegisterVar : VarNameToDevPtr) {
+        auto &VarName = RegisterVar.first;
+        auto DevPtr = RegisterVar.second;
+        auto *GV = M->getNamedGlobal(VarName);
+        assert(GV && "Expected existing global variable");
+        // Remove the re-linked global from llvm.compiler.used since it that use
+        // is not replaceable by the fixed addr constant expression.
+        removeFromUsedLists(*M, [&GV](Constant *C) {
+          if (GV == C)
+            return true;
+
+          return false;
+        });
+
+        Constant *Addr =
+            ConstantInt::get(Type::getInt64Ty(*Ctx), (uint64_t)DevPtr);
+        Value *CE = ConstantExpr::getIntToPtr(Addr, GV->getType());
+        GV->replaceAllUsesWith(CE);
+      }
+
+#ifdef ENABLE_DEBUG
+      dbgs() << "=== Linked M\n" << *M << "=== End of Linked M\n";
+      if (verifyModule(*M, &errs()))
+        report_fatal_error(
+            "After linking, broken module found, JIT compilation aborted!",
+            false);
+      else
+        dbgs() << "Module verified!\n";
+#endif
+
+        // Replace argument uses with runtime constants.
 #ifdef ENABLE_RUNTIME_CONSTPROP
       for (int I = 0; I < Node->getNumOperands(); ++I) {
         ConstantAsMetadata *CAM = cast<ConstantAsMetadata>(Node->getOperand(I));
@@ -742,78 +798,92 @@ public:
     return createSMDiagnosticError(Err);
   }
 
-  void *compileAndRun(StringRef FnName, char *IR, int IRSize,
-                      RuntimeConstant *RC, int NumRuntimeConstants,
-                      uint32_t GridDimX, uint32_t GridDimY, uint32_t GridDimZ,
-                      uint32_t BlockDimX, uint32_t BlockDimY,
-                      uint32_t BlockDimZ, void **KernelArgs, uint64_t ShmemSize,
-                      void *Stream) {
-    TIMESCOPE("compileAndLink");
+  hipError_t compileAndRun(StringRef FnName, char *IR, int IRSize,
+                           RuntimeConstant *RC, int NumRuntimeConstants,
+                           uint32_t GridDimX, uint32_t GridDimY,
+                           uint32_t GridDimZ, uint32_t BlockDimX,
+                           uint32_t BlockDimY, uint32_t BlockDimZ,
+                           void **KernelArgs, uint64_t ShmemSize,
+                           void *Stream) {
+    TIMESCOPE("compileAndRun");
 
+#ifdef ENABLE_HIP
     StringRef StrIR(IR, IRSize);
     // TODO: We don't need a unique suffix here if we use a different hip
     // module, function per specialized kernel. Depends on how we implement
     // loading and executing device kernels.
-    auto TransformedBitcode = parseBitcode(FnName, ".jit", StrIR, RC, NumRuntimeConstants);
-    if(auto E = TransformedBitcode.takeError())
+    auto TransformedBitcode =
+        parseBitcode(FnName, "_jit", StrIR, RC, NumRuntimeConstants);
+    if (auto E = TransformedBitcode.takeError())
       report_fatal_error(toString(std::move(E)).c_str());
 
-    //OptimizationTransform OT{};
-    //auto OptBitcode = OT(std::move(*TransformedBitcode));
-    //if (auto E = OptBitcode.takeError())
-    //  report_fatal_error(toString(std::move(E)).c_str());
-    //Module *M = OptBitcode->getModuleUnlocked();
     Module *M = TransformedBitcode->getModuleUnlocked();
-    std::error_code EC;
-    raw_fd_ostream OS("jit-device.ll", EC);
-    if (EC)
-      report_fatal_error(EC.message().c_str());
+
+    std::string MemBuf;
+    raw_string_ostream OS(MemBuf);
     OS << *M;
-    OS.close();
+    // WriteBitcodeToFile(*M, OS);
+    OS.flush();
 
-    StringRef QueryEnv = "/usr/bin/env";
-    int Ret =
-        sys::ExecuteAndWait(QueryEnv, {"env", "opt", "-O3", "-S", "-o",
-                                       "jit-device-opt.ll", "jit-device.ll"});
-    if (Ret) {
-      std::string Msg = "sys::ExecuteAndWait failed" + std::to_string(Ret);
-      report_fatal_error(Msg.c_str());
-    }
-
-    Ret = sys::ExecuteAndWait(QueryEnv, {"env", "llc", "-mcpu=gfx90a",
-                                             "-O3", "--filetype=obj", "-o",
-                                             "jit-device.o", "jit-device-opt.ll"});
-    if (Ret) {
-      std::string Msg = "sys::ExecuteAndWait failed" + std::to_string(Ret);
-      report_fatal_error(Msg.c_str());
-    }
-
-    Ret = sys::ExecuteAndWait(
-        QueryEnv, {"env", "ld.lld", "-m", "elf64_amdgpu", "--no-undefined",
-                   "-O3", "-shared", "-plugin-opt=-amdgpu-internalize-symbols",
-                   "-plugin-opt=mcpu=gfx90a", "-o", "jit-device-shared.o",
-                   "jit-device.o"});
-    if (Ret)
-      report_fatal_error(
-          std::string("sys::ExecuteAndWait lld failed " + std::to_string(Ret))
-              .c_str());
-
-//#ifdef ENABLE_HIP
-#if 1
-    auto Input = MemoryBuffer::getFileAsStream("jit-device-shared.o");
-    if(!Input)
-      report_fatal_error(Input.getError().message().c_str());
-    auto MemBuf = (*Input)->getBuffer();
-
-    Function *F = M->getFunction(Twine(FnName + ".jit").str());
+    Function *F = M->getFunction(Twine(FnName + "_jit").str());
     assert(F && "Expected non-null function");
-    dbgs() << "F->num_args() " << F->arg_size() << "\n";
-    //getchar();
 
     hipModule_t HipModule;
     hipFunction_t HipFunction;
-    hipErrCheck(hipModuleLoadData(&HipModule, MemBuf.data()));
 
+    hiprtcLinkState hip_link_state_ptr;
+
+    // TODO: Dynamic linking is to be supported through hiprtc. Currently the
+    // interface is limited and lacks support for linking globals. Indicative
+    // code here is for future re-visit.
+#if DYNAMIC_LINK
+    std::vector<hiprtcJIT_option> LinkOptions = {
+        HIPRTC_JIT_GLOBAL_SYMBOL_NAMES, HIPRTC_JIT_GLOBAL_SYMBOL_ADDRESS,
+        HIPRTC_JIT_GLOBAL_SYMBOL_COUNT};
+    std::vector<const char *> GlobalNames;
+    std::vector<const void *> GlobalAddrs;
+    for (auto RegisterVar : VarNameToDevPtr) {
+      auto &VarName = RegisterVar.first;
+      auto DevPtr = RegisterVar.second;
+      GlobalNames.push_back(VarName.c_str());
+      GlobalAddrs.push_back(DevPtr);
+    }
+
+    std::size_t GlobalSize = GlobalNames.size();
+    std::size_t NumOptions = LinkOptions.size();
+    const void *LinkOptionsValues[] = {GlobalNames.data(), GlobalAddrs.data(),
+                                       (void *)&GlobalSize};
+    hiprtcErrCheck(hiprtcLinkCreate(LinkOptions.size(), LinkOptions.data(),
+                                    (void **)&LinkOptionsValues,
+                                    &hip_link_state_ptr));
+
+    hiprtcErrCheck(hiprtcLinkAddData(
+        hip_link_state_ptr, HIPRTC_JIT_INPUT_LLVM_BITCODE,
+        (void *)MemBuf.data(), MemBuf.size(), FnName.data(), LinkOptions.size(),
+        LinkOptions.data(), (void **)&LinkOptionsValues));
+#endif
+
+    void *BinOut;
+    size_t BinSize;
+    {
+      TIMESCOPE("Device linker")
+      hiprtcErrCheck(
+          hiprtcLinkCreate(0, nullptr, nullptr, &hip_link_state_ptr));
+      hiprtcErrCheck(hiprtcLinkAddData(hip_link_state_ptr,
+                                       HIPRTC_JIT_INPUT_LLVM_BITCODE,
+                                       (void *)MemBuf.data(), MemBuf.size(),
+                                       FnName.data(), 0, nullptr, nullptr));
+      hiprtcErrCheck(hiprtcLinkComplete(hip_link_state_ptr, &BinOut, &BinSize));
+    }
+    {
+      TIMESCOPE("Load module");
+      hipErrCheck(hipModuleLoadData(&HipModule, BinOut));
+    }
+
+    // TODO: remove, this is obsolete, version 5.7.1 accepts KernelArgs without
+    // going through the hoops. This code is not correct if arguments are not
+    // pointers or scalars of the same size as pointers.
+#if 0
     std::vector<void *>ArgBuffer(F->arg_size());
     for(size_t I = 0; I < ArgBuffer.size() ; ++I)
       memcpy(&ArgBuffer[I], KernelArgs[I], sizeof(void *));
@@ -822,64 +892,68 @@ public:
     void *Config[] = {HIP_LAUNCH_PARAM_BUFFER_POINTER, &ArgBuffer[0],
                       HIP_LAUNCH_PARAM_BUFFER_SIZE, &ArgBufferSize,
                       HIP_LAUNCH_PARAM_END};
-    hipErrCheck(hipModuleGetFunction(&HipFunction, HipModule,
-                                     (FnName + ".jit").str().c_str()));
-    hipErrCheck(hipModuleLaunchKernel(
+#endif
+    {
+      TIMESCOPE("Module get function");
+      hipErrCheck(hipModuleGetFunction(&HipFunction, HipModule,
+                                       (FnName + "_jit").str().c_str()));
+    }
+
+    auto Ret = hipModuleLaunchKernel(
         HipFunction, GridDimX, GridDimY, GridDimZ, BlockDimX, BlockDimY,
         BlockDimZ, ShmemSize, (hipStream_t)Stream,
-        /* kernel_args (unsupported)*/ nullptr, Config));
+        /* kernel_args (unsupported)*/ KernelArgs, nullptr);
+#else
+#error "Device JIT requires ENABLE_HIP"
 #endif
-    return nullptr;
+    return Ret;
+  }
+
+  void insertRegisterVar(const char *VarName, void *DevPtr) {
+    VarNameToDevPtr[VarName] = DevPtr;
   }
 
 private:
-  JitEngineDevice(int argc, char *argv[]) {
-  }
+  JitEngineDevice() {}
+  std::unordered_map<std::string, void *> VarNameToDevPtr;
 };
 
-__attribute__((used)) int
+// TODO: Guard with ENABLE_HIP.
+// NOTE: A great mystery is: why does this work ONLY if HostAddr is a CONST
+// void*
+__attribute((used)) void __jit_register_var(const void *HostAddr,
+                                            const char *VarName) {
+  JitEngineDevice &Jit = JitEngineDevice::instance();
+  void *DevPtr = nullptr;
+  hipErrCheck(hipGetSymbolAddress(&DevPtr, HIP_SYMBOL(HostAddr)));
+  Jit.insertRegisterVar(VarName, DevPtr);
+}
+
+__attribute__((used)) hipError_t
 __jit_launch_kernel(char *KernelName, char *IR, int IRSize, RuntimeConstant *RC,
                     int NumRuntimeConstants, uint64_t GridDimXY,
                     uint32_t GridDimZ, uint64_t BlockDimXY, uint32_t BlockDimZ,
                     void **KernelArgs, uint64_t ShmemSize, void *Stream) {
   TIMESCOPE("__jit_launch_kernel");
   JitEngineDevice &Jit = JitEngineDevice::instance();
-  dbgs() << "JIT Launch Kernel\n";
+  DBG(dbgs() << "JIT Launch Kernel\n");
   uint32_t *GridDimPtr = (uint32_t *)&GridDimXY;
-  uint32_t GridDimX = *GridDimPtr, GridDimY = *(GridDimPtr+1);
+  uint32_t GridDimX = *GridDimPtr, GridDimY = *(GridDimPtr + 1);
   uint32_t *BlockDimPtr = (uint32_t *)&BlockDimXY;
-  uint32_t BlockDimX = *BlockDimPtr, BlockDimY = *(BlockDimPtr+1);
-  dbgs() << "Grid " << GridDimX << ", " << GridDimY << ", " << GridDimZ << "\n";
-  dbgs() << "Block " << BlockDimX << ", " << BlockDimY << ", " << BlockDimZ
-         << "\n";
-  dbgs() << "KernelArgs " << KernelArgs << "\n";
-  dbgs() << "ShmemSize " << ShmemSize << "\n";
-  dbgs() << "Stream " << Stream << "\n";
-  //getchar();
+  uint32_t BlockDimX = *BlockDimPtr, BlockDimY = *(BlockDimPtr + 1);
+  DBG(dbgs() << "=== Kernel Info\n");
+  DBG(dbgs() << "KernelName " << KernelName << "\n");
+  DBG(dbgs() << "Grid " << GridDimX << ", " << GridDimY << ", " << GridDimZ
+             << "\n");
+  DBG(dbgs() << "Block " << BlockDimX << ", " << BlockDimY << ", " << BlockDimZ
+             << "\n");
+  DBG(dbgs() << "KernelArgs " << KernelArgs << "\n");
+  DBG(dbgs() << "ShmemSize " << ShmemSize << "\n");
+  DBG(dbgs() << "Stream " << Stream << "\n");
+  DBG(dbgs() << "=== End Kernel Info\n");
   StringRef StrIR(IR, IRSize);
-  Jit.compileAndRun(KernelName, IR, IRSize, RC, NumRuntimeConstants, GridDimX,
-                    GridDimY, GridDimZ, BlockDimX, BlockDimY, BlockDimZ,
-                    KernelArgs, ShmemSize, Stream);
-  // auto Ret =Jit.parseBitcode(KernelName, "", StrIR, nullptr, 0);
-  // if (auto E = Ret.takeError()) {
-  //   std::string ErrorStr = "JIT_LAUNCH_KERNEL" + toString(std::move(E));
-  //   report_fatal_error(ErrorStr.c_str());
-  // }
-  //  Approach 1
-  /* DO IT IN COMPILE AND LINK: hipModuleLoad("@embed.object = " <object file
-   * data> ) */
-  //{
-  //jit_kernel_launch(<-- args -->) {
-  //  ... LLVM IR ...
-  //  hipLaunchKernel("jitFnName", <--- args --->);
-  //  ... LLVM IR ...
-  //}
-
-  // Approach 2
-  //jit_entry(..., RuntimeConstant RC, RuntimeVariableArgs RV)
-  //// object file: hipModuleLoad
-  //hipLaunchKernel("jitFnName", RC + RV);
-
-  return 0;
+  return Jit.compileAndRun(KernelName, IR, IRSize, RC, NumRuntimeConstants,
+                           GridDimX, GridDimY, GridDimZ, BlockDimX, BlockDimY,
+                           BlockDimZ, KernelArgs, ShmemSize, Stream);
 }
 }

@@ -10,7 +10,7 @@ target_include_directories(jit
 set(libs ${LLVM_AVAILABLE_LIBS})
 if (ENABLE_HIP)
   target_include_directories(jit SYSTEM PRIVATE ${hip_INCLUDE_DIRS})
-  add_definitions("-D__HIP_PLATFORM_AMD__")
+  target_compile_options(jit PRIVATE -x hip)
   list(APPEND libs hip::amdhip64)
 endif()
 target_link_libraries(jit PRIVATE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
