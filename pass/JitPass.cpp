@@ -873,15 +873,30 @@ llvm::PassPluginLibraryInfo getJitPassPluginInfo() {
 #if ENABLE_HIP
     // NOTE:: For device jitting register the pass late, reduces compilation
     // time and does not have risks of losing the kernel due to inlining.
-    PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM, auto) {
+    // PB.registerPipelineStartEPCallback([&](ModulePassManager &MPM, auto)
+    // {
+    // TODO: Investigate why late pass execution to extract bc on device fails
+    // to link in the runtime with error:
+    // ":1:hiprtcInternal.cpp:654 : 741216360548 us: [pid:3847761
+    // tid:0x15553e8b9ac0] Error in hiprtc: unable to add device libs to
+    // linked bitcode
+    //: 3:hiprtc.cpp               :364 : 741216360556 us: [pid:3847761
+    //: tid:0x15553e8b9ac0] hiprtcLinkComplete: Returned
+    //: HIPRTC_ERROR_LINKING
+    // ERROR @
+    // /p/vast1/ggeorgak/projects/compilers/jitproject/jit/lib/jit.cpp:877
+    // -> HIPRTC_ERROR_LINKING"
+    PB.registerPipelineEarlySimplificationEPCallback(
+        [&](ModulePassManager &MPM, auto) {
+    // PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM, auto) {
 #else
     // NOTE: For host jitting register the pass earlier.
     PB.registerPipelineEarlySimplificationEPCallback(
         [&](ModulePassManager &MPM, auto) {
 #endif
-      MPM.addPass(JitPass());
-      return true;
-    });
+          MPM.addPass(JitPass());
+          return true;
+        });
   };
 
   return {LLVM_PLUGIN_API_VERSION, "JitPass", LLVM_VERSION_STRING, callback};

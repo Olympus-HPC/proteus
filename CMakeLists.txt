@@ -11,7 +11,7 @@ option(ENABLE_HIP "Enable HIP" OFF)
 
 if (ENABLE_HIP)
   add_definitions("-DENABLE_HIP")
-  find_package(hip REQUIRED CONFIG)
+  find_package(hip 5.7.1 REQUIRED CONFIG)
 endif()
 
 include(cmake/SetupLLVM.cmake)

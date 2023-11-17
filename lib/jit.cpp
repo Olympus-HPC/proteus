@@ -13,6 +13,7 @@
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/CodeGen/CommandFlags.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
 #include "llvm/ExecutionEngine/JITEventListener.h"
@@ -717,7 +718,7 @@ public:
         auto DevPtr = RegisterVar.second;
         auto *GV = M->getNamedGlobal(VarName);
         assert(GV && "Expected existing global variable");
-        // Remove the re-linked global from llvm.compiler.used since it that use
+        // Remove the re-linked global from llvm.compiler.used since that use
         // is not replaceable by the fixed addr constant expression.
         removeFromUsedLists(*M, [&GV](Constant *C) {
           if (GV == C)
