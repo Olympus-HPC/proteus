@@ -114,96 +114,6 @@ static bool HasDeviceKernels(Module &M) {
   return true;
 }
 
-ArrayRef<uint8_t> extractDeviceBitcode(Module &M, Function &F,
-                                       StringRef KernelName) {
-  constexpr char OFFLOAD_BUNDLER_MAGIC_STR[] = "__CLANG_OFFLOAD_BUNDLE__";
-  // TODO: Generalize for CUDA.
-  auto *HipBinWrapper =
-      M.getGlobalVariable("__hip_fatbin_wrapper", /* AllowInternal */ true);
-  dbgs() << "HipBinWrapper " << *HipBinWrapper << "\n";
-  assert(HipBinWrapper && "Expected non-null hip binary");
-  ConstantStruct *HipBinData =
-      cast<ConstantStruct>(HipBinWrapper->getOperand(0));
-  auto *HipBin = HipBinData->getOperand(2);
-  dbgs() << "Type " << *HipBin->getType() << "\n";
-  ConstantDataArray *CDA = dyn_cast<ConstantDataArray>(HipBin->getOperand(0));
-  assert(CDA && "Expected non-null constant data array operand");
-  StringRef Binary = CDA->getAsString();
-
-  size_t Pos = 0;
-  StringRef Magic(Binary.data(), sizeof(OFFLOAD_BUNDLER_MAGIC_STR) - 1);
-  if (!Magic.equals(OFFLOAD_BUNDLER_MAGIC_STR))
-    report_fatal_error("Error missing magic string");
-  Pos += sizeof(OFFLOAD_BUNDLER_MAGIC_STR) - 1;
-
-  auto Read8ByteIntLE = [](StringRef S, size_t Pos) {
-    return llvm::support::endian::read64le(S.data() + Pos);
-  };
-
-  uint64_t NumberOfBundles = Read8ByteIntLE(Binary, Pos);
-  Pos += 8;
-  dbgs() << "NumberOfbundles " << NumberOfBundles << "\n";
-
-  StringRef DeviceBinary;
-  for (uint64_t i = 0; i < NumberOfBundles; ++i) {
-    uint64_t Offset = Read8ByteIntLE(Binary, Pos);
-    Pos += 8;
-
-    uint64_t Size = Read8ByteIntLE(Binary, Pos);
-    Pos += 8;
-
-    uint64_t TripleSize = Read8ByteIntLE(Binary, Pos);
-    Pos += 8;
-
-    StringRef Triple = Binary.substr(Pos, TripleSize);
-    Pos += TripleSize;
-
-    dbgs() << "Offset " << Offset << "\n";
-    dbgs() << "Size " << Size << "\n";
-    dbgs() << "TripleSize " << TripleSize << "\n";
-    dbgs() << "Triple " << Triple << "\n";
-
-    if (!Triple.contains("amdgcn"))
-      continue;
-
-    DeviceBinary = Binary.substr(Offset, Size);
-    break;
-  }
-
-  Expected<object::ELF64LEFile> DeviceElf =
-      llvm::object::ELF64LEFile::create(DeviceBinary);
-  if (DeviceElf.takeError())
-    report_fatal_error("Cannot create the device elf");
-
-  auto Sections = DeviceElf->sections();
-  if (Sections.takeError())
-    report_fatal_error("Error reading sections");
-
-  Twine TargetSection = ".jit." + KernelName;
-  ArrayRef<uint8_t> DeviceBitcode;
-  for (auto Section : *Sections) {
-    auto SectionName = DeviceElf->getSectionName(Section);
-    if (SectionName.takeError())
-      report_fatal_error("Error reading section name");
-    dbgs() << "SectionName " << *SectionName << "\n";
-    dbgs() << "TargetSection " << TargetSection << "\n";
-    if (!SectionName->equals(TargetSection.str()))
-      continue;
-
-    auto SectionContents = DeviceElf->getSectionContents(Section);
-    if (SectionContents.takeError())
-      report_fatal_error("Error reading section contents");
-
-    DeviceBitcode = *SectionContents;
-  }
-
-  if (DeviceBitcode.empty())
-    report_fatal_error("Error finding the device function LLVM IR");
-
-  // return createStringError(inconvertibleErrorCode(), "Error extracting bc");
-  return DeviceBitcode;
-}
-
 void parseAnnotations(Module &M) {
   auto GlobalAnnotations = M.getNamedGlobal("llvm.global.annotations");
   if (GlobalAnnotations) {
@@ -594,11 +504,15 @@ static void emitJITKernelStub(Module &M, JitFunctionInfo &JFI,
   Type *Int32Ty = Type::getInt32Ty(M.getContext());
   StructType *RuntimeConstantTy = StructType::create({Int64Ty}, "struct.args");
 
+  GlobalVariable *HipFatbinWrapper =
+      M.getGlobalVariable("__hip_fatbin_wrapper", true);
+  assert(HipFatbinWrapper && "Expected hip fatbinary wrapper global");
+
   FunctionType *JitEntryFnTy = FunctionType::get(
       Int32Ty,
-      {VoidPtrTy, VoidPtrTy, Int32Ty, RuntimeConstantTy->getPointerTo(),
-       Int32Ty, Int64Ty, Int32Ty, Int64Ty, Int32Ty, VoidPtrTy, Int64Ty,
-       VoidPtrTy},
+      {VoidPtrTy, HipFatbinWrapper->getType(),
+       RuntimeConstantTy->getPointerTo(), Int32Ty, Int64Ty, Int32Ty, Int64Ty,
+       Int32Ty, VoidPtrTy, Int64Ty, VoidPtrTy},
       /* isVarArg=*/false);
   FunctionCallee JitEntryFn =
       M.getOrInsertFunction("__jit_launch_kernel", JitEntryFnTy);
@@ -609,7 +523,6 @@ static void emitJITKernelStub(Module &M, JitFunctionInfo &JFI,
   // Create globals for the function name and string IR passed to the jit
   // entry.
   auto *FnNameGlobal = Builder.CreateGlobalString(KernelName);
-  auto *StrIRGlobal = Builder.CreateGlobalString(JFI.ModuleIR);
 
   // Create the runtime constant array type for the runtime constants passed
   // to the jit entry function.
@@ -643,8 +556,8 @@ static void emitJITKernelStub(Module &M, JitFunctionInfo &JFI,
 
   auto *Ret = Builder.CreateCall(
       JitEntryFn,
-      {FnNameGlobal, StrIRGlobal, Builder.getInt32(JFI.ModuleIR.size()),
-       RuntimeConstantsAlloca, Builder.getInt32(JFI.ConstantArgs.size()),
+      {FnNameGlobal, HipFatbinWrapper, RuntimeConstantsAlloca,
+       Builder.getInt32(JFI.ConstantArgs.size()),
        LaunchKernelCall->getArgOperand(1), LaunchKernelCall->getArgOperand(2),
        LaunchKernelCall->getArgOperand(3), LaunchKernelCall->getArgOperand(4),
        LaunchKernelCall->getArgOperand(5), LaunchKernelCall->getArgOperand(6),
@@ -801,10 +714,6 @@ void visitor(Module &M, CallGraph &CG) {
       // kernel, a more robust solution would look up hipRegisterFunction to
       // find the name by the argument global.
       assert(Kernel != nullptr && "Expected non-null kernel");
-      auto DeviceBitcode = extractDeviceBitcode(M, *JFI.Fn, Kernel->getName());
-      JFI.ModuleIR =
-          StringRef(reinterpret_cast<const char *>(DeviceBitcode.data()),
-                    DeviceBitcode.size());
 
       emitJITKernelStub(M, JFI, Kernel->getName(), LaunchKernelCall);
       dbgs() << "DONE!\n";
@@ -875,7 +784,7 @@ llvm::PassPluginLibraryInfo getJitPassPluginInfo() {
     // time and does not have risks of losing the kernel due to inlining.
     // PB.registerPipelineStartEPCallback([&](ModulePassManager &MPM, auto)
     // {
-    // TODO: Investigate why late pass execution to extract bc on device fails
+    // NOTE: Investigating why late pass execution to extract bc on device fails
     // to link in the runtime with error:
     // ":1:hiprtcInternal.cpp:654 : 741216360548 us: [pid:3847761
     // tid:0x15553e8b9ac0] Error in hiprtc: unable to add device libs to
@@ -886,6 +795,8 @@ llvm::PassPluginLibraryInfo getJitPassPluginInfo() {
     // ERROR @
     // /p/vast1/ggeorgak/projects/compilers/jitproject/jit/lib/jit.cpp:877
     // -> HIPRTC_ERROR_LINKING"
+    // Working assumption is that the hiprtc linker cannot re-link already
+    // linked device libraries and aborts.
     PB.registerPipelineEarlySimplificationEPCallback(
         [&](ModulePassManager &MPM, auto) {
     // PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM, auto) {

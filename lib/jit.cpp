@@ -30,6 +30,7 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/MC/TargetRegistry.h"
+#include "llvm/Object/ELF.h"
 #include "llvm/Object/SymbolSize.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
@@ -55,14 +56,15 @@
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Vectorize.h"
-
-#include <iostream>
 #include <llvm/ExecutionEngine/Orc/Core.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/Support/ErrorHandling.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
+
+#include <iostream>
+#include <system_error>
 
 #if ENABLE_HIP
 #include <hip/hip_runtime.h>
@@ -356,6 +358,78 @@ inline hash_code hash_value(const RuntimeConstant &RC) {
 
 // TODO: check if this global is needed.
 static codegen::RegisterCodeGenFlags CFG;
+
+class JitCache {
+public:
+  uint64_t hash(StringRef FnName, RuntimeConstant *RC,
+                int NumRuntimeConstants) {
+    ArrayRef<RuntimeConstant> Data(RC, NumRuntimeConstants);
+    auto HashValue = hash_combine(FnName, Data);
+    return HashValue;
+  }
+
+  hipFunction_t lookup(uint64_t HashValue) {
+    TIMESCOPE("lookup");
+    Accesses++;
+
+    auto It = CacheMap.find(HashValue);
+    if (It == CacheMap.end())
+      return nullptr;
+
+    It->second.NumExecs++;
+    Hits++;
+    return It->second.HipFunction;
+  }
+  void insert(uint64_t HashValue, hipFunction_t HipFunction
+#ifdef ENABLE_DEBUG
+              ,
+              StringRef FnName, RuntimeConstant *RC, int NumRuntimeConstants
+#endif
+  ) {
+#ifdef ENABLE_DEBUG
+    if (CacheMap.count(HashValue))
+      report_fatal_error("JitCache collision detected");
+#endif
+
+    CacheMap[HashValue] = {HipFunction, /* num_execs */ 1};
+
+#ifdef ENABLE_DEBUG
+    CacheMap[HashValue].FnName = FnName.str();
+    for (size_t I = 0; I < NumRuntimeConstants; ++I)
+      CacheMap[HashValue].RCVector.push_back(RC[I]);
+#endif
+  }
+
+  void printStats() {
+    outs() << "JitCache hits " << Hits << " total " << Accesses << "\n";
+    for (auto &It : CacheMap) {
+      uint64_t HashValue = It.first;
+      JitCacheEntry &JCE = It.second;
+      outs() << "HashValue " << HashValue << " num_execs " << JCE.NumExecs;
+#ifdef ENABLE_DEBUG
+      outs() << " FnName " << JCE.FnName << " RCs [";
+      for (auto &RC : JCE.RCVector)
+        outs() << RC.Int64Val << ", ";
+      outs() << "]";
+#endif
+      outs() << "\n";
+    }
+  }
+
+private:
+  struct JitCacheEntry {
+    hipFunction_t HipFunction;
+    uint64_t NumExecs;
+#ifdef ENABLE_DEBUG
+    std::string FnName;
+    SmallVector<RuntimeConstant, 8> RCVector;
+#endif
+  };
+
+  DenseMap<uint64_t, JitCacheEntry> CacheMap;
+  uint64_t Hits = 0;
+  uint64_t Accesses = 0;
+};
 
 class JitEngine {
 public:
@@ -686,6 +760,13 @@ void *__hipRegisterFatBinary(void *);
 void __hipRegisterVar(void *, void *, const char *, const char *, int32_t,
                       int64_t, int32_t, int32_t);
 
+struct HipFatbinWrapper_t {
+  int32_t Magic;
+  int32_t Version;
+  const char *Binary;
+  void *X;
+};
+
 class JitEngineDevice {
 public:
   static JitEngineDevice &instance() {
@@ -693,7 +774,113 @@ public:
     return Jit;
   }
 
-  ~JitEngineDevice() {}
+  ~JitEngineDevice() { CodeCache.printStats(); }
+
+  ArrayRef<uint8_t> extractDeviceBitcode(StringRef KernelName,
+                                         const char *Binary) {
+    constexpr char OFFLOAD_BUNDLER_MAGIC_STR[] = "__CLANG_OFFLOAD_BUNDLE__";
+    // TODO: Generalize for CUDA.
+    size_t Pos = 0;
+    StringRef Magic(Binary, sizeof(OFFLOAD_BUNDLER_MAGIC_STR) - 1);
+    if (!Magic.equals(OFFLOAD_BUNDLER_MAGIC_STR))
+      report_fatal_error("Error missing magic string");
+    Pos += sizeof(OFFLOAD_BUNDLER_MAGIC_STR) - 1;
+
+    auto Read8ByteIntLE = [](const char *S, size_t Pos) {
+      return llvm::support::endian::read64le(S + Pos);
+    };
+
+    uint64_t NumberOfBundles = Read8ByteIntLE(Binary, Pos);
+    Pos += 8;
+    DBG(dbgs() << "NumberOfbundles " << NumberOfBundles << "\n");
+
+    StringRef DeviceBinary;
+    for (uint64_t i = 0; i < NumberOfBundles; ++i) {
+      uint64_t Offset = Read8ByteIntLE(Binary, Pos);
+      Pos += 8;
+
+      uint64_t Size = Read8ByteIntLE(Binary, Pos);
+      Pos += 8;
+
+      uint64_t TripleSize = Read8ByteIntLE(Binary, Pos);
+      Pos += 8;
+
+      StringRef Triple(Binary + Pos, TripleSize);
+      Pos += TripleSize;
+
+      DBG(dbgs() << "Offset " << Offset << "\n");
+      DBG(dbgs() << "Size " << Size << "\n");
+      DBG(dbgs() << "TripleSize " << TripleSize << "\n");
+      DBG(dbgs() << "Triple " << Triple << "\n");
+
+      if (!Triple.contains("amdgcn"))
+        continue;
+
+      DeviceBinary = StringRef(Binary + Offset, Size);
+      break;
+    }
+
+#ifdef ENABLE_DEBUG
+    {
+      std::error_code EC;
+      raw_fd_ostream OutBin("device.bin", EC);
+      if (EC)
+        report_fatal_error("Cannot open device binary file");
+      // TODO: Remove or leave it only for debugging.
+      OutBin << DeviceBinary;
+      OutBin.close();
+      dbgs() << "Binary image found\n";
+    }
+#endif
+
+    Expected<object::ELF64LEFile> DeviceElf =
+        llvm::object::ELF64LEFile::create(DeviceBinary);
+    if (DeviceElf.takeError())
+      report_fatal_error("Cannot create the device elf");
+
+    auto Sections = DeviceElf->sections();
+    if (Sections.takeError())
+      report_fatal_error("Error reading sections");
+
+    // NOTE: We must extract the .jit sections per kernel to avoid linked device
+    // libraries. Otherwise, the hiprtc linker complains that it cannot link
+    // device libraries (working assumption).
+    Twine TargetSection = ".jit." + KernelName;
+    ArrayRef<uint8_t> DeviceBitcode;
+    for (auto Section : *Sections) {
+      auto SectionName = DeviceElf->getSectionName(Section);
+      if (SectionName.takeError())
+        report_fatal_error("Error reading section name");
+      DBG(dbgs() << "SectionName " << *SectionName << "\n");
+      DBG(dbgs() << "TargetSection " << TargetSection << "\n");
+      if (!SectionName->equals(TargetSection.str()))
+        continue;
+
+      auto SectionContents = DeviceElf->getSectionContents(Section);
+      if (SectionContents.takeError())
+        report_fatal_error("Error reading section contents");
+
+      DeviceBitcode = *SectionContents;
+    }
+
+    if (DeviceBitcode.empty())
+      report_fatal_error("Error finding the device bitcode");
+
+#ifdef ENABLE_DEBUG
+    {
+      std::error_code EC;
+      raw_fd_ostream OutBC(Twine(".jit." + KernelName + ".bc").str(), EC);
+      if (EC)
+        report_fatal_error("Cannot open device bitcode file");
+      // TODO: Remove or leave it only for debugging.
+      OutBC << StringRef(reinterpret_cast<const char *>(DeviceBitcode.data()),
+                         DeviceBitcode.size());
+      OutBC.close();
+    }
+#endif
+
+    return DeviceBitcode;
+  }
 
   Expected<llvm::orc::ThreadSafeModule>
   parseBitcode(StringRef FnName, StringRef Suffix, StringRef IR,
@@ -709,6 +896,7 @@ public:
       Function *F = M->getFunction(FnName);
       assert(F && "Expected non-null function!");
       MDNode *Node = F->getMetadata("jit_arg_nos");
+      assert(Node && "Expected metadata for jit arguments");
       DBG(dbgs() << "Metadata jit for F " << F->getName() << " = " << *Node
                  << "\n");
 
@@ -799,22 +987,35 @@ public:
     return createSMDiagnosticError(Err);
   }
 
-  hipError_t compileAndRun(StringRef FnName, char *IR, int IRSize,
-                           RuntimeConstant *RC, int NumRuntimeConstants,
-                           uint32_t GridDimX, uint32_t GridDimY,
-                           uint32_t GridDimZ, uint32_t BlockDimX,
-                           uint32_t BlockDimY, uint32_t BlockDimZ,
-                           void **KernelArgs, uint64_t ShmemSize,
-                           void *Stream) {
+  hipError_t
+  compileAndRun(StringRef KernelName, HipFatbinWrapper_t *HipFatbinWrapper,
+                RuntimeConstant *RC, int NumRuntimeConstants, uint32_t GridDimX,
+                uint32_t GridDimY, uint32_t GridDimZ, uint32_t BlockDimX,
+                uint32_t BlockDimY, uint32_t BlockDimZ, void **KernelArgs,
+                uint64_t ShmemSize, void *Stream) {
     TIMESCOPE("compileAndRun");
 
 #ifdef ENABLE_HIP
-    StringRef StrIR(IR, IRSize);
+    uint64_t HashValue = CodeCache.hash(KernelName, RC, NumRuntimeConstants);
+    hipFunction_t HipFunction = CodeCache.lookup(HashValue);
+    if (HipFunction)
+      return hipModuleLaunchKernel(HipFunction, GridDimX, GridDimY, GridDimZ,
+                                   BlockDimX, BlockDimY, BlockDimZ, ShmemSize,
+                                   (hipStream_t)Stream, KernelArgs, nullptr);
+
+    ArrayRef<uint8_t> Bitcode =
+        extractDeviceBitcode(KernelName, HipFatbinWrapper->Binary);
+    StringRef StrIR(reinterpret_cast<const char *>(Bitcode.data()),
+                    Bitcode.size());
+    // NOTE: we don't need a suffix to differentiate kernels, each
+    // specialization will be in its own module. It exists only for debugging
+    // purposes to verify that the jitted kernel executes.
+    StringRef Suffix = ".jit";
     // TODO: We don't need a unique suffix here if we use a different hip
     // module, function per specialized kernel. Depends on how we implement
     // loading and executing device kernels.
     auto TransformedBitcode =
-        parseBitcode(FnName, "_jit", StrIR, RC, NumRuntimeConstants);
+        parseBitcode(KernelName, Suffix, StrIR, RC, NumRuntimeConstants);
     if (auto E = TransformedBitcode.takeError())
       report_fatal_error(toString(std::move(E)).c_str());
 
@@ -826,11 +1027,23 @@ public:
     // WriteBitcodeToFile(*M, OS);
     OS.flush();
 
-    Function *F = M->getFunction(Twine(FnName + "_jit").str());
+#ifdef ENABLE_DEBUG
+    {
+      std::error_code EC;
+      raw_fd_ostream OutBC(
+          Twine("transformed-.jit." + KernelName + ".bc").str(), EC);
+      if (EC)
+        report_fatal_error("Cannot open device transformed bitcode file");
+      // TODO: Remove or leave it only for debugging.
+      OutBC << *M;
+      OutBC.close();
+    }
+#endif
+
+    Function *F = M->getFunction(Twine(KernelName + Suffix).str());
     assert(F && "Expected non-null function");
 
     hipModule_t HipModule;
-    hipFunction_t HipFunction;
 
     hiprtcLinkState hip_link_state_ptr;
 
@@ -860,8 +1073,8 @@ public:
 
     hiprtcErrCheck(hiprtcLinkAddData(
         hip_link_state_ptr, HIPRTC_JIT_INPUT_LLVM_BITCODE,
-        (void *)MemBuf.data(), MemBuf.size(), FnName.data(), LinkOptions.size(),
-        LinkOptions.data(), (void **)&LinkOptionsValues));
+        (void *)MemBuf.data(), MemBuf.size(), KernelName.data(),
+        LinkOptions.size(), LinkOptions.data(), (void **)&LinkOptionsValues));
 #endif
 
     void *BinOut;
@@ -870,10 +1083,24 @@ public:
       TIMESCOPE("Device linker")
       hiprtcErrCheck(
           hiprtcLinkCreate(0, nullptr, nullptr, &hip_link_state_ptr));
+
+#if CUSTOM_OPTIONS
+      // NOTE: This code is an example of passing custom, AMD-specific options
+      // to the compiler/linker.
+      const char *isaopts[] = {"-mllvm", "-inline-threshold=1", "-mllvm",
+                               "-inlinehint-threshold=1"};
+      std::vector<hiprtcJIT_option> jit_options = {
+          HIPRTC_JIT_IR_TO_ISA_OPT_EXT, HIPRTC_JIT_IR_TO_ISA_OPT_COUNT_EXT};
+      size_t isaoptssize = 4;
+      const void *lopts[] = {(void *)isaopts, (void *)(isaoptssize)};
+      hiprtcErrCheck(hiprtcLinkCreate(2, jit_options.data(), (void **)lopts,
+                                      &hip_link_state_ptr));
+#endif
+
       hiprtcErrCheck(hiprtcLinkAddData(hip_link_state_ptr,
                                        HIPRTC_JIT_INPUT_LLVM_BITCODE,
                                        (void *)MemBuf.data(), MemBuf.size(),
-                                       FnName.data(), 0, nullptr, nullptr));
+                                       KernelName.data(), 0, nullptr, nullptr));
       hiprtcErrCheck(hiprtcLinkComplete(hip_link_state_ptr, &BinOut, &BinSize));
     }
     {
@@ -882,7 +1109,7 @@ public:
     }
 
     // TODO: remove, this is obsolete, version 5.7.1 accepts KernelArgs without
-    // going through the hoops. This code is not correct if arguments are not
+    // going through hoops. This code is not correct if arguments are not
     // pointers or scalars of the same size as pointers.
 #if 0
     std::vector<void *>ArgBuffer(F->arg_size());
@@ -897,17 +1124,20 @@ public:
     {
       TIMESCOPE("Module get function");
       hipErrCheck(hipModuleGetFunction(&HipFunction, HipModule,
-                                       (FnName + "_jit").str().c_str()));
+                                       (KernelName + Suffix).str().c_str()));
     }
-
-    auto Ret = hipModuleLaunchKernel(
-        HipFunction, GridDimX, GridDimY, GridDimZ, BlockDimX, BlockDimY,
-        BlockDimZ, ShmemSize, (hipStream_t)Stream,
-        /* kernel_args (unsupported)*/ KernelArgs, nullptr);
+    CodeCache.insert(HashValue, HipFunction
+#ifdef ENABLE_DEBUG
+                     ,
+                     KernelName, RC, NumRuntimeConstants
+#endif
+    );
+    return hipModuleLaunchKernel(HipFunction, GridDimX, GridDimY, GridDimZ,
+                                 BlockDimX, BlockDimY, BlockDimZ, ShmemSize,
+                                 (hipStream_t)Stream, KernelArgs, nullptr);
 #else
 #error "Device JIT requires ENABLE_HIP"
 #endif
-    return Ret;
   }
 
   void insertRegisterVar(const char *VarName, void *DevPtr) {
@@ -917,6 +1147,7 @@ public:
 private:
   JitEngineDevice() {}
   std::unordered_map<std::string, void *> VarNameToDevPtr;
+  JitCache CodeCache;
 };
 
 // TODO: Guard with ENABLE_HIP.
@@ -931,10 +1162,11 @@ __attribute((used)) void __jit_register_var(const void *HostAddr,
 }
 
 __attribute__((used)) hipError_t
-__jit_launch_kernel(char *KernelName, char *IR, int IRSize, RuntimeConstant *RC,
-                    int NumRuntimeConstants, uint64_t GridDimXY,
-                    uint32_t GridDimZ, uint64_t BlockDimXY, uint32_t BlockDimZ,
-                    void **KernelArgs, uint64_t ShmemSize, void *Stream) {
+__jit_launch_kernel(char *KernelName, HipFatbinWrapper_t *HipFatbinWrapper,
+                    RuntimeConstant *RC, int NumRuntimeConstants,
+                    uint64_t GridDimXY, uint32_t GridDimZ, uint64_t BlockDimXY,
+                    uint32_t BlockDimZ, void **KernelArgs, uint64_t ShmemSize,
+                    void *Stream) {
   TIMESCOPE("__jit_launch_kernel");
   JitEngineDevice &Jit = JitEngineDevice::instance();
   DBG(dbgs() << "JIT Launch Kernel\n");
@@ -952,9 +1184,8 @@ __jit_launch_kernel(char *KernelName, char *IR, int IRSize, RuntimeConstant *RC,
   DBG(dbgs() << "ShmemSize " << ShmemSize << "\n");
   DBG(dbgs() << "Stream " << Stream << "\n");
   DBG(dbgs() << "=== End Kernel Info\n");
-  StringRef StrIR(IR, IRSize);
-  return Jit.compileAndRun(KernelName, IR, IRSize, RC, NumRuntimeConstants,
-                           GridDimX, GridDimY, GridDimZ, BlockDimX, BlockDimY,
-                           BlockDimZ, KernelArgs, ShmemSize, Stream);
+  return Jit.compileAndRun(
+      KernelName, HipFatbinWrapper, RC, NumRuntimeConstants, GridDimX, GridDimY,
+      GridDimZ, BlockDimX, BlockDimY, BlockDimZ, KernelArgs, ShmemSize, Stream);
 }
 }
