@@ -3,7 +3,7 @@
 list(APPEND CMAKE_PREFIX_PATH "${LLVM_INSTALL_DIR}/lib/cmake/llvm/")
 
 # FIXME: This is a warkaround for #25. Remove once resolved and use
-find_package(LLVM 16 REQUIRED CONFIG)
+find_package(LLVM ${LLVM_VERSION} CONFIG)
 
 if(NOT LLVM_ENABLE_RTTI)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")

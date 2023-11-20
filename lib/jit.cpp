@@ -33,6 +33,7 @@
 #include "llvm/Object/ELF.h"
 #include "llvm/Object/SymbolSize.h"
 #include "llvm/Pass.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
@@ -60,10 +61,12 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/Passes/OptimizationLevel.h>
 #include <llvm/Support/ErrorHandling.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
 #include <iostream>
+#include <string>
 #include <system_error>
 
 #if ENABLE_HIP
@@ -94,8 +97,8 @@
 #endif
 
 // #define ENABLE_TIME_PROFILING
-// #define ENABLE_PERFMAP
-// #define ENABLE_DEBUG
+//  #define ENABLE_PERFMAP
+//  #define ENABLE_DEBUG
 
 #define ENABLE_RUNTIME_CONSTPROP
 
@@ -380,6 +383,7 @@ public:
     Hits++;
     return It->second.HipFunction;
   }
+
   void insert(uint64_t HashValue, hipFunction_t HipFunction
 #ifdef ENABLE_DEBUG
               ,
@@ -539,7 +543,6 @@ public:
         ConstantInt *ConstInt = cast<ConstantInt>(CAM->getValue());
         int ArgNo = ConstInt->getZExtValue();
         Value *Arg = F->getArg(ArgNo);
-        // TODO: add constant creation for FP types too.
         Type *ArgType = Arg->getType();
         Constant *C = nullptr;
         if (ArgType->isIntegerTy(32)) {
@@ -736,7 +739,6 @@ __attribute__((used)) void *__jit_entry(char *FnName, char *IR, int IRSize,
                                         int NumRuntimeConstants) {
   TIMESCOPE("__jit_entry");
   JitEngine &Jit = JitEngine::instance();
-  // JitEngi(0, (char *[]){ nullptr });
 #if 0
     dbgs() << "FnName " << FnName << " NumRuntimeConstants "
       << NumRuntimeConstants << "\n";
@@ -884,7 +886,8 @@ public:
 
   Expected<llvm::orc::ThreadSafeModule>
   parseBitcode(StringRef FnName, StringRef Suffix, StringRef IR,
-               RuntimeConstant *RC, int NumRuntimeConstants) {
+               int MaxBlockSize, int MinGridSize, RuntimeConstant *RC,
+               int NumRuntimeConstants) {
 
     TIMESCOPE("parseBitcode");
     auto Ctx = std::make_unique<LLVMContext>();
@@ -938,7 +941,6 @@ public:
         ConstantInt *ConstInt = cast<ConstantInt>(CAM->getValue());
         int ArgNo = ConstInt->getZExtValue();
         Value *Arg = F->getArg(ArgNo);
-        // TODO: add constant creation for FP types too.
         Type *ArgType = Arg->getType();
         Constant *C = nullptr;
         if (ArgType->isIntegerTy(32)) {
@@ -967,10 +969,13 @@ public:
 
       F->setName(FnName + Suffix);
 
-#if 0
-      for(auto &GO: M->global_objects()) {
-        GO.setComdat(nullptr);
-      }
+#ifdef ENABLE_JIT_LAUNCH_BOUNDS
+      // TODO: fix calculation of launch bounds.
+      F->addFnAttr("amdgpu-flat-work-group-size",
+                   "1," + std::to_string(MaxBlockSize));
+      F->addFnAttr("amdgpu-waves-per-eu", std::to_string(MinGridSize));
+      dbgs() << "Set MaxThreads " << MaxBlockSize << " MinTeams " << MinGridSize
+             << "\n";
 #endif
 
 #ifdef ENABLE_DEBUG
@@ -1014,8 +1019,9 @@ public:
     // TODO: We don't need a unique suffix here if we use a different hip
     // module, function per specialized kernel. Depends on how we implement
     // loading and executing device kernels.
-    auto TransformedBitcode =
-        parseBitcode(KernelName, Suffix, StrIR, RC, NumRuntimeConstants);
+    auto TransformedBitcode = parseBitcode(
+        KernelName, Suffix, StrIR, BlockDimX * BlockDimY * BlockDimZ,
+        GridDimX * GridDimY * GridDimZ, RC, NumRuntimeConstants);
     if (auto E = TransformedBitcode.takeError())
       report_fatal_error(toString(std::move(E)).c_str());
 
@@ -1102,6 +1108,19 @@ public:
                                        (void *)MemBuf.data(), MemBuf.size(),
                                        KernelName.data(), 0, nullptr, nullptr));
       hiprtcErrCheck(hiprtcLinkComplete(hip_link_state_ptr, &BinOut, &BinSize));
+#ifdef ENABLE_DEBUG
+      {
+        std::error_code EC;
+        raw_fd_ostream OutBin(Twine("object-.jit." + KernelName + ".o").str(),
+                              EC);
+        if (EC)
+          report_fatal_error("Cannot open device object file");
+        // TODO: Remove or leave it only for debugging.
+        StringRef S(reinterpret_cast<char *>(BinOut), BinSize);
+        OutBin << S;
+        OutBin.close();
+      }
+#endif
     }
     {
       TIMESCOPE("Load module");

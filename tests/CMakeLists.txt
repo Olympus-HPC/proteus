@@ -10,6 +10,6 @@ target_compile_options(
     -fpass-plugin=$<TARGET_FILE:JitPass>
     -march=native)
 
-if (ENABLE_HIP)
-add_subdirectory(hip)
-endif ()
+if(ENABLE_HIP)
+    add_subdirectory(hip)
+endif()

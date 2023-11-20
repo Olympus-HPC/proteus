@@ -37,6 +37,9 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
+#include "llvm/Transforms/IPO/GlobalDCE.h"
+#include "llvm/Transforms/IPO/StripDeadPrototypes.h"
+#include "llvm/Transforms/IPO/StripSymbols.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 #include <llvm/ADT/StringRef.h>
@@ -57,6 +60,11 @@
 
 // #define ENABLE_RECURSIVE_JIT
 #define DEBUG_TYPE "jitpass"
+#ifdef ENABLE_DEBUG
+#define DEBUG(x) x
+#else
+#define DEBUG(x)
+#endif
 
 using namespace llvm;
 
@@ -75,7 +83,7 @@ struct JitFunctionInfo {
 
 SmallVector<JitFunctionInfo, 8> JitFunctionInfoList;
 
-static bool IsDeviceCompilation(Module &M) {
+static bool isDeviceCompilation(Module &M) {
   Triple TargetTriple(M.getTargetTriple());
   dbgs() << "TargetTriple " << M.getTargetTriple() << "\n";
   if (TargetTriple.isNVPTX() || TargetTriple.isAMDGCN())
@@ -84,7 +92,7 @@ static bool IsDeviceCompilation(Module &M) {
   return false;
 }
 
-static bool IsDeviceKernel(Module &M, Function &Fn, CallBase **LaunchKernelCall,
+static bool isDeviceKernel(Module &M, Function &Fn, CallBase **LaunchKernelCall,
                            Value **Kernel) {
   // TODO: generalize to CUDA.
   Function *LaunchKernelFn = M.getFunction("hipLaunchKernel");
@@ -117,8 +125,7 @@ static bool HasDeviceKernels(Module &M) {
 void parseAnnotations(Module &M) {
   auto GlobalAnnotations = M.getNamedGlobal("llvm.global.annotations");
   if (GlobalAnnotations) {
-    dbgs() << "IsDevice " << IsDeviceCompilation(M) << "\n";
-    // getchar();
+    dbgs() << "isDevice " << isDeviceCompilation(M) << "\n";
     auto Array = cast<ConstantArray>(GlobalAnnotations->getOperand(0));
     dbgs() << "Array " << *Array << "\n";
     for (int i = 0; i < Array->getNumOperands(); i++) {
@@ -206,6 +213,30 @@ getReachableFunctions(Module &M, Function &F,
   }
 }
 
+void runCleanupPassPipeline(Module &M) {
+  PassBuilder PB;
+  LoopAnalysisManager LAM;
+  FunctionAnalysisManager FAM;
+  CGSCCAnalysisManager CGAM;
+  ModuleAnalysisManager MAM;
+
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+  ModulePassManager Passes;
+  // Using pass for extraction (to remove?)
+  // Passes.add(createGVExtractionPass(GlobalsToExtract));
+  Passes.addPass(AlwaysInlinerPass());
+  Passes.addPass(GlobalDCEPass());
+  Passes.addPass(StripDeadDebugInfoPass());
+  Passes.addPass(StripDeadPrototypesPass());
+  // JitMod
+  Passes.run(M, MAM);
+}
+
 static void createJITModule(Module &M, JitFunctionInfo &JFI) {
   SmallPtrSet<Function *, 16> ReachableFunctions;
   getReachableFunctions(M, *JFI.Fn, ReachableFunctions);
@@ -261,7 +292,6 @@ static void createJITModule(Module &M, JitFunctionInfo &JFI) {
 #endif
 
           // dbgs() << "Keep reachable " << F->getName() << "\n";
-          // getchar();
 
           return true;
         }
@@ -274,7 +304,8 @@ static void createJITModule(Module &M, JitFunctionInfo &JFI) {
   JitF->setLinkage(GlobalValue::ExternalLinkage);
   // Run a global DCE pass on the JIT module IR to remove
   // unnecessary symbols and reduce the IR to JIT at runtime.
-  dbgs() << "=== Pre DCE JIT IR\n" << *JitMod << "=== End of Pre DCE JIT IR\n";
+  DEBUG(dbgs() << "=== Pre DCE JIT IR\n"
+               << *JitMod << "=== End of Pre DCE JIT IR\n");
   // Using pass for extraction (to remove?)
   // std::vector<GlobalValue *> GlobalsToExtract;
   // for (auto *F : ReachableFunctions) {
@@ -301,20 +332,13 @@ static void createJITModule(Module &M, JitFunctionInfo &JFI) {
     JitModF.addFnAttr(Attribute::AlwaysInline);
   }
 
-  dbgs() << "=== Pre Passes JIT IR\n"
-         << *JitMod << "=== End of Pre Passes JIT R\n";
+  DEBUG(dbgs() << "=== Pre Passes JIT IR\n"
+               << *JitMod << "=== End of Pre Passes JIT R\n");
 
-  legacy::PassManager Passes;
-  // Using pass for extraction (to remove?)
-  // Passes.add(createGVExtractionPass(GlobalsToExtract));
-  Passes.add(createAlwaysInlinerLegacyPass());
-  Passes.add(createGlobalDCEPass());
-  Passes.add(createStripDeadDebugInfoPass());
-  Passes.add(createStripDeadPrototypesPass());
-  Passes.run(*JitMod);
+  runCleanupPassPipeline(*JitMod);
 
-  dbgs() << "=== Post Passes JIT IR\n"
-         << *JitMod << "=== End of Post Passes JIT R\n";
+  DEBUG(dbgs() << "=== Post Passes JIT IR\n"
+               << *JitMod << "=== End of Post Passes JIT R\n");
 
   // Update linkage and visibility in the original module only for
   // globals included in the JIT module required for external
@@ -385,8 +409,8 @@ static void createJITModule(Module &M, JitFunctionInfo &JFI) {
   WriteBitcodeToFile(*JitMod, OS);
   OS.flush();
 
-  dbgs() << "=== Post DCE JIT IR\n"
-         << *JitMod << "=== End of Post DCE JIT IR\n";
+  DEBUG(dbgs() << "=== Post DCE JIT IR\n"
+               << *JitMod << "=== End of Post DCE JIT IR\n");
 }
 
 static void createJITModuleSectionsDevice(Module &M, JitFunctionInfo &JFI) {
@@ -416,7 +440,8 @@ static void createJITModuleSectionsDevice(Module &M, JitFunctionInfo &JFI) {
   Function *JitF = cast<Function>(VMap[JFI.Fn]);
   // Run a global DCE pass on the JIT module IR to remove
   // unnecessary symbols and reduce the IR to JIT at runtime.
-  dbgs() << "=== Pre DCE JIT IR\n" << *JitMod << "=== End of Pre DCE JIT IR\n";
+  DEBUG(dbgs() << "=== Pre DCE JIT IR\n"
+               << *JitMod << "=== End of Pre DCE JIT IR\n");
 
   // TODO: is this necessary? Other tools could be performing it already.
   // Internalize functions, besides JIT function, in the module
@@ -436,18 +461,13 @@ static void createJITModuleSectionsDevice(Module &M, JitFunctionInfo &JFI) {
     JitModF.addFnAttr(Attribute::AlwaysInline);
   }
 
-  dbgs() << "=== Pre Passes JIT IR\n"
-         << *JitMod << "=== End of Pre Passes JIT R\n";
+  DEBUG(dbgs() << "=== Pre Passes JIT IR\n"
+               << *JitMod << "=== End of Pre Passes JIT R\n");
 
-  legacy::PassManager Passes;
-  Passes.add(createAlwaysInlinerLegacyPass());
-  Passes.add(createGlobalDCEPass());
-  Passes.add(createStripDeadDebugInfoPass());
-  Passes.add(createStripDeadPrototypesPass());
-  Passes.run(*JitMod);
+  runCleanupPassPipeline(*JitMod);
 
-  dbgs() << "=== Post Passes JIT IR\n"
-         << *JitMod << "=== End of Post Passes JIT R\n";
+  DEBUG(dbgs() << "=== Post Passes JIT IR\n"
+               << *JitMod << "=== End of Post Passes JIT R\n");
 
   // TODO: Do we want to keep debug info to use for GDB/LLDB
   // interfaces for debugging jitted code?
@@ -475,8 +495,8 @@ static void createJITModuleSectionsDevice(Module &M, JitFunctionInfo &JFI) {
   WriteBitcodeToFile(*JitMod, OS);
   OS.flush();
 
-  dbgs() << "=== Post DCE JIT IR\n"
-         << *JitMod << "=== End of Post DCE JIT IR\n";
+  DEBUG(dbgs() << "=== Post DCE JIT IR\n"
+               << *JitMod << "=== End of Post DCE JIT IR\n");
 
   dbgs() << "Create JIT sections\n";
   Constant *JitModule = ConstantDataArray::get(
@@ -566,8 +586,7 @@ static void emitJITKernelStub(Module &M, JitFunctionInfo &JFI,
   LaunchKernelCall->replaceAllUsesWith(Ret);
   LaunchKernelCall->eraseFromParent();
 
-  dbgs() << "=== StubFn " << *JFI.Fn << "=== End of StubFn\n";
-  // getchar();
+  // dbgs() << "=== StubFn " << *JFI.Fn << "=== End of StubFn\n";
 }
 
 static void instrumentRegisterVar(Module &M) {
@@ -676,7 +695,6 @@ static void emitJITFunctionStub(Module &M, JitFunctionInfo &JFI) {
     Builder.CreateRet(RetVal);
 
   // dbgs() << "=== StubFn " << *StubFn << "=== End of StubFn\n";
-  // getchar();
 }
 
 // This method implements what the pass does
@@ -687,14 +705,14 @@ void visitor(Module &M, CallGraph &CG) {
     return;
   }
 
-  dbgs() << "=== Pre M\n" << M << "=== End of Pre M\n";
+  DEBUG(dbgs() << "=== Pre M\n" << M << "=== End of Pre M\n");
   // TODO: Supporting -fgpu-rdc compilation is tricky because clang compiles
   // first for the host and then for the device. The method here will not work.
   // It assumes that device compilation runs first to output JIT section
   // bitcodes that the host compilation ingests. One possibility is to let the
   // runtime library extract the JIT section bitcodes to perform preprocessing
   // and jit compilation.
-  if (IsDeviceCompilation(M)) {
+  if (isDeviceCompilation(M)) {
     for (JitFunctionInfo &JFI : JitFunctionInfoList)
       createJITModuleSectionsDevice(M, JFI);
 
@@ -709,7 +727,7 @@ void visitor(Module &M, CallGraph &CG) {
     dbgs() << "Processing JIT Function " << JFI.Fn->getName() << "\n";
     Value *Kernel = nullptr;
     CallBase *LaunchKernelCall = nullptr;
-    if (IsDeviceKernel(M, *JFI.Fn, &LaunchKernelCall, &Kernel)) {
+    if (isDeviceKernel(M, *JFI.Fn, &LaunchKernelCall, &Kernel)) {
       // TODO: Assumes Kernel->getName() returns the actual string name of the
       // kernel, a more robust solution would look up hipRegisterFunction to
       // find the name by the argument global.
@@ -725,7 +743,7 @@ void visitor(Module &M, CallGraph &CG) {
     emitJITFunctionStub(M, JFI);
   }
 
-  dbgs() << "=== Post M\n" << M << "=== End Post M\n";
+  DEBUG(dbgs() << "=== Post M\n" << M << "=== End Post M\n");
   if (verifyModule(M, &errs()))
     report_fatal_error("Broken original module found, compilation aborted!",
                        false);
