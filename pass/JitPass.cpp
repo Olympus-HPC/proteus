@@ -437,6 +437,32 @@ static void createJITModuleSectionsDevice(Module &M, JitFunctionInfo &JFI) {
     return true;
   });
 
+  // Remove llvm.global.annotations and .jit section globals from the module and
+  // used lists.
+  SmallPtrSet<GlobalVariable *, 8> JitGlobalsToRemove;
+  auto JitGlobalAnnotations = JitMod->getNamedGlobal("llvm.global.annotations");
+  assert(JitGlobalAnnotations &&
+         "Expected llvm.global.annotations in jit module");
+  JitGlobalsToRemove.insert(JitGlobalAnnotations);
+
+  for (auto &GV : JitMod->globals()) {
+    if (GV.getSection().starts_with(".jit."))
+      JitGlobalsToRemove.insert(&GV);
+  }
+
+  removeFromUsedLists(*JitMod, [&JitGlobalsToRemove](Constant *C) {
+    if (auto *GV = dyn_cast<GlobalVariable>(C)) {
+      if (JitGlobalsToRemove.contains(GV))
+        return true;
+      ;
+    }
+
+    return false;
+  });
+
+  for (auto *GV : JitGlobalsToRemove)
+    JitMod->eraseGlobalVariable(GV);
+
   Function *JitF = cast<Function>(VMap[JFI.Fn]);
   // Run a global DCE pass on the JIT module IR to remove
   // unnecessary symbols and reduce the IR to JIT at runtime.
