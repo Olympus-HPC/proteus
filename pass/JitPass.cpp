@@ -454,7 +454,6 @@ static void createJITModuleSectionsDevice(Module &M, JitFunctionInfo &JFI) {
     if (auto *GV = dyn_cast<GlobalVariable>(C)) {
       if (JitGlobalsToRemove.contains(GV))
         return true;
-      ;
     }
 
     return false;
