@@ -14,7 +14,10 @@ config.test_exec_root = '${CMAKE_CURRENT_BINARY_DIR}'
 
 function(CREATE_TEST exe source)
     add_executable(${exe} ${source})
-    set_source_files_properties(${source} PROPERTIES LANGUAGE HIP)
+    set_source_files_properties(${source} PROPERTIES
+        LANGUAGE HIP
+        OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/JitPass.cpp
+    )
 
     target_link_libraries(${exe} PUBLIC jit)
 

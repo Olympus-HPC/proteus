@@ -19,6 +19,10 @@ add_executable(
     daxpy.cpp
 )
 
+set_source_files_properties(daxpy.cpp PROPERTIES
+    OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/JitPass.cpp
+)
+
 target_link_libraries(daxpy PUBLIC jit)
 target_compile_options(
     daxpy
