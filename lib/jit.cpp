@@ -96,11 +96,7 @@
 
 #endif
 
-// #define ENABLE_TIME_PROFILING
 //  #define ENABLE_PERFMAP
-//  #define ENABLE_DEBUG
-
-#define ENABLE_RUNTIME_CONSTPROP
 
 #ifdef ENABLE_DEBUG
 #define DBG(x) x;
@@ -123,7 +119,7 @@ struct TimeTracerRAII {
   }
 };
 
-#ifdef ENABLE_TIME_PROFILING
+#ifdef ENABLE_TIME_TRACING
 TimeTracerRAII TimeTracer;
 #define TIMESCOPE(x) TimeTraceScope T(x);
 #else
@@ -971,11 +967,15 @@ public:
 
 #ifdef ENABLE_JIT_LAUNCH_BOUNDS
       // TODO: fix calculation of launch bounds.
+      // TODO: find maximum (hardcoded 1024) from device info.
+      // TODO: Setting as 1, MaxBlockSize to replicate launch bounds settings.
+      // Does setting it as MaxBlockSize, MaxBlockSize help?
       F->addFnAttr("amdgpu-flat-work-group-size",
-                   "1," + std::to_string(MaxBlockSize));
-      F->addFnAttr("amdgpu-waves-per-eu", std::to_string(MinGridSize));
-      dbgs() << "Set MaxThreads " << MaxBlockSize << " MinTeams " << MinGridSize
-             << "\n";
+                   "1," + std::to_string(std::min(1024, MaxBlockSize)));
+      // int MaxWavesPerEU = (MinGridSize * MaxBlockSize);
+      //  F->addFnAttr("amdgpu-waves-per-eu",  std::to_string(MinGridSize));
+      DBG(dbgs() << "Set MaxThreads " << MaxBlockSize << " MinTeams "
+                 << MinGridSize << "\n");
 #endif
 
 #ifdef ENABLE_DEBUG
@@ -1086,18 +1086,18 @@ public:
     void *BinOut;
     size_t BinSize;
     {
-      TIMESCOPE("Device linker")
+      TIMESCOPE("Device linker");
       hiprtcErrCheck(
           hiprtcLinkCreate(0, nullptr, nullptr, &hip_link_state_ptr));
 
 #if CUSTOM_OPTIONS
       // NOTE: This code is an example of passing custom, AMD-specific options
       // to the compiler/linker.
-      const char *isaopts[] = {"-mllvm", "-inline-threshold=1", "-mllvm",
-                               "-inlinehint-threshold=1"};
+      const char *isaopts[] = {"-mllvm", "-amdgpu-internalize-symbols",
+                               "-save-temps"};
       std::vector<hiprtcJIT_option> jit_options = {
           HIPRTC_JIT_IR_TO_ISA_OPT_EXT, HIPRTC_JIT_IR_TO_ISA_OPT_COUNT_EXT};
-      size_t isaoptssize = 4;
+      size_t isaoptssize = 3;
       const void *lopts[] = {(void *)isaopts, (void *)(isaoptssize)};
       hiprtcErrCheck(hiprtcLinkCreate(2, jit_options.data(), (void **)lopts,
                                       &hip_link_state_ptr));
