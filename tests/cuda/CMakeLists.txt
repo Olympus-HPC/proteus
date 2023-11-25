@@ -1,4 +1,14 @@
-enable_language(HIP)
+if(NOT CMAKE_CUDA_ARCHITECTURES)
+    message(FATAL_ERROR "Set CMAKE_CUDA_ARCHITECTURES to compile for")
+endif()
+
+enable_language(CUDA)
+
+message(STATUS "CUDA compiler ${CMAKE_CUDA_COMPILER_ID}")
+
+if(NOT ${CMAKE_CUDA_COMPILER_ID} STREQUAL "Clang")
+    message(FATAL_ERROR "JIT is compatible only with Clang CUDA compilation")
+endif()
 
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/lit.cfg.py "
 import lit.formats
@@ -15,60 +25,50 @@ config.substitutions.append(('%ext', ext))
 )
 
 function(CREATE_TEST exe source)
-    add_executable(${exe}.hip ${source})
+    add_executable(${exe}.cuda ${source})
     set_source_files_properties(${source} PROPERTIES
-        LANGUAGE HIP
+        LANGUAGE CUDA
         OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/JitPass.cpp
     )
 
-    target_link_libraries(${exe}.hip PUBLIC jit)
+    target_link_libraries(${exe}.cuda PUBLIC jit)
 
     target_compile_options(
-        ${exe}.hip
+        ${exe}.cuda
         PUBLIC
         -fpass-plugin=$<TARGET_FILE:JitPass>
     )
 
-    add_test(NAME ${exe}.hip COMMAND ${LIT} -vv -D EXT=hip ${source})
+    add_test(NAME ${exe}.cuda COMMAND ${LIT} -vv -D EXT=cuda ${source})
 endfunction()
 
 function(CREATE_TEST_RDC exe source)
-    add_executable(${exe}.hip.rdc ${source})
+    add_executable(${exe}.cuda.rdc ${source})
     set_source_files_properties(${source} PROPERTIES
-        LANGUAGE HIP
+        LANGUAGE CUDA
         OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/JitPass.cpp
     )
 
-    target_link_libraries(${exe}.hip.rdc PUBLIC jit)
+    target_link_libraries(${exe}.cuda.rdc PUBLIC jit)
 
-    # This is unsupported see: https://gitlab.kitware.com/cmake/cmake/-/issues/23210
-    # set_target_properties(${exe}.rdc PROPERTIES HIP_SEPARABLE_COMPILATION on)
-
-    # Add -fgpu-rdc, --hip-link options for compilation and linking to enable RDC.
     target_compile_options(
-        ${exe}.hip.rdc
+        ${exe}.cuda.rdc
         PUBLIC
-        -fgpu-rdc
         -fpass-plugin=$<TARGET_FILE:JitPass>
     )
+    set_target_properties(${exe}.cuda.rdc PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
-    target_link_options(${exe}.hip.rdc PUBLIC -fgpu-rdc --hip-link)
-
-    add_test(NAME ${exe}.hip.rdc COMMAND ${LIT} -vv -D EXT=hip.rdc ${source})
+    add_test(NAME ${exe}.cuda.rdc COMMAND ${LIT} -vv -D EXT=cuda.rdc ${source})
 endfunction()
 
 CREATE_TEST(kernel kernel.cpp)
 CREATE_TEST(kernel_cache kernel_cache.cpp)
 CREATE_TEST(kernel_args kernel_args.cpp)
 CREATE_TEST(kernels_gvar kernels_gvar.cpp)
-CREATE_TEST(kernel_launches kernel_launches.cpp)
-CREATE_TEST(kernel_launches_args kernel_launches_args.cpp)
 CREATE_TEST(daxpy daxpy.cpp)
 
 CREATE_TEST_RDC(kernel kernel.cpp)
 CREATE_TEST_RDC(kernel_cache kernel_cache.cpp)
 CREATE_TEST_RDC(kernel_args kernel_args.cpp)
 CREATE_TEST_RDC(kernels_gvar kernels_gvar.cpp)
-CREATE_TEST_RDC(kernel_launches kernel_launches.cpp)
-CREATE_TEST_RDC(kernel_launches_args kernel_launches_args.cpp)
 CREATE_TEST_RDC(daxpy daxpy.cpp)

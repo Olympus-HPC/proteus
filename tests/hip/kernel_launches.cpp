@@ -1,4 +1,4 @@
-// RUN: ./kernel_cache.%ext | FileCheck %s
+// RUN: ./kernel_launches.%ext | FileCheck %s
 #include <climits>
 #include <cstdio>
 #include <hip/hip_runtime.h>
@@ -18,14 +18,12 @@ __global__ __attribute__((annotate("jit"))) void kernel() {
 }
 
 int main() {
-  for (int i = 0; i < 10; ++i) {
-    kernel<<<1, 1>>>();
-    hipErrCheck(hipDeviceSynchronize());
-  }
+  kernel<<<1, 1>>>();
+  hipErrCheck(hipLaunchKernel((const void *)kernel, 1, 1, nullptr, 0, 0));
+  hipErrCheck(hipDeviceSynchronize());
   return 0;
 }
 
-// CHECK-COUNT-10: Kernel
-// CHECK-NOT: Kernel
-// CHECK: JitCache hits 9 total 10
-// CHECK: HashValue {{[0-9]+}} num_execs 10
+// CHECK: Kernel
+// CHECK: JitCache hits 1 total 2
+// CHECK: HashValue {{[0-9]+}} num_execs 2

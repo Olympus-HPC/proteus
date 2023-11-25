@@ -1,9 +1,9 @@
-// RUN: ./daxpy_hip | FileCheck %s
+// RUN: ./daxpy.%ext | FileCheck %s
 #include <cstddef>
 #include <cstdlib>
 #include <iostream>
 
-#include <hip/hip_runtime.h>
+#include <cuda_runtime.h>
 
 __global__ __attribute__((annotate("jit", 4), noinline)) void
 daxpy_impl(double a, double *x, double *y, int N) {
@@ -16,8 +16,9 @@ daxpy_impl(double a, double *x, double *y, int N) {
 
 void daxpy(double a, double *x, double *y, int N) {
   const std::size_t grid_size = (((N) + (256) - 1) / (256));
-  hipLaunchKernelGGL((daxpy_impl), dim3(grid_size), dim3(256), 0, 0, a, x, y,
-                     N);
+  void *args[] = {&a, &x, &y, &N};
+  cudaLaunchKernel((const void *)(daxpy_impl), dim3(grid_size), dim3(256), args,
+                   0, 0);
 }
 
 int main(int argc, char **argv) {
@@ -25,8 +26,8 @@ int main(int argc, char **argv) {
   double *x;
   double *y;
 
-  hipMallocManaged(&x, sizeof(double) * N);
-  hipMallocManaged(&y, sizeof(double) * N);
+  cudaMallocManaged(&x, sizeof(double) * N);
+  cudaMallocManaged(&y, sizeof(double) * N);
 
   for (std::size_t i{0}; i < N; i++) {
     x[i] = 0.31414 * i;
@@ -35,14 +36,14 @@ int main(int argc, char **argv) {
 
   std::cout << y[10] << std::endl;
   daxpy(6.2, x, y, N);
-  hipDeviceSynchronize();
+  cudaDeviceSynchronize();
   std::cout << y[10] << std::endl;
   daxpy(6.2, x, y, N);
-  hipDeviceSynchronize();
+  cudaDeviceSynchronize();
   std::cout << y[10] << std::endl;
 
-  hipFree(x);
-  hipFree(y);
+  cudaFree(x);
+  cudaFree(y);
 }
 
 // CHECK: 0

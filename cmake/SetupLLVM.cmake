@@ -2,8 +2,7 @@
 # find_package can locate it)
 list(APPEND CMAKE_PREFIX_PATH "${LLVM_INSTALL_DIR}/lib/cmake/llvm/")
 
-# FIXME: This is a warkaround for #25. Remove once resolved and use
-find_package(LLVM ${LLVM_VERSION} CONFIG)
+find_package(LLVM ${LLVM_VERSION} REQUIRED CONFIG)
 
 if(NOT LLVM_ENABLE_RTTI)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")

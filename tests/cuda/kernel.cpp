@@ -1,14 +1,14 @@
 // RUN: ./kernel.%ext | FileCheck %s
 #include <climits>
 #include <cstdio>
-#include <hip/hip_runtime.h>
+#include <cuda_runtime.h>
 
-#define hipErrCheck(CALL)                                                      \
+#define cudaErrCheck(CALL)                                                     \
   {                                                                            \
-    hipError_t err = CALL;                                                     \
-    if (err != hipSuccess) {                                                   \
+    cudaError_t err = CALL;                                                    \
+    if (err != cudaSuccess) {                                                  \
       printf("ERROR @ %s:%d ->  %s\n", __FILE__, __LINE__,                     \
-             hipGetErrorString(err));                                          \
+             cudaGetErrorString(err));                                         \
       abort();                                                                 \
     }                                                                          \
   }
@@ -19,7 +19,7 @@ __global__ __attribute__((annotate("jit"))) void kernel() {
 
 int main() {
   kernel<<<1, 1>>>();
-  hipErrCheck(hipDeviceSynchronize());
+  cudaErrCheck(cudaDeviceSynchronize());
   return 0;
 }
 
