@@ -1154,7 +1154,7 @@ public:
     // NOTE: we don't need a suffix to differentiate kernels, each
     // specialization will be in its own module. It exists only for
     // debugging purposes to verify that the jitted kernel executes.
-    std::string Suffix = "$" + std::to_string(HashValue);
+    std::string Suffix = "$jit$" + std::to_string(HashValue) + "$";
     auto TransformedBitcode = parseBitcode(
         KernelName, Suffix, IRBuffer->getBuffer(),
         BlockDim.x * BlockDim.y * BlockDim.z, GridDim.x * GridDim.y * GridDim.z,
