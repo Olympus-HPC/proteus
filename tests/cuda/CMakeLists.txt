@@ -30,6 +30,7 @@ function(CREATE_TEST exe source)
         LANGUAGE CUDA
         OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/JitPass.cpp
     )
+    add_dependencies(${exe}.cuda JitPass)
 
     target_link_libraries(${exe}.cuda PUBLIC jit)
 
@@ -39,6 +40,7 @@ function(CREATE_TEST exe source)
         -fpass-plugin=$<TARGET_FILE:JitPass>
     )
 
+    # set_target_properties(${exe}.cuda PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
     add_test(NAME ${exe}.cuda COMMAND ${LIT} -vv -D EXT=cuda ${source})
 endfunction()
 
@@ -48,6 +50,7 @@ function(CREATE_TEST_RDC exe source)
         LANGUAGE CUDA
         OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/JitPass.cpp
     )
+    add_dependencies(${exe}.cuda.rdc JitPass)
 
     target_link_libraries(${exe}.cuda.rdc PUBLIC jit)
 
@@ -56,7 +59,10 @@ function(CREATE_TEST_RDC exe source)
         PUBLIC
         -fpass-plugin=$<TARGET_FILE:JitPass>
     )
-    set_target_properties(${exe}.cuda.rdc PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    set_target_properties(${exe}.cuda.rdc PROPERTIES
+
+        # CUDA_RUNTIME_LIBRARY Shared
+        CUDA_SEPARABLE_COMPILATION ON)
 
     add_test(NAME ${exe}.cuda.rdc COMMAND ${LIT} -vv -D EXT=cuda.rdc ${source})
 endfunction()
@@ -65,10 +71,14 @@ CREATE_TEST(kernel kernel.cpp)
 CREATE_TEST(kernel_cache kernel_cache.cpp)
 CREATE_TEST(kernel_args kernel_args.cpp)
 CREATE_TEST(kernels_gvar kernels_gvar.cpp)
+CREATE_TEST(kernel_launches kernel_launches.cpp)
+CREATE_TEST(kernel_launches_args kernel_launches_args.cpp)
 CREATE_TEST(daxpy daxpy.cpp)
 
 CREATE_TEST_RDC(kernel kernel.cpp)
 CREATE_TEST_RDC(kernel_cache kernel_cache.cpp)
 CREATE_TEST_RDC(kernel_args kernel_args.cpp)
 CREATE_TEST_RDC(kernels_gvar kernels_gvar.cpp)
+CREATE_TEST_RDC(kernel_launches kernel_launches.cpp)
+CREATE_TEST_RDC(kernel_launches_args kernel_launches_args.cpp)
 CREATE_TEST_RDC(daxpy daxpy.cpp)

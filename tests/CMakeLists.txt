@@ -12,7 +12,7 @@ if(NOT LIT)
         set(LIT ${CMAKE_CURRENT_SOURCE_DIR}/lit-main.py)
         message(STATUS "Using ${LIT} for lit testing")
     else()
-        message(FATAL_ERROR "Exit code ${EXIT_CODE} Testing requires lit to be installed")
+        message(FATAL_ERROR "Testing requires lit to be installed, e.g., python -m pip install lit>=15.0.7")
     endif()
 else()
     message(STATUS "Found lit at ${LIT}")
@@ -34,6 +34,7 @@ add_executable(
 set_source_files_properties(daxpy.cpp PROPERTIES
     OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/JitPass.cpp
 )
+add_dependencies(daxpy JitPass)
 
 target_link_libraries(daxpy PUBLIC jit)
 

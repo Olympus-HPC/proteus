@@ -737,16 +737,55 @@ public:
                   DeviceBitcode.size()));
   }
 
-  std::unique_ptr<MemoryBuffer> extractDeviceBitcodeCuda(StringRef KernelName) {
-    auto JitModule =
-        MemoryBuffer::getFile("jit-" + KernelName + ".bc", false, false);
-    if (std::error_code EC = JitModule.getError())
-      FATAL_ERROR("Error reading JIT module bitcode file");
+#if ENABLE_CUDA
+  std::unique_ptr<MemoryBuffer> extractDeviceBitcodeCuda(StringRef KernelName,
+                                                         const char *Binary,
+                                                         size_t FatbinSize) {
+    CUmodule CUMod;
+    CUlinkState CULinkState = nullptr;
+    CUdeviceptr DevPtr;
+    size_t Bytes;
+    std::string Symbol = Twine("__jit_bc_" + KernelName).str();
 
-    StringRef DeviceBitcode(JitModule->get()->getBufferStart(),
-                            JitModule->get()->getBufferSize());
-    return MemoryBuffer::getMemBufferCopy(DeviceBitcode);
+    // NOTE: loading a module OR getting the global fails if rdc compilation is
+    // enabled. Try to use the linker interface to load the binary image. If
+    // that fails too, abort.
+    // TODO: detect rdc compilation in the JitPass, see
+    // __cudaRegisterLinkedLibrary or __nv_relfatbin section existences.
+    if (cuModuleLoadFatBinary(&CUMod, Binary) != CUDA_SUCCESS ||
+        cuModuleGetGlobal(&DevPtr, &Bytes, CUMod, Symbol.c_str()) ==
+            CUDA_ERROR_NOT_FOUND) {
+      cuErrCheck(cuLinkCreate(0, nullptr, nullptr, &CULinkState));
+      cuErrCheck(cuLinkAddData(CULinkState, CU_JIT_INPUT_FATBINARY,
+                               (void *)Binary, FatbinSize, "", 0, 0, 0));
+      void *BinOut;
+      size_t BinSize;
+      cuErrCheck(cuLinkComplete(CULinkState, &BinOut, &BinSize));
+      cuErrCheck(cuModuleLoadFatBinary(&CUMod, BinOut));
+    }
+
+    cuErrCheck(cuModuleGetGlobal(&DevPtr, &Bytes, CUMod, Symbol.c_str()));
+
+    SmallString<4096> DeviceBitcode;
+    DeviceBitcode.reserve(Bytes);
+    cuErrCheck(cuMemcpyDtoH(DeviceBitcode.data(), DevPtr, Bytes));
+    {
+      std::error_code EC;
+      raw_fd_ostream OutBC(Twine("from-device-jit-" + KernelName + ".bc").str(),
+                           EC);
+      if (EC)
+        FATAL_ERROR("Cannot open device memory jit file");
+      OutBC << StringRef(DeviceBitcode.data(), Bytes);
+      OutBC.close();
+    }
+
+    cuErrCheck(cuModuleUnload(CUMod));
+    if (CULinkState)
+      cuErrCheck(cuLinkDestroy(CULinkState));
+    return MemoryBuffer::getMemBufferCopy(
+        StringRef(DeviceBitcode.data(), Bytes));
   }
+#endif
 
   Expected<llvm::orc::ThreadSafeModule>
   parseBitcode(StringRef FnName, StringRef Suffix, StringRef IR, int BlockSize,
@@ -771,6 +810,8 @@ public:
 #if ENABLE_HIP
         const void *DevPtr = RegisterVar.second;
 #elif ENABLE_CUDA
+        // For CUDA we must defer resolving the global symbol address here
+        // instead when registering the variable in the constructor context.
         void *DevPtr = nullptr;
         cudaErrCheck(cudaGetSymbolAddress(&DevPtr, RegisterVar.second));
 #else
@@ -876,7 +917,7 @@ public:
                                  RuntimeConstant *RC, int NumRuntimeConstants,
                                  dim3 GridDim, dim3 BlockDim, void **KernelArgs,
                                  uint64_t ShmemSize, hipStream_t Stream) {
-    SmallString<1024> ModuleBuffer;
+    SmallString<4096> ModuleBuffer;
     raw_svector_ostream ModuleBufferOS(ModuleBuffer);
     ModuleBufferOS << *M;
     // WriteBitcodeToFile(*M, ModuleBufferOS);
@@ -971,47 +1012,28 @@ public:
                      KernelName, RC, NumRuntimeConstants
 #endif
     );
-    return hipModuleLaunchKernel(HipFunction, GridDim.x, GridDim.y, GridDim.z,
-                                 BlockDim.x, BlockDim.y, BlockDim.z, ShmemSize,
-                                 (hipStream_t)Stream, KernelArgs, nullptr);
+    hipErrCheck(hipModuleLaunchKernel(
+        HipFunction, GridDim.x, GridDim.y, GridDim.z, BlockDim.x, BlockDim.y,
+        BlockDim.z, ShmemSize, (hipStream_t)Stream, KernelArgs, nullptr));
+    return hipSuccess;
   }
 #endif
 
 #if ENABLE_CUDA
-  cudaError_t codegenAndLaunchCuda(Module *M, StringRef KernelName,
-                                   StringRef Suffix, uint64_t HashValue,
-                                   RuntimeConstant *RC, int NumRuntimeConstants,
-                                   dim3 GridDim, dim3 BlockDim,
-                                   void **KernelArgs, uint64_t ShmemSize,
-                                   CUstream Stream) {
+  cudaError_t codegenAndLaunchCuda(Module *M, StringRef CudaArch,
+                                   StringRef KernelName, StringRef Suffix,
+                                   uint64_t HashValue, RuntimeConstant *RC,
+                                   int NumRuntimeConstants, dim3 GridDim,
+                                   dim3 BlockDim, void **KernelArgs,
+                                   uint64_t ShmemSize, CUstream Stream) {
     // Codegen PTX, load the module and run through the CUDA PTX JIT
-    // interface.
-    CUdevice CUDev;
+    // interface. Check this reference for JIT caching:
+    // https://developer.nvidia.com/blog/cuda-pro-tip-understand-fat-binaries-jit-caching/
+    // Interesting env vars: CUDA_CACHE_DISABLE, CUDA_CACHE_MAXSIZE,
+    // CUDA_CACHE_PATH, CUDA_FORCE_PTX_JIT.
     CUmodule CUMod;
-    CUcontext CUCtx;
 
-    cuErrCheck(cuInit(0));
-
-    CUresult CURes = cuCtxGetDevice(&CUDev);
-    if (CURes == CUDA_ERROR_INVALID_CONTEXT or !CUDev)
-      // TODO: is selecting device 0 correct?
-      cuErrCheck(cuDeviceGet(&CUDev, 0));
-
-    cuErrCheck(cuCtxGetCurrent(&CUCtx));
-    if (!CUCtx)
-      cuErrCheck(cuCtxCreate(&CUCtx, 0, CUDev));
-
-    int CCMajor;
-    cuErrCheck(cuDeviceGetAttribute(
-        &CCMajor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, CUDev));
-    int CCMinor;
-    cuErrCheck(cuDeviceGetAttribute(
-        &CCMinor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, CUDev));
-    std::string CC = "sm_" + std::to_string(CCMajor * 10 + CCMinor);
-
-    DBG(dbgs() << "CUDA CC " << CC << "\n");
-
-    auto TMExpected = createTargetMachine(*M, CC);
+    auto TMExpected = createTargetMachine(*M, CudaArch);
     if (!TMExpected)
       FATAL_ERROR(toString(TMExpected.takeError()));
 
@@ -1023,7 +1045,7 @@ public:
     MachineModuleInfoWrapperPass *MMIWP = new MachineModuleInfoWrapperPass(
         reinterpret_cast<LLVMTargetMachine *>(TM.get()));
 
-    SmallString<1024> PtxStr;
+    SmallString<4096> PtxStr;
     raw_svector_ostream PtxOS(PtxStr);
     TM->addPassesToEmitFile(PM, PtxOS, nullptr, CGFT_AssemblyFile,
                             /* DisableVerify */ false, MMIWP);
@@ -1070,9 +1092,9 @@ public:
 #error "Expected ENABLE_HIP or ENABLE_CUDA to be defined'
 #endif
   compileAndRun(StringRef KernelName, FatbinWrapper_t *FatbinWrapper,
-                RuntimeConstant *RC, int NumRuntimeConstants, dim3 GridDim,
-                dim3 BlockDim, void **KernelArgs, uint64_t ShmemSize,
-                void *Stream) {
+                size_t FatbinSize, RuntimeConstant *RC, int NumRuntimeConstants,
+                dim3 GridDim, dim3 BlockDim, void **KernelArgs,
+                uint64_t ShmemSize, void *Stream) {
     TIMESCOPE("compileAndRun");
 
     uint64_t HashValue = CodeCache.hash(KernelName, RC, NumRuntimeConstants);
@@ -1097,7 +1119,34 @@ public:
 #if ENABLE_HIP
     auto IRBuffer = extractDeviceBitcodeHip(KernelName, FatbinWrapper->Binary);
 #elif ENABLE_CUDA
-    auto IRBuffer = extractDeviceBitcodeCuda(KernelName);
+    // Initialize CUDA and retrieve the compute capability, needed for later
+    // operations.
+    CUdevice CUDev;
+    CUcontext CUCtx;
+
+    cuErrCheck(cuInit(0));
+
+    CUresult CURes = cuCtxGetDevice(&CUDev);
+    if (CURes == CUDA_ERROR_INVALID_CONTEXT or !CUDev)
+      // TODO: is selecting device 0 correct?
+      cuErrCheck(cuDeviceGet(&CUDev, 0));
+
+    cuErrCheck(cuCtxGetCurrent(&CUCtx));
+    if (!CUCtx)
+      cuErrCheck(cuCtxCreate(&CUCtx, 0, CUDev));
+
+    int CCMajor;
+    cuErrCheck(cuDeviceGetAttribute(
+        &CCMajor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, CUDev));
+    int CCMinor;
+    cuErrCheck(cuDeviceGetAttribute(
+        &CCMinor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, CUDev));
+    std::string CudaArch = "sm_" + std::to_string(CCMajor * 10 + CCMinor);
+
+    DBG(dbgs() << "CUDA Arch " << CudaArch << "\n");
+
+    auto IRBuffer =
+        extractDeviceBitcodeCuda(KernelName, FatbinWrapper->Binary, FatbinSize);
 #else
 #error "Expected ENABLE_HIP or ENABLE_CUDA to be defined"
 #endif
@@ -1133,7 +1182,7 @@ public:
                                NumRuntimeConstants, GridDim, BlockDim,
                                KernelArgs, ShmemSize, (hipStream_t)Stream);
 #elif ENABLE_CUDA
-    return codegenAndLaunchCuda(M, KernelName, Suffix, HashValue, RC,
+    return codegenAndLaunchCuda(M, CudaArch, KernelName, Suffix, HashValue, RC,
                                 NumRuntimeConstants, GridDim, BlockDim,
                                 KernelArgs, ShmemSize, (CUstream)Stream);
 #else
@@ -1188,21 +1237,36 @@ __attribute((used)) void __jit_register_var(const void *HostAddr,
 
 __attribute__((used))
 #if ENABLE_HIP
+// NOTE: Using the ABI With scalars for GridDim, BlockDim instead of dim3 to
+// avoid issues with aggregate coercion of parameters.
 hipError_t
+__jit_launch_kernel(char *KernelName, FatbinWrapper_t *FatbinWrapper,
+                    size_t FatbinSize, RuntimeConstant *RC,
+                    int NumRuntimeConstants, uint64_t GridDimXY,
+                    uint32_t GridDimZ, uint64_t BlockDim_XY, uint32_t BlockDimZ,
+                    void **KernelArgs, uint64_t ShmemSize, void *Stream) {
+
 #elif ENABLE_CUDA
 cudaError_t
+__jit_launch_kernel(char *KernelName, FatbinWrapper_t *FatbinWrapper,
+                    size_t FatbinSize, RuntimeConstant *RC,
+                    int NumRuntimeConstants, dim3 GridDim, dim3 BlockDim,
+                    void **KernelArgs, uint64_t ShmemSize, void *Stream) {
 #else
 #error "Expected ENABLE_HIP or ENABLE_CUDA to be defined'
 #endif
-__jit_launch_kernel(char *KernelName, FatbinWrapper_t *FatbinWrapper,
-                    RuntimeConstant *RC, int NumRuntimeConstants, dim3 GridDim,
-                    dim3 BlockDim, void **KernelArgs, uint64_t ShmemSize,
-                    void *Stream) {
+#if ENABLE_HIP
+  dim3 GridDim = {*(uint32_t *)&GridDimXY, *(((uint32_t *)&GridDimXY) + 1),
+                  GridDimZ};
+  dim3 BlockDim = {*(uint32_t *)&BlockDim_XY, *(((uint32_t *)&BlockDim_XY) + 1),
+                   BlockDimZ};
+#endif
   TIMESCOPE("__jit_launch_kernel");
   JitEngineDevice &Jit = JitEngineDevice::instance();
   DBG(dbgs() << "JIT Launch Kernel\n");
   DBG(dbgs() << "=== Kernel Info\n");
   DBG(dbgs() << "KernelName " << KernelName << "\n");
+  DBG(dbgs() << "FatbinSize " << FatbinSize << "\n");
   DBG(dbgs() << "Grid " << GridDim.x << ", " << GridDim.y << ", " << GridDim.z
              << "\n");
   DBG(dbgs() << "Block " << BlockDim.x << ", " << BlockDim.y << ", "
@@ -1211,7 +1275,8 @@ __jit_launch_kernel(char *KernelName, FatbinWrapper_t *FatbinWrapper,
   DBG(dbgs() << "ShmemSize " << ShmemSize << "\n");
   DBG(dbgs() << "Stream " << Stream << "\n");
   DBG(dbgs() << "=== End Kernel Info\n");
-  return Jit.compileAndRun(KernelName, FatbinWrapper, RC, NumRuntimeConstants,
-                           GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
+  return Jit.compileAndRun(KernelName, FatbinWrapper, FatbinSize, RC,
+                           NumRuntimeConstants, GridDim, BlockDim, KernelArgs,
+                           ShmemSize, Stream);
 }
 }

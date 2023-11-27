@@ -49,6 +49,7 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/GlobalValue.h>
+#include <llvm/Transforms/Utils/BuildLibCalls.h>
 
 #include <iostream>
 #include <llvm/IR/GlobalVariable.h>
@@ -57,6 +58,7 @@
 #include <llvm/Support/Error.h>
 #include <llvm/Support/ErrorHandling.h>
 #include <llvm/Support/MemoryBuffer.h>
+#include <llvm/Support/MemoryBufferRef.h>
 #include <string>
 
 // #define ENABLE_RECURSIVE_JIT
@@ -589,21 +591,28 @@ createJITModuleSectionsDevice(Module &M,
 
   dbgs() << "Create JIT sections\n";
   // NOTE: HIP compilation supports custom section in the binary to store the
-  // IR. CUDA does not, hence we emit and parse it from an external file.
-#if ENABLE_HIP
+  // IR. CUDA does not, hence we parse the IR by reading the global from the
+  // device memory.
   Constant *JitModule = ConstantDataArray::get(
       M.getContext(), ArrayRef<uint8_t>((const uint8_t *)JFI.ModuleIR.data(),
                                         JFI.ModuleIR.size()));
   auto *GV = new GlobalVariable(M, JitModule->getType(), /* isConstant */ true,
                                 GlobalValue::PrivateLinkage, JitModule,
-                                ".jit.bc." + JITFn->getName());
+                                "__jit_bc_" + JITFn->getName());
   appendToUsed(M, {GV});
+#if ENABLE_HIP
   GV->setSection(Twine(".jit." + JITFn->getName()).str());
 #endif
   std::error_code EC;
-  raw_fd_ostream Output(Twine("jit-" + JITFn->getName() + ".bc").str(), EC);
+  raw_fd_ostream Output(
+      Twine("jit-" + JITFn->getName() + getUniqueModuleId(JitMod.get()) + ".bc")
+          .str(),
+      EC);
+
   Output << JFI.ModuleIR;
   Output.close();
+
+  DEBUG(dbgs() << "=== Device Post M\n" << M << "=== End Device Post M\n");
 
   return;
 }
@@ -630,20 +639,36 @@ static void emitJITKernelEntry(Module &M,
 #endif
   assert(FatbinWrapper && "Expected hip fatbinary wrapper global");
 
+#if ENABLE_CUDA
+  ConstantStruct *C = dyn_cast<ConstantStruct>(FatbinWrapper->getInitializer());
+  assert(C->getType()->getNumElements() &&
+         "Expected four fields in fatbin wrapper struct");
+  constexpr int FatbinField = 2;
+  auto *Fatbin = C->getAggregateElement(FatbinField);
+  GlobalVariable *FatbinGV = dyn_cast<GlobalVariable>(Fatbin);
+  assert(FatbinGV && "Expected global variable for the fatbin object");
+  ArrayType *ArrayTy =
+      dyn_cast<ArrayType>(FatbinGV->getInitializer()->getType());
+  assert(ArrayTy && "Expected array type of the fatbin object");
+  assert(ArrayTy->getElementType() == Type::getInt8Ty(M.getContext()) &&
+         "Expected byte type for array type of the fatbin object");
+  size_t FatbinSize = ArrayTy->getNumElements();
+#endif
+
 #if ENABLE_HIP
   FunctionType *JitEntryFnTy = FunctionType::get(
       Int32Ty,
-      {VoidPtrTy, FatbinWrapper->getType(), RuntimeConstantTy->getPointerTo(),
-       Int32Ty, Int64Ty, Int32Ty, Int64Ty, Int32Ty, VoidPtrTy, Int64Ty,
-       VoidPtrTy},
+      {VoidPtrTy, FatbinWrapper->getType(), Int64Ty,
+       RuntimeConstantTy->getPointerTo(), Int32Ty, Int64Ty, Int32Ty, Int64Ty,
+       Int32Ty, VoidPtrTy, Int64Ty, VoidPtrTy},
       /* isVarArg=*/false);
 #elif ENABLE_CUDA
   // NOTE: CUDA uses an array type for passing grid, block sizes.
   FunctionType *JitEntryFnTy = FunctionType::get(
       Int32Ty,
-      {VoidPtrTy, FatbinWrapper->getType(), RuntimeConstantTy->getPointerTo(),
-       Int32Ty, ArrayType::get(Int64Ty, 2), ArrayType::get(Int64Ty, 2),
-       VoidPtrTy, Int64Ty, VoidPtrTy},
+      {VoidPtrTy, FatbinWrapper->getType(), Int64Ty,
+       RuntimeConstantTy->getPointerTo(), Int32Ty, ArrayType::get(Int64Ty, 2),
+       ArrayType::get(Int64Ty, 2), VoidPtrTy, Int64Ty, VoidPtrTy},
       /* isVarArg=*/false);
 #else
 #error "Expected ENABLE_HIP or ENABLE_CUDA to be defined"
@@ -702,8 +727,9 @@ static void emitJITKernelEntry(Module &M,
 #ifdef ENABLE_HIP
   auto *Ret = Builder.CreateCall(
       JitEntryFn,
-      {StubToKernelMap[JITFn], FatbinWrapper, RuntimeConstantsAlloca,
-       Builder.getInt32(JFI.ConstantArgs.size()),
+      {StubToKernelMap[JITFn], FatbinWrapper,
+       /* FatbinSize unused by HIP */ Builder.getInt64(0),
+       RuntimeConstantsAlloca, Builder.getInt32(JFI.ConstantArgs.size()),
        LaunchKernelCall->getArgOperand(1), LaunchKernelCall->getArgOperand(2),
        LaunchKernelCall->getArgOperand(3), LaunchKernelCall->getArgOperand(4),
        LaunchKernelCall->getArgOperand(5), LaunchKernelCall->getArgOperand(6),
@@ -711,8 +737,8 @@ static void emitJITKernelEntry(Module &M,
 #elif ENABLE_CUDA
   auto *Ret = Builder.CreateCall(
       JitEntryFn,
-      {StubToKernelMap[JITFn], FatbinWrapper, RuntimeConstantsAlloca,
-       Builder.getInt32(JFI.ConstantArgs.size()),
+      {StubToKernelMap[JITFn], FatbinWrapper, Builder.getInt64(FatbinSize),
+       RuntimeConstantsAlloca, Builder.getInt32(JFI.ConstantArgs.size()),
        LaunchKernelCall->getArgOperand(1), LaunchKernelCall->getArgOperand(2),
        LaunchKernelCall->getArgOperand(3), LaunchKernelCall->getArgOperand(4),
        LaunchKernelCall->getArgOperand(5)});
@@ -881,12 +907,6 @@ void visitor(Module &M, CallGraph &CG) {
   }
 
   DEBUG(dbgs() << "=== Pre M\n" << M << "=== End of Pre M\n");
-  // TODO: Supporting -fgpu-rdc compilation is tricky because clang compiles
-  // first for the host and then for the device. The method here will not work.
-  // It assumes that device compilation runs first to output JIT section
-  // bitcodes that the host compilation ingests. One possibility is to let the
-  // runtime library extract the JIT section bitcodes to perform preprocessing
-  // and jit compilation.
   if (isDeviceCompilation(M)) {
     for (auto &JFI : JitFunctionInfoMap)
       createJITModuleSectionsDevice(M, JFI);
