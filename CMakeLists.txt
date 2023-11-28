@@ -13,6 +13,7 @@ option(ENABLE_DEBUG "Enable debugging output" OFF)
 option(ENABLE_RUNTIME_CONSTPROP "Enable runtime constant propagation through JIT" ON)
 option(ENABLE_JIT_LAUNCH_BOUNDS "Enable runtime launch bounds setting through JIT" ON)
 option(ENABLE_TIME_TRACING "Enable time tracing for the JIT engine" OFF)
+option(BUILD_SHARED_LIBJIT "Builds the JIT library as shared" OFF)
 option(ENABLE_TESTS "Enable tests" ON)
 set(LLVM_VERSION "17" CACHE STRING "LLVM version")
 

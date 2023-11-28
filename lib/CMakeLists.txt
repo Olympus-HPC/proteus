@@ -1,11 +1,14 @@
-# NOTE: The jit library is intentionally build as STATIC to avoid symbol
+# NOTE: For CUDA the jit library is intentionally build as STATIC to avoid symbol
 # resolution problems with cudaGetSymbolAddress for device globals linking on
 # the targeted application
-add_library(jit STATIC jit.cpp)
-
 # NOTE : When SHARED, the jit library and the application to deploy on should
 # link the CUDA runtime as a dynamic, shared library.
-# add_library(jit SHARED jit.cpp)
+if(BUILD_SHARED_LIBJIT)
+  add_library(jit SHARED jit.cpp)
+else()
+  add_library(jit STATIC jit.cpp)
+endif()
+
 target_compile_definitions(jit PRIVATE ${LLVM_DEFINITIONS})
 
 if(ENABLE_RUNTIME_CONSTPROP)
@@ -43,3 +46,7 @@ if(ENABLE_CUDA)
 endif()
 
 target_link_libraries(jit PRIVATE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+set_target_properties(jit PROPERTIES
+  INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+install(TARGETS jit)

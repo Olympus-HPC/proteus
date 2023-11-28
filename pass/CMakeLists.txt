@@ -1,6 +1,6 @@
 add_library(JitPass SHARED JitPass.cpp)
 
-target_include_directories(JitPass 
+target_include_directories(JitPass
   SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
 
 if(NOT LLVM_ENABLE_RTTI)
@@ -11,3 +11,5 @@ endif()
 # behaviour on Linux)
 target_link_libraries(JitPass
   "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+
+install(TARGETS JitPass)
