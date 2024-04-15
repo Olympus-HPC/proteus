@@ -185,6 +185,9 @@ static bool isDeviceKernelStub(Module &M, Function &Fn) {
   if (!LaunchKernelFn)
     return false;
 
+  if (! Fn.getName().contains("__device_stub"))
+    return false;
+
   for (User *Usr : LaunchKernelFn->users())
     if (CallBase *CB = dyn_cast<CallBase>(Usr))
       if (CB->getFunction() == &Fn) {
