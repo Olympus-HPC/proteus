@@ -90,8 +90,7 @@ static Value *getStubGV(Value *Operand) {
   // indirection to use the host kernel stub for finding the device kernel
   // function name global.
   GlobalVariable *IndirectGV = dyn_cast<GlobalVariable>(Operand);
-  assert(IndirectGV && "Expected global variable pointing to hip kernel stub");
-  Value *V = IndirectGV->getInitializer();
+  Value *V = IndirectGV ? IndirectGV->getInitializer() : nullptr;
 #elif ENABLE_CUDA
   Value *V = Operand;
 #else
@@ -185,16 +184,15 @@ static bool isDeviceKernelStub(Module &M, Function &Fn) {
   if (!LaunchKernelFn)
     return false;
 
-  if (! Fn.getName().contains("__device_stub"))
-    return false;
-
   for (User *Usr : LaunchKernelFn->users())
     if (CallBase *CB = dyn_cast<CallBase>(Usr))
       if (CB->getFunction() == &Fn) {
         dbgs() << "Found kernel stub " << Fn.getName() << "\n";
-        assert(StubToKernelMap.contains(getStubGV(CB->getArgOperand(0))) &&
-               "Expected kernel operand to be in the StubToKernel map");
-        return true;
+        auto gv = getStubGV(CB->getArgOperand(0));
+        if (!gv)
+          continue;
+        if(StubToKernelMap.contains(gv))
+          return true;
       }
 
   return false;
