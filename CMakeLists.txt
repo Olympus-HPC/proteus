@@ -37,7 +37,7 @@ if(ENABLE_CUDA)
     add_definitions("-DENABLE_CUDA_PTX_STORED_CACHE")
   endif()
 
-  find_package(CUDAToolkit REQUIRED)
+  find_package(CUDAToolkit 12 REQUIRED)
 endif()
 
 if(ENABLE_DEBUG)

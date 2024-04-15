@@ -44,7 +44,10 @@ if(ENABLE_CUDA)
   target_include_directories(jit SYSTEM PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
 
   # list(APPEND libs CUDA::cuda_driver CUDA::cudart)
-  list(APPEND libs CUDA::cuda_driver CUDA::cudart_static)
+  # TODO: update cmake requirement to > 3.26 to supports the nvPTXCompiler target.
+  # list(APPEND libs CUDA::cuda_driver CUDA::cudart_static CUDA::nvptxcompiler_static)
+  list(APPEND libs CUDA::cuda_driver CUDA::cudart_static
+    ${CUDAToolkit_LIBRARY_DIR}/libnvptxcompiler_static.a)
 endif()
 
 target_link_libraries(jit PRIVATE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")

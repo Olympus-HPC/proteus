@@ -88,6 +88,7 @@
 
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <nvPTXCompiler.h>
 
 #define cudaErrCheck(CALL)                                                     \
   {                                                                            \
@@ -106,6 +107,15 @@
       const char *ErrStr;                                                      \
       cuGetErrorString(err, &ErrStr);                                          \
       printf("ERROR @ %s:%d ->  %s\n", __FILE__, __LINE__, ErrStr);            \
+      abort();                                                                 \
+    }                                                                          \
+  }
+
+#define nvPTXCompilerErrCheck(CALL)                                            \
+  {                                                                            \
+    nvPTXCompileResult err = CALL;                                             \
+    if (err != NVPTXCOMPILE_SUCCESS) {                                         \
+      printf("ERROR @ %s:%d ->  %d\n", __FILE__, __LINE__, err);               \
       abort();                                                                 \
     }                                                                          \
   }
@@ -750,6 +760,7 @@ struct FatbinWrapper_t {
 };
 
 static void runOptimizationPassPipeline(Module &M, StringRef CPU) {
+  TIMESCOPE("Run opt passes");
   PipelineTuningOptions PTO;
 
   std::optional<PGOOptions> PGOOpt;
@@ -1057,14 +1068,26 @@ public:
     return createSMDiagnosticError(Err);
   }
 
+  void storeObjectToStoredCache(StringRef ObjectRef, uint64_t HashValue) {
+    TIMESCOPE("Store object");
+    if (Config.ENV_JIT_USE_STORED_CACHE) {
+      std::error_code EC;
+      raw_fd_ostream OutBin(
+          Twine("cache-jit-" + std::to_string(HashValue) + ".o").str(), EC);
+      if (EC)
+        FATAL_ERROR("Cannot open device object file");
+      OutBin << ObjectRef;
+      OutBin.close();
+    }
+  }
+
 #if ENABLE_HIP
   hipError_t codegenAndLaunchHip(Module *M, StringRef HipArch,
                                  StringRef KernelName, StringRef Suffix,
                                  uint64_t HashValue, RuntimeConstant *RC,
-                                 int NumRuntimeConstants, void **BinOut,
-                                 size_t &BinSize, dim3 GridDim, dim3 BlockDim,
-                                 void **KernelArgs, uint64_t ShmemSize,
-                                 hipStream_t Stream) {
+                                 int NumRuntimeConstants, dim3 GridDim,
+                                 dim3 BlockDim, void **KernelArgs,
+                                 uint64_t ShmemSize, hipStream_t Stream) {
     // Remove extras to get a working CPU architecture value, e.g., from
     // gfx90a:sramecc+:xnack- drop everything after the first :.
     // HipArch = HipArch.substr(0, HipArch.find_first_of(":"));
@@ -1093,6 +1116,8 @@ public:
     raw_svector_ostream ModuleBufferOS(ModuleBuffer);
     WriteBitcodeToFile(*M, ModuleBufferOS);
 
+    char *BinOut;
+    size_t BinSize;
     hipModule_t HipModule;
 
     hiprtcLinkState hip_link_state_ptr;
@@ -1159,11 +1184,12 @@ public:
           hiprtcLinkAddData(hip_link_state_ptr, HIPRTC_JIT_INPUT_LLVM_BITCODE,
                             (void *)ModuleBuffer.data(), ModuleBuffer.size(),
                             KernelName.data(), 0, nullptr, nullptr));
-      hiprtcErrCheck(hiprtcLinkComplete(hip_link_state_ptr, BinOut, &BinSize));
+      hiprtcErrCheck(
+          hiprtcLinkComplete(hip_link_state_ptr, (void **)&BinOut, &BinSize));
     }
     {
       TIMESCOPE("Load module");
-      hipErrCheck(hipModuleLoadData(&HipModule, *BinOut));
+      hipErrCheck(hipModuleLoadData(&HipModule, BinOut));
     }
 
     hipFunction_t HipFunction;
@@ -1178,6 +1204,10 @@ public:
                      KernelName, RC, NumRuntimeConstants
 #endif
     );
+
+    StringRef ObjectRef(BinOut, BinSize);
+    storeObjectToStoredCache(ObjectRef, HashValue);
+
     hipErrCheck(hipModuleLaunchKernel(
         HipFunction, GridDim.x, GridDim.y, GridDim.z, BlockDim.x, BlockDim.y,
         BlockDim.z, ShmemSize, (hipStream_t)Stream, KernelArgs, nullptr));
@@ -1189,6 +1219,7 @@ public:
 
   void codegenPTX(Module &M, StringRef CudaArch,
                   SmallVectorImpl<char> &PTXStr) {
+    TIMESCOPE("Codegen PTX");
     auto TMExpected = createTargetMachine(M, CudaArch);
     if (!TMExpected)
       FATAL_ERROR(toString(TMExpected.takeError()));
@@ -1208,12 +1239,12 @@ public:
     PM.run(M);
   }
 
-  cudaError_t codegenAndLaunchCuda(
-      Module *M, StringRef CudaArch, StringRef KernelName, StringRef Suffix,
-      uint64_t HashValue, RuntimeConstant *RC, int NumRuntimeConstants,
-      SmallVectorImpl<char> &FinalIR, SmallVectorImpl<char> &PTXStr,
-      void **BinOut, std::size_t &BinSize, dim3 GridDim, dim3 BlockDim,
-      void **KernelArgs, uint64_t ShmemSize, CUstream Stream) {
+  cudaError_t codegenAndLaunchCuda(Module *M, StringRef CudaArch,
+                                   StringRef KernelName, StringRef Suffix,
+                                   uint64_t HashValue, RuntimeConstant *RC,
+                                   int NumRuntimeConstants, dim3 GridDim,
+                                   dim3 BlockDim, void **KernelArgs,
+                                   uint64_t ShmemSize, CUstream Stream) {
     // Codegen PTX, load the module and run through the CUDA PTX JIT
     // interface. Check this reference for JIT caching:
     // https://developer.nvidia.com/blog/cuda-pro-tip-understand-fat-binaries-jit-caching/
@@ -1222,6 +1253,10 @@ public:
     // For CUDA, run the target-specific optimization pipeline to optimize the
     // LLVM IR before handing over to the CUDA driver PTX compiler.
     runOptimizationPassPipeline(*M, CudaArch);
+
+    SmallVector<char, 4096> PTXStr;
+    SmallVector<char, 4096> FinalIR;
+    size_t BinSize;
 
 #if ENABLE_DEBUG
     {
@@ -1255,35 +1290,71 @@ public:
 
     CUmodule CUMod;
     CUfunction CUFunc;
-    // CUDA requires null-terminated PTX.
-    PTXStr.push_back('\0');
-#if ENABLE_LLVMIR_STORED_CACHE
+
     {
-      raw_svector_ostream IROS(FinalIR);
-      WriteBitcodeToFile(*M, IROS);
-    }
+      TIMESCOPE("Create object");
+      // CUDA requires null-terminated PTX.
+      PTXStr.push_back('\0');
+#if ENABLE_LLVMIR_STORED_CACHE
+      {
+        raw_svector_ostream IROS(FinalIR);
+        WriteBitcodeToFile(*M, IROS);
+      }
+      StringRef ObjectRef(FinalIR.data(), FinalIR.size());
 #elif ENABLE_CUDA_PTX_STORED_CACHE
-    cuErrCheck(cuModuleLoadData(&CUMod, PTXStr.data()));
-    cuErrCheck(cuModuleGetFunction(&CUFunc, CUMod,
-                                   Twine(KernelName + Suffix).str().c_str()));
-#endif
-    CUlinkState CULinkState;
-    cuErrCheck(cuLinkCreate(0, nullptr, nullptr, &CULinkState));
-    cuErrCheck(cuLinkAddData(CULinkState, CU_JIT_INPUT_PTX,
-                             (void *)PTXStr.data(), PTXStr.size(), "", 0, 0,
-                             0));
-    cuErrCheck(cuLinkComplete(CULinkState, BinOut, &BinSize));
-
-    cuErrCheck(cuModuleLoadData(&CUMod, *BinOut));
-    cuErrCheck(cuModuleGetFunction(&CUFunc, CUMod,
-                                   Twine(KernelName + Suffix).str().c_str()));
-
-    CodeCache.insert(HashValue, CUFunc
+      cuErrCheck(cuModuleLoadData(&CUMod, PTXStr.data()));
+      cuErrCheck(cuModuleGetFunction(&CUFunc, CUMod,
+                                     Twine(KernelName + Suffix).str().c_str()));
+      StringRef ObjectRef(PTXStr.data(), PTXStr.size());
+#else
+      // Store ELF object.
+      nvPTXCompilerHandle PTXCompiler;
+      nvPTXCompilerErrCheck(
+          nvPTXCompilerCreate(&PTXCompiler, PTXStr.size(), PTXStr.data()));
+      std::string ArchOpt = ("--gpu-name=" + CudaArch).str();
 #if ENABLE_DEBUG
-                     ,
-                     KernelName, RC, NumRuntimeConstants
+      const char *CompileOptions[] = {ArchOpt.c_str(), "--verbose"};
+      size_t NumCompileOptions = 2;
+#else
+      const char *CompileOptions[] = {ArchOpt.c_str()};
+      size_t NumCompileOptions = 1;
 #endif
-    );
+      nvPTXCompilerErrCheck(
+          nvPTXCompilerCompile(PTXCompiler, NumCompileOptions, CompileOptions));
+      nvPTXCompilerErrCheck(
+          nvPTXCompilerGetCompiledProgramSize(PTXCompiler, &BinSize));
+      auto BinOut = std::make_unique<char[]>(BinSize);
+      nvPTXCompilerErrCheck(
+          nvPTXCompilerGetCompiledProgram(PTXCompiler, BinOut.get()));
+
+#if ENABLE_DEBUG
+      {
+        size_t LogSize;
+        nvPTXCompilerErrCheck(
+            nvPTXCompilerGetInfoLogSize(PTXCompiler, &LogSize));
+        auto Log = std::make_unique<char[]>(LogSize);
+        nvPTXCompilerErrCheck(nvPTXCompilerGetInfoLog(PTXCompiler, Log.get()));
+        dbgs() << "=== nvPTXCompiler Log\n" << Log.get() << "\n";
+      }
+#endif
+      nvPTXCompilerErrCheck(nvPTXCompilerDestroy(&PTXCompiler));
+
+      cuErrCheck(cuModuleLoadData(&CUMod, BinOut.get()));
+      cuErrCheck(cuModuleGetFunction(&CUFunc, CUMod,
+                                     Twine(KernelName + Suffix).str().c_str()));
+
+      StringRef ObjectRef(BinOut.get(), BinSize);
+#endif
+
+      CodeCache.insert(HashValue, CUFunc
+#if ENABLE_DEBUG
+                       ,
+                       KernelName, RC, NumRuntimeConstants
+#endif
+      );
+
+      storeObjectToStoredCache(ObjectRef, HashValue);
+    }
 
     cuLaunchKernel(CUFunc, GridDim.x, GridDim.y, GridDim.z, BlockDim.x,
                    BlockDim.y, BlockDim.z, ShmemSize, (CUstream)Stream,
@@ -1393,42 +1464,20 @@ public:
     }
 #endif
 
-    void *BinOut;
-    size_t BinSize;
 #if ENABLE_HIP
     auto Ret = codegenAndLaunchHip(M, devProp.gcnArchName, KernelName, Suffix,
-                                   HashValue, RC, NumRuntimeConstants, &BinOut,
-                                   BinSize, GridDim, BlockDim, KernelArgs,
-                                   ShmemSize, (hipStream_t)Stream);
+                                   HashValue, RC, NumRuntimeConstants, GridDim,
+                                   BlockDim, KernelArgs, ShmemSize,
+                                   (hipStream_t)Stream);
 
 #elif ENABLE_CUDA
-    SmallVector<char, 4096> PTXStr;
-    SmallVector<char, 4096> FinalIR;
     auto Ret = codegenAndLaunchCuda(M, CudaArch, KernelName, Suffix, HashValue,
-                                    RC, NumRuntimeConstants, FinalIR, PTXStr,
-                                    &BinOut, BinSize, GridDim, BlockDim,
+                                    RC, NumRuntimeConstants, GridDim, BlockDim,
                                     KernelArgs, ShmemSize, (CUstream)Stream);
-#if ENABLE_LLVMIR_STORED_CACHE
-    BinOut = FinalIR.data();
-    BinSize = FinalIR.size();
-#elif ENABLE_CUDA_PTX_STORED_CACHE
-    BinOut = PTXStr.data();
-    BinSize = PTXStr.size();
-#endif
+
 #else
 #error "Expected ENABLE_HIP or ENABLE_CUDA to be defined"
 #endif
-    StringRef CodeRef(reinterpret_cast<char *>(BinOut), BinSize);
-
-    if (Config.ENV_JIT_USE_STORED_CACHE) {
-      std::error_code EC;
-      raw_fd_ostream OutBin(
-          Twine("cache-jit-" + std::to_string(HashValue) + ".o").str(), EC);
-      if (EC)
-        FATAL_ERROR("Cannot open device object file");
-      OutBin << CodeRef;
-      OutBin.close();
-    }
 
     return Ret;
   }

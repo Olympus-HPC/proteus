@@ -5,7 +5,7 @@ trap exit INT
 ml load cmake/3.23.1
 ml load ninja
 ml load gcc/11.2.1
-ml load cuda/11.8
+ml load cuda/12.2.2
 
 mkdir -p build-lassen-llvm-17.0.5
 pushd build-lassen-llvm-17.0.5

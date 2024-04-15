@@ -1,5 +1,5 @@
 ml load cmake/3.23.1
-ml load cuda/11.8
+ml load cuda/12.2.2
 
 LLVM_INSTALL_DIR=$1
 
