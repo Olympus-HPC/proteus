@@ -12,7 +12,7 @@ arguments that are treated as runtime constants.
 The JIT compiler folds runtime arguments to constants and compiles an optimized specialization of the function.
 
 For example:
-```
+```cpp
 __atribute__((annotate("jit", 1, 2)))
 void daxpy(double A, int N, double *a, double *b)
 {
