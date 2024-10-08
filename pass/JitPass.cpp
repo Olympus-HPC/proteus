@@ -92,7 +92,8 @@ static Value *getStubGV(Value *Operand) {
   GlobalVariable *IndirectGV = dyn_cast<GlobalVariable>(Operand);
   Value *V = IndirectGV ? IndirectGV->getInitializer() : nullptr;
 #elif ENABLE_CUDA
-  Value *V = Operand;
+  GlobalVariable *DirectGV = dyn_cast<GlobalVariable>(Operand);
+  Value *V = DirectGV ? DirectGV : nullptr;
 #else
 #error "Expected ENABLE_HIP or ENABLE_CUDA to be defined"
 #endif
@@ -188,10 +189,10 @@ static bool isDeviceKernelStub(Module &M, Function &Fn) {
     if (CallBase *CB = dyn_cast<CallBase>(Usr))
       if (CB->getFunction() == &Fn) {
         dbgs() << "Found kernel stub " << Fn.getName() << "\n";
-        auto gv = getStubGV(CB->getArgOperand(0));
-        if (!gv)
+        auto GV = getStubGV(CB->getArgOperand(0));
+        if (!GV)
           continue;
-        if(StubToKernelMap.contains(gv))
+        if(StubToKernelMap.contains(GV))
           return true;
       }
 
