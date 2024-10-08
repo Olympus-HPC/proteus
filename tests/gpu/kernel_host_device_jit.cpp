@@ -1,3 +1,4 @@
+// RUN: ./kernel_host_device_jit.%ext | FileCheck %s --check-prefixes=CHECK
 #include <climits>
 #include <cstdio>
 
@@ -27,3 +28,11 @@ int main() {
   gpuErrCheck(gpuDeviceSynchronize());
   return 0;
 }
+
+// CHECK: Kernel
+// CHECK: Kernel
+// CHECK: JitCache hits 0 total 1
+// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: JitCache hits 0 total 1
+// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: JitStoredCache hits 0 total 1
