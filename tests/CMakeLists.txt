@@ -1,4 +1,5 @@
-find_program(LIT lit)
+find_program(LIT lit
+    PATHS ${LLVM_INSTALL_DIR}/bin)
 
 if(NOT LIT)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
@@ -18,7 +19,8 @@ else()
     message(STATUS "Found lit at ${LIT}")
 endif()
 
-find_program(FILECHECK FileCheck)
+find_program(FILECHECK FileCheck
+    PATHS ${LLVM_INSTALL_DIR}/bin)
 
 if(NOT FILECHECK)
     message(FATAL_ERROR "Testing requires FileCheck to be installed")
