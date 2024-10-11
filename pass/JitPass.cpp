@@ -84,6 +84,8 @@ DenseMap<Value *, GlobalVariable *> StubToKernelMap;
 SmallPtrSet<Function *, 16> ModuleDeviceKernels;
 
 static Value *getStubGV(Value *Operand) {
+  // NOTE: when called by isDeviceKernelStub, Operand may not be a global
+  // variable point to the stub, so we check and return null in that case.
 #if ENABLE_HIP
   // NOTE: Hip creates a global named after the device kernel function that
   // points to the host kernel stub. Because of this, we need to unpeel this
@@ -189,6 +191,8 @@ static bool isDeviceKernelStub(Module &M, Function &Fn) {
     if (CallBase *CB = dyn_cast<CallBase>(Usr))
       if (CB->getFunction() == &Fn) {
         dbgs() << "Found kernel stub " << Fn.getName() << "\n";
+        // NOTE: all users may not be stubs, so check return value of
+        // getStubGV. If nullptr, then then this was not a stub.
         auto GV = getStubGV(CB->getArgOperand(0));
         if (!GV)
           continue;
