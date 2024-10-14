@@ -1,3 +1,4 @@
+// RUN: ./daxpy | FileCheck %s --check-prefixes=CHECK
 #include <cstddef>
 #include <cstdlib>
 #include <iostream>
@@ -28,3 +29,10 @@ int main(int argc, char **argv) {
   free(x);
   free(y);
 }
+
+// CHECK: 0
+// CHECK: 19.4767
+// CHECK: 22.6181
+// CHECK: JitCache hits 0 total 2
+// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
