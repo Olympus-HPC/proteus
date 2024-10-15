@@ -711,7 +711,8 @@ static void emitJITKernelEntry(Module &M,
   Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
   Type *Int64Ty = Type::getInt64Ty(M.getContext());
   Type *Int32Ty = Type::getInt32Ty(M.getContext());
-  StructType *RuntimeConstantTy = StructType::create({Int64Ty}, "struct.args");
+  Type *Int128Ty = Type::getInt128Ty(M.getContext());
+  StructType *RuntimeConstantTy = StructType::create({Int128Ty}, "struct.args");
 
   GlobalVariable *ModuleUniqueId =
       M.getGlobalVariable("__module_unique_id", true);
@@ -934,8 +935,9 @@ emitJITFunctionStub(Module &M,
   Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
   Type *Int32Ty = Type::getInt32Ty(M.getContext());
   Type *Int64Ty = Type::getInt64Ty(M.getContext());
+  Type *Int128Ty = Type::getInt128Ty(M.getContext());
   // Use Int64 type for the Value, big enough to hold primitives.
-  StructType *RuntimeConstantTy = StructType::create({Int64Ty}, "struct.args");
+  StructType *RuntimeConstantTy = StructType::create({Int128Ty}, "struct.args");
 
   FunctionType *JitEntryFnTy =
       FunctionType::get(VoidPtrTy,

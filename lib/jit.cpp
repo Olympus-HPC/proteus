@@ -274,10 +274,13 @@ public:
 
 struct RuntimeConstant {
   union {
+    bool BoolVal;
+    int8_t Int8Val;
     int32_t Int32Val;
     int64_t Int64Val;
     float FloatVal;
     double DoubleVal;
+    long double LongDoubleVal;
     // TODO: This allows pointer as runtime constant values. How useful is that?
     void *PtrVal;
   };
@@ -579,7 +582,11 @@ public:
         Value *Arg = F->getArg(ArgNo);
         Type *ArgType = Arg->getType();
         Constant *C = nullptr;
-        if (ArgType->isIntegerTy(32)) {
+        if (ArgType->isIntegerTy(1)) {
+          C = ConstantInt::get(ArgType, RC[I].BoolVal);
+        } else if (ArgType->isIntegerTy(8)) {
+          C = ConstantInt::get(ArgType, RC[I].Int8Val);
+        } else if (ArgType->isIntegerTy(32)) {
           // dbgs() << "RC is Int32\n";
           C = ConstantInt::get(ArgType, RC[I].Int32Val);
         } else if (ArgType->isIntegerTy(64)) {
@@ -591,11 +598,17 @@ public:
         } else if (ArgType->isDoubleTy()) {
           // dbgs() << "RC is Double\n";
           C = ConstantFP::get(ArgType, RC[I].DoubleVal);
+        } else if (ArgType->isX86_FP80Ty() ) {
+          C = ConstantFP::get(ArgType, RC[I].LongDoubleVal);
         } else if (ArgType->isPointerTy()) {
           auto *IntC = ConstantInt::get(Type::getInt64Ty(*Ctx), RC[I].Int64Val);
           C = ConstantExpr::getIntToPtr(IntC, ArgType);
-        } else
-          FATAL_ERROR("JIT Incompatible type in runtime constant");
+        } else {
+          std::string TypeString;
+          llvm::raw_string_ostream TypeOstream(TypeString);
+          ArgType->print(TypeOstream);
+          FATAL_ERROR("JIT Incompatible type in runtime constant: " + TypeOstream.str());
+        }
 
         Arg->replaceAllUsesWith(C);
       }
@@ -1016,7 +1029,11 @@ public:
           Value *Arg = F->getArg(ArgNo);
           Type *ArgType = Arg->getType();
           Constant *C = nullptr;
-          if (ArgType->isIntegerTy(32)) {
+          if (ArgType->isIntegerTy(1)) {
+            C = ConstantInt::get(ArgType, RC[I].BoolVal);
+          } else if (ArgType->isIntegerTy(8)) {
+            C = ConstantInt::get(ArgType, RC[I].Int8Val);
+          } else if (ArgType->isIntegerTy(32)) {
             // dbgs() << "RC is Int32\n";
             C = ConstantInt::get(ArgType, RC[I].Int32Val);
           } else if (ArgType->isIntegerTy(64)) {
@@ -1028,12 +1045,17 @@ public:
           } else if (ArgType->isDoubleTy()) {
             // dbgs() << "RC is Double\n";
             C = ConstantFP::get(ArgType, RC[I].DoubleVal);
+          } else if (ArgType->isX86_FP80Ty() ) {
+            C = ConstantFP::get(ArgType, RC[I].LongDoubleVal);
           } else if (ArgType->isPointerTy()) {
-            auto *IntC =
-                ConstantInt::get(Type::getInt64Ty(*Ctx), RC[I].Int64Val);
+            auto *IntC = ConstantInt::get(Type::getInt64Ty(*Ctx), RC[I].Int64Val);
             C = ConstantExpr::getIntToPtr(IntC, ArgType);
-          } else
-            FATAL_ERROR("JIT Incompatible type in runtime constant");
+          } else {
+            std::string TypeString;
+            llvm::raw_string_ostream TypeOstream(TypeString);
+            ArgType->print(TypeOstream);
+            FATAL_ERROR("JIT Incompatible type in runtime constant: " + TypeOstream.str());
+          }
 
           Arg->replaceAllUsesWith(C);
         }
