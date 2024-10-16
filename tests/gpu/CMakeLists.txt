@@ -118,6 +118,7 @@ CREATE_GPU_TEST(multi_file file1_kernel.cpp file2_kernel.cpp)
 CREATE_GPU_TEST(daxpy daxpy.cpp)
 CREATE_GPU_TEST(kernel_host_jit kernel_host_jit.cpp)
 CREATE_GPU_TEST(kernel_host_device_jit kernel_host_device_jit.cpp)
+CREATE_GPU_TEST(types types.cpp)
 
 CREATE_GPU_TEST_RDC(kernel kernel.cpp)
 CREATE_GPU_TEST_RDC(kernel_cache kernel_cache.cpp)
@@ -129,6 +130,7 @@ CREATE_GPU_TEST_RDC(indirect_launcher indirect_launcher.cpp)
 CREATE_GPU_TEST_RDC(daxpy daxpy.cpp)
 CREATE_GPU_TEST_RDC(kernel_host_jit kernel_host_jit.cpp)
 CREATE_GPU_TEST_RDC(kernel_host_device_jit kernel_host_device_jit.cpp)
+CREATE_GPU_TEST_RDC(types types.cpp)
 
 # TODO: Those two tests fail on CUDA with JIT stored caching because device
 # global variables need to be re-linked to their runtime address. However, I
