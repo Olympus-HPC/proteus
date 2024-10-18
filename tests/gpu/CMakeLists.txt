@@ -49,3 +49,12 @@ CREATE_GPU_TEST_RDC(indirect_launcher indirect_launcher.cpp)
 CREATE_GPU_TEST_RDC(daxpy daxpy.cpp)
 CREATE_GPU_TEST_RDC(kernel_host_jit kernel_host_jit.cpp)
 CREATE_GPU_TEST_RDC(kernel_host_device_jit kernel_host_device_jit.cpp)
+
+# TODO: Those two tests fail on CUDA with JIT stored caching because device
+# global variables need to be re-linked to their runtime address. However, I
+# chose NOT to cast them as WILL_FAIL with the code here, to make the failure
+# explicit when running tests. The WIP solution is caching LLVM IR instead of a
+# binary object, which is pending implementation.
+#if(ENABLE_CUDA)
+#    set_tests_properties(kernels_gvar.CUDA kernels_gvar.CUDA.rdc PROPERTIES WILL_FAIL TRUE)
+#endif()

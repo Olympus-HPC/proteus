@@ -47,6 +47,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include <filesystem>
 #include <llvm/ExecutionEngine/Orc/Core.h>
+#include <llvm/ExecutionEngine/Orc/Shared/ExecutorAddress.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instructions.h>
@@ -719,6 +720,32 @@ private:
               return Name != MainName;
             })));
 
+#if ENABLE_CUDA
+    // Add static library functions for JIT linking.
+
+    // NOTE: For CUDA codes we link the CUDA runtime statically to access device
+    // global variables.  So, if the host JIT module uses CUDA functions, we
+    // need to resolve them statically in the JIT module's linker.
+
+    // TODO: Instead of manually adding symbols, can we handle
+    // materialization errors through a notify callback and automatically add
+    // those symbols?
+
+    // Create a SymbolMap for static symbols.
+    llvm::orc::SymbolMap SymbolMap;
+
+    // Insert symbols in the SymbolMap, disambiguate if needed.
+    using CudaLaunchKernelFn = cudaError_t (*)(const void*, dim3, dim3, void**, size_t, cudaStream_t);
+    auto CudaLaunchKernel = static_cast<CudaLaunchKernelFn>(&cudaLaunchKernel);
+    SymbolMap[Mangle("cudaLaunchKernel")] = llvm::orc::ExecutorSymbolDef(
+        llvm::orc::ExecutorAddr{
+            reinterpret_cast<uint64_t>(CudaLaunchKernel)},
+        llvm::JITSymbolFlags::Exported);
+
+    // Register the symbol manually
+    llvm::cantFail(LLJITPtr->getMainJITDylib().define(
+        absoluteSymbols(SymbolMap)));
+#endif
     // (3) Install transform to optimize modules when they're materialized.
     LLJITPtr->getIRTransformLayer().setTransform(OptimizationTransform());
 

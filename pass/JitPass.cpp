@@ -94,7 +94,7 @@ static Value *getStubGV(Value *Operand) {
   GlobalVariable *IndirectGV = dyn_cast<GlobalVariable>(Operand);
   Value *V = IndirectGV ? IndirectGV->getInitializer() : nullptr;
 #elif ENABLE_CUDA
-  GlobalVariable *DirectGV = dyn_cast<GlobalVariable>(Operand);
+  GlobalValue *DirectGV = dyn_cast<GlobalValue>(Operand);
   Value *V = DirectGV ? DirectGV : nullptr;
 #else
 #error "Expected ENABLE_HIP or ENABLE_CUDA to be defined"
