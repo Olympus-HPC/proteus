@@ -1,5 +1,6 @@
 // RUN: ./types.%ext | FileCheck %s --check-prefixes=CHECK
 
+#include <cstdio>
 #include <cstdlib>
 
 #include "gpu_common.h"
@@ -38,7 +39,14 @@ int main(int argc, char **argv) {
   gpuErrCheck(gpuDeviceSynchronize());
   kernel<<<1, 1>>>(1.0);
   gpuErrCheck(gpuDeviceSynchronize());
+#if ENABLE_HIP
   kernel<<<1, 1>>>(1.0l);
+#elif ENABLE_CUDA
+  // CUDA AOT compilation with a `long double` breaks on lassen.
+  // We re-test the `double` type with a different value (to avoid caching) to
+  // re-use the lit CHECKs below.
+  kernel<<<1, 1>>>(2.0);
+#endif
   gpuErrCheck(gpuDeviceSynchronize());
   kernel<<<1, 1>>>(true);
   gpuErrCheck(gpuDeviceSynchronize());

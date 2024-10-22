@@ -599,6 +599,7 @@ public:
           // dbgs() << "RC is Double\n";
           C = ConstantFP::get(ArgType, RC[I].DoubleVal);
         } else if (ArgType->isX86_FP80Ty() ) {
+          // TODO: this works for x86 but breaks for other archs, e.g., ppc64
           C = ConstantFP::get(ArgType, RC[I].LongDoubleVal);
         } else if (ArgType->isPointerTy()) {
           auto *IntC = ConstantInt::get(Type::getInt64Ty(*Ctx), RC[I].Int64Val);
@@ -1042,11 +1043,12 @@ public:
           } else if (ArgType->isFloatTy()) {
             // dbgs() << "RC is Float\n";
             C = ConstantFP::get(ArgType, RC[I].FloatVal);
+          // NOTE: long double on device should correspond to plain double.
+          // XXX: CUDA with a long double SILENTLY fails to create a working
+          // kernel in AOT compilation, with or without JIT.
           } else if (ArgType->isDoubleTy()) {
             // dbgs() << "RC is Double\n";
             C = ConstantFP::get(ArgType, RC[I].DoubleVal);
-          } else if (ArgType->isX86_FP80Ty() ) {
-            C = ConstantFP::get(ArgType, RC[I].LongDoubleVal);
           } else if (ArgType->isPointerTy()) {
             auto *IntC = ConstantInt::get(Type::getInt64Ty(*Ctx), RC[I].Int64Val);
             C = ConstantExpr::getIntToPtr(IntC, ArgType);
