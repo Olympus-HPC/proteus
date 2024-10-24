@@ -1,47 +1,61 @@
-# NOTE: For CUDA the jit library is must build as STATIC to avoid symbol
+# NOTE: For CUDA the proteusjit library is must build as STATIC to avoid symbol
 # resolution problems with cudaGetSymbolAddress for device globals linking on
 # the targeted application
+set(SOURCES
+  CompilerInterfaceHost.cpp
+  JitEngine.cpp
+  JitEngineHost.cpp
+)
+
+if(ENABLE_CUDA)
+list(APPEND SOURCES
+  CompilerInterfaceDevice.cpp
+  CompilerInterfaceDeviceCUDA.cpp
+  JitEngineDeviceCUDA.cpp
+)
+endif()
+
+if(ENABLE_HIP)
+list(APPEND SOURCES
+  CompilerInterfaceDevice.cpp
+  CompilerInterfaceDeviceHIP.cpp
+  JitEngineDeviceHIP.cpp
+)
+endif()
+
 if(BUILD_SHARED_LIBJIT)
   if(ENABLE_CUDA)
     message(FATAL_ERROR "For CUDA, using libjit as SHARED fails for device globals")
   endif()
 
-  add_library(jit SHARED jit.cpp)
+  add_library(proteusjit SHARED ${SOURCES})
 else()
-  add_library(jit STATIC jit.cpp)
+  add_library(proteusjit STATIC ${SOURCES})
 endif()
 
-target_compile_definitions(jit PRIVATE ${LLVM_DEFINITIONS})
-
-if(ENABLE_RUNTIME_CONSTPROP)
-  target_compile_definitions(jit PRIVATE "-DENABLE_RUNTIME_CONSTPROP")
-endif()
-
-if(ENABLE_JIT_LAUNCH_BOUNDS)
-  target_compile_definitions(jit PRIVATE "-DENABLE_JIT_LAUNCH_BOUNDS")
-endif()
+target_compile_definitions(proteusjit PRIVATE ${LLVM_DEFINITIONS})
 
 if(ENABLE_TIME_TRACING)
-  target_compile_definitions(jit PRIVATE "-DENABLE_TIME_TRACING")
+  target_compile_definitions(proteusjit PRIVATE "-DENABLE_TIME_TRACING")
 endif()
 
-target_include_directories(jit
+target_include_directories(proteusjit
   SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
 
 if(LLVM_LINK_LLVM_DYLIB)
-  llvm_config(jit USE_SHARED)
+  llvm_config(proteusjit USE_SHARED)
 else()
   set(libs ${LLVM_AVAILABLE_LIBS})
 endif()
 
 if(ENABLE_HIP)
-  target_include_directories(jit SYSTEM PRIVATE ${hip_INCLUDE_DIRS})
-  target_compile_options(jit PRIVATE -x hip)
+  target_include_directories(proteusjit SYSTEM PRIVATE ${hip_INCLUDE_DIRS})
+  target_compile_options(proteusjit PRIVATE -x hip)
   list(APPEND libs hip::amdhip64)
 endif()
 
 if(ENABLE_CUDA)
-  target_include_directories(jit SYSTEM PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+  target_include_directories(proteusjit SYSTEM PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
 
   # list(APPEND libs CUDA::cuda_driver CUDA::cudart)
   # TODO: update cmake requirement to > 3.26 to supports the nvPTXCompiler target.
@@ -50,8 +64,8 @@ if(ENABLE_CUDA)
     ${CUDAToolkit_LIBRARY_DIR}/libnvptxcompiler_static.a)
 endif()
 
-target_link_libraries(jit PRIVATE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
-set_target_properties(jit PROPERTIES
+target_link_libraries(proteusjit PRIVATE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+set_target_properties(proteusjit PROPERTIES
   INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-install(TARGETS jit)
+install(TARGETS proteusjit)

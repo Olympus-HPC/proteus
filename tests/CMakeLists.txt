@@ -28,8 +28,8 @@ else()
     message(STATUS "Found Filecheck at ${FILECHECK}")
 endif()
 
-add_test(NAME setupDeleteJitStoredCache COMMAND sh -c "rm -f ${CMAKE_CURRENT_BINARY_DIR}/gpu/cache-jit-*.o")
-add_test(NAME cleanupDeleteJitStoredCache COMMAND sh -c "rm -f ${CMAKE_CURRENT_BINARY_DIR}/gpu/cache-jit-*.o")
+add_test(NAME setupDeleteJitStoredCache COMMAND sh -c "rm -rf ${CMAKE_CURRENT_BINARY_DIR}/gpu/.proteus")
+add_test(NAME cleanupDeleteJitStoredCache COMMAND sh -c "rm -rf ${CMAKE_CURRENT_BINARY_DIR}/gpu/.proteus")
 set_tests_properties(setupDeleteJitStoredCache PROPERTIES FIXTURES_SETUP setupDeleteJitStoredCacheFiles)
 set_tests_properties(cleanupDeleteJitStoredCache PROPERTIES FIXTURES_CLEANUP cleanupDeleteJitStoredCacheFiles)
 

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 
-project(ApolloJIT
+project(ProteusJIT
   VERSION 0.1.0
   LANGUAGES C CXX)
 
@@ -10,8 +10,6 @@ set(CMAKE_CXX_EXTENSIONS NO)
 option(ENABLE_HIP "Enable HIP" OFF)
 option(ENABLE_CUDA "Enable CUDA" OFF)
 option(ENABLE_DEBUG "Enable debugging output" OFF)
-option(ENABLE_RUNTIME_CONSTPROP "Enable runtime constant propagation through JIT" ON)
-option(ENABLE_JIT_LAUNCH_BOUNDS "Enable runtime launch bounds setting through JIT" ON)
 option(ENABLE_TIME_TRACING "Enable time tracing for the JIT engine" OFF)
 option(BUILD_SHARED_LIBJIT "Builds the JIT library as shared" OFF)
 option(ENABLE_TESTS "Enable tests" ON)

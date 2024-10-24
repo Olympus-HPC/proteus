@@ -11,16 +11,16 @@ function(CREATE_GPU_TEST exe check_source)
     add_executable(${exe}.${lang} ${check_source} ${ARGN})
     set_source_files_properties(${check_source} ${ARGN} PROPERTIES
         LANGUAGE ${lang}
-        OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/JitPass.cpp
+        OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/ProteusJitPass.cpp
     )
-    add_dependencies(${exe}.${lang} JitPass)
+    add_dependencies(${exe}.${lang} ProteusJitPass)
 
-    target_link_libraries(${exe}.${lang} PUBLIC jit)
+    target_link_libraries(${exe}.${lang} PUBLIC proteusjit)
 
     target_compile_options(
         ${exe}.${lang}
         PUBLIC
-        -fpass-plugin=$<TARGET_FILE:JitPass>
+        -fpass-plugin=$<TARGET_FILE:ProteusJitPass>
     )
 
     # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
@@ -41,11 +41,11 @@ function(CREATE_GPU_TEST_RDC exe source)
     add_executable(${exe}.${lang}.rdc ${source})
     set_source_files_properties(${source} PROPERTIES
         LANGUAGE ${lang}
-        OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/JitPass.cpp
+        OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/ProteusJitPass.cpp
     )
-    add_dependencies(${exe}.${lang}.rdc JitPass)
+    add_dependencies(${exe}.${lang}.rdc ProteusJitPass)
 
-    target_link_libraries(${exe}.${lang}.rdc PUBLIC jit)
+    target_link_libraries(${exe}.${lang}.rdc PUBLIC proteusjit)
 
     if(ENABLE_HIP)
         # This is unsupported see: https://gitlab.kitware.com/cmake/cmake/-/issues/23210
@@ -56,7 +56,7 @@ function(CREATE_GPU_TEST_RDC exe source)
             ${exe}.${lang}.rdc
             PUBLIC
             -fgpu-rdc
-            -fpass-plugin=$<TARGET_FILE:JitPass>
+            -fpass-plugin=$<TARGET_FILE:ProteusJitPass>
         )
 
         target_link_options(${exe}.${lang}.rdc PUBLIC -fgpu-rdc --hip-link)
@@ -64,7 +64,7 @@ function(CREATE_GPU_TEST_RDC exe source)
         target_compile_options(
             ${exe}.${lang}.rdc
             PUBLIC
-            -fpass-plugin=$<TARGET_FILE:JitPass>
+            -fpass-plugin=$<TARGET_FILE:ProteusJitPass>
         )
 
         # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
