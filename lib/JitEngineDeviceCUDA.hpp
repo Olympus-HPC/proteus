@@ -17,50 +17,53 @@
 namespace proteus {
 
 using namespace llvm;
-using namespace llvm::orc;
+
+class JitEngineDeviceCUDA;
+template <> struct DeviceTraits<JitEngineDeviceCUDA> {
+  using DeviceError_t = cudaError_t;
+  using DeviceStream_t = CUstream;
+  using KernelFunction_t = CUfunction;
+};
 
 class JitEngineDeviceCUDA : public JitEngineDevice<JitEngineDeviceCUDA> {
 public:
   static JitEngineDeviceCUDA &instance();
 
-  ~JitEngineDeviceCUDA() {
-    CodeCache.printStats("CUDA engine");
-    StoredCache.printStats();
-  }
-
-  cudaError_t compileAndRun(StringRef ModuleUniqueId, StringRef KernelName,
-                            FatbinWrapper_t *FatbinWrapper, size_t FatbinSize,
-                            RuntimeConstant *RC, int NumRuntimeConstants,
-                            dim3 GridDim, dim3 BlockDim, void **KernelArgs,
-                            uint64_t ShmemSize, void *Stream);
+protected:
+  friend JitEngineDevice<JitEngineDeviceCUDA>;
 
   void *resolveDeviceGlobalAddr(const void *Addr);
 
   void setLaunchBoundsForKernel(Module *M, Function *F, int GridSize,
                                 int BlockSize);
 
-private:
-  JitCache<CUfunction> CodeCache;
-  JitStoredCache<CUfunction> StoredCache;
-  std::string CudaArch;
-
-  JitEngineDeviceCUDA();
-  JitEngineDeviceCUDA(JitEngineDeviceCUDA &) = delete;
-  JitEngineDeviceCUDA(JitEngineDeviceCUDA &&) = delete;
-
   std::unique_ptr<MemoryBuffer> extractDeviceBitcode(StringRef KernelName,
                                                      const char *Binary,
                                                      size_t FatbinSize = 0);
 
-  cudaError_t codegenAndLaunch(Module *M, StringRef DeviceArch,
-                               StringRef KernelName, StringRef Suffix,
-                               uint64_t HashValue, RuntimeConstant *RC,
-                               int NumRuntimeConstants, dim3 GridDim,
-                               dim3 BlockDim, void **KernelArgs,
-                               uint64_t ShmemSize, CUstream Stream);
-
   void codegenPTX(Module &M, StringRef DeviceArch,
                   SmallVectorImpl<char> &PTXStr);
+
+  std::unique_ptr<MemoryBuffer> codegenObject(Module &M, StringRef DeviceArch);
+
+  cudaError_t
+  cudaModuleLaunchKernel(CUfunction f, unsigned int gridDimX,
+                         unsigned int gridDimY, unsigned int gridDimZ,
+                         unsigned int blockDimX, unsigned int blockDimY,
+                         unsigned int blockDimZ, unsigned int sharedMemBytes,
+                         CUstream hStream, void **kernelParams, void **extra);
+
+  CUfunction getKernelFunctionFromImage(StringRef KernelName,
+                                        const void *Image);
+
+  cudaError_t launchKernelFunction(CUfunction KernelFunc, dim3 GridDim,
+                                   dim3 BlockDim, void **KernelArgs,
+                                   uint64_t ShmemSize, CUstream Stream);
+
+private:
+  JitEngineDeviceCUDA();
+  JitEngineDeviceCUDA(JitEngineDeviceCUDA &) = delete;
+  JitEngineDeviceCUDA(JitEngineDeviceCUDA &&) = delete;
 };
 
 } // namespace proteus

@@ -14,10 +14,10 @@
 #include "JitEngineDevice.hpp"
 #if ENABLE_CUDA
 #include "JitEngineDeviceCUDA.hpp"
-using JitDeviceImpl = proteus::JitEngineDeviceCUDA;
+using JitDeviceImplT = proteus::JitEngineDeviceCUDA;
 #elif ENABLE_HIP
 #include "JitEngineDeviceHIP.hpp"
-using JitDeviceImpl = proteus::JitEngineDeviceHIP;
+using JitDeviceImplT = proteus::JitEngineDeviceHIP;
 #else
 #error "CompilerInterfaceDevice requires ENABLE_CUDA or ENABLE_HIP"
 #endif
@@ -49,10 +49,11 @@ static inline auto __jit_launch_kernel_internal(
 
   TIMESCOPE("__jit_launch_kernel");
   DBG(printKernelLaunchInfo());
-  auto &Jit = JitDeviceImpl::instance();
-  return Jit.compileAndRun(ModuleUniqueId, KernelName, FatbinWrapper,
-                           FatbinSize, RC, NumRuntimeConstants, GridDim,
-                           BlockDim, KernelArgs, ShmemSize, Stream);
+  auto &Jit = JitDeviceImplT::instance();
+  return Jit.compileAndRun(
+      ModuleUniqueId, KernelName, FatbinWrapper, FatbinSize, RC,
+      NumRuntimeConstants, GridDim, BlockDim, KernelArgs, ShmemSize,
+      static_cast<typename JitDeviceImplT::DeviceStream_t>(Stream));
 }
 
 #endif

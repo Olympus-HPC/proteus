@@ -15,6 +15,7 @@
 #include <memory>
 
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/CodeGen/CommandFlags.h"
 #include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
@@ -31,7 +32,7 @@
 #include "CompilerInterfaceTypes.h"
 #include "JitCache.hpp"
 #include "JitEngine.hpp"
-#include "JitStoredCache.hpp"
+#include "JitStorageCache.hpp"
 #include "TransformArgumentSpecialization.hpp"
 #include "Utils.h"
 
@@ -41,7 +42,6 @@ static llvm::codegen::RegisterCodeGenFlags CFG;
 namespace proteus {
 
 using namespace llvm;
-using namespace llvm::orc;
 
 struct FatbinWrapper_t {
   int32_t Magic;
@@ -50,78 +50,93 @@ struct FatbinWrapper_t {
   void *X;
 };
 
+template <typename ImplT> struct DeviceTraits;
+
 template <typename ImplT> class JitEngineDevice : protected JitEngine {
 public:
-  Expected<llvm::orc::ThreadSafeModule>
-  specializeBitcode(StringRef FnName, StringRef Suffix, StringRef IR,
-                    int BlockSize, int GridSize, RuntimeConstant *RC,
-                    int NumRuntimeConstants);
+  using DeviceError_t = typename DeviceTraits<ImplT>::DeviceError_t;
+  using DeviceStream_t = typename DeviceTraits<ImplT>::DeviceStream_t;
+  using KernelFunction_t = typename DeviceTraits<ImplT>::KernelFunction_t;
 
-  auto compileAndRun(StringRef ModuleUniqueId, StringRef KernelName,
-                     FatbinWrapper_t *FatbinWrapper, size_t FatbinSize,
-                     RuntimeConstant *RC, int NumRuntimeConstants, dim3 GridDim,
-                     dim3 BlockDim, void **KernelArgs, uint64_t ShmemSize,
-                     void *Stream) {
-    return static_cast<ImplT &>(*this).compileAndRun(
-        ModuleUniqueId, KernelName, FatbinWrapper, FatbinSize, RC,
-        NumRuntimeConstants, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
-  }
+  DeviceError_t compileAndRun(StringRef ModuleUniqueId, StringRef KernelName,
+                              FatbinWrapper_t *FatbinWrapper, size_t FatbinSize,
+                              RuntimeConstant *RC, int NumRuntimeConstants,
+                              dim3 GridDim, dim3 BlockDim, void **KernelArgs,
+                              uint64_t ShmemSize, DeviceStream_t Stream);
 
   void insertRegisterVar(const char *VarName, const void *Addr) {
     VarNameToDevPtr[VarName] = Addr;
   }
 
-  void
-  relinkGlobals(Module &M,
-                std::unordered_map<std::string, const void *> &VarNameToDevPtr);
-
+private:
+  //------------------------------------------------------------------
+  // Begin Methods implemented in the derived device engine class.
+  //------------------------------------------------------------------
   void *resolveDeviceGlobalAddr(const void *Addr) {
     return static_cast<ImplT &>(*this).resolveDeviceGlobalAddr(Addr);
   }
 
-  void setLaunchBoundsForKernel(Module *M, llvm::Function *F, int GridSize,
+  void setLaunchBoundsForKernel(Module *M, Function *F, int GridSize,
                                 int BlockSize) {
     static_cast<ImplT &>(*this).setLaunchBoundsForKernel(M, F, GridSize,
                                                          BlockSize);
   }
 
+  DeviceError_t launchKernelFunction(KernelFunction_t KernelFunc, dim3 GridDim,
+                                     dim3 BlockDim, void **KernelArgs,
+                                     uint64_t ShmemSize,
+                                     DeviceStream_t Stream) {
+    return static_cast<ImplT &>(*this).launchKernelFunction(
+        KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
+  }
+
+  std::unique_ptr<MemoryBuffer> codegenObject(Module &M, StringRef DeviceArch) {
+    return static_cast<ImplT &>(*this).codegenObject(M, DeviceArch);
+  }
+
+  KernelFunction_t getKernelFunctionFromImage(StringRef KernelName,
+                                              const void *Image) {
+    return static_cast<ImplT &>(*this).getKernelFunctionFromImage(KernelName,
+                                                                  Image);
+  }
+
+  std::unique_ptr<MemoryBuffer> extractDeviceBitcode(StringRef KernelName,
+                                                     const char *Binary,
+                                                     size_t FatbinSize = 0) {
+    return static_cast<ImplT &>(*this).extractDeviceBitcode(KernelName, Binary,
+                                                            FatbinSize);
+  }
+  //------------------------------------------------------------------
+  // End Methods implemented in the derived device engine class.
+  //------------------------------------------------------------------
+
+  Expected<orc::ThreadSafeModule>
+  specializeIR(StringRef FnName, StringRef Suffix, StringRef IR, int BlockSize,
+               int GridSize, RuntimeConstant *RC, int NumRuntimeConstants);
+
+  void
+  relinkGlobals(Module &M,
+                std::unordered_map<std::string, const void *> &VarNameToDevPtr);
+
 protected:
-  JitEngineDevice() {
-    Config.ENV_JIT_USE_STORED_CACHE =
-        getEnvOrDefaultBool("ENV_JIT_USE_STORED_CACHE", true);
-    Config.ENV_JIT_LAUNCH_BOUNDS =
-        getEnvOrDefaultBool("ENV_JIT_LAUNCH_BOUNDS", true);
-    Config.ENV_JIT_SPECIALIZE_ARGS =
-        getEnvOrDefaultBool("ENV_JIT_SPECIALIZE_ARGS", true);
-
-#if ENABLE_DEBUG
-    dbgs() << "ENV_JIT_USE_STORED_CACHE " << Config.ENV_JIT_USE_STORED_CACHE
-           << "\n";
-    dbgs() << "ENV_JIT_LAUNCH_BOUNDS " << Config.ENV_JIT_LAUNCH_BOUNDS << "\n";
-    dbgs() << "ENV_JIT_SPECIALIZE_ARGS " << Config.ENV_JIT_SPECIALIZE_ARGS
-           << "\n";
-#endif
+  JitEngineDevice() {}
+  ~JitEngineDevice() {
+    CodeCache.printStats();
+    StorageCache.printStats();
   }
 
-  bool getEnvOrDefaultBool(const char *VarName, bool Default) {
-    const char *EnvValue = std::getenv(VarName);
-    return EnvValue ? static_cast<bool>(std::stoi(EnvValue)) : Default;
-  }
-
+  JitCache<KernelFunction_t> CodeCache;
+  JitStorageCache<KernelFunction_t> StorageCache;
+  std::string DeviceArch;
   std::unordered_map<std::string, const void *> VarNameToDevPtr;
-  struct {
-    bool ENV_JIT_USE_STORED_CACHE;
-    bool ENV_JIT_LAUNCH_BOUNDS;
-    bool ENV_JIT_SPECIALIZE_ARGS;
-  } Config;
 };
 
 template <typename ImplT>
-Expected<llvm::orc::ThreadSafeModule> JitEngineDevice<ImplT>::specializeBitcode(
+Expected<orc::ThreadSafeModule> JitEngineDevice<ImplT>::specializeIR(
     StringRef FnName, StringRef Suffix, StringRef IR, int BlockSize,
     int GridSize, RuntimeConstant *RC, int NumRuntimeConstants) {
 
-  TIMESCOPE("specializeBitcode");
+  TIMESCOPE("specializeIR");
   auto Ctx = std::make_unique<LLVMContext>();
   SMDiagnostic Err;
   if (auto M = parseIR(MemoryBufferRef(IR, ("Mod-" + FnName + Suffix).str()),
@@ -134,11 +149,8 @@ Expected<llvm::orc::ThreadSafeModule> JitEngineDevice<ImplT>::specializeBitcode(
     DBG(dbgs() << "Metadata jit for F " << F->getName() << " = " << *Node
                << "\n");
 
-    // Relink device globals.
-    relinkGlobals(*M, VarNameToDevPtr);
-
     // Replace argument uses with runtime constants.
-    if (Config.ENV_JIT_SPECIALIZE_ARGS)
+    if (Config.ENV_PROTEUS_SPECIALIZE_ARGS)
       // TODO: change NumRuntimeConstants to size_t at interface.
       TransformArgumentSpecialization::transform(
           *M, *F,
@@ -149,7 +161,7 @@ Expected<llvm::orc::ThreadSafeModule> JitEngineDevice<ImplT>::specializeBitcode(
 
     F->setName(FnName + Suffix);
 
-    if (Config.ENV_JIT_LAUNCH_BOUNDS)
+    if (Config.ENV_PROTEUS_SET_LAUNCH_BOUNDS)
       setLaunchBoundsForKernel(M.get(), F, GridSize, BlockSize);
 
 #if ENABLE_DEBUG
@@ -159,7 +171,7 @@ Expected<llvm::orc::ThreadSafeModule> JitEngineDevice<ImplT>::specializeBitcode(
     else
       dbgs() << "Module verified!\n";
 #endif
-    return ThreadSafeModule(std::move(M), std::move(Ctx));
+    return orc::ThreadSafeModule(std::move(M), std::move(Ctx));
   }
 
   return createSMDiagnosticError(Err);
@@ -179,7 +191,7 @@ void JitEngineDevice<ImplT>::relinkGlobals(
     assert(GV && "Expected existing global variable");
     // Remove the re-linked global from llvm.compiler.used since that
     // use is not replaceable by the fixed addr constant expression.
-    llvm::removeFromUsedLists(M, [&GV](Constant *C) {
+    removeFromUsedLists(M, [&GV](Constant *C) {
       if (GV == C)
         return true;
 
@@ -193,12 +205,103 @@ void JitEngineDevice<ImplT>::relinkGlobals(
   }
 
 #if ENABLE_DEBUG
-  llvm::dbgs() << "=== Linked M\n" << M << "=== End of Linked M\n";
-  if (verifyModule(M, &llvm::errs()))
+  dbgs() << "=== Linked M\n" << M << "=== End of Linked M\n";
+  if (verifyModule(M, &errs()))
     FATAL_ERROR("After linking, broken module found, JIT compilation aborted!");
   else
-    llvm::dbgs() << "Module verified!\n";
+    dbgs() << "Module verified!\n";
 #endif
+}
+
+template <typename ImplT>
+typename DeviceTraits<ImplT>::DeviceError_t
+JitEngineDevice<ImplT>::compileAndRun(
+    StringRef ModuleUniqueId, StringRef KernelName,
+    FatbinWrapper_t *FatbinWrapper, size_t FatbinSize, RuntimeConstant *RC,
+    int NumRuntimeConstants, dim3 GridDim, dim3 BlockDim, void **KernelArgs,
+    uint64_t ShmemSize, typename DeviceTraits<ImplT>::DeviceStream_t Stream) {
+  TIMESCOPE("compileAndRun");
+
+  uint64_t HashValue =
+      CodeCache.hash(ModuleUniqueId, KernelName, RC, NumRuntimeConstants);
+  // NOTE: we don't need a suffix to differentiate kernels, each
+  // specialization will be in its own module uniquely identify by HashValue. It
+  // exists only for debugging purposes to verify that the jitted kernel
+  // executes.
+  std::string Suffix = mangleSuffix(HashValue);
+  std::string KernelMangled = (KernelName + Suffix).str();
+
+  typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc =
+      CodeCache.lookup(HashValue);
+  if (KernelFunc)
+    return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
+                                ShmemSize, Stream);
+
+  if (Config.ENV_PROTEUS_USE_STORED_CACHE) {
+    // If there device global variables, lookup the IR and codegen object
+    // before launching. Else, if there aren't device global variables, lookup
+    // the object and launch.
+    bool HasDeviceGlobals = !VarNameToDevPtr.empty();
+    if (auto CacheBuf =
+            (HasDeviceGlobals
+                 ? StorageCache.lookupBitcode(HashValue, KernelMangled)
+                 : StorageCache.lookupObject(HashValue, KernelMangled))) {
+      std::unique_ptr<MemoryBuffer> ObjBuf;
+      if (HasDeviceGlobals) {
+        auto Ctx = std::make_unique<LLVMContext>();
+        SMDiagnostic Err;
+        auto M = parseIR(CacheBuf->getMemBufferRef(), Err, *Ctx);
+        relinkGlobals(*M, VarNameToDevPtr);
+        ObjBuf = codegenObject(*M, DeviceArch);
+      } else {
+        ObjBuf = std::move(CacheBuf);
+      }
+
+      auto KernelFunc =
+          getKernelFunctionFromImage(KernelMangled, ObjBuf->getBufferStart());
+
+      CodeCache.insert(HashValue, KernelFunc, KernelName, RC,
+                       NumRuntimeConstants);
+
+      return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
+                                  ShmemSize, Stream);
+    }
+  }
+
+  auto IRBuffer =
+      extractDeviceBitcode(KernelName, FatbinWrapper->Binary, FatbinSize);
+
+  auto SpecializedModule =
+      specializeIR(KernelName, Suffix, IRBuffer->getBuffer(),
+                   BlockDim.x * BlockDim.y * BlockDim.z,
+                   GridDim.x * GridDim.y * GridDim.z, RC, NumRuntimeConstants);
+  if (auto E = SpecializedModule.takeError())
+    FATAL_ERROR(toString(std::move(E)).c_str());
+
+  Module *M = SpecializedModule->getModuleUnlocked();
+
+  // For CUDA, run the target-specific optimization pipeline to optimize the
+  // LLVM IR before handing over to the CUDA driver PTX compiler.
+  optimizeIR(*M, DeviceArch);
+
+  SmallString<4096> ModuleBuffer;
+  raw_svector_ostream ModuleBufferOS(ModuleBuffer);
+  WriteBitcodeToFile(*M, ModuleBufferOS);
+  StorageCache.storeBitcode(HashValue, ModuleBuffer);
+
+  relinkGlobals(*M, VarNameToDevPtr);
+
+  auto ObjBuf = codegenObject(*M, DeviceArch);
+  if (Config.ENV_PROTEUS_USE_STORED_CACHE)
+    StorageCache.storeObject(HashValue, ObjBuf->getMemBufferRef());
+
+  KernelFunc =
+      getKernelFunctionFromImage(KernelMangled, ObjBuf->getBufferStart());
+
+  CodeCache.insert(HashValue, KernelFunc, KernelName, RC, NumRuntimeConstants);
+
+  return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
+                              ShmemSize, Stream);
 }
 
 } // namespace proteus

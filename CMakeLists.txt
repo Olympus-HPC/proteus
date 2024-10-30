@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 
-project(ProteusJIT
+project(Proteus
   VERSION 0.1.0
   LANGUAGES C CXX)
 
@@ -13,15 +13,8 @@ option(ENABLE_DEBUG "Enable debugging output" OFF)
 option(ENABLE_TIME_TRACING "Enable time tracing for the JIT engine" OFF)
 option(BUILD_SHARED_LIBJIT "Builds the JIT library as shared" OFF)
 option(ENABLE_TESTS "Enable tests" ON)
-option(ENABLE_LLVMIR_STORED_CACHE "Use LLVM IR for the stored cache" OFF)
-option(ENABLE_CUDA_PTX_STORED_CACHE "Use PTX for the CUDA stored cache" OFF)
 
 set(LLVM_VERSION "17" CACHE STRING "LLVM version")
-
-if(ENABLE_LLVMIR_STORED_CACHE)
-  message(FATAL_ERROR "LLVM IR in stored cache is not supported yet")
-  add_definitions("-DENABLE_LLVMIR_STORED_CACHE")
-endif()
 
 if(ENABLE_HIP)
   add_definitions("-DENABLE_HIP")
@@ -30,10 +23,6 @@ endif()
 
 if(ENABLE_CUDA)
   add_definitions("-DENABLE_CUDA")
-
-  if(ENABLE_CUDA_PTX_STORED_CACHE)
-    add_definitions("-DENABLE_CUDA_PTX_STORED_CACHE")
-  endif()
 
   find_package(CUDAToolkit 12 REQUIRED)
 endif()

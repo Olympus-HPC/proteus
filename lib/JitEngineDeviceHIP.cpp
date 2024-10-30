@@ -44,7 +44,7 @@ std::unique_ptr<MemoryBuffer> JitEngineDeviceHIP::extractDeviceBitcode(
   Pos += sizeof(OFFLOAD_BUNDLER_MAGIC_STR) - 1;
 
   auto Read8ByteIntLE = [](const char *S, size_t Pos) {
-    return llvm::support::endian::read64le(S + Pos);
+    return support::endian::read64le(S + Pos);
   };
 
   uint64_t NumberOfBundles = Read8ByteIntLE(Binary, Pos);
@@ -77,20 +77,8 @@ std::unique_ptr<MemoryBuffer> JitEngineDeviceHIP::extractDeviceBitcode(
     break;
   }
 
-#if ENABLE_DEBUG
-  {
-    std::error_code EC;
-    raw_fd_ostream OutBin("device.bin", EC);
-    if (EC)
-      FATAL_ERROR("Cannot open device binary file");
-    OutBin << DeviceBinary;
-    OutBin.close();
-    dbgs() << "Binary image found\n";
-  }
-#endif
-
   Expected<object::ELF64LEFile> DeviceElf =
-      llvm::object::ELF64LEFile::create(DeviceBinary);
+      object::ELF64LEFile::create(DeviceBinary);
   if (DeviceElf.takeError())
     FATAL_ERROR("Cannot create the device elf");
 
@@ -122,18 +110,6 @@ std::unique_ptr<MemoryBuffer> JitEngineDeviceHIP::extractDeviceBitcode(
   if (DeviceBitcode.empty())
     FATAL_ERROR("Error finding the device bitcode");
 
-#if ENABLE_DEBUG
-  {
-    std::error_code EC;
-    raw_fd_ostream OutBC(Twine(".jit." + KernelName + ".bc").str(), EC);
-    if (EC)
-      FATAL_ERROR("Cannot open device bitcode file");
-    OutBC << StringRef(reinterpret_cast<const char *>(DeviceBitcode.data()),
-                       DeviceBitcode.size());
-    OutBC.close();
-  }
-#endif
-
   return MemoryBuffer::getMemBufferCopy(
       StringRef(reinterpret_cast<const char *>(DeviceBitcode.data()),
                 DeviceBitcode.size()));
@@ -156,205 +132,66 @@ void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module *M, Function *F,
              << WavesPerEU << "\n");
 }
 
-hipError_t JitEngineDeviceHIP::codegenAndLaunch(
-    Module *M, StringRef HipArch, StringRef KernelName, StringRef Suffix,
-    uint64_t HashValue, RuntimeConstant *RC, int NumRuntimeConstants,
-    dim3 GridDim, dim3 BlockDim, void **KernelArgs, uint64_t ShmemSize,
-    hipStream_t Stream) {
-  // Remove extras to get a working CPU architecture value, e.g., from
-  // gfx90a:sramecc+:xnack- drop everything after the first :.
-  // HipArch = HipArch.substr(0, HipArch.find_first_of(":"));
-  // TODO: Do not run optimization pipeline for hip, hiprtc adds O3 by
-  // default. Also, need to fine-tune the pipeline: issue with libor where
-  // aggressive unrolling creates huge, slow binary code.
-  // runOptimizationPassPipeline(*M, HipArch);
-#if ENABLE_DEBUG
-  {
-    if (verifyModule(*M, &errs()))
-      FATAL_ERROR("Broken module found after optimization, JIT "
-                  "compilation aborted!");
-    std::error_code EC;
-    raw_fd_ostream OutBC(
-        Twine("opt-transformed-jit-" + KernelName + Suffix + ".bc").str(), EC);
-    if (EC)
-      FATAL_ERROR("Cannot open device transformed bitcode file");
-    // TODO: Remove or leave it only for debugging.
-    OutBC << *M;
-    OutBC.close();
-  }
-#endif
-
-  SmallString<4096> ModuleBuffer;
-  raw_svector_ostream ModuleBufferOS(ModuleBuffer);
-  WriteBitcodeToFile(*M, ModuleBufferOS);
-
+std::unique_ptr<MemoryBuffer>
+JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
+  TIMESCOPE("Codegen object");
   char *BinOut;
   size_t BinSize;
-  hipModule_t HipModule;
+
+  SmallString<4096> ModuleBuf;
+  raw_svector_ostream ModuleBufOS(ModuleBuf);
+  WriteBitcodeToFile(M, ModuleBufOS);
 
   hiprtcLinkState hip_link_state_ptr;
 
-  // TODO: Dynamic linking is to be supported through hiprtc. Currently
-  // the interface is limited and lacks support for linking globals.
-  // Indicative code here is for future re-visit.
-#if DYNAMIC_LINK
-  std::vector<hiprtcJIT_option> LinkOptions = {HIPRTC_JIT_GLOBAL_SYMBOL_NAMES,
-                                               HIPRTC_JIT_GLOBAL_SYMBOL_ADDRESS,
-                                               HIPRTC_JIT_GLOBAL_SYMBOL_COUNT};
-  std::vector<const char *> GlobalNames;
-  std::vector<const void *> GlobalAddrs;
-  for (auto RegisterVar : VarNameToDevPtr) {
-    auto &VarName = RegisterVar.first;
-    auto DevPtr = RegisterVar.second;
-    GlobalNames.push_back(VarName.c_str());
-    GlobalAddrs.push_back(DevPtr);
-  }
-
-  std::size_t GlobalSize = GlobalNames.size();
-  std::size_t NumOptions = LinkOptions.size();
-  const void *LinkOptionsValues[] = {GlobalNames.data(), GlobalAddrs.data(),
-                                     (void *)&GlobalSize};
-  hiprtcErrCheck(hiprtcLinkCreate(LinkOptions.size(), LinkOptions.data(),
-                                  (void **)&LinkOptionsValues,
+  // NOTE: This code is an example of passing custom, AMD-specific
+  // options to the compiler/linker.
+  // NOTE: Unrolling can have a dramatic (time-consuming) effect on JIT
+  // compilation time and on the resulting optimization, better or worse
+  // depending on code specifics.
+  std::string MArchOpt = ("-march=" + DeviceArch).str();
+  const char *OptArgs[] = {"-mllvm", "-amdgpu-internalize-symbols", "-mllvm",
+                           "-unroll-threshold=1000", MArchOpt.c_str()};
+  std::vector<hiprtcJIT_option> JITOptions = {
+      HIPRTC_JIT_IR_TO_ISA_OPT_EXT, HIPRTC_JIT_IR_TO_ISA_OPT_COUNT_EXT};
+  size_t OptArgsSize = 5;
+  const void *JITOptionsValues[] = {(void *)OptArgs, (void *)(OptArgsSize)};
+  hiprtcErrCheck(hiprtcLinkCreate(JITOptions.size(), JITOptions.data(),
+                                  (void **)JITOptionsValues,
                                   &hip_link_state_ptr));
+  // NOTE: the following version of te code does not set options.
+  // hiprtcErrCheck(hiprtcLinkCreate(0, nullptr, nullptr, &hip_link_state_ptr));
 
   hiprtcErrCheck(hiprtcLinkAddData(
       hip_link_state_ptr, HIPRTC_JIT_INPUT_LLVM_BITCODE,
-      (void *)ModuleBuffer.data(), ModuleBuffer.size(), KernelName.data(),
-      LinkOptions.size(), LinkOptions.data(), (void **)&LinkOptionsValues));
-#endif
+      (void *)ModuleBuf.data(), ModuleBuf.size(), "", 0, nullptr, nullptr));
+  hiprtcErrCheck(
+      hiprtcLinkComplete(hip_link_state_ptr, (void **)&BinOut, &BinSize));
 
-  {
-    TIMESCOPE("Device linker");
-// #if CUSTOM_OPTIONS
-// TODO: Toggle this with an env var.
-#if 1
-    // NOTE: This code is an example of passing custom, AMD-specific
-    // options to the compiler/linker. NOTE: Unrolling can have a dramatic
-    // (time-consuming) effect on JIT compilation time and on the
-    // resulting optimization, better or worse depending on code
-    // specifics. const char *OptArgs[] = {"-mllvm",
-    // "-amdgpu-internalize-symbols",
-    //                         "-save-temps", "-mllvm",
-    //                         "-unroll-threshold=100"};
-    const char *OptArgs[] = {"-mllvm", "-amdgpu-internalize-symbols", "-mllvm",
-                             "-unroll-threshold=1000", "-march=gfx90a"};
-    std::vector<hiprtcJIT_option> JITOptions = {
-        HIPRTC_JIT_IR_TO_ISA_OPT_EXT, HIPRTC_JIT_IR_TO_ISA_OPT_COUNT_EXT};
-    size_t OptArgsSize = 5;
-    const void *JITOptionsValues[] = {(void *)OptArgs, (void *)(OptArgsSize)};
-    hiprtcErrCheck(hiprtcLinkCreate(JITOptions.size(), JITOptions.data(),
-                                    (void **)JITOptionsValues,
-                                    &hip_link_state_ptr));
-#else
-    hiprtcErrCheck(hiprtcLinkCreate(0, nullptr, nullptr, &hip_link_state_ptr));
-#endif
-
-    hiprtcErrCheck(
-        hiprtcLinkAddData(hip_link_state_ptr, HIPRTC_JIT_INPUT_LLVM_BITCODE,
-                          (void *)ModuleBuffer.data(), ModuleBuffer.size(),
-                          KernelName.data(), 0, nullptr, nullptr));
-    hiprtcErrCheck(
-        hiprtcLinkComplete(hip_link_state_ptr, (void **)&BinOut, &BinSize));
-  }
-  {
-    TIMESCOPE("Load module");
-    hipErrCheck(hipModuleLoadData(&HipModule, BinOut));
-  }
-
-  hipFunction_t HipFunction;
-  {
-    TIMESCOPE("Module get function");
-    hipErrCheck(hipModuleGetFunction(&HipFunction, HipModule,
-                                     (KernelName + Suffix).str().c_str()));
-  }
-  CodeCache.insert(HashValue, HipFunction, KernelName, RC, NumRuntimeConstants);
-
-  StringRef ObjectRef(BinOut, BinSize);
-  if (Config.ENV_JIT_USE_STORED_CACHE)
-    StoredCache.storeObject(HashValue, ObjectRef);
-
-  hipErrCheck(hipModuleLaunchKernel(
-      HipFunction, GridDim.x, GridDim.y, GridDim.z, BlockDim.x, BlockDim.y,
-      BlockDim.z, ShmemSize, (hipStream_t)Stream, KernelArgs, nullptr));
-  return hipSuccess;
+  return MemoryBuffer::getMemBuffer(StringRef{BinOut, BinSize});
 }
 
-hipError_t JitEngineDeviceHIP::compileAndRun(
-    StringRef ModuleUniqueId, StringRef KernelName,
-    FatbinWrapper_t *FatbinWrapper, size_t FatbinSize, RuntimeConstant *RC,
-    int NumRuntimeConstants, dim3 GridDim, dim3 BlockDim, void **KernelArgs,
-    uint64_t ShmemSize, void *Stream) {
-  TIMESCOPE("compileAndRun");
+hipFunction_t
+JitEngineDeviceHIP::getKernelFunctionFromImage(StringRef KernelName,
+                                               const void *Image) {
+  hipModule_t HipModule;
+  hipFunction_t KernelFunc;
 
-  uint64_t HashValue =
-      CodeCache.hash(ModuleUniqueId, KernelName, RC, NumRuntimeConstants);
+  hipErrCheck(hipModuleLoadData(&HipModule, Image));
+  hipErrCheck(
+      hipModuleGetFunction(&KernelFunc, HipModule, KernelName.str().c_str()));
 
-  std::string Suffix = mangleSuffix(HashValue);
+  return KernelFunc;
+}
 
-  hipFunction_t HipFunction = CodeCache.lookup(HashValue);
-  if (HipFunction)
-    return hipModuleLaunchKernel(HipFunction, GridDim.x, GridDim.y, GridDim.z,
-                                 BlockDim.x, BlockDim.y, BlockDim.z, ShmemSize,
-                                 (hipStream_t)Stream, KernelArgs, nullptr);
-
-  if (Config.ENV_JIT_USE_STORED_CACHE)
-    if ((HipFunction = StoredCache.lookup(
-             HashValue, (KernelName + Suffix).str(),
-             [](StringRef Filename, StringRef Kernel) -> hipFunction_t {
-               hipFunction_t DevFunction;
-               hipModule_t HipModule;
-               //  Load module from file.
-               auto Err = hipModuleLoad(&HipModule, Filename.str().c_str());
-               if (Err == hipErrorFileNotFound)
-                 return nullptr;
-
-               hipErrCheck(hipModuleGetFunction(&DevFunction, HipModule,
-                                                Kernel.str().c_str()));
-
-               return DevFunction;
-             }
-
-             ))) {
-      CodeCache.insert(HashValue, HipFunction, KernelName, RC,
-                       NumRuntimeConstants);
-
-      return hipModuleLaunchKernel(
-          HipFunction, GridDim.x, GridDim.y, GridDim.z, BlockDim.x, BlockDim.y,
-          BlockDim.z, ShmemSize, (hipStream_t)Stream, KernelArgs, nullptr);
-    }
-
-  hipDeviceProp_t devProp;
-  hipErrCheck(hipGetDeviceProperties(&devProp, 0));
-  auto IRBuffer = extractDeviceBitcode(KernelName, FatbinWrapper->Binary);
-
-  auto TransformedBitcode = specializeBitcode(
-      KernelName, Suffix, IRBuffer->getBuffer(),
-      BlockDim.x * BlockDim.y * BlockDim.z, GridDim.x * GridDim.y * GridDim.z,
-      RC, NumRuntimeConstants);
-  if (auto E = TransformedBitcode.takeError())
-    FATAL_ERROR(toString(std::move(E)).c_str());
-
-  Module *M = TransformedBitcode->getModuleUnlocked();
-
-#if ENABLE_DEBUG
-  {
-    std::error_code EC;
-    raw_fd_ostream OutBC(
-        Twine("transformed-jit-" + KernelName + Suffix + ".bc").str(), EC);
-    if (EC)
-      FATAL_ERROR("Cannot open device transformed bitcode file");
-    OutBC << *M;
-    OutBC.close();
-  }
-#endif
-
-  auto Ret =
-      codegenAndLaunch(M, devProp.gcnArchName, KernelName, Suffix, HashValue,
-                       RC, NumRuntimeConstants, GridDim, BlockDim, KernelArgs,
-                       ShmemSize, (hipStream_t)Stream);
-
-  return Ret;
+hipError_t JitEngineDeviceHIP::launchKernelFunction(hipFunction_t KernelFunc,
+                                                    dim3 GridDim, dim3 BlockDim,
+                                                    void **KernelArgs,
+                                                    uint64_t ShmemSize,
+                                                    hipStream_t Stream) {
+  return hipModuleLaunchKernel(KernelFunc, GridDim.x, GridDim.y, GridDim.z,
+                               BlockDim.x, BlockDim.y, BlockDim.z, ShmemSize,
+                               Stream, KernelArgs, nullptr);
 }
 
 JitEngineDeviceHIP::JitEngineDeviceHIP() {
@@ -362,4 +199,41 @@ JitEngineDeviceHIP::JitEngineDeviceHIP() {
   LLVMInitializeAMDGPUTarget();
   LLVMInitializeAMDGPUTargetMC();
   LLVMInitializeAMDGPUAsmPrinter();
+
+  hipDeviceProp_t devProp;
+  hipErrCheck(hipGetDeviceProperties(&devProp, 0));
+
+  DeviceArch = devProp.gcnArchName;
+  DeviceArch = DeviceArch.substr(0, DeviceArch.find_first_of(":"));
 }
+
+// === APPENDIX ===
+// TODO: Dynamic linking is to be supported through hiprtc. Currently
+// the interface is limited and lacks support for linking globals.
+// Indicative code here is for future re-visit.
+#if DYNAMIC_LINK
+std::vector<hiprtcJIT_option> LinkOptions = {HIPRTC_JIT_GLOBAL_SYMBOL_NAMES,
+                                             HIPRTC_JIT_GLOBAL_SYMBOL_ADDRESS,
+                                             HIPRTC_JIT_GLOBAL_SYMBOL_COUNT};
+std::vector<const char *> GlobalNames;
+std::vector<const void *> GlobalAddrs;
+for (auto RegisterVar : VarNameToDevPtr) {
+  auto &VarName = RegisterVar.first;
+  auto DevPtr = RegisterVar.second;
+  GlobalNames.push_back(VarName.c_str());
+  GlobalAddrs.push_back(DevPtr);
+}
+
+std::size_t GlobalSize = GlobalNames.size();
+std::size_t NumOptions = LinkOptions.size();
+const void *LinkOptionsValues[] = {GlobalNames.data(), GlobalAddrs.data(),
+                                   (void *)&GlobalSize};
+hiprtcErrCheck(hiprtcLinkCreate(LinkOptions.size(), LinkOptions.data(),
+                                (void **)&LinkOptionsValues,
+                                &hip_link_state_ptr));
+
+hiprtcErrCheck(hiprtcLinkAddData(
+    hip_link_state_ptr, HIPRTC_JIT_INPUT_LLVM_BITCODE,
+    (void *)ModuleBuffer.data(), ModuleBuffer.size(), KernelName.data(),
+    LinkOptions.size(), LinkOptions.data(), (void **)&LinkOptionsValues));
+#endif

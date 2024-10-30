@@ -564,18 +564,6 @@ struct ProteusJitPassImpl {
 #if ENABLE_HIP
     GV->setSection(Twine(".jit." + JITFn->getName()).str());
 #endif
-#if ENABLE_DEBUG
-    {
-      std::error_code EC;
-      raw_fd_ostream Output(Twine("jit-" + JITFn->getName() +
-                                  getUniqueModuleId(JitMod.get()) + ".bc")
-                                .str(),
-                            EC);
-
-      Output << JFI.ModuleIR;
-      Output.close();
-    }
-#endif
 
     DEBUG(dbgs() << "=== Post Device Original Module\n"
                  << M << "=== End Post Device Original Module M\n");

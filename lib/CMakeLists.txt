@@ -1,6 +1,6 @@
-# NOTE: For CUDA the proteusjit library is must build as STATIC to avoid symbol
-# resolution problems with cudaGetSymbolAddress for device globals linking on
-# the targeted application
+# NOTE: For CUDA, the proteusjit library must be built as a static library to
+# prevent symbol resolution issues with cudaGetSymbolAddress when linking device
+# globals in the target application.
 set(SOURCES
   CompilerInterfaceHost.cpp
   JitEngine.cpp

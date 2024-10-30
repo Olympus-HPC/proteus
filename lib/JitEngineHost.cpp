@@ -37,6 +37,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/TargetParser/Host.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include <llvm/ExecutionEngine/Orc/Core.h>
 #include <llvm/ExecutionEngine/Orc/Shared/ExecutorAddress.h>
@@ -62,7 +63,8 @@ static codegen::RegisterCodeGenFlags CFG;
 // module as it passes through the IRTransformLayer.
 class OptimizationTransform {
 public:
-  OptimizationTransform() {}
+  OptimizationTransform(JitEngineHost &JitEngineImpl)
+      : JitEngineImpl(JitEngineImpl) {}
 
   Expected<ThreadSafeModule> operator()(ThreadSafeModule TSM,
                                         MaterializationResponsibility &R) {
@@ -70,21 +72,7 @@ public:
       DBG(dbgs() << "=== Begin Before Optimization\n"
                  << M << "=== End Before\n");
       TIMESCOPE("Run Optimization Transform");
-      PassBuilder PB;
-      LoopAnalysisManager LAM;
-      FunctionAnalysisManager FAM;
-      CGSCCAnalysisManager CGAM;
-      ModuleAnalysisManager MAM;
-
-      PB.registerModuleAnalyses(MAM);
-      PB.registerCGSCCAnalyses(CGAM);
-      PB.registerFunctionAnalyses(FAM);
-      PB.registerLoopAnalyses(LAM);
-      PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-      ModulePassManager Passes =
-          PB.buildPerModuleDefaultPipeline(OptimizationLevel::O2);
-      Passes.run(M, MAM);
+      JitEngineImpl.optimizeIR(M, sys::getHostCPUName());
       DBG(dbgs() << "=== Begin After Optimization\n"
                  << M << "=== End After Optimization\n");
 #if ENABLE_DEBUG
@@ -103,21 +91,7 @@ public:
       DBG(dbgs() << "=== Begin Before Optimization\n"
                  << M << "=== End Before\n");
       TIMESCOPE("Run Optimization Transform");
-      PassBuilder PB;
-      LoopAnalysisManager LAM;
-      FunctionAnalysisManager FAM;
-      CGSCCAnalysisManager CGAM;
-      ModuleAnalysisManager MAM;
-
-      PB.registerModuleAnalyses(MAM);
-      PB.registerCGSCCAnalyses(CGAM);
-      PB.registerFunctionAnalyses(FAM);
-      PB.registerLoopAnalyses(LAM);
-      PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-      ModulePassManager Passes =
-          PB.buildPerModuleDefaultPipeline(OptimizationLevel::O2);
-      Passes.run(M, MAM);
+      JitEngineImpl.optimizeIR(M, sys::getHostCPUName());
       DBG(dbgs() << "=== Begin After Optimization\n"
                  << M << "=== End After Optimization\n");
 #if ENABLE_DEBUG
@@ -130,6 +104,9 @@ public:
     });
     return std::move(TSM);
   }
+
+private:
+  JitEngineHost &JitEngineImpl;
 };
 
 JitEngineHost &JitEngineHost::instance() {
@@ -155,20 +132,18 @@ void JitEngineHost::addStaticLibrarySymbols() {
       cudaError_t (*)(const void *, dim3, dim3, void **, size_t, cudaStream_t);
   auto CudaLaunchKernel = static_cast<CudaLaunchKernelFn>(&cudaLaunchKernel);
   SymbolMap[LLJITPtr->mangleAndIntern("cudaLaunchKernel")] =
-      llvm::orc::ExecutorSymbolDef(
-          llvm::orc::ExecutorAddr{
-              reinterpret_cast<uintptr_t>(CudaLaunchKernel)},
-          llvm::JITSymbolFlags::Exported);
+      orc::ExecutorSymbolDef(
+          orc::ExecutorAddr{reinterpret_cast<uintptr_t>(CudaLaunchKernel)},
+          JITSymbolFlags::Exported);
 
 #endif
   // Register the symbol manually.
-  llvm::cantFail(
-      LLJITPtr->getMainJITDylib().define(absoluteSymbols(SymbolMap)));
+  cantFail(LLJITPtr->getMainJITDylib().define(absoluteSymbols(SymbolMap)));
 }
 
 void JitEngineHost::dumpSymbolInfo(
-    const llvm::object::ObjectFile &loadedObj,
-    const llvm::RuntimeDyld::LoadedObjectInfo &objInfo) {
+    const object::ObjectFile &loadedObj,
+    const RuntimeDyld::LoadedObjectInfo &objInfo) {
   // Dump information about symbols.
   auto pid = sys::Process::getProcessId();
   std::error_code EC;
@@ -176,7 +151,7 @@ void JitEngineHost::dumpSymbolInfo(
                      sys::fs::OF_Append);
   if (EC)
     FATAL_ERROR("Cannot open perf map file");
-  for (auto symSizePair : llvm::object::computeSymbolSizes(loadedObj)) {
+  for (auto symSizePair : object::computeSymbolSizes(loadedObj)) {
     auto sym = symSizePair.first;
     auto size = symSizePair.second;
     auto symName = sym.getName();
@@ -195,12 +170,12 @@ void JitEngineHost::dumpSymbolInfo(
       // address.
       loadedSymAddress += objInfo.getSectionLoadAddress(*symbolSection.get());
     }
-    llvm::outs() << llvm::format("Address range: [%12p, %12p]",
-                                 loadedSymAddress, loadedSymAddress + size)
-                 << "\tSymbol: " << *symName << "\n";
+    outs() << format("Address range: [%12p, %12p]", loadedSymAddress,
+                     loadedSymAddress + size)
+           << "\tSymbol: " << *symName << "\n";
 
     if (size > 0)
-      ofd << llvm::format("%lx %x)", loadedSymAddress, size) << " " << *symName
+      ofd << format("%lx %x)", loadedSymAddress, size) << " " << *symName
           << "\n";
   }
 
@@ -213,13 +188,12 @@ void JitEngineHost::notifyLoaded(MaterializationResponsibility &R,
   dumpSymbolInfo(Obj, LOI);
 }
 
-JitEngineHost::~JitEngineHost() { CodeCache.printStats("Host engine"); }
+JitEngineHost::~JitEngineHost() { CodeCache.printStats(); }
 
-Expected<llvm::orc::ThreadSafeModule>
-JitEngineHost::specializeBitcode(StringRef FnName, StringRef Suffix,
-                                 StringRef IR, RuntimeConstant *RC,
-                                 int NumRuntimeConstants) {
-  TIMESCOPE("specializeBitcode");
+Expected<orc::ThreadSafeModule>
+JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
+                            RuntimeConstant *RC, int NumRuntimeConstants) {
+  TIMESCOPE("specializeIR");
   auto Ctx = std::make_unique<LLVMContext>();
   SMDiagnostic Err;
   if (auto M = parseIR(MemoryBufferRef(IR, ("Mod-" + FnName + Suffix).str()),
@@ -244,7 +218,6 @@ JitEngineHost::specializeBitcode(StringRef FnName, StringRef Suffix,
       FATAL_ERROR("Broken module found, JIT compilation aborted!");
     else
       dbgs() << "Module verified!\n";
-    getchar();
 #endif
     return ThreadSafeModule(std::move(M), std::move(Ctx));
   }
@@ -268,8 +241,8 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 
   StringRef StrIR(IR, IRSize);
   // (3) Add modules.
-  ExitOnErr(LLJITPtr->addIRModule(ExitOnErr(
-      specializeBitcode(FnName, Suffix, StrIR, RC, NumRuntimeConstants))));
+  ExitOnErr(LLJITPtr->addIRModule(
+      ExitOnErr(specializeIR(FnName, Suffix, StrIR, RC, NumRuntimeConstants))));
 
   DBG(dbgs() << "===\n"
              << *LLJITPtr->getExecutionSession().getSymbolStringPool()
@@ -341,5 +314,5 @@ JitEngineHost::JitEngineHost(int argc, char *argv[]) {
   addStaticLibrarySymbols();
 
   // (3) Install transform to optimize modules when they're materialized.
-  LLJITPtr->getIRTransformLayer().setTransform(OptimizationTransform());
+  LLJITPtr->getIRTransformLayer().setTransform(OptimizationTransform(*this));
 }

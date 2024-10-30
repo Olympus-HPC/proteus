@@ -8,8 +8,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
+#include <llvm/Support/MemoryBufferRef.h>
+#include <memory>
 
 #include "JitEngineDeviceCUDA.hpp"
 #include "Utils.h"
@@ -87,18 +90,53 @@ void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module *M, Function *F,
   // properties.
   // TODO: set min GridSize.
   int MaxThreads = std::min(1024, BlockSize);
-  llvm::Metadata *MDVals[] = {
-      llvm::ConstantAsMetadata::get(F),
-      llvm::MDString::get(M->getContext(), "maxntidx"),
-      llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
-          llvm::Type::getInt32Ty(M->getContext()), MaxThreads))};
-  NvvmAnnotations->addOperand(llvm::MDNode::get(M->getContext(), MDVals));
+  Metadata *MDVals[] = {ConstantAsMetadata::get(F),
+                        MDString::get(M->getContext(), "maxntidx"),
+                        ConstantAsMetadata::get(ConstantInt::get(
+                            Type::getInt32Ty(M->getContext()), MaxThreads))};
+  NvvmAnnotations->addOperand(MDNode::get(M->getContext(), MDVals));
 }
 
-void JitEngineDeviceCUDA::codegenPTX(Module &M, StringRef CudaArch,
+cudaError_t JitEngineDeviceCUDA::cudaModuleLaunchKernel(
+    CUfunction f, unsigned int gridDimX, unsigned int gridDimY,
+    unsigned int gridDimZ, unsigned int blockDimX, unsigned int blockDimY,
+    unsigned int blockDimZ, unsigned int sharedMemBytes, CUstream hStream,
+    void **kernelParams, void **extra) {
+  cuLaunchKernel(f, gridDimX, gridDimY, gridDimZ, blockDimX, blockDimY,
+                 blockDimZ, sharedMemBytes, hStream, kernelParams, extra);
+  return cudaGetLastError();
+}
+
+CUfunction JitEngineDeviceCUDA::getKernelFunctionFromImage(StringRef KernelName,
+                                                           const void *Image) {
+  CUfunction KernelFunc;
+  CUmodule Mod;
+
+  cuErrCheck(cuModuleLoadData(&Mod, Image));
+  cuErrCheck(cuModuleGetFunction(&KernelFunc, Mod, KernelName.str().c_str()));
+
+  return KernelFunc;
+}
+
+cudaError_t
+JitEngineDeviceCUDA::launchKernelFunction(CUfunction KernelFunc, dim3 GridDim,
+                                          dim3 BlockDim, void **KernelArgs,
+                                          uint64_t ShmemSize, CUstream Stream) {
+  return cudaModuleLaunchKernel(KernelFunc, GridDim.x, GridDim.y, GridDim.z,
+                                BlockDim.x, BlockDim.y, BlockDim.z, ShmemSize,
+                                Stream, KernelArgs, nullptr);
+}
+
+void JitEngineDeviceCUDA::codegenPTX(Module &M, StringRef DeviceArch,
                                      SmallVectorImpl<char> &PTXStr) {
+  // TODO: It is possbile to use PTX directly through the CUDA PTX JIT
+  // interface. Maybe useful if we can re-link globals using the CUDA API.
+  // Check this reference for PTX JIT caching:
+  // https://developer.nvidia.com/blog/cuda-pro-tip-understand-fat-binaries-jit-caching/
+  // Interesting env vars: CUDA_CACHE_DISABLE, CUDA_CACHE_MAXSIZE,
+  // CUDA_CACHE_PATH, CUDA_FORCE_PTX_JIT.
   TIMESCOPE("Codegen PTX");
-  auto TMExpected = createTargetMachine(M, CudaArch);
+  auto TMExpected = createTargetMachine(M, DeviceArch);
   if (!TMExpected)
     FATAL_ERROR(toString(TMExpected.takeError()));
 
@@ -117,200 +155,45 @@ void JitEngineDeviceCUDA::codegenPTX(Module &M, StringRef CudaArch,
   PM.run(M);
 }
 
-cudaError_t JitEngineDeviceCUDA::codegenAndLaunch(
-    Module *M, StringRef CudaArch, StringRef KernelName, StringRef Suffix,
-    uint64_t HashValue, RuntimeConstant *RC, int NumRuntimeConstants,
-    dim3 GridDim, dim3 BlockDim, void **KernelArgs, uint64_t ShmemSize,
-    CUstream Stream) {
-  // Codegen PTX, load the module and run through the CUDA PTX JIT
-  // interface. Check this reference for JIT caching:
-  // https://developer.nvidia.com/blog/cuda-pro-tip-understand-fat-binaries-jit-caching/
-  // Interesting env vars: CUDA_CACHE_DISABLE, CUDA_CACHE_MAXSIZE,
-  // CUDA_CACHE_PATH, CUDA_FORCE_PTX_JIT.
-  // For CUDA, run the target-specific optimization pipeline to optimize the
-  // LLVM IR before handing over to the CUDA driver PTX compiler.
-  runOptimizationPassPipeline(*M, CudaArch);
-
+std::unique_ptr<MemoryBuffer>
+JitEngineDeviceCUDA::codegenObject(Module &M, StringRef DeviceArch) {
+  TIMESCOPE("Codegen object");
   SmallVector<char, 4096> PTXStr;
-  SmallVector<char, 4096> FinalIR;
   size_t BinSize;
 
+  codegenPTX(M, DeviceArch, PTXStr);
+  PTXStr.push_back('\0');
+
+  nvPTXCompilerHandle PTXCompiler;
+  nvPTXCompilerErrCheck(
+      nvPTXCompilerCreate(&PTXCompiler, PTXStr.size(), PTXStr.data()));
+  std::string ArchOpt = ("--gpu-name=" + DeviceArch).str();
 #if ENABLE_DEBUG
-  {
-    if (verifyModule(*M, &errs()))
-      FATAL_ERROR("Broken module found after optimization, JIT "
-                  "compilation aborted!");
-    std::error_code EC;
-    raw_fd_ostream OutBC(
-        Twine("opt-transformed-jit-" + KernelName + Suffix + ".bc").str(), EC);
-    if (EC)
-      FATAL_ERROR("Cannot open device transformed bitcode file");
-    OutBC << *M;
-    OutBC.close();
-  }
-#endif
-
-  codegenPTX(*M, CudaArch, PTXStr);
-
-#if ENABLE_DEBUG
-  {
-    std::error_code EC;
-    raw_fd_ostream OutPtx(
-        Twine("jit-" + std::to_string(HashValue) + ".ptx").str(), EC);
-    if (EC)
-      FATAL_ERROR("Cannot open ptx output file");
-    OutPtx << PTXStr;
-    OutPtx.close();
-  }
-#endif
-
-  CUmodule CUMod;
-  CUfunction CUFunc;
-
-  {
-    TIMESCOPE("Create object");
-    // CUDA requires null-terminated PTX.
-    PTXStr.push_back('\0');
-#if ENABLE_LLVMIR_STORED_CACHE
-    {
-      raw_svector_ostream IROS(FinalIR);
-      WriteBitcodeToFile(*M, IROS);
-    }
-    StringRef ObjectRef(FinalIR.data(), FinalIR.size());
-#elif ENABLE_CUDA_PTX_STORED_CACHE
-    cuErrCheck(cuModuleLoadData(&CUMod, PTXStr.data()));
-    cuErrCheck(cuModuleGetFunction(&CUFunc, CUMod,
-                                   Twine(KernelName + Suffix).str().c_str()));
-    StringRef ObjectRef(PTXStr.data(), PTXStr.size());
+  const char *CompileOptions[] = {ArchOpt.c_str(), "--verbose"};
+  size_t NumCompileOptions = 2;
 #else
-    // Store ELF object.
-    nvPTXCompilerHandle PTXCompiler;
-    nvPTXCompilerErrCheck(
-        nvPTXCompilerCreate(&PTXCompiler, PTXStr.size(), PTXStr.data()));
-    std::string ArchOpt = ("--gpu-name=" + CudaArch).str();
-#if ENABLE_DEBUG
-    const char *CompileOptions[] = {ArchOpt.c_str(), "--verbose"};
-    size_t NumCompileOptions = 2;
-#else
-    const char *CompileOptions[] = {ArchOpt.c_str()};
-    size_t NumCompileOptions = 1;
+  const char *CompileOptions[] = {ArchOpt.c_str()};
+  size_t NumCompileOptions = 1;
 #endif
-    nvPTXCompilerErrCheck(
-        nvPTXCompilerCompile(PTXCompiler, NumCompileOptions, CompileOptions));
-    nvPTXCompilerErrCheck(
-        nvPTXCompilerGetCompiledProgramSize(PTXCompiler, &BinSize));
-    auto BinOut = std::make_unique<char[]>(BinSize);
-    nvPTXCompilerErrCheck(
-        nvPTXCompilerGetCompiledProgram(PTXCompiler, BinOut.get()));
-
-#if ENABLE_DEBUG
-    {
-      size_t LogSize;
-      nvPTXCompilerErrCheck(nvPTXCompilerGetInfoLogSize(PTXCompiler, &LogSize));
-      auto Log = std::make_unique<char[]>(LogSize);
-      nvPTXCompilerErrCheck(nvPTXCompilerGetInfoLog(PTXCompiler, Log.get()));
-      dbgs() << "=== nvPTXCompiler Log\n" << Log.get() << "\n";
-    }
-#endif
-    nvPTXCompilerErrCheck(nvPTXCompilerDestroy(&PTXCompiler));
-
-    cuErrCheck(cuModuleLoadData(&CUMod, BinOut.get()));
-    cuErrCheck(cuModuleGetFunction(&CUFunc, CUMod,
-                                   Twine(KernelName + Suffix).str().c_str()));
-
-    StringRef ObjectRef(BinOut.get(), BinSize);
-#endif
-
-    CodeCache.insert(HashValue, CUFunc, KernelName, RC, NumRuntimeConstants);
-
-    if (Config.ENV_JIT_USE_STORED_CACHE)
-      StoredCache.storeObject(HashValue, ObjectRef);
-  }
-
-  cuLaunchKernel(CUFunc, GridDim.x, GridDim.y, GridDim.z, BlockDim.x,
-                 BlockDim.y, BlockDim.z, ShmemSize, (CUstream)Stream,
-                 KernelArgs, nullptr);
-  // TODO: cuModuleUnload and ctxCtxDestroy at program exit.
-  return cudaGetLastError();
-}
-
-cudaError_t JitEngineDeviceCUDA::compileAndRun(
-    StringRef ModuleUniqueId, StringRef KernelName,
-    FatbinWrapper_t *FatbinWrapper, size_t FatbinSize, RuntimeConstant *RC,
-    int NumRuntimeConstants, dim3 GridDim, dim3 BlockDim, void **KernelArgs,
-    uint64_t ShmemSize, void *Stream) {
-  TIMESCOPE("compileAndRun");
-
-  uint64_t HashValue =
-      CodeCache.hash(ModuleUniqueId, KernelName, RC, NumRuntimeConstants);
-  // NOTE: we don't need a suffix to differentiate kernels, each
-  // specialization will be in its own module uniquely identify by HashValue. It
-  // exists only for debugging purposes to verify that the jitted kernel
-  // executes.
-  std::string Suffix = mangleSuffix(HashValue);
-
-  CUfunction CUFunc = CodeCache.lookup(HashValue);
-  if (CUFunc) {
-    cuLaunchKernel(CUFunc, GridDim.x, GridDim.y, GridDim.z, BlockDim.x,
-                   BlockDim.y, BlockDim.z, ShmemSize, (CUstream)Stream,
-                   KernelArgs, nullptr);
-    return cudaGetLastError();
-  }
-
-  if (Config.ENV_JIT_USE_STORED_CACHE)
-    if ((CUFunc = StoredCache.lookup(
-             HashValue, (KernelName + Suffix).str(),
-             [](StringRef Filename, StringRef Kernel) -> CUfunction {
-               CUfunction DevFunction;
-               CUmodule CUMod;
-               auto Err = cuModuleLoad(&CUMod, Filename.str().c_str());
-
-               if (Err == CUDA_ERROR_FILE_NOT_FOUND)
-                 return nullptr;
-
-               cuErrCheck(Err);
-
-               cuErrCheck(cuModuleGetFunction(&DevFunction, CUMod,
-                                              Kernel.str().c_str()));
-
-               return DevFunction;
-             }))) {
-      CodeCache.insert(HashValue, CUFunc, KernelName, RC, NumRuntimeConstants);
-
-      cuLaunchKernel(CUFunc, GridDim.x, GridDim.y, GridDim.z, BlockDim.x,
-                     BlockDim.y, BlockDim.z, ShmemSize, (CUstream)Stream,
-                     KernelArgs, nullptr);
-      return cudaGetLastError();
-    }
-
-  auto IRBuffer =
-      extractDeviceBitcode(KernelName, FatbinWrapper->Binary, FatbinSize);
-
-  auto TransformedBitcode = specializeBitcode(
-      KernelName, Suffix, IRBuffer->getBuffer(),
-      BlockDim.x * BlockDim.y * BlockDim.z, GridDim.x * GridDim.y * GridDim.z,
-      RC, NumRuntimeConstants);
-  if (auto E = TransformedBitcode.takeError())
-    FATAL_ERROR(toString(std::move(E)).c_str());
-
-  Module *M = TransformedBitcode->getModuleUnlocked();
-
+  nvPTXCompilerErrCheck(
+      nvPTXCompilerCompile(PTXCompiler, NumCompileOptions, CompileOptions));
+  nvPTXCompilerErrCheck(
+      nvPTXCompilerGetCompiledProgramSize(PTXCompiler, &BinSize));
+  auto ObjBuf = WritableMemoryBuffer::getNewUninitMemBuffer(BinSize);
+  nvPTXCompilerErrCheck(
+      nvPTXCompilerGetCompiledProgram(PTXCompiler, ObjBuf->getBufferStart()));
 #if ENABLE_DEBUG
   {
-    std::error_code EC;
-    raw_fd_ostream OutBC(
-        Twine("transformed-jit-" + KernelName + Suffix + ".bc").str(), EC);
-    if (EC)
-      FATAL_ERROR("Cannot open device transformed bitcode file");
-    OutBC << *M;
-    OutBC.close();
+    size_t LogSize;
+    nvPTXCompilerErrCheck(nvPTXCompilerGetInfoLogSize(PTXCompiler, &LogSize));
+    auto Log = std::make_unique<char[]>(LogSize);
+    nvPTXCompilerErrCheck(nvPTXCompilerGetInfoLog(PTXCompiler, Log.get()));
+    dbgs() << "=== nvPTXCompiler Log\n" << Log.get() << "\n";
   }
 #endif
+  nvPTXCompilerErrCheck(nvPTXCompilerDestroy(&PTXCompiler));
 
-  auto Ret = codegenAndLaunch(M, CudaArch, KernelName, Suffix, HashValue, RC,
-                              NumRuntimeConstants, GridDim, BlockDim,
-                              KernelArgs, ShmemSize, (CUstream)Stream);
-  return Ret;
+  return std::move(ObjBuf);
 }
 
 JitEngineDeviceCUDA::JitEngineDeviceCUDA() {
@@ -341,7 +224,7 @@ JitEngineDeviceCUDA::JitEngineDeviceCUDA() {
   int CCMinor;
   cuErrCheck(cuDeviceGetAttribute(
       &CCMinor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, CUDev));
-  CudaArch = "sm_" + std::to_string(CCMajor * 10 + CCMinor);
+  DeviceArch = "sm_" + std::to_string(CCMajor * 10 + CCMinor);
 
-  DBG(dbgs() << "CUDA Arch " << CudaArch << "\n");
+  DBG(dbgs() << "CUDA Arch " << DeviceArch << "\n");
 }

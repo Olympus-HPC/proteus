@@ -1,3 +1,13 @@
+//===-- TimeTracing.hpp -- Time tracing helpers --===//
+//
+// Part of the Proteus Project, under the Apache License v2.0 with LLVM
+// Exceptions. See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+//===----------------------------------------------------------------------===//
+
 #ifndef PROTEUS_TIME_TRACING_HPP
 #define PROTEUS_TIME_TRACING_HPP
 
@@ -20,7 +30,6 @@ struct TimeTracerRAII {
 };
 
 #if ENABLE_TIME_TRACING
-TimeTracerRAII TimeTracer;
 #define TIMESCOPE(x) TimeTraceScope T(x);
 #else
 #define TIMESCOPE(x)

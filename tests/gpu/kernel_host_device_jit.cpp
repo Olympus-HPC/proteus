@@ -13,12 +13,13 @@
       abort();                                                                 \
     }                                                                          \
   }
- __global__ __attribute__((annotate("jit"))) void kernel() {
- 
-   printf("Kernel\n");
- }
+__global__ __attribute__((annotate("jit"))) void kernel() {
 
-template <typename T> __attribute__((annotate("jit"))) gpuError_t launcher(T kernel_in) {
+  printf("Kernel\n");
+}
+
+template <typename T>
+__attribute__((annotate("jit"))) gpuError_t launcher(T kernel_in) {
   return gpuLaunchKernel((const void *)kernel_in, 1, 1, 0, 0, 0);
 }
 
@@ -35,4 +36,4 @@ int main() {
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: JitCache hits 0 total 1
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: JitStoredCache hits 0 total 1
+// CHECK: JitStorageCache hits 0 total 1

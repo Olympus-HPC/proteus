@@ -27,9 +27,14 @@
 
 #include "JitEngine.hpp"
 
+#include "TimeTracing.hpp"
 #include "Utils.h"
 
 namespace proteus {
+
+#if ENABLE_TIME_TRACING
+TimeTracerRAII TimeTracer;
+#endif
 
 using namespace llvm;
 
@@ -96,18 +101,19 @@ void JitEngine::runOptimizationPassPipeline(Module &M, StringRef CPU) {
 }
 
 JitEngine::JitEngine() {
-  Config.ENV_JIT_USE_STORED_CACHE =
-      getEnvOrDefaultBool("ENV_JIT_USE_STORED_CACHE", true);
-  Config.ENV_JIT_LAUNCH_BOUNDS =
-      getEnvOrDefaultBool("ENV_JIT_LAUNCH_BOUNDS", true);
-  Config.ENV_JIT_SPECIALIZE_ARGS =
-      getEnvOrDefaultBool("ENV_JIT_SPECIALIZE_ARGS", true);
+  Config.ENV_PROTEUS_USE_STORED_CACHE =
+      getEnvOrDefaultBool("ENV_PROTEUS_USE_STORED_CACHE", true);
+  Config.ENV_PROTEUS_SET_LAUNCH_BOUNDS =
+      getEnvOrDefaultBool("ENV_PROTEUS_SET_LAUNCH_BOUNDS", true);
+  Config.ENV_PROTEUS_SPECIALIZE_ARGS =
+      getEnvOrDefaultBool("ENV_PROTEUS_SPECIALIZE_ARGS", true);
 
 #if ENABLE_DEBUG
-  dbgs() << "ENV_JIT_USE_STORED_CACHE " << Config.ENV_JIT_USE_STORED_CACHE
-         << "\n";
-  dbgs() << "ENV_JIT_LAUNCH_BOUNDS " << Config.ENV_JIT_LAUNCH_BOUNDS << "\n";
-  dbgs() << "ENV_JIT_SPECIALIZE_ARGS " << Config.ENV_JIT_SPECIALIZE_ARGS
+  dbgs() << "ENV_PROTEUS_USE_STORED_CACHE "
+         << Config.ENV_PROTEUS_USE_STORED_CACHE << "\n";
+  dbgs() << "ENV_PROTEUS_SET_LAUNCH_BOUNDS "
+         << Config.ENV_PROTEUS_SET_LAUNCH_BOUNDS << "\n";
+  dbgs() << "ENV_PROTEUS_SPECIALIZE_ARGS " << Config.ENV_PROTEUS_SPECIALIZE_ARGS
          << "\n";
 #endif
 }
@@ -119,6 +125,11 @@ bool JitEngine::getEnvOrDefaultBool(const char *VarName, bool Default) {
 
 std::string JitEngine::mangleSuffix(uint64_t HashValue) {
   return "$jit$" + std::to_string(HashValue) + "$";
+}
+
+void JitEngine::optimizeIR(Module &M, StringRef Arch) {
+  TIMESCOPE("Optimize IR");
+  runOptimizationPassPipeline(M, Arch);
 }
 
 } // namespace proteus

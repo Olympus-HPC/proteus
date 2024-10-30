@@ -23,27 +23,28 @@
 
 namespace proteus {
 
-class JitEngineHost : JitEngine {
+using namespace llvm;
+
+class JitEngineHost : public JitEngine {
 public:
-  std::unique_ptr<llvm::orc::LLJIT> LLJITPtr;
-  llvm::ExitOnError ExitOnErr;
+  std::unique_ptr<orc::LLJIT> LLJITPtr;
+  ExitOnError ExitOnErr;
 
   static JitEngineHost &instance();
 
-  static void
-  dumpSymbolInfo(const llvm::object::ObjectFile &loadedObj,
-                 const llvm::RuntimeDyld::LoadedObjectInfo &objInfo);
-  static void notifyLoaded(llvm::orc::MaterializationResponsibility &R,
-                           const llvm::object::ObjectFile &Obj,
-                           const llvm::RuntimeDyld::LoadedObjectInfo &LOI);
+  static void dumpSymbolInfo(const object::ObjectFile &loadedObj,
+                             const RuntimeDyld::LoadedObjectInfo &objInfo);
+  static void notifyLoaded(orc::MaterializationResponsibility &R,
+                           const object::ObjectFile &Obj,
+                           const RuntimeDyld::LoadedObjectInfo &LOI);
   ~JitEngineHost();
 
-  llvm::Expected<llvm::orc::ThreadSafeModule>
-  specializeBitcode(llvm::StringRef FnName, llvm::StringRef Suffix,
-                    llvm::StringRef IR, RuntimeConstant *RC,
-                    int NumRuntimeConstants);
+  Expected<orc::ThreadSafeModule> specializeIR(StringRef FnName,
+                                               StringRef Suffix, StringRef IR,
+                                               RuntimeConstant *RC,
+                                               int NumRuntimeConstants);
 
-  void *compileAndLink(llvm::StringRef FnName, char *IR, int IRSize,
+  void *compileAndLink(StringRef FnName, char *IR, int IRSize,
                        RuntimeConstant *RC, int NumRuntimeConstants);
 
 private:

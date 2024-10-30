@@ -38,5 +38,5 @@ int main() {
 // CHECK: Kernel
 // CHECK: JitCache hits 0 total 1
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: JitStoredCache hits 0 total 1
-// CHECK-SECOND: JitStoredCache hits 1 total 1
+// CHECK-FIRST: JitStorageCache hits 0 total 1
+// CHECK-SECOND: JitStorageCache hits 1 total 1

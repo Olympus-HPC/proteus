@@ -24,17 +24,19 @@ namespace proteus {
 
 using namespace llvm;
 
-static inline Error createSMDiagnosticError(llvm::SMDiagnostic &Diag) {
+static inline Error createSMDiagnosticError(SMDiagnostic &Diag) {
   std::string Msg;
   {
-    llvm::raw_string_ostream OS(Msg);
+    raw_string_ostream OS(Msg);
     Diag.print("", OS);
   }
-  return llvm::make_error<llvm::StringError>(std::move(Msg),
-                                             llvm::inconvertibleErrorCode());
+  return make_error<StringError>(std::move(Msg), inconvertibleErrorCode());
 }
 
 class JitEngine {
+public:
+  void optimizeIR(Module &M, StringRef Arch);
+
 protected:
   Expected<std::unique_ptr<TargetMachine>>
   createTargetMachine(Module &M, StringRef CPU /*, unsigned OptLevel*/);
@@ -48,9 +50,9 @@ protected:
   std::string mangleSuffix(uint64_t HashValue);
 
   struct {
-    bool ENV_JIT_USE_STORED_CACHE;
-    bool ENV_JIT_LAUNCH_BOUNDS;
-    bool ENV_JIT_SPECIALIZE_ARGS;
+    bool ENV_PROTEUS_USE_STORED_CACHE;
+    bool ENV_PROTEUS_SET_LAUNCH_BOUNDS;
+    bool ENV_PROTEUS_SPECIALIZE_ARGS;
   } Config;
 };
 
