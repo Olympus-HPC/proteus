@@ -73,7 +73,7 @@ public:
   void printStats() {
     // outs() << "JitCache hits " << Hits << " total " << Accesses << "\n";
     // Use printf to avoid re-ordering outputs by outs() in HIP.
-    printf(" JitCache hits %lu total %lu\n", Hits, Accesses);
+    printf("JitCache hits %lu total %lu\n", Hits, Accesses);
     for (auto &It : CacheMap) {
       uint64_t HashValue = It.first;
       JitCacheEntry &JCE = It.second;

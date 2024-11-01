@@ -23,11 +23,11 @@ namespace proteus {
 
 using namespace llvm;
 
-// NOTE: Stored cache assumes that stored code is re-usable across runs!
-// Source code changes should invalidate the cache (TODO). Also, if
-// storing assembly (PTX) or binary (ELF), then device globals may
-// have different addresses that render it invalid. In this case, store LLVM IR
-// to re-link globals.
+// NOTE: Storage cache assumes that stored code is re-usable across runs!
+// TODO: Source code changes should invalidate the cache. Also, if storing
+// assembly (PTX) or binary (ELF), then device globals may have different
+// addresses that render it invalid. In this case, store LLVM IR to re-link
+// globals.
 template <typename Function_t> class JitStorageCache {
 public:
   JitStorageCache() { std::filesystem::create_directory(StorageDirectory); }

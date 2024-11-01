@@ -10,6 +10,7 @@
 
 #include <cstdlib>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "llvm/CodeGen/CommandFlags.h"
@@ -39,11 +40,11 @@ TimeTracerRAII TimeTracer;
 using namespace llvm;
 
 Expected<std::unique_ptr<TargetMachine>>
-JitEngine::createTargetMachine(Module &M,
-                               StringRef CPU /*, unsigned OptLevel*/) {
+JitEngine::createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel) {
   Triple TT(M.getTargetTriple());
-  // TODO: Parameterize optlevel.
-  CodeGenOpt::Level CGOptLevel = CodeGenOpt::Aggressive;
+  std::optional<CodeGenOpt::Level> CGOptLevel = CodeGenOpt::getLevel(OptLevel);
+  if (CGOptLevel == std::nullopt)
+    FATAL_ERROR("Invalid opt level");
 
   std::string Msg;
   const Target *T = TargetRegistry::lookupTarget(M.getTargetTriple(), Msg);
@@ -62,21 +63,22 @@ JitEngine::createTargetMachine(Module &M,
 
   TargetOptions Options = codegen::InitTargetOptionsFromCodeGenFlags(TT);
 
-  std::unique_ptr<TargetMachine> TM(
-      T->createTargetMachine(M.getTargetTriple(), CPU, Features.getString(),
-                             Options, RelocModel, CodeModel, CGOptLevel));
+  std::unique_ptr<TargetMachine> TM(T->createTargetMachine(
+      M.getTargetTriple(), Arch, Features.getString(), Options, RelocModel,
+      CodeModel, CGOptLevel.value()));
   if (!TM)
     return make_error<StringError>("Failed to create target machine",
                                    inconvertibleErrorCode());
   return TM;
 }
 
-void JitEngine::runOptimizationPassPipeline(Module &M, StringRef CPU) {
+void JitEngine::runOptimizationPassPipeline(Module &M, StringRef Arch,
+                                            unsigned OptLevel) {
   TIMESCOPE("Run opt passes");
   PipelineTuningOptions PTO;
 
   std::optional<PGOOptions> PGOOpt;
-  auto TM = createTargetMachine(M, CPU);
+  auto TM = createTargetMachine(M, Arch, OptLevel);
   if (auto Err = TM.takeError())
     report_fatal_error(std::move(Err));
   TargetLibraryInfoImpl TLII(Triple(M.getTargetTriple()));
@@ -116,11 +118,6 @@ JitEngine::JitEngine() {
   dbgs() << "ENV_PROTEUS_SPECIALIZE_ARGS " << Config.ENV_PROTEUS_SPECIALIZE_ARGS
          << "\n";
 #endif
-}
-
-bool JitEngine::getEnvOrDefaultBool(const char *VarName, bool Default) {
-  const char *EnvValue = std::getenv(VarName);
-  return EnvValue ? static_cast<bool>(std::stoi(EnvValue)) : Default;
 }
 
 std::string JitEngine::mangleSuffix(uint64_t HashValue) {

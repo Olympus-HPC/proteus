@@ -33,19 +33,24 @@ static inline Error createSMDiagnosticError(SMDiagnostic &Diag) {
   return make_error<StringError>(std::move(Msg), inconvertibleErrorCode());
 }
 
+static inline bool getEnvOrDefaultBool(const char *VarName, bool Default) {
+
+  const char *EnvValue = std::getenv(VarName);
+  return EnvValue ? static_cast<bool>(std::stoi(EnvValue)) : Default;
+}
+
 class JitEngine {
 public:
   void optimizeIR(Module &M, StringRef Arch);
 
 protected:
   Expected<std::unique_ptr<TargetMachine>>
-  createTargetMachine(Module &M, StringRef CPU /*, unsigned OptLevel*/);
+  createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3);
 
-  void runOptimizationPassPipeline(Module &M, StringRef CPU);
+  void runOptimizationPassPipeline(Module &M, StringRef Arch,
+                                   unsigned OptLevel = 3);
 
   JitEngine();
-
-  bool getEnvOrDefaultBool(const char *VarName, bool Default);
 
   std::string mangleSuffix(uint64_t HashValue);
 

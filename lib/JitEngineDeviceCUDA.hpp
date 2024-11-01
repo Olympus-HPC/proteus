@@ -29,9 +29,6 @@ class JitEngineDeviceCUDA : public JitEngineDevice<JitEngineDeviceCUDA> {
 public:
   static JitEngineDeviceCUDA &instance();
 
-protected:
-  friend JitEngineDevice<JitEngineDeviceCUDA>;
-
   void *resolveDeviceGlobalAddr(const void *Addr);
 
   void setLaunchBoundsForKernel(Module *M, Function *F, int GridSize,

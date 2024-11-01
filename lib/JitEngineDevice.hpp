@@ -188,7 +188,9 @@ void JitEngineDevice<ImplT>::relinkGlobals(
     void *DevPtr = resolveDeviceGlobalAddr(RegisterVar.second);
     auto &VarName = RegisterVar.first;
     auto *GV = M.getNamedGlobal(VarName);
-    assert(GV && "Expected existing global variable");
+    // Skip linking if the GV does not exist in the module.
+    if (!GV)
+      continue;
     // Remove the re-linked global from llvm.compiler.used since that
     // use is not replaceable by the fixed addr constant expression.
     removeFromUsedLists(M, [&GV](Constant *C) {
@@ -224,23 +226,28 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   uint64_t HashValue =
       CodeCache.hash(ModuleUniqueId, KernelName, RC, NumRuntimeConstants);
-  // NOTE: we don't need a suffix to differentiate kernels, each
-  // specialization will be in its own module uniquely identify by HashValue. It
-  // exists only for debugging purposes to verify that the jitted kernel
-  // executes.
-  std::string Suffix = mangleSuffix(HashValue);
-  std::string KernelMangled = (KernelName + Suffix).str();
-
   typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc =
       CodeCache.lookup(HashValue);
   if (KernelFunc)
     return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                                 ShmemSize, Stream);
 
+  // NOTE: we don't need a suffix to differentiate kernels, each specialization
+  // will be in its own module uniquely identify by HashValue. It exists only
+  // for debugging purposes to verify that the jitted kernel executes.
+  std::string Suffix = mangleSuffix(HashValue);
+  std::string KernelMangled = (KernelName + Suffix).str();
+
   if (Config.ENV_PROTEUS_USE_STORED_CACHE) {
     // If there device global variables, lookup the IR and codegen object
     // before launching. Else, if there aren't device global variables, lookup
     // the object and launch.
+
+    // TODO: Check for globals is very conservative and always re-builds from
+    // LLVM IR even if the Jit module does not use global variables.  A better
+    // solution is to keep track of whether a kernel uses gvars (store a flag in
+    // the cache file?) and load the object in case it does not use any.
+    // TODO: Can we use RTC interfaces for fast linking on object files?
     bool HasDeviceGlobals = !VarNameToDevPtr.empty();
     if (auto CacheBuf =
             (HasDeviceGlobals

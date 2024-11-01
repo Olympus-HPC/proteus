@@ -11,7 +11,8 @@
 #include "CompilerInterfaceDevice.h"
 
 // NOTE: Using the ABI With scalars for GridDim, BlockDim instead of dim3 to
-// avoid issues with aggregate coercion of parameters.
+// avoid issues with aggregate coercion of parameters. Caller packs XY in a
+// uint64_t.
 extern "C" __attribute__((used)) hipError_t __jit_launch_kernel(
     const char *ModuleUniqueId, char *KernelName,
     proteus::FatbinWrapper_t *FatbinWrapper, size_t FatbinSize,

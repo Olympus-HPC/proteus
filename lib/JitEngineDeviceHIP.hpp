@@ -29,9 +29,6 @@ class JitEngineDeviceHIP : public JitEngineDevice<JitEngineDeviceHIP> {
 public:
   static JitEngineDeviceHIP &instance();
 
-protected:
-  friend JitEngineDevice<JitEngineDeviceHIP>;
-
   void *resolveDeviceGlobalAddr(const void *Addr);
 
   void setLaunchBoundsForKernel(Module *M, Function *F, int GridSize,

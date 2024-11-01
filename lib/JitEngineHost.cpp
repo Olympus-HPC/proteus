@@ -110,7 +110,8 @@ private:
 };
 
 JitEngineHost &JitEngineHost::instance() {
-  static JitEngineHost Jit(0, (char *[]){nullptr});
+  static char *args[] = {nullptr};
+  static JitEngineHost Jit(0, args);
   return Jit;
 }
 
@@ -269,6 +270,7 @@ JitEngineHost::JitEngineHost(int argc, char *argv[]) {
 
   InitializeNativeTarget();
   InitializeNativeTargetAsmPrinter();
+  InitializeNativeTargetAsmParser();
 
   ExitOnErr.setBanner("JIT: ");
   // Create the LLJIT instance.
