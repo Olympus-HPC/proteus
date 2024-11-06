@@ -62,3 +62,4 @@ install(FILES
   "${PROJECT_BINARY_DIR}/proteusConfig.cmake"
   DESTINATION
   lib/cmake/proteus)
+  
