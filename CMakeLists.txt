@@ -40,3 +40,25 @@ if(ENABLE_TESTS)
   enable_testing()
   add_subdirectory(tests)
 endif()
+
+include(CMakePackageConfigHelpers)
+
+configure_package_config_file(
+  "${PROJECT_SOURCE_DIR}/cmake/proteusConfig.cmake.in"
+  "${PROJECT_BINARY_DIR}/proteusConfig.cmake"
+  INSTALL_DESTINATION
+  lib/cmake/proteus)
+
+write_basic_package_version_file(
+  "${PROJECT_BINARY_DIR}/proteusConfigVersion.cmake"
+  VERSION ${PROJECT_VERSION}
+  COMPATIBILITY AnyNewerVersion)
+
+install(EXPORT proteusTargets
+  DESTINATION lib/cmake/proteus)
+
+install(FILES
+  "${PROJECT_BINARY_DIR}/proteusConfigVersion.cmake"
+  "${PROJECT_BINARY_DIR}/proteusConfig.cmake"
+  DESTINATION
+  lib/cmake/proteus)

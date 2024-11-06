@@ -4,9 +4,9 @@ function(CREATE_CPU_TEST exe check_source)
     set_source_files_properties(${check_source} PROPERTIES
         OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/ProteusJitPass.cpp
     )
-    add_dependencies(${exe} ProteusJitPass)
+    add_dependencies(${exe} ProteusPass)
 
-    target_link_libraries(${exe} PUBLIC proteusjit)
+    target_link_libraries(${exe} PUBLIC proteus)
 
     if(${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "ppc64le")
         set(NATIVE_OPT_FLAGS "-mcpu=native" "-mtune=native")
@@ -17,7 +17,7 @@ function(CREATE_CPU_TEST exe check_source)
     target_compile_options(
         ${exe}
         PUBLIC
-        -fpass-plugin=$<TARGET_FILE:ProteusJitPass>
+        -fpass-plugin=$<TARGET_FILE:ProteusPass>
         ${NATIVE_OPT_FLAGS}
     )
 

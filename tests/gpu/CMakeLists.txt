@@ -13,14 +13,14 @@ function(CREATE_GPU_TEST exe check_source)
         LANGUAGE ${lang}
         OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/ProteusJitPass.cpp
     )
-    add_dependencies(${exe}.${lang} ProteusJitPass)
+    add_dependencies(${exe}.${lang} ProteusPass)
 
-    target_link_libraries(${exe}.${lang} PUBLIC proteusjit)
+    target_link_libraries(${exe}.${lang} PUBLIC proteus)
 
     target_compile_options(
         ${exe}.${lang}
         PUBLIC
-        -fpass-plugin=$<TARGET_FILE:ProteusJitPass>
+        -fpass-plugin=$<TARGET_FILE:ProteusPass>
     )
 
     # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
@@ -43,9 +43,9 @@ function(CREATE_GPU_TEST_RDC exe source)
         LANGUAGE ${lang}
         OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/ProteusJitPass.cpp
     )
-    add_dependencies(${exe}.${lang}.rdc ProteusJitPass)
+    add_dependencies(${exe}.${lang}.rdc ProteusPass)
 
-    target_link_libraries(${exe}.${lang}.rdc PUBLIC proteusjit)
+    target_link_libraries(${exe}.${lang}.rdc PUBLIC proteus)
 
     if(ENABLE_HIP)
         # This is unsupported see: https://gitlab.kitware.com/cmake/cmake/-/issues/23210
@@ -56,7 +56,7 @@ function(CREATE_GPU_TEST_RDC exe source)
             ${exe}.${lang}.rdc
             PUBLIC
             -fgpu-rdc
-            -fpass-plugin=$<TARGET_FILE:ProteusJitPass>
+            -fpass-plugin=$<TARGET_FILE:ProteusPass>
         )
 
         target_link_options(${exe}.${lang}.rdc PUBLIC -fgpu-rdc --hip-link)
@@ -64,7 +64,7 @@ function(CREATE_GPU_TEST_RDC exe source)
         target_compile_options(
             ${exe}.${lang}.rdc
             PUBLIC
-            -fpass-plugin=$<TARGET_FILE:ProteusJitPass>
+            -fpass-plugin=$<TARGET_FILE:ProteusPass>
         )
 
         # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
