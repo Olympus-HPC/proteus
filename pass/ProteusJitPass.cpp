@@ -58,6 +58,9 @@
 #include <llvm/Support/MemoryBufferRef.h>
 
 #include <iostream>
+#include <optional>
+#include <ostream>
+#include <random>
 #include <string>
 
 // #define ENABLE_RECURSIVE_JIT
@@ -71,6 +74,17 @@
 #define FATAL_ERROR(x)                                                         \
   report_fatal_error(llvm::Twine(std::string{} + __FILE__ + ":" +              \
                                  std::to_string(__LINE__) + " => " + x))
+
+#ifdef ENABLE_HIP
+constexpr char const* register_function_name = "__hipRegisterFunction";
+constexpr char const* launch_function_name = "hipLaunchKernel";
+constexpr char const* fatbin_name = "__hip_fatbin_wrapper";
+#endif
+#if ENABLE_CUDA
+constexpr char* register_function_name = "__cudaRegisterFunction";
+constexpr char* launch_function_name = "cudaLaunchKernel";
+constexpr char const* fatbin_name = "__cuda_fatbin_wrapper";
+#endif
 
 using namespace llvm;
 
@@ -706,14 +720,10 @@ struct ProteusJitPassImpl {
 
   void getKernelHostStubs(Module &M) {
     Function *RegisterFunction = nullptr;
-#if ENABLE_HIP
-    RegisterFunction = M.getFunction("__hipRegisterFunction");
-#elif ENABLE_CUDA
-    RegisterFunction = M.getFunction("__cudaRegisterFunction");
-#endif
-
-    if (!RegisterFunction)
+    RegisterFunction = M.getFunction(register_function_name);
+    if (!RegisterFunction) {
       return;
+    }
 
     constexpr int StubOperand = 1;
     constexpr int KernelOperand = 2;
@@ -761,7 +771,7 @@ struct ProteusJitPassImpl {
     return Kernels;
   }
 
-  bool isDeviceKernelHostStub(Module &M, Function &Fn) {
+  bool isDeviceKernelHostStub(Module &M, const Function &Fn) {
     if (StubToKernelMap.contains(&Fn))
       return true;
 
@@ -770,11 +780,7 @@ struct ProteusJitPassImpl {
 
   bool hasDeviceLaunchKernelCalls(Module &M) {
     Function *LaunchKernelFn = nullptr;
-#if ENABLE_HIP
-    LaunchKernelFn = M.getFunction("hipLaunchKernel");
-#elif ENABLE_CUDA
-    LaunchKernelFn = M.getFunction("cudaLaunchKernel");
-#endif
+    LaunchKernelFn = M.getFunction(launch_function_name);
 
     if (!LaunchKernelFn)
       return false;
@@ -782,12 +788,13 @@ struct ProteusJitPassImpl {
     return true;
   }
 
+  /// Replace every kernel launch inside a Module M with __jit_launch_kernel, even if a
+  /// user did not specify to JIT the kernel.
   void
   replaceWithJitLaunchKernel(Module &M,
-                             std::pair<Function *, JitFunctionInfo> &JITInfo,
+                             Function *JITFn,
+                             const std::optional<JitFunctionInfo>& JITInfo,
                              CallBase *LaunchKernelCall) {
-    Function *JITFn = JITInfo.first;
-    JitFunctionInfo &JFI = JITInfo.second;
     // Create jit entry runtime function.
     Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
     Type *Int64Ty = Type::getInt64Ty(M.getContext());
@@ -801,11 +808,8 @@ struct ProteusJitPassImpl {
     assert(ModuleUniqueId && "Expected ModuleUniqueId global to be defined");
 
     GlobalVariable *FatbinWrapper = nullptr;
-#if ENABLE_HIP
-    FatbinWrapper = M.getGlobalVariable("__hip_fatbin_wrapper", true);
-#elif ENABLE_CUDA
-    FatbinWrapper = M.getGlobalVariable("__cuda_fatbin_wrapper", true);
-#endif
+    FatbinWrapper = M.getGlobalVariable(fatbin_name, true);
+
     if (!FatbinWrapper)
       FATAL_ERROR(
           "Expected hip fatbinary wrapper global, check "
@@ -823,7 +827,7 @@ struct ProteusJitPassImpl {
     // NOTE: CUDA uses an array type for passing grid, block sizes.
     JitEntryFnTy = FunctionType::get(
         Int32Ty,
-        {ModuleUniqueId->getType(), VoidPtrTy, FatbinWrapper->getType(),
+        {VoidPtrTy, ModuleUniqueId->getType(), VoidPtrTy, FatbinWrapper->getType(),
          Int64Ty, RuntimeConstantTy->getPointerTo(), Int32Ty,
          ArrayType::get(Int64Ty, 2), ArrayType::get(Int64Ty, 2), VoidPtrTy,
          Int64Ty, VoidPtrTy},
@@ -843,12 +847,14 @@ struct ProteusJitPassImpl {
 
     // Create the runtime constant array type for the runtime constants passed
     // to the jit entry function.
+    size_t ConstArgsSize = JITInfo.has_value() ? JITInfo.value().ConstantArgs.size() : 0;
     ArrayType *RuntimeConstantArrayTy =
-        ArrayType::get(RuntimeConstantTy, JFI.ConstantArgs.size());
+        ArrayType::get(RuntimeConstantTy, ConstArgsSize);
 
     // Create the runtime constants data structure passed to the jit entry.
     Value *RuntimeConstantsAlloca = nullptr;
-    if (JFI.ConstantArgs.size() > 0) {
+    if (JITInfo.has_value() && ConstArgsSize > 0) {
+      const JitFunctionInfo& JFI = JITInfo.value();
       auto IP = Builder.saveIP();
       Function *InsertFn = LaunchKernelCall->getFunction();
       Builder.SetInsertPoint(&InsertFn->getEntryBlock(),
@@ -880,9 +886,10 @@ struct ProteusJitPassImpl {
           Builder.CreateStore(Load, GEP);
         }
       }
-    } else
+    } else {
       RuntimeConstantsAlloca =
           Constant::getNullValue(RuntimeConstantArrayTy->getPointerTo());
+    }
 
     assert(RuntimeConstantsAlloca &&
            "Expected non-null runtime constants alloca");
@@ -893,7 +900,7 @@ struct ProteusJitPassImpl {
         JitEntryFn,
         {ModuleUniqueId, StubToKernelMap[JITFn], FatbinWrapper,
          /* FatbinSize unused by HIP */ Builder.getInt64(0),
-         RuntimeConstantsAlloca, Builder.getInt32(JFI.ConstantArgs.size()),
+         RuntimeConstantsAlloca, Builder.getInt32(ConstArgsSize),
          LaunchKernelCall->getArgOperand(1), LaunchKernelCall->getArgOperand(2),
          LaunchKernelCall->getArgOperand(3), LaunchKernelCall->getArgOperand(4),
          LaunchKernelCall->getArgOperand(5), LaunchKernelCall->getArgOperand(6),
@@ -934,23 +941,18 @@ struct ProteusJitPassImpl {
   }
 
   void
-  emitJitLaunchKernelCall(Module &M,
-                          std::pair<Function *, JitFunctionInfo> &JITInfo) {
+  emitJitLaunchKernelCalls(Module &M) {
     Function *LaunchKernelFn = nullptr;
-#if ENABLE_HIP
-    LaunchKernelFn = M.getFunction("hipLaunchKernel");
-#elif ENABLE_CUDA
-    LaunchKernelFn = M.getFunction("cudaLaunchKernel");
-#endif
+    LaunchKernelFn = M.getFunction(launch_function_name);
+
     if (!LaunchKernelFn)
       FATAL_ERROR(
           "Expected non-null LaunchKernelFn, check "
           "ENABLE_CUDA|ENABLE_HIP compilation flags for ProteusJitPass");
 
-    Function *JITFn = JITInfo.first;
-
-    SmallVector<CallBase *> ToBeReplaced;
-    for (User *Usr : LaunchKernelFn->users())
+    DenseMap<CallBase*, std::pair<Function*, JitFunctionInfo>> ToJITCompile;
+    DenseMap<CallBase*, Function*> ToReplaceWithKernelLaunch;
+    for (User *Usr : LaunchKernelFn->users()) {
       if (CallBase *CB = dyn_cast<CallBase>(Usr)) {
         // NOTE: We search for calls to the LaunchKernelFn that directly call
         // the kernel through its global value to replace with JIT kernel
@@ -963,15 +965,26 @@ struct ProteusJitPassImpl {
         if (!KernelGV)
           continue;
 
-        if (getStubGV(KernelGV) != JITFn)
-          continue;
-
-        ToBeReplaced.push_back(CB);
+        if (Function* JITFn = dyn_cast<Function>(getStubGV(KernelGV)); JITFn && isDeviceKernelHostStub(M, *JITFn)){
+          if (JitFunctionInfoMap.contains(JITFn)) {
+            DEBUG(dbgs() << "Processing JIT Function " << JITFn->getName() << "\n");
+            ToJITCompile[CB] = std::make_pair(JITFn, JitFunctionInfoMap[JITFn]);
+          // In this case JITFn is a device kernel host stub, but we still need to replace it with a __jit_kernel_launch.
+          } else {
+            ToReplaceWithKernelLaunch[CB] = JITFn;
+          }
+        }
       }
-
-    for (CallBase *CB : ToBeReplaced)
-      replaceWithJitLaunchKernel(M, JITInfo, CB);
+    }
+    for (const auto& [CB, JITFnInfoPair] : ToJITCompile) {
+      instrumentRegisterJITFunc(M, CB);
+      replaceWithJitLaunchKernel(M, JITFnInfoPair.first, JITFnInfoPair.second, CB);
+    }
+    for (const auto& [CB, FunctionPassedToLaunch] : ToReplaceWithKernelLaunch) {
+      replaceWithJitLaunchKernel(M, FunctionPassedToLaunch, std::nullopt, CB);
+    }
   }
+
 
   void instrumentRegisterVar(Module &M) {
     Function *RegisterVarFn = nullptr;
@@ -1008,14 +1021,38 @@ struct ProteusJitPassImpl {
       }
   }
 
+  /// instrumentRegisterJITFunc instruments any function passed to a kernel launch in the IR
+  /// with a `__jit_register_function` call.
+  void instrumentRegisterJITFunc(Module &M, CallBase* CB) {
+
+    // Create jit entry runtime function.
+    Type *VoidPtrType = Type::getInt8PtrTy(M.getContext());
+    Type* VoidType =  Type::getVoidTy(M.getContext());
+    //// Function name
+    //Type *Int8PtrType = Type::getInt8PtrTy(M.getContext());
+
+    // The prototype is
+    // __jit_register_function(const void *HostAddr, const char *FuncName).
+    FunctionType *JitRegisterFunctionFnTy =
+        FunctionType::get(VoidType, {VoidPtrType},
+                          /* isVarArg=*/false);
+    FunctionCallee JitRegisterKernelFn =
+        M.getOrInsertFunction("__jit_register_function", JitRegisterFunctionFnTy);
+
+
+    IRBuilder<> Builder(CB->getNextNode());
+    //Value *SymbolName = CB->getArgOperand(1);
+    Builder.CreateCall(JitRegisterKernelFn, {CB->getArgOperand(0)});
+  }
+
   bool run(Module &M, CallGraph &CG) {
     parseAnnotations(M);
 
     if (JitFunctionInfoMap.empty())
       return false;
 
-    DEBUG(dbgs() << "=== Pre Original Host Module\n"
-                 << M << "=== End of Pre Original Host Module\n");
+    // DEBUG(dbgs() << "=== Pre Original Host Module\n"
+    //              << M << "=== End of Pre Original Host Module\n");
 
     // ==================
     // Device compilation
@@ -1038,20 +1075,15 @@ struct ProteusJitPassImpl {
       getKernelHostStubs(M);
       instrumentRegisterVar(M);
       emitModuleUniqueIdGlobal(M);
+      emitJitLaunchKernelCalls(M);
     }
 
     for (auto &JFI : JitFunctionInfoMap) {
       Function *JITFn = JFI.first;
-      DEBUG(dbgs() << "Processing JIT Function " << JITFn->getName() << "\n");
-      if (isDeviceKernelHostStub(M, *JITFn)) {
-        emitJitLaunchKernelCall(M, JFI);
-        DEBUG(dbgs() << "DONE!\n");
-
-        continue;
+      if (!isDeviceKernelHostStub(M, *JITFn)) {
+        emitJitModuleHost(M, JFI);
+        emitJitEntryCall(M, JFI);
       }
-
-      emitJitModuleHost(M, JFI);
-      emitJitEntryCall(M, JFI);
     }
 
     DEBUG(dbgs() << "=== Post Original Host Module\n"

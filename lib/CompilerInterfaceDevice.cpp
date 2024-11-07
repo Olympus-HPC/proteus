@@ -23,3 +23,11 @@ extern "C" __attribute((used)) void __jit_register_var(const void *HostAddr,
   // works for both CUDA and HIP.
   Jit.insertRegisterVar(VarName, HostAddr);
 }
+
+// The LLVM pass injects __jit_register_function into the IR for any
+// kernel called by CUDA or HIP register function.
+extern "C" __attribute__((used)) void __jit_register_function(
+    void **KernelFunc) {
+  printf("calling register func\n");
+  JITKernelFuncs.insert(KernelFunc);
+}

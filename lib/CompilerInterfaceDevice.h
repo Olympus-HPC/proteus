@@ -24,7 +24,7 @@ using JitDeviceImplT = proteus::JitEngineDeviceHIP;
 
 // Return "auto" should resolve to cudaError_t or hipError_t.
 static inline auto __jit_launch_kernel_internal(
-    const char *ModuleUniqueId, char *KernelName,
+    void **KernelFunc, const char *ModuleUniqueId, char *KernelName,
     proteus::FatbinWrapper_t *FatbinWrapper, size_t FatbinSize,
     RuntimeConstant *RC, int NumRuntimeConstants, dim3 GridDim, dim3 BlockDim,
     void **KernelArgs, uint64_t ShmemSize, void *Stream) {
@@ -50,6 +50,18 @@ static inline auto __jit_launch_kernel_internal(
   TIMESCOPE("__jit_launch_kernel");
   DBG(printKernelLaunchInfo());
   auto &Jit = JitDeviceImplT::instance();
+  // If the kernel isn't marked to be JIT compiled, fallback and call it directly.
+  if (!JITKernelFuncs.count(KernelFunc)) {
+    #if defined(ENABLE_HIP)
+    // hipFunction_t* function_ptr = nullptr;
+    // hipGetFuncBySymbol(function_ptr, *KernelFunc);
+    hipFunction_t function_ptr = (hipFunction_t)*KernelFunc;
+    #elif defined(ENABLE_HIP)
+    CUfunction function_ptr = *(CUfunction*)KernelFunc;
+    #endif
+    return Jit.launchKernelFunction(function_ptr, GridDim, BlockDim, KernelArgs, ShmemSize, static_cast<typename JitDeviceImplT::DeviceStream_t>(Stream));
+  }
+  // Otherwise, compile the kernel and execute.
   return Jit.compileAndRun(
       ModuleUniqueId, KernelName, FatbinWrapper, FatbinSize, RC,
       NumRuntimeConstants, GridDim, BlockDim, KernelArgs, ShmemSize,

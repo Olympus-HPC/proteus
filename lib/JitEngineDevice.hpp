@@ -38,6 +38,7 @@
 
 // TODO: check if this global is needed.
 static llvm::codegen::RegisterCodeGenFlags CFG;
+static llvm::DenseSet<void**> JITKernelFuncs;
 
 namespace proteus {
 
@@ -68,6 +69,14 @@ public:
     VarNameToDevPtr[VarName] = Addr;
   }
 
+  DeviceError_t launchKernelFunction(KernelFunction_t KernelFunc, dim3 GridDim,
+                                     dim3 BlockDim, void **KernelArgs,
+                                     uint64_t ShmemSize,
+                                     DeviceStream_t Stream) {
+    return static_cast<ImplT &>(*this).launchKernelFunction(
+        KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
+  }
+
 private:
   //------------------------------------------------------------------
   // Begin Methods implemented in the derived device engine class.
@@ -80,14 +89,6 @@ private:
                                 int BlockSize) {
     static_cast<ImplT &>(*this).setLaunchBoundsForKernel(M, F, GridSize,
                                                          BlockSize);
-  }
-
-  DeviceError_t launchKernelFunction(KernelFunction_t KernelFunc, dim3 GridDim,
-                                     dim3 BlockDim, void **KernelArgs,
-                                     uint64_t ShmemSize,
-                                     DeviceStream_t Stream) {
-    return static_cast<ImplT &>(*this).launchKernelFunction(
-        KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
   }
 
   std::unique_ptr<MemoryBuffer> codegenObject(Module &M, StringRef DeviceArch) {
