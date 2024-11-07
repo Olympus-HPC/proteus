@@ -11,7 +11,7 @@ function(CREATE_GPU_TEST exe check_source)
     add_executable(${exe}.${lang} ${check_source} ${ARGN})
     set_source_files_properties(${check_source} ${ARGN} PROPERTIES
         LANGUAGE ${lang}
-        OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/ProteusJitPass.cpp
+        OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/ProteusPass.cpp
     )
     add_dependencies(${exe}.${lang} ProteusPass)
 
@@ -41,7 +41,7 @@ function(CREATE_GPU_TEST_RDC exe source)
     add_executable(${exe}.${lang}.rdc ${source})
     set_source_files_properties(${source} PROPERTIES
         LANGUAGE ${lang}
-        OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/ProteusJitPass.cpp
+        OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/ProteusPass.cpp
     )
     add_dependencies(${exe}.${lang}.rdc ProteusPass)
 

@@ -7,12 +7,28 @@ set(SOURCES
   JitEngineHost.cpp
 )
 
+set(HEADERS
+  CompilerInterfaceTypes.h
+  JitCache.hpp
+  JitEngine.hpp
+  JitEngineHost.hpp
+  JitStorageCache.hpp
+  TimeTracing.hpp
+  TransformArgumentSpecialization.hpp
+  Utils.h)
+
 if(ENABLE_CUDA)
 list(APPEND SOURCES
   CompilerInterfaceDevice.cpp
   CompilerInterfaceDeviceCUDA.cpp
   JitEngineDeviceCUDA.cpp
 )
+
+list(APPEND HEADERS
+  CompilerInterfaceDevice.h
+  JitEngineDevice.hpp
+  JitEngineDeviceCUDA.hpp
+  UtilsCUDA.h)
 endif()
 
 if(ENABLE_HIP)
@@ -21,6 +37,12 @@ list(APPEND SOURCES
   CompilerInterfaceDeviceHIP.cpp
   JitEngineDeviceHIP.cpp
 )
+
+list(APPEND HEADERS
+  CompilerInterfaceDevice.h
+  JitEngineDevice.hpp
+  JitEngineDeviceHIP.hpp
+  UtilsHIP.h)
 endif()
 
 if(BUILD_SHARED_LIBJIT)
@@ -41,6 +63,11 @@ endif()
 
 target_include_directories(proteus
   SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
+
+target_include_directories(proteus
+  PUBLIC
+  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/lib>
+  $<INSTALL_INTERFACE:include>)
 
 if(LLVM_LINK_LLVM_DYLIB)
   llvm_config(proteus USE_SHARED)
@@ -74,3 +101,7 @@ install(
   RUNTIME DESTINATION lib
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib)
+
+install(
+  FILES ${HEADERS}
+  DESTINATION include/)

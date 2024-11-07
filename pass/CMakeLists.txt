@@ -1,4 +1,4 @@
-add_library(ProteusPass SHARED ProteusJitPass.cpp)
+add_library(ProteusPass SHARED ProteusPass.cpp)
 
 target_include_directories(ProteusPass
   SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})

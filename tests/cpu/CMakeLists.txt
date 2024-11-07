@@ -2,7 +2,7 @@ function(CREATE_CPU_TEST exe check_source)
     add_executable(${exe} ${check_source} ${ARGN})
 
     set_source_files_properties(${check_source} PROPERTIES
-        OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/ProteusJitPass.cpp
+        OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/ProteusPass.cpp
     )
     add_dependencies(${exe} ProteusPass)
 
