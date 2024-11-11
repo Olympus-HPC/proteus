@@ -1,0 +1,10 @@
+# Perf counters group 1
+pmc : VFetchInsts
+pmc: VALUBusy
+pmc: L2CacheHit
+#pmc: Wavefronts
+pmc: VALUInsts SALUInsts SFetchInsts
+pmc: MeanOccupancyPerCU
+# Filter by dispatches range, GPU index and kernel names
+# supported range formats: "3:9", "3:", "3"
+gpu: 0

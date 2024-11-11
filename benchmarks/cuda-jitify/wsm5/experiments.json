@@ -1,0 +1,9 @@
+{
+  "name": "wsm5",
+  "executables": {
+     "jitify": "main-jit.x"
+  },
+  "inputs" : {
+    "default":"10"
+  }
+}

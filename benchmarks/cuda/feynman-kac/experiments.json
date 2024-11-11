@@ -1,0 +1,10 @@
+{
+  "name": "feynman-kac",
+  "executables": {
+     "aot" : "fk-aot.x",
+     "jit": "fk-jit.x"
+  },
+  "inputs" : {
+    "default":"1"
+  }
+}

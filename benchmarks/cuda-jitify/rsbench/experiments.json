@@ -1,0 +1,9 @@
+{
+  "name": "rsbench",
+  "executables": {
+     "jitify": "rsbench-jit.x"
+  },
+  "inputs" : {
+    "default":"-s large -m event"
+  }
+}

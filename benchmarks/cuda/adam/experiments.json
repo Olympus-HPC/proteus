@@ -1,0 +1,10 @@
+{
+  "name": "adam",
+  "executables": {
+    "aot": "adam-aot.x",
+    "jit": "adam-jit.x"
+  },
+  "inputs": {
+    "default": "160000 1600 1000"
+  }
+}

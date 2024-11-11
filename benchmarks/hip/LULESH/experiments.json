@@ -1,0 +1,10 @@
+{
+  "name": "lulesh",
+  "executables": {
+     "aot" : "lulesh-aot.x",
+     "jit": "lulesh-jit.x"
+  },
+  "inputs" : {
+    "default":"-s 128"
+  }
+}
