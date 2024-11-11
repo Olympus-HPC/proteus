@@ -1,0 +1,10 @@
+{
+  "name": "sw4ck",
+  "executables": {
+    "aot": "sw4ck-aot.x",
+    "jit": "sw4ck-jit.x"
+  },
+  "inputs": {
+    "default": "sw4ck.in 1000"
+  }
+}

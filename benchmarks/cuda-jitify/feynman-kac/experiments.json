@@ -1,0 +1,9 @@
+{
+  "name": "feynman-kac",
+  "executables": {
+     "jitify": "fk-jit.x"
+  },
+  "inputs" : {
+    "default":"1"
+  }
+}

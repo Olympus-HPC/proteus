@@ -1,0 +1,9 @@
+{
+  "name": "sw4ck",
+  "executables": {
+    "jitify": "sw4ck-jit.x"
+  },
+  "inputs": {
+    "default": "sw4ck.in 1000"
+  }
+}

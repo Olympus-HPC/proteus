@@ -1,17 +1,10 @@
-ml load cmake/3.23.1
-ml load cuda/12.2.2
+# NOTE: load any needed modules for CUDA
 
-LLVM_INSTALL_DIR=$1
+LLVM_INSTALL_DIR=$(llvm-config --prefix)
 
-if [ -z "$LLVM_INSTALL_DIR" ]; then
-    echo "Usage: setup-lassen.sh <LLVM installation dir>"
-    return 0
-fi
-
-export PATH="$LLVM_INSTALL_DIR/bin":$PATH
-
-mkdir build-lassen
-pushd build-lassen
+rm -rf build-nvidia
+mkdir build-nvidia
+pushd build-nvidia
 
 cmake .. \
 -DLLVM_INSTALL_DIR="$LLVM_INSTALL_DIR" \

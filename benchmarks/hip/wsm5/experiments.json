@@ -1,0 +1,10 @@
+{
+  "name": "wsm5",
+  "executables": {
+     "aot" : "main-aot.x",
+     "jit": "main-jit.x"
+  },
+  "inputs" : {
+    "default":"10"
+  }
+}

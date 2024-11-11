@@ -1,0 +1,10 @@
+{
+  "name": "rsbench",
+  "executables": {
+     "aot" : "rsbench-aot.x",
+     "jit": "rsbench-jit.x"
+  },
+  "inputs" : {
+    "default":"-s large -m event"
+  }
+}
