@@ -120,6 +120,7 @@ CREATE_GPU_TEST(kernel_host_jit kernel_host_jit.cpp)
 CREATE_GPU_TEST(kernel_host_device_jit kernel_host_device_jit.cpp)
 CREATE_GPU_TEST(types types.cpp)
 CREATE_GPU_TEST(kernel_unused_gvar kernel_unused_gvar.cpp kernel_unused_gvar_def.cpp)
+CREATE_GPU_TEST(launch_in_if_else launch_in_if_else.cpp)
 
 CREATE_GPU_TEST_RDC(kernel kernel.cpp)
 CREATE_GPU_TEST_RDC(kernel_cache kernel_cache.cpp)

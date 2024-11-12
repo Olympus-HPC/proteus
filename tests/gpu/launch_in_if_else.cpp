@@ -37,9 +37,12 @@ template <typename T> gpuError_t launchertwo(T kernel_in) {
 
 int main() {
   auto indirect = reinterpret_cast<const void*>(&kernel);
-  gpuErrCheck(launcher(indirect));
-  gpuErrCheck(launcher(kernel_two));
-  gpuErrCheck(launchertwo(kernel_two));
+  int a = 0;
+  if (a > 0) {
+    gpuErrCheck(launcher(indirect));
+  } else {
+    gpuErrCheck(launcher(kernel_two));
+  }
   gpuErrCheck(gpuDeviceSynchronize());
 
   return 0;

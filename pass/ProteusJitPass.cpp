@@ -1010,11 +1010,47 @@ struct ProteusJitPassImpl {
   void replaceWithJIT(Module& M, User* Usr,
                               Function* JitFn, const JitFunctionInfo& FnInfo) {
     if (CallBase *CB = dyn_cast<CallBase>(Usr)) {
-      //if (CB->getDebugLoc()) {
-      //  CB->setDebugLoc(llvm::DebugLoc()); // Remove debug info
-      //}
       if (isDeviceKernelHostStub(M, *JitFn)) {
         replaceWithJitLaunchKernel(M, JitFn, FnInfo, CB);
+      }
+    }
+  }
+
+  /// Walk the def-use chain of a JitFn using BFS until a GPU kernel launch call is reached
+  void findCallBasesofJitFunction(Module& M, const DenseSet<User*>& LaunchUses, Function* JitFn,
+                                  DenseSet<User*>& toReplaceWithJit) {
+    std::queue<User*> q;
+    DenseSet<User*> processed;
+    for (User* user: JitFn->users()) {
+      q.push(user);
+    }
+    dbgs() << "PROCESSING " << *(StubToKernelMap[JitFn]) << "\n";
+    // BFS through the def-use chain of JitFn
+    while (!q.empty()) {
+      User* CurrentUser = q.front();
+      q.pop();
+      processed.insert(CurrentUser);
+      // The current user is a kernel launch, add to set and process later
+      if (LaunchUses.contains(CurrentUser)) {
+        toReplaceWithJit.insert(CurrentUser);
+      // If one of the users of the jit function is a function call, enqueue
+      // the instructions to recursively look for a kernel launch.
+      } else if (auto cb = dyn_cast<CallBase>(CurrentUser); cb) {
+        if (auto CalledFunction = cb->getCalledFunction(); CalledFunction && !processed.contains(CalledFunction)) {
+          for (BasicBlock& BB : *CalledFunction) {
+            for (Instruction& I : BB) {
+              if (!processed.contains(&I)) {
+                q.push(&I);
+              }
+            }
+          }
+        }
+      }
+      // Process downstream users directly
+      for (User* Usr : CurrentUser->users()) {
+        if (!processed.contains(Usr)) {
+          q.push(Usr);
+        }
       }
     }
   }
@@ -1034,42 +1070,10 @@ struct ProteusJitPassImpl {
 
     // Traverse use-def from Jit functions to their uses at hipLaunchKernel or cudaLaunchKernel
     for (const auto& [JitFn, FnInfo] : JitFunctionInfoMap) {
-      std::queue<User*> q;
-      DenseSet<User*> processed;
       DenseSet<User*> toReplaceWithJit;
-      for (User* user: JitFn->users()) {
-        q.push(user);
-      }
-      dbgs() << "PROCESSING " << *(StubToKernelMap[JitFn]) << "\n";
-      // BFS to all users of the kernel until we reach the "leaves" or functions calling
-      // kernel
-      while (!q.empty()) {
-        User* CurrentUser = q.front();
-        q.pop();
-        processed.insert(CurrentUser);
-        // Process Direct launches
-        if (LaunchUses.contains(CurrentUser)) {
-          toReplaceWithJit.insert(CurrentUser);
-        // Go further down the call stack
-        } else if (auto cb = dyn_cast<CallBase>(CurrentUser); cb) {
-          if (auto CalledFunction = cb->getCalledFunction(); CalledFunction && !processed.contains(CalledFunction)) {
-            for (BasicBlock& BB : *CalledFunction) {
-              for (Instruction& I : BB) {
-                if (!processed.contains(&I)) {
-                  q.push(&I);
-                }
-              }
-            }
-          }
-        }
-        // Process downstream users
-        for (User* Usr : CurrentUser->users()) {
-          if (!processed.contains(Usr)) {
-            q.push(Usr);
-          }
-        }
-      }
-      // Actually inject the JIT to the callbases
+      // Use BFS to walk def-use chain.
+      findCallBasesofJitFunction(M, LaunchUses, JitFn, toReplaceWithJit);
+      // Replace called function with jit_kernel_launch
       for (User* Usr : toReplaceWithJit) {
         replaceWithJIT(M, Usr, JitFn, FnInfo);
       }
