@@ -1010,9 +1010,9 @@ struct ProteusJitPassImpl {
   void replaceWithJIT(Module& M, User* Usr,
                               Function* JitFn, const JitFunctionInfo& FnInfo) {
     if (CallBase *CB = dyn_cast<CallBase>(Usr)) {
-      if (CB->getDebugLoc()) {
-        CB->setDebugLoc(llvm::DebugLoc()); // Remove debug info
-      }
+      //if (CB->getDebugLoc()) {
+      //  CB->setDebugLoc(llvm::DebugLoc()); // Remove debug info
+      //}
       if (isDeviceKernelHostStub(M, *JitFn)) {
         replaceWithJitLaunchKernel(M, JitFn, FnInfo, CB);
       }
@@ -1045,7 +1045,6 @@ struct ProteusJitPassImpl {
       // kernel
       while (!q.empty()) {
         User* CurrentUser = q.front();
-        dbgs() << "iter  " << *CurrentUser << "\n";
         q.pop();
         processed.insert(CurrentUser);
         // Process Direct launches
@@ -1113,8 +1112,10 @@ struct ProteusJitPassImpl {
     for (auto &JFI : JitFunctionInfoMap) {
       Function *JITFn = JFI.first;
       DEBUG(dbgs() << "Processing JIT Function " << JITFn->getName() << "\n");
-      emitJitModuleHost(M, JFI);
-      emitJitEntryCall(M, JFI);
+       if (!isDeviceKernelHostStub(M, *JITFn)) {
+        emitJitModuleHost(M, JFI);
+        emitJitEntryCall(M, JFI);
+      }
     }
 
     DEBUG(dbgs() << "=== Post Original Host Module\n"
