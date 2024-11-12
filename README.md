@@ -93,6 +93,11 @@ An one-liner example is:
 clang++ -fpass-plugin=<install_path>/lib/libiProteusJitPass.so -L <install_path>/lib -Wl,-rpath,<install_path>/lib -lproteusjit MyAwesomeCode.cpp -o MyAwesomeExe
 ```
 
+## Environment Variables Controlling logger
+
+The following variables will control the loggin capabilities ...
+
+
 🚧 A cmake export file for easy integration is in the works
 
 ## Contributing
