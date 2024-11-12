@@ -6,7 +6,6 @@
 
 #include <climits>
 #include <cstdio>
-#include <iostream>
 
 #include "gpu_common.h"
 
@@ -19,35 +18,26 @@
       abort();                                                                 \
     }                                                                          \
   }
-__global__ __attribute__((annotate("jit"))) void kernel() {
-  printf("Kernel one\n");
+__global__ __attribute__((annotate("jit"))) void kernel(size_t len) {
+
+  printf("Kernel\n");
 }
 
-__global__ __attribute__((annotate("jit"))) void kernel_two() {
-  printf("Kernel two\n");
-}
-
-template <typename T> gpuError_t launcher(T kernel_in) {
-  return gpuLaunchKernel((const void*)kernel_in, 1, 1, 0, 0, 0);
-}
-
-template <typename T> gpuError_t launchertwo(T kernel_in) {
-  return launcher(kernel_in);
+template <typename T> gpuError_t launcher(T kernel_in, size_t len) {
+  void *args[] = {&len};
+  return gpuLaunchKernel((const void *)kernel_in, 1, 1, args, 0, 0);
 }
 
 int main() {
-  auto indirect = reinterpret_cast<const void*>(&kernel);
-  gpuErrCheck(launcher(indirect));
-  gpuErrCheck(launcher(kernel_two));
-  gpuErrCheck(launchertwo(kernel_two));
+  //kernel<<<1, 1>>>();
+  gpuErrCheck(launcher(kernel, 5));
   gpuErrCheck(gpuDeviceSynchronize());
-  std::cout << "exiting\n";
   return 0;
 }
 
 // CHECK: Kernel
 // CHECK: Kernel
-// CHECK: JitCache hits 1 total 3
+// CHECK: JitCache hits 0 total 1
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: JitStorageCache hits 0 total 2
-// CHECK-SECOND: JitStorageCache hits 2 total 2
+// CHECK-FIRST: JitStorageCache hits 0 total 1
+// CHECK-SECOND: JitStorageCache hits 1 total 1
