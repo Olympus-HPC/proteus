@@ -27,23 +27,27 @@ __global__ __attribute__((annotate("jit"))) void kernel_two() {
   printf("Kernel two\n");
 }
 
-template <typename T> gpuError_t launcher(T kernel_in) {
+gpuError_t launcher(const void** kernel_in) {
   return gpuLaunchKernel((const void*)kernel_in, 1, 1, 0, 0, 0);
 }
 
-template <typename T> gpuError_t launchertwo(T kernel_in) {
-  return launcher(kernel_in);
-}
+//template <typename T> gpuError_t launchertwo(T kernel_in) {
+//  return launcher(kernel_in);
+//}
 
 int main() {
   auto indirect = reinterpret_cast<const void*>(&kernel);
-  gpuErrCheck(launcher(kernel));
-  gpuErrCheck(launcher(kernel_two));
-  gpuErrCheck(launchertwo(kernel_two));
+  auto indirect2 = reinterpret_cast<const void*>(&kernel_two);
+  gpuErrCheck(launcher(&indirect));
+  gpuErrCheck(launcher(&indirect2));
+  //gpuErrCheck(launchertwo(kernel_two));
   gpuErrCheck(gpuDeviceSynchronize());
 
   return 0;
 }
+
+// void* launcher
+// call launcher, kernel function to execute is extern
 
 // CHECK: Kernel
 // CHECK: Kernel

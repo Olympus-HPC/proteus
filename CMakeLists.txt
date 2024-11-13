@@ -18,7 +18,7 @@ set(LLVM_VERSION "17" CACHE STRING "LLVM version")
 
 if(ENABLE_HIP)
   add_definitions("-DENABLE_HIP")
-  find_package(hip 5.7.1 REQUIRED CONFIG)
+  find_package(hip 6.1.1 REQUIRED CONFIG)
 endif()
 
 if(ENABLE_CUDA)
@@ -35,6 +35,7 @@ include(cmake/SetupLLVM.cmake)
 
 add_subdirectory(lib)
 add_subdirectory(pass)
+#add_subdirectory(RAJAPerf)
 
 if(ENABLE_TESTS)
   enable_testing()
