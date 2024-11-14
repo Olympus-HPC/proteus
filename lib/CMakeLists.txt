@@ -45,9 +45,9 @@ list(APPEND HEADERS
   UtilsHIP.h)
 endif()
 
-if(BUILD_SHARED_LIBJIT)
+if(BUILD_SHARED)
   if(ENABLE_CUDA)
-    message(FATAL_ERROR "For CUDA, using libjit as SHARED fails for device globals")
+    message(FATAL_ERROR "For CUDA, using libproteus as SHARED fails for device globals")
   endif()
 
   add_library(proteus SHARED ${SOURCES})

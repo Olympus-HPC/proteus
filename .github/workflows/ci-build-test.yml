@@ -1,0 +1,52 @@
+name: Build and test
+
+on:
+  pull_request:
+
+jobs:
+  build-and-test:
+    name: proteus ${{ matrix.os }} LLVM ${{ matrix.llvm }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        llvm: [17.0.5]
+        enable_debug: [on, off]
+        enable_time_tracing: [on, off]
+        build_shared: [on, off]
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          conda-remove-defaults: true
+      # Install Clang/LLVM using conda and lit, filecheck utilities.
+      - name: Create environment
+        run: |
+          conda install -y -c conda-forge \
+            clang=${{ matrix.llvm }} \
+            clangxx=${{ matrix.llvm }} \
+            llvmdev=${{ matrix.llvm }} \
+            lit=${{ matrix.llvm }}
+          ln -s ${CONDA_PREFIX}/libexec/llvm/FileCheck ${CONDA_PREFIX}/bin
+      - name: Build enable_debug=${{ matrix.enable_debug }} enable_time_tracing=${{ matrix.enable_time_tracing }} build_shared=${{ matrix.build_shared }}
+        run: |
+          mkdir -p build
+          pushd build
+          cmake .. \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DLLVM_INSTALL_DIR=$(llvm-config --prefix) \
+            -DENABLE_DEBUG=${{ matrix.enable_debug }} \
+            -DENABLE_TIME_TRACING=${{ matrix.enable_time_tracing }} \
+            -DBUILD_SHARED=${{ matrix.build_shared }}
+          make -j
+          popd
+      - name: Test
+        run: |
+          pushd build
+          make test
+          popd

@@ -20,7 +20,7 @@ else()
 endif()
 
 find_program(FILECHECK FileCheck
-    PATHS ${LLVM_INSTALL_DIR}/bin)
+    PATHS ${LLVM_INSTALL_DIR}/bin ${LLVM_INSTALL_DIR}/libexec/llvm)
 
 if(NOT FILECHECK)
     message(FATAL_ERROR "Testing requires FileCheck to be installed")
