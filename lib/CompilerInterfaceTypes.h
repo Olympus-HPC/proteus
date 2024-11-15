@@ -28,6 +28,7 @@ struct RuntimeConstant {
     void *PtrVal;
   };
   RuntimeConstantType Value;
+  int32_t Slot{-1};
 };
 
 #endif
