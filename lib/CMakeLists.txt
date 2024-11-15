@@ -9,6 +9,7 @@ set(SOURCES
 
 set(HEADERS
   CompilerInterfaceTypes.h
+  jit.hpp
   JitCache.hpp
   JitEngine.hpp
   JitEngineHost.hpp

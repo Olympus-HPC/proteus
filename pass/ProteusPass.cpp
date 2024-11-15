@@ -28,6 +28,7 @@
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/Mangler.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Object/ELF.h"
@@ -47,6 +48,7 @@
 #include <llvm/IR/CallingConv.h>
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalValue.h>
@@ -136,6 +138,7 @@ public:
     instrumentRegisterFatBinary(M);
     instrumentRegisterFatBinaryEnd(M);
     instrumentRegisterVar(M);
+    findJitVariables(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
       getKernelHostStubs(M);
@@ -915,7 +918,7 @@ private:
       FATAL_ERROR("instrumentRegisterJITFunc only callable with `EnableHIP or "
                   "EnableCUDA set.");
       return;
-    }
+
     Function *RegisterFunction = M.getFunction(RegisterFunctionName);
     assert(RegisterFunction &&
            "Expected register function to be called at least once.");
@@ -976,6 +979,42 @@ private:
                           RegisterCB->getArgOperand(2),
                           RuntimeConstantsIndicesAlloca, NumRCsValue});
     }
+  }
+
+  void findJitVariables(Module &M) {
+    dbgs() << "finding jit variables" << "\n";
+    dbgs() << "users..." << "\n";
+
+    SmallVector<StringRef, 16> JitFunctionNames;
+
+    for (auto& F : M.getFunctionList()) {
+      if (F.getName().contains("jit_variable")) {
+        JitFunctionNames.push_back(F.getName());
+      }
+    }
+
+    for (auto FnName : JitFunctionNames) {
+      Function *ProteusJitFn = M.getFunction(FnName);
+
+      CallBase *CB = dyn_cast<CallBase>(*(ProteusJitFn->users().begin()));
+      dbgs() << "call: " << *CB << "\n";
+      StoreInst *S = dyn_cast<StoreInst>(*(CB->users().begin()));
+      dbgs() << "store: " << *S << "\n";
+      Value *V = S->getPointerOperand();
+      GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(V);
+      if (GEP) {
+        dbgs() << "gep: " << *GEP << "\n";
+        auto Slot = GEP->getOperand(GEP->getNumOperands() - 1);
+        dbgs() << "slot: " << *Slot << "\n";
+        CB->setArgOperand(1, Slot);
+      } else {
+        dbgs() << "no gep, assuming slot 0" << "\n";
+        Constant *C = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
+        CB->setArgOperand(1, C);
+      }
+    }
+    
+    dbgs() << "done." << "\n";
   }
 };
 

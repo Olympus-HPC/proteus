@@ -40,3 +40,8 @@ config.test_exec_root = '${CMAKE_CURRENT_BINARY_DIR}'
 
 CREATE_CPU_TEST(daxpy daxpy.cpp)
 CREATE_CPU_TEST(types types.cpp)
+CREATE_CPU_TEST(lambda lambda.cpp)
+
+if (ENABLE_HIP)
+target_link_libraries(lambda PRIVATE hip::host)
+endif ()
