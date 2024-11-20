@@ -23,3 +23,11 @@ extern "C" __attribute((used)) void __jit_register_var(const void *HostAddr,
   // works for both CUDA and HIP.
   Jit.insertRegisterVar(VarName, HostAddr);
 }
+
+extern "C" __attribute((used)) void __jit_register_function(const void **HostAddr,
+                                                            char *FunctionName,
+                                                            int32_t *RCIndices,
+                                                            int32_t NumRCs) {
+  auto &Jit = JitDeviceImplT::instance();
+  Jit.insertRegisterFunction(HostAddr, FunctionName, RCIndices, NumRCs);
+}

@@ -11,7 +11,9 @@
 #ifndef PROTEUS_COMPILERINTERFACEDEVICE_H
 #define PROTEUS_COMPILERINTERFACEDEVICE_H
 
+#include "CompilerInterfaceTypes.h"
 #include "JitEngineDevice.hpp"
+#include <llvm/ADT/ArrayRef.h>
 #if ENABLE_CUDA
 #include "JitEngineDeviceCUDA.hpp"
 using JitDeviceImplT = proteus::JitEngineDeviceCUDA;
@@ -24,13 +26,29 @@ using JitDeviceImplT = proteus::JitEngineDeviceHIP;
 
 // Return "auto" should resolve to cudaError_t or hipError_t.
 static inline auto __jit_launch_kernel_internal(
-    const char *ModuleUniqueId, char *KernelName,
+    const char *ModuleUniqueId, void** Kernel,
     proteus::FatbinWrapper_t *FatbinWrapper, size_t FatbinSize,
-    RuntimeConstant *RC, int NumRuntimeConstants, dim3 GridDim, dim3 BlockDim,
+    dim3 GridDim, dim3 BlockDim,
     void **KernelArgs, uint64_t ShmemSize, void *Stream) {
 
   using namespace llvm;
   using namespace proteus;
+  auto &Jit = JitDeviceImplT::instance();
+  auto& JITKernelFuncs = Jit.JITKernelFuncs;
+  if (!JITKernelFuncs.contains(Kernel)) {
+    #if ENABLE_CUDA
+      return cudaLaunchKernel((const void*)Kernel, GridDim, BlockDim, KernelArgs, ShmemSize,
+        static_cast<typename JitDeviceImplT::DeviceStream_t>(Stream));
+    #elif ENABLE_HIP
+      return hipLaunchKernel((const void*)Kernel, GridDim, BlockDim, KernelArgs, ShmemSize,
+        static_cast<typename JitDeviceImplT::DeviceStream_t>(Stream));
+    #endif
+  }
+
+  const auto& KernelInfo = JITKernelFuncs[(const void**)Kernel];
+  const char* KernelName = KernelInfo.GetName();
+  int32_t NumRuntimeConstants = KernelInfo.GetNumRCs();
+  int32_t* RCIndices = KernelInfo.GetRCIndices();
 
   auto printKernelLaunchInfo = [&]() {
     dbgs() << "JIT Launch Kernel\n";
@@ -49,9 +67,16 @@ static inline auto __jit_launch_kernel_internal(
 
   TIMESCOPE("__jit_launch_kernel");
   DBG(printKernelLaunchInfo());
-  auto &Jit = JitDeviceImplT::instance();
+
+  SmallVector<RuntimeConstant> RCs;
+  for (size_t Idx = 0; Idx < NumRuntimeConstants; ++Idx) {
+    auto RC = RuntimeConstant {.PtrVal = KernelArgs[RCIndices[Idx]] };
+    RCs.push_back(RC);
+  }
+
+
   return Jit.compileAndRun(
-      ModuleUniqueId, KernelName, FatbinWrapper, FatbinSize, RC,
+      ModuleUniqueId, KernelName, FatbinWrapper, FatbinSize, RCs.data(),
       NumRuntimeConstants, GridDim, BlockDim, KernelArgs, ShmemSize,
       static_cast<typename JitDeviceImplT::DeviceStream_t>(Stream));
 }

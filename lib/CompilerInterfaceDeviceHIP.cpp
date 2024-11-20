@@ -14,9 +14,9 @@
 // avoid issues with aggregate coercion of parameters. Caller packs XY in a
 // uint64_t.
 extern "C" __attribute__((used)) hipError_t __jit_launch_kernel(
-    const char *ModuleUniqueId, char *KernelName,
-    proteus::FatbinWrapper_t *FatbinWrapper, size_t FatbinSize,
-    RuntimeConstant *RC, int NumRuntimeConstants, uint64_t GridDimXY,
+    const char *ModuleUniqueId, void** Kernel,
+    proteus::FatbinWrapper_t *FatbinWrapper,
+    size_t FatbinSize, uint64_t GridDimXY,
     uint32_t GridDimZ, uint64_t BlockDim_XY, uint32_t BlockDimZ,
     void **KernelArgs, uint64_t ShmemSize, void *Stream) {
   dim3 GridDim = {*(uint32_t *)&GridDimXY, *(((uint32_t *)&GridDimXY) + 1),
@@ -25,6 +25,6 @@ extern "C" __attribute__((used)) hipError_t __jit_launch_kernel(
                    BlockDimZ};
 
   return __jit_launch_kernel_internal(
-      ModuleUniqueId, KernelName, FatbinWrapper, FatbinSize, RC,
-      NumRuntimeConstants, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
+      ModuleUniqueId, Kernel, FatbinWrapper, FatbinSize,
+      GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
 }

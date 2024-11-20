@@ -11,6 +11,7 @@
 #ifndef PROTEUS_JITENGINEDEVICE_HPP
 #define PROTEUS_JITENGINEDEVICE_HPP
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 
@@ -39,6 +40,31 @@
 // TODO: check if this global is needed.
 static llvm::codegen::RegisterCodeGenFlags CFG;
 
+class JITKernelEntry {
+  char const* Name;
+  int32_t* RCIndices;
+  int32_t NumRCs;
+public:
+  JITKernelEntry(char const* _Name,
+                 int32_t* _RCIndices,
+                 int32_t _NumRCs) :
+                 Name(_Name),
+                 NumRCs(_NumRCs) {
+                  // TODO(bowen): Why is this deep copy needed?
+                  RCIndices = new int32_t[NumRCs];
+                  for (int32_t I = 0; I < NumRCs; ++I) {
+                    RCIndices[I] = _RCIndices[I];
+                  }
+                 }
+  JITKernelEntry() :
+                 Name(nullptr),
+                 NumRCs(0),
+                 RCIndices(nullptr) {}
+  auto GetName() const { return Name; }
+  auto GetRCIndices() const { return RCIndices; }
+  auto GetNumRCs() const { return NumRCs; }
+};
+
 namespace proteus {
 
 using namespace llvm;
@@ -66,6 +92,13 @@ public:
 
   void insertRegisterVar(const char *VarName, const void *Addr) {
     VarNameToDevPtr[VarName] = Addr;
+  }
+
+  void insertRegisterFunction(const void **HostAddr,
+                              char *FunctionName,
+                              int32_t *RCIndices,
+                              int32_t NumRCs) {
+    JITKernelFuncs[HostAddr] = JITKernelEntry(FunctionName, RCIndices, NumRCs);
   }
 
 private:
@@ -129,6 +162,8 @@ protected:
   JitStorageCache<KernelFunction_t> StorageCache;
   std::string DeviceArch;
   std::unordered_map<std::string, const void *> VarNameToDevPtr;
+public:
+  llvm::DenseMap<const void**, JITKernelEntry> JITKernelFuncs;
 };
 
 template <typename ImplT>
@@ -228,9 +263,10 @@ JitEngineDevice<ImplT>::compileAndRun(
       CodeCache.hash(ModuleUniqueId, KernelName, RC, NumRuntimeConstants);
   typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc =
       CodeCache.lookup(HashValue);
-  if (KernelFunc)
+  if (KernelFunc) {
     return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                                 ShmemSize, Stream);
+  }
 
   // NOTE: we don't need a suffix to differentiate kernels, each specialization
   // will be in its own module uniquely identify by HashValue. It exists only
