@@ -68,15 +68,8 @@ static inline auto __jit_launch_kernel_internal(
   TIMESCOPE("__jit_launch_kernel");
   DBG(printKernelLaunchInfo());
 
-  SmallVector<RuntimeConstant> RCs;
-  for (size_t Idx = 0; Idx < NumRuntimeConstants; ++Idx) {
-    auto RC = RuntimeConstant {.PtrVal = KernelArgs[RCIndices[Idx]] };
-    RCs.push_back(RC);
-  }
-
-
   return Jit.compileAndRun(
-      ModuleUniqueId, KernelName, FatbinWrapper, FatbinSize, RCs.data(),
+      ModuleUniqueId, KernelName, FatbinWrapper, FatbinSize, RCIndices,
       NumRuntimeConstants, GridDim, BlockDim, KernelArgs, ShmemSize,
       static_cast<typename JitDeviceImplT::DeviceStream_t>(Stream));
 }

@@ -95,6 +95,10 @@ target_link_libraries(proteus PRIVATE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefine
 set_target_properties(proteus PROPERTIES
   INSTALL_RPATH_USE_LINK_PATH TRUE)
 
+if(NOT LLVM_ENABLE_RTTI)
+  target_compile_options(proteus PRIVATE -fno-rtti)
+endif()
+
 install(
   TARGETS proteus
   EXPORT proteusTargets
