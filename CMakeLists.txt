@@ -18,7 +18,10 @@ set(LLVM_VERSION "17" CACHE STRING "LLVM version")
 
 if(ENABLE_HIP)
   add_definitions("-DENABLE_HIP")
-  find_package(hip 5.7.1 REQUIRED CONFIG)
+  find_package(hip REQUIRED CONFIG)
+  if (hip_VERSION VERSION_LESS "5.7")
+    message(FATAL_ERROR "HIP version 5.7 or higher is required, but found ${hip_VERSION}")
+  endif()
 endif()
 
 if(ENABLE_CUDA)
