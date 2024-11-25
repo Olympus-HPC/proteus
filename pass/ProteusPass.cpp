@@ -73,17 +73,21 @@
   report_fatal_error(llvm::Twine(std::string{} + __FILE__ + ":" +              \
                                  std::to_string(__LINE__) + " => " + x))
 
-#ifdef ENABLE_HIP
+#if ENABLE_HIP
 constexpr char const* RegisterFunctionName = "__hipRegisterFunction";
-constexpr char const* LaunchFunctionName = "hipLaunchKernel";
-constexpr char const* FatbinName = "__hip_fatbin_wrapper";
-constexpr char const* RegisterVarName = "__hipRegisterVar";
-#endif
-#if ENABLE_CUDA
+constexpr char const* LaunchFunctionName   = "hipLaunchKernel";
+constexpr char const* FatbinName           = "__hip_fatbin_wrapper";
+constexpr char const* RegisterVarName      = "__hipRegisterVar";
+#elif ENABLE_CUDA
 constexpr char const* RegisterFunctionName = "__cudaRegisterFunction";
-constexpr char const* LaunchFunctionName = "cudaLaunchKernel";
-constexpr char const* FatbinName = "__cuda_fatbin_wrapper";
-constexpr char const* RegisterVarName = "__cudaRegisterVar";
+constexpr char const* LaunchFunctionName   = "cudaLaunchKernel";
+constexpr char const* FatbinName           = "__cuda_fatbin_wrapper";
+constexpr char const* RegisterVarName      = "__cudaRegisterVar";
+#else
+constexpr char const* RegisterFunctionName = nullptr;
+constexpr char const* LaunchFunctionName   = nullptr;
+constexpr char const* FatbinName           = nullptr;
+constexpr char const* RegisterVarName      = nullptr;
 #endif
 
 using namespace llvm;
@@ -714,6 +718,11 @@ struct ProteusJitPassImpl {
 
   void getKernelHostStubs(Module &M) {
     Function *RegisterFunction = nullptr;
+    if (!RegisterFunctionName) {
+      report_fatal_error("getKernelHostStubs only callable with `EnableHIP or EnableCUDA set.",
+                         false);
+      return;
+    }
     RegisterFunction = M.getFunction(RegisterFunctionName);
 
     if (!RegisterFunction)
@@ -774,11 +783,10 @@ struct ProteusJitPassImpl {
 
   bool hasDeviceLaunchKernelCalls(Module &M) {
     Function *LaunchKernelFn = nullptr;
-#if ENABLE_HIP
-    LaunchKernelFn = M.getFunction("hipLaunchKernel");
-#elif ENABLE_CUDA
-    LaunchKernelFn = M.getFunction("cudaLaunchKernel");
-#endif
+    if (!LaunchFunctionName) {
+      return false;
+    }
+    LaunchKernelFn = M.getFunction(LaunchFunctionName);
 
     if (!LaunchKernelFn)
       return false;
@@ -800,6 +808,10 @@ struct ProteusJitPassImpl {
     GlobalVariable *ModuleUniqueId =
         M.getGlobalVariable("__module_unique_id", true);
     assert(ModuleUniqueId && "Expected ModuleUniqueId global to be defined");
+
+    if (!FatbinName)
+      FATAL_ERROR(
+           "replaceWithJitLaunchKernel not callable without EnableHIP or EnableCUDA set.");
 
     GlobalVariable *FatbinWrapper = nullptr;
     FatbinWrapper = M.getGlobalVariable(FatbinName, true);
@@ -837,9 +849,6 @@ struct ProteusJitPassImpl {
 
     // Insert before the launch kernel call instruction.
     IRBuilder<> Builder(LaunchKernelCall);
-
-
-
     CallInst *Call = nullptr;
 #ifdef ENABLE_HIP
     Call = Builder.CreateCall(
@@ -888,6 +897,11 @@ struct ProteusJitPassImpl {
   emitJitLaunchKernelCall(Module &M,
                           std::pair<Function *, JitFunctionInfo> &JITInfo) {
     Function *LaunchKernelFn = nullptr;
+    if (!LaunchFunctionName) {
+      FATAL_ERROR(
+          "Expected non-null LaunchKernelFn, check "
+          "ENABLE_CUDA|ENABLE_HIP compilation flags for ProteusJitPass");
+    }
     LaunchKernelFn = M.getFunction(LaunchFunctionName);
     if (!LaunchKernelFn)
       FATAL_ERROR(
@@ -916,6 +930,9 @@ struct ProteusJitPassImpl {
 
   void instrumentRegisterVar(Module &M) {
     Function *RegisterVarFn = nullptr;
+    if (!RegisterVarName) {
+      FATAL_ERROR("instrumentRegisterVar is not callable without EnableCUDA or EnableHIP set.");
+    }
     RegisterVarFn = M.getFunction(RegisterVarName);
     if (!RegisterVarFn)
       return;
@@ -947,6 +964,11 @@ struct ProteusJitPassImpl {
   /// instrumentRegisterJITFunc instruments any function passed to a kernel launch in the IR
   /// with a `__jit_register_function` call.
   void instrumentRegisterJITFunc(Module &M) {
+    if (!RegisterFunctionName) {
+      report_fatal_error("instrumentRegisterJITFunc only callable with `EnableHIP or EnableCUDA set.",
+                    false);
+      return;
+    }
     Function* RegisterFunction = M.getFunction(RegisterFunctionName);
     if (!RegisterFunction) {
       return;
