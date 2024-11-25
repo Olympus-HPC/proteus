@@ -26,7 +26,7 @@ using JitDeviceImplT = proteus::JitEngineDeviceHIP;
 
 // Return "auto" should resolve to cudaError_t or hipError_t.
 static inline auto __jit_launch_kernel_internal(
-    const char *ModuleUniqueId, void** Kernel,
+    const char *ModuleUniqueId, void* Kernel,
     proteus::FatbinWrapper_t *FatbinWrapper, size_t FatbinSize,
     dim3 GridDim, dim3 BlockDim,
     void **KernelArgs, uint64_t ShmemSize, void *Stream) {
@@ -34,8 +34,8 @@ static inline auto __jit_launch_kernel_internal(
   using namespace llvm;
   using namespace proteus;
   auto &Jit = JitDeviceImplT::instance();
-  auto& JITKernelFuncs = Jit.JITKernelFuncs;
-  if (!JITKernelFuncs.contains(Kernel)) {
+  auto optionalKernelInfo = Jit.getJITKernelInfo(Kernel);
+  if (!optionalKernelInfo) {
     #if ENABLE_CUDA
       return cudaLaunchKernel((const void*)Kernel, GridDim, BlockDim, KernelArgs, ShmemSize,
         static_cast<typename JitDeviceImplT::DeviceStream_t>(Stream));
@@ -45,10 +45,10 @@ static inline auto __jit_launch_kernel_internal(
     #endif
   }
 
-  const auto& KernelInfo = JITKernelFuncs[(const void**)Kernel];
-  const char* KernelName = KernelInfo.GetName();
-  int32_t NumRuntimeConstants = KernelInfo.GetNumRCs();
-  int32_t* RCIndices = KernelInfo.GetRCIndices();
+  const auto& KernelInfo = optionalKernelInfo.value();
+  const char* KernelName = KernelInfo.getName();
+  int32_t NumRuntimeConstants = KernelInfo.getNumRCs();
+  auto RCIndices = KernelInfo.getRCIndices();
 
   auto printKernelLaunchInfo = [&]() {
     dbgs() << "JIT Launch Kernel\n";

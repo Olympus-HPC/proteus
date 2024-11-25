@@ -14,7 +14,7 @@
 // avoid issues with aggregate coercion of parameters. Caller packs XY in a
 // uint64_t.
 extern "C" __attribute__((used)) hipError_t __jit_launch_kernel(
-    const char *ModuleUniqueId, void** Kernel,
+    const char *ModuleUniqueId, void* Kernel,
     proteus::FatbinWrapper_t *FatbinWrapper,
     size_t FatbinSize, uint64_t GridDimXY,
     uint32_t GridDimZ, uint64_t BlockDim_XY, uint32_t BlockDimZ,

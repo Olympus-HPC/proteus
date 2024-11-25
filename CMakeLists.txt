@@ -35,6 +35,7 @@ include(cmake/SetupLLVM.cmake)
 
 add_subdirectory(lib)
 add_subdirectory(pass)
+add_subdirectory(RAJAPerf)
 
 if(ENABLE_TESTS)
   enable_testing()

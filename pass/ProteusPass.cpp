@@ -52,7 +52,6 @@
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Instructions.h>
-#include <llvm/IR/User.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/ErrorHandling.h>
 #include <llvm/Support/MemoryBuffer.h>
@@ -662,30 +661,30 @@ struct ProteusJitPassImpl {
     auto *StrIRGlobal = Builder.CreateGlobalString(JFI.ModuleIR);
 
     // Create the runtime constants data structure passed to the jit entry.
-    Value *RuntimeConstantsAlloca = nullptr;
+    Value *RuntimeConstantsIndicesAlloca = nullptr;
     if (JFI.ConstantArgs.size() > 0) {
-      RuntimeConstantsAlloca = Builder.CreateAlloca(RuntimeConstantArrayTy);
+      RuntimeConstantsIndicesAlloca = Builder.CreateAlloca(RuntimeConstantArrayTy);
       // Zero-initialize the alloca to avoid stack garbage for caching.
       Builder.CreateStore(Constant::getNullValue(RuntimeConstantArrayTy),
-                          RuntimeConstantsAlloca);
+                          RuntimeConstantsIndicesAlloca);
       for (int ArgI = 0; ArgI < JFI.ConstantArgs.size(); ++ArgI) {
         auto *GEP = Builder.CreateInBoundsGEP(
-            RuntimeConstantArrayTy, RuntimeConstantsAlloca,
+            RuntimeConstantArrayTy, RuntimeConstantsIndicesAlloca,
             {Builder.getInt32(0), Builder.getInt32(ArgI)});
         int ArgNo = JFI.ConstantArgs[ArgI];
         Builder.CreateStore(StubFn->getArg(ArgNo), GEP);
       }
     } else
-      RuntimeConstantsAlloca =
+      RuntimeConstantsIndicesAlloca =
           Constant::getNullValue(RuntimeConstantArrayTy->getPointerTo());
 
-    assert(RuntimeConstantsAlloca &&
+    assert(RuntimeConstantsIndicesAlloca &&
            "Expected non-null runtime constants alloca");
 
     auto *JitFnPtr = Builder.CreateCall(
         JitEntryFn,
         {FnNameGlobal, StrIRGlobal, Builder.getInt32(JFI.ModuleIR.size()),
-         RuntimeConstantsAlloca, Builder.getInt32(JFI.ConstantArgs.size())});
+         RuntimeConstantsIndicesAlloca, Builder.getInt32(JFI.ConstantArgs.size())});
     SmallVector<Value *, 8> Args;
     for (auto &Arg : StubFn->args())
       Args.push_back(&Arg);
@@ -970,79 +969,75 @@ struct ProteusJitPassImpl {
       return;
     }
     Function* RegisterFunction = M.getFunction(RegisterFunctionName);
-    if (!RegisterFunction) {
-      return;
-    }
-    for (const auto [Jit, _] : JitFunctionInfoMap) {
-      dbgs () << *Jit ;
-    }
+    assert(RegisterFunction && "Expected register function to be called at least once.");
+
     for (User* RegisterFunctionUser : RegisterFunction->users()) {
-      if (CallBase *RegisterCB = dyn_cast<CallBase>(RegisterFunctionUser); RegisterCB) {
-        Function* FunctionToRegister = dyn_cast<Function>(getStubGV(RegisterCB->getArgOperand(1)));
-        if (!FunctionToRegister) {
-          dbgs() << "Expected function passed to " << RegisterFunctionName << "\n";
-        }
-        if (!JitFunctionInfoMap.contains(FunctionToRegister)) {
-          dbgs() << "Not instrumenting device kernel " << *FunctionToRegister << "\n";
-          continue;
-        }
-        dbgs() << "Instrumenting JIT function " << *FunctionToRegister << "\n";
-        const auto& JFI = JitFunctionInfoMap[FunctionToRegister];
-        size_t NumRuntimeConstants = JFI.ConstantArgs.size();
-        // Create jit entry runtime function.
-        Type* VoidPtrType = Type::getInt8PtrTy(M.getContext());
-        Type* VoidType =  Type::getVoidTy(M.getContext());
-        Type* Int32PtrType = Type::getInt32PtrTy(M.getContext());
-        Type* Int32Type = Type::getInt32Ty(M.getContext());
-        // Type *Int128Ty = Type::getInt128Ty(M.getContext());
-        // StructType *RuntimeConstantTy =
-        //     StructType::create({Int128Ty}, "struct.args");
-        ArrayType *RuntimeConstantIdxArrayTy =
-            ArrayType::get(Int32Type, NumRuntimeConstants);
+      CallBase *RegisterCB = dyn_cast<CallBase>(RegisterFunctionUser);
+      if (!RegisterCB)
+        continue;
 
-        IRBuilder<> Builder(RegisterCB->getNextNode());
-        // Create the runtime constants data structure passed to the jit entry.
-        Value *RuntimeConstantsAlloca = nullptr;
-        RuntimeConstantsAlloca = Builder.CreateAlloca(RuntimeConstantIdxArrayTy);
-        assert(RuntimeConstantsAlloca &&
-           "Expected non-null runtime constants alloca");
-        // Zero-initialize the alloca to avoid stack garbage for caching.
-        Builder.CreateStore(Constant::getNullValue(RuntimeConstantIdxArrayTy),
-                            RuntimeConstantsAlloca);
-
-        for (int ArgI = 0; ArgI < NumRuntimeConstants; ++ArgI) {
-          auto *GEP = Builder.CreateInBoundsGEP(
-              RuntimeConstantIdxArrayTy, RuntimeConstantsAlloca,
-              {Builder.getInt32(0), Builder.getInt32(ArgI)});
-          int ArgNo = JFI.ConstantArgs[ArgI];
-          Value* Idx = ConstantInt::get(Builder.getInt32Ty(), ArgNo);
-          Builder.CreateStore(Idx, GEP);
-        }
-        Value* NumRCsValue = ConstantInt::get(Builder.getInt32Ty(), NumRuntimeConstants);
-        // The prototype is
-        // __jit_register_function(const void **HostAddr,
-        //                         char const *FunctionName,
-        //                         size_t* RCIndices,
-        //                         size_t NumRCs)
-        FunctionType *JitRegisterFunctionFnTy = FunctionType::get(VoidType,
-                                                                  {VoidPtrType,
-                                                                        VoidPtrType,
-                                                                        Int32PtrType,
-                                                                        Int32Type},
-                                                                        /* isVarArg=*/false);
-        FunctionCallee JitRegisterKernelFn =
-            M.getOrInsertFunction("__jit_register_function", JitRegisterFunctionFnTy);
-
-        constexpr int StubOperand = 1;
-        Value* Kernel = RegisterCB->getArgOperand(StubOperand);
-        Value* Stub = getStubGV(Kernel);
-        Builder.CreateCall(JitRegisterKernelFn, {RegisterCB->getArgOperand(1),
-                                                              StubToKernelMap[FunctionToRegister],
-                                                              RuntimeConstantsAlloca,
-                                                              NumRCsValue});
+      Function* FunctionToRegister = dyn_cast<Function>(getStubGV(RegisterCB->getArgOperand(1)));
+      assert(FunctionToRegister && "Expected function passed to register function call");
+      if (!JitFunctionInfoMap.contains(FunctionToRegister)) {
+        DEBUG(dbgs() << "Not instrumenting device kernel " << *FunctionToRegister << "\n");
+        continue;
       }
+
+      DEBUG(dbgs() << "Instrumenting JIT function " << *FunctionToRegister << "\n");
+      const auto& JFI = JitFunctionInfoMap[FunctionToRegister];
+      size_t NumRuntimeConstants = JFI.ConstantArgs.size();
+      // Create jit entry runtime function.
+      Type* VoidPtrType = Type::getInt8PtrTy(M.getContext());
+      Type* VoidType =  Type::getVoidTy(M.getContext());
+      Type* Int32PtrType = Type::getInt32PtrTy(M.getContext());
+      Type* Int32Type = Type::getInt32Ty(M.getContext());
+
+      ArrayType *RuntimeConstantIdxArrayTy =
+          ArrayType::get(Int32Type, NumRuntimeConstants);
+
+      IRBuilder<> Builder(RegisterCB->getNextNode());
+      // Create an array representing the indices of the args which are runtime constants.
+      Value *RuntimeConstantsIndicesAlloca = nullptr;
+      RuntimeConstantsIndicesAlloca = Builder.CreateAlloca(RuntimeConstantIdxArrayTy);
+      assert(RuntimeConstantsIndicesAlloca &&
+          "Expected non-null runtime constants alloca");
+      // Zero-initialize the alloca to avoid stack garbage for caching.
+      Builder.CreateStore(Constant::getNullValue(RuntimeConstantIdxArrayTy),
+                          RuntimeConstantsIndicesAlloca);
+
+      for (int ArgI = 0; ArgI < NumRuntimeConstants; ++ArgI) {
+        auto *GEP = Builder.CreateInBoundsGEP(
+            RuntimeConstantIdxArrayTy, RuntimeConstantsIndicesAlloca,
+            {Builder.getInt32(0), Builder.getInt32(ArgI)});
+        int ArgNo = JFI.ConstantArgs[ArgI];
+        Value* Idx = ConstantInt::get(Builder.getInt32Ty(), ArgNo);
+        Builder.CreateStore(Idx, GEP);
+      }
+      Value* NumRCsValue = ConstantInt::get(Builder.getInt32Ty(), NumRuntimeConstants);
+      // The prototype is
+      // __jit_register_function(const void *HostAddr,
+      //                         char const *FunctionName,
+      //                         int32_t* RCIndices,
+      //                         int32_t NumRCs)
+      FunctionType *JitRegisterFunctionFnTy = FunctionType::get(VoidType,
+                                                                {VoidPtrType,
+                                                                      VoidPtrType,
+                                                                      Int32PtrType,
+                                                                      Int32Type},
+                                                                      /* isVarArg=*/false);
+      FunctionCallee JitRegisterKernelFn =
+          M.getOrInsertFunction("__jit_register_function", JitRegisterFunctionFnTy);
+
+      constexpr int StubOperand = 1;
+      Value* Kernel = RegisterCB->getArgOperand(StubOperand);
+      Value* Stub = getStubGV(Kernel);
+      Builder.CreateCall(JitRegisterKernelFn, {RegisterCB->getArgOperand(1),
+                                                            StubToKernelMap[FunctionToRegister],
+                                                            RuntimeConstantsIndicesAlloca,
+                                                            NumRCsValue});
     }
   }
+
 
   bool run(Module &M, CallGraph &CG) {
     parseAnnotations(M);

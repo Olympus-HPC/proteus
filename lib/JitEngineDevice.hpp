@@ -11,7 +11,6 @@
 #ifndef PROTEUS_JITENGINEDEVICE_HPP
 #define PROTEUS_JITENGINEDEVICE_HPP
 
-#include <cstddef>
 #include <cstdint>
 #include <llvm/ADT/StringRef.h>
 #include <memory>
@@ -30,6 +29,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include <llvm/IR/Constants.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
+#include <optional>
 
 #include "CompilerInterfaceTypes.h"
 #include "JitCache.hpp"
@@ -41,29 +41,27 @@
 // TODO: check if this global is needed.
 static llvm::codegen::RegisterCodeGenFlags CFG;
 
-class JITKernelEntry {
+class JITKernelInfo {
   char const* Name;
-  int32_t* RCIndices;
+  llvm::SmallVector<int32_t> RCIndices;
   int32_t NumRCs;
 public:
-  JITKernelEntry(char const* _Name,
+  JITKernelInfo(char const* _Name,
                  int32_t* _RCIndices,
                  int32_t _NumRCs) :
                  Name(_Name),
                  NumRCs(_NumRCs) {
-                  // TODO(bowen): Why is this deep copy needed?
-                  RCIndices = new int32_t[NumRCs];
                   for (int32_t I = 0; I < NumRCs; ++I) {
-                    RCIndices[I] = _RCIndices[I];
+                    RCIndices.push_back(_RCIndices[I]);
                   }
                  }
-  JITKernelEntry() :
+  JITKernelInfo() :
                  Name(nullptr),
                  NumRCs(0),
-                 RCIndices(nullptr) {}
-  auto GetName() const { return Name; }
-  auto GetRCIndices() const { return RCIndices; }
-  auto GetNumRCs() const { return NumRCs; }
+                 RCIndices() {}
+  auto getName() const { return Name; }
+  auto getRCIndices() const { return RCIndices; }
+  auto getNumRCs() const { return NumRCs; }
 };
 
 namespace proteus {
@@ -86,7 +84,7 @@ public:
   using KernelFunction_t = typename DeviceTraits<ImplT>::KernelFunction_t;
 
   DeviceError_t compileAndRun(StringRef ModuleUniqueId, StringRef KernelName,
-    FatbinWrapper_t *FatbinWrapper, size_t FatbinSize, int32_t* RCIndices,
+    FatbinWrapper_t *FatbinWrapper, size_t FatbinSize, const llvm::SmallVector<int32_t>& RCIndices,
     int32_t NumRuntimeConstants, dim3 GridDim, dim3 BlockDim, void **KernelArgs,
     uint64_t ShmemSize, typename DeviceTraits<ImplT>::DeviceStream_t Stream);
 
@@ -94,11 +92,22 @@ public:
     VarNameToDevPtr[VarName] = Addr;
   }
 
-  void insertRegisterFunction(const void **HostAddr,
+  void insertRegisterFunction(const void *HostAddr,
                               char *FunctionName,
                               int32_t *RCIndices,
                               int32_t NumRCs) {
-    JITKernelFuncs[HostAddr] = JITKernelEntry(FunctionName, RCIndices, NumRCs);
+    JITKernelInfoMap[HostAddr] = JITKernelInfo(FunctionName, RCIndices, NumRCs);
+  }
+
+  bool containsJITKernelInfo(const void* Func) {
+    return JITKernelInfoMap.contains(Func);
+  }
+
+  std::optional<JITKernelInfo> getJITKernelInfo(const void* Func) {
+    if (!containsJITKernelInfo(Func)) {
+      return std::nullopt;
+    }
+    return JITKernelInfoMap[Func];
   }
 
 private:
@@ -117,7 +126,7 @@ private:
 
   void getRuntimeConstantsFromModule(void** KernelArgs, StringRef KernelName,
                                      StringRef IRBuffer,
-                                     int32_t* RCIndices,
+                                     const llvm::SmallVector<int32_t>& RCIndices,
                                      SmallVector<RuntimeConstant>& RCsVec) {
   auto Ctx = std::make_unique<LLVMContext>();
   SMDiagnostic Err;
@@ -151,7 +160,7 @@ private:
           RCsVec.push_back(RuntimeConstant {{ .DoubleVal = *(double*)KernelArgs[RCIndices[I]] }});
         } else if (ArgType->isX86_FP80Ty() || ArgType->isPPC_FP128Ty() ||
                   ArgType->isFP128Ty()) {
-          RCsVec.push_back(RuntimeConstant {{ .LongDoubleVal = *(double*)KernelArgs[RCIndices[I]] }});
+          RCsVec.push_back(RuntimeConstant {{ .LongDoubleVal = *(long double*)KernelArgs[RCIndices[I]] }});
         } else if (ArgType->isPointerTy()) {
           RCsVec.push_back(RuntimeConstant {{ .PtrVal = (void*)KernelArgs[RCIndices[I]] }});
         } else {
@@ -212,8 +221,9 @@ protected:
   JitStorageCache<KernelFunction_t> StorageCache;
   std::string DeviceArch;
   std::unordered_map<std::string, const void *> VarNameToDevPtr;
-public:
-  llvm::DenseMap<const void**, JITKernelEntry> JITKernelFuncs;
+private:
+  // This map is private and only accessible via the API.
+  llvm::DenseMap<const void*, JITKernelInfo> JITKernelInfoMap;
 };
 
 template <typename ImplT>
@@ -304,7 +314,7 @@ template <typename ImplT>
 typename DeviceTraits<ImplT>::DeviceError_t
 JitEngineDevice<ImplT>::compileAndRun(
     StringRef ModuleUniqueId, StringRef KernelName,
-    FatbinWrapper_t *FatbinWrapper, size_t FatbinSize, int32_t* RCIndices,
+    FatbinWrapper_t *FatbinWrapper, size_t FatbinSize, const llvm::SmallVector<int32_t>& RCIndices,
     int32_t NumRuntimeConstants, dim3 GridDim, dim3 BlockDim, void **KernelArgs,
     uint64_t ShmemSize, typename DeviceTraits<ImplT>::DeviceStream_t Stream) {
   TIMESCOPE("compileAndRun");
@@ -319,10 +329,10 @@ JitEngineDevice<ImplT>::compileAndRun(
       CodeCache.hash(ModuleUniqueId, KernelName, RCsVec.data(), NumRuntimeConstants);
   typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc =
       CodeCache.lookup(HashValue);
-  if (KernelFunc) {
+  if (KernelFunc)
     return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                                 ShmemSize, Stream);
-  }
+
 
   // NOTE: we don't need a suffix to differentiate kernels, each specialization
   // will be in its own module uniquely identify by HashValue. It exists only
