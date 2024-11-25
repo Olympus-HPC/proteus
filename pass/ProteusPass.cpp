@@ -498,7 +498,7 @@ struct ProteusJitPassImpl {
     JitFunctionInfo &JFI = JITInfo.second;
 
     // Create jit entry runtime function.
-    Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
+    Type *VoidPtrTy = PointerType::get(M.getContext(), 0);
     Type *Int32Ty = Type::getInt32Ty(M.getContext());
     Type *Int128Ty = Type::getInt128Ty(M.getContext());
     // Use Int64 type for the Value, big enough to hold primitives.
@@ -674,7 +674,7 @@ struct ProteusJitPassImpl {
 
   void replaceWithJitLaunchKernel(Module &M, CallBase *LaunchKernelCall) {
     // Create jit entry runtime function.
-    Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
+    Type *VoidPtrTy = PointerType::get(M.getContext(), 0);
     Type *Int64Ty = Type::getInt64Ty(M.getContext());
     Type *Int32Ty = Type::getInt32Ty(M.getContext());
 
@@ -749,7 +749,7 @@ struct ProteusJitPassImpl {
     ArrayType *ArrayTy =
         dyn_cast<ArrayType>(FatbinGV->getInitializer()->getType());
     assert(ArrayTy && "Expected array type of the fatbin object");
-    assert(ArrayTy->getElementType() == Type::getInt8Ty(M.getContext()) &&
+    assert(ArrayTy->getElementType() == PointerType::get(M.getContext(), 0) &&
            "Expected byte type for array type of the fatbin object");
     size_t FatbinSize = ArrayTy->getNumElements();
 
@@ -818,7 +818,8 @@ struct ProteusJitPassImpl {
     if (!RegisterVarFn)
       return;
 
-    Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
+
+    Type *VoidPtrTy = PointerType::get(M.getContext(), 0);
 
     // The prototype is __jit_register_var(const void *HostAddr, const char
     // *VarName).
