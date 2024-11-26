@@ -21,7 +21,6 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
-#include "llvm/Support/CodeGen.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/TargetParser/SubtargetFeature.h"
 #include <llvm/IR/Constants.h>
@@ -47,11 +46,7 @@ using namespace llvm;
 Expected<std::unique_ptr<TargetMachine>>
 JitEngine::createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel) {
   Triple TT(M.getTargetTriple());
-#if LLVM_VERSION_MAJOR >= 18
-  std::optional<llvm::CodeGenOptLevel> CGOptLevel = CodeGenOpt::getLevel(OptLevel);
-#else
-  std::optional<CodeGenOpt::Level> CGOptLevel = CodeGenOpt::getLevel(OptLevel);
-#endif
+  auto CGOptLevel = CodeGenOpt::getLevel(OptLevel);
   if (CGOptLevel == std::nullopt)
     FATAL_ERROR("Invalid opt level");
 
