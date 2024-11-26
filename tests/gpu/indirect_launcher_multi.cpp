@@ -1,7 +1,7 @@
 // clang-format off
-// RUN: ./indirect_launcher.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: ./indirect_launcher_multi.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./indirect_launcher.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: ./indirect_launcher_multi.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-SECOND
 // clang-format on
 
 #include <climits>
