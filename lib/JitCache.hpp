@@ -24,7 +24,7 @@
 #include "llvm/ADT/StringRef.h"
 
 inline llvm::hash_code hash_value(const RuntimeConstant &RC) {
-  return llvm::hash_value(RC.Int64Val);
+  return llvm::hash_value(RC.Value.Int64Val);
 }
 
 namespace proteus {
@@ -86,7 +86,7 @@ public:
       printf(" FnName %s RCs [", JCE.FnName.c_str());
       for (auto &RC : JCE.RCVector)
         // outs() << RC.Int64Val << ", ";
-        printf("%ld, ", RC.Int64Val);
+        printf("%ld, ", RC.Value.Int64Val);
       // outs() << "]";
       printf("]");
 #endif

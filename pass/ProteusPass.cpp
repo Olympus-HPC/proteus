@@ -827,10 +827,15 @@ struct ProteusJitPassImpl {
     // NOTE: CUDA uses an array type for passing grid, block sizes.
     JitEntryFnTy = FunctionType::get(
         Int32Ty,
-        {ModuleUniqueId->getType(), VoidPtrTy, FatbinWrapper->getType(),
-         Int64Ty, Int32Ty,
-         ArrayType::get(Int64Ty, 2), ArrayType::get(Int64Ty, 2), VoidPtrTy,
-         Int64Ty, VoidPtrTy},
+        {ModuleUniqueId->getType(),
+         VoidPtrTy, // Kernel address
+         FatbinWrapper->getType(),
+         Int64Ty, // Fatbin size
+         ArrayType::get(Int64Ty, 2), // Grid dim array
+         ArrayType::get(Int64Ty, 2), // Block dim array
+         VoidPtrTy, // Kernel args
+         Int64Ty,  // Shared mem size
+         VoidPtrTy},
         /* isVarArg=*/false);
 #endif
 
@@ -872,11 +877,16 @@ struct ProteusJitPassImpl {
 
     Call = Builder.CreateCall(
         JitEntryFn,
-        {ModuleUniqueId, LaunchKernelCall->getArgOperand(0), FatbinWrapper,
+        {ModuleUniqueId,
+         LaunchKernelCall->getArgOperand(0), // Kernel address
+         FatbinWrapper,
          Builder.getInt64(FatbinSize),
-         LaunchKernelCall->getArgOperand(1), LaunchKernelCall->getArgOperand(2),
-         LaunchKernelCall->getArgOperand(3), LaunchKernelCall->getArgOperand(4),
-         LaunchKernelCall->getArgOperand(5)});
+         LaunchKernelCall->getArgOperand(1), // Grid dim
+         LaunchKernelCall->getArgOperand(2), // Block dim
+         LaunchKernelCall->getArgOperand(3), // Kernel args
+         LaunchKernelCall->getArgOperand(4), // Shmem size
+         LaunchKernelCall->getArgOperand(5) // Stream
+        });
 #endif
 
     if (!Call)

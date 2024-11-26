@@ -86,7 +86,7 @@ public:
   using KernelFunction_t = typename DeviceTraits<ImplT>::KernelFunction_t;
 
   DeviceError_t compileAndRun(StringRef ModuleUniqueId, StringRef KernelName,
-    FatbinWrapper_t *FatbinWrapper, size_t FatbinSize, const llvm::SmallVector<int32_t>& RCIndices,
+    FatbinWrapper_t *FatbinWrapper, size_t FatbinSize, const SmallVector<int32_t>& RCIndices,
     int32_t NumRuntimeConstants, dim3 GridDim, dim3 BlockDim, void **KernelArgs,
     uint64_t ShmemSize, typename DeviceTraits<ImplT>::DeviceStream_t Stream);
 
@@ -143,28 +143,28 @@ private:
         Value *Arg = F->getArg(ArgNo);
         Type *ArgType = Arg->getType();
         Constant *C = nullptr;
+        RuntimeConstant RC;
         if (ArgType->isIntegerTy(1)) {
-          bool b = *(bool*)KernelArgs[RCIndices[I]];
-          RCsVec.push_back(RuntimeConstant {{ .BoolVal = b }} );
+          RC.Value.BoolVal = *(bool*)KernelArgs[RCIndices[I]];
         } else if (ArgType->isIntegerTy(8)) {
-          RCsVec.push_back(RuntimeConstant {{ .Int8Val = *(int8_t*)KernelArgs[RCIndices[I]] }});
+          RC.Value.Int8Val = *(int8_t*)KernelArgs[RCIndices[I]];
         } else if (ArgType->isIntegerTy(32)) {
-          RCsVec.push_back(RuntimeConstant {{ .Int32Val = *(int32_t*)KernelArgs[RCIndices[I]] }});
+          RC.Value.Int32Val = *(int32_t*)KernelArgs[RCIndices[I]];
         } else if (ArgType->isIntegerTy(64)) {
-          RCsVec.push_back(RuntimeConstant {{ .Int64Val = *(int64_t*)KernelArgs[RCIndices[I]] }});
+          RC.Value.Int64Val = *(int64_t*)KernelArgs[RCIndices[I]];
         } else if (ArgType->isFloatTy()) {
-          RCsVec.push_back(RuntimeConstant {{ .FloatVal = *(float*)KernelArgs[RCIndices[I]] }});
+          RC.Value.FloatVal = *(float*)KernelArgs[RCIndices[I]];
         }
         // NOTE: long double on device should correspond to plain double.
         // XXX: CUDA with a long double SILENTLY fails to create a working
         // kernel in AOT compilation, with or without JIT.
         else if (ArgType->isDoubleTy()) {
-          RCsVec.push_back(RuntimeConstant {{ .DoubleVal = *(double*)KernelArgs[RCIndices[I]] }});
+          RC.Value.DoubleVal = *(double*)KernelArgs[RCIndices[I]];
         } else if (ArgType->isX86_FP80Ty() || ArgType->isPPC_FP128Ty() ||
                   ArgType->isFP128Ty()) {
-          RCsVec.push_back(RuntimeConstant {{ .LongDoubleVal = *(long double*)KernelArgs[RCIndices[I]] }});
+          RC.Value.LongDoubleVal = *(long double*)KernelArgs[RCIndices[I]];
         } else if (ArgType->isPointerTy()) {
-          RCsVec.push_back(RuntimeConstant {{ .PtrVal = (void*)KernelArgs[RCIndices[I]] }});
+          RC.Value.PtrVal = (void*)KernelArgs[RCIndices[I]];
         } else {
           std::string TypeString;
           raw_string_ostream TypeOstream(TypeString);
@@ -172,6 +172,7 @@ private:
           FATAL_ERROR("JIT Incompatible type in runtime constant: " +
                       TypeOstream.str());
         }
+        RCsVec.push_back(RC);
       }
     }
   }
@@ -324,7 +325,7 @@ template <typename ImplT>
 typename DeviceTraits<ImplT>::DeviceError_t
 JitEngineDevice<ImplT>::compileAndRun(
     StringRef ModuleUniqueId, StringRef KernelName,
-    FatbinWrapper_t *FatbinWrapper, size_t FatbinSize, const llvm::SmallVector<int32_t>& RCIndices,
+    FatbinWrapper_t *FatbinWrapper, size_t FatbinSize, const SmallVector<int32_t>& RCIndices,
     int32_t NumRuntimeConstants, dim3 GridDim, dim3 BlockDim, void **KernelArgs,
     uint64_t ShmemSize, typename DeviceTraits<ImplT>::DeviceStream_t Stream) {
   TIMESCOPE("compileAndRun");

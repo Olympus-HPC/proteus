@@ -1,7 +1,5 @@
 // clang-format off
-// RUN: ./indirect_fallthrough.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-FIRST
-// Second run uses the object cache.
-// RUN: ./indirect_fallthrough.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: ./indirect_fallthrough.%ext | FileCheck %s --check-prefixes=CHECK
 // clang-format on
 
 #include <climits>

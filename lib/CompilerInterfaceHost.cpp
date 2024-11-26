@@ -25,10 +25,10 @@ extern "C" __attribute__((used)) void *__jit_entry(char *FnName, char *IR,
   dbgs() << "FnName " << FnName << " NumRuntimeConstants "
          << NumRuntimeConstants << "\n";
   for (int I = 0; I < NumRuntimeConstants; ++I)
-    dbgs() << " Value Int32=" << RC[I].Int32Val
-           << " Value Int64=" << RC[I].Int64Val
-           << " Value Float=" << RC[I].FloatVal
-           << " Value Double=" << RC[I].DoubleVal << "\n";
+    dbgs() << " Value Int32=" << RC[I].Value.Int32Val
+           << " Value Int64=" << RC[I].Value.Int64Val
+           << " Value Float=" << RC[I].Value.FloatVal
+           << " Value Double=" << RC[I].Value.DoubleVal << "\n";
 #endif
 
   void *JitFnPtr =
