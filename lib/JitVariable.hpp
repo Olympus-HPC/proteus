@@ -24,11 +24,4 @@ T jit_variable(T v, int pos=-1) {
   return v;
 }
 
-// template<typename T> struct jit_variable {
-//   const T value;
-//   jit_variable(const T v) : value(v) {}
-//   operator T() { return value; }
-//   operator T() const { return value; }
-// };
-
 }
