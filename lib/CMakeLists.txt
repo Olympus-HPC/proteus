@@ -9,11 +9,11 @@ set(SOURCES
 
 set(HEADERS
   CompilerInterfaceTypes.h
-  jit.hpp
   JitCache.hpp
   JitEngine.hpp
   JitEngineHost.hpp
   JitStorageCache.hpp
+  JitVariable.hpp
   TimeTracing.hpp
   TransformArgumentSpecialization.hpp
   Utils.h)
@@ -80,6 +80,7 @@ if(ENABLE_HIP)
   target_include_directories(proteus SYSTEM PRIVATE ${hip_INCLUDE_DIRS})
   target_compile_options(proteus PRIVATE -x hip)
   list(APPEND libs hip::amdhip64)
+  target_link_libraries(proteus PUBLIC hip::host)
 endif()
 
 if(ENABLE_CUDA)

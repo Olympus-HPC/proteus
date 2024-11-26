@@ -47,7 +47,6 @@
 #include <llvm/Passes/OptimizationLevel.h>
 #include <llvm/Support/ErrorHandling.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
-#include <type_traits>
 
 #include "CompilerInterfaceTypes.h"
 #include "JitEngineHost.hpp"

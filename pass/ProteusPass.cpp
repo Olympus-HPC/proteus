@@ -985,22 +985,28 @@ private:
     dbgs() << "finding jit variables" << "\n";
     dbgs() << "users..." << "\n";
 
-    SmallVector<StringRef, 16> JitFunctionNames;
+    SmallVector<Function*, 16> JitFunctions;
 
     for (auto& F : M.getFunctionList()) {
       if (F.getName().contains("jit_variable")) {
-        JitFunctionNames.push_back(F.getName());
+        JitFunctions.push_back(&F);
       }
     }
 
-    for (auto FnName : JitFunctionNames) {
-      Function *ProteusJitFn = M.getFunction(FnName);
-      for (auto User : ProteusJitFn->users()) {
+    for (auto Function : JitFunctions) {
+      for (auto User : Function->users()) {
+
         CallBase *CB = dyn_cast<CallBase>(User);
+        if (!CB) 
+          FATAL_ERROR("Expected CallBase as user of proteus::jit_variable function");
+
         dbgs() << "call: " << *CB << "\n";
         StoreInst *S = dyn_cast<StoreInst>(*(CB->users().begin()));
+        if (!S) 
+          FATAL_ERROR("Expected StoreInst");
         dbgs() << "store: " << *S << "\n";
         Value *V = S->getPointerOperand();
+
         GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(V);
         if (GEP) {
           dbgs() << "gep: " << *GEP << "\n";

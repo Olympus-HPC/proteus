@@ -3,7 +3,7 @@
 #include <iostream>
 #include <chrono>
 
-#include "jit.hpp"
+#include "JitVariable.hpp"
 
 
 template<typename F>
