@@ -995,22 +995,23 @@ private:
 
     for (auto FnName : JitFunctionNames) {
       Function *ProteusJitFn = M.getFunction(FnName);
-
-      CallBase *CB = dyn_cast<CallBase>(*(ProteusJitFn->users().begin()));
-      dbgs() << "call: " << *CB << "\n";
-      StoreInst *S = dyn_cast<StoreInst>(*(CB->users().begin()));
-      dbgs() << "store: " << *S << "\n";
-      Value *V = S->getPointerOperand();
-      GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(V);
-      if (GEP) {
-        dbgs() << "gep: " << *GEP << "\n";
-        auto Slot = GEP->getOperand(GEP->getNumOperands() - 1);
-        dbgs() << "slot: " << *Slot << "\n";
-        CB->setArgOperand(1, Slot);
-      } else {
-        dbgs() << "no gep, assuming slot 0" << "\n";
-        Constant *C = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
-        CB->setArgOperand(1, C);
+      for (auto User : ProteusJitFn->users()) {
+        CallBase *CB = dyn_cast<CallBase>(User);
+        dbgs() << "call: " << *CB << "\n";
+        StoreInst *S = dyn_cast<StoreInst>(*(CB->users().begin()));
+        dbgs() << "store: " << *S << "\n";
+        Value *V = S->getPointerOperand();
+        GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(V);
+        if (GEP) {
+          dbgs() << "gep: " << *GEP << "\n";
+          auto Slot = GEP->getOperand(GEP->getNumOperands() - 1);
+          dbgs() << "slot: " << *Slot << "\n";
+          CB->setArgOperand(1, Slot);
+        } else {
+          dbgs() << "no gep, assuming slot 0" << "\n";
+          Constant *C = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
+          CB->setArgOperand(1, C);
+        }
       }
     }
     

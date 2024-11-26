@@ -14,6 +14,7 @@ void run(F&& f) {
 int main(int argc, char **argv) {
   int N = 1024;
   double a = 3.14;
+  double b = 1.484;
 
   double *x = static_cast<double *>(malloc(sizeof(double) * N));
   double *y = static_cast<double *>(malloc(sizeof(double) * N));
@@ -23,11 +24,12 @@ int main(int argc, char **argv) {
     y[i] = 0.0;
   }
 
-  run([=, N=proteus::jit_variable(N), a=proteus::jit_variable(a)] ()  __attribute__((annotate("jit"))) {
+  run([=, N=proteus::jit_variable(N), a=proteus::jit_variable(a), b=proteus::jit_variable(b)] ()  __attribute__((annotate("jit"))) {
     for (std::size_t i{0}; i < N; ++i) {
-      y[i] += a * x[i];
+      y[i] += a * b * x[i];
     }
   });
+  
 
   free(x);
   free(y);
