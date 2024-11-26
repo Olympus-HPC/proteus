@@ -91,19 +91,6 @@ public:
         }
       }
     }
-
-    //     for (BasicBlock& BB : F) {
-    //       for (Instruction& I : BB) {
-    //         if (dyn_cast<GetElementPtrInst>(&I)) {
-    //           for (User* U : I.users()) {
-    //             dbgs() << *U << "\n";
-    //               Type *Int32Ty = Type::getInt32Ty(M.getContext());
-    //               Constant *C = ConstantInt::get(Int32Ty, val);
-    //               U->replaceAllUsesWith(C);
-    //             }
-    //         }
-    //       }
-    //     }
   }
 };
 

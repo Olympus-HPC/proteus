@@ -742,7 +742,24 @@ private:
     return true;
   }
 
+<<<<<<< HEAD
   void replaceWithJitLaunchKernel(Module &M, CallBase *LaunchKernelCall) {
+=======
+  void
+  replaceWithJitLaunchKernel(Module &M,
+                             std::pair<Function *, JitFunctionInfo> &JITInfo,
+                             CallBase *LaunchKernelCall) {
+    Function *JITFn = JITInfo.first;
+    JitFunctionInfo &JFI = JITInfo.second;
+    // Create jit entry runtime function.
+    Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
+    Type *Int64Ty = Type::getInt64Ty(M.getContext());
+    Type *Int32Ty = Type::getInt32Ty(M.getContext());
+    Type *Int128Ty = Type::getInt128Ty(M.getContext());
+    StructType *RuntimeConstantTy =
+        StructType::create({Int128Ty, Int32Ty}, "struct.args");
+
+>>>>>>> 1d51a22 (Fixup RuntimeConstantTy size)
     GlobalVariable *ModuleUniqueId =
         M.getGlobalVariable("__module_unique_id", true);
     assert(ModuleUniqueId && "Expected ModuleUniqueId global to be defined");
