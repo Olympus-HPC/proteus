@@ -20,7 +20,9 @@
 // Forward declaration
 __device__ void device_function(int a);
 
-__global__ void kernel_function(int a) { device_function(a); };
+__global__ __attribute__((annotate("jit"))) void kernel_function(int a) {
+  device_function(a);
+};
 
 int main() {
   kernel_function<<<1, 1>>>(1);
