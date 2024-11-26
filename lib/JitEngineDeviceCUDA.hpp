@@ -57,6 +57,10 @@ public:
                                    dim3 BlockDim, void **KernelArgs,
                                    uint64_t ShmemSize, CUstream Stream);
 
+  cudaError_t launchKernelDirect(void* KernelFunc, dim3 GridDim,
+                                 dim3 BlockDim, void **KernelArgs,
+                                 uint64_t ShmemSize, CUstream Stream);
+
 private:
   JitEngineDeviceCUDA();
   JitEngineDeviceCUDA(JitEngineDeviceCUDA &) = delete;

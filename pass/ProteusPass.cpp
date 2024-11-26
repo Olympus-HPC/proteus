@@ -141,15 +141,14 @@ struct ProteusJitPassImpl {
       if (isDeviceCompilation(M)) {
         ModuleDeviceKernels = getDeviceKernels(M);
         if (!isDeviceKernel(Fn))
-          report_fatal_error(std::string{} + __FILE__ + ":" +
+          FATAL_ERROR(std::string{} + __FILE__ + ":" +
                              std::to_string(__LINE__) +
                              " => Expected the annotated Fn " + Fn->getName() +
                              " to be a kernel function!");
       }
 
       if (JitFunctionInfoMap.contains(Fn))
-        report_fatal_error("Duplicate jit annotation for Fn " + Fn->getName(),
-                           false);
+        FATAL_ERROR("Duplicate jit annotation for Fn " + Fn->getName());
 
       DEBUG(dbgs() << "JIT Function " << Fn->getName() << "\n");
 
@@ -179,7 +178,7 @@ struct ProteusJitPassImpl {
           auto *Index = cast<ConstantInt>(AnnotArgs->getOperand(I));
           uint64_t ArgNo = Index->getValue().getZExtValue();
           if (ArgNo > Fn->arg_size())
-            report_fatal_error(
+            FATAL_ERROR(
                 Twine("Error: JIT annotation runtime constant argument " +
                       std::to_string(ArgNo) +
                       " is greater than number of arguments " +
@@ -426,8 +425,7 @@ struct ProteusJitPassImpl {
     emitJitFunctionArgMetadata(*JitMod, JFI, *JitF);
 
     if (verifyModule(*JitMod, &errs()))
-      report_fatal_error("Broken JIT module found, compilation aborted!",
-                         false);
+      FATAL_ERROR("Broken JIT module found, compilation aborted!");
 
     raw_string_ostream OS(JFI.ModuleIR);
     WriteBitcodeToFile(*JitMod, OS);
@@ -542,7 +540,7 @@ struct ProteusJitPassImpl {
       // RTC interfaces fail with linking errors.
       auto JITKernels = getDeviceKernels(*JitMod);
       if (JITKernels.size() != 1)
-        report_fatal_error("Expected a single kernel in JIT module");
+        FATAL_ERROR("Expected a single kernel in JIT module");
     }
 
 #endif
@@ -561,8 +559,7 @@ struct ProteusJitPassImpl {
     emitJitFunctionArgMetadata(*JitMod, JFI, *JitF);
 
     if (verifyModule(*JitMod, &errs()))
-      report_fatal_error("Broken JIT module found, compilation aborted!",
-                         false);
+      FATAL_ERROR("Broken JIT module found, compilation aborted!");
 
     raw_string_ostream OS(JFI.ModuleIR);
     WriteBitcodeToFile(*JitMod, OS);
@@ -718,8 +715,7 @@ struct ProteusJitPassImpl {
   void getKernelHostStubs(Module &M) {
     Function *RegisterFunction = nullptr;
     if (!RegisterFunctionName) {
-      report_fatal_error("getKernelHostStubs only callable with `EnableHIP or EnableCUDA set.",
-                         false);
+      FATAL_ERROR("getKernelHostStubs only callable with `EnableHIP or EnableCUDA set.");
       return;
     }
     RegisterFunction = M.getFunction(RegisterFunctionName);
@@ -964,8 +960,7 @@ struct ProteusJitPassImpl {
   /// with a `__jit_register_function` call.
   void instrumentRegisterJITFunc(Module &M) {
     if (!RegisterFunctionName) {
-      report_fatal_error("instrumentRegisterJITFunc only callable with `EnableHIP or EnableCUDA set.",
-                    false);
+      FATAL_ERROR("instrumentRegisterJITFunc only callable with `EnableHIP or EnableCUDA set.");
       return;
     }
     Function* RegisterFunction = M.getFunction(RegisterFunctionName);
@@ -1089,8 +1084,7 @@ struct ProteusJitPassImpl {
     DEBUG(dbgs() << "=== Post Original Host Module\n"
                  << M << "=== End Post Original Host Module\n");
     if (verifyModule(M, &errs()))
-      report_fatal_error("Broken original module found, compilation aborted!",
-                         false);
+      FATAL_ERROR("Broken original module found, compilation aborted!");
 
     return true;
   }

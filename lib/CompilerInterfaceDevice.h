@@ -36,13 +36,8 @@ static inline auto __jit_launch_kernel_internal(
   auto &Jit = JitDeviceImplT::instance();
   auto optionalKernelInfo = Jit.getJITKernelInfo(Kernel);
   if (!optionalKernelInfo) {
-    #if ENABLE_CUDA
-      return cudaLaunchKernel((const void*)Kernel, GridDim, BlockDim, KernelArgs, ShmemSize,
+    return Jit.launchKernelDirect(Kernel, GridDim, BlockDim, KernelArgs, ShmemSize,
         static_cast<typename JitDeviceImplT::DeviceStream_t>(Stream));
-    #elif ENABLE_HIP
-      return hipLaunchKernel((const void*)Kernel, GridDim, BlockDim, KernelArgs, ShmemSize,
-        static_cast<typename JitDeviceImplT::DeviceStream_t>(Stream));
-    #endif
   }
 
   const auto& KernelInfo = optionalKernelInfo.value();

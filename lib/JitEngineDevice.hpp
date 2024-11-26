@@ -41,9 +41,14 @@
 // TODO: check if this global is needed.
 static llvm::codegen::RegisterCodeGenFlags CFG;
 
+
+namespace proteus {
+
+using namespace llvm;
+
 class JITKernelInfo {
   char const* Name;
-  llvm::SmallVector<int32_t> RCIndices;
+  SmallVector<int32_t> RCIndices;
   int32_t NumRCs;
 public:
   JITKernelInfo(char const* _Name,
@@ -64,9 +69,6 @@ public:
   auto getNumRCs() const { return NumRCs; }
 };
 
-namespace proteus {
-
-using namespace llvm;
 
 struct FatbinWrapper_t {
   int32_t Magic;
@@ -126,7 +128,7 @@ private:
 
   void getRuntimeConstantsFromModule(void** KernelArgs, StringRef KernelName,
                                      StringRef IRBuffer,
-                                     const llvm::SmallVector<int32_t>& RCIndices,
+                                     const SmallVector<int32_t>& RCIndices,
                                      SmallVector<RuntimeConstant>& RCsVec) {
   auto Ctx = std::make_unique<LLVMContext>();
   SMDiagnostic Err;
@@ -182,6 +184,14 @@ private:
         KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
   }
 
+  DeviceError_t launchKernelDirect(void* KernelFunc, dim3 GridDim,
+                                     dim3 BlockDim, void **KernelArgs,
+                                     uint64_t ShmemSize,
+                                     DeviceStream_t Stream) {
+    return static_cast<ImplT &>(*this).launchKernelDirect(
+        KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
+  }
+
   std::unique_ptr<MemoryBuffer> codegenObject(Module &M, StringRef DeviceArch) {
     return static_cast<ImplT &>(*this).codegenObject(M, DeviceArch);
   }
@@ -223,7 +233,7 @@ protected:
   std::unordered_map<std::string, const void *> VarNameToDevPtr;
 private:
   // This map is private and only accessible via the API.
-  llvm::DenseMap<const void*, JITKernelInfo> JITKernelInfoMap;
+  DenseMap<const void*, JITKernelInfo> JITKernelInfoMap;
 };
 
 template <typename ImplT>
