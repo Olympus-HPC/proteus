@@ -9,7 +9,7 @@
     gpuError_t err = CALL;                                                     \
     if (err != gpuSuccess) {                                                   \
       printf("ERROR @ %s:%d ->  %s\n", __FILE__, __LINE__,                     \
-             gpuGetErrorString(err));                                          \
+             gpuGetErrorString(err));                                           \
       abort();                                                                 \
     }                                                                          \
   }
@@ -18,7 +18,7 @@ __global__ __attribute__((annotate("jit"))) void kernel() {
 }
 
 template <typename T>
-gpuError_t launcher(T kernel_in) {
+__attribute__((annotate("jit"))) gpuError_t launcher(T kernel_in) {
   return gpuLaunchKernel((const void *)kernel_in, 1, 1, 0, 0, 0);
 }
 
@@ -30,11 +30,8 @@ int main() {
   return 0;
 }
 
-
 // CHECK: Kernel
 // CHECK: Kernel
-// CHECK: JitCache hits 0 total 1
-// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: JitCache hits 0 total 1
-// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: JitCache hits 1 total 2
+// CHECK: HashValue {{[0-9]+}} NumExecs 2 NumHits 1
 // CHECK: JitStorageCache hits 0 total 1
