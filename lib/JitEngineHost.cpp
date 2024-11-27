@@ -230,7 +230,6 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
 #if ENABLE_CUDA || ENABLE_HIP
       if (GV.getName() == "__jit_launch_kernel") {
         DBG(dbgs() << "Resolving via ORC jit_launch_kernel\n");
-        getchar();
         SymbolMap SymbolMap;
         SymbolMap[LLJITPtr->mangleAndIntern("__jit_launch_kernel")] =
             orc::ExecutorSymbolDef(
@@ -249,7 +248,6 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
       if (GV.getName() == "__hip_fatbin") {
         DBG(dbgs() << "Resolving via ORC hip_fatbin at pointer "
                    << &__hip_fatbin << "\n");
-        getchar();
         SymbolMap SymbolMap;
         SymbolMap[LLJITPtr->mangleAndIntern("__hip_fatbin")] =
             orc::ExecutorSymbolDef(

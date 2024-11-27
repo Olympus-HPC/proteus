@@ -81,20 +81,20 @@ std::unique_ptr<MemoryBuffer> JitEngineDeviceCUDA::extractDeviceBitcode(
   return MemoryBuffer::getMemBufferCopy(StringRef(DeviceBitcode.data(), Bytes));
 }
 
-void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module *M, Function *F,
+void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module &M, Function &F,
                                                    int GridSize,
                                                    int BlockSize) {
-  NamedMDNode *NvvmAnnotations = M->getNamedMetadata("nvvm.annotations");
+  NamedMDNode *NvvmAnnotations = M.getNamedMetadata("nvvm.annotations");
   assert(NvvmAnnotations && "Expected non-null nvvm.annotations metadata");
   // TODO: fix hardcoded 1024 as the maximum, by reading device
   // properties.
   // TODO: set min GridSize.
   int MaxThreads = std::min(1024, BlockSize);
-  Metadata *MDVals[] = {ConstantAsMetadata::get(F),
-                        MDString::get(M->getContext(), "maxntidx"),
+  Metadata *MDVals[] = {ConstantAsMetadata::get(&F),
+                        MDString::get(M.getContext(), "maxntidx"),
                         ConstantAsMetadata::get(ConstantInt::get(
-                            Type::getInt32Ty(M->getContext()), MaxThreads))};
-  NvvmAnnotations->addOperand(MDNode::get(M->getContext(), MDVals));
+                            Type::getInt32Ty(M.getContext()), MaxThreads))};
+  NvvmAnnotations->addOperand(MDNode::get(M.getContext(), MDVals));
 }
 
 cudaError_t JitEngineDeviceCUDA::cudaModuleLaunchKernel(

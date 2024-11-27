@@ -115,14 +115,14 @@ std::unique_ptr<MemoryBuffer> JitEngineDeviceHIP::extractDeviceBitcode(
                 DeviceBitcode.size()));
 }
 
-void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module *M, Function *F,
+void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
                                                   int GridSize, int BlockSize) {
   // TODO: fix calculation of launch bounds.
   // TODO: find maximum (hardcoded 1024) from device info.
   // TODO: Setting as 1, BlockSize to replicate launch bounds settings
   // Does setting it as BlockSize, BlockSize help?
-  F->addFnAttr("amdgpu-flat-work-group-size",
-               "1," + std::to_string(std::min(1024, BlockSize)));
+  F.addFnAttr("amdgpu-flat-work-group-size",
+              "1," + std::to_string(std::min(1024, BlockSize)));
   // TODO: find warp size (hardcoded 64) from device info.
   // int WavesPerEU = (GridSize * BlockSize) / 64 / 110 / 4 / 2;
   int WavesPerEU = 0;
