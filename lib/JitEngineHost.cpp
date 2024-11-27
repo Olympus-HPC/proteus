@@ -227,8 +227,9 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
       DBG(dbgs() << "Resolve statically missing GV symbol " << GV.getName()
                  << "\n");
 
+#if ENABLE_CUDA || ENABLE_HIP
       if (GV.getName() == "__jit_launch_kernel") {
-        dbgs() << "LINKING jit_launch_kernel\n";
+        DBG(dbgs() << "Resolving via ORC jit_launch_kernel\n");
         getchar();
         SymbolMap SymbolMap;
         SymbolMap[LLJITPtr->mangleAndIntern("__jit_launch_kernel")] =
@@ -242,10 +243,12 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
 
         continue;
       }
+#endif
 
 #if ENABLE_HIP
       if (GV.getName() == "__hip_fatbin") {
-        dbgs() << "LINKING hip_fatbin at pointer " << &__hip_fatbin << "\n";
+        DBG(dbgs() << "Resolving via ORC hip_fatbin at pointer "
+                   << &__hip_fatbin << "\n");
         getchar();
         SymbolMap SymbolMap;
         SymbolMap[LLJITPtr->mangleAndIntern("__hip_fatbin")] =
