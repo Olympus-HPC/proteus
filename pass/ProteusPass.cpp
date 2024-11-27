@@ -60,7 +60,6 @@
 #include <iostream>
 #include <string>
 
-// #define ENABLE_RECURSIVE_JIT
 #define DEBUG_TYPE "jitpass"
 #ifdef ENABLE_DEBUG
 #define DEBUG(x) x
@@ -194,43 +193,6 @@ struct ProteusJitPassImpl {
     }
   }
 
-  void getReachableFunctions(Module &M, Function &F,
-                             SmallPtrSetImpl<Function *> &ReachableFunctions) {
-    SmallVector<Function *, 8> ToVisit;
-    ToVisit.push_back(&F);
-    CallGraphWrapperPass CG;
-    CG.runOnModule(M);
-    while (!ToVisit.empty()) {
-      Function *VisitF = ToVisit.pop_back_val();
-      CallGraphNode *CGNode = CG[VisitF];
-
-      for (const auto &Callee : *CGNode) {
-        Function *CalleeF = Callee.second->getFunction();
-
-        if (!CalleeF) {
-          DEBUG(dbgs() << "Skip external node\n");
-          continue;
-        }
-
-        if (CalleeF->isDeclaration()) {
-          DEBUG(dbgs() << "Skip declaration of " << CalleeF->getName() << "\n");
-          continue;
-        }
-
-        if (ReachableFunctions.contains(CalleeF)) {
-          DEBUG(dbgs() << "Skip already visited " << CalleeF->getName()
-                       << "\n");
-          continue;
-        }
-
-        DEBUG(dbgs() << "Found reachable " << CalleeF->getName()
-                     << " ... to visit\n");
-        ReachableFunctions.insert(CalleeF);
-        ToVisit.push_back(CalleeF);
-      }
-    }
-  }
-
   void runCleanupPassPipeline(Module &M) {
     PassBuilder PB;
     LoopAnalysisManager LAM;
@@ -245,7 +207,6 @@ struct ProteusJitPassImpl {
     PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
     ModulePassManager Passes;
-    // Passes.addPass(AlwaysInlinerPass());
     Passes.addPass(GlobalDCEPass());
     Passes.addPass(StripDeadDebugInfoPass());
     Passes.addPass(StripDeadPrototypesPass());
@@ -273,80 +234,20 @@ struct ProteusJitPassImpl {
 
   void emitJitModuleHost(Module &M,
                          std::pair<Function *, JitFunctionInfo> &JITInfo) {
-    SmallPtrSet<Function *, 16> ReachableFunctions;
-
     Function *JITFn = JITInfo.first;
     JitFunctionInfo &JFI = JITInfo.second;
 
-    getReachableFunctions(M, *JITFn, ReachableFunctions);
-    ReachableFunctions.insert(JITFn);
-
     ValueToValueMapTy VMap;
-    auto JitMod = CloneModule(
-        M, VMap, [&ReachableFunctions, &JITFn](const GlobalValue *GV) {
-          if (const GlobalVariable *G = dyn_cast<GlobalVariable>(GV)) {
-            if (!G->isConstant())
-              return false;
-            // For constant global variables, keep their definitions only
-            // if they are reachable by any of the functions in the
-            // JIT module.
-            // TODO: Is isConstant() enough? Maybe we want isManifestConstant()
-            // that makes sure that the constant is free of unknown values.
-            for (const User *Usr : GV->users()) {
-              const Instruction *UsrI = dyn_cast<Instruction>(Usr);
-              if (!UsrI)
-                continue;
-              const Function *ParentF = UsrI->getParent()->getParent();
-              if (ReachableFunctions.contains(ParentF))
-                return true;
-            }
-
-            return false;
-          }
-
-          // TODO: do not clone aliases' definitions, it this sound?
-          if (const GlobalAlias *GA = dyn_cast<GlobalAlias>(GV))
-            return false;
-
-          if (const Function *OrigF = dyn_cast<Function>(GV)) {
-            if (OrigF == JITFn)
-              return true;
-
-            // Do not keep definitions of unreachable functions.
-            if (!ReachableFunctions.contains(OrigF)) {
-              // dbgs() << "Drop unreachable " << F->getName() << "\n";
-              return false;
-            }
-
-#ifdef ENABLE_RECURSIVE_JIT
-            // Enable recursive jit'ing.
-            for (auto &JFIInner : JitFunctionInfoList)
-              if (JFIInner.Fn == OrigF) {
-                dbgs() << "Do not keep definitions of another jit function "
-                       << OrigF->getName() << "\n";
-                return false;
-              }
-#endif
-
-            // dbgs() << "Keep reachable " << F->getName() << "\n";
-
-            return true;
-          }
-
-          // For the rest global values do not keep their definitions.
+    auto JitMod = CloneModule(M, VMap, [](const GlobalValue *GV) {
+      if (const GlobalVariable *G = dyn_cast<GlobalVariable>(GV))
+        if (!G->isConstant())
           return false;
-        });
+
+      return true;
+    });
 
     Function *JitF = cast<Function>(VMap[JITFn]);
     JitF->setLinkage(GlobalValue::ExternalLinkage);
-    // Using pass for extraction (to remove?)
-    // std::vector<GlobalValue *> GlobalsToExtract;
-    // for (auto *F : ReachableFunctions) {
-    //  GlobalValue *GV = dyn_cast<GlobalValue>(JitF);
-    //  assert(GV && "Expected non-null GV");
-    //  GlobalsToExtract.push_back(GV);
-    //  dbgs() << "Extract global " << *GV << "\n";
-    //}
 
     // Internalize functions, besides JIT function, in the module
     // to help global DCE (reduce compilation time), inlining.
@@ -359,10 +260,6 @@ struct ProteusJitPassImpl {
 
       // Internalize other functions in the module.
       JitModF.setLinkage(GlobalValue::InternalLinkage);
-      // F.setLinkage(GlobalValue::PrivateLinkage);
-      JitModF.removeFnAttr(Attribute::NoInline);
-      // F.addFnAttr(Attribute::InlineHint);
-      JitModF.addFnAttr(Attribute::AlwaysInline);
     }
 
     DEBUG(dbgs() << "=== Pre Passes Host JIT Module\n"
@@ -377,23 +274,27 @@ struct ProteusJitPassImpl {
     // globals included in the JIT module required for external
     // linking.
     for (auto &GVar : M.globals()) {
-      if (VMap[&GVar]) {
+      auto printGVarInfo = [](auto &GVar) {
         dbgs() << "=== GVar\n";
-        dbgs() << GVar << "\n";
+        dbgs() << GVar.getName() << "\n";
         dbgs() << "Linkage " << GVar.getLinkage() << "\n";
         dbgs() << "Visibility " << GVar.getVisibility() << "\n";
         dbgs() << "=== End GV\n";
+      };
+
+      if (VMap[&GVar]) {
+        DEBUG(printGVarInfo(GVar));
 
         if (GVar.isConstant())
           continue;
 
         if (GVar.getName() == "llvm.global_ctors") {
-          dbgs() << "Skip llvm.global_ctors";
+          DEBUG(dbgs() << "Skip llvm.global_ctors");
           continue;
         }
 
         if (GVar.hasAvailableExternallyLinkage()) {
-          dbgs() << "Skip available externally";
+          DEBUG(dbgs() << "Skip available externally");
           continue;
         }
 
@@ -402,20 +303,6 @@ struct ProteusJitPassImpl {
       }
     }
 
-#ifdef ENABLE_RECURSIVE_JIT
-    // Set linkage to external for any reachable jit'ed function to enable
-    // recursive jit'ing.
-    for (auto &JFIInner : JitFunctionInfoList) {
-      if (!ReachableFunctions.contains(JFIInner.Fn))
-        continue;
-      if (VMap[JFIInner.Fn]) {
-        Function *JitF = cast<Function>(VMap[JFIInner.Fn]);
-        JFIInner.Fn->setLinkage(GlobalValue::ExternalLinkage);
-        JFIInner.Fn->setVisibility(
-            GlobalValue::VisibilityTypes::DefaultVisibility);
-      }
-    }
-#endif
     // TODO: Do we want to keep debug info to use for GDB/LLDB
     // interfaces for debugging jitted code?
     StripDebugInfo(*JitMod);
@@ -440,10 +327,7 @@ struct ProteusJitPassImpl {
     ValueToValueMapTy VMap;
     Function *JITFn = JITInfo.first;
     JitFunctionInfo &JFI = JITInfo.second;
-    // TODO: We clone everything, use ReachableFunctions to prune. What happens
-    // if there are cross-kernel globals? Need to remove all other __global__
-    // functions in the module, hipModuleLoadData expects a single kernel
-    // (__global__) in the image.
+
     auto JitMod = CloneModule(M, VMap, [&](const GlobalValue *GV) {
       // Do not clone JIT bitcodes of other kernels, assumes the existing
       // special naming for globals storing the bitcodes.
@@ -522,9 +406,6 @@ struct ProteusJitPassImpl {
 
       // Internalize other functions in the module.
       JitModF.setLinkage(GlobalValue::InternalLinkage);
-      // JitModF.removeFnAttr(Attribute::NoInline);
-      //// F.addFnAttr(Attribute::InlineHint);
-      // JitModF.addFnAttr(Attribute::AlwaysInline);
     }
 
     DEBUG(dbgs() << "=== Pre Passes Device JIT Module\n"
@@ -1043,8 +924,7 @@ struct ProteusJitPassImpl {
     }
   }
 
-
-  bool run(Module &M, CallGraph &CG) {
+  bool run(Module &M) {
     parseAnnotations(M);
 
     if (JitFunctionInfoMap.empty())
@@ -1104,8 +984,7 @@ struct ProteusJitPassImpl {
 struct ProteusJitPass : PassInfoMixin<ProteusJitPass> {
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
     ProteusJitPassImpl PJP;
-    CallGraph &CG = AM.getResult<CallGraphAnalysis>(M);
-    bool Changed = PJP.run(M, CG);
+    bool Changed = PJP.run(M);
     if (Changed)
       // TODO: is anything preserved?
       return PreservedAnalyses::none();
@@ -1125,8 +1004,7 @@ struct LegacyProteusJitPass : public ModulePass {
   LegacyProteusJitPass() : ModulePass(ID) {}
   bool runOnModule(Module &M) override {
     ProteusJitPassImpl PJP;
-    CallGraph &CG = getAnalysis<CallGraphWrapperPass>().getCallGraph();
-    bool Changed = PJP.run(M, CG);
+    bool Changed = PJP.run(M);
     return Changed;
   }
 };

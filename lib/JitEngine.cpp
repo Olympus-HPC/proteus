@@ -31,6 +31,10 @@
 #include "TimeTracing.hpp"
 #include "Utils.h"
 
+// TODO: Used in InitTargetOptionsFromCodeGenFlags. Re-think for a different
+// initialization, especially using static compilation flags forwarded from
+// ProteusPass.
+static llvm::codegen::RegisterCodeGenFlags CFG;
 namespace proteus {
 
 #if ENABLE_TIME_TRACING

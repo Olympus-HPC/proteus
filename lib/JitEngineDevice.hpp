@@ -38,10 +38,6 @@
 #include "TransformArgumentSpecialization.hpp"
 #include "Utils.h"
 
-// TODO: check if this global is needed.
-static llvm::codegen::RegisterCodeGenFlags CFG;
-
-
 namespace proteus {
 
 using namespace llvm;

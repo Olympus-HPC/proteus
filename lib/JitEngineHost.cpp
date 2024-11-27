@@ -51,13 +51,15 @@
 #include "CompilerInterfaceTypes.h"
 #include "JitEngineHost.hpp"
 #include "TransformArgumentSpecialization.hpp"
+#include "Utils.h"
 
 using namespace proteus;
 using namespace llvm;
 using namespace llvm::orc;
 
-// TODO: check if this global is needed.
-static codegen::RegisterCodeGenFlags CFG;
+#if ENABLE_HIP || ENABLE_CUDA
+#include "CompilerInterfaceDevice.h"
+#endif
 
 // A function object that creates a simple pass pipeline to apply to each
 // module as it passes through the IRTransformLayer.
@@ -202,6 +204,63 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
     // dbgs() << "=== Parsed Module\n" << *M << "=== End of Parsed Module\n ";
     Function *F = M->getFunction(FnName);
     assert(F && "Expected non-null function!");
+
+    // Find GlobalValue declarations that are externally defined. Resolve them
+    // statically as absolute symbols in the ORC linker. Required for resolving
+    // __jit_launch_kernel for a host JIT function when libproteus is compiled
+    // as a static library. Required for resolving the __hip_fatbin symbol to
+    // the fatbinary in RDC compilation since this is linked late in static
+    // compilation. For other non-resolved symbols, return a fatal error to
+    // investigate.
+    for (auto &GV : M->global_values()) {
+      if (!GV.isDeclaration())
+        continue;
+
+      if (Function *F = dyn_cast<Function>(&GV))
+        if (F->isIntrinsic())
+          continue;
+
+      auto ExecutorAddr = LLJITPtr->lookup(GV.getName());
+      if (ExecutorAddr)
+        continue;
+
+      DBG(dbgs() << "Resolve statically missing GV symbol " << GV.getName()
+                 << "\n");
+
+      if (GV.getName() == "__jit_launch_kernel") {
+        dbgs() << "LINKING jit_launch_kernel\n";
+        getchar();
+        SymbolMap SymbolMap;
+        SymbolMap[LLJITPtr->mangleAndIntern("__jit_launch_kernel")] =
+            orc::ExecutorSymbolDef(
+                orc::ExecutorAddr{
+                    reinterpret_cast<uintptr_t>(__jit_launch_kernel)},
+                JITSymbolFlags::Exported);
+
+        cantFail(
+            LLJITPtr->getMainJITDylib().define(absoluteSymbols(SymbolMap)));
+
+        continue;
+      }
+
+#if ENABLE_HIP
+      if (GV.getName() == "__hip_fatbin") {
+        dbgs() << "LINKING hip_fatbin at pointer " << &__hip_fatbin << "\n";
+        getchar();
+        SymbolMap SymbolMap;
+        SymbolMap[LLJITPtr->mangleAndIntern("__hip_fatbin")] =
+            orc::ExecutorSymbolDef(
+                orc::ExecutorAddr{reinterpret_cast<uintptr_t>(&__hip_fatbin)},
+                JITSymbolFlags::Exported);
+        cantFail(
+            LLJITPtr->getMainJITDylib().define(absoluteSymbols(SymbolMap)));
+
+        continue;
+      }
+#endif
+
+      FATAL_ERROR("Unknown global value" + GV.getName() + " to resolve");
+    }
     // Replace argument uses with runtime constants.
     // TODO: change NumRuntimeConstants to size_t at interface.
     TransformArgumentSpecialization::transform(
