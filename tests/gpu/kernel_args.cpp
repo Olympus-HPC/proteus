@@ -6,16 +6,6 @@
 
 #include "gpu_common.h"
 
-#define gpuErrCheck(CALL)                                                      \
-  {                                                                            \
-    gpuError_t err = CALL;                                                     \
-    if (err != gpuSuccess) {                                                   \
-      printf("ERROR @ %s:%d ->  %s\n", __FILE__, __LINE__,                     \
-             gpuGetErrorString(err));                                          \
-      abort();                                                                 \
-    }                                                                          \
-  }
-
 __global__ __attribute__((annotate("jit", 1, 2, 3))) void
 kernel(int arg1, int arg2, int arg3) {
   printf("Kernel arg %d\n", arg1 + arg2 + arg3);

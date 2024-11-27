@@ -8,16 +8,6 @@
 
 __device__ int gvar = 23;
 
-#define gpuErrCheck(CALL)                                                      \
-  {                                                                            \
-    gpuError_t err = CALL;                                                     \
-    if (err != gpuSuccess) {                                                   \
-      printf("ERROR @ %s:%d ->  %s\n", __FILE__, __LINE__,                     \
-             gpuGetErrorString(err));                                          \
-      abort();                                                                 \
-    }                                                                          \
-  }
-
 __global__ __attribute__((annotate("jit"))) void kernel() {
   gvar++;
   printf("Kernel gvar %d addr %p\n", gvar, &gvar);

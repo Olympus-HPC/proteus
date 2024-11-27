@@ -9,16 +9,6 @@
 
 #include "gpu_common.h"
 
-#define gpuErrCheck(CALL)                                                      \
-  {                                                                            \
-    gpuError_t err = CALL;                                                     \
-    if (err != gpuSuccess) {                                                   \
-      printf("ERROR @ %s:%d ->  %s\n", __FILE__, __LINE__,                     \
-             gpuGetErrorString(err));                                          \
-      abort();                                                                 \
-    }                                                                          \
-  }
-
 __global__ __attribute__((annotate("jit"))) void kernel() {
   printf("Kernel one\n");
 }
@@ -27,13 +17,13 @@ __global__ __attribute__((annotate("jit"))) void kernel_two() {
   printf("Kernel two\n");
 }
 
-gpuError_t launcher(void** kernel_in) {
-  return gpuLaunchKernel((const void *)kernel_in, 1, 1, 0, 0, 0);
+gpuError_t launcher(const void *kernel_in) {
+  return gpuLaunchKernel(kernel_in, 1, 1, 0, 0, 0);
 }
 
 int main() {
-  gpuErrCheck(launcher((void**)kernel));
-  gpuErrCheck(launcher((void**)kernel_two));
+  gpuErrCheck(launcher((const void *)kernel));
+  gpuErrCheck(launcher((const void *)kernel_two));
   gpuErrCheck(gpuDeviceSynchronize());
   return 0;
 }

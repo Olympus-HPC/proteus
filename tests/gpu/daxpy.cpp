@@ -35,8 +35,8 @@ int main(int argc, char **argv) {
   double *x;
   double *y;
 
-  gpuMallocManaged(&x, sizeof(double) * N);
-  gpuMallocManaged(&y, sizeof(double) * N);
+  gpuErrCheck(gpuMallocManaged(&x, sizeof(double) * N));
+  gpuErrCheck(gpuMallocManaged(&y, sizeof(double) * N));
 
   for (std::size_t i{0}; i < N; i++) {
     x[i] = 0.31414 * i;
@@ -45,14 +45,14 @@ int main(int argc, char **argv) {
 
   std::cout << y[10] << std::endl;
   daxpy(6.2, x, y, N);
-  gpuDeviceSynchronize();
+  gpuErrCheck(gpuDeviceSynchronize());
   std::cout << y[10] << std::endl;
   daxpy(6.2, x, y, N);
-  gpuDeviceSynchronize();
+  gpuErrCheck(gpuDeviceSynchronize());
   std::cout << y[10] << std::endl;
 
-  gpuFree(x);
-  gpuFree(y);
+  gpuErrCheck(gpuFree(x));
+  gpuErrCheck(gpuFree(y));
 }
 
 // CHECK: 0

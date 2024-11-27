@@ -19,3 +19,13 @@
 #else
 #error "Must provide ENABLE_HIP or ENABLE_CUDA"
 #endif
+
+#define gpuErrCheck(CALL)                                                      \
+  {                                                                            \
+    gpuError_t err = CALL;                                                     \
+    if (err != gpuSuccess) {                                                   \
+      printf("ERROR @ %s:%d ->  %s\n", __FILE__, __LINE__,                     \
+             gpuGetErrorString(err));                                          \
+      abort();                                                                 \
+    }                                                                          \
+  }
