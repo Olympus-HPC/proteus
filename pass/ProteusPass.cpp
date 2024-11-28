@@ -500,7 +500,6 @@ struct ProteusJitPassImpl {
     // Create jit entry runtime function.
     Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
     Type *Int32Ty = Type::getInt32Ty(M.getContext());
-    Type *Int64Ty = Type::getInt64Ty(M.getContext());
     Type *Int128Ty = Type::getInt128Ty(M.getContext());
     // Use Int64 type for the Value, big enough to hold primitives.
     StructType *RuntimeConstantTy =
@@ -678,9 +677,6 @@ struct ProteusJitPassImpl {
     Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
     Type *Int64Ty = Type::getInt64Ty(M.getContext());
     Type *Int32Ty = Type::getInt32Ty(M.getContext());
-    Type *Int128Ty = Type::getInt128Ty(M.getContext());
-    StructType *RuntimeConstantTy =
-        StructType::create({Int128Ty}, "struct.args");
 
     GlobalVariable *ModuleUniqueId =
         M.getGlobalVariable("__module_unique_id", true);
@@ -794,8 +790,6 @@ struct ProteusJitPassImpl {
           "Expected non-null LaunchKernelFn, check "
           "ENABLE_CUDA|ENABLE_HIP compilation flags for ProteusJitPass");
 
-    Function *JITFn = JITInfo.first;
-
     SmallVector<CallBase *> ToBeReplaced;
     for (User *Usr : LaunchKernelFn->users())
       if (CallBase *CB = dyn_cast<CallBase>(Usr)) {
@@ -824,9 +818,7 @@ struct ProteusJitPassImpl {
     if (!RegisterVarFn)
       return;
 
-    // Create jit entry runtime function.
     Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
-    Type *Int32Ty = Type::getInt32Ty(M.getContext());
 
     // The prototype is __jit_register_var(const void *HostAddr, const char
     // *VarName).
@@ -922,8 +914,6 @@ struct ProteusJitPassImpl {
           "__jit_register_function", JitRegisterFunctionFnTy);
 
       constexpr int StubOperand = 1;
-      Value *Kernel = RegisterCB->getArgOperand(StubOperand);
-      Value *Stub = getStubGV(Kernel);
       Builder.CreateCall(JitRegisterKernelFn,
                          {RegisterCB->getArgOperand(1),
                           StubToKernelMap[FunctionToRegister],
