@@ -127,12 +127,13 @@ JitEngineDeviceCUDA::launchKernelFunction(CUfunction KernelFunc, dim3 GridDim,
                                 Stream, KernelArgs, nullptr);
 }
 
-cudaError_t
-JitEngineDeviceCUDA::launchKernelDirect(void* KernelFunc, dim3 GridDim,
-                                          dim3 BlockDim, void **KernelArgs,
-                                          uint64_t ShmemSize, CUstream Stream) {
+cudaError_t JitEngineDeviceCUDA::launchKernelDirect(void *KernelFunc,
+                                                    dim3 GridDim, dim3 BlockDim,
+                                                    void **KernelArgs,
+                                                    uint64_t ShmemSize,
+                                                    CUstream Stream) {
   return cudaLaunchKernel(KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize,
-                                Stream);
+                          Stream);
 }
 
 void JitEngineDeviceCUDA::codegenPTX(Module &M, StringRef DeviceArch,

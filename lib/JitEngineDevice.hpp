@@ -45,28 +45,22 @@ namespace proteus {
 using namespace llvm;
 
 class JITKernelInfo {
-  char const* Name;
+  char const *Name;
   SmallVector<int32_t> RCIndices;
   int32_t NumRCs;
+
 public:
-  JITKernelInfo(char const* _Name,
-                 int32_t* _RCIndices,
-                 int32_t _NumRCs) :
-                 Name(_Name),
-                 NumRCs(_NumRCs) {
-                  for (int32_t I = 0; I < NumRCs; ++I) {
-                    RCIndices.push_back(_RCIndices[I]);
-                  }
-                 }
-  JITKernelInfo() :
-                 Name(nullptr),
-                 NumRCs(0),
-                 RCIndices() {}
+  JITKernelInfo(char const *_Name, int32_t *_RCIndices, int32_t _NumRCs)
+      : Name(_Name), NumRCs(_NumRCs) {
+    for (int32_t I = 0; I < NumRCs; ++I) {
+      RCIndices.push_back(_RCIndices[I]);
+    }
+  }
+  JITKernelInfo() : Name(nullptr), NumRCs(0), RCIndices() {}
   auto getName() const { return Name; }
   auto getRCIndices() const { return RCIndices; }
   auto getNumRCs() const { return NumRCs; }
 };
-
 
 struct FatbinWrapper_t {
   int32_t Magic;
@@ -83,27 +77,28 @@ public:
   using DeviceStream_t = typename DeviceTraits<ImplT>::DeviceStream_t;
   using KernelFunction_t = typename DeviceTraits<ImplT>::KernelFunction_t;
 
-  DeviceError_t compileAndRun(StringRef ModuleUniqueId, StringRef KernelName,
-    FatbinWrapper_t *FatbinWrapper, size_t FatbinSize, const SmallVector<int32_t>& RCIndices,
-    int32_t NumRuntimeConstants, dim3 GridDim, dim3 BlockDim, void **KernelArgs,
-    uint64_t ShmemSize, typename DeviceTraits<ImplT>::DeviceStream_t Stream);
+  DeviceError_t
+  compileAndRun(StringRef ModuleUniqueId, StringRef KernelName,
+                FatbinWrapper_t *FatbinWrapper, size_t FatbinSize,
+                const SmallVector<int32_t> &RCIndices,
+                int32_t NumRuntimeConstants, dim3 GridDim, dim3 BlockDim,
+                void **KernelArgs, uint64_t ShmemSize,
+                typename DeviceTraits<ImplT>::DeviceStream_t Stream);
 
   void insertRegisterVar(const char *VarName, const void *Addr) {
     VarNameToDevPtr[VarName] = Addr;
   }
 
-  void insertRegisterFunction(const void *HostAddr,
-                              char *FunctionName,
-                              int32_t *RCIndices,
-                              int32_t NumRCs) {
+  void insertRegisterFunction(const void *HostAddr, char *FunctionName,
+                              int32_t *RCIndices, int32_t NumRCs) {
     JITKernelInfoMap[HostAddr] = JITKernelInfo(FunctionName, RCIndices, NumRCs);
   }
 
-  bool containsJITKernelInfo(const void* Func) {
+  bool containsJITKernelInfo(const void *Func) {
     return JITKernelInfoMap.contains(Func);
   }
 
-  std::optional<JITKernelInfo> getJITKernelInfo(const void* Func) {
+  std::optional<JITKernelInfo> getJITKernelInfo(const void *Func) {
     if (!containsJITKernelInfo(Func)) {
       return std::nullopt;
     }
@@ -181,10 +176,9 @@ private:
         KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
   }
 
-  DeviceError_t launchKernelDirect(void* KernelFunc, dim3 GridDim,
-                                     dim3 BlockDim, void **KernelArgs,
-                                     uint64_t ShmemSize,
-                                     DeviceStream_t Stream) {
+  DeviceError_t launchKernelDirect(void *KernelFunc, dim3 GridDim,
+                                   dim3 BlockDim, void **KernelArgs,
+                                   uint64_t ShmemSize, DeviceStream_t Stream) {
     return static_cast<ImplT &>(*this).launchKernelDirect(
         KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
   }
@@ -228,9 +222,10 @@ protected:
   JitStorageCache<KernelFunction_t> StorageCache;
   std::string DeviceArch;
   std::unordered_map<std::string, const void *> VarNameToDevPtr;
+
 private:
   // This map is private and only accessible via the API.
-  DenseMap<const void*, JITKernelInfo> JITKernelInfoMap;
+  DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
 };
 
 template <typename ImplT>
@@ -314,9 +309,10 @@ template <typename ImplT>
 typename DeviceTraits<ImplT>::DeviceError_t
 JitEngineDevice<ImplT>::compileAndRun(
     StringRef ModuleUniqueId, StringRef KernelName,
-    FatbinWrapper_t *FatbinWrapper, size_t FatbinSize, const SmallVector<int32_t>& RCIndices,
-    int32_t NumRuntimeConstants, dim3 GridDim, dim3 BlockDim, void **KernelArgs,
-    uint64_t ShmemSize, typename DeviceTraits<ImplT>::DeviceStream_t Stream) {
+    FatbinWrapper_t *FatbinWrapper, size_t FatbinSize,
+    const SmallVector<int32_t> &RCIndices, int32_t NumRuntimeConstants,
+    dim3 GridDim, dim3 BlockDim, void **KernelArgs, uint64_t ShmemSize,
+    typename DeviceTraits<ImplT>::DeviceStream_t Stream) {
   TIMESCOPE("compileAndRun");
 
   SmallVector<RuntimeConstant> RCsVec;
@@ -341,14 +337,13 @@ JitEngineDevice<ImplT>::compileAndRun(
   getRuntimeConstantsFromModule(*JitModule, KernelArgs, KernelName, RCIndices,
                                 RCsVec);
 
-  uint64_t HashValue =
-      CodeCache.hash(ModuleUniqueId, KernelName, RCsVec.data(), NumRuntimeConstants);
+  uint64_t HashValue = CodeCache.hash(ModuleUniqueId, KernelName, RCsVec.data(),
+                                      NumRuntimeConstants);
   typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc =
       CodeCache.lookup(HashValue);
   if (KernelFunc)
     return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                                 ShmemSize, Stream);
-
 
   // NOTE: we don't need a suffix to differentiate kernels, each specialization
   // will be in its own module uniquely identify by HashValue. It exists only
@@ -415,7 +410,8 @@ JitEngineDevice<ImplT>::compileAndRun(
   KernelFunc =
       getKernelFunctionFromImage(KernelMangled, ObjBuf->getBufferStart());
 
-  CodeCache.insert(HashValue, KernelFunc, KernelName, RCsVec.data(), NumRuntimeConstants);
+  CodeCache.insert(HashValue, KernelFunc, KernelName, RCsVec.data(),
+                   NumRuntimeConstants);
 
   return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                               ShmemSize, Stream);

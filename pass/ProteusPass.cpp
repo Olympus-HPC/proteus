@@ -72,20 +72,20 @@
                                  std::to_string(__LINE__) + " => " + x))
 
 #if ENABLE_HIP
-constexpr char const* RegisterFunctionName = "__hipRegisterFunction";
-constexpr char const* LaunchFunctionName   = "hipLaunchKernel";
-constexpr char const* FatbinName           = "__hip_fatbin_wrapper";
-constexpr char const* RegisterVarName      = "__hipRegisterVar";
+constexpr char const *RegisterFunctionName = "__hipRegisterFunction";
+constexpr char const *LaunchFunctionName = "hipLaunchKernel";
+constexpr char const *FatbinName = "__hip_fatbin_wrapper";
+constexpr char const *RegisterVarName = "__hipRegisterVar";
 #elif ENABLE_CUDA
-constexpr char const* RegisterFunctionName = "__cudaRegisterFunction";
-constexpr char const* LaunchFunctionName   = "cudaLaunchKernel";
-constexpr char const* FatbinName           = "__cuda_fatbin_wrapper";
-constexpr char const* RegisterVarName      = "__cudaRegisterVar";
+constexpr char const *RegisterFunctionName = "__cudaRegisterFunction";
+constexpr char const *LaunchFunctionName = "cudaLaunchKernel";
+constexpr char const *FatbinName = "__cuda_fatbin_wrapper";
+constexpr char const *RegisterVarName = "__cudaRegisterVar";
 #else
-constexpr char const* RegisterFunctionName = nullptr;
-constexpr char const* LaunchFunctionName   = nullptr;
-constexpr char const* FatbinName           = nullptr;
-constexpr char const* RegisterVarName      = nullptr;
+constexpr char const *RegisterFunctionName = nullptr;
+constexpr char const *LaunchFunctionName = nullptr;
+constexpr char const *FatbinName = nullptr;
+constexpr char const *RegisterVarName = nullptr;
 #endif
 
 using namespace llvm;
@@ -141,9 +141,9 @@ struct ProteusJitPassImpl {
         ModuleDeviceKernels = getDeviceKernels(M);
         if (!isDeviceKernel(Fn))
           FATAL_ERROR(std::string{} + __FILE__ + ":" +
-                             std::to_string(__LINE__) +
-                             " => Expected the annotated Fn " + Fn->getName() +
-                             " to be a kernel function!");
+                      std::to_string(__LINE__) +
+                      " => Expected the annotated Fn " + Fn->getName() +
+                      " to be a kernel function!");
       }
 
       if (JitFunctionInfoMap.contains(Fn))
@@ -541,7 +541,8 @@ struct ProteusJitPassImpl {
     // Create the runtime constants data structure passed to the jit entry.
     Value *RuntimeConstantsIndicesAlloca = nullptr;
     if (JFI.ConstantArgs.size() > 0) {
-      RuntimeConstantsIndicesAlloca = Builder.CreateAlloca(RuntimeConstantArrayTy);
+      RuntimeConstantsIndicesAlloca =
+          Builder.CreateAlloca(RuntimeConstantArrayTy);
       // Zero-initialize the alloca to avoid stack garbage for caching.
       Builder.CreateStore(Constant::getNullValue(RuntimeConstantArrayTy),
                           RuntimeConstantsIndicesAlloca);
@@ -562,7 +563,8 @@ struct ProteusJitPassImpl {
     auto *JitFnPtr = Builder.CreateCall(
         JitEntryFn,
         {FnNameGlobal, StrIRGlobal, Builder.getInt32(JFI.ModuleIR.size()),
-         RuntimeConstantsIndicesAlloca, Builder.getInt32(JFI.ConstantArgs.size())});
+         RuntimeConstantsIndicesAlloca,
+         Builder.getInt32(JFI.ConstantArgs.size())});
     SmallVector<Value *, 8> Args;
     for (auto &Arg : StubFn->args())
       Args.push_back(&Arg);
@@ -596,7 +598,8 @@ struct ProteusJitPassImpl {
   void getKernelHostStubs(Module &M) {
     Function *RegisterFunction = nullptr;
     if (!RegisterFunctionName) {
-      FATAL_ERROR("getKernelHostStubs only callable with `EnableHIP or EnableCUDA set.");
+      FATAL_ERROR("getKernelHostStubs only callable with `EnableHIP or "
+                  "EnableCUDA set.");
       return;
     }
     RegisterFunction = M.getFunction(RegisterFunctionName);
@@ -670,9 +673,7 @@ struct ProteusJitPassImpl {
     return true;
   }
 
-  void
-  replaceWithJitLaunchKernel(Module &M,
-                             CallBase *LaunchKernelCall) {
+  void replaceWithJitLaunchKernel(Module &M, CallBase *LaunchKernelCall) {
     // Create jit entry runtime function.
     Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
     Type *Int64Ty = Type::getInt64Ty(M.getContext());
@@ -686,8 +687,8 @@ struct ProteusJitPassImpl {
     assert(ModuleUniqueId && "Expected ModuleUniqueId global to be defined");
 
     if (!FatbinName)
-      FATAL_ERROR(
-           "replaceWithJitLaunchKernel not callable without EnableHIP or EnableCUDA set.");
+      FATAL_ERROR("replaceWithJitLaunchKernel not callable without EnableHIP "
+                  "or EnableCUDA set.");
 
     GlobalVariable *FatbinWrapper = nullptr;
     FatbinWrapper = M.getGlobalVariable(FatbinName, true);
@@ -698,26 +699,26 @@ struct ProteusJitPassImpl {
 
     FunctionType *JitEntryFnTy = nullptr;
 #if ENABLE_HIP
-    JitEntryFnTy = FunctionType::get(
-        Int32Ty,
-        {ModuleUniqueId->getType(), VoidPtrTy, FatbinWrapper->getType(),
-         Int64Ty, Int64Ty, Int32Ty,
-         Int64Ty, Int32Ty, VoidPtrTy, Int64Ty, VoidPtrTy},
-        /* isVarArg=*/false);
+    JitEntryFnTy =
+        FunctionType::get(Int32Ty,
+                          {ModuleUniqueId->getType(), VoidPtrTy,
+                           FatbinWrapper->getType(), Int64Ty, Int64Ty, Int32Ty,
+                           Int64Ty, Int32Ty, VoidPtrTy, Int64Ty, VoidPtrTy},
+                          /* isVarArg=*/false);
 #elif ENABLE_CUDA
     // NOTE: CUDA uses an array type for passing grid, block sizes.
-    JitEntryFnTy = FunctionType::get(
-        Int32Ty,
-        {ModuleUniqueId->getType(),
-         VoidPtrTy, // Kernel address
-         FatbinWrapper->getType(),
-         Int64Ty, // Fatbin size
-         ArrayType::get(Int64Ty, 2), // Grid dim array
-         ArrayType::get(Int64Ty, 2), // Block dim array
-         VoidPtrTy, // Kernel args
-         Int64Ty,  // Shared mem size
-         VoidPtrTy},
-        /* isVarArg=*/false);
+    JitEntryFnTy =
+        FunctionType::get(Int32Ty,
+                          {ModuleUniqueId->getType(),
+                           VoidPtrTy, // Kernel address
+                           FatbinWrapper->getType(),
+                           Int64Ty,                    // Fatbin size
+                           ArrayType::get(Int64Ty, 2), // Grid dim array
+                           ArrayType::get(Int64Ty, 2), // Block dim array
+                           VoidPtrTy,                  // Kernel args
+                           Int64Ty,                    // Shared mem size
+                           VoidPtrTy},
+                          /* isVarArg=*/false);
 #endif
 
     if (!JitEntryFnTy)
@@ -757,17 +758,16 @@ struct ProteusJitPassImpl {
     size_t FatbinSize = ArrayTy->getNumElements();
 
     Call = Builder.CreateCall(
-        JitEntryFn,
-        {ModuleUniqueId,
-         LaunchKernelCall->getArgOperand(0), // Kernel address
-         FatbinWrapper,
-         Builder.getInt64(FatbinSize),
-         LaunchKernelCall->getArgOperand(1), // Grid dim
-         LaunchKernelCall->getArgOperand(2), // Block dim
-         LaunchKernelCall->getArgOperand(3), // Kernel args
-         LaunchKernelCall->getArgOperand(4), // Shmem size
-         LaunchKernelCall->getArgOperand(5) // Stream
-        });
+        JitEntryFn, {
+                        ModuleUniqueId,
+                        LaunchKernelCall->getArgOperand(0), // Kernel address
+                        FatbinWrapper, Builder.getInt64(FatbinSize),
+                        LaunchKernelCall->getArgOperand(1), // Grid dim
+                        LaunchKernelCall->getArgOperand(2), // Block dim
+                        LaunchKernelCall->getArgOperand(3), // Kernel args
+                        LaunchKernelCall->getArgOperand(4), // Shmem size
+                        LaunchKernelCall->getArgOperand(5)  // Stream
+                    });
 #endif
 
     if (!Call)
@@ -817,7 +817,8 @@ struct ProteusJitPassImpl {
   void instrumentRegisterVar(Module &M) {
     Function *RegisterVarFn = nullptr;
     if (!RegisterVarName) {
-      FATAL_ERROR("instrumentRegisterVar is not callable without EnableCUDA or EnableHIP set.");
+      FATAL_ERROR("instrumentRegisterVar is not callable without EnableCUDA or "
+                  "EnableHIP set.");
     }
     RegisterVarFn = M.getFunction(RegisterVarName);
     if (!RegisterVarFn)
@@ -847,46 +848,54 @@ struct ProteusJitPassImpl {
       }
   }
 
-  /// instrumentRegisterJITFunc instruments any function passed to a kernel launch in the IR
-  /// with a `__jit_register_function` call.
+  /// instrumentRegisterJITFunc instruments any function passed to a kernel
+  /// launch in the IR with a `__jit_register_function` call.
   void instrumentRegisterJITFunc(Module &M) {
     if (!RegisterFunctionName) {
-      FATAL_ERROR("instrumentRegisterJITFunc only callable with `EnableHIP or EnableCUDA set.");
+      FATAL_ERROR("instrumentRegisterJITFunc only callable with `EnableHIP or "
+                  "EnableCUDA set.");
       return;
     }
-    Function* RegisterFunction = M.getFunction(RegisterFunctionName);
-    assert(RegisterFunction && "Expected register function to be called at least once.");
+    Function *RegisterFunction = M.getFunction(RegisterFunctionName);
+    assert(RegisterFunction &&
+           "Expected register function to be called at least once.");
 
-    for (User* RegisterFunctionUser : RegisterFunction->users()) {
+    for (User *RegisterFunctionUser : RegisterFunction->users()) {
       CallBase *RegisterCB = dyn_cast<CallBase>(RegisterFunctionUser);
       if (!RegisterCB)
         continue;
 
-      Function* FunctionToRegister = dyn_cast<Function>(getStubGV(RegisterCB->getArgOperand(1)));
-      assert(FunctionToRegister && "Expected function passed to register function call");
+      Function *FunctionToRegister =
+          dyn_cast<Function>(getStubGV(RegisterCB->getArgOperand(1)));
+      assert(FunctionToRegister &&
+             "Expected function passed to register function call");
       if (!JitFunctionInfoMap.contains(FunctionToRegister)) {
-        DEBUG(dbgs() << "Not instrumenting device kernel " << *FunctionToRegister << "\n");
+        DEBUG(dbgs() << "Not instrumenting device kernel "
+                     << *FunctionToRegister << "\n");
         continue;
       }
 
-      DEBUG(dbgs() << "Instrumenting JIT function " << *FunctionToRegister << "\n");
-      const auto& JFI = JitFunctionInfoMap[FunctionToRegister];
+      DEBUG(dbgs() << "Instrumenting JIT function " << *FunctionToRegister
+                   << "\n");
+      const auto &JFI = JitFunctionInfoMap[FunctionToRegister];
       size_t NumRuntimeConstants = JFI.ConstantArgs.size();
       // Create jit entry runtime function.
-      Type* VoidPtrType = Type::getInt8PtrTy(M.getContext());
-      Type* VoidType =  Type::getVoidTy(M.getContext());
-      Type* Int32PtrType = Type::getInt32PtrTy(M.getContext());
-      Type* Int32Type = Type::getInt32Ty(M.getContext());
+      Type *VoidPtrType = Type::getInt8PtrTy(M.getContext());
+      Type *VoidType = Type::getVoidTy(M.getContext());
+      Type *Int32PtrType = Type::getInt32PtrTy(M.getContext());
+      Type *Int32Type = Type::getInt32Ty(M.getContext());
 
       ArrayType *RuntimeConstantIdxArrayTy =
           ArrayType::get(Int32Type, NumRuntimeConstants);
 
       IRBuilder<> Builder(RegisterCB->getNextNode());
-      // Create an array representing the indices of the args which are runtime constants.
+      // Create an array representing the indices of the args which are runtime
+      // constants.
       Value *RuntimeConstantsIndicesAlloca = nullptr;
-      RuntimeConstantsIndicesAlloca = Builder.CreateAlloca(RuntimeConstantIdxArrayTy);
+      RuntimeConstantsIndicesAlloca =
+          Builder.CreateAlloca(RuntimeConstantIdxArrayTy);
       assert(RuntimeConstantsIndicesAlloca &&
-          "Expected non-null runtime constants alloca");
+             "Expected non-null runtime constants alloca");
       // Zero-initialize the alloca to avoid stack garbage for caching.
       Builder.CreateStore(Constant::getNullValue(RuntimeConstantIdxArrayTy),
                           RuntimeConstantsIndicesAlloca);
@@ -896,31 +905,29 @@ struct ProteusJitPassImpl {
             RuntimeConstantIdxArrayTy, RuntimeConstantsIndicesAlloca,
             {Builder.getInt32(0), Builder.getInt32(ArgI)});
         int ArgNo = JFI.ConstantArgs[ArgI];
-        Value* Idx = ConstantInt::get(Builder.getInt32Ty(), ArgNo);
+        Value *Idx = ConstantInt::get(Builder.getInt32Ty(), ArgNo);
         Builder.CreateStore(Idx, GEP);
       }
-      Value* NumRCsValue = ConstantInt::get(Builder.getInt32Ty(), NumRuntimeConstants);
+      Value *NumRCsValue =
+          ConstantInt::get(Builder.getInt32Ty(), NumRuntimeConstants);
       // The prototype is
       // __jit_register_function(const void *HostAddr,
       //                         char const *FunctionName,
       //                         int32_t* RCIndices,
       //                         int32_t NumRCs)
-      FunctionType *JitRegisterFunctionFnTy = FunctionType::get(VoidType,
-                                                                {VoidPtrType,
-                                                                      VoidPtrType,
-                                                                      Int32PtrType,
-                                                                      Int32Type},
-                                                                      /* isVarArg=*/false);
-      FunctionCallee JitRegisterKernelFn =
-          M.getOrInsertFunction("__jit_register_function", JitRegisterFunctionFnTy);
+      FunctionType *JitRegisterFunctionFnTy = FunctionType::get(
+          VoidType, {VoidPtrType, VoidPtrType, Int32PtrType, Int32Type},
+          /* isVarArg=*/false);
+      FunctionCallee JitRegisterKernelFn = M.getOrInsertFunction(
+          "__jit_register_function", JitRegisterFunctionFnTy);
 
       constexpr int StubOperand = 1;
-      Value* Kernel = RegisterCB->getArgOperand(StubOperand);
-      Value* Stub = getStubGV(Kernel);
-      Builder.CreateCall(JitRegisterKernelFn, {RegisterCB->getArgOperand(1),
-                                                            StubToKernelMap[FunctionToRegister],
-                                                            RuntimeConstantsIndicesAlloca,
-                                                            NumRCsValue});
+      Value *Kernel = RegisterCB->getArgOperand(StubOperand);
+      Value *Stub = getStubGV(Kernel);
+      Builder.CreateCall(JitRegisterKernelFn,
+                         {RegisterCB->getArgOperand(1),
+                          StubToKernelMap[FunctionToRegister],
+                          RuntimeConstantsIndicesAlloca, NumRCsValue});
     }
   }
 

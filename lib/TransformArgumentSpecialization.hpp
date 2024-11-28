@@ -61,7 +61,8 @@ public:
                  ArgType->isFP128Ty()) {
         C = ConstantFP::get(ArgType, RC[I].Value.LongDoubleVal);
       } else if (ArgType->isPointerTy()) {
-        auto *IntC = ConstantInt::get(Type::getInt64Ty(Ctx), RC[I].Value.Int64Val);
+        auto *IntC =
+            ConstantInt::get(Type::getInt64Ty(Ctx), RC[I].Value.Int64Val);
         C = ConstantExpr::getIntToPtr(IntC, ArgType);
       } else {
         std::string TypeString;

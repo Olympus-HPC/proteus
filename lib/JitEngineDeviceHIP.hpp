@@ -47,9 +47,9 @@ public:
                                   dim3 BlockDim, void **KernelArgs,
                                   uint64_t ShmemSize, hipStream_t Stream);
 
-  hipError_t launchKernelDirect(void* KernelFunc, dim3 GridDim,
-                                 dim3 BlockDim, void **KernelArgs,
-                                 uint64_t ShmemSize, hipStream_t Stream);
+  hipError_t launchKernelDirect(void *KernelFunc, dim3 GridDim, dim3 BlockDim,
+                                void **KernelArgs, uint64_t ShmemSize,
+                                hipStream_t Stream);
 
 private:
   JitEngineDeviceHIP();

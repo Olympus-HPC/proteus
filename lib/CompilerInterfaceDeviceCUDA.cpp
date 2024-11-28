@@ -13,11 +13,12 @@
 
 using namespace proteus;
 
-extern "C" __attribute__((used)) cudaError_t __jit_launch_kernel(
-    const char *ModuleUniqueId, void *Kernel, void *FatbinWrapper,
-    size_t FatbinSize, dim3 GridDim, dim3 BlockDim, void **KernelArgs,
-    uint64_t ShmemSize, void *Stream) {
-  return __jit_launch_kernel_internal(
-      ModuleUniqueId, Kernel, FatbinWrapper, FatbinSize,
-      GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
+extern "C" __attribute__((used)) cudaError_t
+__jit_launch_kernel(const char *ModuleUniqueId, void *Kernel,
+                    void *FatbinWrapper, size_t FatbinSize, dim3 GridDim,
+                    dim3 BlockDim, void **KernelArgs, uint64_t ShmemSize,
+                    void *Stream) {
+  return __jit_launch_kernel_internal(ModuleUniqueId, Kernel, FatbinWrapper,
+                                      FatbinSize, GridDim, BlockDim, KernelArgs,
+                                      ShmemSize, Stream);
 }

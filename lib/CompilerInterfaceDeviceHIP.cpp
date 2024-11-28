@@ -24,7 +24,7 @@ __jit_launch_kernel(const char *ModuleUniqueId, void *Kernel,
   dim3 BlockDim = {*(uint32_t *)&BlockDim_XY, *(((uint32_t *)&BlockDim_XY) + 1),
                    BlockDimZ};
 
-  return __jit_launch_kernel_internal(
-      ModuleUniqueId, Kernel, FatbinWrapper, FatbinSize,
-      GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
+  return __jit_launch_kernel_internal(ModuleUniqueId, Kernel, FatbinWrapper,
+                                      FatbinSize, GridDim, BlockDim, KernelArgs,
+                                      ShmemSize, Stream);
 }

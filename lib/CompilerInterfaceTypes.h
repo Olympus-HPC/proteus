@@ -11,8 +11,8 @@
 #ifndef PROTEUS_COMPILERINTERFACETYPES_H
 #define PROTEUS_COMPILERINTERFACETYPES_H
 
-#include <stdint.h>
 #include <cstring>
+#include <stdint.h>
 
 struct RuntimeConstant {
   RuntimeConstant() { std::memset(&Value, 0, sizeof(RuntimeConstantType)); }
