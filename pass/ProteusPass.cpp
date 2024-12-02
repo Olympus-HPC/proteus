@@ -48,12 +48,15 @@
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalValue.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/ErrorHandling.h>
+#include <llvm/Support/FileSystem.h>
+#include <llvm/Support/FileSystem/UniqueID.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/MemoryBufferRef.h>
 
@@ -74,18 +77,18 @@
 #if ENABLE_HIP
 constexpr char const *RegisterFunctionName = "__hipRegisterFunction";
 constexpr char const *LaunchFunctionName = "hipLaunchKernel";
-constexpr char const *FatbinName = "__hip_fatbin_wrapper";
 constexpr char const *RegisterVarName = "__hipRegisterVar";
+constexpr char const *RegisterFatBinaryName = "__hipRegisterFatBinary";
 #elif ENABLE_CUDA
 constexpr char const *RegisterFunctionName = "__cudaRegisterFunction";
 constexpr char const *LaunchFunctionName = "cudaLaunchKernel";
-constexpr char const *FatbinName = "__cuda_fatbin_wrapper";
 constexpr char const *RegisterVarName = "__cudaRegisterVar";
+constexpr char const *RegisterFatBinaryName = "__cudaRegisterFatBinary";
 #else
 constexpr char const *RegisterFunctionName = nullptr;
 constexpr char const *LaunchFunctionName = nullptr;
-constexpr char const *FatbinName = nullptr;
 constexpr char const *RegisterVarName = nullptr;
+constexpr char const *RegisterFatBinaryName = nullptr;
 #endif
 
 using namespace llvm;
@@ -110,9 +113,6 @@ public:
   bool run(Module &M) {
     parseAnnotations(M);
 
-    if (JitFunctionInfoMap.empty())
-      return false;
-
     DEBUG(dbgs() << "=== Pre Original Host Module\n"
                  << M << "=== End of Pre Original Host Module\n");
 
@@ -120,11 +120,10 @@ public:
     // Device compilation
     // ==================
 
-    // For device compilation, just extract the module IR for annotated device
-    // kernels and return.
+    // For device compilation, just extract the module IR of device code and
+    // return.
     if (isDeviceCompilation(M)) {
-      for (auto &JFI : JitFunctionInfoMap)
-        emitJitModuleDevice(M, JFI);
+      emitJitModuleDevice(M);
 
       return true;
     }
@@ -133,26 +132,31 @@ public:
     // Host compilation
     // ================
 
+    instrumentRegisterLinkedBinary(M);
+    instrumentRegisterFatBinary(M);
+    instrumentRegisterFatBinaryEnd(M);
+    instrumentRegisterVar(M);
+
     if (hasDeviceLaunchKernelCalls(M)) {
       getKernelHostStubs(M);
-      instrumentRegisterVar(M);
       emitModuleUniqueIdGlobal(M);
-      instrumentRegisterJITFunc(M);
+      instrumentRegisterFunction(M);
+      emitJitLaunchKernelCall(M);
     }
 
     for (auto &JFI : JitFunctionInfoMap) {
       Function *JITFn = JFI.first;
       DEBUG(dbgs() << "Processing JIT Function " << JITFn->getName() << "\n");
-      if (isDeviceKernelHostStub(M, *JITFn)) {
-        emitJitLaunchKernelCall(M, JFI);
-        DEBUG(dbgs() << "DONE!\n");
-
+      // Skip host device stubs coming from kernel annotations.
+      if (isDeviceKernelHostStub(M, *JITFn))
         continue;
-      }
 
       emitJitModuleHost(M, JFI);
       emitJitEntryCall(M, JFI);
     }
+
+    DEBUG(dbgs() << "=== Post Original Host Module\n"
+                 << M << "=== End Post Original Host Module\n");
 
     DEBUG(dbgs() << "=== Post Original Host Module\n"
                  << M << "=== End Post Original Host Module\n");
@@ -194,6 +198,19 @@ private:
       return true;
 
     return false;
+  }
+
+  std::string getJitBitcodeUniqueName(Module &M) {
+    llvm::sys::fs::UniqueID ID;
+    if (auto EC = llvm::sys::fs::getUniqueID(M.getSourceFileName(), ID))
+      FATAL_ERROR("Cound not get unique id");
+
+    SmallString<64> Out;
+    llvm::raw_svector_ostream OutStr(Out);
+    OutStr << "_jit_bitcode" << llvm::format("_%x", ID.getDevice())
+           << llvm::format("_%x", ID.getFile());
+
+    return std::string(Out);
   }
 
   void parseAnnotations(Module &M) {
@@ -397,148 +414,24 @@ private:
                  << *JitMod << "=== End of Final Host JIT Module\n");
   }
 
-  void emitJitModuleDevice(Module &M,
-                           std::pair<Function *, JitFunctionInfo> &JITInfo) {
-    ValueToValueMapTy VMap;
-    Function *JITFn = JITInfo.first;
-    JitFunctionInfo &JFI = JITInfo.second;
+  void emitJitModuleDevice(Module &M) {
+    std::string BitcodeStr;
+    raw_string_ostream OS(BitcodeStr);
+    WriteBitcodeToFile(M, OS);
 
-    auto JitMod = CloneModule(M, VMap, [&](const GlobalValue *GV) {
-      // Do not clone JIT bitcodes of other kernels, assumes the existing
-      // special naming for globals storing the bitcodes.
-      if (GV->getName().starts_with("__jit_bc"))
-        return false;
-
-      if (const Function *F = dyn_cast<Function>(GV)) {
-        if (F == JITFn)
-          return true;
-        // Do not clone other host-callable kernels.
-        // TODO: Is this necessary when using hiprtc? In any case it reduces
-        // the JITted code which should reduce compilation time.
-        if (isDeviceKernel(F))
-          return false;
-      }
-
-      return true;
-    });
-
-    // Remove llvm.global.annotations and .jit section globals from the module
-    // and used lists.
-    SmallPtrSet<GlobalVariable *, 8> JitGlobalsToRemove;
-    auto JitGlobalAnnotations =
-        JitMod->getNamedGlobal("llvm.global.annotations");
-    assert(JitGlobalAnnotations &&
-           "Expected llvm.global.annotations in jit module");
-    JitGlobalsToRemove.insert(JitGlobalAnnotations);
-
-    // Clang emits this global variable in RDC compilation. We need to remove it
-    // to avoid dangling references to unused kernels that are removed.
-    auto *JitClangGPUUsedExternals =
-        JitMod->getNamedGlobal("__clang_gpu_used_external");
-    if (JitClangGPUUsedExternals)
-      JitGlobalsToRemove.insert(JitClangGPUUsedExternals);
-
-    for (auto &GV : JitMod->globals()) {
-      if (GV.getName().starts_with("__jit_bc"))
-        JitGlobalsToRemove.insert(&GV);
-    }
-
-    removeFromUsedLists(*JitMod, [&JitGlobalsToRemove](Constant *C) {
-      if (auto *GV = dyn_cast<GlobalVariable>(C)) {
-        if (JitGlobalsToRemove.contains(GV))
-          return true;
-      }
-
-      return false;
-    });
-
-    for (auto *GV : JitGlobalsToRemove)
-      GV->eraseFromParent();
-
-    ModuleDeviceKernels = getDeviceKernels(*JitMod);
-    SmallPtrSet<Function *, 8> JitUnusedKernelsToRemove;
-    for (auto &JitModF : *JitMod) {
-      // Remove unused kernels that have been demoted to declarations during
-      // cloning.
-      if (JitModF.isDeclaration())
-        if (isDeviceKernel(&JitModF))
-          JitUnusedKernelsToRemove.insert(&JitModF);
-    }
-
-    for (auto *F : JitUnusedKernelsToRemove)
-      F->eraseFromParent();
-
-    Function *JitF = cast<Function>(VMap[JITFn]);
-
-    // Internalize functions, besides JIT function, in the module
-    // to help global DCE (reduce compilation time), inlining.
-    for (Function &JitModF : *JitMod) {
-      if (JitModF.isDeclaration())
-        continue;
-
-      if (&JitModF == JitF)
-        continue;
-
-      // Internalize other functions in the module.
-      JitModF.setLinkage(GlobalValue::InternalLinkage);
-    }
-
-    DEBUG(dbgs() << "=== Pre Passes Device JIT Module\n"
-                 << *JitMod << "=== End of Pre Passes Device JIT Module\n");
-
-    // Run a global DCE pass on the JIT module IR to remove
-    // unnecessary symbols and reduce the IR to JIT at runtime.
-    runCleanupPassPipeline(*JitMod);
-
-#if ENABLE_DEBUG
-    {
-      // NOTE: We must have a single kernel per JIT module, otherwise CUDA/HIP
-      // RTC interfaces fail with linking errors.
-      auto JITKernels = getDeviceKernels(*JitMod);
-      if (JITKernels.size() != 1)
-        FATAL_ERROR("Expected a single kernel in JIT module");
-    }
-
-#endif
-    // TODO: Decide whether to run optimization on the extracted module.
-    // runOptimizationPassPipeline(*JitMod);
-
-    DEBUG(dbgs() << "=== Post Passes Device JIT Module\n"
-                 << *JitMod << "=== End of Post Passes Device JIT Module\n");
-
-    // TODO: Do we want to keep debug info to use for GDB/LLDB
-    // interfaces for debugging jitted code?
-    StripDebugInfo(*JitMod);
-
-    // Add metadata for the JIT function to store the argument positions for
-    // runtime constants.
-    emitJitFunctionArgMetadata(*JitMod, JFI, *JitF);
-
-    if (verifyModule(*JitMod, &errs()))
-      FATAL_ERROR("Broken JIT module found, compilation aborted!");
-
-    raw_string_ostream OS(JFI.ModuleIR);
-    WriteBitcodeToFile(*JitMod, OS);
-    OS.flush();
-
-    // NOTE: HIP compilation supports custom section in the binary to store the
-    // IR. CUDA does not, hence we parse the IR by reading the global from the
-    // device memory.
+    std::string GVName = getJitBitcodeUniqueName(M);
+    //  NOTE: HIP compilation supports custom section in the binary to store the
+    //  IR. CUDA does not, hence we parse the IR by reading the global from the
+    //  device memory.
     Constant *JitModule = ConstantDataArray::get(
-        M.getContext(), ArrayRef<uint8_t>((const uint8_t *)JFI.ModuleIR.data(),
-                                          JFI.ModuleIR.size()));
-    auto *GV = new GlobalVariable(
-        M, JitModule->getType(), /* isConstant */ true,
-        GlobalValue::PrivateLinkage, JitModule, "__jit_bc_" + JITFn->getName());
+        M.getContext(), ArrayRef<uint8_t>((const uint8_t *)BitcodeStr.data(),
+                                          BitcodeStr.size()));
+    auto *GV =
+        new GlobalVariable(M, JitModule->getType(), /* isConstant */ true,
+                           GlobalValue::ExternalLinkage, JitModule, GVName);
     appendToUsed(M, {GV});
-#if ENABLE_HIP
-    GV->setSection(Twine(".jit." + JITFn->getName()).str());
-#endif
-
-    DEBUG(dbgs() << "=== Post Device Original Module\n"
-                 << M << "=== End Post Device Original Module M\n");
-
-    return;
+    GV->setSection(Twine(".jit.bitcode" + getUniqueModuleId(&M)).str());
+    DEBUG(dbgs() << "Emit jit bitcode GV " << GVName << "\n");
   }
 
   void emitJitFunctionArgMetadata(Module &JitMod, JitFunctionInfo &JFI,
@@ -566,18 +459,24 @@ private:
     return GV;
   }
 
-  void emitJitEntryCall(Module &M,
-                        std::pair<Function *, JitFunctionInfo> &JITInfo) {
-
-    Function *JITFn = JITInfo.first;
-    JitFunctionInfo &JFI = JITInfo.second;
-
+  FunctionCallee getJitEntryFn(Module &M) {
     FunctionType *JitEntryFnTy = FunctionType::get(
         PtrTy,
         {PtrTy, PtrTy, Int32Ty, RuntimeConstantTy->getPointerTo(), Int32Ty},
         /* isVarArg=*/false);
     FunctionCallee JitEntryFn =
         M.getOrInsertFunction("__jit_entry", JitEntryFnTy);
+
+    return JitEntryFn;
+  }
+
+  void emitJitEntryCall(Module &M,
+                        std::pair<Function *, JitFunctionInfo> &JITInfo) {
+
+    Function *JITFn = JITInfo.first;
+    JitFunctionInfo &JFI = JITInfo.second;
+
+    FunctionCallee JitEntryFn = getJitEntryFn(M);
 
     // Replaces jit'ed functions in the original module with stubs to call the
     // runtime entry point that compiles and links.
@@ -738,37 +637,20 @@ private:
     return true;
   }
 
-  void replaceWithJitLaunchKernel(Module &M, CallBase *LaunchKernelCall) {
-    GlobalVariable *ModuleUniqueId =
-        M.getGlobalVariable("__module_unique_id", true);
-    assert(ModuleUniqueId && "Expected ModuleUniqueId global to be defined");
-
-    if (!FatbinName)
-      FATAL_ERROR("replaceWithJitLaunchKernel not callable without EnableHIP "
-                  "or EnableCUDA set.");
-
-    GlobalVariable *FatbinWrapper = nullptr;
-    FatbinWrapper = M.getGlobalVariable(FatbinName, true);
-    if (!FatbinWrapper)
-      FATAL_ERROR(
-          "Expected hip fatbinary wrapper global, check "
-          "ENABLE_CUDA|ENABLE_HIP compilation flags for ProteusJitPass");
-
-    FunctionType *JitEntryFnTy = nullptr;
+  FunctionCallee getJitLaunchKernelFn(Module &M) {
+    FunctionType *JitLaunchKernelFnTy = nullptr;
 #if ENABLE_HIP
-    JitEntryFnTy = FunctionType::get(
-        Int32Ty,
-        {ModuleUniqueId->getType(), PtrTy, FatbinWrapper->getType(), Int64Ty,
-         Int64Ty, Int32Ty, Int64Ty, Int32Ty, PtrTy, Int64Ty, PtrTy},
-        /* isVarArg=*/false);
+    JitLaunchKernelFnTy =
+        FunctionType::get(Int32Ty,
+                          {PtrTy, PtrTy, Int64Ty, Int32Ty, Int64Ty, Int32Ty,
+                           PtrTy, Int64Ty, PtrTy},
+                          /* isVarArg=*/false);
 #elif ENABLE_CUDA
     // NOTE: CUDA uses an array type for passing grid, block sizes.
-    JitEntryFnTy =
+    JitLaunchKernelFnTy =
         FunctionType::get(Int32Ty,
-                          {ModuleUniqueId->getType(),
-                           PtrTy, // Kernel address
-                           FatbinWrapper->getType(),
-                           Int64Ty,                    // Fatbin size
+                          {PtrTy,                      // Module unique id
+                           PtrTy,                      // Kernel address
                            ArrayType::get(Int64Ty, 2), // Grid dim array
                            ArrayType::get(Int64Ty, 2), // Block dim array
                            PtrTy,                      // Kernel args
@@ -777,53 +659,47 @@ private:
                           /* isVarArg=*/false);
 #endif
 
-    if (!JitEntryFnTy)
+    if (!JitLaunchKernelFnTy)
       FATAL_ERROR(
           "Expected non-null jit entry function type, check "
           "ENABLE_CUDA|ENABLE_HIP compilation flags for ProteusJitPass");
 
-    FunctionCallee JitEntryFn =
-        M.getOrInsertFunction("__jit_launch_kernel", JitEntryFnTy);
+    FunctionCallee JitLaunchKernelFn =
+        M.getOrInsertFunction("__jit_launch_kernel", JitLaunchKernelFnTy);
+
+    return JitLaunchKernelFn;
+  }
+
+  void replaceWithJitLaunchKernel(Module &M, CallBase *LaunchKernelCall) {
+    GlobalVariable *ModuleUniqueId =
+        M.getGlobalVariable("__module_unique_id", true);
+    assert(ModuleUniqueId && "Expected ModuleUniqueId global to be defined");
+
+    FunctionCallee JitLaunchKernelFn = getJitLaunchKernelFn(M);
 
     // Insert before the launch kernel call instruction.
     IRBuilder<> Builder(LaunchKernelCall);
     CallInst *Call = nullptr;
 #ifdef ENABLE_HIP
     Call = Builder.CreateCall(
-        JitEntryFn,
-        {ModuleUniqueId, LaunchKernelCall->getArgOperand(0), FatbinWrapper,
-         /* FatbinSize unused by HIP */ Builder.getInt64(0),
+        JitLaunchKernelFn,
+        {ModuleUniqueId, LaunchKernelCall->getArgOperand(0),
          LaunchKernelCall->getArgOperand(1), LaunchKernelCall->getArgOperand(2),
          LaunchKernelCall->getArgOperand(3), LaunchKernelCall->getArgOperand(4),
          LaunchKernelCall->getArgOperand(5), LaunchKernelCall->getArgOperand(6),
          LaunchKernelCall->getArgOperand(7)});
 #elif ENABLE_CUDA
-    ConstantStruct *C =
-        dyn_cast<ConstantStruct>(FatbinWrapper->getInitializer());
-    assert(C->getType()->getNumElements() &&
-           "Expected four fields in fatbin wrapper struct");
-    constexpr int FatbinField = 2;
-    auto *Fatbin = C->getAggregateElement(FatbinField);
-    GlobalVariable *FatbinGV = dyn_cast<GlobalVariable>(Fatbin);
-    assert(FatbinGV && "Expected global variable for the fatbin object");
-    ArrayType *ArrayTy =
-        dyn_cast<ArrayType>(FatbinGV->getInitializer()->getType());
-    assert(ArrayTy && "Expected array type of the fatbin object");
-    assert(ArrayTy->getElementType() == Type::getInt8Ty(M.getContext()) &&
-           "Expected byte type for array type of the fatbin object");
-    size_t FatbinSize = ArrayTy->getNumElements();
-
     Call = Builder.CreateCall(
-        JitEntryFn, {
-                        ModuleUniqueId,
-                        LaunchKernelCall->getArgOperand(0), // Kernel address
-                        FatbinWrapper, Builder.getInt64(FatbinSize),
-                        LaunchKernelCall->getArgOperand(1), // Grid dim
-                        LaunchKernelCall->getArgOperand(2), // Block dim
-                        LaunchKernelCall->getArgOperand(3), // Kernel args
-                        LaunchKernelCall->getArgOperand(4), // Shmem size
-                        LaunchKernelCall->getArgOperand(5)  // Stream
-                    });
+        JitLaunchKernelFn,
+        {
+            ModuleUniqueId,
+            LaunchKernelCall->getArgOperand(0), // Kernel address
+            LaunchKernelCall->getArgOperand(1), // Grid dim
+            LaunchKernelCall->getArgOperand(2), // Block dim
+            LaunchKernelCall->getArgOperand(3), // Kernel args
+            LaunchKernelCall->getArgOperand(4), // Shmem size
+            LaunchKernelCall->getArgOperand(5)  // Stream
+        });
 #endif
 
     if (!Call)
@@ -835,9 +711,7 @@ private:
     LaunchKernelCall->eraseFromParent();
   }
 
-  void
-  emitJitLaunchKernelCall(Module &M,
-                          std::pair<Function *, JitFunctionInfo> &JITInfo) {
+  void emitJitLaunchKernelCall(Module &M) {
     Function *LaunchKernelFn = nullptr;
     if (!LaunchFunctionName) {
       FATAL_ERROR(
@@ -868,6 +742,135 @@ private:
       replaceWithJitLaunchKernel(M, CB);
   }
 
+  FunctionCallee getJitRegisterFatBinaryFn(Module &M) {
+    FunctionType *JitRegisterFatbinaryFnTy =
+        FunctionType::get(VoidTy, {PtrTy, PtrTy, PtrTy},
+                          /* isVarArg=*/false);
+    FunctionCallee JitRegisterFatbinaryFn = M.getOrInsertFunction(
+        "__jit_register_fatbinary", JitRegisterFatbinaryFnTy);
+
+    return JitRegisterFatbinaryFn;
+  }
+
+  void instrumentRegisterFatBinary(Module &M) {
+    Function *F = nullptr;
+
+    if (!RegisterFatBinaryName)
+      return;
+
+    F = M.getFunction(RegisterFatBinaryName);
+    if (!F)
+      return;
+
+    FunctionCallee JitRegisterFatBinaryFn = getJitRegisterFatBinaryFn(M);
+
+    for (auto *User : F->users()) {
+      CallBase *CB = dyn_cast<CallBase>(User);
+      if (!CB)
+        continue;
+
+      IRBuilder<> Builder(CB->getNextNode());
+      Value *FatbinWrapper = CB->getArgOperand(0);
+
+      std::string GVName = getJitBitcodeUniqueName(M);
+      DEBUG(dbgs() << "Instrument register fatbinary bitcode GV " << GVName
+                   << "\n";);
+      auto *Arg = Builder.CreateGlobalString(GVName);
+
+      Builder.CreateCall(JitRegisterFatBinaryFn, {CB, FatbinWrapper, Arg});
+    }
+  }
+
+  FunctionCallee getJitRegisterFatBinaryEndFn(Module &M) {
+    FunctionType *JitRegisterFatBinaryEndFnTy =
+        FunctionType::get(VoidTy, {PtrTy},
+                          /* isVarArg=*/false);
+    FunctionCallee JitRegisterFatBinaryEndFn = M.getOrInsertFunction(
+        "__jit_register_fatbinary_end", JitRegisterFatBinaryEndFnTy);
+
+    return JitRegisterFatBinaryEndFn;
+  }
+
+  void instrumentRegisterFatBinaryEnd(Module &M) {
+// This is CUDA specific.
+#if !ENABLE_CUDA
+    return;
+#endif
+
+    Function *F = M.getFunction("__cudaRegisterFatBinaryEnd");
+    if (!F)
+      return;
+
+    FunctionCallee JitRegisterFatBinaryEndFn = getJitRegisterFatBinaryEndFn(M);
+
+    for (auto *User : F->users()) {
+      CallBase *CB = dyn_cast<CallBase>(User);
+      if (!CB)
+        continue;
+
+      IRBuilder<> Builder(CB->getNextNode());
+      Value *FatbinWrapper = CB->getArgOperand(0);
+      Builder.CreateCall(JitRegisterFatBinaryEndFn, {FatbinWrapper});
+    }
+  }
+
+  FunctionCallee getJitRegisterLinkedBinaryFn(Module &M) {
+    FunctionType *JitRegisterLinkedBinaryFnTy =
+        FunctionType::get(VoidTy, {PtrTy},
+                          /* isVarArg=*/false);
+    FunctionCallee JitRegisteLinkedBinaryrFn = M.getOrInsertFunction(
+        "__jit_register_linked_binary", JitRegisterLinkedBinaryFnTy);
+
+    return JitRegisteLinkedBinaryrFn;
+  }
+
+  void instrumentRegisterLinkedBinary(Module &M) {
+// This is CUDA specific.
+#if !ENABLE_CUDA
+    return;
+#endif
+
+    // Note: we check for __cuda_fatibn_wrapper to avoid emitting for the
+    // link.stub. It's not strictly necessary since this module will not have a
+    // device bitcode to pull and we skip at runtime.
+    if (!M.getGlobalVariable("__cuda_fatbin_wrapper", /*AllowInternal=*/true)) {
+      DEBUG(dbgs() << "Skip " << M.getSourceFileName() << "\n";)
+      return;
+    }
+
+    FunctionCallee JitRegisterLinkedBinaryFn = getJitRegisterLinkedBinaryFn(M);
+
+    for (auto &F : M.getFunctionList()) {
+      if (!F.getName().starts_with("__cudaRegisterLinkedBinary"))
+        continue;
+
+      for (auto *User : F.users()) {
+        CallBase *CB = dyn_cast<CallBase>(User);
+        if (!CB)
+          continue;
+
+        IRBuilder<> Builder(CB);
+        std::string GVName = getJitBitcodeUniqueName(M);
+        DEBUG(
+            dbgs() << "Instrument register linked binary to extract bitcode GV "
+                   << GVName << "\n");
+        auto *Arg = Builder.CreateGlobalString(GVName);
+        Builder.CreateCall(JitRegisterLinkedBinaryFn, {Arg});
+      }
+    }
+  }
+
+  FunctionCallee getJitRegisterVarFn(Module &M) {
+    // The prototype is
+    // __jit_register_var(const void *HostAddr, const char *VarName).
+    FunctionType *JitRegisterVarFnTy = FunctionType::get(PtrTy, {PtrTy, PtrTy},
+                                                         /* isVarArg=*/false);
+    FunctionCallee JitRegisterVarFn =
+        M.getOrInsertFunction("__jit_register_var", JitRegisterVarFnTy);
+
+    return JitRegisterVarFn;
+  }
+
   void instrumentRegisterVar(Module &M) {
     Function *RegisterVarFn = nullptr;
     if (!RegisterVarName) {
@@ -878,28 +881,37 @@ private:
     if (!RegisterVarFn)
       return;
 
-    // The prototype is __jit_register_var(const void *HostAddr, const char
-    // *VarName).
-    FunctionType *JitRegisterVarFnTy = FunctionType::get(PtrTy, {PtrTy, PtrTy},
-                                                         /* isVarArg=*/false);
-    FunctionCallee JitRegisterVarFn =
-        M.getOrInsertFunction("__jit_register_var", JitRegisterVarFnTy);
+    FunctionCallee JitRegisterVarFn = getJitRegisterVarFn(M);
 
     for (User *Usr : RegisterVarFn->users())
       if (CallBase *CB = dyn_cast<CallBase>(Usr)) {
         IRBuilder<> Builder(CB->getNextNode());
         Value *Symbol = CB->getArgOperand(1);
         auto *GV = dyn_cast<GlobalVariable>(Symbol);
-        // GV->setDSOLocal(false);
-        // GV->setVisibility(llvm::GlobalValue::DefaultVisibility);
         Value *SymbolName = CB->getArgOperand(2);
         Builder.CreateCall(JitRegisterVarFn, {GV, SymbolName});
       }
   }
 
-  /// instrumentRegisterJITFunc instruments any function passed to a kernel
-  /// launch in the IR with a `__jit_register_function` call.
-  void instrumentRegisterJITFunc(Module &M) {
+  FunctionCallee getJitRegisterFunctionFn(Module &M) {
+    // The prototype is
+    // __jit_register_function(void *Handle,
+    //                         void *Kernel,
+    //                         char const *KernelName,
+    //                         int32_t* RCIndices,
+    //                         int32_t NumRCs)
+    FunctionType *JitRegisterFunctionFnTy =
+        FunctionType::get(VoidTy, {PtrTy, PtrTy, PtrTy, PtrTy, Int32Ty},
+                          /* isVarArg=*/false);
+    FunctionCallee JitRegisterKernelFn = M.getOrInsertFunction(
+        "__jit_register_function", JitRegisterFunctionFnTy);
+
+    return JitRegisterKernelFn;
+  }
+
+  /// instrumentRegisterFunction instruments kernel functions following GPU
+  /// runtime registration with __jit_register_function.
+  void instrumentRegisterFunction(Module &M) {
     if (!RegisterFunctionName) {
       FATAL_ERROR("instrumentRegisterJITFunc only callable with `EnableHIP or "
                   "EnableCUDA set.");
@@ -955,21 +967,14 @@ private:
       }
       Value *NumRCsValue =
           ConstantInt::get(Builder.getInt32Ty(), NumRuntimeConstants);
-      // The prototype is
-      // __jit_register_function(const void *HostAddr,
-      //                         char const *FunctionName,
-      //                         int32_t* RCIndices,
-      //                         int32_t NumRCs)
-      FunctionType *JitRegisterFunctionFnTy =
-          FunctionType::get(VoidTy, {PtrTy, PtrTy, PtrTy, Int32Ty},
-                            /* isVarArg=*/false);
-      FunctionCallee JitRegisterKernelFn = M.getOrInsertFunction(
-          "__jit_register_function", JitRegisterFunctionFnTy);
+
+      FunctionCallee JitRegisterFunction = getJitRegisterFunctionFn(M);
 
       constexpr int StubOperand = 1;
-      Builder.CreateCall(JitRegisterKernelFn,
-                         {RegisterCB->getArgOperand(1),
-                          StubToKernelMap[FunctionToRegister],
+      Builder.CreateCall(JitRegisterFunction,
+                         {RegisterCB->getArgOperand(0),
+                          RegisterCB->getArgOperand(1),
+                          RegisterCB->getArgOperand(2),
                           RuntimeConstantsIndicesAlloca, NumRCsValue});
     }
   }

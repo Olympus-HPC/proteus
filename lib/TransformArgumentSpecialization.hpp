@@ -23,17 +23,16 @@ using namespace llvm;
 
 class TransformArgumentSpecialization {
 public:
-  static void transform(Module &M, Function &F, ArrayRef<RuntimeConstant> RC) {
+  static void transform(Module &M, Function &F,
+                        const SmallVectorImpl<int32_t> &ArgPos,
+                        ArrayRef<RuntimeConstant> RC) {
     auto &Ctx = M.getContext();
-    MDNode *Node = F.getMetadata("jit_arg_nos");
     DBG(dbgs() << "Metadata jit for F " << F.getName() << " = " << *Node
                << "\n");
 
     // Replace argument uses with runtime constants.
-    for (int I = 0; I < Node->getNumOperands(); ++I) {
-      ConstantAsMetadata *CAM = cast<ConstantAsMetadata>(Node->getOperand(I));
-      ConstantInt *ConstInt = cast<ConstantInt>(CAM->getValue());
-      int ArgNo = ConstInt->getZExtValue();
+    for (int I = 0; I < ArgPos.size(); ++I) {
+      int ArgNo = ArgPos[I];
       Value *Arg = F.getArg(ArgNo);
       Type *ArgType = Arg->getType();
       Constant *C = nullptr;
@@ -72,6 +71,8 @@ public:
                     TypeOstream.str());
       }
 
+      DBG(dbgs() << "[ArgSpecial] Replaced Function " << F.getName() + " ArgNo "
+                 << ArgNo << " with value " << *C << "\n");
       Arg->replaceAllUsesWith(C);
     }
   }

@@ -208,10 +208,8 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
     // Find GlobalValue declarations that are externally defined. Resolve them
     // statically as absolute symbols in the ORC linker. Required for resolving
     // __jit_launch_kernel for a host JIT function when libproteus is compiled
-    // as a static library. Required for resolving the __hip_fatbin symbol to
-    // the fatbinary in RDC compilation since this is linked late in static
-    // compilation. For other non-resolved symbols, return a fatal error to
-    // investigate.
+    // as a static library. For other non-resolved symbols, return a fatal error
+    // to investigate.
     for (auto &GV : M->global_values()) {
       if (!GV.isDeclaration())
         continue;
@@ -247,28 +245,26 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
       }
 #endif
 
-#if ENABLE_HIP
-      if (GV.getName() == "__hip_fatbin") {
-        DBG(dbgs() << "Resolving via ORC hip_fatbin at pointer "
-                   << &__hip_fatbin << "\n");
-        SymbolMap SymbolMap;
-        SymbolMap[LLJITPtr->mangleAndIntern("__hip_fatbin")] =
-            orc::ExecutorSymbolDef(
-                orc::ExecutorAddr{reinterpret_cast<uintptr_t>(&__hip_fatbin)},
-                JITSymbolFlags::Exported);
-        cantFail(
-            LLJITPtr->getMainJITDylib().define(absoluteSymbols(SymbolMap)));
-
-        continue;
-      }
-#endif
-
       FATAL_ERROR("Unknown global value" + GV.getName() + " to resolve");
     }
     // Replace argument uses with runtime constants.
     // TODO: change NumRuntimeConstants to size_t at interface.
+    MDNode *Node = F->getMetadata("jit_arg_nos");
+    assert(Node && "Expected metata for jit argument positions");
+    DBG(dbgs() << "Metadata jit for F " << F.getName() << " = " << *Node
+               << "\n");
+
+    // Replace argument uses with runtime constants.
+    SmallVector<int32_t> ArgPos;
+    for (int I = 0; I < Node->getNumOperands(); ++I) {
+      ConstantAsMetadata *CAM = cast<ConstantAsMetadata>(Node->getOperand(I));
+      ConstantInt *ConstInt = cast<ConstantInt>(CAM->getValue());
+      int ArgNo = ConstInt->getZExtValue();
+      ArgPos.push_back(ArgNo);
+    }
+
     TransformArgumentSpecialization::transform(
-        *M, *F,
+        *M, *F, ArgPos,
         ArrayRef<RuntimeConstant>{RC,
                                   static_cast<size_t>(NumRuntimeConstants)});
 

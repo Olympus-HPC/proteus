@@ -18,10 +18,13 @@
   }
 
 // Forward declaration
-__device__ void device_function(int a);
+extern __device__ void device_function(int a);
+extern __device__ void device_function2(int a);
 
-__global__ __attribute__((annotate("jit"))) void kernel_function(int a) {
+__global__ __attribute__((annotate("jit", 1))) void kernel_function(int a) {
   device_function(a);
+  device_function2(a);
+  printf("Kernel %d\n", a);
 };
 
 int main() {

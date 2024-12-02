@@ -14,17 +14,15 @@
 // NOTE: Using the ABI With scalars for GridDim, BlockDim instead of dim3 to
 // avoid issues with aggregate coercion of parameters. Caller packs XY in a
 // uint64_t.
-extern "C" __attribute__((used)) hipError_t
-__jit_launch_kernel(const char *ModuleUniqueId, void *Kernel,
-                    void *FatbinWrapper, size_t FatbinSize, uint64_t GridDimXY,
-                    uint32_t GridDimZ, uint64_t BlockDim_XY, uint32_t BlockDimZ,
-                    void **KernelArgs, uint64_t ShmemSize, void *Stream) {
+extern "C" __attribute__((used)) hipError_t __jit_launch_kernel(
+    const char *ModuleUniqueId, void *Kernel, uint64_t GridDimXY,
+    uint32_t GridDimZ, uint64_t BlockDim_XY, uint32_t BlockDimZ,
+    void **KernelArgs, uint64_t ShmemSize, void *Stream) {
   dim3 GridDim = {*(uint32_t *)&GridDimXY, *(((uint32_t *)&GridDimXY) + 1),
                   GridDimZ};
   dim3 BlockDim = {*(uint32_t *)&BlockDim_XY, *(((uint32_t *)&BlockDim_XY) + 1),
                    BlockDimZ};
 
-  return __jit_launch_kernel_internal(ModuleUniqueId, Kernel, FatbinWrapper,
-                                      FatbinSize, GridDim, BlockDim, KernelArgs,
-                                      ShmemSize, Stream);
+  return __jit_launch_kernel_internal(ModuleUniqueId, Kernel, GridDim, BlockDim,
+                                      KernelArgs, ShmemSize, Stream);
 }

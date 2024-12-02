@@ -35,8 +35,7 @@ public:
                                 int BlockSize);
 
   std::unique_ptr<MemoryBuffer> extractDeviceBitcode(StringRef KernelName,
-                                                     const char *Binary,
-                                                     size_t FatbinSize = 0);
+                                                     void *Kernel);
 
   std::unique_ptr<MemoryBuffer> codegenObject(Module &M, StringRef DeviceArch);
 

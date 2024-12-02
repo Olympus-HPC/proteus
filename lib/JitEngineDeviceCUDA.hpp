@@ -13,6 +13,8 @@
 
 #include "JitEngineDevice.hpp"
 #include "Utils.h"
+#include <llvm/ADT/DenseMap.h>
+#include <llvm/ADT/SmallVector.h>
 
 namespace proteus {
 
@@ -35,8 +37,7 @@ public:
                                 int BlockSize);
 
   std::unique_ptr<MemoryBuffer> extractDeviceBitcode(StringRef KernelName,
-                                                     const char *Binary,
-                                                     size_t FatbinSize = 0);
+                                                     void *Kernel);
 
   void codegenPTX(Module &M, StringRef DeviceArch,
                   SmallVectorImpl<char> &PTXStr);

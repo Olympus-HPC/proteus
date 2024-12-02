@@ -9,8 +9,11 @@
 //===----------------------------------------------------------------------===//
 
 #include <cstddef>
+#include <llvm/ADT/ArrayRef.h>
+#include <string>
 
 #include "llvm/Bitcode/BitcodeWriter.h"
+#include "llvm/Linker/Linker.h"
 #include "llvm/Object/ELF.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/TargetSelect.h"
@@ -34,10 +37,24 @@ JitEngineDeviceHIP &JitEngineDeviceHIP::instance() {
   return Jit;
 }
 
-std::unique_ptr<MemoryBuffer> JitEngineDeviceHIP::extractDeviceBitcode(
-    StringRef KernelName, const char *Binary, size_t FatbinSize) {
+std::unique_ptr<MemoryBuffer>
+JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
   constexpr char OFFLOAD_BUNDLER_MAGIC_STR[] = "__CLANG_OFFLOAD_BUNDLE__";
   size_t Pos = 0;
+
+  if (!KernelToHandleMap.contains(Kernel))
+    FATAL_ERROR("Expected Kerne in map");
+
+  void *Handle = KernelToHandleMap[Kernel];
+  if (!HandleToBinaryInfo.contains(Handle))
+    FATAL_ERROR("Expected Handle in map");
+
+  FatbinWrapper_t *FatbinWrapper = HandleToBinaryInfo[Handle].FatbinWrapper;
+  if (!FatbinWrapper)
+    FATAL_ERROR("Expected FatbinWrapper in map");
+
+  const char *Binary = FatbinWrapper->Binary;
+
   StringRef Magic(Binary, sizeof(OFFLOAD_BUNDLER_MAGIC_STR) - 1);
   if (!Magic.equals(OFFLOAD_BUNDLER_MAGIC_STR))
     FATAL_ERROR("Error missing magic string");
@@ -90,6 +107,10 @@ std::unique_ptr<MemoryBuffer> JitEngineDeviceHIP::extractDeviceBitcode(
   // device libraries. Otherwise, the hiprtc linker complains that it
   // cannot link device libraries (working assumption).
   ArrayRef<uint8_t> DeviceBitcode;
+  SmallVector<std::unique_ptr<Module>> LinkedModules;
+  auto Ctx = std::make_unique<LLVMContext>();
+  auto JitModule = std::make_unique<llvm::Module>("JitModule", *Ctx);
+
   Twine TargetSection = ".jit." + KernelName;
   for (auto Section : *Sections) {
     auto SectionName = DeviceElf->getSectionName(Section);
@@ -97,22 +118,47 @@ std::unique_ptr<MemoryBuffer> JitEngineDeviceHIP::extractDeviceBitcode(
       FATAL_ERROR("Error reading section name");
     DBG(dbgs() << "SectionName " << *SectionName << "\n");
     DBG(dbgs() << "TargetSection " << TargetSection << "\n");
-    if (!SectionName->equals(TargetSection.str()))
-      continue;
 
-    auto SectionContents = DeviceElf->getSectionContents(Section);
-    if (SectionContents.takeError())
-      FATAL_ERROR("Error reading section contents");
+    if (SectionName->starts_with(".jit.bitcode")) {
+      ArrayRef<uint8_t> LinkBitcode;
 
-    DeviceBitcode = *SectionContents;
+      auto SectionContents = DeviceElf->getSectionContents(Section);
+      if (SectionContents.takeError())
+        FATAL_ERROR("Error reading section contents");
+      LinkBitcode = *SectionContents;
+      std::string LinkData =
+          StringRef(reinterpret_cast<const char *>(LinkBitcode.data()),
+                    LinkBitcode.size())
+              .str();
+
+      SMDiagnostic Err;
+      auto M =
+          parseIR(MemoryBufferRef(StringRef(LinkData.data(), LinkData.size()),
+                                  *SectionName),
+                  Err, *Ctx);
+      if (!M)
+        FATAL_ERROR("unexpected");
+
+      LinkedModules.push_back(std::move(M));
+    }
+
+    if (SectionName->equals(TargetSection.str())) {
+      auto SectionContents = DeviceElf->getSectionContents(Section);
+      if (SectionContents.takeError())
+        FATAL_ERROR("Error reading section contents");
+
+      DeviceBitcode = *SectionContents;
+    }
   }
 
-  if (DeviceBitcode.empty())
-    FATAL_ERROR("Error finding the device bitcode");
+  linkJitModule(JitModule.get(), Ctx.get(), KernelName, LinkedModules);
 
-  return MemoryBuffer::getMemBufferCopy(
-      StringRef(reinterpret_cast<const char *>(DeviceBitcode.data()),
-                DeviceBitcode.size()));
+  std::string LinkedDeviceBitcode;
+  raw_string_ostream OS(LinkedDeviceBitcode);
+  WriteBitcodeToFile(*JitModule.get(), OS);
+  OS.flush();
+
+  return MemoryBuffer::getMemBufferCopy(StringRef(LinkedDeviceBitcode));
 }
 
 void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
@@ -161,6 +207,16 @@ JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
                                   &hip_link_state_ptr));
   // NOTE: the following version of te code does not set options.
   // hiprtcErrCheck(hiprtcLinkCreate(0, nullptr, nullptr, &hip_link_state_ptr));
+
+#if 0
+  for (auto &KV : LinkedModules) {
+    auto DeviceBitcode = KV.second;
+    hiprtcErrCheck(
+        hiprtcLinkAddData(hip_link_state_ptr, HIPRTC_JIT_INPUT_LLVM_BITCODE,
+                          (void *)DeviceBitcode.data(), DeviceBitcode.size(),
+                          "", 0, nullptr, nullptr));
+  }
+#endif
 
   hiprtcErrCheck(hiprtcLinkAddData(
       hip_link_state_ptr, HIPRTC_JIT_INPUT_LLVM_BITCODE,

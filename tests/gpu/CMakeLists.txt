@@ -152,7 +152,7 @@ CREATE_GPU_TEST_RDC(kernel_host_device_jit kernel_host_device_jit.cpp)
 CREATE_GPU_TEST_RDC(types types.cpp)
 
 # The following tests fails and need to be "fixed" I pass will fail true to enable CI
-CREATE_GPU_TEST_RDC(device_function "main_code.cpp;device_code.cpp")
+CREATE_GPU_TEST_RDC(device_function "main_code.cpp;device_code.cpp;device_code2.cpp")
 if(ENABLE_CUDA)
 set_tests_properties(device_function.CUDA.rdc PROPERTIES WILL_FAIL TRUE)
 else()

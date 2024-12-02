@@ -11,8 +11,11 @@
 #ifndef PROTEUS_JITENGINEDEVICE_HPP
 #define PROTEUS_JITENGINEDEVICE_HPP
 
+#include "llvm/Linker/Linker.h"
 #include <cstdint>
+#include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
+#include <llvm/IR/LLVMContext.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/MemoryBufferRef.h>
 #include <memory>
@@ -37,6 +40,7 @@
 #include "JitCache.hpp"
 #include "JitEngine.hpp"
 #include "JitStorageCache.hpp"
+#include "TimeTracing.hpp"
 #include "TransformArgumentSpecialization.hpp"
 #include "Utils.h"
 
@@ -66,7 +70,7 @@ struct FatbinWrapper_t {
   int32_t Magic;
   int32_t Version;
   const char *Binary;
-  void *X;
+  void *PrelinkedFatbins[];
 };
 
 template <typename ImplT> struct DeviceTraits;
@@ -78,21 +82,31 @@ public:
   using KernelFunction_t = typename DeviceTraits<ImplT>::KernelFunction_t;
 
   DeviceError_t
-  compileAndRun(StringRef ModuleUniqueId, StringRef KernelName,
-                FatbinWrapper_t *FatbinWrapper, size_t FatbinSize,
-                const SmallVector<int32_t> &RCIndices,
-                int32_t NumRuntimeConstants, dim3 GridDim, dim3 BlockDim,
-                void **KernelArgs, uint64_t ShmemSize,
+  compileAndRun(StringRef ModuleUniqueId, void *Kernel, StringRef KernelName,
+                const SmallVector<int32_t> &RCIndices, int NumRuntimeConstants,
+                dim3 GridDim, dim3 BlockDim, void **KernelArgs,
+                uint64_t ShmemSize,
                 typename DeviceTraits<ImplT>::DeviceStream_t Stream);
 
   void insertRegisterVar(const char *VarName, const void *Addr) {
     VarNameToDevPtr[VarName] = Addr;
   }
+  void registerLinkedBinary(const char *ModuleId);
+  void registerFatBinary(void *Handle, FatbinWrapper_t *FatbinWrapper,
+                         const char *ModuleId);
+  void registerFatBinaryEnd();
+  void registerFunction(void *Handle, void *Kernel, char *KernelName,
+                        int32_t *RCIndices, int32_t NumRCs);
 
-  void insertRegisterFunction(const void *HostAddr, char *FunctionName,
-                              int32_t *RCIndices, int32_t NumRCs) {
-    JITKernelInfoMap[HostAddr] = JITKernelInfo(FunctionName, RCIndices, NumRCs);
-  }
+  struct BinaryInfo {
+    FatbinWrapper_t *FatbinWrapper;
+    SmallVector<std::string> LinkedModuleIds;
+  };
+
+  void *CurHandle = nullptr;
+  DenseMap<void *, BinaryInfo> HandleToBinaryInfo;
+  DenseMap<void *, void *> KernelToHandleMap;
+  SmallVector<std::string> GlobalLinkedModuleIds;
 
   bool containsJITKernelInfo(const void *Func) {
     return JITKernelInfoMap.contains(Func);
@@ -119,18 +133,13 @@ private:
                                                          BlockSize);
   }
 
-  void getRuntimeConstantsFromModule(Module &M, void **KernelArgs,
-                                     StringRef KernelName,
+  void getRuntimeConstantsFromModule(Module &M, StringRef FnName,
+                                     void **KernelArgs,
                                      const SmallVector<int32_t> &RCIndices,
                                      SmallVector<RuntimeConstant> &RCsVec) {
-    Function *F = M.getFunction(KernelName);
-    MDNode *Node = F->getMetadata("jit_arg_nos");
-
-    for (int I = 0; I < Node->getNumOperands(); ++I) {
-      ConstantAsMetadata *CAM = cast<ConstantAsMetadata>(Node->getOperand(I));
-      ConstantInt *ConstInt = cast<ConstantInt>(CAM->getValue());
-      int ArgNo = ConstInt->getZExtValue();
-      Value *Arg = F->getArg(ArgNo);
+    Function *F = M.getFunction(FnName);
+    for (int I = 0; I < RCIndices.size(); ++I) {
+      Value *Arg = F->getArg(RCIndices[I]);
       Type *ArgType = Arg->getType();
       Constant *C = nullptr;
 
@@ -172,6 +181,7 @@ private:
                                      dim3 BlockDim, void **KernelArgs,
                                      uint64_t ShmemSize,
                                      DeviceStream_t Stream) {
+    TIMESCOPE(__FUNCTION__);
     return static_cast<ImplT &>(*this).launchKernelFunction(
         KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
   }
@@ -194,17 +204,17 @@ private:
   }
 
   std::unique_ptr<MemoryBuffer> extractDeviceBitcode(StringRef KernelName,
-                                                     const char *Binary,
-                                                     size_t FatbinSize = 0) {
-    return static_cast<ImplT &>(*this).extractDeviceBitcode(KernelName, Binary,
-                                                            FatbinSize);
+                                                     void *Kernel) {
+    TIMESCOPE(__FUNCTION__)
+    return static_cast<ImplT &>(*this).extractDeviceBitcode(KernelName, Kernel);
   }
   //------------------------------------------------------------------
   // End Methods implemented in the derived device engine class.
   //------------------------------------------------------------------
 
   void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
-                    int BlockSize, int GridSize, RuntimeConstant *RC,
+                    int BlockSize, int GridSize,
+                    const SmallVector<int32_t> &RCIndices, RuntimeConstant *RC,
                     int NumRuntimeConstants);
 
   void
@@ -222,6 +232,8 @@ protected:
   JitStorageCache<KernelFunction_t> StorageCache;
   std::string DeviceArch;
   std::unordered_map<std::string, const void *> VarNameToDevPtr;
+  void linkJitModule(Module *M, LLVMContext *Ctx, StringRef KernelName,
+                     SmallVector<std::unique_ptr<Module>> &LinkedModules);
 
 private:
   // This map is private and only accessible via the API.
@@ -231,23 +243,36 @@ private:
 template <typename ImplT>
 void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
                                           StringRef Suffix, int BlockSize,
-                                          int GridSize, RuntimeConstant *RC,
+                                          int GridSize,
+                                          const SmallVector<int32_t> &RCIndices,
+                                          RuntimeConstant *RC,
                                           int NumRuntimeConstants) {
 
   TIMESCOPE("specializeIR");
   DBG(dbgs() << "=== Parsed Module\n" << M << "=== End of Parsed Module\n");
   Function *F = M.getFunction(FnName);
   assert(F && "Expected non-null function!");
-  MDNode *Node = F->getMetadata("jit_arg_nos");
-  assert(Node && "Expected metadata for jit arguments");
-  DBG(dbgs() << "Metadata jit for F " << F->getName() << " = " << *Node
-             << "\n");
+
+  // Remove llvm.global.annotations now that we have read them.
+  if (auto *GlobalAnnotations = M.getGlobalVariable("llvm.global.annotations"))
+    M.eraseGlobalVariable(GlobalAnnotations);
+  // Remove the __clang_gpu_used_external used in HIP RDC compilation and its
+  // uses in llvm.used, llvm.compiler.used.
+  if (auto *ClangGPUUsedExternal =
+          M.getNamedGlobal("__clang_gpu_used_external")) {
+    removeFromUsedLists(M, [&ClangGPUUsedExternal](Constant *C) {
+      if (auto *GV = dyn_cast<GlobalVariable>(C))
+        return GV == ClangGPUUsedExternal;
+      return false;
+    });
+    M.eraseGlobalVariable(ClangGPUUsedExternal);
+  }
 
   // Replace argument uses with runtime constants.
   if (Config.ENV_PROTEUS_SPECIALIZE_ARGS)
     // TODO: change NumRuntimeConstants to size_t at interface.
     TransformArgumentSpecialization::transform(
-        M, *F,
+        M, *F, RCIndices,
         ArrayRef<RuntimeConstant>{RC,
                                   static_cast<size_t>(NumRuntimeConstants)});
 
@@ -308,17 +333,15 @@ void JitEngineDevice<ImplT>::relinkGlobals(
 template <typename ImplT>
 typename DeviceTraits<ImplT>::DeviceError_t
 JitEngineDevice<ImplT>::compileAndRun(
-    StringRef ModuleUniqueId, StringRef KernelName,
-    FatbinWrapper_t *FatbinWrapper, size_t FatbinSize,
-    const SmallVector<int32_t> &RCIndices, int32_t NumRuntimeConstants,
+    StringRef ModuleUniqueId, void *Kernel, StringRef KernelName,
+    const SmallVector<int32_t> &RCIndices, int NumRuntimeConstants,
     dim3 GridDim, dim3 BlockDim, void **KernelArgs, uint64_t ShmemSize,
     typename DeviceTraits<ImplT>::DeviceStream_t Stream) {
   TIMESCOPE("compileAndRun");
 
   SmallVector<RuntimeConstant> RCsVec;
 
-  auto IRBuffer =
-      extractDeviceBitcode(KernelName, FatbinWrapper->Binary, FatbinSize);
+  auto IRBuffer = extractDeviceBitcode(KernelName, Kernel);
 
   auto parseBitcode = [&]() -> Expected<orc::ThreadSafeModule> {
     auto Ctx = std::make_unique<LLVMContext>();
@@ -334,7 +357,7 @@ JitEngineDevice<ImplT>::compileAndRun(
     FATAL_ERROR(toString(std::move(E)).c_str());
 
   auto *JitModule = SafeModule->getModuleUnlocked();
-  getRuntimeConstantsFromModule(*JitModule, KernelArgs, KernelName, RCIndices,
+  getRuntimeConstantsFromModule(*JitModule, KernelName, KernelArgs, RCIndices,
                                 RCsVec);
 
   uint64_t HashValue = CodeCache.hash(ModuleUniqueId, KernelName, RCsVec.data(),
@@ -388,9 +411,10 @@ JitEngineDevice<ImplT>::compileAndRun(
     }
   }
 
-  specializeIR(
-      *JitModule, KernelName, Suffix, BlockDim.x * BlockDim.y * BlockDim.z,
-      GridDim.x * GridDim.y * GridDim.z, RCsVec.data(), NumRuntimeConstants);
+  specializeIR(*JitModule, KernelName, Suffix,
+               BlockDim.x * BlockDim.y * BlockDim.z,
+               GridDim.x * GridDim.y * GridDim.z, RCIndices, RCsVec.data(),
+               NumRuntimeConstants);
 
   // For CUDA, run the target-specific optimization pipeline to optimize the
   // LLVM IR before handing over to the CUDA driver PTX compiler.
@@ -415,6 +439,76 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                               ShmemSize, Stream);
+}
+
+template <typename ImplT>
+void JitEngineDevice<ImplT>::registerFatBinary(void *Handle,
+                                               FatbinWrapper_t *FatbinWrapper,
+                                               const char *ModuleId) {
+  CurHandle = Handle;
+  HandleToBinaryInfo[Handle] = {FatbinWrapper, {ModuleId}};
+  DBG(dbgs() << "Register fatbinary Handle " << Handle << " FatbinWrapper "
+             << FatbinWrapper << " ModulId " << ModuleId << "\n");
+}
+
+template <typename ImplT> void JitEngineDevice<ImplT>::registerFatBinaryEnd() {
+  DBG(dbgs() << "Register fatbinary end\n");
+  CurHandle = nullptr;
+}
+
+template <typename ImplT>
+void JitEngineDevice<ImplT>::registerFunction(void *Handle, void *Kernel,
+                                              char *KernelName,
+                                              int32_t *RCIndices,
+                                              int32_t NumRCs) {
+  DBG(dbgs() << "Register function " << Kernel << " To Handle " << Handle
+             << "\n");
+  assert(!KernelToHandleMap.contains(Kernel) &&
+         "Expected kernel inserted only once in the map");
+  KernelToHandleMap[Kernel] = Handle;
+
+  JITKernelInfoMap[Kernel] = JITKernelInfo(KernelName, RCIndices, NumRCs);
+}
+
+template <typename ImplT>
+void JitEngineDevice<ImplT>::registerLinkedBinary(const char *ModuleId) {
+  DBG(dbgs() << "Register linked binary ModuleId " << ModuleId << "\n");
+  if (CurHandle) {
+    if (!HandleToBinaryInfo.contains(CurHandle))
+      FATAL_ERROR("Expected CurHandle in map");
+
+    HandleToBinaryInfo[CurHandle].LinkedModuleIds.push_back(ModuleId);
+  } else
+    GlobalLinkedModuleIds.push_back(ModuleId);
+}
+
+template <typename ImplT>
+void JitEngineDevice<ImplT>::linkJitModule(
+    Module *M, LLVMContext *Ctx, StringRef KernelName,
+    SmallVector<std::unique_ptr<Module>> &LinkedModules) {
+  if (LinkedModules.empty())
+    FATAL_ERROR("Expected jit module");
+
+  Linker IRLinker(*M);
+  for (auto &LinkedM : LinkedModules) {
+    // Returns true if linking failed.
+    if (IRLinker.linkInModule(std::move(LinkedM), Linker::LinkOnlyNeeded,
+                              [&KernelName](Module &M, const StringSet<> &GVS) {
+                                for (auto &Symbol : GVS) {
+                                  if (Symbol.getKey() == KernelName)
+                                    continue;
+
+                                  Function *F = M.getFunction(Symbol.getKey());
+                                  if (!F)
+                                    continue;
+
+                                  // Internalize functions, the JIT module is
+                                  // self-contained.
+                                  F->setLinkage(GlobalValue::InternalLinkage);
+                                }
+                              }))
+      FATAL_ERROR("Linking failed");
+  }
 }
 
 } // namespace proteus

@@ -9,6 +9,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "CompilerInterfaceDevice.h"
+#include "JitEngineDevice.hpp"
 
 using namespace proteus;
 
@@ -24,9 +25,28 @@ extern "C" __attribute((used)) void __jit_register_var(const void *HostAddr,
   Jit.insertRegisterVar(VarName, HostAddr);
 }
 
+extern "C" __attribute__((used)) void
+__jit_register_fatbinary(void *Handle, void *FatbinWrapper,
+                         const char *ModuleId) {
+  auto &Jit = JitDeviceImplT::instance();
+  Jit.registerFatBinary(
+      Handle, reinterpret_cast<FatbinWrapper_t *>(FatbinWrapper), ModuleId);
+}
+
+extern "C" __attribute__((used)) void __jit_register_fatbinary_end(void *) {
+  auto &Jit = JitDeviceImplT::instance();
+  Jit.registerFatBinaryEnd();
+}
+
+extern "C" __attribute__((used)) void
+__jit_register_linked_binary(const char *ModuleId) {
+  auto &Jit = JitDeviceImplT::instance();
+  Jit.registerLinkedBinary(ModuleId);
+}
+
 extern "C" __attribute((used)) void
-__jit_register_function(const void *HostAddr, char *FunctionName,
+__jit_register_function(void *Handle, void *Kernel, char *KernelName,
                         int32_t *RCIndices, int32_t NumRCs) {
   auto &Jit = JitDeviceImplT::instance();
-  Jit.insertRegisterFunction(HostAddr, FunctionName, RCIndices, NumRCs);
+  Jit.registerFunction(Handle, Kernel, KernelName, RCIndices, NumRCs);
 }

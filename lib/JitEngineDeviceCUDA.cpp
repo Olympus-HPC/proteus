@@ -11,11 +11,15 @@
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
+#include <llvm/Linker/Linker.h>
 #include <llvm/Support/MemoryBufferRef.h>
 #include <memory>
 
+#include "JitEngineDevice.hpp"
 #include "JitEngineDeviceCUDA.hpp"
 #include "Utils.h"
+#include <cuda_runtime.h>
+#include <sys/types.h>
 
 using namespace proteus;
 using namespace llvm;
@@ -33,52 +37,71 @@ JitEngineDeviceCUDA &JitEngineDeviceCUDA::instance() {
   return Jit;
 }
 
-std::unique_ptr<MemoryBuffer> JitEngineDeviceCUDA::extractDeviceBitcode(
-    StringRef KernelName, const char *Binary, size_t FatbinSize) {
+std::unique_ptr<MemoryBuffer>
+JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
   CUmodule CUMod;
-  CUlinkState CULinkState = nullptr;
   CUdeviceptr DevPtr;
   size_t Bytes;
-  std::string Symbol = Twine("__jit_bc_" + KernelName).str();
 
-  // NOTE: loading a module OR getting the global fails if rdc compilation
-  // is enabled. Try to use the linker interface to load the binary image.
-  // If that fails too, abort.
-  // TODO: detect rdc compilation in the ProteusJitPass, see
-  // __cudaRegisterLinkedLibrary or __nv_relfatbin section existences.
-  if (cuModuleLoadFatBinary(&CUMod, Binary) != CUDA_SUCCESS ||
-      cuModuleGetGlobal(&DevPtr, &Bytes, CUMod, Symbol.c_str()) ==
-          CUDA_ERROR_NOT_FOUND) {
-    cuErrCheck(cuLinkCreate(0, nullptr, nullptr, &CULinkState));
-    cuErrCheck(cuLinkAddData(CULinkState, CU_JIT_INPUT_FATBINARY,
-                             (void *)Binary, FatbinSize, "", 0, 0, 0));
-    void *BinOut;
-    size_t BinSize;
-    cuErrCheck(cuLinkComplete(CULinkState, &BinOut, &BinSize));
-    cuErrCheck(cuModuleLoadFatBinary(&CUMod, BinOut));
-  }
+  SmallVector<std::unique_ptr<Module>> LinkedModules;
+  auto Ctx = std::make_unique<LLVMContext>();
+  auto JitModule = std::make_unique<llvm::Module>("JitModule", *Ctx);
+  if (!KernelToHandleMap.contains(Kernel))
+    FATAL_ERROR("Expected Kernel in map");
 
-  cuErrCheck(cuModuleGetGlobal(&DevPtr, &Bytes, CUMod, Symbol.c_str()));
+  void *Handle = KernelToHandleMap[Kernel];
+  if (!HandleToBinaryInfo.contains(Handle))
+    FATAL_ERROR("Expected Handle in map");
 
-  SmallString<4096> DeviceBitcode;
-  DeviceBitcode.reserve(Bytes);
-  cuErrCheck(cuMemcpyDtoH(DeviceBitcode.data(), DevPtr, Bytes));
-#ifdef ENABLE_DEBUG
-  {
-    std::error_code EC;
-    raw_fd_ostream OutBC(Twine("from-device-jit-" + KernelName + ".bc").str(),
-                         EC);
-    if (EC)
-      FATAL_ERROR("Cannot open device memory jit file");
-    OutBC << StringRef(DeviceBitcode.data(), Bytes);
-    OutBC.close();
-  }
-#endif
+  FatbinWrapper_t *FatbinWrapper = HandleToBinaryInfo[Handle].FatbinWrapper;
+  if (!FatbinWrapper)
+    FATAL_ERROR("Expected FatbinWrapper in map");
+
+  auto &LinkedModuleIds = HandleToBinaryInfo[Handle].LinkedModuleIds;
+
+  cuErrCheck(cuModuleLoadData(&CUMod, FatbinWrapper->Binary));
+
+  auto extractLinkedBitcode = [&CUMod, &Ctx,
+                               &LinkedModules](std::string &ModuleId) {
+    CUdeviceptr DevPtr;
+    size_t Bytes;
+    // Skips non-emitted device bitcode from the CUDA link.stub.
+    if (cuModuleGetGlobal(&DevPtr, &Bytes, CUMod, ModuleId.c_str()) !=
+        CUDA_SUCCESS) {
+      DBG(dbgs() << ModuleId + " not included !\n ");
+      return;
+    }
+
+    SmallString<4096> DeviceBitcode;
+    DeviceBitcode.reserve(Bytes);
+    cuErrCheck(cuMemcpyDtoH(DeviceBitcode.data(), DevPtr, Bytes));
+
+    SMDiagnostic Err;
+    auto M = parseIR(
+        MemoryBufferRef(StringRef(DeviceBitcode.data(), Bytes), ModuleId), Err,
+        *Ctx);
+    if (!M)
+      FATAL_ERROR("unexpected");
+
+    LinkedModules.push_back(std::move(M));
+  };
+
+  for (auto &ModuleId : LinkedModuleIds)
+    extractLinkedBitcode(ModuleId);
+
+  for (auto &ModuleId : GlobalLinkedModuleIds)
+    extractLinkedBitcode(ModuleId);
 
   cuErrCheck(cuModuleUnload(CUMod));
-  if (CULinkState)
-    cuErrCheck(cuLinkDestroy(CULinkState));
-  return MemoryBuffer::getMemBufferCopy(StringRef(DeviceBitcode.data(), Bytes));
+
+  linkJitModule(JitModule.get(), Ctx.get(), KernelName, LinkedModules);
+
+  std::string LinkedDeviceBitcode;
+  raw_string_ostream OS(LinkedDeviceBitcode);
+  WriteBitcodeToFile(*JitModule.get(), OS);
+  OS.flush();
+
+  return MemoryBuffer::getMemBufferCopy(LinkedDeviceBitcode);
 }
 
 void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module &M, Function &F,
