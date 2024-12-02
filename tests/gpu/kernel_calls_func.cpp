@@ -1,7 +1,7 @@
 // clang-format off
-// RUN: ./rdc.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: ./kernel_calls_func.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./rdc.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: ./kernel_calls_func.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-SECOND
 // clang-format on
 
 #include "gpu_common.h"
