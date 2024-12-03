@@ -150,7 +150,7 @@ void JitEngineDeviceCUDA::setKernelDims(Module &M, Function &F, dim3 &GridDim,
   ReplaceIntrinsicDim("llvm.nvvm.read.ptx.sreg.nctaid.y", GridDim.y);
   ReplaceIntrinsicDim("llvm.nvvm.read.ptx.sreg.nctaid.z", GridDim.z);
 
-  ReplaceIntrinsicDim("llvm.nvvm.read.ptx.sreg.ntid.z", BlockDim.x);
+  ReplaceIntrinsicDim("llvm.nvvm.read.ptx.sreg.ntid.x", BlockDim.x);
   ReplaceIntrinsicDim("llvm.nvvm.read.ptx.sreg.ntid.y", BlockDim.y);
   ReplaceIntrinsicDim("llvm.nvvm.read.ptx.sreg.ntid.z", BlockDim.z);
 
