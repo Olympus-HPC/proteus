@@ -221,8 +221,11 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
           continue;
 
       auto ExecutorAddr = LLJITPtr->lookup(GV.getName());
-      if (ExecutorAddr)
+      auto Error = ExecutorAddr.takeError();
+      if (!Error)
         continue;
+      // Consume the error and fix with static linking.
+      consumeError(std::move(Error));
 
       DBG(dbgs() << "Resolve statically missing GV symbol " << GV.getName()
                  << "\n");
