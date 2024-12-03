@@ -180,6 +180,10 @@ void JitEngineDeviceCUDA::setKernelDims(Module &M, Function &F, dim3 &GridDim,
   InsertAssume("llvm.nvvm.read.ptx.sreg.tid.x", BlockDim.x);
   InsertAssume("llvm.nvvm.read.ptx.sreg.tid.y", BlockDim.y);
   InsertAssume("llvm.nvvm.read.ptx.sreg.tid.z", BlockDim.z);
+
+  InsertAssume("llvm.nvvm.read.ptx.sreg.ctaid.x", BlockDim.x);
+  InsertAssume("llvm.nvvm.read.ptx.sreg.ctaid.y", BlockDim.y);
+  InsertAssume("llvm.nvvm.read.ptx.sreg.ctaid.z", BlockDim.z);
 }
 
 cudaError_t JitEngineDeviceCUDA::cudaModuleLaunchKernel(
