@@ -29,7 +29,7 @@ specify a list of function arguments to specialize for.
 
 For example:
 ```cpp
-__atribute__((annotate("jit", 1, 2)))
+__attribute__((annotate("jit", 1, 2)))
 void daxpy(double A, int N, double *a, double *b)
 {
   for(int i=0; i<N; ++i)
