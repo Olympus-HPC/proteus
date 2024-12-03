@@ -129,7 +129,30 @@ void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module &M, Function &F,
 
 void JitEngineDeviceCUDA::setKernelDims(Module &M, Function &F, dim3 &GridDim,
                                         dim3 &BlockDim) {
-  std::abort();
+  auto ReplaceIntrinsicDim = [&](StringRef IntrinsicName, uint32_t value) {
+    Function *IntrinsicFunction = M.getFunction(IntrinsicName);
+    if (!IntrinsicFunction)
+      return;
+
+    for (auto U = IntrinsicFunction->use_begin(),
+              UE = IntrinsicFunction->use_end();
+         U != UE;) {
+      Use &Use = *U++;
+      if (auto *Call = dyn_cast<CallInst>(Use.getUser())) {
+        Value *ConstantValue =
+            ConstantInt::get(Type::getInt32Ty(M.getContext()), value);
+        Call->replaceAllUsesWith(ConstantValue);
+        Call->eraseFromParent();
+      }
+    }
+  };
+  ReplaceIntrinsicDim("llvm.nvvm.read.ptx.sreg.nctaid.x", GridDim.x);
+  ReplaceIntrinsicDim("llvm.nvvm.read.ptx.sreg.nctaid.y", GridDim.y);
+  ReplaceIntrinsicDim("llvm.nvvm.read.ptx.sreg.nctaid.z", GridDim.z);
+
+  ReplaceIntrinsicDim("llvm.nvvm.read.ptx.sreg.ntid.z", BlockDim.x);
+  ReplaceIntrinsicDim("llvm.nvvm.read.ptx.sreg.ntid.y", BlockDim.y);
+  ReplaceIntrinsicDim("llvm.nvvm.read.ptx.sreg.ntid.z", BlockDim.z);
 }
 
 cudaError_t JitEngineDeviceCUDA::cudaModuleLaunchKernel(
