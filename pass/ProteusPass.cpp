@@ -749,6 +749,8 @@ struct ProteusJitPassImpl {
     ArrayType *ArrayTy =
         dyn_cast<ArrayType>(FatbinGV->getInitializer()->getType());
     assert(ArrayTy && "Expected array type of the fatbin object");
+    assert(ArrayTy->getElementType() == Type::getInt8Ty(M.getContext()) &&
+           "Expected byte type for array type of the fatbin object");
     size_t FatbinSize = ArrayTy->getNumElements();
 
     Call = Builder.CreateCall(
