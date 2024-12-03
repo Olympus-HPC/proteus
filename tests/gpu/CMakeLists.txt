@@ -36,7 +36,40 @@ function(CREATE_GPU_TEST exe check_source will_fail)
     set_tests_properties(${exe}.${lang} PROPERTIES LABELS "GPU")
 endfunction()
 
-function(CREATE_GPU_TEST_RDC exe source will_fail)
+# Creates a device library, which can be linked with another  test. The library does not
+# apply the pass
+function(CREATE_GPU_LIBRARY lib source)
+    if(ENABLE_HIP)
+        SET(lang HIP)
+    elseif(ENABLE_CUDA)
+        SET(lang CUDA)
+    else()
+        message(FATAL_ERROR "ENABLE_HIP or ENABLE_CUDA must be defined for GPU tests")
+    endif()
+
+    add_library(${lib} ${source})
+
+    set_source_files_properties(${source} PROPERTIES LANGUAGE ${lang})
+
+    if(ENABLE_HIP)
+        # This is unsupported see: https://gitlab.kitware.com/cmake/cmake/-/issues/23210
+        # set_target_properties(${exe}.rdc PROPERTIES HIP_SEPARABLE_COMPILATION on)
+        target_compile_options(
+          ${lib}
+            PUBLIC
+            -fgpu-rdc
+        )
+
+        target_link_options(${exe}.${lang}.rdc PUBLIC -fgpu-rdc --hip-link)
+    elseif(ENABLE_CUDA)
+        # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
+        set_target_properties(${lib} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    else()
+        message(FATAL_ERROR "ENABLE_HIP or ENABLE_CUDA must be defined for GPU tests")
+    endif()
+endfunction()
+
+function(CREATE_GPU_TEST_RDC exe source will_fail libs)
     if(ENABLE_HIP)
         SET(lang HIP)
     elseif(ENABLE_CUDA)
@@ -53,6 +86,7 @@ function(CREATE_GPU_TEST_RDC exe source will_fail)
     add_dependencies(${exe}.${lang}.rdc ProteusPass)
 
     target_link_libraries(${exe}.${lang}.rdc PUBLIC proteus)
+    target_link_libraries(${exe}.${lang}.rdc PRIVATE ${libs})
 
     if(ENABLE_HIP)
         # This is unsupported see: https://gitlab.kitware.com/cmake/cmake/-/issues/23210
@@ -137,20 +171,22 @@ CREATE_GPU_TEST(kernel_host_device_jit kernel_host_device_jit.cpp FALSE)
 CREATE_GPU_TEST(types types.cpp FALSE)
 CREATE_GPU_TEST(kernel_unused_gvar "kernel_unused_gvar.cpp;kernel_unused_gvar_def.cpp" FALSE)
 
-CREATE_GPU_TEST_RDC(kernel kernel.cpp FALSE)
-CREATE_GPU_TEST_RDC(kernel_cache kernel_cache.cpp FALSE)
-CREATE_GPU_TEST_RDC(kernel_args kernel_args.cpp FALSE)
-CREATE_GPU_TEST_RDC(kernels_gvar kernels_gvar.cpp FALSE)
-CREATE_GPU_TEST_RDC(kernel_launches kernel_launches.cpp FALSE)
-CREATE_GPU_TEST_RDC(kernel_launches_args kernel_launches_args.cpp FALSE)
-CREATE_GPU_TEST_RDC(indirect_launcher indirect_launcher.cpp FALSE)
-CREATE_GPU_TEST_RDC(daxpy daxpy.cpp FALSE)
-CREATE_GPU_TEST_RDC(kernel_host_jit kernel_host_jit.cpp FALSE)
-CREATE_GPU_TEST_RDC(kernel_host_device_jit kernel_host_device_jit.cpp FALSE)
-CREATE_GPU_TEST_RDC(types types.cpp FALSE)
+CREATE_GPU_TEST_RDC(kernel kernel.cpp FALSE "")
+CREATE_GPU_TEST_RDC(kernel_cache kernel_cache.cpp FALSE "")
+CREATE_GPU_TEST_RDC(kernel_args kernel_args.cpp FALSE "")
+CREATE_GPU_TEST_RDC(kernels_gvar kernels_gvar.cpp FALSE "")
+CREATE_GPU_TEST_RDC(kernel_launches kernel_launches.cpp FALSE "")
+CREATE_GPU_TEST_RDC(kernel_launches_args kernel_launches_args.cpp FALSE "")
+CREATE_GPU_TEST_RDC(indirect_launcher indirect_launcher.cpp FALSE "")
+CREATE_GPU_TEST_RDC(daxpy daxpy.cpp FALSE "")
+CREATE_GPU_TEST_RDC(kernel_host_jit kernel_host_jit.cpp FALSE "")
+CREATE_GPU_TEST_RDC(kernel_host_device_jit kernel_host_device_jit.cpp FALSE "")
+CREATE_GPU_TEST_RDC(types types.cpp FALSE "")
 
 # The following tests fails and need to be "fixed" I pass will fail true to enable CI
-CREATE_GPU_TEST_RDC(kernel_calls_func "kernel_calls_func.cpp;device_func.cpp" TRUE)
+CREATE_GPU_TEST_RDC(kernel_calls_func "kernel_calls_func.cpp;device_func.cpp" TRUE "")
+CREATE_GPU_LIBRARY(device_func "device_func.cpp")
+CREATE_GPU_TEST_RDC(kernel_calls_lib_func "kernel_calls_func.cpp;device_func.cpp" TRUE device_func)
 
 # TODO: Those two tests fail on CUDA with JIT stored caching because device
 # global variables need to be re-linked to their runtime address. However, I
