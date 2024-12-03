@@ -95,7 +95,82 @@ using namespace llvm;
 //-----------------------------------------------------------------------------
 namespace {
 
-struct ProteusJitPassImpl {
+class ProteusJitPassImpl {
+public:
+  ProteusJitPassImpl(Module &M) {
+    PtrTy = PointerType::getUnqual(M.getContext());
+    VoidTy = Type::getVoidTy(M.getContext());
+    Int8Ty = Type::getInt8Ty(M.getContext());
+    Int32Ty = Type::getInt32Ty(M.getContext());
+    Int64Ty = Type::getInt64Ty(M.getContext());
+    Int128Ty = Type::getInt128Ty(M.getContext());
+    RuntimeConstantTy = StructType::create({Int128Ty}, "struct.args");
+  }
+
+  bool run(Module &M) {
+    parseAnnotations(M);
+
+    if (JitFunctionInfoMap.empty())
+      return false;
+
+    DEBUG(dbgs() << "=== Pre Original Host Module\n"
+                 << M << "=== End of Pre Original Host Module\n");
+
+    // ==================
+    // Device compilation
+    // ==================
+
+    // For device compilation, just extract the module IR for annotated device
+    // kernels and return.
+    if (isDeviceCompilation(M)) {
+      for (auto &JFI : JitFunctionInfoMap)
+        emitJitModuleDevice(M, JFI);
+
+      return true;
+    }
+
+    // ================
+    // Host compilation
+    // ================
+
+    if (hasDeviceLaunchKernelCalls(M)) {
+      getKernelHostStubs(M);
+      instrumentRegisterVar(M);
+      emitModuleUniqueIdGlobal(M);
+      instrumentRegisterJITFunc(M);
+    }
+
+    for (auto &JFI : JitFunctionInfoMap) {
+      Function *JITFn = JFI.first;
+      DEBUG(dbgs() << "Processing JIT Function " << JITFn->getName() << "\n");
+      if (isDeviceKernelHostStub(M, *JITFn)) {
+        emitJitLaunchKernelCall(M, JFI);
+        DEBUG(dbgs() << "DONE!\n");
+
+        continue;
+      }
+
+      emitJitModuleHost(M, JFI);
+      emitJitEntryCall(M, JFI);
+    }
+
+    (dbgs() << "=== Post Original Host Module\n"
+            << M << "=== End Post Original Host Module\n");
+    if (verifyModule(M, &errs()))
+      FATAL_ERROR("Broken original module found, compilation aborted!");
+
+    return true;
+  }
+
+private:
+  Type *PtrTy = nullptr;
+  Type *VoidTy = nullptr;
+  Type *Int8Ty = nullptr;
+  Type *Int32Ty = nullptr;
+  Type *Int64Ty = nullptr;
+  Type *Int128Ty = nullptr;
+  StructType *RuntimeConstantTy = nullptr;
+
   struct JitFunctionInfo {
     SmallVector<int, 8> ConstantArgs;
     std::string ModuleIR;
@@ -472,8 +547,8 @@ struct ProteusJitPassImpl {
     SmallVector<Metadata *> ConstArgNos;
     for (size_t I = 0; I < JFI.ConstantArgs.size(); ++I) {
       int ArgNo = JFI.ConstantArgs[I];
-      Metadata *Meta = ConstantAsMetadata::get(
-          ConstantInt::get(Type::getInt32Ty(Ctx), ArgNo));
+      Metadata *Meta =
+          ConstantAsMetadata::get(ConstantInt::get(Int32Ty, ArgNo));
       ConstArgNos.push_back(Meta);
     }
     MDNode *Node = MDNode::get(Ctx, ConstArgNos);
@@ -497,19 +572,10 @@ struct ProteusJitPassImpl {
     Function *JITFn = JITInfo.first;
     JitFunctionInfo &JFI = JITInfo.second;
 
-    // Create jit entry runtime function.
-    Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
-    Type *Int32Ty = Type::getInt32Ty(M.getContext());
-    Type *Int128Ty = Type::getInt128Ty(M.getContext());
-    // Use Int64 type for the Value, big enough to hold primitives.
-    StructType *RuntimeConstantTy =
-        StructType::create({Int128Ty}, "struct.args");
-
-    FunctionType *JitEntryFnTy =
-        FunctionType::get(VoidPtrTy,
-                          {VoidPtrTy, VoidPtrTy, Int32Ty,
-                           RuntimeConstantTy->getPointerTo(), Int32Ty},
-                          /* isVarArg=*/false);
+    FunctionType *JitEntryFnTy = FunctionType::get(
+        PtrTy,
+        {PtrTy, PtrTy, Int32Ty, RuntimeConstantTy->getPointerTo(), Int32Ty},
+        /* isVarArg=*/false);
     FunctionCallee JitEntryFn =
         M.getOrInsertFunction("__jit_entry", JitEntryFnTy);
 
@@ -673,11 +739,6 @@ struct ProteusJitPassImpl {
   }
 
   void replaceWithJitLaunchKernel(Module &M, CallBase *LaunchKernelCall) {
-    // Create jit entry runtime function.
-    Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
-    Type *Int64Ty = Type::getInt64Ty(M.getContext());
-    Type *Int32Ty = Type::getInt32Ty(M.getContext());
-
     GlobalVariable *ModuleUniqueId =
         M.getGlobalVariable("__module_unique_id", true);
     assert(ModuleUniqueId && "Expected ModuleUniqueId global to be defined");
@@ -695,25 +756,24 @@ struct ProteusJitPassImpl {
 
     FunctionType *JitEntryFnTy = nullptr;
 #if ENABLE_HIP
-    JitEntryFnTy =
-        FunctionType::get(Int32Ty,
-                          {ModuleUniqueId->getType(), VoidPtrTy,
-                           FatbinWrapper->getType(), Int64Ty, Int64Ty, Int32Ty,
-                           Int64Ty, Int32Ty, VoidPtrTy, Int64Ty, VoidPtrTy},
-                          /* isVarArg=*/false);
+    JitEntryFnTy = FunctionType::get(
+        Int32Ty,
+        {ModuleUniqueId->getType(), PtrTy, FatbinWrapper->getType(), Int64Ty,
+         Int64Ty, Int32Ty, Int64Ty, Int32Ty, PtrTy, Int64Ty, PtrTy},
+        /* isVarArg=*/false);
 #elif ENABLE_CUDA
     // NOTE: CUDA uses an array type for passing grid, block sizes.
     JitEntryFnTy =
         FunctionType::get(Int32Ty,
                           {ModuleUniqueId->getType(),
-                           VoidPtrTy, // Kernel address
+                           PtrTy, // Kernel address
                            FatbinWrapper->getType(),
                            Int64Ty,                    // Fatbin size
                            ArrayType::get(Int64Ty, 2), // Grid dim array
                            ArrayType::get(Int64Ty, 2), // Block dim array
-                           VoidPtrTy,                  // Kernel args
+                           PtrTy,                      // Kernel args
                            Int64Ty,                    // Shared mem size
-                           VoidPtrTy},
+                           PtrTy},
                           /* isVarArg=*/false);
 #endif
 
@@ -818,13 +878,10 @@ struct ProteusJitPassImpl {
     if (!RegisterVarFn)
       return;
 
-    Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
-
     // The prototype is __jit_register_var(const void *HostAddr, const char
     // *VarName).
-    FunctionType *JitRegisterVarFnTy =
-        FunctionType::get(VoidPtrTy, {VoidPtrTy, VoidPtrTy},
-                          /* isVarArg=*/false);
+    FunctionType *JitRegisterVarFnTy = FunctionType::get(PtrTy, {PtrTy, PtrTy},
+                                                         /* isVarArg=*/false);
     FunctionCallee JitRegisterVarFn =
         M.getOrInsertFunction("__jit_register_var", JitRegisterVarFnTy);
 
@@ -872,13 +929,9 @@ struct ProteusJitPassImpl {
       const auto &JFI = JitFunctionInfoMap[FunctionToRegister];
       size_t NumRuntimeConstants = JFI.ConstantArgs.size();
       // Create jit entry runtime function.
-      Type *VoidPtrType = Type::getInt8PtrTy(M.getContext());
-      Type *VoidType = Type::getVoidTy(M.getContext());
-      Type *Int32PtrType = Type::getInt32PtrTy(M.getContext());
-      Type *Int32Type = Type::getInt32Ty(M.getContext());
 
       ArrayType *RuntimeConstantIdxArrayTy =
-          ArrayType::get(Int32Type, NumRuntimeConstants);
+          ArrayType::get(Int32Ty, NumRuntimeConstants);
 
       IRBuilder<> Builder(RegisterCB->getNextNode());
       // Create an array representing the indices of the args which are runtime
@@ -907,9 +960,9 @@ struct ProteusJitPassImpl {
       //                         char const *FunctionName,
       //                         int32_t* RCIndices,
       //                         int32_t NumRCs)
-      FunctionType *JitRegisterFunctionFnTy = FunctionType::get(
-          VoidType, {VoidPtrType, VoidPtrType, Int32PtrType, Int32Type},
-          /* isVarArg=*/false);
+      FunctionType *JitRegisterFunctionFnTy =
+          FunctionType::get(VoidTy, {PtrTy, PtrTy, PtrTy, Int32Ty},
+                            /* isVarArg=*/false);
       FunctionCallee JitRegisterKernelFn = M.getOrInsertFunction(
           "__jit_register_function", JitRegisterFunctionFnTy);
 
@@ -920,67 +973,12 @@ struct ProteusJitPassImpl {
                           RuntimeConstantsIndicesAlloca, NumRCsValue});
     }
   }
-
-  bool run(Module &M) {
-    parseAnnotations(M);
-
-    if (JitFunctionInfoMap.empty())
-      return false;
-
-    DEBUG(dbgs() << "=== Pre Original Host Module\n"
-                 << M << "=== End of Pre Original Host Module\n");
-
-    // ==================
-    // Device compilation
-    // ==================
-
-    // For device compilation, just extract the module IR for annotated device
-    // kernels and return.
-    if (isDeviceCompilation(M)) {
-      for (auto &JFI : JitFunctionInfoMap)
-        emitJitModuleDevice(M, JFI);
-
-      return true;
-    }
-
-    // ================
-    // Host compilation
-    // ================
-
-    if (hasDeviceLaunchKernelCalls(M)) {
-      getKernelHostStubs(M);
-      instrumentRegisterVar(M);
-      emitModuleUniqueIdGlobal(M);
-      instrumentRegisterJITFunc(M);
-    }
-
-    for (auto &JFI : JitFunctionInfoMap) {
-      Function *JITFn = JFI.first;
-      DEBUG(dbgs() << "Processing JIT Function " << JITFn->getName() << "\n");
-      if (isDeviceKernelHostStub(M, *JITFn)) {
-        emitJitLaunchKernelCall(M, JFI);
-        DEBUG(dbgs() << "DONE!\n");
-
-        continue;
-      }
-
-      emitJitModuleHost(M, JFI);
-      emitJitEntryCall(M, JFI);
-    }
-
-    DEBUG(dbgs() << "=== Post Original Host Module\n"
-                 << M << "=== End Post Original Host Module\n");
-    if (verifyModule(M, &errs()))
-      FATAL_ERROR("Broken original module found, compilation aborted!");
-
-    return true;
-  }
 };
 
 // New PM implementation.
 struct ProteusJitPass : PassInfoMixin<ProteusJitPass> {
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
-    ProteusJitPassImpl PJP;
+    ProteusJitPassImpl PJP{M};
     bool Changed = PJP.run(M);
     if (Changed)
       // TODO: is anything preserved?
@@ -1000,7 +998,7 @@ struct LegacyProteusJitPass : public ModulePass {
   static char ID;
   LegacyProteusJitPass() : ModulePass(ID) {}
   bool runOnModule(Module &M) override {
-    ProteusJitPassImpl PJP;
+    ProteusJitPassImpl PJP{M};
     bool Changed = PJP.run(M);
     return Changed;
   }

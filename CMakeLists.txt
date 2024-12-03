@@ -14,11 +14,13 @@ option(ENABLE_TIME_TRACING "Enable time tracing for the JIT engine" OFF)
 option(BUILD_SHARED "Builds the JIT library as shared" OFF)
 option(ENABLE_TESTS "Enable tests" ON)
 
-set(LLVM_VERSION "17" CACHE STRING "LLVM version")
-
 if(ENABLE_HIP)
   add_definitions("-DENABLE_HIP")
-  find_package(hip 5.7.1 REQUIRED CONFIG)
+  find_package(hip REQUIRED CONFIG)
+  message(STATUS "HIP Version: ${hip_VERSION}")
+  if(hip_VERSION VERSION_LESS "5.7.1")
+    message(FATAL_ERROR "HIP found: ${hip_VERSION} is less than minimum required version 5.7.1.")
+  endif()
 endif()
 
 if(ENABLE_CUDA)

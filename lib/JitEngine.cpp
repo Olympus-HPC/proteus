@@ -46,7 +46,7 @@ using namespace llvm;
 Expected<std::unique_ptr<TargetMachine>>
 JitEngine::createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel) {
   Triple TT(M.getTargetTriple());
-  std::optional<CodeGenOpt::Level> CGOptLevel = CodeGenOpt::getLevel(OptLevel);
+  auto CGOptLevel = CodeGenOpt::getLevel(OptLevel);
   if (CGOptLevel == std::nullopt)
     FATAL_ERROR("Invalid opt level");
 
