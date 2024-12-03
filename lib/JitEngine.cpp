@@ -113,6 +113,8 @@ JitEngine::JitEngine() {
       getEnvOrDefaultBool("ENV_PROTEUS_SET_LAUNCH_BOUNDS", true);
   Config.ENV_PROTEUS_SPECIALIZE_ARGS =
       getEnvOrDefaultBool("ENV_PROTEUS_SPECIALIZE_ARGS", true);
+  Config.ENV_PROTEUS_SPECIALIZE_DIMS =
+      getEnvOrDefaultBool("ENV_PROTEUS_SPECIALIZE_DIMS", true);
 
 #if ENABLE_DEBUG
   dbgs() << "ENV_PROTEUS_USE_STORED_CACHE "
@@ -120,6 +122,8 @@ JitEngine::JitEngine() {
   dbgs() << "ENV_PROTEUS_SET_LAUNCH_BOUNDS "
          << Config.ENV_PROTEUS_SET_LAUNCH_BOUNDS << "\n";
   dbgs() << "ENV_PROTEUS_SPECIALIZE_ARGS " << Config.ENV_PROTEUS_SPECIALIZE_ARGS
+         << "\n";
+  dbgs() << "ENV_PROTEUS_SPECIALIZE_DIMS " << Config.ENV_PROTEUS_SPECIALIZE_DIMS
          << "\n";
 #endif
 }
