@@ -872,9 +872,8 @@ struct ProteusJitPassImpl {
       const auto &JFI = JitFunctionInfoMap[FunctionToRegister];
       size_t NumRuntimeConstants = JFI.ConstantArgs.size();
       // Create jit entry runtime function.
-      Type *VoidPtrType = Type::getInt8PtrTy(M.getContext());
+      Type *VoidPtrType = PointerType::get(M.getContext(), 0);
       Type *VoidType = Type::getVoidTy(M.getContext());
-      Type *Int32PtrType = Type::getInt32PtrTy(M.getContext());
       Type *Int32Type = Type::getInt32Ty(M.getContext());
 
       ArrayType *RuntimeConstantIdxArrayTy =
@@ -908,7 +907,7 @@ struct ProteusJitPassImpl {
       //                         int32_t* RCIndices,
       //                         int32_t NumRCs)
       FunctionType *JitRegisterFunctionFnTy = FunctionType::get(
-          VoidType, {VoidPtrType, VoidPtrType, Int32PtrType, Int32Type},
+          VoidType, {VoidPtrType, VoidPtrType, VoidPtrType, Int32Type},
           /* isVarArg=*/false);
       FunctionCallee JitRegisterKernelFn = M.getOrInsertFunction(
           "__jit_register_function", JitRegisterFunctionFnTy);
