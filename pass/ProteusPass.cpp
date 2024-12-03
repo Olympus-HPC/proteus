@@ -816,7 +816,6 @@ struct ProteusJitPassImpl {
     if (!RegisterVarFn)
       return;
 
-
     Type *VoidPtrTy = PointerType::get(M.getContext(), 0);
 
     // The prototype is __jit_register_var(const void *HostAddr, const char
