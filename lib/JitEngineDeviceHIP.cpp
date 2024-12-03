@@ -116,7 +116,8 @@ std::unique_ptr<MemoryBuffer> JitEngineDeviceHIP::extractDeviceBitcode(
 }
 
 void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
-                                                  int GridSize, int BlockSize) {
+                                                  size_t GridSize,
+                                                  int BlockSize) {
   // TODO: fix calculation of launch bounds.
   // TODO: find maximum (hardcoded 1024) from device info.
   // TODO: Setting as 1, BlockSize to replicate launch bounds settings

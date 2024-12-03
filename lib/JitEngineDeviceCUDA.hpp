@@ -31,7 +31,7 @@ public:
 
   void *resolveDeviceGlobalAddr(const void *Addr);
 
-  void setLaunchBoundsForKernel(Module &M, Function &F, int GridSize,
+  void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
                                 int BlockSize);
 
   std::unique_ptr<MemoryBuffer> extractDeviceBitcode(StringRef KernelName,

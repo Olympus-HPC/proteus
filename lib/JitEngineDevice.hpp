@@ -113,7 +113,7 @@ private:
     return static_cast<ImplT &>(*this).resolveDeviceGlobalAddr(Addr);
   }
 
-  void setLaunchBoundsForKernel(Module &M, Function &F, int GridSize,
+  void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
                                 int BlockSize) {
     static_cast<ImplT &>(*this).setLaunchBoundsForKernel(M, F, GridSize,
                                                          BlockSize);
@@ -204,7 +204,7 @@ private:
   //------------------------------------------------------------------
 
   void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
-                    int BlockSize, int GridSize, RuntimeConstant *RC,
+                    dim3 &BlockDim, dim3 &GridDim, RuntimeConstant *RC,
                     int NumRuntimeConstants);
 
   void
@@ -230,8 +230,8 @@ private:
 
 template <typename ImplT>
 void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
-                                          StringRef Suffix, int BlockSize,
-                                          int GridSize, RuntimeConstant *RC,
+                                          StringRef Suffix, dim3 &BlockDim,
+                                          dim3 &GridDim, RuntimeConstant *RC,
                                           int NumRuntimeConstants) {
 
   TIMESCOPE("specializeIR");
@@ -256,7 +256,8 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
   F->setName(FnName + Suffix);
 
   if (Config.ENV_PROTEUS_SET_LAUNCH_BOUNDS)
-    setLaunchBoundsForKernel(M, *F, GridSize, BlockSize);
+    setLaunchBoundsForKernel(M, *F, GridDim.x * GridDim.y * GridDim.z,
+                             BlockDim.x * BlockDim.y * BlockDim.z);
 
 #if ENABLE_DEBUG
   dbgs() << "=== Final Module\n" << M << "=== End Final Module\n";
@@ -388,9 +389,8 @@ JitEngineDevice<ImplT>::compileAndRun(
     }
   }
 
-  specializeIR(
-      *JitModule, KernelName, Suffix, BlockDim.x * BlockDim.y * BlockDim.z,
-      GridDim.x * GridDim.y * GridDim.z, RCsVec.data(), NumRuntimeConstants);
+  specializeIR(*JitModule, KernelName, Suffix, BlockDim, GridDim, RCsVec.data(),
+               NumRuntimeConstants);
 
   // For CUDA, run the target-specific optimization pipeline to optimize the
   // LLVM IR before handing over to the CUDA driver PTX compiler.
