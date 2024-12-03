@@ -137,7 +137,6 @@ private:
   }
 
   void setKernelDims(Module &M, Function &F, dim3 &GridDim, dim3 &BlockDim) {
-    std::cout << "I am here \n";
     static_cast<ImplT &>(*this).setKernelDims(M, F, GridDim, BlockDim);
   }
 

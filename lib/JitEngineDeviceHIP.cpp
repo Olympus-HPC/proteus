@@ -180,7 +180,61 @@ void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
 
 void JitEngineDeviceHIP::setKernelDims(Module &M, Function &F, dim3 &GridDim,
                                        dim3 &BlockDim) {
-  std::abort();
+  auto ReplaceDim = [&](StringRef IntrinsicName, uint32_t value) {
+    Function *IntrinsicFunction = M.getFunction(IntrinsicName);
+    if (!IntrinsicFunction)
+      return;
+
+    for (auto U = IntrinsicFunction->use_begin(),
+              UE = IntrinsicFunction->use_end();
+         U != UE;) {
+      Use &Use = *U++;
+      if (auto *Call = dyn_cast<CallInst>(Use.getUser())) {
+        Value *ConstantValue =
+            ConstantInt::get(Type::getInt32Ty(M.getContext()), value);
+        Call->replaceAllUsesWith(ConstantValue);
+        Call->eraseFromParent();
+      }
+    }
+  };
+
+  ReplaceDim("_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__XcvjEv", BlockDim.x);
+  ReplaceDim("_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__YcvjEv", BlockDim.y);
+  ReplaceDim("_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__ZcvjEv", BlockDim.z);
+
+  ReplaceDim("_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__XcvjEv", BlockDim.x);
+  ReplaceDim("_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__YcvjEv", BlockDim.y);
+  ReplaceDim("_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__ZcvjEv", BlockDim.z);
+
+  auto InsertAssume = [&](StringRef IntrinsicName, int BlockDim) {
+    Function *IntrinsicFunction = M.getFunction(IntrinsicName);
+    if (!IntrinsicFunction || IntrinsicFunction->use_empty())
+      return; // No modifications made if the intrinsic is not used
+
+    // Iterate over all uses of the intrinsic
+    for (auto U = IntrinsicFunction->use_begin(),
+              UE = IntrinsicFunction->use_end();
+         U != UE;) {
+      Use &Use = *U++;
+      if (auto *Call = dyn_cast<CallInst>(Use.getUser())) {
+        // Insert the llvm.assume intrinsic
+        IRBuilder<> Builder(Call->getNextNode());
+        Value *Bound = ConstantInt::get(Call->getType(), BlockDim);
+        Value *Cmp = Builder.CreateICmpULT(Call, Bound);
+
+        Function *AssumeIntrinsic =
+            Intrinsic::getDeclaration(&M, Intrinsic::assume);
+        Builder.CreateCall(AssumeIntrinsic, Cmp);
+      }
+    }
+  };
+
+  InsertAssume("_ZNK17__HIP_CoordinatesI15__HIP_ThreadIdxE3__XcvjEv",
+               BlockDim.x);
+  InsertAssume("_ZNK17__HIP_CoordinatesI15__HIP_ThreadIdxE3__YcvjEv",
+               BlockDim.y);
+  InsertAssume("_ZNK17__HIP_CoordinatesI15__HIP_ThreadIdxE3__ZcvjEv",
+               BlockDim.z);
 }
 
 std::unique_ptr<MemoryBuffer>
