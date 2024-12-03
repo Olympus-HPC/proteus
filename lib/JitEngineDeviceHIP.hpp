@@ -34,6 +34,8 @@ public:
   void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
                                 int BlockSize);
 
+  void setKernelDims(Module &M, Function &F, dim3 &GridDim, dim3 &BlockDim);
+
   std::unique_ptr<MemoryBuffer> extractDeviceBitcode(StringRef KernelName,
                                                      void *Kernel);
 

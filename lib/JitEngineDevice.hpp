@@ -136,11 +136,16 @@ private:
                                                          BlockSize);
   }
 
-  void getRuntimeConstantsFromModule(Module &M, StringRef FnName,
-                                     void **KernelArgs,
+  void setKernelDims(Module &M, Function &F, dim3 &GridDim, dim3 &BlockDim) {
+    std::cout << "I am here \n";
+    static_cast<ImplT &>(*this).setKernelDims(M, F, GridDim, BlockDim);
+  }
+
+  void getRuntimeConstantsFromModule(Module &M, void **KernelArgs,
+                                     StringRef KernelName,
                                      const SmallVector<int32_t> &RCIndices,
                                      SmallVector<RuntimeConstant> &RCsVec) {
-    Function *F = M.getFunction(FnName);
+    Function *F = M.getFunction(KernelName);
     for (int I = 0; I < RCIndices.size(); ++I) {
       Value *Arg = F->getArg(RCIndices[I]);
       Type *ArgType = Arg->getType();
@@ -279,6 +284,13 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
         ArrayRef<RuntimeConstant>{RC,
                                   static_cast<size_t>(NumRuntimeConstants)});
 
+  std::cout << "Calling proteus kernel dims\n";
+  // Replace uses of blockDim.* and gridDim.* with constants
+  if (Config.ENV_PROTEUS_SPECIALIZE_DIMS) {
+    std::cout << "Calling proteus kernel dims\n";
+    setKernelDims(M, *F, GridDim, BlockDim);
+  }
+
   DBG(dbgs() << "=== JIT Module\n" << M << "=== End of JIT Module\n");
 
   F->setName(FnName + Suffix);
@@ -361,7 +373,7 @@ JitEngineDevice<ImplT>::compileAndRun(
     FATAL_ERROR(toString(std::move(E)).c_str());
 
   auto *JitModule = SafeModule->getModuleUnlocked();
-  getRuntimeConstantsFromModule(*JitModule, KernelName, KernelArgs, RCIndices,
+  getRuntimeConstantsFromModule(*JitModule, KernelArgs, KernelName, RCIndices,
                                 RCsVec);
 
   uint64_t HashValue = CodeCache.hash(ModuleUniqueId, KernelName, RCsVec.data(),

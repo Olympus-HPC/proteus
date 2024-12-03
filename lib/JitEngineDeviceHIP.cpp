@@ -178,6 +178,11 @@ void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
              << WavesPerEU << "\n");
 }
 
+void JitEngineDeviceHIP::setKernelDims(Module &M, Function &F, dim3 &GridDim,
+                                       dim3 &BlockDim) {
+  std::abort();
+}
+
 std::unique_ptr<MemoryBuffer>
 JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
   TIMESCOPE("Codegen object");

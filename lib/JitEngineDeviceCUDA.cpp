@@ -127,6 +127,11 @@ void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module &M, Function &F,
   NvvmAnnotations->addOperand(MDNode::get(M.getContext(), MDVals));
 }
 
+void JitEngineDeviceCUDA::setKernelDims(Module &M, Function &F, dim3 &GridDim,
+                                        dim3 &BlockDim) {
+  std::abort();
+}
+
 cudaError_t JitEngineDeviceCUDA::cudaModuleLaunchKernel(
     CUfunction f, unsigned int gridDimX, unsigned int gridDimY,
     unsigned int gridDimZ, unsigned int blockDimX, unsigned int blockDimY,
