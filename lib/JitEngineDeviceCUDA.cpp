@@ -112,7 +112,7 @@ JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
 }
 
 void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module &M, Function &F,
-                                                   int GridSize,
+                                                   size_t GridSize,
                                                    int BlockSize) {
   NamedMDNode *NvvmAnnotations = M.getNamedMetadata("nvvm.annotations");
   assert(NvvmAnnotations && "Expected non-null nvvm.annotations metadata");
