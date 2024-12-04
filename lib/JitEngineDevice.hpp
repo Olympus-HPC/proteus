@@ -136,8 +136,8 @@ private:
                                                          BlockSize);
   }
 
-  void setKernelDims(Module &M, Function &F, dim3 &GridDim, dim3 &BlockDim) {
-    static_cast<ImplT &>(*this).setKernelDims(M, F, GridDim, BlockDim);
+  void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
+    static_cast<ImplT &>(*this).setKernelDims(M, GridDim, BlockDim);
   }
 
   void getRuntimeConstantsFromModule(Module &M, void **KernelArgs,
@@ -287,7 +287,7 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
   // Replace uses of blockDim.* and gridDim.* with constants
   if (Config.ENV_PROTEUS_SPECIALIZE_DIMS) {
     std::cout << "Calling proteus kernel dims\n";
-    setKernelDims(M, *F, GridDim, BlockDim);
+    setKernelDims(M, GridDim, BlockDim);
   }
 
   DBG(dbgs() << "=== JIT Module\n" << M << "=== End of JIT Module\n");

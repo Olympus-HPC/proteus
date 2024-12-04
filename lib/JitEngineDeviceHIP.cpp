@@ -178,8 +178,15 @@ void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
              << WavesPerEU << "\n");
 }
 
-void JitEngineDeviceHIP::setKernelDims(Module &M, Function &F, dim3 &GridDim,
+void JitEngineDeviceHIP::setKernelDims(Module &M, dim3 &GridDim,
                                        dim3 &BlockDim) {
+  // NOTE: These function names appear to be mangled ones. The optimizer later
+  // will completely replace them with some amdgc intrinsic. Which is fine. But
+  // we need to always certain this happens early in the pipeline. Otherwise the
+  // optimization will not find uses of these functions.
+  //
+  // We can always search for both the names. Which may be ok. but requires
+  // double the amount of work
   auto ReplaceDim = [&](StringRef IntrinsicName, uint32_t value) {
     Function *IntrinsicFunction = M.getFunction(IntrinsicName);
     if (!IntrinsicFunction)
@@ -234,6 +241,13 @@ void JitEngineDeviceHIP::setKernelDims(Module &M, Function &F, dim3 &GridDim,
   InsertAssume("_ZNK17__HIP_CoordinatesI15__HIP_ThreadIdxE3__YcvjEv",
                BlockDim.y);
   InsertAssume("_ZNK17__HIP_CoordinatesI15__HIP_ThreadIdxE3__ZcvjEv",
+               BlockDim.z);
+
+  InsertAssume("_ZNK17__HIP_CoordinatesI14__HIP_BlockIdxE3__XcvjEv",
+               BlockDim.x);
+  InsertAssume("_ZNK17__HIP_CoordinatesI14__HIP_BlockIdxE3__YcvjEv",
+               BlockDim.y);
+  InsertAssume("_ZNK17__HIP_CoordinatesI14__HIP_BlockIdxE3__ZcvjEv",
                BlockDim.z);
 }
 

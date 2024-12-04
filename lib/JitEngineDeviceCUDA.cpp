@@ -127,7 +127,7 @@ void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module &M, Function &F,
   NvvmAnnotations->addOperand(MDNode::get(M.getContext(), MDVals));
 }
 
-void JitEngineDeviceCUDA::setKernelDims(Module &M, Function &F, dim3 &GridDim,
+void JitEngineDeviceCUDA::setKernelDims(Module &M, dim3 &GridDim,
                                         dim3 &BlockDim) {
   auto ReplaceIntrinsicDim = [&](StringRef IntrinsicName, uint32_t value) {
     Function *IntrinsicFunction = M.getFunction(IntrinsicName);
