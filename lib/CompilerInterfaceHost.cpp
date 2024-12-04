@@ -36,3 +36,9 @@ extern "C" __attribute__((used)) void *__jit_entry(char *FnName, char *IR,
 
   return JitFnPtr;
 }
+
+extern "C" __attribute__((used)) void __jit_push_variable(RuntimeConstant RC) {
+  JitEngineHost &Jit = JitEngineHost::instance();
+  Jit.pushJitVariable(RC);
+  return;
+}

@@ -8,20 +8,19 @@
 //
 //===----------------------------------------------------------------------===//
 #include "CompilerInterfaceTypes.h"
-#include "JitEngineHost.hpp"
 
+#include <cstring>
+
+extern "C" void __jit_push_variable(RuntimeConstant RC);
 namespace proteus {
 
-template<typename T>
-T jit_variable(T v, int pos=-1) {
-  JitEngineHost &Jit = JitEngineHost::instance();
+template <typename T> T jit_variable(T v, int pos = -1) {
 
   RuntimeConstant RC;
   std::memcpy(&RC, &v, sizeof(T));
   RC.Slot = pos;
-  Jit.pushJitVariable(RC);
+  __jit_push_variable(RC);
 
   return v;
 }
-
 }
