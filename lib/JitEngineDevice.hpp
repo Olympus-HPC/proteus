@@ -283,10 +283,8 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
         ArrayRef<RuntimeConstant>{RC,
                                   static_cast<size_t>(NumRuntimeConstants)});
 
-  std::cout << "Calling proteus kernel dims\n";
   // Replace uses of blockDim.* and gridDim.* with constants
   if (Config.ENV_PROTEUS_SPECIALIZE_DIMS) {
-    std::cout << "Calling proteus kernel dims\n";
     setKernelDims(M, GridDim, BlockDim);
   }
 
