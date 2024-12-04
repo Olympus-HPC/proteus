@@ -29,6 +29,54 @@ class JitEngineDeviceHIP : public JitEngineDevice<JitEngineDeviceHIP> {
 public:
   static JitEngineDeviceHIP &instance();
 
+  static const char *gridDimXFnName() {
+    return "_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__XcvjEv";
+  };
+
+  static const char *gridDimYFnName() {
+    return "_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__YcvjEv";
+  };
+
+  static const char *gridDimZFnName() {
+    return "_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__ZcvjEv";
+  };
+
+  static const char *blockDimXFnName() {
+    return "_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__XcvjEv";
+  };
+
+  static const char *blockDimYFnName() {
+    return "_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__YcvjEv";
+  };
+
+  static const char *blockDimZFnName() {
+    return "_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__ZcvjEv";
+  };
+
+  static const char *blockIdxXFnName() {
+    return "_ZNK17__HIP_CoordinatesI15__HIP_ThreadIdxE3__XcvjEv";
+  };
+
+  static const char *blockIdxYFnName() {
+    return "_ZNK17__HIP_CoordinatesI15__HIP_ThreadIdxE3__YcvjEv";
+  };
+
+  static const char *blockIdxZFnName() {
+    return "_ZNK17__HIP_CoordinatesI15__HIP_ThreadIdxE3__ZcvjEv";
+  };
+
+  static const char *threadIdxXFnName() {
+    return "_ZNK17__HIP_CoordinatesI14__HIP_BlockIdxE3__XcvjEv";
+  };
+
+  static const char *threadIdxYFnName() {
+    return "_ZNK17__HIP_CoordinatesI14__HIP_BlockIdxE3__YcvjEv";
+  };
+
+  static const char *threadIdxZFnName() {
+    return "_ZNK17__HIP_CoordinatesI14__HIP_BlockIdxE3__ZcvjEv";
+  };
+
   void *resolveDeviceGlobalAddr(const void *Addr);
 
   void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
