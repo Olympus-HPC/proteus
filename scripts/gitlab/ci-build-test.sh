@@ -25,6 +25,13 @@ if [ "${CI_MACHINE}" == "lassen" ]; then
 elif [ "${CI_MACHINE}" == "tioga" ]; then
   ml load rocm/${PROTEUS_CI_ROCM_VERSION}
 
+  if [ -n "$ROCM_PATH" ]; then
+    echo "=> ROCM_PATH ${ROCM_PATH}"
+  else
+    echo "=> Failed to find ROCM_PATH"
+    exit 1
+  fi
+
   LLVM_INSTALL_DIR=${ROCM_PATH}/llvm
   CMAKE_OPTIONS_MACHINE=" -DENABLE_HIP=on"
 else
