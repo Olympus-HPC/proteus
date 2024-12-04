@@ -137,7 +137,69 @@ private:
   }
 
   void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
-    static_cast<ImplT &>(*this).setKernelDims(M, GridDim, BlockDim);
+    auto ReplaceIntrinsicDim = [&](StringRef IntrinsicName, uint32_t DimValue) {
+      Function *IntrinsicFunction = M.getFunction(IntrinsicName);
+      if (!IntrinsicFunction)
+        return;
+
+      for (auto U = IntrinsicFunction->use_begin(),
+                UE = IntrinsicFunction->use_end();
+           U != UE;) {
+        Use &Use = *U++;
+
+        auto *Call = dyn_cast<CallInst>(Use.getUser());
+        if (!Call)
+          continue;
+
+        Value *ConstantValue =
+            ConstantInt::get(Type::getInt32Ty(M.getContext()), DimValue);
+        Call->replaceAllUsesWith(ConstantValue);
+        Call->eraseFromParent();
+      }
+    };
+    ReplaceIntrinsicDim(ImplT::gridDimXFnName(), GridDim.x);
+    ReplaceIntrinsicDim(ImplT::gridDimYFnName(), GridDim.y);
+    ReplaceIntrinsicDim(ImplT::gridDimZFnName(), GridDim.z);
+
+    ReplaceIntrinsicDim(ImplT::blockDimXFnName(), BlockDim.x);
+    ReplaceIntrinsicDim(ImplT::blockDimYFnName(), BlockDim.y);
+    ReplaceIntrinsicDim(ImplT::blockDimZFnName(), BlockDim.z);
+
+    auto InsertAssume = [&](StringRef IntrinsicName, int DimValue) {
+      Function *IntrinsicFunction = M.getFunction(IntrinsicName);
+      if (!IntrinsicFunction || IntrinsicFunction->use_empty())
+        return;
+
+      // Iterate over all uses of the intrinsic.
+      for (auto U = IntrinsicFunction->use_begin(),
+                UE = IntrinsicFunction->use_end();
+           U != UE;) {
+        Use &Use = *U++;
+
+        auto *Call = dyn_cast<CallInst>(Use.getUser());
+        if (!Call)
+          continue;
+
+        // Insert the llvm.assume intrinsic.
+        IRBuilder<> Builder(Call->getNextNode());
+        Value *Bound = ConstantInt::get(Call->getType(), DimValue);
+        Value *Cmp = Builder.CreateICmpULT(Call, Bound);
+
+        Function *AssumeIntrinsic =
+            Intrinsic::getDeclaration(&M, Intrinsic::assume);
+        Builder.CreateCall(AssumeIntrinsic, Cmp);
+      }
+    };
+
+    // Inform LLVM about the range of possible values of threadIdx.*.
+    InsertAssume(ImplT::threadIdxXFnName(), BlockDim.x);
+    InsertAssume(ImplT::threadIdxYFnName(), BlockDim.y);
+    InsertAssume(ImplT::threadIdxZFnName(), BlockDim.z);
+
+    // Inform LLVM about the range of possible values of blockIdx.*.
+    InsertAssume(ImplT::blockIdxXFnName(), GridDim.x);
+    InsertAssume(ImplT::blockIdxYFnName(), GridDim.y);
+    InsertAssume(ImplT::blockIdxZFnName(), GridDim.z);
   }
 
   void getRuntimeConstantsFromModule(Module &M, void **KernelArgs,
@@ -283,7 +345,7 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
         ArrayRef<RuntimeConstant>{RC,
                                   static_cast<size_t>(NumRuntimeConstants)});
 
-  // Replace uses of blockDim.* and gridDim.* with constants
+  // Replace uses of blockDim.* and gridDim.* with constants.
   if (Config.ENV_PROTEUS_SPECIALIZE_DIMS) {
     setKernelDims(M, GridDim, BlockDim);
   }

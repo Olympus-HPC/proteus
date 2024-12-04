@@ -31,12 +31,58 @@ class JitEngineDeviceCUDA : public JitEngineDevice<JitEngineDeviceCUDA> {
 public:
   static JitEngineDeviceCUDA &instance();
 
+  static const char *gridDimXFnName() {
+    return "llvm.nvvm.read.ptx.sreg.nctaid.x";
+  };
+
+  static const char *gridDimYFnName() {
+    return "llvm.nvvm.read.ptx.sreg.nctaid.y";
+  };
+
+  static const char *gridDimZFnName() {
+    return "llvm.nvvm.read.ptx.sreg.nctaid.z";
+  };
+
+  static const char *blockDimXFnName() {
+    return "llvm.nvvm.read.ptx.sreg.ntid.x";
+  };
+
+  static const char *blockDimYFnName() {
+    return "llvm.nvvm.read.ptx.sreg.ntid.y";
+  };
+
+  static const char *blockDimZFnName() {
+    return "llvm.nvvm.read.ptx.sreg.ntid.z";
+  };
+
+  static const char *blockIdxXFnName() {
+    return "llvm.nvvm.read.ptx.sreg.ctaid.x";
+  };
+
+  static const char *blockIdxYFnName() {
+    return "llvm.nvvm.read.ptx.sreg.ctaid.y";
+  };
+
+  static const char *blockIdxZFnName() {
+    return "llvm.nvvm.read.ptx.sreg.ctaid.z";
+  };
+
+  static const char *threadIdxXFnName() {
+    return "llvm.nvvm.read.ptx.sreg.tid.x";
+  };
+
+  static const char *threadIdxYFnName() {
+    return "llvm.nvvm.read.ptx.sreg.tid.y";
+  };
+
+  static const char *threadIdxZFnName() {
+    return "llvm.nvvm.read.ptx.sreg.tid.z";
+  };
+
   void *resolveDeviceGlobalAddr(const void *Addr);
 
   void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
                                 int BlockSize);
-
-  void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim);
 
   std::unique_ptr<MemoryBuffer> extractDeviceBitcode(StringRef KernelName,
                                                      void *Kernel);

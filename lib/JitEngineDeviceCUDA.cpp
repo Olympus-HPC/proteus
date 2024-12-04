@@ -127,65 +127,6 @@ void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module &M, Function &F,
   NvvmAnnotations->addOperand(MDNode::get(M.getContext(), MDVals));
 }
 
-void JitEngineDeviceCUDA::setKernelDims(Module &M, dim3 &GridDim,
-                                        dim3 &BlockDim) {
-  auto ReplaceIntrinsicDim = [&](StringRef IntrinsicName, uint32_t value) {
-    Function *IntrinsicFunction = M.getFunction(IntrinsicName);
-    if (!IntrinsicFunction)
-      return;
-
-    for (auto U = IntrinsicFunction->use_begin(),
-              UE = IntrinsicFunction->use_end();
-         U != UE;) {
-      Use &Use = *U++;
-      if (auto *Call = dyn_cast<CallInst>(Use.getUser())) {
-        Value *ConstantValue =
-            ConstantInt::get(Type::getInt32Ty(M.getContext()), value);
-        Call->replaceAllUsesWith(ConstantValue);
-        Call->eraseFromParent();
-      }
-    }
-  };
-  ReplaceIntrinsicDim("llvm.nvvm.read.ptx.sreg.nctaid.x", GridDim.x);
-  ReplaceIntrinsicDim("llvm.nvvm.read.ptx.sreg.nctaid.y", GridDim.y);
-  ReplaceIntrinsicDim("llvm.nvvm.read.ptx.sreg.nctaid.z", GridDim.z);
-
-  ReplaceIntrinsicDim("llvm.nvvm.read.ptx.sreg.ntid.x", BlockDim.x);
-  ReplaceIntrinsicDim("llvm.nvvm.read.ptx.sreg.ntid.y", BlockDim.y);
-  ReplaceIntrinsicDim("llvm.nvvm.read.ptx.sreg.ntid.z", BlockDim.z);
-
-  auto InsertAssume = [&](StringRef IntrinsicName, int BlockDim) {
-    Function *IntrinsicFunction = M.getFunction(IntrinsicName);
-    if (!IntrinsicFunction || IntrinsicFunction->use_empty())
-      return; // No modifications made if the intrinsic is not used
-
-    // Iterate over all uses of the intrinsic
-    for (auto U = IntrinsicFunction->use_begin(),
-              UE = IntrinsicFunction->use_end();
-         U != UE;) {
-      Use &Use = *U++;
-      if (auto *Call = dyn_cast<CallInst>(Use.getUser())) {
-        // Insert the llvm.assume intrinsic
-        IRBuilder<> Builder(Call->getNextNode());
-        Value *Bound = ConstantInt::get(Call->getType(), BlockDim);
-        Value *Cmp = Builder.CreateICmpULT(Call, Bound);
-
-        Function *AssumeIntrinsic =
-            Intrinsic::getDeclaration(&M, Intrinsic::assume);
-        Builder.CreateCall(AssumeIntrinsic, Cmp);
-      }
-    }
-  };
-
-  InsertAssume("llvm.nvvm.read.ptx.sreg.tid.x", BlockDim.x);
-  InsertAssume("llvm.nvvm.read.ptx.sreg.tid.y", BlockDim.y);
-  InsertAssume("llvm.nvvm.read.ptx.sreg.tid.z", BlockDim.z);
-
-  InsertAssume("llvm.nvvm.read.ptx.sreg.ctaid.x", BlockDim.x);
-  InsertAssume("llvm.nvvm.read.ptx.sreg.ctaid.y", BlockDim.y);
-  InsertAssume("llvm.nvvm.read.ptx.sreg.ctaid.z", BlockDim.z);
-}
-
 cudaError_t JitEngineDeviceCUDA::cudaModuleLaunchKernel(
     CUfunction f, unsigned int gridDimX, unsigned int gridDimY,
     unsigned int gridDimZ, unsigned int blockDimX, unsigned int blockDimY,
