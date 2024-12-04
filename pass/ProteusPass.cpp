@@ -154,8 +154,8 @@ public:
       emitJitEntryCall(M, JFI);
     }
 
-    (dbgs() << "=== Post Original Host Module\n"
-            << M << "=== End Post Original Host Module\n");
+    DEBUG(dbgs() << "=== Post Original Host Module\n"
+                 << M << "=== End Post Original Host Module\n");
     if (verifyModule(M, &errs()))
       FATAL_ERROR("Broken original module found, compilation aborted!");
 
