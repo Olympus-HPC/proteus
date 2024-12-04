@@ -29,9 +29,9 @@ FLAGS += --cuda-gpu-arch=$(ARCH) --cuda-path=${CUDA_HOME}/nvidia $(RFLAGS)
 
 ifeq ($(JIT),yes)
   LIBLLVM_PATH=$(dir $(realpath $(CC)))../lib
-  FLAGS += -fpass-plugin=$(JIT_PATH)/pass/libProteusJitPass.so -DENABLE_JIT
+  FLAGS += -fpass-plugin=$(JIT_PATH)/pass/libProteusPass.so -DENABLE_JIT
   LINKFLAGS += -Wl,-rpath,$(LIBLLVM_PATH) -L$(LIBLLVM_PATH) -lLLVM \
-	       -Wl,-rpath,$(JIT_PATH)/lib -L${JIT_PATH}/lib/ -lproteusjit -lnvptxcompiler_static
+	       -Wl,-rpath,$(JIT_PATH)/lib -L${JIT_PATH}/lib/ -lproteus -lnvptxcompiler_static
 endif
 
 lulesh$(SUFFIX).x: allocator$(SUFFIX).o lulesh$(SUFFIX).o lulesh-comms$(SUFFIX).o lulesh-comms-gpu$(SUFFIX).o

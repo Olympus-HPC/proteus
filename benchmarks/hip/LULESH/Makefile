@@ -26,8 +26,8 @@ LINKFLAGS =
 FLAGS += $(RFLAGS)
 
 ifeq ($(JIT),yes)
-  FLAGS += -fpass-plugin=$(JIT_PATH)/pass/libProteusJitPass.so -DENABLE_JIT
-  LINKFLAGS += -Wl,-rpath,$(JIT_PATH)/lib -L${JIT_PATH}/lib/ -lproteusjit
+  FLAGS += -fpass-plugin=$(JIT_PATH)/pass/libProteusPass.so -DENABLE_JIT
+  LINKFLAGS += -Wl,-rpath,$(JIT_PATH)/lib -L${JIT_PATH}/lib/ -lproteus
 endif
 
 lulesh$(SUFFIX).x: allocator$(SUFFIX).o lulesh$(SUFFIX).o lulesh-comms$(SUFFIX).o lulesh-comms-gpu$(SUFFIX).o

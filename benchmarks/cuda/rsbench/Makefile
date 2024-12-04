@@ -57,9 +57,9 @@ endif
 
 ifeq ($(JIT),yes)
   LIBLLVM_PATH=$(dir $(realpath $(CC)))../lib
-  CFLAGS += -fpass-plugin=$(JIT_PATH)/pass/libProteusJitPass.so -DENABLE_JIT
+  CFLAGS += -fpass-plugin=$(JIT_PATH)/pass/libProteusPass.so -DENABLE_JIT
   LDFLAGS += -Wl,-rpath,$(LIBLLVM_PATH) -L$(LIBLLVM_PATH) -lLLVM \
-	     -Wl,-rpath,$(JIT_PATH)/lib -L$(JIT_PATH)/lib/ -lproteusjit -lnvptxcompiler_static
+	     -Wl,-rpath,$(JIT_PATH)/lib -L$(JIT_PATH)/lib/ -lproteus -lnvptxcompiler_static
 endif
 
 LDFLAGS +=-lnvptxcompiler_static

@@ -48,8 +48,8 @@ ifeq ($(OPTIMIZE),yes)
 endif
 
 ifeq ($(JIT),yes)
-  CFLAGS += -fpass-plugin=$(JIT_PATH)/pass/libProteusJitPass.so -DENABLE_JIT
-  LDFLAGS += -Wl,-rpath,$(JIT_PATH)/lib -L${JIT_PATH}/lib/ -lproteusjit
+  CFLAGS += -fpass-plugin=$(JIT_PATH)/pass/libProteusPass.so -DENABLE_JIT
+  LDFLAGS += -Wl,-rpath,$(JIT_PATH)/lib -L${JIT_PATH}/lib/ -lproteus
 endif
 
 #===============================================================================
