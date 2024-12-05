@@ -106,7 +106,7 @@ public:
     Int32Ty = Type::getInt32Ty(M.getContext());
     Int64Ty = Type::getInt64Ty(M.getContext());
     Int128Ty = Type::getInt128Ty(M.getContext());
-    RuntimeConstantTy = StructType::create({Int128Ty}, "struct.args");
+    RuntimeConstantTy = StructType::create({Int128Ty, Int32Ty}, "struct.args", true);
   }
 
   bool run(Module &M) {
@@ -743,13 +743,10 @@ private:
   }
 
   void replaceWithJitLaunchKernel(Module &M, CallBase *LaunchKernelCall) {
-  StructType *getRuntimeConstantTy(Module &M) {
-    Type *Int32Ty = Type::getInt32Ty(M.getContext());
-    Type *Int128Ty = Type::getInt128Ty(M.getContext());
-    StructType *RuntimeConstantTy =
-        StructType::create({Int128Ty, Int32Ty}, "struct.args", true);
-
-    return RuntimeConstantTy;
+    // Type *Int32Ty = Type::getInt32Ty(M.getContext());
+    // Type *Int128Ty = Type::getInt128Ty(M.getContext());
+    // StructType *RuntimeConstantTy =
+    //     StructType::create({Int128Ty, Int32Ty}, "struct.args", true);
 
     GlobalVariable *ModuleUniqueId =
         M.getGlobalVariable("__module_unique_id", true);
@@ -912,7 +909,7 @@ private:
   /// instrumentRegisterJITFunc instruments any function passed to a kernel
   /// launch in the IR with a `__jit_register_function` call.
   void instrumentRegisterJITFunc(Module &M) {
-    if (!RegisterFunctionName) {
+    if (!RegisterFunctionName)
       FATAL_ERROR("instrumentRegisterJITFunc only callable with `EnableHIP or "
                   "EnableCUDA set.");
       return;
