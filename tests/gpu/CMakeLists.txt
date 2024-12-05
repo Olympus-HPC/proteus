@@ -29,7 +29,7 @@ function(CREATE_GPU_TEST exe check_source)
     set_tests_properties(${exe}.${lang} PROPERTIES FIXTURES_REQUIRED cleanupDeleteJitStoredCacheFiles)
 endfunction()
 
-function(CREATE_GPU_TEST_RDC exe source)
+function(CREATE_GPU_TEST_RDC exe check_source)
     if(ENABLE_HIP)
         SET(lang HIP)
     elseif(ENABLE_CUDA)
@@ -38,8 +38,8 @@ function(CREATE_GPU_TEST_RDC exe source)
         message(FATAL_ERROR "ENABLE_HIP or ENABLE_CUDA must be defined for GPU tests")
     endif()
 
-    add_executable(${exe}.${lang}.rdc ${source})
-    set_source_files_properties(${source} PROPERTIES
+    add_executable(${exe}.${lang}.rdc ${check_source} ${ARGN})
+    set_source_files_properties(${check_source} ${ARGN} PROPERTIES
         LANGUAGE ${lang}
         OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/ProteusPass.cpp
     )
@@ -73,14 +73,7 @@ function(CREATE_GPU_TEST_RDC exe source)
         message(FATAL_ERROR "ENABLE_HIP or ENABLE_CUDA must be defined for GPU tests")
     endif()
 
-    # Code to pull only lit instructions from first source file
-    list(LENGTH source num_source_files)
-    if(${num_source_files} GREATER 1)
-      list(GET source 0 lit_instructions)
-      add_test(NAME ${exe}.${lang}.rdc COMMAND ${LIT} -vv -D EXT=${lang}.rdc ${lit_instructions})
-    else()
-      add_test(NAME ${exe}.${lang}.rdc COMMAND ${LIT} -vv -D EXT=${lang}.rdc ${source})
-    endif()
+    add_test(NAME ${exe}.${lang}.rdc COMMAND ${LIT} -vv -D EXT=${lang}.rdc ${check_source})
     set_tests_properties(${exe}.${lang}.rdc PROPERTIES FIXTURES_REQUIRED setupDeleteJitStoredCacheFiles)
     set_tests_properties(${exe}.${lang}.rdc PROPERTIES FIXTURES_REQUIRED cleanupDeleteJitStoredCacheFiles)
 endfunction()
@@ -151,13 +144,7 @@ CREATE_GPU_TEST_RDC(kernel_host_jit kernel_host_jit.cpp)
 CREATE_GPU_TEST_RDC(kernel_host_device_jit kernel_host_device_jit.cpp)
 CREATE_GPU_TEST_RDC(types types.cpp)
 
-# The following tests fails and need to be "fixed" I pass will fail true to enable CI
-CREATE_GPU_TEST_RDC(device_function "main_code.cpp;device_code.cpp;device_code2.cpp")
-if(ENABLE_CUDA)
-set_tests_properties(device_function.CUDA.rdc PROPERTIES WILL_FAIL TRUE)
-else()
-set_tests_properties(device_function.HIP.rdc PROPERTIES WILL_FAIL TRUE)
-endif()
+CREATE_GPU_TEST_RDC(kernel_calls_func kernel_calls_func.cpp device_func.cpp)
 
 # TODO: Those two tests fail on CUDA with JIT stored caching because device
 # global variables need to be re-linked to their runtime address. However, I
