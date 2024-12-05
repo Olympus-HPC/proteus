@@ -78,6 +78,54 @@ function(CREATE_GPU_TEST_RDC exe check_source)
     set_tests_properties(${exe}.${lang}.rdc PROPERTIES FIXTURES_REQUIRED cleanupDeleteJitStoredCacheFiles)
 endfunction()
 
+function(CREATE_GPU_TEST_RDC_LIBS exe libs check_source)
+    if(ENABLE_HIP)
+        SET(lang HIP)
+    elseif(ENABLE_CUDA)
+        SET(lang CUDA)
+    else()
+        message(FATAL_ERROR "ENABLE_HIP or ENABLE_CUDA must be defined for GPU tests")
+    endif()
+
+    #message(FATAL_ERROR "libs ${libs} check_source ${check_source} ARGN ${ARGN}")
+
+    CREATE_GPU_TEST_RDC(${exe} ${check_source} ${ARGN})
+    target_link_libraries(${exe}.${lang}.rdc PRIVATE ${libs})
+endfunction()
+
+# Creates a device library, which can be linked with another  test. The library does not
+# apply the pass
+function(CREATE_GPU_LIBRARY lib source)
+    if(ENABLE_HIP)
+        SET(lang HIP)
+    elseif(ENABLE_CUDA)
+        SET(lang CUDA)
+    else()
+        message(FATAL_ERROR "ENABLE_HIP or ENABLE_CUDA must be defined for GPU tests")
+    endif()
+
+    add_library(${lib} ${source})
+
+    set_source_files_properties(${source} PROPERTIES LANGUAGE ${lang})
+
+    if(ENABLE_HIP)
+        # This is unsupported see: https://gitlab.kitware.com/cmake/cmake/-/issues/23210
+        # set_target_properties(${exe}.rdc PROPERTIES HIP_SEPARABLE_COMPILATION on)
+        target_compile_options(
+          ${lib}
+            PUBLIC
+            -fgpu-rdc
+        )
+
+        target_link_options(${lib} PUBLIC -fgpu-rdc --hip-link)
+    elseif(ENABLE_CUDA)
+        # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
+        set_target_properties(${lib} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    else()
+        message(FATAL_ERROR "ENABLE_HIP or ENABLE_CUDA must be defined for GPU tests")
+    endif()
+endfunction()
+
 if(ENABLE_HIP)
     enable_language(HIP)
 elseif(ENABLE_CUDA)
@@ -145,12 +193,7 @@ CREATE_GPU_TEST_RDC(kernel_host_device_jit kernel_host_device_jit.cpp)
 CREATE_GPU_TEST_RDC(types types.cpp)
 
 CREATE_GPU_TEST_RDC(kernel_calls_func kernel_calls_func.cpp device_func.cpp)
-
-# TODO: Those two tests fail on CUDA with JIT stored caching because device
-# global variables need to be re-linked to their runtime address. However, I
-# chose NOT to cast them as WILL_FAIL with the code here, to make the failure
-# explicit when running tests. The WIP solution is caching LLVM IR instead of a
-# binary object, which is pending implementation.
-#if(ENABLE_CUDA)
-#    set_tests_properties(kernels_gvar.CUDA kernels_gvar.CUDA.rdc PROPERTIES WILL_FAIL TRUE)
-#endif()
+# TODO: Fix linking with external binaries that have not been compiled with the
+# ProteusPass.
+#CREATE_GPU_LIBRARY(device_func_lib device_func.cpp)
+#CREATE_GPU_TEST_RDC_LIBS(kernel_calls_func_lib device_func_lib kernel_calls_func.cpp)
