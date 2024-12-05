@@ -16,6 +16,7 @@
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Instructions.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/MemoryBufferRef.h>
 #include <memory>
@@ -138,25 +139,29 @@ private:
 
   void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
     auto ReplaceIntrinsicDim = [&](StringRef IntrinsicName, uint32_t DimValue) {
+      auto CollectCallUsers = [](Function &F) {
+        SmallVector<CallInst *> CallUsers;
+        for (auto *User : F.users()) {
+          auto *Call = dyn_cast<CallInst>(User);
+          if (!Call)
+            continue;
+          CallUsers.push_back(Call);
+        }
+
+        return CallUsers;
+      };
       Function *IntrinsicFunction = M.getFunction(IntrinsicName);
       if (!IntrinsicFunction)
         return;
 
-      for (auto U = IntrinsicFunction->use_begin(),
-                UE = IntrinsicFunction->use_end();
-           U != UE;) {
-        Use &Use = *U++;
-
-        auto *Call = dyn_cast<CallInst>(Use.getUser());
-        if (!Call)
-          continue;
-
+      for (auto *Call : CollectCallUsers(*IntrinsicFunction)) {
         Value *ConstantValue =
             ConstantInt::get(Type::getInt32Ty(M.getContext()), DimValue);
         Call->replaceAllUsesWith(ConstantValue);
         Call->eraseFromParent();
       }
     };
+
     ReplaceIntrinsicDim(ImplT::gridDimXFnName(), GridDim.x);
     ReplaceIntrinsicDim(ImplT::gridDimYFnName(), GridDim.y);
     ReplaceIntrinsicDim(ImplT::gridDimZFnName(), GridDim.z);
@@ -171,12 +176,8 @@ private:
         return;
 
       // Iterate over all uses of the intrinsic.
-      for (auto U = IntrinsicFunction->use_begin(),
-                UE = IntrinsicFunction->use_end();
-           U != UE;) {
-        Use &Use = *U++;
-
-        auto *Call = dyn_cast<CallInst>(Use.getUser());
+      for (auto U : IntrinsicFunction->users()) {
+        auto *Call = dyn_cast<CallInst>(U);
         if (!Call)
           continue;
 
