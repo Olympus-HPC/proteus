@@ -109,7 +109,7 @@ public:
     Int32Ty = Type::getInt32Ty(M.getContext());
     Int64Ty = Type::getInt64Ty(M.getContext());
     Int128Ty = Type::getInt128Ty(M.getContext());
-    RuntimeConstantTy = StructType::create({Int128Ty}, "struct.args");
+    RuntimeConstantTy = StructType::create({Int128Ty, Int32Ty}, "struct.args", true);
   }
 
   bool run(Module &M, bool IsLTO) {

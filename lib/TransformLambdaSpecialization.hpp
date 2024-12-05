@@ -25,22 +25,22 @@ using namespace llvm;
 
 static inline Constant* getConstant(LLVMContext& Ctx, Type* ArgType, RuntimeConstant RC) {
       if (ArgType->isIntegerTy(1)) {
-        return ConstantInt::get(ArgType, RC.BoolVal);
+        return ConstantInt::get(ArgType, RC.Value.BoolVal);
       } else if (ArgType->isIntegerTy(8)) {
-        return ConstantInt::get(ArgType, RC.Int8Val);
+        return ConstantInt::get(ArgType, RC.Value.Int8Val);
       } else if (ArgType->isIntegerTy(32)) {
-        return ConstantInt::get(ArgType, RC.Int32Val);
+        return ConstantInt::get(ArgType, RC.Value.Int32Val);
       } else if (ArgType->isIntegerTy(64)) {
-        return ConstantInt::get(ArgType, RC.Int64Val);
+        return ConstantInt::get(ArgType, RC.Value.Int64Val);
       } else if (ArgType->isFloatTy()) {
-        return ConstantFP::get(ArgType, RC.FloatVal);
+        return ConstantFP::get(ArgType, RC.Value.FloatVal);
       } else if (ArgType->isDoubleTy()) {
-        return ConstantFP::get(ArgType, RC.DoubleVal);
+        return ConstantFP::get(ArgType, RC.Value.DoubleVal);
       } else if (ArgType->isX86_FP80Ty() || ArgType->isPPC_FP128Ty() ||
                  ArgType->isFP128Ty()) {
-        return ConstantFP::get(ArgType, RC.LongDoubleVal);
+        return ConstantFP::get(ArgType, RC.Value.LongDoubleVal);
       } else if (ArgType->isPointerTy()) {
-        auto *IntC = ConstantInt::get(Type::getInt64Ty(Ctx), RC.Int64Val);
+        auto *IntC = ConstantInt::get(Type::getInt64Ty(Ctx), RC.Value.Int64Val);
         return ConstantExpr::getIntToPtr(IntC, ArgType);
       } else {
         std::string TypeString;
@@ -61,7 +61,7 @@ public:
     dbgs() << "\t args"
            << "\n";
     for (auto Arg : RC) {
-      dbgs() << "{" << Arg.Int64Val << ", " << Arg.Slot << " }\n";
+      dbgs() << "{" << Arg.Value.Int64Val << ", " << Arg.Slot << " }\n";
     }
 
     dbgs() << "\t users"
