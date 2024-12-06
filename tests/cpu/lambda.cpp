@@ -1,15 +1,11 @@
 // RUN: ./lambda | FileCheck %s --check-prefixes=CHECK
 
-#include <iostream>
 #include <chrono>
+#include <iostream>
 
 #include "JitVariable.hpp"
 
-
-template<typename F>
-void run(F&& f) {
-  f();
-}
+template <typename F> void run(F &&f) { f(); }
 
 int main(int argc, char **argv) {
   int N = 1024;
@@ -26,7 +22,10 @@ int main(int argc, char **argv) {
 
   std::cout << y[1] << std::endl;
 
-  run([=, N=proteus::jit_variable(N), a=proteus::jit_variable(a), b=proteus::jit_variable(b)] ()  __attribute__((annotate("jit"))) {
+  run([
+    =, N = proteus::jit_variable(N), a = proteus::jit_variable(a),
+    b = proteus::jit_variable(b)
+  ]() __attribute__((annotate("jit"))) {
     for (std::size_t i{0}; i < N; ++i) {
       y[i] += a * b * x[i];
     }

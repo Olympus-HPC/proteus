@@ -23,4 +23,4 @@ template <typename T> T jit_variable(T v, int pos = -1) {
 
   return v;
 }
-}
+} // namespace proteus
