@@ -251,7 +251,7 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
     // TODO: change NumRuntimeConstants to size_t at interface.
     MDNode *Node = F->getMetadata("jit_arg_nos");
     assert(Node && "Expected metata for jit argument positions");
-    DBG(dbgs() << "Metadata jit for F " << F.getName() << " = " << *Node
+    DBG(dbgs() << "Metadata jit for F " << F->getName() << " = " << *Node
                << "\n");
 
     // Replace argument uses with runtime constants.

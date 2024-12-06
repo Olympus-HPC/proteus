@@ -27,8 +27,6 @@ public:
                         const SmallVectorImpl<int32_t> &ArgPos,
                         ArrayRef<RuntimeConstant> RC) {
     auto &Ctx = M.getContext();
-    DBG(dbgs() << "Metadata jit for F " << F.getName() << " = " << *Node
-               << "\n");
 
     // Replace argument uses with runtime constants.
     for (int I = 0; I < ArgPos.size(); ++I) {

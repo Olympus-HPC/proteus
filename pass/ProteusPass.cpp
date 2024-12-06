@@ -158,8 +158,6 @@ public:
     DEBUG(dbgs() << "=== Post Original Host Module\n"
                  << M << "=== End Post Original Host Module\n");
 
-    DEBUG(dbgs() << "=== Post Original Host Module\n"
-                 << M << "=== End Post Original Host Module\n");
     if (verifyModule(M, &errs()))
       FATAL_ERROR("Broken original module found, compilation aborted!");
 
@@ -873,10 +871,9 @@ private:
 
   void instrumentRegisterVar(Module &M) {
     Function *RegisterVarFn = nullptr;
-    if (!RegisterVarName) {
-      FATAL_ERROR("instrumentRegisterVar is not callable without EnableCUDA or "
-                  "EnableHIP set.");
-    }
+    if (!RegisterVarName)
+      return;
+
     RegisterVarFn = M.getFunction(RegisterVarName);
     if (!RegisterVarFn)
       return;

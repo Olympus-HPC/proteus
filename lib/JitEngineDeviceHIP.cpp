@@ -208,16 +208,6 @@ JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
   // NOTE: the following version of te code does not set options.
   // hiprtcErrCheck(hiprtcLinkCreate(0, nullptr, nullptr, &hip_link_state_ptr));
 
-#if 0
-  for (auto &KV : LinkedModules) {
-    auto DeviceBitcode = KV.second;
-    hiprtcErrCheck(
-        hiprtcLinkAddData(hip_link_state_ptr, HIPRTC_JIT_INPUT_LLVM_BITCODE,
-                          (void *)DeviceBitcode.data(), DeviceBitcode.size(),
-                          "", 0, nullptr, nullptr));
-  }
-#endif
-
   hiprtcErrCheck(hiprtcLinkAddData(
       hip_link_state_ptr, HIPRTC_JIT_INPUT_LLVM_BITCODE,
       (void *)ModuleBuf.data(), ModuleBuf.size(), "", 0, nullptr, nullptr));
