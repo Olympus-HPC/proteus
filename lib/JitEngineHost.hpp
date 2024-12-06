@@ -54,7 +54,6 @@ private:
   void addStaticLibrarySymbols();
   JitCache<void *> CodeCache;
   SmallVector<RuntimeConstant, 8> JitVariables;
-
 };
 
 } // namespace proteus

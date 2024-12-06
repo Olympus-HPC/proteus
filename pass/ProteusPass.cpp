@@ -109,7 +109,8 @@ public:
     Int32Ty = Type::getInt32Ty(M.getContext());
     Int64Ty = Type::getInt64Ty(M.getContext());
     Int128Ty = Type::getInt128Ty(M.getContext());
-    RuntimeConstantTy = StructType::create({Int128Ty, Int32Ty}, "struct.args", true);
+    RuntimeConstantTy =
+        StructType::create({Int128Ty, Int32Ty}, "struct.args", true);
   }
 
   bool run(Module &M, bool IsLTO) {
@@ -918,6 +919,7 @@ private:
       FATAL_ERROR("instrumentRegisterJITFunc only callable with `EnableHIP or "
                   "EnableCUDA set.");
       return;
+    }
 
     Function *RegisterFunction = M.getFunction(RegisterFunctionName);
     assert(RegisterFunction &&
@@ -985,9 +987,9 @@ private:
     dbgs() << "finding jit variables" << "\n";
     dbgs() << "users..." << "\n";
 
-    SmallVector<Function*, 16> JitFunctions;
+    SmallVector<Function *, 16> JitFunctions;
 
-    for (auto& F : M.getFunctionList()) {
+    for (auto &F : M.getFunctionList()) {
       if (F.getName().contains("jit_variable")) {
         JitFunctions.push_back(&F);
       }
@@ -997,12 +999,13 @@ private:
       for (auto User : Function->users()) {
 
         CallBase *CB = dyn_cast<CallBase>(User);
-        if (!CB) 
-          FATAL_ERROR("Expected CallBase as user of proteus::jit_variable function");
+        if (!CB)
+          FATAL_ERROR(
+              "Expected CallBase as user of proteus::jit_variable function");
 
         dbgs() << "call: " << *CB << "\n";
         StoreInst *S = dyn_cast<StoreInst>(*(CB->users().begin()));
-        if (!S) 
+        if (!S)
           FATAL_ERROR("Expected StoreInst");
         dbgs() << "store: " << *S << "\n";
         Value *V = S->getPointerOperand();
@@ -1020,7 +1023,7 @@ private:
         }
       }
     }
-    
+
     dbgs() << "done." << "\n";
   }
 };
