@@ -268,8 +268,8 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
         *M, *F, ArgPos,
         ArrayRef<RuntimeConstant>{RC,
                                   static_cast<size_t>(NumRuntimeConstants)});
-
-    TransformLambdaSpecialization::transform(*M, *F, JitVariables);
+    if (!JitVariables.empty())
+      TransformLambdaSpecialization::transform(*M, *F, JitVariables);
 
     // dbgs() << "=== JIT Module\n" << *M << "=== End of JIT Module\n";
 
