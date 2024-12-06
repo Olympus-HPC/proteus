@@ -23,32 +23,33 @@ namespace proteus {
 
 using namespace llvm;
 
-static inline Constant* getConstant(LLVMContext& Ctx, Type* ArgType, RuntimeConstant RC) {
-      if (ArgType->isIntegerTy(1)) {
-        return ConstantInt::get(ArgType, RC.Value.BoolVal);
-      } else if (ArgType->isIntegerTy(8)) {
-        return ConstantInt::get(ArgType, RC.Value.Int8Val);
-      } else if (ArgType->isIntegerTy(32)) {
-        return ConstantInt::get(ArgType, RC.Value.Int32Val);
-      } else if (ArgType->isIntegerTy(64)) {
-        return ConstantInt::get(ArgType, RC.Value.Int64Val);
-      } else if (ArgType->isFloatTy()) {
-        return ConstantFP::get(ArgType, RC.Value.FloatVal);
-      } else if (ArgType->isDoubleTy()) {
-        return ConstantFP::get(ArgType, RC.Value.DoubleVal);
-      } else if (ArgType->isX86_FP80Ty() || ArgType->isPPC_FP128Ty() ||
-                 ArgType->isFP128Ty()) {
-        return ConstantFP::get(ArgType, RC.Value.LongDoubleVal);
-      } else if (ArgType->isPointerTy()) {
-        auto *IntC = ConstantInt::get(Type::getInt64Ty(Ctx), RC.Value.Int64Val);
-        return ConstantExpr::getIntToPtr(IntC, ArgType);
-      } else {
-        std::string TypeString;
-        raw_string_ostream TypeOstream(TypeString);
-        ArgType->print(TypeOstream);
-        FATAL_ERROR("JIT Incompatible type in runtime constant: " +
-                    TypeOstream.str());
-      }
+static inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
+                                    RuntimeConstant RC) {
+  if (ArgType->isIntegerTy(1)) {
+    return ConstantInt::get(ArgType, RC.Value.BoolVal);
+  } else if (ArgType->isIntegerTy(8)) {
+    return ConstantInt::get(ArgType, RC.Value.Int8Val);
+  } else if (ArgType->isIntegerTy(32)) {
+    return ConstantInt::get(ArgType, RC.Value.Int32Val);
+  } else if (ArgType->isIntegerTy(64)) {
+    return ConstantInt::get(ArgType, RC.Value.Int64Val);
+  } else if (ArgType->isFloatTy()) {
+    return ConstantFP::get(ArgType, RC.Value.FloatVal);
+  } else if (ArgType->isDoubleTy()) {
+    return ConstantFP::get(ArgType, RC.Value.DoubleVal);
+  } else if (ArgType->isX86_FP80Ty() || ArgType->isPPC_FP128Ty() ||
+             ArgType->isFP128Ty()) {
+    return ConstantFP::get(ArgType, RC.Value.LongDoubleVal);
+  } else if (ArgType->isPointerTy()) {
+    auto *IntC = ConstantInt::get(Type::getInt64Ty(Ctx), RC.Value.Int64Val);
+    return ConstantExpr::getIntToPtr(IntC, ArgType);
+  } else {
+    std::string TypeString;
+    raw_string_ostream TypeOstream(TypeString);
+    ArgType->print(TypeOstream);
+    FATAL_ERROR("JIT Incompatible type in runtime constant: " +
+                TypeOstream.str());
+  }
 }
 
 class TransformLambdaSpecialization {
@@ -82,8 +83,8 @@ public:
         int Slot = CI->getZExtValue();
         for (auto Arg : RC) {
           if (Arg.Slot == Slot) {
-            LoadInst* LI = dyn_cast<LoadInst>(*(User->users().begin()));
-            Type* LoadType = LI->getType();
+            LoadInst *LI = dyn_cast<LoadInst>(*(User->users().begin()));
+            Type *LoadType = LI->getType();
             Constant *C = getConstant(M.getContext(), LoadType, Arg);
             LI->replaceAllUsesWith(C);
             dbgs() << "Replacing " << *User << " with " << *C << "\n";
@@ -94,6 +95,6 @@ public:
   }
 };
 
-}
+} // namespace proteus
 
 #endif
