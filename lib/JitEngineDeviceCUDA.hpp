@@ -66,6 +66,10 @@ private:
   JitEngineDeviceCUDA();
   JitEngineDeviceCUDA(JitEngineDeviceCUDA &) = delete;
   JitEngineDeviceCUDA(JitEngineDeviceCUDA &&) = delete;
+
+  void extractLinkedBitcode(LLVMContext &Ctx, CUmodule &CUMod,
+                            SmallVector<std::unique_ptr<Module>> &LinkedModules,
+                            std::string &ModuleId);
 };
 
 } // namespace proteus

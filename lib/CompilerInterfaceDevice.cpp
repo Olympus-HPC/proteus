@@ -39,9 +39,10 @@ extern "C" __attribute__((used)) void __jit_register_fatbinary_end(void *) {
 }
 
 extern "C" __attribute__((used)) void
-__jit_register_linked_binary(const char *ModuleId) {
+__jit_register_linked_binary(void *FatbinWrapper, const char *ModuleId) {
   auto &Jit = JitDeviceImplT::instance();
-  Jit.registerLinkedBinary(ModuleId);
+  Jit.registerLinkedBinary(reinterpret_cast<FatbinWrapper_t *>(FatbinWrapper),
+                           ModuleId);
 }
 
 extern "C" __attribute((used)) void

@@ -18,6 +18,7 @@
 #include "JitEngineDevice.hpp"
 #include "JitEngineDeviceCUDA.hpp"
 #include "Utils.h"
+#include "UtilsCUDA.h"
 #include <cuda_runtime.h>
 #include <sys/types.h>
 
@@ -35,6 +36,37 @@ void *JitEngineDeviceCUDA::resolveDeviceGlobalAddr(const void *Addr) {
 JitEngineDeviceCUDA &JitEngineDeviceCUDA::instance() {
   static JitEngineDeviceCUDA Jit{};
   return Jit;
+}
+
+void JitEngineDeviceCUDA::extractLinkedBitcode(
+    LLVMContext &Ctx, CUmodule &CUMod,
+    SmallVector<std::unique_ptr<Module>> &LinkedModules,
+    std::string &ModuleId) {
+  DBG(dbgs() << "extractLinkedBitcode " << ModuleId << "\n");
+
+  if (!ModuleIdToFatBinary.count(ModuleId))
+    FATAL_ERROR("Expected to find module id " + ModuleId + " in map");
+
+  FatbinWrapper_t *ModuleFatBinWrapper = ModuleIdToFatBinary[ModuleId];
+  // Remove proteus-compiled binary with JIT bitcode from linked binaries.
+  GlobalLinkedBinaries.erase((void *)ModuleFatBinWrapper->Binary);
+
+  CUdeviceptr DevPtr;
+  size_t Bytes;
+  cuErrCheck(cuModuleGetGlobal(&DevPtr, &Bytes, CUMod, ModuleId.c_str()));
+
+  SmallString<4096> DeviceBitcode;
+  DeviceBitcode.reserve(Bytes);
+  cuErrCheck(cuMemcpyDtoH(DeviceBitcode.data(), DevPtr, Bytes));
+
+  SMDiagnostic Err;
+  auto M =
+      parseIR(MemoryBufferRef(StringRef(DeviceBitcode.data(), Bytes), ModuleId),
+              Err, Ctx);
+  if (!M)
+    FATAL_ERROR("unexpected");
+
+  LinkedModules.push_back(std::move(M));
 }
 
 std::unique_ptr<MemoryBuffer>
@@ -61,36 +93,11 @@ JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
 
   cuErrCheck(cuModuleLoadData(&CUMod, FatbinWrapper->Binary));
 
-  auto extractLinkedBitcode = [&CUMod, &Ctx,
-                               &LinkedModules](std::string &ModuleId) {
-    CUdeviceptr DevPtr;
-    size_t Bytes;
-    // Skips non-emitted device bitcode from the CUDA link.stub.
-    if (cuModuleGetGlobal(&DevPtr, &Bytes, CUMod, ModuleId.c_str()) !=
-        CUDA_SUCCESS) {
-      DBG(dbgs() << ModuleId + " not included !\n ");
-      return;
-    }
-
-    SmallString<4096> DeviceBitcode;
-    DeviceBitcode.reserve(Bytes);
-    cuErrCheck(cuMemcpyDtoH(DeviceBitcode.data(), DevPtr, Bytes));
-
-    SMDiagnostic Err;
-    auto M = parseIR(
-        MemoryBufferRef(StringRef(DeviceBitcode.data(), Bytes), ModuleId), Err,
-        *Ctx);
-    if (!M)
-      FATAL_ERROR("unexpected");
-
-    LinkedModules.push_back(std::move(M));
-  };
-
   for (auto &ModuleId : LinkedModuleIds)
-    extractLinkedBitcode(ModuleId);
+    extractLinkedBitcode(*Ctx.get(), CUMod, LinkedModules, ModuleId);
 
   for (auto &ModuleId : GlobalLinkedModuleIds)
-    extractLinkedBitcode(ModuleId);
+    extractLinkedBitcode(*Ctx.get(), CUMod, LinkedModules, ModuleId);
 
   cuErrCheck(cuModuleUnload(CUMod));
 
@@ -134,9 +141,33 @@ CUfunction JitEngineDeviceCUDA::getKernelFunctionFromImage(StringRef KernelName,
                                                            const void *Image) {
   CUfunction KernelFunc;
   CUmodule Mod;
+  CUlinkState CULinkState = nullptr;
 
-  cuErrCheck(cuModuleLoadData(&Mod, Image));
+  const void *Binary = Image;
+  if (!GlobalLinkedBinaries.empty()) {
+    cuErrCheck(cuLinkCreate(0, nullptr, nullptr, &CULinkState));
+    for (auto *Ptr : GlobalLinkedBinaries)
+      // We do not know the size of the binary but the CUDA API just needs a
+      // non-zero argument.
+      cuErrCheck(cuLinkAddData(CULinkState, CU_JIT_INPUT_FATBINARY, Ptr, 1, "",
+                               0, 0, 0));
+
+    // Again using a non-zero argument, though we can get the size from the ptx
+    // compiler.
+    cuErrCheck(cuLinkAddData(CULinkState, CU_JIT_INPUT_FATBINARY,
+                             const_cast<void *>(Image), 1, "", 0, 0, 0));
+
+    void *BinOut;
+    size_t BinSize;
+    cuErrCheck(cuLinkComplete(CULinkState, &BinOut, &BinSize));
+    Binary = BinOut;
+  }
+
+  cuErrCheck(cuModuleLoadData(&Mod, Binary));
   cuErrCheck(cuModuleGetFunction(&KernelFunc, Mod, KernelName.str().c_str()));
+
+  if (CULinkState)
+    cuLinkDestroy(CULinkState);
 
   return KernelFunc;
 }
@@ -200,12 +231,16 @@ JitEngineDeviceCUDA::codegenObject(Module &M, StringRef DeviceArch) {
   nvPTXCompilerErrCheck(
       nvPTXCompilerCreate(&PTXCompiler, PTXStr.size(), PTXStr.data()));
   std::string ArchOpt = ("--gpu-name=" + DeviceArch).str();
+  std::string RDCOption = "";
+  if (!GlobalLinkedBinaries.empty())
+    RDCOption = "-c";
 #if ENABLE_DEBUG
-  const char *CompileOptions[] = {ArchOpt.c_str(), "--verbose"};
-  size_t NumCompileOptions = 2;
+  const char *CompileOptions[] = {ArchOpt.c_str(), "--verbose",
+                                  RDCOption.c_str()};
+  size_t NumCompileOptions = 2 + (RDCOption.empty() ? 0 : 1);
 #else
-  const char *CompileOptions[] = {ArchOpt.c_str()};
-  size_t NumCompileOptions = 1;
+  const char *CompileOptions[] = {ArchOpt.c_str(), RDCOption.c_str()};
+  size_t NumCompileOptions = 1 + (RDCOption.empty() ? 0 : 1);
 #endif
   nvPTXCompilerErrCheck(
       nvPTXCompilerCompile(PTXCompiler, NumCompileOptions, CompileOptions));

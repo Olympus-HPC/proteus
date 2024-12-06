@@ -195,5 +195,5 @@ CREATE_GPU_TEST_RDC(types types.cpp)
 CREATE_GPU_TEST_RDC(kernel_calls_func kernel_calls_func.cpp device_func.cpp)
 # TODO: Fix linking with external binaries that have not been compiled with the
 # ProteusPass.
-#CREATE_GPU_LIBRARY(device_func_lib device_func.cpp)
-#CREATE_GPU_TEST_RDC_LIBS(kernel_calls_func_lib device_func_lib kernel_calls_func.cpp)
+CREATE_GPU_LIBRARY(device_func_lib device_func.cpp)
+CREATE_GPU_TEST_RDC_LIBS(kernel_calls_func_lib device_func_lib kernel_calls_func_lib.cpp)

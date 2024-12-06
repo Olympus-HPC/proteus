@@ -814,7 +814,7 @@ private:
 
   FunctionCallee getJitRegisterLinkedBinaryFn(Module &M) {
     FunctionType *JitRegisterLinkedBinaryFnTy =
-        FunctionType::get(VoidTy, {PtrTy},
+        FunctionType::get(VoidTy, {PtrTy, PtrTy},
                           /* isVarArg=*/false);
     FunctionCallee JitRegisteLinkedBinaryrFn = M.getOrInsertFunction(
         "__jit_register_linked_binary", JitRegisterLinkedBinaryFnTy);
@@ -853,7 +853,8 @@ private:
             dbgs() << "Instrument register linked binary to extract bitcode GV "
                    << GVName << "\n");
         auto *Arg = Builder.CreateGlobalString(GVName);
-        Builder.CreateCall(JitRegisterLinkedBinaryFn, {Arg});
+        Builder.CreateCall(JitRegisterLinkedBinaryFn,
+                           {CB->getArgOperand(1), Arg});
       }
     }
   }

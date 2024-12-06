@@ -70,7 +70,7 @@ struct FatbinWrapper_t {
   int32_t Magic;
   int32_t Version;
   const char *Binary;
-  void *PrelinkedFatbins[];
+  void **PrelinkedFatbins;
 };
 
 template <typename ImplT> struct DeviceTraits;
@@ -91,7 +91,8 @@ public:
   void insertRegisterVar(const char *VarName, const void *Addr) {
     VarNameToDevPtr[VarName] = Addr;
   }
-  void registerLinkedBinary(const char *ModuleId);
+  void registerLinkedBinary(FatbinWrapper_t *FatbinWrapper,
+                            const char *ModuleId);
   void registerFatBinary(void *Handle, FatbinWrapper_t *FatbinWrapper,
                          const char *ModuleId);
   void registerFatBinaryEnd();
@@ -104,9 +105,11 @@ public:
   };
 
   void *CurHandle = nullptr;
+  std::unordered_map<std::string, FatbinWrapper_t *> ModuleIdToFatBinary;
   DenseMap<void *, BinaryInfo> HandleToBinaryInfo;
   DenseMap<void *, void *> KernelToHandleMap;
   SmallVector<std::string> GlobalLinkedModuleIds;
+  SmallPtrSet<void *, 8> GlobalLinkedBinaries;
 
   bool containsJITKernelInfo(const void *Func) {
     return JITKernelInfoMap.contains(Func);
@@ -446,9 +449,27 @@ void JitEngineDevice<ImplT>::registerFatBinary(void *Handle,
                                                FatbinWrapper_t *FatbinWrapper,
                                                const char *ModuleId) {
   CurHandle = Handle;
-  HandleToBinaryInfo[Handle] = {FatbinWrapper, {ModuleId}};
   DBG(dbgs() << "Register fatbinary Handle " << Handle << " FatbinWrapper "
-             << FatbinWrapper << " ModulId " << ModuleId << "\n");
+             << FatbinWrapper << " Binary " << (void *)FatbinWrapper->Binary
+             << " ModuleId " << ModuleId << "\n");
+  if (FatbinWrapper->PrelinkedFatbins) {
+    // This is RDC compilation, just insert the FatbinWrapper and ignore the
+    // ModuleId coming from the link.stub.
+    HandleToBinaryInfo[Handle] = {FatbinWrapper, {}};
+
+    // Initialize GlobalLinkedBinaries with prelinked fatbins.
+    void *Ptr = FatbinWrapper->PrelinkedFatbins[0];
+    for (int I = 0; Ptr != nullptr;
+         ++I, Ptr = FatbinWrapper->PrelinkedFatbins[I]) {
+      DBG(dbgs() << "I " << I << " PrelinkedFatbin " << Ptr << "\n");
+      GlobalLinkedBinaries.insert(Ptr);
+    }
+  } else {
+    // This is non-RDC compilation, associate the ModuleId of the JIT bitcode in
+    // the module with the FatbinWrapper.
+    ModuleIdToFatBinary[ModuleId] = FatbinWrapper;
+    HandleToBinaryInfo[Handle] = {FatbinWrapper, {ModuleId}};
+  }
 }
 
 template <typename ImplT> void JitEngineDevice<ImplT>::registerFatBinaryEnd() {
@@ -471,8 +492,11 @@ void JitEngineDevice<ImplT>::registerFunction(void *Handle, void *Kernel,
 }
 
 template <typename ImplT>
-void JitEngineDevice<ImplT>::registerLinkedBinary(const char *ModuleId) {
-  DBG(dbgs() << "Register linked binary ModuleId " << ModuleId << "\n");
+void JitEngineDevice<ImplT>::registerLinkedBinary(
+    FatbinWrapper_t *FatbinWrapper, const char *ModuleId) {
+  DBG(dbgs() << "Register linked binary FatBinary " << FatbinWrapper
+             << " Binary " << (void *)FatbinWrapper->Binary << " ModuleId "
+             << ModuleId << "\n");
   if (CurHandle) {
     if (!HandleToBinaryInfo.contains(CurHandle))
       FATAL_ERROR("Expected CurHandle in map");
@@ -480,6 +504,8 @@ void JitEngineDevice<ImplT>::registerLinkedBinary(const char *ModuleId) {
     HandleToBinaryInfo[CurHandle].LinkedModuleIds.push_back(ModuleId);
   } else
     GlobalLinkedModuleIds.push_back(ModuleId);
+
+  ModuleIdToFatBinary[ModuleId] = FatbinWrapper;
 }
 
 template <typename ImplT>
