@@ -10,6 +10,7 @@
 
 #include <cstddef>
 #include <llvm/ADT/ArrayRef.h>
+#include <llvm/ADT/StringRef.h>
 #include <string>
 
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -103,51 +104,49 @@ JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
   if (Sections.takeError())
     FATAL_ERROR("Error reading sections");
 
-  // NOTE: We must extract the .jit sections per kernel to avoid linked
-  // device libraries. Otherwise, the hiprtc linker complains that it
-  // cannot link device libraries (working assumption).
   ArrayRef<uint8_t> DeviceBitcode;
   SmallVector<std::unique_ptr<Module>> LinkedModules;
   auto Ctx = std::make_unique<LLVMContext>();
   auto JitModule = std::make_unique<llvm::Module>("JitModule", *Ctx);
 
-  Twine TargetSection = ".jit." + KernelName;
+  auto extractModuleFromSection = [&DeviceElf, &Ctx](auto &Section,
+                                                     StringRef SectionName) {
+    ArrayRef<uint8_t> BitcodeData;
+    auto SectionContents = DeviceElf->getSectionContents(Section);
+    if (SectionContents.takeError())
+      FATAL_ERROR("Error reading section contents");
+    BitcodeData = *SectionContents;
+    auto Bitcode = StringRef{reinterpret_cast<const char *>(BitcodeData.data()),
+                             BitcodeData.size()};
+
+    SMDiagnostic Err;
+    auto M = parseIR(MemoryBufferRef{Bitcode, SectionName}, Err, *Ctx);
+    if (!M)
+      FATAL_ERROR("unexpected");
+
+    return M;
+  };
+
+  // We extract bitcode from sections. If there is a .jit.bitcode.lto section
+  // due to RDC compilation that's the only bitcode we need, othewise we collect
+  // all .jit.bitcode sections.
   for (auto Section : *Sections) {
     auto SectionName = DeviceElf->getSectionName(Section);
     if (SectionName.takeError())
       FATAL_ERROR("Error reading section name");
     DBG(dbgs() << "SectionName " << *SectionName << "\n");
-    DBG(dbgs() << "TargetSection " << TargetSection << "\n");
 
-    if (SectionName->starts_with(".jit.bitcode")) {
-      ArrayRef<uint8_t> LinkBitcode;
+    if (!SectionName->starts_with(".jit.bitcode"))
+      continue;
 
-      auto SectionContents = DeviceElf->getSectionContents(Section);
-      if (SectionContents.takeError())
-        FATAL_ERROR("Error reading section contents");
-      LinkBitcode = *SectionContents;
-      std::string LinkData =
-          StringRef(reinterpret_cast<const char *>(LinkBitcode.data()),
-                    LinkBitcode.size())
-              .str();
+    auto M = extractModuleFromSection(Section, *SectionName);
 
-      SMDiagnostic Err;
-      auto M =
-          parseIR(MemoryBufferRef(StringRef(LinkData.data(), LinkData.size()),
-                                  *SectionName),
-                  Err, *Ctx);
-      if (!M)
-        FATAL_ERROR("unexpected");
-
+    if (SectionName->equals(".jit.bitcode.lto")) {
+      LinkedModules.clear();
       LinkedModules.push_back(std::move(M));
-    }
-
-    if (SectionName->equals(TargetSection.str())) {
-      auto SectionContents = DeviceElf->getSectionContents(Section);
-      if (SectionContents.takeError())
-        FATAL_ERROR("Error reading section contents");
-
-      DeviceBitcode = *SectionContents;
+      break;
+    } else {
+      LinkedModules.push_back(std::move(M));
     }
   }
 

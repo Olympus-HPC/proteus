@@ -58,6 +58,11 @@ function(CREATE_GPU_TEST_RDC exe check_source)
             -fgpu-rdc
             -fpass-plugin=$<TARGET_FILE:ProteusPass>
         )
+        target_link_options(
+            ${exe}.${lang}.rdc
+            PRIVATE
+            "SHELL:-Xoffload-linker -plugin=$<TARGET_FILE:ProteusPass>"
+            "SHELL:-Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPass>")
 
         target_link_options(${exe}.${lang}.rdc PUBLIC -fgpu-rdc --hip-link)
     elseif(ENABLE_CUDA)
@@ -93,7 +98,7 @@ function(CREATE_GPU_TEST_RDC_LIBS exe libs check_source)
     target_link_libraries(${exe}.${lang}.rdc PRIVATE ${libs})
 endfunction()
 
-# Creates a device library, which can be linked with another  test. The library does not
+# Creates a device library, which can be linked with another test. The library does not
 # apply the pass
 function(CREATE_GPU_LIBRARY lib source)
     if(ENABLE_HIP)
@@ -191,9 +196,7 @@ CREATE_GPU_TEST_RDC(daxpy daxpy.cpp)
 CREATE_GPU_TEST_RDC(kernel_host_jit kernel_host_jit.cpp)
 CREATE_GPU_TEST_RDC(kernel_host_device_jit kernel_host_device_jit.cpp)
 CREATE_GPU_TEST_RDC(types types.cpp)
-
 CREATE_GPU_TEST_RDC(kernel_calls_func kernel_calls_func.cpp device_func.cpp)
-# TODO: Fix linking with external binaries that have not been compiled with the
-# ProteusPass.
+
 CREATE_GPU_LIBRARY(device_func_lib device_func.cpp)
 CREATE_GPU_TEST_RDC_LIBS(kernel_calls_func_lib device_func_lib kernel_calls_func_lib.cpp)

@@ -110,7 +110,7 @@ public:
     RuntimeConstantTy = StructType::create({Int128Ty}, "struct.args");
   }
 
-  bool run(Module &M) {
+  bool run(Module &M, bool IsLTO) {
     parseAnnotations(M);
 
     DEBUG(dbgs() << "=== Pre Original Host Module\n"
@@ -120,10 +120,10 @@ public:
     // Device compilation
     // ==================
 
-    // For device compilation, just extract the module IR of device code and
-    // return.
+    // For device compilation, just extract the module IR of device code
+    // and return.
     if (isDeviceCompilation(M)) {
-      emitJitModuleDevice(M);
+      emitJitModuleDevice(M, IsLTO);
 
       return true;
     }
@@ -412,12 +412,13 @@ private:
                  << *JitMod << "=== End of Final Host JIT Module\n");
   }
 
-  void emitJitModuleDevice(Module &M) {
+  void emitJitModuleDevice(Module &M, bool IsLTO) {
     std::string BitcodeStr;
     raw_string_ostream OS(BitcodeStr);
     WriteBitcodeToFile(M, OS);
 
-    std::string GVName = getJitBitcodeUniqueName(M);
+    std::string GVName =
+        (IsLTO ? "__jit_bitcode_lto" : getJitBitcodeUniqueName(M));
     //  NOTE: HIP compilation supports custom section in the binary to store the
     //  IR. CUDA does not, hence we parse the IR by reading the global from the
     //  device memory.
@@ -428,7 +429,7 @@ private:
         new GlobalVariable(M, JitModule->getType(), /* isConstant */ true,
                            GlobalValue::ExternalLinkage, JitModule, GVName);
     appendToUsed(M, {GV});
-    GV->setSection(Twine(".jit.bitcode" + getUniqueModuleId(&M)).str());
+    GV->setSection(".jit.bitcode" + (IsLTO ? ".lto" : getUniqueModuleId(&M)));
     DEBUG(dbgs() << "Emit jit bitcode GV " << GVName << "\n");
   }
 
@@ -980,9 +981,13 @@ private:
 
 // New PM implementation.
 struct ProteusJitPass : PassInfoMixin<ProteusJitPass> {
+  ProteusJitPass(bool IsLTO) : IsLTO(IsLTO) {}
+  bool IsLTO;
+
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
     ProteusJitPassImpl PJP{M};
-    bool Changed = PJP.run(M);
+
+    bool Changed = PJP.run(M, IsLTO);
     if (Changed)
       // TODO: is anything preserved?
       return PreservedAnalyses::none();
@@ -1002,7 +1007,7 @@ struct LegacyProteusJitPass : public ModulePass {
   LegacyProteusJitPass() : ModulePass(ID) {}
   bool runOnModule(Module &M) override {
     ProteusJitPassImpl PJP{M};
-    bool Changed = PJP.run(M);
+    bool Changed = PJP.run(M, false);
     return Changed;
   }
 };
@@ -1028,7 +1033,13 @@ llvm::PassPluginLibraryInfo getProteusJitPassPluginInfo() {
     // PB.registerOptimizerLastEPCallback(
     PB.registerPipelineEarlySimplificationEPCallback(
         [&](ModulePassManager &MPM, auto) {
-          MPM.addPass(ProteusJitPass());
+          MPM.addPass(ProteusJitPass{false});
+          return true;
+        });
+
+    PB.registerFullLinkTimeOptimizationEarlyEPCallback(
+        [&](ModulePassManager &MPM, auto) {
+          MPM.addPass(ProteusJitPass{true});
           return true;
         });
   };
