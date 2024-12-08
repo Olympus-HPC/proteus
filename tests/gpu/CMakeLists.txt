@@ -15,7 +15,7 @@ function(CREATE_GPU_TEST exe check_source)
     )
     add_dependencies(${exe}.${lang} ProteusPass)
 
-    target_link_libraries(${exe}.${lang} PUBLIC proteus)
+    target_link_libraries(${exe}.${lang} PUBLIC ProteusPass proteus)
 
     target_compile_options(
         ${exe}.${lang}
@@ -43,9 +43,8 @@ function(CREATE_GPU_TEST_RDC exe check_source)
         LANGUAGE ${lang}
         OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/ProteusPass.cpp
     )
-    add_dependencies(${exe}.${lang}.rdc ProteusPass)
 
-    target_link_libraries(${exe}.${lang}.rdc PUBLIC proteus)
+    target_link_libraries(${exe}.${lang}.rdc PUBLIC ProteusPass proteus)
 
     if(ENABLE_HIP)
         # This is unsupported see: https://gitlab.kitware.com/cmake/cmake/-/issues/23210
@@ -56,13 +55,7 @@ function(CREATE_GPU_TEST_RDC exe check_source)
             ${exe}.${lang}.rdc
             PUBLIC
             -fgpu-rdc
-            -fpass-plugin=$<TARGET_FILE:ProteusPass>
         )
-        target_link_options(
-            ${exe}.${lang}.rdc
-            PRIVATE
-            "SHELL:-Xoffload-linker -plugin=$<TARGET_FILE:ProteusPass>"
-            "SHELL:-Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPass>")
 
         target_link_options(${exe}.${lang}.rdc PUBLIC -fgpu-rdc --hip-link)
     elseif(ENABLE_CUDA)
