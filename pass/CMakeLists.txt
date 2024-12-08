@@ -18,6 +18,12 @@ target_compile_options(
   -fpass-plugin=$<TARGET_FILE:ProteusPass>
 )
 
+target_link_options(
+  ProteusPass
+  INTERFACE
+  "SHELL:$<$<LINK_LANGUAGE:HIP>:-Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPass>>"
+)
+
 install(
   TARGETS ProteusPass
   EXPORT proteusTargets

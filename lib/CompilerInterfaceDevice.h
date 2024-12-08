@@ -18,8 +18,7 @@
 using JitDeviceImplT = proteus::JitEngineDeviceCUDA;
 
 extern "C" cudaError_t __jit_launch_kernel(const char *ModuleUniqueId,
-                                           void *Kernel, void *FatbinWrapper,
-                                           size_t FatbinSize, dim3 GridDim,
+                                           void *Kernel, dim3 GridDim,
                                            dim3 BlockDim, void **KernelArgs,
                                            uint64_t ShmemSize, void *Stream);
 
@@ -27,14 +26,12 @@ extern "C" cudaError_t __jit_launch_kernel(const char *ModuleUniqueId,
 #include "JitEngineDeviceHIP.hpp"
 using JitDeviceImplT = proteus::JitEngineDeviceHIP;
 
-// This extern global variable is used to resolve the global symbol through ORC
-// in JitEngineHost, if existing (extern weak linkage).
-__attribute__((weak)) extern "C" char __hip_fatbin;
-extern "C" hipError_t
-__jit_launch_kernel(const char *ModuleUniqueId, void *Kernel,
-                    void *FatbinWrapper, size_t FatbinSize, uint64_t GridDimXY,
-                    uint32_t GridDimZ, uint64_t BlockDim_XY, uint32_t BlockDimZ,
-                    void **KernelArgs, uint64_t ShmemSize, void *Stream);
+extern "C" hipError_t __jit_launch_kernel(const char *ModuleUniqueId,
+                                          void *Kernel, uint64_t GridDimXY,
+                                          uint32_t GridDimZ,
+                                          uint64_t BlockDim_XY,
+                                          uint32_t BlockDimZ, void **KernelArgs,
+                                          uint64_t ShmemSize, void *Stream);
 
 #else
 #error "CompilerInterfaceDevice requires ENABLE_CUDA or ENABLE_HIP"

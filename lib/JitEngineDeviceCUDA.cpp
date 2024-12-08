@@ -11,11 +11,16 @@
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
+#include <llvm/Linker/Linker.h>
 #include <llvm/Support/MemoryBufferRef.h>
 #include <memory>
 
+#include "JitEngineDevice.hpp"
 #include "JitEngineDeviceCUDA.hpp"
 #include "Utils.h"
+#include "UtilsCUDA.h"
+#include <cuda_runtime.h>
+#include <sys/types.h>
 
 using namespace proteus;
 using namespace llvm;
@@ -33,52 +38,77 @@ JitEngineDeviceCUDA &JitEngineDeviceCUDA::instance() {
   return Jit;
 }
 
-std::unique_ptr<MemoryBuffer> JitEngineDeviceCUDA::extractDeviceBitcode(
-    StringRef KernelName, const char *Binary, size_t FatbinSize) {
-  CUmodule CUMod;
-  CUlinkState CULinkState = nullptr;
+void JitEngineDeviceCUDA::extractLinkedBitcode(
+    LLVMContext &Ctx, CUmodule &CUMod,
+    SmallVector<std::unique_ptr<Module>> &LinkedModules,
+    std::string &ModuleId) {
+  DBG(dbgs() << "extractLinkedBitcode " << ModuleId << "\n");
+
+  if (!ModuleIdToFatBinary.count(ModuleId))
+    FATAL_ERROR("Expected to find module id " + ModuleId + " in map");
+
+  FatbinWrapper_t *ModuleFatBinWrapper = ModuleIdToFatBinary[ModuleId];
+  // Remove proteus-compiled binary with JIT bitcode from linked binaries.
+  GlobalLinkedBinaries.erase((void *)ModuleFatBinWrapper->Binary);
+
   CUdeviceptr DevPtr;
   size_t Bytes;
-  std::string Symbol = Twine("__jit_bc_" + KernelName).str();
-
-  // NOTE: loading a module OR getting the global fails if rdc compilation
-  // is enabled. Try to use the linker interface to load the binary image.
-  // If that fails too, abort.
-  // TODO: detect rdc compilation in the ProteusJitPass, see
-  // __cudaRegisterLinkedLibrary or __nv_relfatbin section existences.
-  if (cuModuleLoadFatBinary(&CUMod, Binary) != CUDA_SUCCESS ||
-      cuModuleGetGlobal(&DevPtr, &Bytes, CUMod, Symbol.c_str()) ==
-          CUDA_ERROR_NOT_FOUND) {
-    cuErrCheck(cuLinkCreate(0, nullptr, nullptr, &CULinkState));
-    cuErrCheck(cuLinkAddData(CULinkState, CU_JIT_INPUT_FATBINARY,
-                             (void *)Binary, FatbinSize, "", 0, 0, 0));
-    void *BinOut;
-    size_t BinSize;
-    cuErrCheck(cuLinkComplete(CULinkState, &BinOut, &BinSize));
-    cuErrCheck(cuModuleLoadFatBinary(&CUMod, BinOut));
-  }
-
-  cuErrCheck(cuModuleGetGlobal(&DevPtr, &Bytes, CUMod, Symbol.c_str()));
+  cuErrCheck(cuModuleGetGlobal(&DevPtr, &Bytes, CUMod, ModuleId.c_str()));
 
   SmallString<4096> DeviceBitcode;
   DeviceBitcode.reserve(Bytes);
   cuErrCheck(cuMemcpyDtoH(DeviceBitcode.data(), DevPtr, Bytes));
-#ifdef ENABLE_DEBUG
-  {
-    std::error_code EC;
-    raw_fd_ostream OutBC(Twine("from-device-jit-" + KernelName + ".bc").str(),
-                         EC);
-    if (EC)
-      FATAL_ERROR("Cannot open device memory jit file");
-    OutBC << StringRef(DeviceBitcode.data(), Bytes);
-    OutBC.close();
-  }
-#endif
+
+  SMDiagnostic Err;
+  auto M =
+      parseIR(MemoryBufferRef(StringRef(DeviceBitcode.data(), Bytes), ModuleId),
+              Err, Ctx);
+  if (!M)
+    FATAL_ERROR("unexpected");
+
+  LinkedModules.push_back(std::move(M));
+}
+
+std::unique_ptr<MemoryBuffer>
+JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
+  CUmodule CUMod;
+  CUdeviceptr DevPtr;
+  size_t Bytes;
+
+  SmallVector<std::unique_ptr<Module>> LinkedModules;
+  auto Ctx = std::make_unique<LLVMContext>();
+  auto JitModule = std::make_unique<llvm::Module>("JitModule", *Ctx);
+  if (!KernelToHandleMap.contains(Kernel))
+    FATAL_ERROR("Expected Kernel in map");
+
+  void *Handle = KernelToHandleMap[Kernel];
+  if (!HandleToBinaryInfo.contains(Handle))
+    FATAL_ERROR("Expected Handle in map");
+
+  FatbinWrapper_t *FatbinWrapper = HandleToBinaryInfo[Handle].FatbinWrapper;
+  if (!FatbinWrapper)
+    FATAL_ERROR("Expected FatbinWrapper in map");
+
+  auto &LinkedModuleIds = HandleToBinaryInfo[Handle].LinkedModuleIds;
+
+  cuErrCheck(cuModuleLoadData(&CUMod, FatbinWrapper->Binary));
+
+  for (auto &ModuleId : LinkedModuleIds)
+    extractLinkedBitcode(*Ctx.get(), CUMod, LinkedModules, ModuleId);
+
+  for (auto &ModuleId : GlobalLinkedModuleIds)
+    extractLinkedBitcode(*Ctx.get(), CUMod, LinkedModules, ModuleId);
 
   cuErrCheck(cuModuleUnload(CUMod));
-  if (CULinkState)
-    cuErrCheck(cuLinkDestroy(CULinkState));
-  return MemoryBuffer::getMemBufferCopy(StringRef(DeviceBitcode.data(), Bytes));
+
+  linkJitModule(JitModule.get(), Ctx.get(), KernelName, LinkedModules);
+
+  std::string LinkedDeviceBitcode;
+  raw_string_ostream OS(LinkedDeviceBitcode);
+  WriteBitcodeToFile(*JitModule.get(), OS);
+  OS.flush();
+
+  return MemoryBuffer::getMemBufferCopy(LinkedDeviceBitcode);
 }
 
 void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module &M, Function &F,
@@ -111,9 +141,33 @@ CUfunction JitEngineDeviceCUDA::getKernelFunctionFromImage(StringRef KernelName,
                                                            const void *Image) {
   CUfunction KernelFunc;
   CUmodule Mod;
+  CUlinkState CULinkState = nullptr;
 
-  cuErrCheck(cuModuleLoadData(&Mod, Image));
+  const void *Binary = Image;
+  if (!GlobalLinkedBinaries.empty()) {
+    cuErrCheck(cuLinkCreate(0, nullptr, nullptr, &CULinkState));
+    for (auto *Ptr : GlobalLinkedBinaries)
+      // We do not know the size of the binary but the CUDA API just needs a
+      // non-zero argument.
+      cuErrCheck(cuLinkAddData(CULinkState, CU_JIT_INPUT_FATBINARY, Ptr, 1, "",
+                               0, 0, 0));
+
+    // Again using a non-zero argument, though we can get the size from the ptx
+    // compiler.
+    cuErrCheck(cuLinkAddData(CULinkState, CU_JIT_INPUT_FATBINARY,
+                             const_cast<void *>(Image), 1, "", 0, 0, 0));
+
+    void *BinOut;
+    size_t BinSize;
+    cuErrCheck(cuLinkComplete(CULinkState, &BinOut, &BinSize));
+    Binary = BinOut;
+  }
+
+  cuErrCheck(cuModuleLoadData(&Mod, Binary));
   cuErrCheck(cuModuleGetFunction(&KernelFunc, Mod, KernelName.str().c_str()));
+
+  if (CULinkState)
+    cuLinkDestroy(CULinkState);
 
   return KernelFunc;
 }
@@ -177,12 +231,16 @@ JitEngineDeviceCUDA::codegenObject(Module &M, StringRef DeviceArch) {
   nvPTXCompilerErrCheck(
       nvPTXCompilerCreate(&PTXCompiler, PTXStr.size(), PTXStr.data()));
   std::string ArchOpt = ("--gpu-name=" + DeviceArch).str();
+  std::string RDCOption = "";
+  if (!GlobalLinkedBinaries.empty())
+    RDCOption = "-c";
 #if ENABLE_DEBUG
-  const char *CompileOptions[] = {ArchOpt.c_str(), "--verbose"};
-  size_t NumCompileOptions = 2;
+  const char *CompileOptions[] = {ArchOpt.c_str(), "--verbose",
+                                  RDCOption.c_str()};
+  size_t NumCompileOptions = 2 + (RDCOption.empty() ? 0 : 1);
 #else
-  const char *CompileOptions[] = {ArchOpt.c_str()};
-  size_t NumCompileOptions = 1;
+  const char *CompileOptions[] = {ArchOpt.c_str(), RDCOption.c_str()};
+  size_t NumCompileOptions = 1 + (RDCOption.empty() ? 0 : 1);
 #endif
   nvPTXCompilerErrCheck(
       nvPTXCompilerCompile(PTXCompiler, NumCompileOptions, CompileOptions));

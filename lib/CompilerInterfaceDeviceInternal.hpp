@@ -3,7 +3,6 @@
 // Return "auto" should resolve to cudaError_t or hipError_t.
 static inline auto
 __jit_launch_kernel_internal(const char *ModuleUniqueId, void *Kernel,
-                             void *FatbinWrapper, size_t FatbinSize,
                              dim3 GridDim, dim3 BlockDim, void **KernelArgs,
                              uint64_t ShmemSize, void *Stream) {
 
@@ -26,7 +25,6 @@ __jit_launch_kernel_internal(const char *ModuleUniqueId, void *Kernel,
     dbgs() << "JIT Launch Kernel\n";
     dbgs() << "=== Kernel Info\n";
     dbgs() << "KernelName " << KernelName << "\n";
-    dbgs() << "FatbinSize " << FatbinSize << "\n";
     dbgs() << "Grid " << GridDim.x << ", " << GridDim.y << ", " << GridDim.z
            << "\n";
     dbgs() << "Block " << BlockDim.x << ", " << BlockDim.y << ", " << BlockDim.z
@@ -41,8 +39,7 @@ __jit_launch_kernel_internal(const char *ModuleUniqueId, void *Kernel,
   DBG(printKernelLaunchInfo());
 
   return Jit.compileAndRun(
-      ModuleUniqueId, KernelName,
-      reinterpret_cast<FatbinWrapper_t *>(FatbinWrapper), FatbinSize, RCIndices,
-      NumRuntimeConstants, GridDim, BlockDim, KernelArgs, ShmemSize,
+      ModuleUniqueId, Kernel, KernelName, RCIndices, NumRuntimeConstants,
+      GridDim, BlockDim, KernelArgs, ShmemSize,
       static_cast<typename JitDeviceImplT::DeviceStream_t>(Stream));
 }
