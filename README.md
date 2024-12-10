@@ -29,7 +29,7 @@ specify a list of function arguments to specialize for.
 
 For example:
 ```cpp
-__atribute__((annotate("jit", 1, 2)))
+__attribute__((annotate("jit", 1, 2)))
 void daxpy(double A, int N, double *a, double *b)
 {
   for(int i=0; i<N; ++i)
@@ -93,7 +93,20 @@ An one-liner example is:
 clang++ -fpass-plugin=<install_path>/lib/libiProteusJitPass.so -L <install_path>/lib -Wl,-rpath,<install_path>/lib -lproteusjit MyAwesomeCode.cpp -o MyAwesomeExe
 ```
 
-🚧 A cmake export file for easy integration is in the works
+### CMake
+
+To use Proteus with CMake, make sure the Proteus install directory is defined
+in the `CMAKE_PREFIX_PATH` environment variable. Then, in your project's 
+`CMakeLists.txt` simply add the following two lines:
+
+```cmake
+find_package(proteus CONFIG REQUIRED)
+
+add_proteus(target)
+```
+
+Where `target` is the name of your library or executable target.
+
 
 ## Contributing
 
