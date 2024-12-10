@@ -7,14 +7,13 @@ project(Proteus
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "")
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 set(CMAKE_CXX_EXTENSIONS NO)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
 option(ENABLE_HIP "Enable HIP" OFF)
 option(ENABLE_CUDA "Enable CUDA" OFF)
 option(ENABLE_DEBUG "Enable debugging output" OFF)
 option(ENABLE_TIME_TRACING "Enable time tracing for the JIT engine" OFF)
 option(BUILD_SHARED "Builds the JIT library as shared" OFF)
 option(ENABLE_TESTS "Enable tests" ON)
+option(ENABLE_PIC "Builds the library with position-independent code" OFF)
 
 if(ENABLE_HIP)
   add_definitions("-DENABLE_HIP")
@@ -33,6 +32,10 @@ endif()
 
 if(ENABLE_DEBUG)
   add_definitions("-DENABLE_DEBUG")
+endif()
+
+if(ENABLE_PIC)
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
 
 include(cmake/SetupLLVM.cmake)
