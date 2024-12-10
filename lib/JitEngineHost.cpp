@@ -51,6 +51,7 @@
 #include "CompilerInterfaceTypes.h"
 #include "JitEngineHost.hpp"
 #include "TransformArgumentSpecialization.hpp"
+#include "TransformLambdaSpecialization.hpp"
 #include "Utils.h"
 
 using namespace proteus;
@@ -267,8 +268,12 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
         *M, *F, ArgPos,
         ArrayRef<RuntimeConstant>{RC,
                                   static_cast<size_t>(NumRuntimeConstants)});
+    if (!JitVariables.empty())
+      TransformLambdaSpecialization::transform(*M, *F, JitVariables);
 
     // dbgs() << "=== JIT Module\n" << *M << "=== End of JIT Module\n";
+
+    JitVariables.clear();
 
     F->setName(FnName + Suffix);
 
@@ -376,4 +381,8 @@ JitEngineHost::JitEngineHost(int argc, char *argv[]) {
 
   // (3) Install transform to optimize modules when they're materialized.
   LLJITPtr->getIRTransformLayer().setTransform(OptimizationTransform(*this));
+}
+
+void JitEngineHost::pushJitVariable(RuntimeConstant RC) {
+  JitVariables.push_back(RC);
 }
