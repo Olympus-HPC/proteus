@@ -35,16 +35,16 @@ env_configs = {
             "ENV_PROTEUS_SET_LAUNCH_BOUNDS": "0",
             "ENV_PROTEUS_SPECIALIZE_ARGS": "0",
         },
-        {
-            "ENV_PROTEUS_USE_STORED_CACHE": "0",
-            "ENV_PROTEUS_SET_LAUNCH_BOUNDS": "0",
-            "ENV_PROTEUS_SPECIALIZE_ARGS": "1",
-        },
-        {
-            "ENV_PROTEUS_USE_STORED_CACHE": "0",
-            "ENV_PROTEUS_SET_LAUNCH_BOUNDS": "1",
-            "ENV_PROTEUS_SPECIALIZE_ARGS": "0",
-        },
+        # {
+        #    "ENV_PROTEUS_USE_STORED_CACHE": "0",
+        #    "ENV_PROTEUS_SET_LAUNCH_BOUNDS": "0",
+        #    "ENV_PROTEUS_SPECIALIZE_ARGS": "1",
+        # },
+        # {
+        #    "ENV_PROTEUS_USE_STORED_CACHE": "0",
+        #    "ENV_PROTEUS_SET_LAUNCH_BOUNDS": "1",
+        #    "ENV_PROTEUS_SPECIALIZE_ARGS": "0",
+        # },
         {
             "ENV_PROTEUS_USE_STORED_CACHE": "0",
             "ENV_PROTEUS_SET_LAUNCH_BOUNDS": "1",
@@ -55,21 +55,21 @@ env_configs = {
         # Especially, JIT launch bounds, runtime constprop will be baked into
         # the binary so we need a "warmup" run for each setting before taking
         # the measurement.
-        {
-            "ENV_PROTEUS_USE_STORED_CACHE": "1",
-            "ENV_PROTEUS_SET_LAUNCH_BOUNDS": "0",
-            "ENV_PROTEUS_SPECIALIZE_ARGS": "0",
-        },
-        {
-            "ENV_PROTEUS_USE_STORED_CACHE": "1",
-            "ENV_PROTEUS_SET_LAUNCH_BOUNDS": "0",
-            "ENV_PROTEUS_SPECIALIZE_ARGS": "1",
-        },
-        {
-            "ENV_PROTEUS_USE_STORED_CACHE": "1",
-            "ENV_PROTEUS_SET_LAUNCH_BOUNDS": "1",
-            "ENV_PROTEUS_SPECIALIZE_ARGS": "0",
-        },
+        #        {
+        #            "ENV_PROTEUS_USE_STORED_CACHE": "1",
+        #            "ENV_PROTEUS_SET_LAUNCH_BOUNDS": "0",
+        #            "ENV_PROTEUS_SPECIALIZE_ARGS": "0",
+        #        },
+        #        {
+        #            "ENV_PROTEUS_USE_STORED_CACHE": "1",
+        #            "ENV_PROTEUS_SET_LAUNCH_BOUNDS": "0",
+        #            "ENV_PROTEUS_SPECIALIZE_ARGS": "1",
+        #        },
+        #        {
+        #            "ENV_PROTEUS_USE_STORED_CACHE": "1",
+        #            "ENV_PROTEUS_SET_LAUNCH_BOUNDS": "1",
+        #            "ENV_PROTEUS_SPECIALIZE_ARGS": "0",
+        #        },
         {
             "ENV_PROTEUS_USE_STORED_CACHE": "1",
             "ENV_PROTEUS_SET_LAUNCH_BOUNDS": "1",
