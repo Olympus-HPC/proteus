@@ -984,12 +984,14 @@ private:
   }
 
   void findJitVariables(Module &M) {
-    dbgs() << "finding jit variables" << "\n";
-    dbgs() << "users..." << "\n";
+    DEBUG(dbgs() << "finding jit variables" << "\n");
+    DEBUG(dbgs() << "users..." << "\n");
 
     SmallVector<Function *, 16> JitFunctions;
 
     for (auto &F : M.getFunctionList()) {
+      // TODO: Demangle and search for the fully qualified proteus::jit_variable
+      // name.
       if (F.getName().contains("jit_variable")) {
         JitFunctions.push_back(&F);
       }
@@ -1003,28 +1005,28 @@ private:
           FATAL_ERROR(
               "Expected CallBase as user of proteus::jit_variable function");
 
-        dbgs() << "call: " << *CB << "\n";
+        DEBUG(dbgs() << "call: " << *CB << "\n");
+        if (!CB->hasOneUser())
+          FATAL_ERROR("Expected single user");
         StoreInst *S = dyn_cast<StoreInst>(*(CB->users().begin()));
         if (!S)
           FATAL_ERROR("Expected StoreInst");
-        dbgs() << "store: " << *S << "\n";
+        DEBUG(dbgs() << "store: " << *S << "\n");
         Value *V = S->getPointerOperand();
 
         GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(V);
         if (GEP) {
-          dbgs() << "gep: " << *GEP << "\n";
+          DEBUG(dbgs() << "gep: " << *GEP << "\n");
           auto Slot = GEP->getOperand(GEP->getNumOperands() - 1);
-          dbgs() << "slot: " << *Slot << "\n";
+          DEBUG(dbgs() << "slot: " << *Slot << "\n");
           CB->setArgOperand(1, Slot);
         } else {
-          dbgs() << "no gep, assuming slot 0" << "\n";
-          Constant *C = ConstantInt::get(Type::getInt32Ty(M.getContext()), 0);
+          DEBUG(dbgs() << "no gep, assuming slot 0" << "\n");
+          Constant *C = ConstantInt::get(Int32Ty, 0);
           CB->setArgOperand(1, C);
         }
       }
     }
-
-    dbgs() << "done." << "\n";
   }
 };
 

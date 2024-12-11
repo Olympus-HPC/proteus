@@ -24,7 +24,7 @@ namespace proteus {
 using namespace llvm;
 
 static inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
-                                    RuntimeConstant RC) {
+                                    RuntimeConstant &RC) {
   if (ArgType->isIntegerTy(1)) {
     return ConstantInt::get(ArgType, RC.Value.BoolVal);
   } else if (ArgType->isIntegerTy(8)) {
@@ -56,38 +56,41 @@ class TransformLambdaSpecialization {
 public:
   static void transform(Module &M, Function &F,
                         SmallVector<RuntimeConstant, 8> &RC) {
-    dbgs() << "TransformLambdaSpecialization::transform"
-           << "\n";
     auto LambdaClass = F.getArg(0);
-    dbgs() << "\t args"
-           << "\n";
-    for (auto Arg : RC) {
-      dbgs() << "{" << Arg.Value.Int64Val << ", " << Arg.Slot << " }\n";
+    DBG(dbgs() << "TransformLambdaSpecialization::transform" << "\n");
+    DBG(dbgs() << "\t args" << "\n");
+    for (auto &Arg : RC) {
+      DBG(dbgs() << "{" << Arg.Value.Int64Val << ", " << Arg.Slot << " }\n");
     }
 
-    dbgs() << "\t users"
-           << "\n";
+    DBG(dbgs() << "\t users" << "\n");
     for (User *User : LambdaClass->users()) {
-      dbgs() << *User << "\n";
+      DBG(dbgs() << *User << "\n");
       if (dyn_cast<LoadInst>(User)) {
-        for (auto Arg : RC) {
+        for (auto &Arg : RC) {
           if (Arg.Slot == 0) {
             Constant *C = getConstant(M.getContext(), User->getType(), Arg);
             User->replaceAllUsesWith(C);
-            dbgs() << "Replacing " << *User << " with " << *C << "\n";
+            DBG(dbgs() << "[LambdaSpec] Replacing " << *User << " with " << *C
+                       << "\n");
           }
         }
-      } else if (dyn_cast<GetElementPtrInst>(User)) {
-        auto GEPSlot = User->getOperand(User->getNumOperands() - 1);
+      } else if (auto *GEP = dyn_cast<GetElementPtrInst>(User)) {
+        auto GEPSlot = GEP->getOperand(User->getNumOperands() - 1);
         ConstantInt *CI = dyn_cast<ConstantInt>(GEPSlot);
         int Slot = CI->getZExtValue();
-        for (auto Arg : RC) {
+        for (auto &Arg : RC) {
           if (Arg.Slot == Slot) {
-            LoadInst *LI = dyn_cast<LoadInst>(*(User->users().begin()));
-            Type *LoadType = LI->getType();
-            Constant *C = getConstant(M.getContext(), LoadType, Arg);
-            LI->replaceAllUsesWith(C);
-            dbgs() << "Replacing " << *User << " with " << *C << "\n";
+            for (auto *GEPUser : GEP->users()) {
+              auto *LI = dyn_cast<LoadInst>(GEPUser);
+              if (!LI)
+                FATAL_ERROR("Expected load instruction");
+              Type *LoadType = LI->getType();
+              Constant *C = getConstant(M.getContext(), LoadType, Arg);
+              LI->replaceAllUsesWith(C);
+              DBG(dbgs() << "[LambdaSpec] Replacing " << *User << " with " << *C
+                         << "\n");
+            }
           }
         }
       }
