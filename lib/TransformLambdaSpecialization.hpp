@@ -57,13 +57,16 @@ public:
   static void transform(Module &M, Function &F,
                         SmallVector<RuntimeConstant, 8> &RC) {
     auto LambdaClass = F.getArg(0);
-    DBG(dbgs() << "TransformLambdaSpecialization::transform" << "\n");
-    DBG(dbgs() << "\t args" << "\n");
+    DBG(dbgs() << "TransformLambdaSpecialization::transform"
+               << "\n");
+    DBG(dbgs() << "\t args"
+               << "\n");
     for (auto &Arg : RC) {
       DBG(dbgs() << "{" << Arg.Value.Int64Val << ", " << Arg.Slot << " }\n");
     }
 
-    DBG(dbgs() << "\t users" << "\n");
+    DBG(dbgs() << "\t users"
+               << "\n");
     for (User *User : LambdaClass->users()) {
       DBG(dbgs() << *User << "\n");
       if (dyn_cast<LoadInst>(User)) {

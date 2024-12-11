@@ -984,8 +984,10 @@ private:
   }
 
   void findJitVariables(Module &M) {
-    DEBUG(dbgs() << "finding jit variables" << "\n");
-    DEBUG(dbgs() << "users..." << "\n");
+    DEBUG(dbgs() << "finding jit variables"
+                 << "\n");
+    DEBUG(dbgs() << "users..."
+                 << "\n");
 
     SmallVector<Function *, 16> JitFunctions;
 
@@ -1021,7 +1023,8 @@ private:
           DEBUG(dbgs() << "slot: " << *Slot << "\n");
           CB->setArgOperand(1, Slot);
         } else {
-          DEBUG(dbgs() << "no gep, assuming slot 0" << "\n");
+          DEBUG(dbgs() << "no gep, assuming slot 0"
+                       << "\n");
           Constant *C = ConstantInt::get(Int32Ty, 0);
           CB->setArgOperand(1, C);
         }
