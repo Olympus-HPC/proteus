@@ -34,8 +34,10 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Target/TargetMachine.h"
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/Type.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 #include <optional>
+#include <string>
 
 #include "CompilerInterfaceTypes.h"
 #include "JitCache.hpp"
@@ -51,20 +53,22 @@ using namespace llvm;
 
 class JITKernelInfo {
   char const *Name;
+  SmallVector<int32_t> RCTypes;
   SmallVector<int32_t> RCIndices;
   int32_t NumRCs;
 
 public:
-  JITKernelInfo(char const *_Name, int32_t *_RCIndices, int32_t _NumRCs)
-      : Name(_Name), NumRCs(_NumRCs) {
-    for (int32_t I = 0; I < NumRCs; ++I) {
-      RCIndices.push_back(_RCIndices[I]);
-    }
-  }
-  JITKernelInfo() : Name(nullptr), NumRCs(0), RCIndices() {}
-  auto getName() const { return Name; }
-  auto getRCIndices() const { return RCIndices; }
-  auto getNumRCs() const { return NumRCs; }
+  JITKernelInfo(char const *Name, int32_t *RCIndices, int32_t *RCTypes,
+                int32_t NumRCs)
+      : Name(Name), RCIndices{ArrayRef{RCIndices, static_cast<size_t>(NumRCs)}},
+        RCTypes{ArrayRef{RCTypes, static_cast<size_t>(NumRCs)}},
+        NumRCs(NumRCs) {}
+
+  JITKernelInfo() : Name(nullptr), NumRCs(0), RCIndices(), RCTypes() {}
+  const auto &getName() const { return Name; }
+  const auto &getRCIndices() const { return RCIndices; }
+  const auto &getRCTypes() const { return RCTypes; }
+  const auto &getNumRCs() const { return NumRCs; }
 };
 
 struct FatbinWrapper_t {
@@ -84,7 +88,8 @@ public:
 
   DeviceError_t
   compileAndRun(StringRef ModuleUniqueId, void *Kernel, StringRef KernelName,
-                const SmallVector<int32_t> &RCIndices, int NumRuntimeConstants,
+                const SmallVector<int32_t> &RCIndices,
+                const SmallVector<int32_t> &RCTypes, int NumRuntimeConstants,
                 dim3 GridDim, dim3 BlockDim, void **KernelArgs,
                 uint64_t ShmemSize,
                 typename DeviceTraits<ImplT>::DeviceStream_t Stream);
@@ -98,7 +103,7 @@ public:
                          const char *ModuleId);
   void registerFatBinaryEnd();
   void registerFunction(void *Handle, void *Kernel, char *KernelName,
-                        int32_t *RCIndices, int32_t NumRCs);
+                        int32_t *RCIndices, int32_t *RCTypes, int32_t NumRCs);
 
   struct BinaryInfo {
     FatbinWrapper_t *FatbinWrapper;
@@ -203,44 +208,45 @@ private:
     InsertAssume(ImplT::blockIdxZFnName(), GridDim.z);
   }
 
-  void getRuntimeConstantsFromModule(Module &M, void **KernelArgs,
-                                     StringRef KernelName,
-                                     const SmallVector<int32_t> &RCIndices,
-                                     SmallVector<RuntimeConstant> &RCsVec) {
-    Function *F = M.getFunction(KernelName);
+  void getRuntimeConstantValues(void **KernelArgs,
+                                const SmallVector<int32_t> &RCIndices,
+                                const SmallVector<int32_t> &RCTypes,
+                                SmallVector<RuntimeConstant> &RCsVec) {
     for (int I = 0; I < RCIndices.size(); ++I) {
-      Value *Arg = F->getArg(RCIndices[I]);
-      Type *ArgType = Arg->getType();
-      Constant *C = nullptr;
-
+      DBG(dbgs() << "RC Index " << RCIndices[I] << " Type " << RCTypes[I]
+                 << "\n");
       RuntimeConstant RC;
-      if (ArgType->isIntegerTy(1)) {
+      switch (RCTypes[I]) {
+      case RuntimeConstantTypes::BOOL:
         RC.Value.BoolVal = *(bool *)KernelArgs[RCIndices[I]];
-      } else if (ArgType->isIntegerTy(8)) {
+        break;
+      case RuntimeConstantTypes::INT8:
         RC.Value.Int8Val = *(int8_t *)KernelArgs[RCIndices[I]];
-      } else if (ArgType->isIntegerTy(32)) {
+        break;
+      case RuntimeConstantTypes::INT32:
         RC.Value.Int32Val = *(int32_t *)KernelArgs[RCIndices[I]];
-      } else if (ArgType->isIntegerTy(64)) {
+        break;
+      case RuntimeConstantTypes::INT64:
         RC.Value.Int64Val = *(int64_t *)KernelArgs[RCIndices[I]];
-      } else if (ArgType->isFloatTy()) {
+        break;
+      case RuntimeConstantTypes::FLOAT:
         RC.Value.FloatVal = *(float *)KernelArgs[RCIndices[I]];
-      }
+        break;
+      case RuntimeConstantTypes::DOUBLE:
+        RC.Value.DoubleVal = *(double *)KernelArgs[RCIndices[I]];
+        break;
       // NOTE: long double on device should correspond to plain double.
       // XXX: CUDA with a long double SILENTLY fails to create a working
       // kernel in AOT compilation, with or without JIT.
-      else if (ArgType->isDoubleTy()) {
-        RC.Value.DoubleVal = *(double *)KernelArgs[RCIndices[I]];
-      } else if (ArgType->isX86_FP80Ty() || ArgType->isPPC_FP128Ty() ||
-                 ArgType->isFP128Ty()) {
+      case RuntimeConstantTypes::LONG_DOUBLE:
         RC.Value.LongDoubleVal = *(long double *)KernelArgs[RCIndices[I]];
-      } else if (ArgType->isPointerTy()) {
+        break;
+      case RuntimeConstantTypes::PTR:
         RC.Value.PtrVal = (void *)KernelArgs[RCIndices[I]];
-      } else {
-        std::string TypeString;
-        raw_string_ostream TypeOstream(TypeString);
-        ArgType->print(TypeOstream);
+        break;
+      default:
         FATAL_ERROR("JIT Incompatible type in runtime constant: " +
-                    TypeOstream.str());
+                    std::to_string(RCTypes[I]));
       }
 
       RCsVec.push_back(RC);
@@ -410,31 +416,14 @@ template <typename ImplT>
 typename DeviceTraits<ImplT>::DeviceError_t
 JitEngineDevice<ImplT>::compileAndRun(
     StringRef ModuleUniqueId, void *Kernel, StringRef KernelName,
-    const SmallVector<int32_t> &RCIndices, int NumRuntimeConstants,
-    dim3 GridDim, dim3 BlockDim, void **KernelArgs, uint64_t ShmemSize,
-    typename DeviceTraits<ImplT>::DeviceStream_t Stream) {
+    const SmallVector<int32_t> &RCIndices, const SmallVector<int32_t> &RCTypes,
+    int NumRuntimeConstants, dim3 GridDim, dim3 BlockDim, void **KernelArgs,
+    uint64_t ShmemSize, typename DeviceTraits<ImplT>::DeviceStream_t Stream) {
   TIMESCOPE("compileAndRun");
 
   SmallVector<RuntimeConstant> RCsVec;
 
-  auto IRBuffer = extractDeviceBitcode(KernelName, Kernel);
-
-  auto parseBitcode = [&]() -> Expected<orc::ThreadSafeModule> {
-    auto Ctx = std::make_unique<LLVMContext>();
-    SMDiagnostic Err;
-    if (auto M = parseIR(IRBuffer->getMemBufferRef(), Err, *Ctx))
-      return orc::ThreadSafeModule(std::move(M), std::move(Ctx));
-
-    return createSMDiagnosticError(Err);
-  };
-
-  auto SafeModule = parseBitcode();
-  if (auto E = SafeModule.takeError())
-    FATAL_ERROR(toString(std::move(E)).c_str());
-
-  auto *JitModule = SafeModule->getModuleUnlocked();
-  getRuntimeConstantsFromModule(*JitModule, KernelArgs, KernelName, RCIndices,
-                                RCsVec);
+  getRuntimeConstantValues(KernelArgs, RCIndices, RCTypes, RCsVec);
 
   uint64_t HashValue = CodeCache.hash(ModuleUniqueId, KernelName, RCsVec.data(),
                                       NumRuntimeConstants);
@@ -486,6 +475,23 @@ JitEngineDevice<ImplT>::compileAndRun(
                                   ShmemSize, Stream);
     }
   }
+
+  auto IRBuffer = extractDeviceBitcode(KernelName, Kernel);
+
+  auto parseBitcode = [&]() -> Expected<orc::ThreadSafeModule> {
+    auto Ctx = std::make_unique<LLVMContext>();
+    SMDiagnostic Err;
+    if (auto M = parseIR(IRBuffer->getMemBufferRef(), Err, *Ctx))
+      return orc::ThreadSafeModule(std::move(M), std::move(Ctx));
+
+    return createSMDiagnosticError(Err);
+  };
+
+  auto SafeModule = parseBitcode();
+  if (auto E = SafeModule.takeError())
+    FATAL_ERROR(toString(std::move(E)).c_str());
+
+  auto *JitModule = SafeModule->getModuleUnlocked();
 
   specializeIR(*JitModule, KernelName, Suffix, BlockDim, GridDim, RCIndices,
                RCsVec.data(), NumRuntimeConstants);
@@ -545,6 +551,11 @@ void JitEngineDevice<ImplT>::registerFatBinary(void *Handle,
 
 template <typename ImplT> void JitEngineDevice<ImplT>::registerFatBinaryEnd() {
   DBG(dbgs() << "Register fatbinary end\n");
+  // Erase linked binaries for which we have LLVM IR code, those binaries are
+  // stored in the ModuleIdToFatBinary map.
+  for (auto &[ModuleId, FatbinWrapper] : ModuleIdToFatBinary)
+    GlobalLinkedBinaries.erase((void *)FatbinWrapper->Binary);
+
   CurHandle = nullptr;
 }
 
@@ -552,6 +563,7 @@ template <typename ImplT>
 void JitEngineDevice<ImplT>::registerFunction(void *Handle, void *Kernel,
                                               char *KernelName,
                                               int32_t *RCIndices,
+                                              int32_t *RCTypes,
                                               int32_t NumRCs) {
   DBG(dbgs() << "Register function " << Kernel << " To Handle " << Handle
              << "\n");
@@ -559,7 +571,8 @@ void JitEngineDevice<ImplT>::registerFunction(void *Handle, void *Kernel,
          "Expected kernel inserted only once in the map");
   KernelToHandleMap[Kernel] = Handle;
 
-  JITKernelInfoMap[Kernel] = JITKernelInfo(KernelName, RCIndices, NumRCs);
+  JITKernelInfoMap[Kernel] =
+      JITKernelInfo(KernelName, RCIndices, RCTypes, NumRCs);
 }
 
 template <typename ImplT>

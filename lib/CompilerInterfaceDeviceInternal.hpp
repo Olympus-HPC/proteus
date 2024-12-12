@@ -20,6 +20,7 @@ __jit_launch_kernel_internal(const char *ModuleUniqueId, void *Kernel,
   const char *KernelName = KernelInfo.getName();
   int32_t NumRuntimeConstants = KernelInfo.getNumRCs();
   auto RCIndices = KernelInfo.getRCIndices();
+  auto RCTypes = KernelInfo.getRCTypes();
 
   auto printKernelLaunchInfo = [&]() {
     dbgs() << "JIT Launch Kernel\n";
@@ -39,7 +40,7 @@ __jit_launch_kernel_internal(const char *ModuleUniqueId, void *Kernel,
   DBG(printKernelLaunchInfo());
 
   return Jit.compileAndRun(
-      ModuleUniqueId, Kernel, KernelName, RCIndices, NumRuntimeConstants,
-      GridDim, BlockDim, KernelArgs, ShmemSize,
+      ModuleUniqueId, Kernel, KernelName, RCIndices, RCTypes,
+      NumRuntimeConstants, GridDim, BlockDim, KernelArgs, ShmemSize,
       static_cast<typename JitDeviceImplT::DeviceStream_t>(Stream));
 }
