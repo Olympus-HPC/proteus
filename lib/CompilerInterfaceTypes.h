@@ -14,6 +14,19 @@
 #include <cstring>
 #include <stdint.h>
 
+namespace proteus {
+
+enum RuntimeConstantTypes : int32_t {
+  BOOL = 1,
+  INT8,
+  INT32,
+  INT64,
+  FLOAT,
+  DOUBLE,
+  LONG_DOUBLE,
+  PTR
+};
+
 struct RuntimeConstant {
   RuntimeConstant() { std::memset(&Value, 0, sizeof(RuntimeConstantType)); }
   using RuntimeConstantType = union {
@@ -30,5 +43,7 @@ struct RuntimeConstant {
   RuntimeConstantType Value;
   int32_t Slot{-1};
 } __attribute__((packed));
+
+} // namespace proteus
 
 #endif

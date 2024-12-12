@@ -23,13 +23,14 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 
-inline llvm::hash_code hash_value(const RuntimeConstant &RC) {
-  return llvm::hash_value(RC.Value.Int64Val);
-}
-
 namespace proteus {
 
 using namespace llvm;
+
+inline hash_code hash_value(const proteus::RuntimeConstant &RC) {
+  return llvm::hash_value(
+      StringRef{reinterpret_cast<const char *>(&RC.Value), sizeof(RC.Value)});
+}
 
 template <typename Function_t> class JitCache {
 public:

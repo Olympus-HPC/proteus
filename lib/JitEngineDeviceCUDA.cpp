@@ -48,8 +48,6 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
     FATAL_ERROR("Expected to find module id " + ModuleId + " in map");
 
   FatbinWrapper_t *ModuleFatBinWrapper = ModuleIdToFatBinary[ModuleId];
-  // Remove proteus-compiled binary with JIT bitcode from linked binaries.
-  GlobalLinkedBinaries.erase((void *)ModuleFatBinWrapper->Binary);
 
   CUdeviceptr DevPtr;
   size_t Bytes;
@@ -141,33 +139,9 @@ CUfunction JitEngineDeviceCUDA::getKernelFunctionFromImage(StringRef KernelName,
                                                            const void *Image) {
   CUfunction KernelFunc;
   CUmodule Mod;
-  CUlinkState CULinkState = nullptr;
 
-  const void *Binary = Image;
-  if (!GlobalLinkedBinaries.empty()) {
-    cuErrCheck(cuLinkCreate(0, nullptr, nullptr, &CULinkState));
-    for (auto *Ptr : GlobalLinkedBinaries)
-      // We do not know the size of the binary but the CUDA API just needs a
-      // non-zero argument.
-      cuErrCheck(cuLinkAddData(CULinkState, CU_JIT_INPUT_FATBINARY, Ptr, 1, "",
-                               0, 0, 0));
-
-    // Again using a non-zero argument, though we can get the size from the ptx
-    // compiler.
-    cuErrCheck(cuLinkAddData(CULinkState, CU_JIT_INPUT_FATBINARY,
-                             const_cast<void *>(Image), 1, "", 0, 0, 0));
-
-    void *BinOut;
-    size_t BinSize;
-    cuErrCheck(cuLinkComplete(CULinkState, &BinOut, &BinSize));
-    Binary = BinOut;
-  }
-
-  cuErrCheck(cuModuleLoadData(&Mod, Binary));
+  cuErrCheck(cuModuleLoadData(&Mod, Image));
   cuErrCheck(cuModuleGetFunction(&KernelFunc, Mod, KernelName.str().c_str()));
-
-  if (CULinkState)
-    cuLinkDestroy(CULinkState);
 
   return KernelFunc;
 }
@@ -260,7 +234,33 @@ JitEngineDeviceCUDA::codegenObject(Module &M, StringRef DeviceArch) {
 #endif
   nvPTXCompilerErrCheck(nvPTXCompilerDestroy(&PTXCompiler));
 
-  return std::move(ObjBuf);
+  std::unique_ptr<MemoryBuffer> FinalObjBuf;
+  if (!GlobalLinkedBinaries.empty()) {
+    CUlinkState CULinkState;
+    cuErrCheck(cuLinkCreate(0, nullptr, nullptr, &CULinkState));
+    for (auto *Ptr : GlobalLinkedBinaries) {
+      // We do not know the size of the binary but the CUDA API just needs a
+      // non-zero argument.
+      cuErrCheck(cuLinkAddData(CULinkState, CU_JIT_INPUT_FATBINARY, Ptr, 1, "",
+                               0, 0, 0));
+    }
+
+    // Again using a non-zero argument, though we can get the size from the ptx
+    // compiler.
+    cuErrCheck(cuLinkAddData(CULinkState, CU_JIT_INPUT_FATBINARY,
+                             static_cast<void *>(ObjBuf->getBufferStart()), 1,
+                             "", 0, 0, 0));
+
+    void *BinOut;
+    size_t BinSize;
+    cuErrCheck(cuLinkComplete(CULinkState, &BinOut, &BinSize));
+    FinalObjBuf = std::move(MemoryBuffer::getMemBufferCopy(
+        StringRef{static_cast<char *>(BinOut), BinSize}));
+  } else {
+    FinalObjBuf = std::move(ObjBuf);
+  }
+
+  return std::move(FinalObjBuf);
 }
 
 JitEngineDeviceCUDA::JitEngineDeviceCUDA() {

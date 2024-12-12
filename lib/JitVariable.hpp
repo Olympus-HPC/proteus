@@ -11,7 +11,7 @@
 
 #include <cstring>
 
-extern "C" void __jit_push_variable(RuntimeConstant RC);
+extern "C" void __jit_push_variable(proteus::RuntimeConstant RC);
 namespace proteus {
 
 template <typename T> T jit_variable(T v, int pos = -1) {
