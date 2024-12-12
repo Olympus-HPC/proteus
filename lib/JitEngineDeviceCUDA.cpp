@@ -9,6 +9,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Bitcode/BitcodeWriter.h"
+#include "llvm/IR/Metadata.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 #include <llvm/Linker/Linker.h>
@@ -118,10 +119,26 @@ void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module &M, Function &F,
   // properties.
   // TODO: set min GridSize.
   int MaxThreads = std::min(1024, BlockSize);
-  Metadata *MDVals[] = {ConstantAsMetadata::get(&F),
-                        MDString::get(M.getContext(), "maxntidx"),
-                        ConstantAsMetadata::get(ConstantInt::get(
-                            Type::getInt32Ty(M.getContext()), MaxThreads))};
+  auto *FuncMetadata = ConstantAsMetadata::get(&F);
+  auto *MaxntidxMetadata = MDString::get(M.getContext(), "maxntidx");
+  auto *MaxThreadsMetadata = ConstantAsMetadata::get(
+      ConstantInt::get(Type::getInt32Ty(M.getContext()), MaxThreads));
+
+  // Replace if the metadata exists.
+  for (auto *MetadataNode : NvvmAnnotations->operands()) {
+    // Expecting 3 operands ptr, desc, i32 value.
+    assert(MetadataNode->getNumOperands() == 3);
+
+    auto *PtrMetadata = MetadataNode->getOperand(0).get();
+    auto *DescMetadata = MetadataNode->getOperand(1).get();
+    if (PtrMetadata == FuncMetadata && MaxntidxMetadata == DescMetadata) {
+      MetadataNode->replaceOperandWith(2, MaxThreadsMetadata);
+      return;
+    }
+  }
+
+  // Otherwise create the metadata and insert.
+  Metadata *MDVals[] = {FuncMetadata, MaxntidxMetadata, MaxThreadsMetadata};
   NvvmAnnotations->addOperand(MDNode::get(M.getContext(), MDVals));
 }
 

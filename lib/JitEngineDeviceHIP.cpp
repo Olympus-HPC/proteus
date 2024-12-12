@@ -167,6 +167,7 @@ void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
   // TODO: find maximum (hardcoded 1024) from device info.
   // TODO: Setting as 1, BlockSize to replicate launch bounds settings
   // Does setting it as BlockSize, BlockSize help?
+  // Setting the attribute override any previous setting.
   F.addFnAttr("amdgpu-flat-work-group-size",
               "1," + std::to_string(std::min(1024, BlockSize)));
   // TODO: find warp size (hardcoded 64) from device info.
