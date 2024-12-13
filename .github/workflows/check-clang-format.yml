@@ -12,7 +12,7 @@ jobs:
         shell: bash -el {0}
     steps:
       - name: Install clang-format
-        run: pip install clang-format==17.0.6
+        run: pip install clang-format==18.1.8
       - uses: actions/checkout@v4
         with:
             fetch-depth: 0
