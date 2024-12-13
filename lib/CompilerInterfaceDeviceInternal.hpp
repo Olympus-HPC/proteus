@@ -23,17 +23,17 @@ __jit_launch_kernel_internal(const char *ModuleUniqueId, void *Kernel,
   auto RCTypes = KernelInfo.getRCTypes();
 
   auto printKernelLaunchInfo = [&]() {
-    dbgs() << "JIT Launch Kernel\n";
-    dbgs() << "=== Kernel Info\n";
-    dbgs() << "KernelName " << KernelName << "\n";
-    dbgs() << "Grid " << GridDim.x << ", " << GridDim.y << ", " << GridDim.z
-           << "\n";
-    dbgs() << "Block " << BlockDim.x << ", " << BlockDim.y << ", " << BlockDim.z
-           << "\n";
-    dbgs() << "KernelArgs " << KernelArgs << "\n";
-    dbgs() << "ShmemSize " << ShmemSize << "\n";
-    dbgs() << "Stream " << Stream << "\n";
-    dbgs() << "=== End Kernel Info\n";
+    Logger::logs("proteus") << "JIT Launch Kernel\n";
+    Logger::logs("proteus") << "=== Kernel Info\n";
+    Logger::logs("proteus") << "KernelName " << KernelName << "\n";
+    Logger::logs("proteus") << "Grid " << GridDim.x << ", " << GridDim.y << ", "
+                            << GridDim.z << "\n";
+    Logger::logs("proteus") << "Block " << BlockDim.x << ", " << BlockDim.y
+                            << ", " << BlockDim.z << "\n";
+    Logger::logs("proteus") << "KernelArgs " << KernelArgs << "\n";
+    Logger::logs("proteus") << "ShmemSize " << ShmemSize << "\n";
+    Logger::logs("proteus") << "Stream " << Stream << "\n";
+    Logger::logs("proteus") << "=== End Kernel Info\n";
   };
 
   TIMESCOPE("__jit_launch_kernel");

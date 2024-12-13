@@ -213,8 +213,8 @@ private:
                                 const SmallVector<int32_t> &RCTypes,
                                 SmallVector<RuntimeConstant> &RCsVec) {
     for (int I = 0; I < RCIndices.size(); ++I) {
-      DBG(dbgs() << "RC Index " << RCIndices[I] << " Type " << RCTypes[I]
-                 << "\n");
+      DBG(Logger::logs("proteus")
+          << "RC Index " << RCIndices[I] << " Type " << RCTypes[I] << "\n");
       RuntimeConstant RC;
       switch (RCTypes[I]) {
       case RuntimeConstantTypes::BOOL:
@@ -325,7 +325,8 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
                                           int NumRuntimeConstants) {
 
   TIMESCOPE("specializeIR");
-  DBG(dbgs() << "=== Parsed Module\n" << M << "=== End of Parsed Module\n");
+  DBG(Logger::logs("proteus") << "=== Parsed Module\n"
+                              << M << "=== End of Parsed Module\n");
   Function *F = M.getFunction(FnName);
   assert(F && "Expected non-null function!");
 
@@ -357,7 +358,8 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
     setKernelDims(M, GridDim, BlockDim);
   }
 
-  DBG(dbgs() << "=== JIT Module\n" << M << "=== End of JIT Module\n");
+  DBG(Logger::logs("proteus") << "=== JIT Module\n"
+                              << M << "=== End of JIT Module\n");
 
   F->setName(FnName + Suffix);
 
@@ -366,11 +368,12 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
                              BlockDim.x * BlockDim.y * BlockDim.z);
 
 #if ENABLE_DEBUG
-  dbgs() << "=== Final Module\n" << M << "=== End Final Module\n";
+  Logger::logs("proteus") << "=== Final Module\n"
+                          << M << "=== End Final Module\n";
   if (verifyModule(M, &errs()))
     FATAL_ERROR("Broken module found, JIT compilation aborted!");
   else
-    dbgs() << "Module verified!\n";
+    Logger::logs("proteus") << "Module verified!\n";
 #endif
 }
 
@@ -404,11 +407,11 @@ void JitEngineDevice<ImplT>::relinkGlobals(
   }
 
 #if ENABLE_DEBUG
-  dbgs() << "=== Linked M\n" << M << "=== End of Linked M\n";
+  Logger::logs("proteus") << "=== Linked M\n" << M << "=== End of Linked M\n";
   if (verifyModule(M, &errs()))
     FATAL_ERROR("After linking, broken module found, JIT compilation aborted!");
   else
-    dbgs() << "Module verified!\n";
+    Logger::logs("proteus") << "Module verified!\n";
 #endif
 }
 
@@ -526,9 +529,10 @@ void JitEngineDevice<ImplT>::registerFatBinary(void *Handle,
                                                FatbinWrapper_t *FatbinWrapper,
                                                const char *ModuleId) {
   CurHandle = Handle;
-  DBG(dbgs() << "Register fatbinary Handle " << Handle << " FatbinWrapper "
-             << FatbinWrapper << " Binary " << (void *)FatbinWrapper->Binary
-             << " ModuleId " << ModuleId << "\n");
+  DBG(Logger::logs("proteus")
+      << "Register fatbinary Handle " << Handle << " FatbinWrapper "
+      << FatbinWrapper << " Binary " << (void *)FatbinWrapper->Binary
+      << " ModuleId " << ModuleId << "\n");
   if (FatbinWrapper->PrelinkedFatbins) {
     // This is RDC compilation, just insert the FatbinWrapper and ignore the
     // ModuleId coming from the link.stub.
@@ -538,7 +542,8 @@ void JitEngineDevice<ImplT>::registerFatBinary(void *Handle,
     void *Ptr = FatbinWrapper->PrelinkedFatbins[0];
     for (int I = 0; Ptr != nullptr;
          ++I, Ptr = FatbinWrapper->PrelinkedFatbins[I]) {
-      DBG(dbgs() << "I " << I << " PrelinkedFatbin " << Ptr << "\n");
+      DBG(Logger::logs("proteus")
+          << "I " << I << " PrelinkedFatbin " << Ptr << "\n");
       GlobalLinkedBinaries.insert(Ptr);
     }
   } else {
@@ -550,7 +555,7 @@ void JitEngineDevice<ImplT>::registerFatBinary(void *Handle,
 }
 
 template <typename ImplT> void JitEngineDevice<ImplT>::registerFatBinaryEnd() {
-  DBG(dbgs() << "Register fatbinary end\n");
+  DBG(Logger::logs("proteus") << "Register fatbinary end\n");
   // Erase linked binaries for which we have LLVM IR code, those binaries are
   // stored in the ModuleIdToFatBinary map.
   for (auto &[ModuleId, FatbinWrapper] : ModuleIdToFatBinary)
@@ -565,8 +570,8 @@ void JitEngineDevice<ImplT>::registerFunction(void *Handle, void *Kernel,
                                               int32_t *RCIndices,
                                               int32_t *RCTypes,
                                               int32_t NumRCs) {
-  DBG(dbgs() << "Register function " << Kernel << " To Handle " << Handle
-             << "\n");
+  DBG(Logger::logs("proteus")
+      << "Register function " << Kernel << " To Handle " << Handle << "\n");
   assert(!KernelToHandleMap.contains(Kernel) &&
          "Expected kernel inserted only once in the map");
   KernelToHandleMap[Kernel] = Handle;
@@ -578,9 +583,9 @@ void JitEngineDevice<ImplT>::registerFunction(void *Handle, void *Kernel,
 template <typename ImplT>
 void JitEngineDevice<ImplT>::registerLinkedBinary(
     FatbinWrapper_t *FatbinWrapper, const char *ModuleId) {
-  DBG(dbgs() << "Register linked binary FatBinary " << FatbinWrapper
-             << " Binary " << (void *)FatbinWrapper->Binary << " ModuleId "
-             << ModuleId << "\n");
+  DBG(Logger::logs("proteus")
+      << "Register linked binary FatBinary " << FatbinWrapper << " Binary "
+      << (void *)FatbinWrapper->Binary << " ModuleId " << ModuleId << "\n");
   if (CurHandle) {
     if (!HandleToBinaryInfo.contains(CurHandle))
       FATAL_ERROR("Expected CurHandle in map");

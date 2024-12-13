@@ -72,18 +72,18 @@ public:
   Expected<ThreadSafeModule> operator()(ThreadSafeModule TSM,
                                         MaterializationResponsibility &R) {
     TSM.withModuleDo([this](Module &M) {
-      DBG(dbgs() << "=== Begin Before Optimization\n"
-                 << M << "=== End Before\n");
+      DBG(Logger::logs("proteus") << "=== Begin Before Optimization\n"
+                                  << M << "=== End Before\n");
       TIMESCOPE("Run Optimization Transform");
       JitEngineImpl.optimizeIR(M, sys::getHostCPUName());
-      DBG(dbgs() << "=== Begin After Optimization\n"
-                 << M << "=== End After Optimization\n");
+      DBG(Logger::logs("proteus") << "=== Begin After Optimization\n"
+                                  << M << "=== End After Optimization\n");
 #if ENABLE_DEBUG
       if (verifyModule(M, &errs()))
         FATAL_ERROR(
             "Broken module found after optimization, JIT compilation aborted!");
       else
-        dbgs() << "Module after optimization verified!\n";
+        Logger::logs("proteus") << "Module after optimization verified!\n";
 #endif
     });
     return std::move(TSM);
@@ -91,18 +91,18 @@ public:
 
   Expected<ThreadSafeModule> operator()(ThreadSafeModule TSM) {
     TSM.withModuleDo([this](Module &M) {
-      DBG(dbgs() << "=== Begin Before Optimization\n"
-                 << M << "=== End Before\n");
+      DBG(Logger::logs("proteus") << "=== Begin Before Optimization\n"
+                                  << M << "=== End Before\n");
       TIMESCOPE("Run Optimization Transform");
       JitEngineImpl.optimizeIR(M, sys::getHostCPUName());
-      DBG(dbgs() << "=== Begin After Optimization\n"
-                 << M << "=== End After Optimization\n");
+      DBG(Logger::logs("proteus") << "=== Begin After Optimization\n"
+                                  << M << "=== End After Optimization\n");
 #if ENABLE_DEBUG
       if (verifyModule(M, &errs()))
         FATAL_ERROR(
             "Broken module found after optimization, JIT compilation aborted!");
       else
-        dbgs() << "Module after optimization verified!\n";
+        Logger::logs("proteus") << "Module after optimization verified!\n";
 #endif
     });
     return std::move(TSM);
@@ -202,7 +202,8 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
   SMDiagnostic Err;
   if (auto M = parseIR(MemoryBufferRef(IR, ("Mod-" + FnName + Suffix).str()),
                        Err, *Ctx)) {
-    // dbgs() << "=== Parsed Module\n" << *M << "=== End of Parsed Module\n ";
+    // Logger::logs("proteus") << "=== Parsed Module\n" << *M << "=== End of
+    // Parsed Module\n ";
     Function *F = M->getFunction(FnName);
     assert(F && "Expected non-null function!");
 
@@ -226,12 +227,12 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
       // Consume the error and fix with static linking.
       consumeError(std::move(Error));
 
-      DBG(dbgs() << "Resolve statically missing GV symbol " << GV.getName()
-                 << "\n");
+      DBG(Logger::logs("proteus")
+          << "Resolve statically missing GV symbol " << GV.getName() << "\n");
 
 #if ENABLE_CUDA || ENABLE_HIP
       if (GV.getName() == "__jit_launch_kernel") {
-        DBG(dbgs() << "Resolving via ORC jit_launch_kernel\n");
+        DBG(Logger::logs("proteus") << "Resolving via ORC jit_launch_kernel\n");
         SymbolMap SymbolMap;
         SymbolMap[LLJITPtr->mangleAndIntern("__jit_launch_kernel")] =
             orc::ExecutorSymbolDef(
@@ -252,8 +253,8 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
     // TODO: change NumRuntimeConstants to size_t at interface.
     MDNode *Node = F->getMetadata("jit_arg_nos");
     assert(Node && "Expected metata for jit argument positions");
-    DBG(dbgs() << "Metadata jit for F " << F->getName() << " = " << *Node
-               << "\n");
+    DBG(Logger::logs("proteus")
+        << "Metadata jit for F " << F->getName() << " = " << *Node << "\n");
 
     // Replace argument uses with runtime constants.
     SmallVector<int32_t> ArgPos;
@@ -271,18 +272,20 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
     if (!JitVariables.empty())
       TransformLambdaSpecialization::transform(*M, *F, JitVariables);
 
-    // dbgs() << "=== JIT Module\n" << *M << "=== End of JIT Module\n";
+    // Logger::logs("proteus") << "=== JIT Module\n" << *M << "=== End of JIT
+    // Module\n";
 
     JitVariables.clear();
 
     F->setName(FnName + Suffix);
 
 #if ENABLE_DEBUG
-    dbgs() << "=== Final Module\n" << *M << "=== End Final Module\n";
+    Logger::logs("proteus") << "=== Final Module\n"
+                            << *M << "=== End Final Module\n";
     if (verifyModule(*M, &errs()))
       FATAL_ERROR("Broken module found, JIT compilation aborted!");
     else
-      dbgs() << "Module verified!\n";
+      Logger::logs("proteus") << "Module verified!\n";
 #endif
     return ThreadSafeModule(std::move(M), std::move(Ctx));
   }
@@ -309,23 +312,25 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   ExitOnErr(LLJITPtr->addIRModule(
       ExitOnErr(specializeIR(FnName, Suffix, StrIR, RC, NumRuntimeConstants))));
 
-  DBG(dbgs() << "===\n"
-             << *LLJITPtr->getExecutionSession().getSymbolStringPool()
-             << "===\n");
+  DBG(Logger::logs("proteus")
+      << "===\n"
+      << *LLJITPtr->getExecutionSession().getSymbolStringPool() << "===\n");
 
   // (4) Look up the JIT'd function.
-  DBG(dbgs() << "Lookup FnName " << FnName << " mangled as " << MangledFnName
-             << "\n");
+  DBG(Logger::logs("proteus")
+      << "Lookup FnName " << FnName << " mangled as " << MangledFnName << "\n");
   auto EntryAddr = ExitOnErr(LLJITPtr->lookup(MangledFnName));
 
   JitFnPtr = (void *)EntryAddr.getValue();
-  DBG(dbgs() << "FnName " << FnName << " Mangled " << MangledFnName
-             << " address " << JitFnPtr << "\n");
+  DBG(Logger::logs("proteus")
+      << "FnName " << FnName << " Mangled " << MangledFnName << " address "
+      << JitFnPtr << "\n");
   assert(JitFnPtr && "Expected non-null JIT function pointer");
   CodeCache.insert(HashValue, JitFnPtr, FnName, RC, NumRuntimeConstants);
 
-  dbgs() << "=== JIT compile: " << FnName << " Mangled " << MangledFnName
-         << " RC HashValue " << HashValue << " Addr " << JitFnPtr << "\n";
+  Logger::logs("proteus") << "=== JIT compile: " << FnName << " Mangled "
+                          << MangledFnName << " RC HashValue " << HashValue
+                          << " Addr " << JitFnPtr << "\n";
   return JitFnPtr;
 }
 
@@ -372,7 +377,7 @@ JitEngineHost::JitEngineHost(int argc, char *argv[]) {
       ExitOnErr(orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
           LLJITPtr->getDataLayout().getGlobalPrefix(),
           [MainName = Mangle("main")](const orc::SymbolStringPtr &Name) {
-            // dbgs() << "Search name " << Name << "\n";
+            // Logger::logs("proteus") << "Search name " << Name << "\n";
             return Name != MainName;
           })));
 
