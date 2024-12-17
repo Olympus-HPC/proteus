@@ -35,6 +35,7 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/SHA256.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
@@ -55,6 +56,7 @@
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/Metadata.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/ErrorHandling.h>
 #include <llvm/Support/FileSystem.h>
@@ -117,6 +119,22 @@ public:
         StructType::create({Int128Ty, Int32Ty}, "struct.args", true);
   }
 
+  // Function to attach the SHA-256 checksum as custom metadata to the Module
+  NamedMDNode *addSHA256AsMetadata(Module &M,
+                                   const std::string &SHA256Checksum) {
+    // Get or create a named metadata node
+    NamedMDNode *SHA256Metadata =
+        M.getOrInsertNamedMetadata("proteus.module.sha256");
+
+    // Create a metadata node with the SHA-256 hash as a string
+    MDNode *SHA256Node = MDNode::get(
+        M.getContext(), MDString::get(M.getContext(), SHA256Checksum));
+
+    // Add the metadata node as an operand to the named metadata
+    SHA256Metadata->addOperand(SHA256Node);
+    return SHA256Metadata;
+  }
+
   bool run(Module &M, bool IsLTO) {
     parseAnnotations(M);
 
@@ -131,7 +149,15 @@ public:
     // For device compilation, just extract the module IR of device code
     // and return.
     if (isDeviceCompilation(M)) {
+      // Calling the SHA256 on top of the module, as `hash_code` is not
+      // deterministic across executions
+      auto proteusHashMDNode =
+          addSHA256AsMetadata(M, getModuleBitcodeSHA256(M));
+      std::cout << "Proteus hash is :\n";
+      proteusHashMDNode->dump();
       emitJitModuleDevice(M, IsLTO);
+      // The AOT compilation does not need the SHA, so we delete it
+      M.eraseNamedMetadata(proteusHashMDNode);
 
       return true;
     }
@@ -1099,6 +1125,22 @@ private:
         }
       }
     }
+  }
+
+  // Function to get the SHA-256 checksum of a Module's bitcode
+  std::string getModuleBitcodeSHA256(const Module &M) {
+    std::string BitcodeStr;
+    llvm::raw_string_ostream BitcodeStream(BitcodeStr);
+
+    WriteBitcodeToFile(M, BitcodeStream);
+    BitcodeStream.flush();
+
+    llvm::SHA256 SHA256Hasher;
+    SHA256Hasher.update(BitcodeStr);    // Feed the bitcode to the hasher
+    auto Digest = SHA256Hasher.final(); // Finalize the hash computation
+
+    // Convert the SHA-256 result to a human-readable hexadecimal string
+    return llvm::toHex(Digest);
   }
 };
 

@@ -12,6 +12,7 @@
 #include "llvm/IR/Metadata.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
+#include <algorithm>
 #include <llvm/Linker/Linker.h>
 #include <llvm/Support/MemoryBufferRef.h>
 #include <memory>
@@ -65,18 +66,28 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
   if (!M)
     FATAL_ERROR("unexpected");
 
-  LinkedModules.push_back(std::move(M));
+  LinkedModules.emplace_back(std::move(M));
 }
 
-std::unique_ptr<MemoryBuffer>
-JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
+std::unique_ptr<llvm::Module> JitEngineDeviceCUDA::createLinkedModule(
+    ArrayRef<std::unique_ptr<llvm::Module>> LinkedModules,
+    StringRef KernelName) {
+  auto JitModule = std::make_unique<llvm::Module>("JitModule", *ProteusCtx);
+  linkJitModule(*JitModule, KernelName, LinkedModules);
+  return std::move(JitModule);
+}
+
+int JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName,
+                                              void *Kernel) {
   CUmodule CUMod;
   CUdeviceptr DevPtr;
+
   size_t Bytes;
 
+  if (KernelToBitcodeIndex.contains(Kernel))
+    return KernelToBitcodeIndex[Kernel];
+
   SmallVector<std::unique_ptr<Module>> LinkedModules;
-  auto Ctx = std::make_unique<LLVMContext>();
-  auto JitModule = std::make_unique<llvm::Module>("JitModule", *Ctx);
   if (!KernelToHandleMap.contains(Kernel))
     FATAL_ERROR("Expected Kernel in map");
 
@@ -93,21 +104,30 @@ JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
   cuErrCheck(cuModuleLoadData(&CUMod, FatbinWrapper->Binary));
 
   for (auto &ModuleId : LinkedModuleIds)
-    extractLinkedBitcode(*Ctx.get(), CUMod, LinkedModules, ModuleId);
+    extractLinkedBitcode(*ProteusCtx, CUMod, LinkedModules, ModuleId);
 
   for (auto &ModuleId : GlobalLinkedModuleIds)
-    extractLinkedBitcode(*Ctx.get(), CUMod, LinkedModules, ModuleId);
+    extractLinkedBitcode(*ProteusCtx, CUMod, LinkedModules, ModuleId);
 
   cuErrCheck(cuModuleUnload(CUMod));
 
-  linkJitModule(JitModule.get(), Ctx.get(), KernelName, LinkedModules);
+  // Store the linked modules. For future accesses
+  int index = SHA256HashWithBitcodes.size();
+  SHA256HashWithBitcodes.push_back(
+      std::make_pair(getCombinedModuleHash(LinkedModules),
+                     SmallVector<std::unique_ptr<Module>>()));
+  // Iterate and pop elements
+  for (auto it = LinkedModules.rbegin(); it != LinkedModules.rend(); ++it) {
+    SHA256HashWithBitcodes[index].second.push_back(std::move(*it));
+  }
 
-  std::string LinkedDeviceBitcode;
-  raw_string_ostream OS(LinkedDeviceBitcode);
-  WriteBitcodeToFile(*JitModule.get(), OS);
-  OS.flush();
+  for (const auto &KV : KernelToHandleMap) {
+    if (KV.second == Handle) {
+      KernelToBitcodeIndex.try_emplace(KV.first, index);
+    }
+  }
 
-  return MemoryBuffer::getMemBufferCopy(LinkedDeviceBitcode);
+  return index;
 }
 
 void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module &M, Function &F,
@@ -222,6 +242,7 @@ JitEngineDeviceCUDA::codegenObject(Module &M, StringRef DeviceArch) {
   nvPTXCompilerErrCheck(
       nvPTXCompilerCreate(&PTXCompiler, PTXStr.size(), PTXStr.data()));
   std::string ArchOpt = ("--gpu-name=" + DeviceArch).str();
+
   std::string RDCOption = "";
   if (!GlobalLinkedBinaries.empty())
     RDCOption = "-c";

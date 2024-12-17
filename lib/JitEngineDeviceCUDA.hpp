@@ -84,8 +84,11 @@ public:
   void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
                                 int BlockSize);
 
-  std::unique_ptr<MemoryBuffer> extractDeviceBitcode(StringRef KernelName,
-                                                     void *Kernel);
+  int extractDeviceBitcode(StringRef KernelName, void *Kernel);
+
+  std::unique_ptr<llvm::Module>
+  createLinkedModule(ArrayRef<std::unique_ptr<llvm::Module>> LinkedModules,
+                     StringRef KernelName);
 
   void codegenPTX(Module &M, StringRef DeviceArch,
                   SmallVectorImpl<char> &PTXStr);

@@ -13,12 +13,14 @@
 
 #include "llvm/Linker/Linker.h"
 #include <cstdint>
+#include <llvm/ADT/DenseSet.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/MemoryBufferRef.h>
+#include <llvm/Support/raw_ostream.h>
 #include <memory>
 
 #include "llvm/Analysis/TargetTransformInfo.h"
@@ -33,6 +35,7 @@
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Type.h>
 #include <llvm/Transforms/IPO/Internalize.h>
@@ -115,6 +118,15 @@ public:
   std::unordered_map<std::string, FatbinWrapper_t *> ModuleIdToFatBinary;
   DenseMap<void *, BinaryInfo> HandleToBinaryInfo;
   DenseMap<void *, void *> KernelToHandleMap;
+
+  SmallVector<std::pair<std::string, SmallVector<std::unique_ptr<Module>>>>
+      SHA256HashWithBitcodes;
+
+  DenseMap<void *, std::unique_ptr<llvm::Module>> LinkedLLVMIRModules;
+  DenseMap<void *, int> KernelToBitcodeIndex;
+  /* @Brief After proteus initialization contains all kernels annotathed with
+   * proteus */
+  DenseSet<void *> ProteusAnnotatedKernels;
   SmallVector<std::string> GlobalLinkedModuleIds;
   SmallPtrSet<void *, 8> GlobalLinkedBinaries;
 
@@ -280,8 +292,15 @@ private:
                                                                   Image);
   }
 
-  std::unique_ptr<MemoryBuffer> extractDeviceBitcode(StringRef KernelName,
-                                                     void *Kernel) {
+  std::unique_ptr<llvm::Module>
+  createLinkedModule(ArrayRef<std::unique_ptr<Module>> LinkedModules,
+                     StringRef KernelName) {
+    TIMESCOPE(__FUNCTION__)
+    return static_cast<ImplT &>(*this).createLinkedModule(LinkedModules,
+                                                          KernelName);
+  }
+
+  int extractDeviceBitcode(StringRef KernelName, void *Kernel) {
     TIMESCOPE(__FUNCTION__)
     return static_cast<ImplT &>(*this).extractDeviceBitcode(KernelName, Kernel);
   }
@@ -299,18 +318,33 @@ private:
                 std::unordered_map<std::string, const void *> &VarNameToDevPtr);
 
 protected:
-  JitEngineDevice() {}
+  JitEngineDevice() { ProteusCtx = std::make_unique<LLVMContext>(); }
   ~JitEngineDevice() {
     CodeCache.printStats();
     StorageCache.printStats();
+    // Note: We manually clear or unique_ptr to Modules before the destructor
+    // releases the ProteusCtx.
+    //
+    // Explicitly clear the LinkedLLVMIRModules
+    LinkedLLVMIRModules.clear();
+
+    // Explicitly clear SHA256HashWithBitcodes
+    for (auto &Entry : SHA256HashWithBitcodes)
+      Entry.second.clear();
+    SHA256HashWithBitcodes.clear();
   }
 
   JitCache<KernelFunction_t> CodeCache;
   JitStorageCache<KernelFunction_t> StorageCache;
   std::string DeviceArch;
   std::unordered_map<std::string, const void *> VarNameToDevPtr;
-  void linkJitModule(Module *M, LLVMContext *Ctx, StringRef KernelName,
-                     SmallVector<std::unique_ptr<Module>> &LinkedModules);
+  void linkJitModule(Module &M, StringRef KernelName,
+                     ArrayRef<std::unique_ptr<Module>> LinkedModules);
+  std::string
+  getCombinedModuleHash(ArrayRef<std::unique_ptr<Module>> LinkedModules);
+
+  // All modules are associated with context, to guarantee correct lifetime.
+  std::unique_ptr<LLVMContext> ProteusCtx;
 
 private:
   // This map is private and only accessible via the API.
@@ -435,14 +469,28 @@ JitEngineDevice<ImplT>::compileAndRun(
     uint64_t ShmemSize, typename DeviceTraits<ImplT>::DeviceStream_t Stream) {
   TIMESCOPE("compileAndRun");
 
+  // This was never registered, return immediately
+  if (!KernelToHandleMap.contains(Kernel))
+    return launchKernelDirect(Kernel, GridDim, BlockDim, KernelArgs, ShmemSize,
+                              Stream);
+
   SmallVector<RuntimeConstant> RCsVec;
 
   getRuntimeConstantValues(KernelArgs, RCIndices, RCTypes, RCsVec);
 
-  uint64_t HashValue = CodeCache.hash(ModuleUniqueId, KernelName, RCsVec.data(),
-                                      NumRuntimeConstants);
-  typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc =
-      CodeCache.lookup(HashValue);
+  typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc;
+
+  auto Index = KernelToBitcodeIndex.contains(Kernel)
+                   ? KernelToBitcodeIndex[Kernel]
+                   : extractDeviceBitcode(KernelName, Kernel);
+
+  // I have already read the LLVM IR from the Binary. Pick the Static Hash
+  auto StaticHash = SHA256HashWithBitcodes[Index].first;
+  // TODO: This does not include the GridDims/BlockDims. We need to fix it.
+  uint64_t DynamicHashValue = CodeCache.hash(
+      StaticHash, KernelName, RCsVec.data(), NumRuntimeConstants);
+  KernelFunc = CodeCache.lookup(DynamicHashValue);
+  // We found the kernel, execute
   if (KernelFunc)
     return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                                 ShmemSize, Stream);
@@ -450,11 +498,12 @@ JitEngineDevice<ImplT>::compileAndRun(
   // NOTE: we don't need a suffix to differentiate kernels, each specialization
   // will be in its own module uniquely identify by HashValue. It exists only
   // for debugging purposes to verify that the jitted kernel executes.
-  std::string Suffix = mangleSuffix(HashValue);
+  std::string Suffix = mangleSuffix(DynamicHashValue);
   std::string KernelMangled = (KernelName + Suffix).str();
 
   if (Config.ENV_PROTEUS_USE_STORED_CACHE) {
-    // If there device global variables, lookup the IR and codegen object
+    // FIXME: The code cache is completely broken as of now. I need to revisit
+    // this. If there device global variables, lookup the IR and codegen object
     // before launching. Else, if there aren't device global variables, lookup
     // the object and launch.
 
@@ -466,13 +515,13 @@ JitEngineDevice<ImplT>::compileAndRun(
     bool HasDeviceGlobals = !VarNameToDevPtr.empty();
     if (auto CacheBuf =
             (HasDeviceGlobals
-                 ? StorageCache.lookupBitcode(HashValue, KernelMangled)
-                 : StorageCache.lookupObject(HashValue, KernelMangled))) {
+                 ? StorageCache.lookupBitcode(DynamicHashValue, KernelMangled)
+                 : StorageCache.lookupObject(DynamicHashValue,
+                                             KernelMangled))) {
       std::unique_ptr<MemoryBuffer> ObjBuf;
       if (HasDeviceGlobals) {
-        auto Ctx = std::make_unique<LLVMContext>();
         SMDiagnostic Err;
-        auto M = parseIR(CacheBuf->getMemBufferRef(), Err, *Ctx);
+        auto M = parseIR(CacheBuf->getMemBufferRef(), Err, *ProteusCtx.get());
         relinkGlobals(*M, VarNameToDevPtr);
         ObjBuf = codegenObject(*M, DeviceArch);
       } else {
@@ -482,7 +531,7 @@ JitEngineDevice<ImplT>::compileAndRun(
       auto KernelFunc =
           getKernelFunctionFromImage(KernelMangled, ObjBuf->getBufferStart());
 
-      CodeCache.insert(HashValue, KernelFunc, KernelName, RCsVec.data(),
+      CodeCache.insert(DynamicHashValue, KernelFunc, KernelName, RCsVec.data(),
                        NumRuntimeConstants);
 
       return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
@@ -490,22 +539,18 @@ JitEngineDevice<ImplT>::compileAndRun(
     }
   }
 
-  auto IRBuffer = extractDeviceBitcode(KernelName, Kernel);
+  if (!LinkedLLVMIRModules.contains(Kernel)) {
+    // if we get here, we have access to the LLVM-IR of the module, but we
+    // have never linked everything together and internalized the symbols.
+    LinkedLLVMIRModules.insert(
+        {Kernel,
+         createLinkedModule(SHA256HashWithBitcodes[Index].second, KernelName)});
+  }
 
-  auto parseBitcode = [&]() -> Expected<orc::ThreadSafeModule> {
-    auto Ctx = std::make_unique<LLVMContext>();
-    SMDiagnostic Err;
-    if (auto M = parseIR(IRBuffer->getMemBufferRef(), Err, *Ctx))
-      return orc::ThreadSafeModule(std::move(M), std::move(Ctx));
-
-    return createSMDiagnosticError(Err);
-  };
-
-  auto SafeModule = parseBitcode();
-  if (auto E = SafeModule.takeError())
-    FATAL_ERROR(toString(std::move(E)).c_str());
-
-  auto *JitModule = SafeModule->getModuleUnlocked();
+  // We need to clone, The JitModule will be specialized later, and we need
+  // the one stored under LinkedLLVMIRModules to be a generic version prior
+  // specialization.
+  auto JitModule = llvm::CloneModule(*LinkedLLVMIRModules[Kernel]);
 
   specializeIR(*JitModule, KernelName, Suffix, BlockDim, GridDim, RCIndices,
                RCsVec.data(), NumRuntimeConstants);
@@ -517,18 +562,18 @@ JitEngineDevice<ImplT>::compileAndRun(
   SmallString<4096> ModuleBuffer;
   raw_svector_ostream ModuleBufferOS(ModuleBuffer);
   WriteBitcodeToFile(*JitModule, ModuleBufferOS);
-  StorageCache.storeBitcode(HashValue, ModuleBuffer);
+  StorageCache.storeBitcode(DynamicHashValue, ModuleBuffer);
 
   relinkGlobals(*JitModule, VarNameToDevPtr);
 
   auto ObjBuf = codegenObject(*JitModule, DeviceArch);
   if (Config.ENV_PROTEUS_USE_STORED_CACHE)
-    StorageCache.storeObject(HashValue, ObjBuf->getMemBufferRef());
+    StorageCache.storeObject(DynamicHashValue, ObjBuf->getMemBufferRef());
 
   KernelFunc =
       getKernelFunctionFromImage(KernelMangled, ObjBuf->getBufferStart());
 
-  CodeCache.insert(HashValue, KernelFunc, KernelName, RCsVec.data(),
+  CodeCache.insert(DynamicHashValue, KernelFunc, KernelName, RCsVec.data(),
                    NumRuntimeConstants);
 
   return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
@@ -587,6 +632,10 @@ void JitEngineDevice<ImplT>::registerFunction(void *Handle, void *Kernel,
          "Expected kernel inserted only once in the map");
   KernelToHandleMap[Kernel] = Handle;
 
+  assert(!ProteusAnnotatedKernels.contains(Kernel) &&
+         "Expected kernel inserted only once in proteus kernel map");
+  ProteusAnnotatedKernels.insert(Kernel);
+
   JITKernelInfoMap[Kernel] =
       JITKernelInfo(KernelName, RCIndices, RCTypes, NumRCs);
 }
@@ -609,14 +658,42 @@ void JitEngineDevice<ImplT>::registerLinkedBinary(
 }
 
 template <typename ImplT>
+std::string JitEngineDevice<ImplT>::getCombinedModuleHash(
+    ArrayRef<std::unique_ptr<Module>> LinkedModules) {
+  SmallVector<std::string> SHA256HashCodes;
+  for (auto &Mod : LinkedModules) {
+    NamedMDNode *ProteusSHANode =
+        Mod->getNamedMetadata("proteus.module.sha256");
+    assert(ProteusSHANode != nullptr &&
+           "Expected non-null proteus.module.sha256 metadata");
+    assert(ProteusSHANode->getNumOperands() == 1 &&
+           "Hash MD Node should have a single operand");
+    auto MDHash = ProteusSHANode->getOperand(0);
+    MDString *sha256 = dyn_cast<MDString>(MDHash->getOperand(0));
+    if (!sha256) {
+      FATAL_ERROR("Could not read sha256 from module\n");
+    }
+    SHA256HashCodes.push_back(sha256->getString().str());
+    Mod->eraseNamedMetadata(ProteusSHANode);
+  }
+
+  std::sort(SHA256HashCodes.begin(), SHA256HashCodes.end());
+  std::string combinedHash;
+  for (auto hash : SHA256HashCodes) {
+    combinedHash += hash;
+  }
+  return combinedHash;
+}
+
+template <typename ImplT>
 void JitEngineDevice<ImplT>::linkJitModule(
-    Module *M, LLVMContext *Ctx, StringRef KernelName,
-    SmallVector<std::unique_ptr<Module>> &LinkedModules) {
+    Module &M, StringRef KernelName,
+    ArrayRef<std::unique_ptr<Module>> LinkedModules) {
   if (LinkedModules.empty())
     FATAL_ERROR("Expected jit module");
 
-  Linker IRLinker(*M);
-  for (auto &LinkedM : LinkedModules) {
+  Linker IRLinker(M);
+  for (auto &LinkedM : llvm::reverse(LinkedModules)) {
     // Returns true if linking failed.
     if (IRLinker.linkInModule(std::move(LinkedM)))
       FATAL_ERROR("Linking failed");
