@@ -22,13 +22,14 @@ extern "C" __attribute__((used)) void *__jit_entry(char *FnName, char *IR,
   TIMESCOPE("__jit_entry");
   JitEngineHost &Jit = JitEngineHost::instance();
 #if ENABLE_DEBUG
-  dbgs() << "FnName " << FnName << " NumRuntimeConstants "
-         << NumRuntimeConstants << "\n";
+  Logger::logs("proteus") << "FnName " << FnName << " NumRuntimeConstants "
+                          << NumRuntimeConstants << "\n";
   for (int I = 0; I < NumRuntimeConstants; ++I)
-    dbgs() << " Value Int32=" << RC[I].Value.Int32Val
-           << " Value Int64=" << RC[I].Value.Int64Val
-           << " Value Float=" << RC[I].Value.FloatVal
-           << " Value Double=" << RC[I].Value.DoubleVal << "\n";
+    Logger::logs("proteus")
+        << " Value Int32=" << RC[I].Value.Int32Val
+        << " Value Int64=" << RC[I].Value.Int64Val
+        << " Value Float=" << RC[I].Value.FloatVal
+        << " Value Double=" << RC[I].Value.DoubleVal << "\n";
 #endif
 
   void *JitFnPtr =

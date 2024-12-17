@@ -62,6 +62,7 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/MemoryBufferRef.h>
 
+#include "../common/Logger.hpp"
 #include <iostream>
 #include <string>
 
@@ -119,8 +120,9 @@ public:
   bool run(Module &M, bool IsLTO) {
     parseAnnotations(M);
 
-    DEBUG(dbgs() << "=== Pre Original Host Module\n"
-                 << M << "=== End of Pre Original Host Module\n");
+    DEBUG(Logger::logs("proteus-pass")
+          << "=== Pre Original Host Module\n"
+          << M << "=== End of Pre Original Host Module\n");
 
     // ==================
     // Device compilation
@@ -153,7 +155,8 @@ public:
 
     for (auto &JFI : JitFunctionInfoMap) {
       Function *JITFn = JFI.first;
-      DEBUG(dbgs() << "Processing JIT Function " << JITFn->getName() << "\n");
+      DEBUG(Logger::logs("proteus-pass")
+            << "Processing JIT Function " << JITFn->getName() << "\n");
       // Skip host device stubs coming from kernel annotations.
       if (isDeviceKernelHostStub(M, *JITFn))
         continue;
@@ -162,8 +165,9 @@ public:
       emitJitEntryCall(M, JFI);
     }
 
-    DEBUG(dbgs() << "=== Post Original Host Module\n"
-                 << M << "=== End Post Original Host Module\n");
+    DEBUG(Logger::logs("proteus-pass")
+          << "=== Post Original Host Module\n"
+          << M << "=== End Post Original Host Module\n");
 
     if (verifyModule(M, &errs()))
       FATAL_ERROR("Broken original module found, compilation aborted!");
@@ -191,7 +195,8 @@ private:
 
   bool isDeviceCompilation(Module &M) {
     Triple TargetTriple(M.getTargetTriple());
-    DEBUG(dbgs() << "TargetTriple " << M.getTargetTriple() << "\n");
+    DEBUG(Logger::logs("proteus-pass")
+          << "TargetTriple " << M.getTargetTriple() << "\n");
     if (TargetTriple.isNVPTX() || TargetTriple.isAMDGCN())
       return true;
 
@@ -224,10 +229,11 @@ private:
       return;
 
     auto Array = cast<ConstantArray>(GlobalAnnotations->getOperand(0));
-    DEBUG(dbgs() << "Annotation Array " << *Array << "\n");
+    DEBUG(Logger::logs("proteus-pass")
+          << "Annotation Array " << *Array << "\n");
     for (int i = 0; i < Array->getNumOperands(); i++) {
       auto Entry = cast<ConstantStruct>(Array->getOperand(i));
-      DEBUG(dbgs() << "Entry " << *Entry << "\n");
+      DEBUG(Logger::logs("proteus-pass") << "Entry " << *Entry << "\n");
 
       auto Fn = dyn_cast<Function>(Entry->getOperand(0)->stripPointerCasts());
 
@@ -246,12 +252,14 @@ private:
       if (JitFunctionInfoMap.contains(Fn))
         FATAL_ERROR("Duplicate jit annotation for Fn " + Fn->getName());
 
-      DEBUG(dbgs() << "JIT Function " << Fn->getName() << "\n");
+      DEBUG(Logger::logs("proteus-pass")
+            << "JIT Function " << Fn->getName() << "\n");
 
       auto Annotation =
           cast<ConstantDataArray>(Entry->getOperand(1)->getOperand(0));
 
-      DEBUG(dbgs() << "Annotation " << Annotation->getAsCString() << "\n");
+      DEBUG(Logger::logs("proteus-pass")
+            << "Annotation " << Annotation->getAsCString() << "\n");
 
       // TODO: needs CString for comparison to work, why?
       if (Annotation->getAsCString().compare("jit"))
@@ -262,11 +270,11 @@ private:
       if (Entry->getOperand(4)->isNullValue())
         JFI.ConstantArgs = {};
       else {
-        DEBUG(dbgs() << "AnnotArgs " << *Entry->getOperand(4)->getOperand(0)
-                     << "\n");
-        DEBUG(dbgs() << "Type AnnotArgs "
-                     << *Entry->getOperand(4)->getOperand(0)->getType()
-                     << "\n");
+        DEBUG(Logger::logs("proteus-pass")
+              << "AnnotArgs " << *Entry->getOperand(4)->getOperand(0) << "\n");
+        DEBUG(Logger::logs("proteus-pass")
+              << "Type AnnotArgs "
+              << *Entry->getOperand(4)->getOperand(0)->getType() << "\n");
         auto AnnotArgs =
             cast<ConstantStruct>(Entry->getOperand(4)->getOperand(0));
 
@@ -359,8 +367,9 @@ private:
       JitModF.setLinkage(GlobalValue::InternalLinkage);
     }
 
-    DEBUG(dbgs() << "=== Pre Passes Host JIT Module\n"
-                 << *JitMod << "=== End of Pre Passes Host JIT Module\n");
+    DEBUG(Logger::logs("proteus-pass")
+          << "=== Pre Passes Host JIT Module\n"
+          << *JitMod << "=== End of Pre Passes Host JIT Module\n");
 
     // Run a global DCE pass and O3 on the JIT module IR to remove unnecessary
     // symbols and reduce the IR to JIT at runtime.
@@ -372,11 +381,12 @@ private:
     // linking.
     for (auto &GVar : M.globals()) {
       auto printGVarInfo = [](auto &GVar) {
-        dbgs() << "=== GVar\n";
-        dbgs() << GVar.getName() << "\n";
-        dbgs() << "Linkage " << GVar.getLinkage() << "\n";
-        dbgs() << "Visibility " << GVar.getVisibility() << "\n";
-        dbgs() << "=== End GV\n";
+        Logger::logs("proteus-pass") << "=== GVar\n";
+        Logger::logs("proteus-pass") << GVar.getName() << "\n";
+        Logger::logs("proteus-pass") << "Linkage " << GVar.getLinkage() << "\n";
+        Logger::logs("proteus-pass")
+            << "Visibility " << GVar.getVisibility() << "\n";
+        Logger::logs("proteus-pass") << "=== End GV\n";
       };
 
       if (VMap[&GVar]) {
@@ -386,12 +396,12 @@ private:
           continue;
 
         if (GVar.getName() == "llvm.global_ctors") {
-          DEBUG(dbgs() << "Skip llvm.global_ctors");
+          DEBUG(Logger::logs("proteus-pass") << "Skip llvm.global_ctors");
           continue;
         }
 
         if (GVar.hasAvailableExternallyLinkage()) {
-          DEBUG(dbgs() << "Skip available externally");
+          DEBUG(Logger::logs("proteus-pass") << "Skip available externally");
           continue;
         }
 
@@ -415,8 +425,9 @@ private:
     WriteBitcodeToFile(*JitMod, OS);
     OS.flush();
 
-    DEBUG(dbgs() << "=== Final Host JIT Module\n"
-                 << *JitMod << "=== End of Final Host JIT Module\n");
+    DEBUG(Logger::logs("proteus-pass")
+          << "=== Final Host JIT Module\n"
+          << *JitMod << "=== End of Final Host JIT Module\n");
   }
 
   void emitJitModuleDevice(Module &M, bool IsLTO) {
@@ -437,7 +448,8 @@ private:
                            GlobalValue::ExternalLinkage, JitModule, GVName);
     appendToUsed(M, {GV});
     GV->setSection(".jit.bitcode" + (IsLTO ? ".lto" : getUniqueModuleId(&M)));
-    DEBUG(dbgs() << "Emit jit bitcode GV " << GVName << "\n");
+    DEBUG(Logger::logs("proteus-pass")
+          << "Emit jit bitcode GV " << GVName << "\n");
   }
 
   void emitJitFunctionArgMetadata(Module &JitMod, JitFunctionInfo &JFI,
@@ -587,8 +599,9 @@ private:
         Value *Key = getStubGV(CB->getArgOperand(StubOperand));
         assert(Key && "Expected valid kernel stub key");
         StubToKernelMap[Key] = GV;
-        DEBUG(dbgs() << "StubToKernelMap Key: " << Key->getName() << " -> "
-                     << *GV << "\n");
+        DEBUG(Logger::logs("proteus-pass")
+              << "StubToKernelMap Key: " << Key->getName() << " -> " << *GV
+              << "\n");
       }
   }
 
@@ -779,8 +792,9 @@ private:
       Value *FatbinWrapper = CB->getArgOperand(0);
 
       std::string GVName = getJitBitcodeUniqueName(M);
-      DEBUG(dbgs() << "Instrument register fatbinary bitcode GV " << GVName
-                   << "\n";);
+      DEBUG(Logger::logs("proteus-pass")
+                << "Instrument register fatbinary bitcode GV " << GVName
+                << "\n";);
       auto *Arg = Builder.CreateGlobalString(GVName);
 
       Builder.CreateCall(JitRegisterFatBinaryFn, {CB, FatbinWrapper, Arg});
@@ -840,7 +854,8 @@ private:
     // link.stub. It's not strictly necessary since this module will not have a
     // device bitcode to pull and we skip at runtime.
     if (!M.getGlobalVariable("__cuda_fatbin_wrapper", /*AllowInternal=*/true)) {
-      DEBUG(dbgs() << "Skip " << M.getSourceFileName() << "\n";)
+      DEBUG(Logger::logs("proteus-pass")
+                << "Skip " << M.getSourceFileName() << "\n";)
       return;
     }
 
@@ -857,9 +872,9 @@ private:
 
         IRBuilder<> Builder(CB);
         std::string GVName = getJitBitcodeUniqueName(M);
-        DEBUG(
-            dbgs() << "Instrument register linked binary to extract bitcode GV "
-                   << GVName << "\n");
+        DEBUG(Logger::logs("proteus-pass")
+              << "Instrument register linked binary to extract bitcode GV "
+              << GVName << "\n");
         auto *Arg = Builder.CreateGlobalString(GVName);
         Builder.CreateCall(JitRegisterLinkedBinaryFn,
                            {CB->getArgOperand(1), Arg});
@@ -939,8 +954,8 @@ private:
       assert(FunctionToRegister &&
              "Expected function passed to register function call");
       if (!JitFunctionInfoMap.contains(FunctionToRegister)) {
-        DEBUG(dbgs() << "Not instrumenting device kernel "
-                     << *FunctionToRegister << "\n");
+        DEBUG(Logger::logs("proteus-pass") << "Not instrumenting device kernel "
+                                           << *FunctionToRegister << "\n");
         continue;
       }
 
@@ -969,8 +984,8 @@ private:
         }
       };
 
-      DEBUG(dbgs() << "Instrumenting JIT function " << *FunctionToRegister
-                   << "\n");
+      DEBUG(Logger::logs("proteus-pass")
+            << "Instrumenting JIT function " << *FunctionToRegister << "\n");
       const auto &JFI = JitFunctionInfoMap[FunctionToRegister];
       size_t NumRuntimeConstants = JFI.ConstantArgs.size();
       // Create jit entry runtime function.
@@ -1030,10 +1045,8 @@ private:
   }
 
   void findJitVariables(Module &M) {
-    DEBUG(dbgs() << "finding jit variables"
-                 << "\n");
-    DEBUG(dbgs() << "users..."
-                 << "\n");
+    DEBUG(Logger::logs("proteus-pass") << "finding jit variables" << "\n");
+    DEBUG(Logger::logs("proteus-pass") << "users..." << "\n");
 
     SmallVector<Function *, 16> JitFunctions;
 
@@ -1053,24 +1066,24 @@ private:
           FATAL_ERROR(
               "Expected CallBase as user of proteus::jit_variable function");
 
-        DEBUG(dbgs() << "call: " << *CB << "\n");
+        DEBUG(Logger::logs("proteus-pass") << "call: " << *CB << "\n");
         if (!CB->hasOneUser())
           FATAL_ERROR("Expected single user");
         StoreInst *S = dyn_cast<StoreInst>(*(CB->users().begin()));
         if (!S)
           FATAL_ERROR("Expected StoreInst");
-        DEBUG(dbgs() << "store: " << *S << "\n");
+        DEBUG(Logger::logs("proteus-pass") << "store: " << *S << "\n");
         Value *V = S->getPointerOperand();
 
         GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(V);
         if (GEP) {
-          DEBUG(dbgs() << "gep: " << *GEP << "\n");
+          DEBUG(Logger::logs("proteus-pass") << "gep: " << *GEP << "\n");
           auto Slot = GEP->getOperand(GEP->getNumOperands() - 1);
-          DEBUG(dbgs() << "slot: " << *Slot << "\n");
+          DEBUG(Logger::logs("proteus-pass") << "slot: " << *Slot << "\n");
           CB->setArgOperand(1, Slot);
         } else {
-          DEBUG(dbgs() << "no gep, assuming slot 0"
-                       << "\n");
+          DEBUG(Logger::logs("proteus-pass")
+                << "no gep, assuming slot 0" << "\n");
           Constant *C = ConstantInt::get(Int32Ty, 0);
           CB->setArgOperand(1, C);
         }

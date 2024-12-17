@@ -42,7 +42,7 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
     LLVMContext &Ctx, CUmodule &CUMod,
     SmallVector<std::unique_ptr<Module>> &LinkedModules,
     std::string &ModuleId) {
-  DBG(dbgs() << "extractLinkedBitcode " << ModuleId << "\n");
+  DBG(Logger::logs("proteus") << "extractLinkedBitcode " << ModuleId << "\n");
 
   if (!ModuleIdToFatBinary.count(ModuleId))
     FATAL_ERROR("Expected to find module id " + ModuleId + " in map");
@@ -229,7 +229,7 @@ JitEngineDeviceCUDA::codegenObject(Module &M, StringRef DeviceArch) {
     nvPTXCompilerErrCheck(nvPTXCompilerGetInfoLogSize(PTXCompiler, &LogSize));
     auto Log = std::make_unique<char[]>(LogSize);
     nvPTXCompilerErrCheck(nvPTXCompilerGetInfoLog(PTXCompiler, Log.get()));
-    dbgs() << "=== nvPTXCompiler Log\n" << Log.get() << "\n";
+    Logger::logs("proteus") << "=== nvPTXCompiler Log\n" << Log.get() << "\n";
   }
 #endif
   nvPTXCompilerErrCheck(nvPTXCompilerDestroy(&PTXCompiler));
@@ -293,5 +293,5 @@ JitEngineDeviceCUDA::JitEngineDeviceCUDA() {
       &CCMinor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, CUDev));
   DeviceArch = "sm_" + std::to_string(CCMajor * 10 + CCMinor);
 
-  DBG(dbgs() << "CUDA Arch " << DeviceArch << "\n");
+  DBG(Logger::logs("proteus") << "CUDA Arch " << DeviceArch << "\n");
 }

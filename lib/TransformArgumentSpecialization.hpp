@@ -39,20 +39,20 @@ public:
       } else if (ArgType->isIntegerTy(8)) {
         C = ConstantInt::get(ArgType, RC[I].Value.Int8Val);
       } else if (ArgType->isIntegerTy(32)) {
-        // dbgs() << "RC is Int32\n";
+        // Logger::logs("proteus") << "RC is Int32\n";
         C = ConstantInt::get(ArgType, RC[I].Value.Int32Val);
       } else if (ArgType->isIntegerTy(64)) {
-        // dbgs() << "RC is Int64\n";
+        // Logger::logs("proteus") << "RC is Int64\n";
         C = ConstantInt::get(ArgType, RC[I].Value.Int64Val);
       } else if (ArgType->isFloatTy()) {
-        // dbgs() << "RC is Float\n";
+        // Logger::logs("proteus") << "RC is Float\n";
         C = ConstantFP::get(ArgType, RC[I].Value.FloatVal);
       }
       // NOTE: long double on device should correspond to plain double.
       // XXX: CUDA with a long double SILENTLY fails to create a working
       // kernel in AOT compilation, with or without JIT.
       else if (ArgType->isDoubleTy()) {
-        // dbgs() << "RC is Double\n";
+        // Logger::logs("proteus") << "RC is Double\n";
         C = ConstantFP::get(ArgType, RC[I].Value.DoubleVal);
       } else if (ArgType->isX86_FP80Ty() || ArgType->isPPC_FP128Ty() ||
                  ArgType->isFP128Ty()) {
@@ -69,8 +69,9 @@ public:
                     TypeOstream.str());
       }
 
-      DBG(dbgs() << "[ArgSpecial] Replaced Function " << F.getName() + " ArgNo "
-                 << ArgNo << " with value " << *C << "\n");
+      DBG(Logger::logs("proteus")
+          << "[ArgSpecial] Replaced Function " << F.getName() + " ArgNo "
+          << ArgNo << " with value " << *C << "\n");
       Arg->replaceAllUsesWith(C);
     }
   }

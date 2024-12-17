@@ -18,6 +18,7 @@
 
 #include "TimeTracing.hpp"
 
+#include "../common/Logger.hpp"
 #if ENABLE_DEBUG
 #define DBG(x) x;
 #else
