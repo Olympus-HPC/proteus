@@ -689,7 +689,7 @@ private:
     return JitLaunchKernelFn;
   }
 
-  void replaceWithJitLaunchKernel(Module &M, CallBase *LaunchKernelCall) {
+  void replaceWithJitLaunchKernel(Module &M, CallBase *LaunchKernelCB) {
     GlobalVariable *ModuleUniqueId =
         M.getGlobalVariable("__module_unique_id", true);
     assert(ModuleUniqueId && "Expected ModuleUniqueId global to be defined");
@@ -697,37 +697,47 @@ private:
     FunctionCallee JitLaunchKernelFn = getJitLaunchKernelFn(M);
 
     // Insert before the launch kernel call instruction.
-    IRBuilder<> Builder(LaunchKernelCall);
-    CallInst *Call = nullptr;
+    IRBuilder<> Builder(LaunchKernelCB);
+    CallBase *CallOrInvoke = nullptr;
 #ifdef ENABLE_HIP
-    Call = Builder.CreateCall(
-        JitLaunchKernelFn,
-        {ModuleUniqueId, LaunchKernelCall->getArgOperand(0),
-         LaunchKernelCall->getArgOperand(1), LaunchKernelCall->getArgOperand(2),
-         LaunchKernelCall->getArgOperand(3), LaunchKernelCall->getArgOperand(4),
-         LaunchKernelCall->getArgOperand(5), LaunchKernelCall->getArgOperand(6),
-         LaunchKernelCall->getArgOperand(7)});
+    SmallVector<Value *> Args = {ModuleUniqueId,
+                                 LaunchKernelCB->getArgOperand(0),
+                                 LaunchKernelCB->getArgOperand(1),
+                                 LaunchKernelCB->getArgOperand(2),
+                                 LaunchKernelCB->getArgOperand(3),
+                                 LaunchKernelCB->getArgOperand(4),
+                                 LaunchKernelCB->getArgOperand(5),
+                                 LaunchKernelCB->getArgOperand(6),
+                                 LaunchKernelCB->getArgOperand(7)};
 #elif ENABLE_CUDA
-    Call = Builder.CreateCall(
-        JitLaunchKernelFn,
-        {
-            ModuleUniqueId,
-            LaunchKernelCall->getArgOperand(0), // Kernel address
-            LaunchKernelCall->getArgOperand(1), // Grid dim
-            LaunchKernelCall->getArgOperand(2), // Block dim
-            LaunchKernelCall->getArgOperand(3), // Kernel args
-            LaunchKernelCall->getArgOperand(4), // Shmem size
-            LaunchKernelCall->getArgOperand(5)  // Stream
-        });
+    SmallVector<Value *> Args = {
+        ModuleUniqueId,
+        LaunchKernelCB->getArgOperand(0), // Kernel address
+        LaunchKernelCB->getArgOperand(1), // Grid dim
+        LaunchKernelCB->getArgOperand(2), // Block dim
+        LaunchKernelCB->getArgOperand(3), // Kernel args
+        LaunchKernelCB->getArgOperand(4), // Shmem size
+        LaunchKernelCB->getArgOperand(5)  // Stream
+    };
+#else
+    SmallVector<Value *> Args;
 #endif
 
-    if (!Call)
+    if (auto *CallI = dyn_cast<CallInst>(LaunchKernelCB)) {
+      CallOrInvoke = Builder.CreateCall(JitLaunchKernelFn, Args);
+    } else if (auto *InvokeI = dyn_cast<InvokeInst>(LaunchKernelCB)) {
+      CallOrInvoke =
+          Builder.CreateInvoke(JitLaunchKernelFn, InvokeI->getNormalDest(),
+                               InvokeI->getUnwindDest(), Args);
+    }
+
+    if (!CallOrInvoke)
       FATAL_ERROR(
-          "Expected non-null jit launch kernel call, check "
+          "Expected non-null jit launch kernel call or invoke, check "
           "ENABLE_CUDA|ENABLE_HIP compilation flags for ProteusJitPass");
 
-    LaunchKernelCall->replaceAllUsesWith(Call);
-    LaunchKernelCall->eraseFromParent();
+    LaunchKernelCB->replaceAllUsesWith(CallOrInvoke);
+    LaunchKernelCB->eraseFromParent();
   }
 
   void emitJitLaunchKernelCall(Module &M) {
