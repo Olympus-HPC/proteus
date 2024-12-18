@@ -719,7 +719,10 @@ private:
         LaunchKernelCB->getArgOperand(4), // Shmem size
         LaunchKernelCB->getArgOperand(5)  // Stream
     };
+#else
+    SmallVector<Value *> Args;
 #endif
+
     if (auto *CallI = dyn_cast<CallInst>(LaunchKernelCB)) {
       CallOrInvoke = Builder.CreateCall(JitLaunchKernelFn, Args);
     } else if (auto *InvokeI = dyn_cast<InvokeInst>(LaunchKernelCB)) {
