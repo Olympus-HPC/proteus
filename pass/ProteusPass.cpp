@@ -44,7 +44,9 @@
 #include "llvm/Transforms/IPO/StripSymbols.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
+#include <filesystem>
 #include <llvm/ADT/SmallPtrSet.h>
+#include <llvm/ADT/StringExtras.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/IR/CallingConv.h>
 #include <llvm/IR/Constant.h>
@@ -91,6 +93,7 @@ constexpr char const *RegisterFunctionName = "__cudaRegisterFunction";
 constexpr char const *LaunchFunctionName = "cudaLaunchKernel";
 constexpr char const *RegisterVarName = "__cudaRegisterVar";
 constexpr char const *RegisterFatBinaryName = "__cudaRegisterFatBinary";
+constexpr char const *FatBinWrapperSymbolName = "__cuda_fatbin_wrapper";
 #else
 constexpr char const *RegisterFunctionName = nullptr;
 constexpr char const *LaunchFunctionName = nullptr;
@@ -153,8 +156,6 @@ public:
       // deterministic across executions
       auto proteusHashMDNode =
           addSHA256AsMetadata(M, getModuleBitcodeSHA256(M));
-      std::cout << "Proteus hash is :\n";
-      proteusHashMDNode->dump();
       emitJitModuleDevice(M, IsLTO);
       // The AOT compilation does not need the SHA, so we delete it
       M.eraseNamedMetadata(proteusHashMDNode);
@@ -197,6 +198,16 @@ public:
 
     if (verifyModule(M, &errs()))
       FATAL_ERROR("Broken original module found, compilation aborted!");
+
+    std::filesystem::path ModulePath(M.getSourceFileName());
+    std::filesystem::path filename(M.getSourceFileName());
+    std::string rrBC(Twine(filename.filename().string(), ".host.bc").str());
+    std::error_code EC;
+    raw_fd_ostream OutBC(rrBC, EC);
+    if (EC)
+      throw std::runtime_error("Cannot open device code " + rrBC);
+    OutBC << M;
+    OutBC.close();
 
     return true;
   }
@@ -954,14 +965,15 @@ private:
   FunctionCallee getJitRegisterFunctionFn(Module &M) {
     // The prototype is
     // __jit_register_function(void *Handle,
+    //                         const char ModuleSHA256,
     //                         void *Kernel,
     //                         char const *KernelName,
     //                         int32_t *RCIndices,
     //                         int32_t *RCTypes,
     //                         int32_t NumRCs)
-    FunctionType *JitRegisterFunctionFnTy =
-        FunctionType::get(VoidTy, {PtrTy, PtrTy, PtrTy, PtrTy, PtrTy, Int32Ty},
-                          /* isVarArg=*/false);
+    FunctionType *JitRegisterFunctionFnTy = FunctionType::get(
+        VoidTy, {PtrTy, PtrTy, PtrTy, PtrTy, PtrTy, PtrTy, Int32Ty},
+        /* isVarArg=*/false);
     FunctionCallee JitRegisterKernelFn = M.getOrInsertFunction(
         "__jit_register_function", JitRegisterFunctionFnTy);
 
@@ -1072,13 +1084,64 @@ private:
 
       FunctionCallee JitRegisterFunction = getJitRegisterFunctionFn(M);
 
+      auto SHA256Global = getOrCreateModuleSHAGlobal(M);
+      Value *SHAValue = Builder.CreateBitCast(SHA256Global, PtrTy);
+      SHAValue->dump();
+
       constexpr int StubOperand = 1;
       Builder.CreateCall(
           JitRegisterFunction,
-          {RegisterCB->getArgOperand(0), RegisterCB->getArgOperand(1),
+          {RegisterCB->getArgOperand(0), SHAValue, RegisterCB->getArgOperand(1),
            RegisterCB->getArgOperand(2), RuntimeConstantsIndicesAlloca,
            RuntimeConstantsTypesAlloca, NumRCsValue});
     }
+  }
+
+  GlobalVariable *computeSHA256(Module &M, GlobalVariable *GV) {
+    assert(GV->hasInitializer() &&
+           "Global Variable must have initializer to compute the SHA256");
+    LLVMContext &Context = M.getContext();
+    auto *LLVMDeviceIR = dyn_cast<ConstantDataArray>(GV->getInitializer());
+    StringRef Data = LLVMDeviceIR->getRawDataValues();
+    SHA256 Hash;
+    Hash.update(Data);
+    auto HashValue = Hash.result();
+    std::cout << "Hash value is " << llvm::toHex(HashValue) << "\n";
+    std::vector<Constant *> HashBytes;
+    for (uint8_t Byte : HashValue) {
+      HashBytes.push_back(ConstantInt::get(Type::getInt8Ty(Context), Byte));
+    }
+
+    // Create a ConstantDataArray from the hash bytes
+    ArrayType *HashType =
+        ArrayType::get(Type::getInt8Ty(Context), HashBytes.size());
+    Constant *HashInitializer = ConstantArray::get(HashType, HashBytes);
+    auto *HashGlobal = new GlobalVariable(M, HashType, /* isConstant */ true,
+                                          GlobalValue::PrivateLinkage,
+                                          HashInitializer, "sha256_hash");
+    // Add a null terminator to the hash bytes
+
+    return HashGlobal;
+  }
+
+  GlobalVariable *getOrCreateModuleSHAGlobal(Module &M) {
+    GlobalVariable *ProteusSHA256GV = M.getGlobalVariable("sha256_hash");
+    if (ProteusSHA256GV != nullptr)
+      return ProteusSHA256GV;
+
+    GlobalVariable *FatbinWrapper =
+        M.getGlobalVariable(FatBinWrapperSymbolName, true);
+    assert(FatbinWrapper && "Expected existing fat bin wrapper");
+    ConstantStruct *C =
+        dyn_cast<ConstantStruct>(FatbinWrapper->getInitializer());
+    assert(C->getType()->getNumElements() == 4 &&
+           "Expected four fields in fatbin wrapper struct");
+    constexpr int FatbinField = 2;
+    auto *Fatbin = C->getAggregateElement(FatbinField);
+    GlobalVariable *FatbinGV = dyn_cast<GlobalVariable>(Fatbin);
+    assert(FatbinGV && "Expected global variable for the fatbin object");
+    ProteusSHA256GV = computeSHA256(M, FatbinGV);
+    return ProteusSHA256GV;
   }
 
   void findJitVariables(Module &M) {

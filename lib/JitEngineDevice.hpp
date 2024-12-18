@@ -59,15 +59,17 @@ namespace proteus {
 using namespace llvm;
 
 class JITKernelInfo {
+  StringRef SHA256;
   char const *Name;
   SmallVector<int32_t> RCTypes;
   SmallVector<int32_t> RCIndices;
   int32_t NumRCs;
 
 public:
-  JITKernelInfo(char const *Name, int32_t *RCIndices, int32_t *RCTypes,
-                int32_t NumRCs)
-      : Name(Name), RCIndices{ArrayRef{RCIndices, static_cast<size_t>(NumRCs)}},
+  JITKernelInfo(const char *SHA256, char const *Name, int32_t *RCIndices,
+                int32_t *RCTypes, int32_t NumRCs)
+      : SHA256(SHA256, 32), Name(Name),
+        RCIndices{ArrayRef{RCIndices, static_cast<size_t>(NumRCs)}},
         RCTypes{ArrayRef{RCTypes, static_cast<size_t>(NumRCs)}},
         NumRCs(NumRCs) {}
 
@@ -109,8 +111,9 @@ public:
   void registerFatBinary(void *Handle, FatbinWrapper_t *FatbinWrapper,
                          const char *ModuleId);
   void registerFatBinaryEnd();
-  void registerFunction(void *Handle, void *Kernel, char *KernelName,
-                        int32_t *RCIndices, int32_t *RCTypes, int32_t NumRCs);
+  void registerFunction(void *Handle, const char *SHA256, void *Kernel,
+                        char *KernelName, int32_t *RCIndices, int32_t *RCTypes,
+                        int32_t NumRCs);
 
   struct BinaryInfo {
     FatbinWrapper_t *FatbinWrapper;
@@ -685,8 +688,8 @@ template <typename ImplT> void JitEngineDevice<ImplT>::registerFatBinaryEnd() {
 }
 
 template <typename ImplT>
-void JitEngineDevice<ImplT>::registerFunction(void *Handle, void *Kernel,
-                                              char *KernelName,
+void JitEngineDevice<ImplT>::registerFunction(void *Handle, const char *SHA256,
+                                              void *Kernel, char *KernelName,
                                               int32_t *RCIndices,
                                               int32_t *RCTypes,
                                               int32_t NumRCs) {
@@ -701,7 +704,7 @@ void JitEngineDevice<ImplT>::registerFunction(void *Handle, void *Kernel,
   ProteusAnnotatedKernels.insert(Kernel);
 
   JITKernelInfoMap[Kernel] =
-      JITKernelInfo(KernelName, RCIndices, RCTypes, NumRCs);
+      JITKernelInfo(SHA256, KernelName, RCIndices, RCTypes, NumRCs);
 }
 
 template <typename ImplT>

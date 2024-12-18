@@ -10,6 +10,8 @@
 
 #include "CompilerInterfaceDevice.h"
 #include "JitEngineDevice.hpp"
+#include <llvm/ADT/StringExtras.h>
+#include <llvm/ADT/StringRef.h>
 
 using namespace proteus;
 
@@ -46,8 +48,12 @@ __jit_register_linked_binary(void *FatbinWrapper, const char *ModuleId) {
 }
 
 extern "C" __attribute((used)) void
-__jit_register_function(void *Handle, void *Kernel, char *KernelName,
-                        int32_t *RCIndices, int32_t *RCTypes, int32_t NumRCs) {
+__jit_register_function(void *Handle, const char *ModuleSHA256, void *Kernel,
+                        char *KernelName, int32_t *RCIndices, int32_t *RCTypes,
+                        int32_t NumRCs) {
   auto &Jit = JitDeviceImplT::instance();
-  Jit.registerFunction(Handle, Kernel, KernelName, RCIndices, RCTypes, NumRCs);
+  std::cout << "Got ModuleSHA256 "
+            << llvm::toHex(StringRef(ModuleSHA256, 32).str()) << "\n";
+  Jit.registerFunction(Handle, ModuleSHA256, Kernel, KernelName, RCIndices,
+                       RCTypes, NumRCs);
 }
