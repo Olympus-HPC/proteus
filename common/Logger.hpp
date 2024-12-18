@@ -3,7 +3,9 @@
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/raw_ostream.h>
 #include <stdexcept>
+#include <string>
 #include <system_error>
+#include <unistd.h>
 
 namespace proteus {
 
@@ -22,8 +24,9 @@ private:
 
   Logger(std::string Name)
       : DirExists(std::filesystem::create_directory(LogDir)),
-        OutStream(llvm::raw_fd_ostream{LogDir + "/" + Name + ".log", EC,
-                                       llvm::sys::fs::OF_None}) {
+        OutStream(llvm::raw_fd_ostream{LogDir + "/" + Name + "." +
+                                           std::to_string(getpid()) + ".log",
+                                       EC, llvm::sys::fs::OF_None}) {
     if (EC)
       throw std::runtime_error("Error opening file: " + EC.message());
   }
