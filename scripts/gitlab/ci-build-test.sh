@@ -2,6 +2,9 @@
 
 set -e
 
+mkdir -p /tmp/proteus-ci-${CI_JOB_ID}
+cd /tmp/proteus-ci-${CI_JOB_ID}
+
 if [ "${CI_MACHINE}" == "lassen" ]; then
   ml load cmake/3.23.1
   ml load cuda/12.2.2
@@ -50,7 +53,7 @@ fi
 mkdir build
 pushd build
 
-cmake .. ${CMAKE_OPTIONS}
+cmake ${CI_PROJECT_DIR} ${CMAKE_OPTIONS}
 make -j
 make test
 
