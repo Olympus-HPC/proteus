@@ -66,26 +66,18 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
   if (!M)
     FATAL_ERROR("unexpected");
 
-  LinkedModules.emplace_back(std::move(M));
+  LinkedModules.push_back(std::move(M));
 }
 
-std::unique_ptr<llvm::Module> JitEngineDeviceCUDA::createLinkedModule(
-    ArrayRef<std::unique_ptr<llvm::Module>> LinkedModules,
-    StringRef KernelName) {
-  auto JitModule = std::make_unique<llvm::Module>("JitModule", *ProteusCtx);
-  linkJitModule(*JitModule, KernelName, LinkedModules);
-  return std::move(JitModule);
-}
-
-int JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName,
-                                              void *Kernel) {
+void JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName,
+                                               void *Kernel) {
   CUmodule CUMod;
   CUdeviceptr DevPtr;
 
   size_t Bytes;
 
-  if (KernelToBitcodeIndex.contains(Kernel))
-    return KernelToBitcodeIndex[Kernel];
+  if (KernelToLinkedBitcode.contains(Kernel))
+    return;
 
   SmallVector<std::unique_ptr<Module>> LinkedModules;
   if (!KernelToHandleMap.contains(Kernel))
@@ -111,23 +103,18 @@ int JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName,
 
   cuErrCheck(cuModuleUnload(CUMod));
 
-  // Store the linked modules. For future accesses
-  int index = SHA256HashWithBitcodes.size();
-  SHA256HashWithBitcodes.push_back(
-      std::make_pair(getCombinedModuleHash(LinkedModules),
-                     SmallVector<std::unique_ptr<Module>>()));
-  // Iterate and pop elements
-  for (auto it = LinkedModules.rbegin(); it != LinkedModules.rend(); ++it) {
-    SHA256HashWithBitcodes[index].second.push_back(std::move(*it));
-  }
+  auto JitModule =
+      std::shared_ptr<Module>(linkJitModule(KernelName, LinkedModules));
 
   for (const auto &KV : KernelToHandleMap) {
+    // All kernels included in this collection of modules will have an identical
+    // non specialized IR file. Map all Kernels, to this generic IR file
     if (KV.second == Handle) {
-      KernelToBitcodeIndex.try_emplace(KV.first, index);
+      KernelToLinkedBitcode.try_emplace(KV.first, JitModule);
     }
   }
 
-  return index;
+  return;
 }
 
 void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module &M, Function &F,
@@ -242,7 +229,6 @@ JitEngineDeviceCUDA::codegenObject(Module &M, StringRef DeviceArch) {
   nvPTXCompilerErrCheck(
       nvPTXCompilerCreate(&PTXCompiler, PTXStr.size(), PTXStr.data()));
   std::string ArchOpt = ("--gpu-name=" + DeviceArch).str();
-
   std::string RDCOption = "";
   if (!GlobalLinkedBinaries.empty())
     RDCOption = "-c";

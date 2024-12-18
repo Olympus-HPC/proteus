@@ -122,22 +122,6 @@ public:
         StructType::create({Int128Ty, Int32Ty}, "struct.args", true);
   }
 
-  // Function to attach the SHA-256 checksum as custom metadata to the Module
-  NamedMDNode *addSHA256AsMetadata(Module &M,
-                                   const std::string &SHA256Checksum) {
-    // Get or create a named metadata node
-    NamedMDNode *SHA256Metadata =
-        M.getOrInsertNamedMetadata("proteus.module.sha256");
-
-    // Create a metadata node with the SHA-256 hash as a string
-    MDNode *SHA256Node = MDNode::get(
-        M.getContext(), MDString::get(M.getContext(), SHA256Checksum));
-
-    // Add the metadata node as an operand to the named metadata
-    SHA256Metadata->addOperand(SHA256Node);
-    return SHA256Metadata;
-  }
-
   bool run(Module &M, bool IsLTO) {
     parseAnnotations(M);
 
@@ -152,14 +136,9 @@ public:
     // For device compilation, just extract the module IR of device code
     // and return.
     if (isDeviceCompilation(M)) {
-      // Calling the SHA256 on top of the module, as `hash_code` is not
-      // deterministic across executions
-      auto proteusHashMDNode =
-          addSHA256AsMetadata(M, getModuleBitcodeSHA256(M));
+      DEBUG(dump(M, "device", IsLTO ? "lto-before-proteus" : "before-proteus"));
       emitJitModuleDevice(M, IsLTO);
-      // The AOT compilation does not need the SHA, so we delete it
-      M.eraseNamedMetadata(proteusHashMDNode);
-
+      DEBUG(dump(M, "device", IsLTO ? "lto-after-proteus" : "after-proteus"));
       return true;
     }
 
@@ -199,15 +178,7 @@ public:
     if (verifyModule(M, &errs()))
       FATAL_ERROR("Broken original module found, compilation aborted!");
 
-    std::filesystem::path ModulePath(M.getSourceFileName());
-    std::filesystem::path filename(M.getSourceFileName());
-    std::string rrBC(Twine(filename.filename().string(), ".host.bc").str());
-    std::error_code EC;
-    raw_fd_ostream OutBC(rrBC, EC);
-    if (EC)
-      throw std::runtime_error("Cannot open device code " + rrBC);
-    OutBC << M;
-    OutBC.close();
+    DEBUG(dump(M, "host", "after-proteus"));
 
     return true;
   }
@@ -225,6 +196,19 @@ private:
     SmallVector<int, 8> ConstantArgs;
     std::string ModuleIR;
   };
+
+  void dump(Module M, StringRef device, StringRef phase) {
+    std::filesystem::path ModulePath(M.getSourceFileName());
+    std::filesystem::path filename(M.getSourceFileName());
+    std::string rrBC(
+        Twine(filename.filename().string() + "." + device + "." + phase).str());
+    std::error_code EC;
+    raw_fd_ostream OutBC(rrBC, EC);
+    if (EC)
+      throw std::runtime_error("Cannot open device code " + rrBC);
+    OutBC << M;
+    OutBC.close();
+  }
 
   MapVector<Function *, JitFunctionInfo> JitFunctionInfoMap;
   DenseMap<Value *, GlobalVariable *> StubToKernelMap;
@@ -1191,22 +1175,6 @@ private:
         }
       }
     }
-  }
-
-  // Function to get the SHA-256 checksum of a Module's bitcode
-  std::string getModuleBitcodeSHA256(const Module &M) {
-    std::string BitcodeStr;
-    llvm::raw_string_ostream BitcodeStream(BitcodeStr);
-
-    WriteBitcodeToFile(M, BitcodeStream);
-    BitcodeStream.flush();
-
-    llvm::SHA256 SHA256Hasher;
-    SHA256Hasher.update(BitcodeStr);    // Feed the bitcode to the hasher
-    auto Digest = SHA256Hasher.final(); // Finalize the hash computation
-
-    // Convert the SHA-256 result to a human-readable hexadecimal string
-    return llvm::toHex(Digest);
   }
 };
 

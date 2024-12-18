@@ -15,6 +15,7 @@
 #include "Utils.h"
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/SmallVector.h>
+#include <llvm/ADT/StringRef.h>
 
 namespace proteus {
 
@@ -79,18 +80,18 @@ public:
     return "llvm.nvvm.read.ptx.sreg.tid.z";
   };
 
-  static const char *getFatBinSectionName() { return ".nv_fatbin"; }
+  static bool HashSection(StringRef sectionName) {
+    static DenseSet<StringRef> Sections{".nv_fatbin", ".nvFatBinSegment",
+                                        "__nv_relfatbin", "__nv_module_id"};
+    return Sections.contains(sectionName);
+  }
 
   void *resolveDeviceGlobalAddr(const void *Addr);
 
   void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
                                 int BlockSize);
 
-  int extractDeviceBitcode(StringRef KernelName, void *Kernel);
-
-  std::unique_ptr<llvm::Module>
-  createLinkedModule(ArrayRef<std::unique_ptr<llvm::Module>> LinkedModules,
-                     StringRef KernelName);
+  void extractDeviceBitcode(StringRef KernelName, void *Kernel);
 
   void codegenPTX(Module &M, StringRef DeviceArch,
                   SmallVectorImpl<char> &PTXStr);
