@@ -79,6 +79,8 @@ public:
     return "llvm.nvvm.read.ptx.sreg.tid.z";
   };
 
+  static const char *getFatBinSectionName() { return ".nv_fatbin"; }
+
   void *resolveDeviceGlobalAddr(const void *Addr);
 
   void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,

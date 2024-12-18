@@ -12,9 +12,12 @@
 #define PROTEUS_JITENGINEDEVICE_HPP
 
 #include "llvm/Linker/Linker.h"
+#include "llvm/Object/ELFObjectFile.h"
+#include "llvm/Support/SHA256.h"
 #include <cstdint>
 #include <llvm/ADT/DenseSet.h>
 #include <llvm/ADT/SmallVector.h>
+#include <llvm/ADT/StringExtras.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/LLVMContext.h>
@@ -317,8 +320,61 @@ private:
   relinkGlobals(Module &M,
                 std::unordered_map<std::string, const void *> &VarNameToDevPtr);
 
+  static std::string computeDeviceFatBinHash() {
+    TIMESCOPE("computeDeviceFatBinHash");
+    using namespace llvm::object;
+    llvm::SHA256 sha256;
+    auto ExePath = std::filesystem::canonical("/proc/self/exe");
+
+    std::cout << "Reading file from path " << ExePath.string() << "\n";
+
+    auto bufferOrErr = MemoryBuffer::getFile(ExePath.string());
+    if (!bufferOrErr) {
+      FATAL_ERROR("Failed to open binary file");
+    }
+
+    auto objOrErr =
+        ObjectFile::createELFObjectFile(bufferOrErr.get()->getMemBufferRef());
+    if (!objOrErr) {
+      FATAL_ERROR("Failed to create Object File");
+    }
+
+    ObjectFile &elfObj = **objOrErr;
+
+    // Step 3: Iterate through sections and get their contents
+    for (const SectionRef &section : elfObj.sections()) {
+      auto nameOrErr = section.getName();
+      if (!nameOrErr)
+        FATAL_ERROR("Error getting section name: ");
+
+      StringRef sectionName = nameOrErr.get();
+      if (sectionName.compare(ImplT::getFatBinSectionName()) != 0)
+        continue;
+
+      // Get the contents of the section
+      auto contentsOrErr = section.getContents();
+      if (!contentsOrErr) {
+        FATAL_ERROR("Error getting section contents: ");
+        continue;
+      }
+      StringRef sectionContents = contentsOrErr.get();
+
+      // Print section name and size
+      outs() << "Section: " << sectionName
+             << ", Size: " << sectionContents.size() << " bytes\n";
+      sha256.update(sectionContents);
+      break;
+    }
+    auto sha256Hash = sha256.final();
+    return llvm::toHex(sha256Hash);
+  }
+
 protected:
-  JitEngineDevice() { ProteusCtx = std::make_unique<LLVMContext>(); }
+  JitEngineDevice() {
+    ProteusCtx = std::make_unique<LLVMContext>();
+    ProteusDeviceBinHash = computeDeviceFatBinHash();
+    std::cout << "Device Bin Hash is " << ProteusDeviceBinHash << "\n";
+  }
   ~JitEngineDevice() {
     CodeCache.printStats();
     StorageCache.printStats();
@@ -345,6 +401,7 @@ protected:
 
   // All modules are associated with context, to guarantee correct lifetime.
   std::unique_ptr<LLVMContext> ProteusCtx;
+  std::string ProteusDeviceBinHash;
 
 private:
   // This map is private and only accessible via the API.
@@ -487,9 +544,16 @@ JitEngineDevice<ImplT>::compileAndRun(
   // I have already read the LLVM IR from the Binary. Pick the Static Hash
   auto StaticHash = SHA256HashWithBitcodes[Index].first;
   // TODO: This does not include the GridDims/BlockDims. We need to fix it.
-  uint64_t DynamicHashValue = CodeCache.hash(
-      StaticHash, KernelName, RCsVec.data(), NumRuntimeConstants);
+  auto PersistentHash = ProteusDeviceBinHash;
+  uint64_t DynamicHashValue =
+      CodeCache.hash(PersistentHash, KernelName, GridDim, BlockDim,
+                     RCsVec.data(), NumRuntimeConstants);
   KernelFunc = CodeCache.lookup(DynamicHashValue);
+  std::cout << " Function with name " << KernelName.str() << "at address "
+            << Kernel << " has PersistentHash " << PersistentHash
+            << " Static Hash:" << StaticHash
+            << " Dynamic Hash:" << DynamicHashValue << "\n";
+
   // We found the kernel, execute
   if (KernelFunc)
     return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,

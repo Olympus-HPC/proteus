@@ -463,9 +463,9 @@ private:
 
     std::string GVName =
         (IsLTO ? "__jit_bitcode_lto" : getJitBitcodeUniqueName(M));
-    //  NOTE: HIP compilation supports custom section in the binary to store the
-    //  IR. CUDA does not, hence we parse the IR by reading the global from the
-    //  device memory.
+    //  NOTE: HIP compilation supports custom section in the binary to store
+    //  the IR. CUDA does not, hence we parse the IR by reading the global
+    //  from the device memory.
     Constant *JitModule = ConstantDataArray::get(
         M.getContext(), ArrayRef<uint8_t>((const uint8_t *)BitcodeStr.data(),
                                           BitcodeStr.size()));
@@ -585,8 +585,9 @@ private:
   }
 
   Value *getStubGV(Value *Operand) {
-    // NOTE: when called by isDeviceKernelHostStub, Operand may not be a global
-    // variable point to the stub, so we check and return null in that case.
+    // NOTE: when called by isDeviceKernelHostStub, Operand may not be a
+    // global variable point to the stub, so we check and return null in that
+    // case.
     Value *V = nullptr;
 #if ENABLE_HIP
     // NOTE: Hip creates a global named after the device kernel function that
@@ -1031,8 +1032,8 @@ private:
           ArrayType::get(Int32Ty, NumRuntimeConstants);
 
       IRBuilder<> Builder(RegisterCB->getNextNode());
-      // Create an array representing the indices of the args which are runtime
-      // constants.
+      // Create an array representing the indices of the args which are
+      // runtime constants.
       Value *RuntimeConstantsIndicesAlloca =
           Builder.CreateAlloca(RuntimeConstantArrayTy);
       assert(RuntimeConstantsIndicesAlloca &&
@@ -1081,14 +1082,16 @@ private:
   }
 
   void findJitVariables(Module &M) {
-    DEBUG(Logger::logs("proteus-pass") << "finding jit variables" << "\n");
-    DEBUG(Logger::logs("proteus-pass") << "users..." << "\n");
+    DEBUG(Logger::logs("proteus-pass") << "finding jit variables"
+                                       << "\n");
+    DEBUG(Logger::logs("proteus-pass") << "users..."
+                                       << "\n");
 
     SmallVector<Function *, 16> JitFunctions;
 
     for (auto &F : M.getFunctionList()) {
-      // TODO: Demangle and search for the fully qualified proteus::jit_variable
-      // name.
+      // TODO: Demangle and search for the fully qualified
+      // proteus::jit_variable name.
       if (F.getName().contains("jit_variable")) {
         JitFunctions.push_back(&F);
       }
@@ -1118,8 +1121,8 @@ private:
           DEBUG(Logger::logs("proteus-pass") << "slot: " << *Slot << "\n");
           CB->setArgOperand(1, Slot);
         } else {
-          DEBUG(Logger::logs("proteus-pass")
-                << "no gep, assuming slot 0" << "\n");
+          DEBUG(Logger::logs("proteus-pass") << "no gep, assuming slot 0"
+                                             << "\n");
           Constant *C = ConstantInt::get(Int32Ty, 0);
           CB->setArgOperand(1, C);
         }
@@ -1160,9 +1163,9 @@ struct ProteusJitPass : PassInfoMixin<ProteusJitPass> {
     return PreservedAnalyses::all();
   }
 
-  // Without isRequired returning true, this pass will be skipped for functions
-  // decorated with the optnone LLVM attribute. Note that clang -O0 decorates
-  // all functions with optnone.
+  // Without isRequired returning true, this pass will be skipped for
+  // functions decorated with the optnone LLVM attribute. Note that clang -O0
+  // decorates all functions with optnone.
   static bool isRequired() { return true; }
 };
 

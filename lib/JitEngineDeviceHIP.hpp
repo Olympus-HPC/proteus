@@ -77,6 +77,8 @@ public:
     return "_ZNK17__HIP_CoordinatesI14__HIP_BlockIdxE3__ZcvjEv";
   };
 
+  static const char *getFatBinSectionName() { return ".hip_fatbin"; }
+
   void *resolveDeviceGlobalAddr(const void *Addr);
 
   void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
