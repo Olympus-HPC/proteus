@@ -35,6 +35,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Type.h>
+#include <llvm/Transforms/IPO/Internalize.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 #include <optional>
 #include <string>
@@ -358,6 +359,16 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
     setKernelDims(M, GridDim, BlockDim);
   }
 
+  // Internalize others besides the kernel function.
+  internalizeModule(M, [&F](const GlobalValue &GV) {
+    // Do not internalize the kernel function.
+    if (&GV == F)
+      return true;
+
+    // Internalize everything else.
+    return false;
+  });
+
   DBG(Logger::logs("proteus") << "=== JIT Module\n"
                               << M << "=== End of JIT Module\n");
 
@@ -607,21 +618,7 @@ void JitEngineDevice<ImplT>::linkJitModule(
   Linker IRLinker(*M);
   for (auto &LinkedM : LinkedModules) {
     // Returns true if linking failed.
-    if (IRLinker.linkInModule(std::move(LinkedM), Linker::LinkOnlyNeeded,
-                              [&KernelName](Module &M, const StringSet<> &GVS) {
-                                for (auto &Symbol : GVS) {
-                                  if (Symbol.getKey() == KernelName)
-                                    continue;
-
-                                  Function *F = M.getFunction(Symbol.getKey());
-                                  if (!F)
-                                    continue;
-
-                                  // Internalize functions, the JIT module is
-                                  // self-contained.
-                                  F->setLinkage(GlobalValue::InternalLinkage);
-                                }
-                              }))
+    if (IRLinker.linkInModule(std::move(LinkedM)))
       FATAL_ERROR("Linking failed");
   }
 }
