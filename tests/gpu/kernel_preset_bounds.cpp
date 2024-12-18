@@ -8,8 +8,8 @@
 
 #include "gpu_common.h"
 
-__global__ __attribute__((annotate("jit")))
-__launch_bounds__(128, 4) void kernel() {
+__global__ __attribute__((annotate("jit"))) __launch_bounds__(128,
+                                                              4) void kernel() {
   printf("Kernel\n");
 }
 
