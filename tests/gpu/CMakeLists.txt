@@ -11,11 +11,11 @@ function(CREATE_GPU_TEST exe check_source)
     add_executable(${exe}.${lang} ${check_source} ${ARGN})
     set_source_files_properties(${check_source} ${ARGN} PROPERTIES
         LANGUAGE ${lang}
-        OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/ProteusPass.cpp
+        OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/pass/ProteusPass.cpp
     )
     add_dependencies(${exe}.${lang} ProteusPass)
 
-    target_link_libraries(${exe}.${lang} PUBLIC ProteusPass proteus)
+    target_link_libraries(${exe}.${lang} PUBLIC proteus)
 
     target_compile_options(
         ${exe}.${lang}
@@ -41,10 +41,10 @@ function(CREATE_GPU_TEST_RDC exe check_source)
     add_executable(${exe}.${lang}.rdc ${check_source} ${ARGN})
     set_source_files_properties(${check_source} ${ARGN} PROPERTIES
         LANGUAGE ${lang}
-        OBJECT_DEPENDS ${CMAKE_SOURCE_DIR}/pass/ProteusPass.cpp
+        OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/pass/ProteusPass.cpp
     )
 
-    target_link_libraries(${exe}.${lang}.rdc PUBLIC ProteusPass proteus)
+    target_link_libraries(${exe}.${lang}.rdc PUBLIC proteus)
 
     if(ENABLE_HIP)
         # This is unsupported see: https://gitlab.kitware.com/cmake/cmake/-/issues/23210
@@ -55,9 +55,16 @@ function(CREATE_GPU_TEST_RDC exe check_source)
             ${exe}.${lang}.rdc
             PUBLIC
             -fgpu-rdc
+            -fpass-plugin=$<TARGET_FILE:ProteusPass>
         )
 
-        target_link_options(${exe}.${lang}.rdc PUBLIC -fgpu-rdc --hip-link)
+        target_link_options(
+            ${exe}.${lang}.rdc
+            PUBLIC
+            -fgpu-rdc
+            --hip-link
+            -Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPass>
+        )
     elseif(ENABLE_CUDA)
         target_compile_options(
             ${exe}.${lang}.rdc
