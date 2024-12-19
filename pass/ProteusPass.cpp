@@ -35,6 +35,7 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/SHA256.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
@@ -43,7 +44,9 @@
 #include "llvm/Transforms/IPO/StripSymbols.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
+#include <filesystem>
 #include <llvm/ADT/SmallPtrSet.h>
+#include <llvm/ADT/StringExtras.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/IR/CallingConv.h>
 #include <llvm/IR/Constant.h>
@@ -84,16 +87,19 @@ constexpr char const *RegisterFunctionName = "__hipRegisterFunction";
 constexpr char const *LaunchFunctionName = "hipLaunchKernel";
 constexpr char const *RegisterVarName = "__hipRegisterVar";
 constexpr char const *RegisterFatBinaryName = "__hipRegisterFatBinary";
+constexpr char const *FatBinWrapperSymbolName = "__hip_fatbin_wrapper";
 #elif ENABLE_CUDA
 constexpr char const *RegisterFunctionName = "__cudaRegisterFunction";
 constexpr char const *LaunchFunctionName = "cudaLaunchKernel";
 constexpr char const *RegisterVarName = "__cudaRegisterVar";
 constexpr char const *RegisterFatBinaryName = "__cudaRegisterFatBinary";
+constexpr char const *FatBinWrapperSymbolName = "__cuda_fatbin_wrapper";
 #else
 constexpr char const *RegisterFunctionName = nullptr;
 constexpr char const *LaunchFunctionName = nullptr;
 constexpr char const *RegisterVarName = nullptr;
 constexpr char const *RegisterFatBinaryName = nullptr;
+constexpr char const *FatBinWrapperSymbolName = nullptr;
 #endif
 
 using namespace llvm;
@@ -131,14 +137,17 @@ public:
     // For device compilation, just extract the module IR of device code
     // and return.
     if (isDeviceCompilation(M)) {
+      DEBUG(dump(M, "device", IsLTO ? "lto-before-proteus" : "before-proteus"));
       emitJitModuleDevice(M, IsLTO);
-
+      DEBUG(dump(M, "device", IsLTO ? "lto-after-proteus" : "after-proteus"));
       return true;
     }
 
     // ================
     // Host compilation
     // ================
+
+    DEBUG(dump(M, "host", IsLTO ? "lto-before-proteus" : "before-proteus"));
 
     instrumentRegisterLinkedBinary(M);
     instrumentRegisterFatBinary(M);
@@ -172,6 +181,8 @@ public:
     if (verifyModule(M, &errs()))
       FATAL_ERROR("Broken original module found, compilation aborted!");
 
+    DEBUG(dump(M, "host", IsLTO ? "lto-after-proteus" : "after-proteus"));
+
     return true;
   }
 
@@ -188,6 +199,20 @@ private:
     SmallVector<int, 8> ConstantArgs;
     std::string ModuleIR;
   };
+
+  void dump(Module &M, StringRef device, StringRef phase) {
+    std::filesystem::path ModulePath(M.getSourceFileName());
+    std::filesystem::path filename(M.getSourceFileName());
+    std::string rrBC(
+        Twine(filename.filename().string() + "." + device + "." + phase + ".bc")
+            .str());
+    std::error_code EC;
+    raw_fd_ostream OutBC(rrBC, EC);
+    if (EC)
+      throw std::runtime_error("Cannot open device code " + rrBC);
+    OutBC << M;
+    OutBC.close();
+  }
 
   MapVector<Function *, JitFunctionInfo> JitFunctionInfoMap;
   DenseMap<Value *, GlobalVariable *> StubToKernelMap;
@@ -437,9 +462,9 @@ private:
 
     std::string GVName =
         (IsLTO ? "__jit_bitcode_lto" : getJitBitcodeUniqueName(M));
-    //  NOTE: HIP compilation supports custom section in the binary to store the
-    //  IR. CUDA does not, hence we parse the IR by reading the global from the
-    //  device memory.
+    //  NOTE: HIP compilation supports custom section in the binary to store
+    //  the IR. CUDA does not, hence we parse the IR by reading the global
+    //  from the device memory.
     Constant *JitModule = ConstantDataArray::get(
         M.getContext(), ArrayRef<uint8_t>((const uint8_t *)BitcodeStr.data(),
                                           BitcodeStr.size()));
@@ -447,7 +472,19 @@ private:
         new GlobalVariable(M, JitModule->getType(), /* isConstant */ true,
                            GlobalValue::ExternalLinkage, JitModule, GVName);
     appendToUsed(M, {GV});
-    GV->setSection(".jit.bitcode" + (IsLTO ? ".lto" : getUniqueModuleId(&M)));
+
+    auto ModHash = [&M] {
+      std::string BitcodeStr;
+      llvm::raw_string_ostream BitcodeStream(BitcodeStr);
+      WriteBitcodeToFile(M, BitcodeStream);
+      BitcodeStream.flush();
+      llvm::SHA256 SHA256Hasher;
+      SHA256Hasher.update(BitcodeStr);
+      auto Digest = SHA256Hasher.final();
+      return llvm::toHex(Digest);
+    }();
+
+    GV->setSection(".jit.bitcode." + (IsLTO ? "lto" : ModHash));
     DEBUG(Logger::logs("proteus-pass")
           << "Emit jit bitcode GV " << GVName << "\n");
   }
@@ -559,8 +596,9 @@ private:
   }
 
   Value *getStubGV(Value *Operand) {
-    // NOTE: when called by isDeviceKernelHostStub, Operand may not be a global
-    // variable point to the stub, so we check and return null in that case.
+    // NOTE: when called by isDeviceKernelHostStub, Operand may not be a
+    // global variable point to the stub, so we check and return null in that
+    // case.
     Value *V = nullptr;
 #if ENABLE_HIP
     // NOTE: Hip creates a global named after the device kernel function that
@@ -927,14 +965,15 @@ private:
   FunctionCallee getJitRegisterFunctionFn(Module &M) {
     // The prototype is
     // __jit_register_function(void *Handle,
+    //                         const char ModuleSHA256,
     //                         void *Kernel,
     //                         char const *KernelName,
     //                         int32_t *RCIndices,
     //                         int32_t *RCTypes,
     //                         int32_t NumRCs)
-    FunctionType *JitRegisterFunctionFnTy =
-        FunctionType::get(VoidTy, {PtrTy, PtrTy, PtrTy, PtrTy, PtrTy, Int32Ty},
-                          /* isVarArg=*/false);
+    FunctionType *JitRegisterFunctionFnTy = FunctionType::get(
+        VoidTy, {PtrTy, PtrTy, PtrTy, PtrTy, PtrTy, PtrTy, Int32Ty},
+        /* isVarArg=*/false);
     FunctionCallee JitRegisterKernelFn = M.getOrInsertFunction(
         "__jit_register_function", JitRegisterFunctionFnTy);
 
@@ -1005,8 +1044,8 @@ private:
           ArrayType::get(Int32Ty, NumRuntimeConstants);
 
       IRBuilder<> Builder(RegisterCB->getNextNode());
-      // Create an array representing the indices of the args which are runtime
-      // constants.
+      // Create an array representing the indices of the args which are
+      // runtime constants.
       Value *RuntimeConstantsIndicesAlloca =
           Builder.CreateAlloca(RuntimeConstantArrayTy);
       assert(RuntimeConstantsIndicesAlloca &&
@@ -1045,24 +1084,78 @@ private:
 
       FunctionCallee JitRegisterFunction = getJitRegisterFunctionFn(M);
 
+      auto SHA256Global = getOrCreateModuleSHAGlobal(M);
+      Value *SHAValue = Builder.CreateBitCast(SHA256Global, PtrTy);
+
       constexpr int StubOperand = 1;
       Builder.CreateCall(
           JitRegisterFunction,
-          {RegisterCB->getArgOperand(0), RegisterCB->getArgOperand(1),
+          {RegisterCB->getArgOperand(0), SHAValue, RegisterCB->getArgOperand(1),
            RegisterCB->getArgOperand(2), RuntimeConstantsIndicesAlloca,
            RuntimeConstantsTypesAlloca, NumRCsValue});
     }
   }
 
+  Value *computeSHA256(Module &M, GlobalVariable *GV) {
+    if (!GV->hasInitializer()) {
+      PointerType *OpaquePtr = PointerType::get(M.getContext(), 0);
+      return ConstantPointerNull::get(OpaquePtr);
+    }
+    LLVMContext &Context = M.getContext();
+    auto *LLVMDeviceIR = dyn_cast<ConstantDataArray>(GV->getInitializer());
+    StringRef Data = LLVMDeviceIR->getRawDataValues();
+    SHA256 Hash;
+    Hash.update(Data);
+    auto HashValue = Hash.result();
+    std::cout << "Hash value is " << llvm::toHex(HashValue) << "\n";
+    std::vector<Constant *> HashBytes;
+    for (uint8_t Byte : HashValue) {
+      HashBytes.push_back(ConstantInt::get(Type::getInt8Ty(Context), Byte));
+    }
+
+    // Create a ConstantDataArray from the hash bytes
+    ArrayType *HashType =
+        ArrayType::get(Type::getInt8Ty(Context), HashBytes.size());
+    Constant *HashInitializer = ConstantArray::get(HashType, HashBytes);
+    auto *HashGlobal = new GlobalVariable(M, HashType, /* isConstant */ true,
+                                          GlobalValue::PrivateLinkage,
+                                          HashInitializer, "sha256_hash");
+    // Add a null terminator to the hash bytes
+
+    return HashGlobal;
+  }
+
+  Value *getOrCreateModuleSHAGlobal(Module &M) {
+    Value *ProteusSHA256GV = M.getGlobalVariable("sha256_hash");
+    if (ProteusSHA256GV != nullptr)
+      return ProteusSHA256GV;
+
+    GlobalVariable *FatbinWrapper =
+        M.getGlobalVariable(FatBinWrapperSymbolName, true);
+    assert(FatbinWrapper && "Expected existing fat bin wrapper");
+    ConstantStruct *C =
+        dyn_cast<ConstantStruct>(FatbinWrapper->getInitializer());
+    assert(C->getType()->getNumElements() == 4 &&
+           "Expected four fields in fatbin wrapper struct");
+    constexpr int FatbinField = 2;
+    auto *Fatbin = C->getAggregateElement(FatbinField);
+    GlobalVariable *FatbinGV = dyn_cast<GlobalVariable>(Fatbin);
+    assert(FatbinGV && "Expected global variable for the fatbin object");
+    ProteusSHA256GV = computeSHA256(M, FatbinGV);
+    return ProteusSHA256GV;
+  }
+
   void findJitVariables(Module &M) {
-    DEBUG(Logger::logs("proteus-pass") << "finding jit variables" << "\n");
-    DEBUG(Logger::logs("proteus-pass") << "users..." << "\n");
+    DEBUG(Logger::logs("proteus-pass") << "finding jit variables"
+                                       << "\n");
+    DEBUG(Logger::logs("proteus-pass") << "users..."
+                                       << "\n");
 
     SmallVector<Function *, 16> JitFunctions;
 
     for (auto &F : M.getFunctionList()) {
-      // TODO: Demangle and search for the fully qualified proteus::jit_variable
-      // name.
+      // TODO: Demangle and search for the fully qualified
+      // proteus::jit_variable name.
       if (F.getName().contains("jit_variable")) {
         JitFunctions.push_back(&F);
       }
@@ -1092,8 +1185,8 @@ private:
           DEBUG(Logger::logs("proteus-pass") << "slot: " << *Slot << "\n");
           CB->setArgOperand(1, Slot);
         } else {
-          DEBUG(Logger::logs("proteus-pass")
-                << "no gep, assuming slot 0" << "\n");
+          DEBUG(Logger::logs("proteus-pass") << "no gep, assuming slot 0"
+                                             << "\n");
           Constant *C = ConstantInt::get(Int32Ty, 0);
           CB->setArgOperand(1, C);
         }
@@ -1118,9 +1211,9 @@ struct ProteusJitPass : PassInfoMixin<ProteusJitPass> {
     return PreservedAnalyses::all();
   }
 
-  // Without isRequired returning true, this pass will be skipped for functions
-  // decorated with the optnone LLVM attribute. Note that clang -O0 decorates
-  // all functions with optnone.
+  // Without isRequired returning true, this pass will be skipped for
+  // functions decorated with the optnone LLVM attribute. Note that clang -O0
+  // decorates all functions with optnone.
   static bool isRequired() { return true; }
 };
 
