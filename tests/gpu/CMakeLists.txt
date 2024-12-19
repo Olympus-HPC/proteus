@@ -21,6 +21,7 @@ function(CREATE_GPU_TEST exe check_source)
         ${exe}.${lang}
         PUBLIC
         -fpass-plugin=$<TARGET_FILE:ProteusPass>
+        -mlink-builtin-bitcode-postopt
     )
 
     # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
@@ -55,6 +56,7 @@ function(CREATE_GPU_TEST_RDC exe check_source)
             ${exe}.${lang}.rdc
             PUBLIC
             -fgpu-rdc
+            -mlink-builtin-bitcode-postopt
         )
 
         target_link_options(${exe}.${lang}.rdc PUBLIC -fgpu-rdc --hip-link)
