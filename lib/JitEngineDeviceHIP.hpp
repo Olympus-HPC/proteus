@@ -77,7 +77,12 @@ public:
     return "_ZNK17__HIP_CoordinatesI14__HIP_BlockIdxE3__ZcvjEv";
   };
 
-  static const char *getFatBinSectionName() { return ".hip_fatbin"; }
+  static bool HashSection(StringRef sectionName) {
+    static DenseSet<StringRef> Sections{".hip_fatbin", ".hipFatBinSegment",
+                                        ".hip_gpubin_handle"};
+    return Sections.contains(sectionName);
+    ;
+  }
 
   void *resolveDeviceGlobalAddr(const void *Addr);
 
@@ -86,8 +91,7 @@ public:
 
   void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim);
 
-  std::unique_ptr<MemoryBuffer> extractDeviceBitcode(StringRef KernelName,
-                                                     void *Kernel);
+  void extractDeviceBitcode(StringRef KernelName, void *Kernel);
 
   std::unique_ptr<MemoryBuffer> codegenObject(Module &M, StringRef DeviceArch);
 

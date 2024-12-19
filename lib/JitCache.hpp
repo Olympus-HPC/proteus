@@ -34,8 +34,9 @@ inline hash_code hash_value(const proteus::RuntimeConstant &RC) {
 
 template <typename Function_t> class JitCache {
 public:
+  template <typename T>
   uint64_t hash(StringRef ModuleUniqueId, StringRef KernelHash,
-                StringRef KernelName, const dim3 &GridDim, const dim3 &BlockDim,
+                StringRef KernelName, const T &GridDim, const T &BlockDim,
                 const RuntimeConstant *RC, int NumRuntimeConstants) const {
     ArrayRef<RuntimeConstant> Data(RC, NumRuntimeConstants);
     auto HashValue = hash_combine(ModuleUniqueId, KernelHash, KernelName,

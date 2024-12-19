@@ -19,6 +19,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/TargetSelect.h"
 
+#include "JitEngineDevice.hpp"
 #include "JitEngineDeviceHIP.hpp"
 #include "Utils.h"
 
@@ -38,10 +39,13 @@ JitEngineDeviceHIP &JitEngineDeviceHIP::instance() {
   return Jit;
 }
 
-std::unique_ptr<MemoryBuffer>
-JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
+void JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
+                                              void *Kernel) {
   constexpr char OFFLOAD_BUNDLER_MAGIC_STR[] = "__CLANG_OFFLOAD_BUNDLE__";
   size_t Pos = 0;
+
+  if (KernelToLinkedBitcode.contains(Kernel))
+    return;
 
   if (!KernelToHandleMap.contains(Kernel))
     FATAL_ERROR("Expected Kerne in map");
@@ -106,11 +110,9 @@ JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
 
   ArrayRef<uint8_t> DeviceBitcode;
   SmallVector<std::unique_ptr<Module>> LinkedModules;
-  auto Ctx = std::make_unique<LLVMContext>();
-  auto JitModule = std::make_unique<llvm::Module>("JitModule", *Ctx);
-
-  auto extractModuleFromSection = [&DeviceElf, &Ctx](auto &Section,
-                                                     StringRef SectionName) {
+  auto extractModuleFromSection = [&DeviceElf](auto &Section,
+                                               StringRef SectionName,
+                                               LLVMContext &Ctx) {
     ArrayRef<uint8_t> BitcodeData;
     auto SectionContents = DeviceElf->getSectionContents(Section);
     if (SectionContents.takeError())
@@ -120,7 +122,7 @@ JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
                              BitcodeData.size()};
 
     SMDiagnostic Err;
-    auto M = parseIR(MemoryBufferRef{Bitcode, SectionName}, Err, *Ctx);
+    auto M = parseIR(MemoryBufferRef{Bitcode, SectionName}, Err, Ctx);
     if (!M)
       FATAL_ERROR("unexpected");
 
@@ -135,29 +137,60 @@ JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
     if (SectionName.takeError())
       FATAL_ERROR("Error reading section name");
     DBG(Logger::logs("proteus") << "SectionName " << *SectionName << "\n");
-
-    if (!SectionName->starts_with(".jit.bitcode"))
+    const std::string BitCodePrefix(".jit.bitcode.");
+    if (!SectionName->starts_with(BitCodePrefix))
       continue;
 
-    auto M = extractModuleFromSection(Section, *SectionName);
+    // Skip cause we will handle later.
+    if (SectionName->equals(".jit.bitcode.lto"))
+      continue;
 
-    if (SectionName->equals(".jit.bitcode.lto")) {
-      LinkedModules.clear();
-      LinkedModules.push_back(std::move(M));
-      break;
-    } else {
-      LinkedModules.push_back(std::move(M));
+    auto SHA256 = SectionName->substr(BitCodePrefix.size());
+
+    auto M = extractModuleFromSection(Section, *SectionName, *ProteusCtx);
+    DenseSet<StringRef> KernelNames;
+    for (auto &Func : *M) {
+      if (Func.getCallingConv() == CallingConv::AMDGPU_KERNEL)
+        KernelNames.insert(Func.getName());
+    }
+
+    for (auto &[Kernel, KernelInfo] : JITKernelInfoMap) {
+      auto it = KernelNames.find(KernelInfo.getName());
+      if (it != KernelNames.end()) {
+        KernelInfo.setSHA256(SHA256);
+      }
+    }
+
+    LinkedModules.push_back(std::move(M));
+  }
+
+  for (auto Section : *Sections) {
+    auto SectionName = DeviceElf->getSectionName(Section);
+    if (SectionName.takeError())
+      FATAL_ERROR("Error reading section name");
+
+    if (!SectionName->equals(".jit.bitcode.lto"))
+      continue;
+
+    auto M = extractModuleFromSection(Section, *SectionName, *ProteusCtx);
+    LinkedModules.clear();
+    LinkedModules.push_back(std::move(M));
+    break;
+  }
+
+  auto JitModule =
+      std::shared_ptr<Module>(linkJitModule(KernelName, LinkedModules));
+
+  for (const auto &KV : KernelToHandleMap) {
+    // All kernels included in this collection of modules will have an
+    // identical non specialized IR file. Map all Kernels, to this generic IR
+    // file
+    if (KV.second == Handle) {
+      KernelToLinkedBitcode.try_emplace(KV.first, JitModule);
     }
   }
 
-  linkJitModule(JitModule.get(), Ctx.get(), KernelName, LinkedModules);
-
-  std::string LinkedDeviceBitcode;
-  raw_string_ostream OS(LinkedDeviceBitcode);
-  WriteBitcodeToFile(*JitModule.get(), OS);
-  OS.flush();
-
-  return MemoryBuffer::getMemBufferCopy(StringRef(LinkedDeviceBitcode));
+  return;
 }
 
 void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
@@ -208,7 +241,8 @@ JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
                                   (void **)JITOptionsValues,
                                   &hip_link_state_ptr));
   // NOTE: the following version of te code does not set options.
-  // hiprtcErrCheck(hiprtcLinkCreate(0, nullptr, nullptr, &hip_link_state_ptr));
+  // hiprtcErrCheck(hiprtcLinkCreate(0, nullptr, nullptr,
+  // &hip_link_state_ptr));
 
   hiprtcErrCheck(hiprtcLinkAddData(
       hip_link_state_ptr, HIPRTC_JIT_INPUT_LLVM_BITCODE,

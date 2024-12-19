@@ -58,7 +58,6 @@
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Instructions.h>
-#include <llvm/IR/Metadata.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/ErrorHandling.h>
 #include <llvm/Support/FileSystem.h>
@@ -88,6 +87,7 @@ constexpr char const *RegisterFunctionName = "__hipRegisterFunction";
 constexpr char const *LaunchFunctionName = "hipLaunchKernel";
 constexpr char const *RegisterVarName = "__hipRegisterVar";
 constexpr char const *RegisterFatBinaryName = "__hipRegisterFatBinary";
+constexpr char const *FatBinWrapperSymbolName = "__hip_fatbin_wrapper";
 #elif ENABLE_CUDA
 constexpr char const *RegisterFunctionName = "__cudaRegisterFunction";
 constexpr char const *LaunchFunctionName = "cudaLaunchKernel";
@@ -99,6 +99,7 @@ constexpr char const *RegisterFunctionName = nullptr;
 constexpr char const *LaunchFunctionName = nullptr;
 constexpr char const *RegisterVarName = nullptr;
 constexpr char const *RegisterFatBinaryName = nullptr;
+constexpr char const *FatBinWrapperSymbolName = nullptr;
 #endif
 
 using namespace llvm;
@@ -146,6 +147,8 @@ public:
     // Host compilation
     // ================
 
+    DEBUG(dump(M, "host", IsLTO ? "lto-before-proteus" : "before-proteus"));
+
     instrumentRegisterLinkedBinary(M);
     instrumentRegisterFatBinary(M);
     instrumentRegisterFatBinaryEnd(M);
@@ -178,7 +181,7 @@ public:
     if (verifyModule(M, &errs()))
       FATAL_ERROR("Broken original module found, compilation aborted!");
 
-    DEBUG(dump(M, "host", "after-proteus"));
+    DEBUG(dump(M, "host", IsLTO ? "lto-after-proteus" : "after-proteus"));
 
     return true;
   }
@@ -197,11 +200,12 @@ private:
     std::string ModuleIR;
   };
 
-  void dump(Module M, StringRef device, StringRef phase) {
+  void dump(Module &M, StringRef device, StringRef phase) {
     std::filesystem::path ModulePath(M.getSourceFileName());
     std::filesystem::path filename(M.getSourceFileName());
     std::string rrBC(
-        Twine(filename.filename().string() + "." + device + "." + phase).str());
+        Twine(filename.filename().string() + "." + device + "." + phase + ".bc")
+            .str());
     std::error_code EC;
     raw_fd_ostream OutBC(rrBC, EC);
     if (EC)
@@ -468,7 +472,19 @@ private:
         new GlobalVariable(M, JitModule->getType(), /* isConstant */ true,
                            GlobalValue::ExternalLinkage, JitModule, GVName);
     appendToUsed(M, {GV});
-    GV->setSection(".jit.bitcode" + (IsLTO ? ".lto" : getUniqueModuleId(&M)));
+
+    auto ModHash = [&M] {
+      std::string BitcodeStr;
+      llvm::raw_string_ostream BitcodeStream(BitcodeStr);
+      WriteBitcodeToFile(M, BitcodeStream);
+      BitcodeStream.flush();
+      llvm::SHA256 SHA256Hasher;
+      SHA256Hasher.update(BitcodeStr);
+      auto Digest = SHA256Hasher.final();
+      return llvm::toHex(Digest);
+    }();
+
+    GV->setSection(".jit.bitcode." + (IsLTO ? "lto" : ModHash));
     DEBUG(Logger::logs("proteus-pass")
           << "Emit jit bitcode GV " << GVName << "\n");
   }
@@ -1070,7 +1086,6 @@ private:
 
       auto SHA256Global = getOrCreateModuleSHAGlobal(M);
       Value *SHAValue = Builder.CreateBitCast(SHA256Global, PtrTy);
-      SHAValue->dump();
 
       constexpr int StubOperand = 1;
       Builder.CreateCall(
@@ -1081,9 +1096,11 @@ private:
     }
   }
 
-  GlobalVariable *computeSHA256(Module &M, GlobalVariable *GV) {
-    assert(GV->hasInitializer() &&
-           "Global Variable must have initializer to compute the SHA256");
+  Value *computeSHA256(Module &M, GlobalVariable *GV) {
+    if (!GV->hasInitializer()) {
+      PointerType *OpaquePtr = PointerType::get(M.getContext(), 0);
+      return ConstantPointerNull::get(OpaquePtr);
+    }
     LLVMContext &Context = M.getContext();
     auto *LLVMDeviceIR = dyn_cast<ConstantDataArray>(GV->getInitializer());
     StringRef Data = LLVMDeviceIR->getRawDataValues();
@@ -1108,8 +1125,8 @@ private:
     return HashGlobal;
   }
 
-  GlobalVariable *getOrCreateModuleSHAGlobal(Module &M) {
-    GlobalVariable *ProteusSHA256GV = M.getGlobalVariable("sha256_hash");
+  Value *getOrCreateModuleSHAGlobal(Module &M) {
+    Value *ProteusSHA256GV = M.getGlobalVariable("sha256_hash");
     if (ProteusSHA256GV != nullptr)
       return ProteusSHA256GV;
 

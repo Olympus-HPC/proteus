@@ -66,12 +66,14 @@ class JITKernelInfo {
   int32_t NumRCs;
 
 public:
-  JITKernelInfo(const char *SHA256, char const *Name, int32_t *RCIndices,
+  JITKernelInfo(const char *_SHA256, char const *Name, int32_t *RCIndices,
                 int32_t *RCTypes, int32_t NumRCs)
-      : SHA256(SHA256, 32), Name(Name),
-        RCIndices{ArrayRef{RCIndices, static_cast<size_t>(NumRCs)}},
+      : Name(Name), RCIndices{ArrayRef{RCIndices, static_cast<size_t>(NumRCs)}},
         RCTypes{ArrayRef{RCTypes, static_cast<size_t>(NumRCs)}},
-        NumRCs(NumRCs) {}
+        NumRCs(NumRCs) {
+    if (_SHA256)
+      SHA256 = StringRef(_SHA256, 32);
+  }
 
   JITKernelInfo() : Name(nullptr), NumRCs(0), RCIndices(), RCTypes() {}
   const auto &getName() const { return Name; }
@@ -79,6 +81,7 @@ public:
   const auto &getRCTypes() const { return RCTypes; }
   const auto &getNumRCs() const { return NumRCs; }
   const auto &getSHA256() const { return SHA256; }
+  void setSHA256(StringRef sha) { SHA256 = StringRef(sha); }
 };
 
 struct FatbinWrapper_t {
@@ -318,7 +321,8 @@ private:
     llvm::SHA256 sha256;
     auto ExePath = std::filesystem::canonical("/proc/self/exe");
 
-    std::cout << "Reading file from path " << ExePath.string() << "\n";
+    DBG(Logger::logs("proteus")
+        << "Reading file from path " << ExePath.string() << "\n");
 
     auto bufferOrErr = MemoryBuffer::getFile(ExePath.string());
     if (!bufferOrErr) {
@@ -363,14 +367,13 @@ protected:
     ProteusCtx = std::make_unique<LLVMContext>();
     ProteusDeviceBinHash = computeDeviceFatBinHash();
     DBG(Logger::logs("proteus")
-        << "Device Bin Hash is " << ProteusDeviceBinHash << "\n");
+        << "Persistent Hash is " << ProteusDeviceBinHash << "\n");
   }
   ~JitEngineDevice() {
     CodeCache.printStats();
     StorageCache.printStats();
-    // Note: We manually clear or unique_ptr to Modules before the destructor
-    // releases the ProteusCtx.
-
+    // Note: We manually the LinkedBitCodes manually. Otherwise we have a
+    // deconstruction fiasco, ProteusCtx is destroyed before the modules
     KernelToLinkedBitcode.clear();
   }
 
@@ -386,8 +389,6 @@ protected:
   std::unique_ptr<LLVMContext> ProteusCtx;
   std::string ProteusDeviceBinHash;
 
-private:
-  // This map is private and only accessible via the API.
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
 };
 
@@ -514,6 +515,14 @@ JitEngineDevice<ImplT>::compileAndRun(
     return launchKernelDirect(Kernel, GridDim, BlockDim, KernelArgs, ShmemSize,
                               Stream);
 
+  // This needs to happen early. In HIP we need to have parsed the IR at
+  // least once to get access to the "KernelHash". ExtractBitCode populates
+  // many entries on the KernelToLinkedBitcode. Thus this call will
+  // asymptotically return always true. With a worst case scenario being called
+  // number of unique annotated kernels.
+  if (!KernelToLinkedBitcode.contains(Kernel))
+    extractDeviceBitcode(KernelName, Kernel);
+
   SmallVector<RuntimeConstant> RCsVec;
 
   getRuntimeConstantValues(KernelArgs, RCIndices, RCTypes, RCsVec);
@@ -580,12 +589,8 @@ JitEngineDevice<ImplT>::compileAndRun(
     }
   }
 
-  if (!KernelToLinkedBitcode.contains(Kernel))
-    extractDeviceBitcode(KernelName, Kernel);
-
-  // We need to clone, The JitModule will be specialized later, and we need
-  // the one generic one in KernelToLinkedBitcode to be a generic version prior
-  // specialization.
+  // We clone the JitModule as we need a copy of a generic, non specialized one
+  // in the KernelToLinkedBitcode
   auto JitModule = llvm::CloneModule(*KernelToLinkedBitcode[Kernel]);
 
   specializeIR(*JitModule, KernelName, Suffix, BlockDim, GridDim, RCIndices,
