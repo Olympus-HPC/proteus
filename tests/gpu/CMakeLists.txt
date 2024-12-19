@@ -58,7 +58,13 @@ function(CREATE_GPU_TEST_RDC exe check_source)
             -fpass-plugin=$<TARGET_FILE:ProteusPass>
         )
 
-        target_link_options(${exe}.${lang}.rdc PUBLIC -fgpu-rdc --hip-link)
+        target_link_options(
+            ${exe}.${lang}.rdc
+            PUBLIC
+            -fgpu-rdc
+            --hip-link
+            -Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPass>
+        )
     elseif(ENABLE_CUDA)
         target_compile_options(
             ${exe}.${lang}.rdc
