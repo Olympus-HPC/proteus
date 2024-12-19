@@ -585,6 +585,8 @@ void JitEngineDevice<ImplT>::registerFunction(void *Handle, void *Kernel,
       << "Register function " << Kernel << " To Handle " << Handle << "\n");
   assert(!KernelToHandleMap.contains(Kernel) &&
          "Expected kernel inserted only once in the map");
+  //if (KernelToHandleMap.contains(Kernel))
+  //  return;
   KernelToHandleMap[Kernel] = Handle;
 
   JITKernelInfoMap[Kernel] =

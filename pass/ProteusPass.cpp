@@ -249,8 +249,10 @@ private:
                       " to be a kernel function!");
       }
 
-      if (JitFunctionInfoMap.contains(Fn))
+      if (JitFunctionInfoMap.contains(Fn)) {
+        // continue;
         FATAL_ERROR("Duplicate jit annotation for Fn " + Fn->getName());
+      }
 
       DEBUG(Logger::logs("proteus-pass")
             << "JIT Function " << Fn->getName() << "\n");
