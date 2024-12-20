@@ -12,6 +12,7 @@
 #include "llvm/IR/Metadata.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
+#include <algorithm>
 #include <llvm/Linker/Linker.h>
 #include <llvm/Support/MemoryBufferRef.h>
 #include <memory>
@@ -68,15 +69,17 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
   LinkedModules.push_back(std::move(M));
 }
 
-std::unique_ptr<MemoryBuffer>
-JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
+void JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName,
+                                               void *Kernel) {
   CUmodule CUMod;
   CUdeviceptr DevPtr;
+
   size_t Bytes;
 
+  if (KernelToLinkedBitcode.contains(Kernel))
+    return;
+
   SmallVector<std::unique_ptr<Module>> LinkedModules;
-  auto Ctx = std::make_unique<LLVMContext>();
-  auto JitModule = std::make_unique<llvm::Module>("JitModule", *Ctx);
   if (!KernelToHandleMap.contains(Kernel))
     FATAL_ERROR("Expected Kernel in map");
 
@@ -93,21 +96,25 @@ JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
   cuErrCheck(cuModuleLoadData(&CUMod, FatbinWrapper->Binary));
 
   for (auto &ModuleId : LinkedModuleIds)
-    extractLinkedBitcode(*Ctx.get(), CUMod, LinkedModules, ModuleId);
+    extractLinkedBitcode(*ProteusCtx, CUMod, LinkedModules, ModuleId);
 
   for (auto &ModuleId : GlobalLinkedModuleIds)
-    extractLinkedBitcode(*Ctx.get(), CUMod, LinkedModules, ModuleId);
+    extractLinkedBitcode(*ProteusCtx, CUMod, LinkedModules, ModuleId);
 
   cuErrCheck(cuModuleUnload(CUMod));
 
-  linkJitModule(JitModule.get(), Ctx.get(), KernelName, LinkedModules);
+  auto JitModule =
+      std::shared_ptr<Module>(linkJitModule(KernelName, LinkedModules));
 
-  std::string LinkedDeviceBitcode;
-  raw_string_ostream OS(LinkedDeviceBitcode);
-  WriteBitcodeToFile(*JitModule.get(), OS);
-  OS.flush();
+  for (const auto &KV : KernelToHandleMap) {
+    // All kernels included in this collection of modules will have an identical
+    // non specialized IR file. Map all Kernels, to this generic IR file
+    if (KV.second == Handle) {
+      KernelToLinkedBitcode.try_emplace(KV.first, JitModule);
+    }
+  }
 
-  return MemoryBuffer::getMemBufferCopy(LinkedDeviceBitcode);
+  return;
 }
 
 void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module &M, Function &F,
