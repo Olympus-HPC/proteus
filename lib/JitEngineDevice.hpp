@@ -340,8 +340,8 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
   SmallVector<GlobalVariable*> GlobalsToErase;
   for (auto &GV : M.globals()) {
     auto Name = GV.getName();
-   if (Name.contains("__clang_gpu_used_external") ||
-       Name.contains("__jit_bitcode")) {
+   if (Name.starts_with("__clang_gpu_used_external") ||
+       Name.starts_with("__jit_bitcode")) {
       GlobalsToErase.push_back(&GV);
       removeFromUsedLists(M, [&GV](Constant *C) {
         if (auto *Global = dyn_cast<GlobalVariable>(C))
