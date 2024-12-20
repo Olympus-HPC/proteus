@@ -334,16 +334,24 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
   // Remove llvm.global.annotations now that we have read them.
   if (auto *GlobalAnnotations = M.getGlobalVariable("llvm.global.annotations"))
     M.eraseGlobalVariable(GlobalAnnotations);
+
   // Remove the __clang_gpu_used_external used in HIP RDC compilation and its
   // uses in llvm.used, llvm.compiler.used.
-  if (auto *ClangGPUUsedExternal =
-          M.getNamedGlobal("__clang_gpu_used_external")) {
-    removeFromUsedLists(M, [&ClangGPUUsedExternal](Constant *C) {
-      if (auto *GV = dyn_cast<GlobalVariable>(C))
-        return GV == ClangGPUUsedExternal;
-      return false;
-    });
-    M.eraseGlobalVariable(ClangGPUUsedExternal);
+  SmallVector<GlobalVariable*> GlobalsToErase;
+  for (auto &GV : M.globals()) {
+    auto Name = GV.getName();
+   if (Name.contains("__clang_gpu_used_external") ||
+       Name.contains("__jit_bitcode")) {
+      GlobalsToErase.push_back(&GV);
+      removeFromUsedLists(M, [&GV](Constant *C) {
+        if (auto *Global = dyn_cast<GlobalVariable>(C))
+          return Global == &GV;
+        return false;
+      });
+    }
+  }
+  for (auto GV : GlobalsToErase) {
+      M.eraseGlobalVariable(GV);
   }
 
   // Replace argument uses with runtime constants.
