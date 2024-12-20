@@ -1,5 +1,5 @@
 struct kernel_body_t {
-  __device__ void operator()() { printf("Kernel body"); }
+  __device__ void operator()() { printf("Kernel body\n"); }
 };
 
 const kernel_body_t kernel_body{};
