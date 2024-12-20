@@ -3,6 +3,4 @@
 #include "gpu_common.h"
 #include "launcher.hpp"
 
-void foo() {
-  launcher(my_kernel_body);
-}
+void foo() { gpuErrCheck(launcher(kernel_body)); }

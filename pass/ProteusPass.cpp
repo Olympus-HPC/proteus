@@ -250,8 +250,10 @@ private:
       }
 
       if (JitFunctionInfoMap.contains(Fn)) {
-        // continue;
-        FATAL_ERROR("Duplicate jit annotation for Fn " + Fn->getName());
+        DEBUG(Logger::logs("proteus-pass")
+              << "Warning: Duplicate jit annotation for Fn " + Fn->getName() +
+                     "\n");
+        continue;
       }
 
       DEBUG(Logger::logs("proteus-pass")

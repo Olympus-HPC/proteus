@@ -29,9 +29,3 @@
       abort();                                                                 \
     }                                                                          \
   }
-
-struct kernel_body {
-  __device__ void operator()() { printf("Kernel"); }
-};
-
-const kernel_body my_kernel_body{};
