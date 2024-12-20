@@ -583,8 +583,17 @@ void JitEngineDevice<ImplT>::registerFunction(void *Handle, void *Kernel,
                                               int32_t NumRCs) {
   DBG(Logger::logs("proteus")
       << "Register function " << Kernel << " To Handle " << Handle << "\n");
-  assert(!KernelToHandleMap.contains(Kernel) &&
-         "Expected kernel inserted only once in the map");
+  // NOTE: HIP RDC might call multiple times the registerFunction for the same
+  // kernel, which has weak linkage, when it comes from different translation
+  // units. Either the first or the second call can prevail and should be
+  // equivalent. We let the first one prevail.
+  if (KernelToHandleMap.contains(Kernel)) {
+    DBG(Logger::logs("proteus")
+        << "Warning: duplicate register function for kernel " +
+               std::string(KernelName)
+        << "\n");
+    return;
+  }
   KernelToHandleMap[Kernel] = Handle;
 
   JITKernelInfoMap[Kernel] =
