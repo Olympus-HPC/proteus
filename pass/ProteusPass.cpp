@@ -68,6 +68,8 @@
 
 #include "../lib/CompilerInterfaceTypes.h"
 
+#include "GenRuntimeConstantTy.hpp"
+
 #define DEBUG_TYPE "jitpass"
 #ifdef ENABLE_DEBUG
 #define DEBUG(x) x
@@ -113,8 +115,13 @@ public:
     Int32Ty = Type::getInt32Ty(M.getContext());
     Int64Ty = Type::getInt64Ty(M.getContext());
     Int128Ty = Type::getInt128Ty(M.getContext());
-    RuntimeConstantTy =
-        StructType::create({Int128Ty, Int32Ty}, "struct.args", true);
+
+    auto ExpecedRuntimeConstantTy = getRuntimeConstantTy(M.getContext());
+    if (auto E = ExpecedRuntimeConstantTy.takeError())
+      FATAL_ERROR("Expected valid generated RuntimeConstantTy: " +
+                  toString(std::move(E)));
+
+    RuntimeConstantTy = ExpecedRuntimeConstantTy.get();
   }
 
   bool run(Module &M, bool IsLTO) {
@@ -525,32 +532,30 @@ private:
     auto *StrIRGlobal = Builder.CreateGlobalString(JFI.ModuleIR);
 
     // Create the runtime constants data structure passed to the jit entry.
-    Value *RuntimeConstantsIndicesAlloca = nullptr;
+    Value *RuntimeConstantsAlloca = nullptr;
     if (JFI.ConstantArgs.size() > 0) {
-      RuntimeConstantsIndicesAlloca =
-          Builder.CreateAlloca(RuntimeConstantArrayTy);
+      RuntimeConstantsAlloca = Builder.CreateAlloca(RuntimeConstantArrayTy);
       // Zero-initialize the alloca to avoid stack garbage for caching.
       Builder.CreateStore(Constant::getNullValue(RuntimeConstantArrayTy),
-                          RuntimeConstantsIndicesAlloca);
+                          RuntimeConstantsAlloca);
       for (int ArgI = 0; ArgI < JFI.ConstantArgs.size(); ++ArgI) {
         auto *GEP = Builder.CreateInBoundsGEP(
-            RuntimeConstantArrayTy, RuntimeConstantsIndicesAlloca,
+            RuntimeConstantArrayTy, RuntimeConstantsAlloca,
             {Builder.getInt32(0), Builder.getInt32(ArgI)});
         int ArgNo = JFI.ConstantArgs[ArgI];
         Builder.CreateStore(StubFn->getArg(ArgNo), GEP);
       }
     } else
-      RuntimeConstantsIndicesAlloca =
+      RuntimeConstantsAlloca =
           Constant::getNullValue(RuntimeConstantArrayTy->getPointerTo());
 
-    assert(RuntimeConstantsIndicesAlloca &&
+    assert(RuntimeConstantsAlloca &&
            "Expected non-null runtime constants alloca");
 
     auto *JitFnPtr = Builder.CreateCall(
         JitEntryFn,
         {FnNameGlobal, StrIRGlobal, Builder.getInt32(JFI.ModuleIR.size()),
-         RuntimeConstantsIndicesAlloca,
-         Builder.getInt32(JFI.ConstantArgs.size())});
+         RuntimeConstantsAlloca, Builder.getInt32(JFI.ConstantArgs.size())});
     SmallVector<Value *, 8> Args;
     for (auto &Arg : StubFn->args())
       Args.push_back(&Arg);
