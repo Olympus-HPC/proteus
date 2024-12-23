@@ -341,7 +341,7 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
   for (auto &GV : M.globals()) {
     auto Name = GV.getName();
     if (Name.starts_with("__clang_gpu_used_external") ||
-        Name.starts_with("__jit_bitcode")) {
+        Name.starts_with("_jit_bitcode")) {
       GlobalsToErase.push_back(&GV);
       removeFromUsedLists(M, [&GV](Constant *C) {
         if (auto *Global = dyn_cast<GlobalVariable>(C))
