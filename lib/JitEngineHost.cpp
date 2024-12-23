@@ -299,7 +299,8 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   TIMESCOPE("compileAndLink");
 
   // TODO: implement ModuleUniqueId for host code.
-  uint64_t HashValue = CodeCache.hash("", FnName, RC, NumRuntimeConstants);
+  // TODO: implement l1hash for host code
+  uint64_t HashValue = CodeCache.hash({}, "", FnName, RC, NumRuntimeConstants);
   void *JitFnPtr = CodeCache.lookup(HashValue);
   if (JitFnPtr)
     return JitFnPtr;
