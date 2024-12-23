@@ -439,8 +439,10 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   getRuntimeConstantValues(KernelArgs, RCIndices, RCTypes, RCsVec);
 
-  uint64_t HashValue = CodeCache.hash(ModuleUniqueId, KernelName, RCsVec.data(),
-                                      NumRuntimeConstants);
+  uint64_t HashValue = CodeCache.hash(ModuleUniqueId,
+    KernelName, RCsVec.data(), NumRuntimeConstants, GridDim.x, GridDim.y,
+    GridDim.z, BlockDim.x, BlockDim.y, BlockDim.z);
+
   typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc =
       CodeCache.lookup(HashValue);
   if (KernelFunc)
