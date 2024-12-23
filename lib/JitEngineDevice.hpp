@@ -12,6 +12,8 @@
 #define PROTEUS_JITENGINEDEVICE_HPP
 
 #include "llvm/Linker/Linker.h"
+#include "llvm/Object/ELFObjectFile.h"
+#include "llvm/Support/SHA256.h"
 #include <cstdint>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
@@ -298,8 +300,58 @@ private:
   relinkGlobals(Module &M,
                 std::unordered_map<std::string, const void *> &VarNameToDevPtr);
 
+  static std::array<uint8_t, 32> computeDeviceFatBinHash() {
+    TIMESCOPE("computeDeviceFatBinHash");
+    using namespace llvm::object;
+    llvm::SHA256 sha256;
+    auto ExePath = std::filesystem::canonical("/proc/self/exe");
+
+    DBG(Logger::logs("proteus")
+        << "Reading file from path " << ExePath.string() << "\n");
+
+    auto bufferOrErr = MemoryBuffer::getFile(ExePath.string());
+    if (!bufferOrErr) {
+      FATAL_ERROR("Failed to open binary file");
+    }
+
+    auto objOrErr =
+        ObjectFile::createELFObjectFile(bufferOrErr.get()->getMemBufferRef());
+    if (!objOrErr) {
+      FATAL_ERROR("Failed to create Object File");
+    }
+
+    ObjectFile &elfObj = **objOrErr;
+
+    for (const SectionRef &section : elfObj.sections()) {
+      auto nameOrErr = section.getName();
+      if (!nameOrErr)
+        FATAL_ERROR("Error getting section name: ");
+
+      StringRef sectionName = nameOrErr.get();
+      if (!ImplT::HashSection(sectionName))
+        continue;
+
+      DBG(Logger::logs("proteus")
+          << "Hashing section " << sectionName.str() << "\n");
+
+      auto contentsOrErr = section.getContents();
+      if (!contentsOrErr) {
+        FATAL_ERROR("Error getting section contents: ");
+        continue;
+      }
+      StringRef sectionContents = contentsOrErr.get();
+
+      sha256.update(sectionContents);
+    }
+    return sha256.final();
+  }
+
 protected:
-  JitEngineDevice() {}
+  JitEngineDevice() {
+    L1Hash = computeDeviceFatBinHash();
+    DBG(Logger::logs("proteus")
+        << "L1-Hash is " << ProteusDeviceBinHash << "\n");
+  }
   ~JitEngineDevice() {
     CodeCache.printStats();
     StorageCache.printStats();
@@ -312,9 +364,12 @@ protected:
   void linkJitModule(Module *M, LLVMContext *Ctx, StringRef KernelName,
                      SmallVector<std::unique_ptr<Module>> &LinkedModules);
 
+  const ArrayRef<uint8_t> getL1Hash() const { return L1Hash; }
+
 private:
   // This map is private and only accessible via the API.
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
+  std::array<uint8_t, 32> L1Hash;
 };
 
 template <typename ImplT>
@@ -446,10 +501,11 @@ JitEngineDevice<ImplT>::compileAndRun(
   SmallVector<RuntimeConstant> RCsVec;
 
   getRuntimeConstantValues(KernelArgs, RCIndices, RCTypes, RCsVec);
+  auto L1Hash = getL1Hash();
 
   uint64_t HashValue = CodeCache.hash(
-      ModuleUniqueId, KernelName, RCsVec.data(), NumRuntimeConstants, GridDim.x,
-      GridDim.y, GridDim.z, BlockDim.x, BlockDim.y, BlockDim.z);
+      L1Hash, ModuleUniqueId, KernelName, RCsVec.data(), NumRuntimeConstants,
+      GridDim.x, GridDim.y, GridDim.z, BlockDim.x, BlockDim.y, BlockDim.z);
 
   typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc =
       CodeCache.lookup(HashValue);
