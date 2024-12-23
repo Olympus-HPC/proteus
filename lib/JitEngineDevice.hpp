@@ -337,11 +337,11 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
 
   // Remove the __clang_gpu_used_external used in HIP RDC compilation and its
   // uses in llvm.used, llvm.compiler.used.
-  SmallVector<GlobalVariable*> GlobalsToErase;
+  SmallVector<GlobalVariable *> GlobalsToErase;
   for (auto &GV : M.globals()) {
     auto Name = GV.getName();
-   if (Name.starts_with("__clang_gpu_used_external") ||
-       Name.starts_with("__jit_bitcode")) {
+    if (Name.starts_with("__clang_gpu_used_external") ||
+        Name.starts_with("__jit_bitcode")) {
       GlobalsToErase.push_back(&GV);
       removeFromUsedLists(M, [&GV](Constant *C) {
         if (auto *Global = dyn_cast<GlobalVariable>(C))
@@ -351,7 +351,7 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
     }
   }
   for (auto GV : GlobalsToErase) {
-      M.eraseGlobalVariable(GV);
+    M.eraseGlobalVariable(GV);
   }
 
   // Replace argument uses with runtime constants.
