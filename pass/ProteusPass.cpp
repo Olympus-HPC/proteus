@@ -1158,11 +1158,11 @@ llvm::PassPluginLibraryInfo getProteusJitPassPluginInfo() {
 
     // PB.registerPipelineStartEPCallback(
     // PB.registerOptimizerLastEPCallback(
-    PB.registerPipelineEarlySimplificationEPCallback(
-        [&](ModulePassManager &MPM, auto) {
-          MPM.addPass(ProteusJitPass{false});
-          return true;
-        });
+    // PB.registerPipelineEarlySimplificationEPCallback(
+    PB.registerOptimizerLastEPCallback([&](ModulePassManager &MPM, auto) {
+      MPM.addPass(ProteusJitPass{false});
+      return true;
+    });
 
     PB.registerFullLinkTimeOptimizationEarlyEPCallback(
         [&](ModulePassManager &MPM, auto) {
