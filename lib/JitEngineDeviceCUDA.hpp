@@ -79,7 +79,7 @@ public:
     return "llvm.nvvm.read.ptx.sreg.tid.z";
   };
 
-  static bool HashSection(StringRef sectionName) {
+  static bool isHashedSection(StringRef sectionName) {
     static const std::string Section{".nv_fatbin"};
     return Section.compare(sectionName) == 0;
   }

@@ -21,6 +21,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StableHashing.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace proteus {
@@ -35,9 +36,9 @@ inline hash_code hash_value(const proteus::RuntimeConstant &RC) {
 template <typename Function_t> class JitCache {
 public:
   template <typename... Ts>
-  uint64_t hash(ArrayRef<uint8_t> L1Hash, StringRef ModuleUniqueId,
-                StringRef FnName, const RuntimeConstant *RC,
-                int NumRuntimeConstants, Ts... args) const {
+  uint64_t hash(stable_hash L1Hash, StringRef ModuleUniqueId, StringRef FnName,
+                const RuntimeConstant *RC, int NumRuntimeConstants,
+                Ts... args) const {
     ArrayRef<RuntimeConstant> Data(RC, NumRuntimeConstants);
     auto HashValue =
         hash_combine(L1Hash, ModuleUniqueId, FnName, Data, args...);

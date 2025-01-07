@@ -77,7 +77,7 @@ public:
     return "_ZNK17__HIP_CoordinatesI14__HIP_BlockIdxE3__ZcvjEv";
   };
 
-  static bool HashSection(StringRef sectionName) {
+  static bool isHashedSection(StringRef sectionName) {
     static const std::string Section{".hip_fatbin"};
     return Section.compare(sectionName) == 0;
   }

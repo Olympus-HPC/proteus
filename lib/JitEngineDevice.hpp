@@ -11,9 +11,9 @@
 #ifndef PROTEUS_JITENGINEDEVICE_HPP
 #define PROTEUS_JITENGINEDEVICE_HPP
 
+#include "llvm/ADT/StableHashing.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Object/ELFObjectFile.h"
-#include "llvm/Support/SHA256.h"
 #include <cstdint>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
@@ -300,10 +300,10 @@ private:
   relinkGlobals(Module &M,
                 std::unordered_map<std::string, const void *> &VarNameToDevPtr);
 
-  static std::array<uint8_t, 32> computeDeviceFatBinHash() {
+  static stable_hash computeDeviceFatBinHash() {
     TIMESCOPE("computeDeviceFatBinHash");
     using namespace llvm::object;
-    llvm::SHA256 sha256;
+    stable_hash L1Hash;
     auto ExePath = std::filesystem::canonical("/proc/self/exe");
 
     DBG(Logger::logs("proteus")
@@ -328,7 +328,8 @@ private:
         FATAL_ERROR("Error getting section name: ");
 
       StringRef sectionName = nameOrErr.get();
-      if (!ImplT::HashSection(sectionName))
+
+      if (!ImplT::isHashedSection(sectionName))
         continue;
 
       DBG(Logger::logs("proteus")
@@ -340,17 +341,16 @@ private:
         continue;
       }
       StringRef sectionContents = contentsOrErr.get();
-
-      sha256.update(sectionContents);
+      auto sectionHash = stable_hash_combine_string(sectionContents);
+      L1Hash = stable_hash_combine(sectionHash, L1Hash);
     }
-    return sha256.final();
+    return L1Hash;
   }
 
 protected:
   JitEngineDevice() {
     L1Hash = computeDeviceFatBinHash();
-    DBG(Logger::logs("proteus")
-        << "L1-Hash is " << ProteusDeviceBinHash << "\n");
+    DBG(Logger::logs("proteus") << "L1-Hash is " << L1Hash << "\n");
   }
   ~JitEngineDevice() {
     CodeCache.printStats();
@@ -364,12 +364,12 @@ protected:
   void linkJitModule(Module *M, LLVMContext *Ctx, StringRef KernelName,
                      SmallVector<std::unique_ptr<Module>> &LinkedModules);
 
-  const ArrayRef<uint8_t> getL1Hash() const { return L1Hash; }
+  const stable_hash getL1Hash() const { return L1Hash; }
 
 private:
   // This map is private and only accessible via the API.
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
-  std::array<uint8_t, 32> L1Hash;
+  stable_hash L1Hash;
 };
 
 template <typename ImplT>
