@@ -1,10 +1,6 @@
 name: cpp-linter
 
 on:
-  push:
-    paths:
-      - "pass/*"
-      - "lib/*"
   pull_request:
     paths:
       - "pass/*"
@@ -13,6 +9,8 @@ on:
 jobs:
   cpp-linter:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
       - uses: cpp-linter/cpp-linter-action@v2

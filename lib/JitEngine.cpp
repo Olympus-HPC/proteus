@@ -79,7 +79,7 @@ JitEngine::createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel) {
 void JitEngine::runOptimizationPassPipeline(Module &M, StringRef Arch,
                                             unsigned OptLevel) {
   TIMESCOPE("Run opt passes");
-  PipelineTuningOptions pTO;
+  PipelineTuningOptions pto;
 
   std::optional<PGOOptions> PGOOpt;
   auto TM = createTargetMachine(M, Arch, OptLevel);
@@ -87,7 +87,7 @@ void JitEngine::runOptimizationPassPipeline(Module &M, StringRef Arch,
     report_fatal_error(std::move(Err));
   TargetLibraryInfoImpl TLII(Triple(M.getTargetTriple()));
 
-  PassBuilder PB(TM->get(), PTO, PGOOpt, nullptr);
+  PassBuilder PB(TM->get(), pto, PGOOpt, nullptr);
   LoopAnalysisManager LAM;
   FunctionAnalysisManager FAM;
   CGSCCAnalysisManager CGAM;
