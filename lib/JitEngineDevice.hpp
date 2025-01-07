@@ -10,8 +10,15 @@
 
 #ifndef PROTEUS_JITENGINEDEVICE_HPP
 #define PROTEUS_JITENGINEDEVICE_HPP
+#include "llvm/Config/llvm-config.h"
+#if LLVM_VERSION_MAJOR == 18
+#include "llvm/ADT/StableHashing.h"
+#else
+#include "llvm/CodeGen/StableHashing.h"
+#endif
 
 #include "llvm/Linker/Linker.h"
+#include "llvm/Object/ELFObjectFile.h"
 #include <cstdint>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
@@ -298,8 +305,58 @@ private:
   relinkGlobals(Module &M,
                 std::unordered_map<std::string, const void *> &VarNameToDevPtr);
 
+  static stable_hash computeDeviceFatBinHash() {
+    TIMESCOPE("computeDeviceFatBinHash");
+    using namespace llvm::object;
+    stable_hash L1Hash{0};
+    auto ExePath = std::filesystem::canonical("/proc/self/exe");
+
+    DBG(Logger::logs("proteus")
+        << "Reading file from path " << ExePath.string() << "\n");
+
+    auto bufferOrErr = MemoryBuffer::getFile(ExePath.string());
+    if (!bufferOrErr) {
+      FATAL_ERROR("Failed to open binary file");
+    }
+
+    auto objOrErr =
+        ObjectFile::createELFObjectFile(bufferOrErr.get()->getMemBufferRef());
+    if (!objOrErr) {
+      FATAL_ERROR("Failed to create Object File");
+    }
+
+    ObjectFile &elfObj = **objOrErr;
+
+    for (const SectionRef &section : elfObj.sections()) {
+      auto nameOrErr = section.getName();
+      if (!nameOrErr)
+        FATAL_ERROR("Error getting section name: ");
+
+      StringRef sectionName = nameOrErr.get();
+
+      if (!ImplT::isHashedSection(sectionName))
+        continue;
+
+      DBG(Logger::logs("proteus")
+          << "Hashing section " << sectionName.str() << "\n");
+
+      auto contentsOrErr = section.getContents();
+      if (!contentsOrErr) {
+        FATAL_ERROR("Error getting section contents: ");
+        continue;
+      }
+      StringRef sectionContents = contentsOrErr.get();
+      auto sectionHash = stable_hash_combine_string(sectionContents);
+      L1Hash = stable_hash_combine(sectionHash, L1Hash);
+    }
+    return L1Hash;
+  }
+
 protected:
-  JitEngineDevice() {}
+  JitEngineDevice() {
+    L1Hash = computeDeviceFatBinHash();
+    DBG(Logger::logs("proteus") << "L1-Hash is " << L1Hash << "\n");
+  }
   ~JitEngineDevice() {
     CodeCache.printStats();
     StorageCache.printStats();
@@ -312,9 +369,12 @@ protected:
   void linkJitModule(Module *M, LLVMContext *Ctx, StringRef KernelName,
                      SmallVector<std::unique_ptr<Module>> &LinkedModules);
 
+  const stable_hash getL1Hash() const { return L1Hash; }
+
 private:
   // This map is private and only accessible via the API.
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
+  stable_hash L1Hash;
 };
 
 template <typename ImplT>
@@ -446,10 +506,11 @@ JitEngineDevice<ImplT>::compileAndRun(
   SmallVector<RuntimeConstant> RCsVec;
 
   getRuntimeConstantValues(KernelArgs, RCIndices, RCTypes, RCsVec);
+  auto L1Hash = getL1Hash();
 
   uint64_t HashValue = CodeCache.hash(
-      ModuleUniqueId, KernelName, RCsVec.data(), NumRuntimeConstants, GridDim.x,
-      GridDim.y, GridDim.z, BlockDim.x, BlockDim.y, BlockDim.z);
+      L1Hash, ModuleUniqueId, KernelName, RCsVec.data(), NumRuntimeConstants,
+      GridDim.x, GridDim.y, GridDim.z, BlockDim.x, BlockDim.y, BlockDim.z);
 
   typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc =
       CodeCache.lookup(HashValue);
