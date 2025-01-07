@@ -106,8 +106,7 @@ JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
 
   ArrayRef<uint8_t> DeviceBitcode;
   SmallVector<std::unique_ptr<Module>> LinkedModules;
-  auto Ctx = std::make_unique<LLVMContext>();
-  auto JitModule = std::make_unique<llvm::Module>("JitModule", *Ctx);
+  auto &Ctx = getProteusLLVMCtx();
 
   auto extractModuleFromSection = [&DeviceElf, &Ctx](auto &Section,
                                                      StringRef SectionName) {
@@ -120,7 +119,7 @@ JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
                              BitcodeData.size()};
 
     SMDiagnostic Err;
-    auto M = parseIR(MemoryBufferRef{Bitcode, SectionName}, Err, *Ctx);
+    auto M = parseIR(MemoryBufferRef{Bitcode, SectionName}, Err, Ctx);
     if (!M)
       FATAL_ERROR("unexpected");
 
@@ -150,7 +149,7 @@ JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
     }
   }
 
-  linkJitModule(JitModule.get(), Ctx.get(), KernelName, LinkedModules);
+  auto JitModule = linkJitModule(KernelName, LinkedModules);
 
   std::string LinkedDeviceBitcode;
   raw_string_ostream OS(LinkedDeviceBitcode);
