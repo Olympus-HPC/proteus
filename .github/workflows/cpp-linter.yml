@@ -3,6 +3,7 @@ name: cpp-linter
 on:
   pull_request:
     paths:
+      - "common/*"
       - "pass/*"
       - "lib/*"
 
@@ -20,13 +21,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          version: 18
+          ignore: .github | tests | scripts
           style: file
           tidy-checks: ''
           files-changed-only: true
           lines-changed-only: true
           format-review: true
           tidy-review: true
-          thread-comments: ${{ github.event_name == 'pull_request' && 'update' }}
 
       - name: Fail fast?!
         if: steps.linter.outputs.checks-failed != 0
