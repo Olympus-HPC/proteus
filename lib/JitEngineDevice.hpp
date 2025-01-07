@@ -10,8 +10,13 @@
 
 #ifndef PROTEUS_JITENGINEDEVICE_HPP
 #define PROTEUS_JITENGINEDEVICE_HPP
-
+#include "llvm/Config/llvm-config.h"
+#if LLVM_VERSION_MAJOR == 18
 #include "llvm/ADT/StableHashing.h"
+#else
+#include "llvm/CodeGen/StableHashing.h"
+#endif
+
 #include "llvm/Linker/Linker.h"
 #include "llvm/Object/ELFObjectFile.h"
 #include <cstdint>
@@ -303,7 +308,7 @@ private:
   static stable_hash computeDeviceFatBinHash() {
     TIMESCOPE("computeDeviceFatBinHash");
     using namespace llvm::object;
-    stable_hash L1Hash;
+    stable_hash L1Hash{0};
     auto ExePath = std::filesystem::canonical("/proc/self/exe");
 
     DBG(Logger::logs("proteus")

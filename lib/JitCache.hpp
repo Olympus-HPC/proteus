@@ -19,9 +19,13 @@
 #include "Utils.h"
 
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/SmallVector.h"
+#include "llvm/Config/llvm-config.h"
+#if LLVM_VERSION_MAJOR == 18
 #include "llvm/ADT/StableHashing.h"
+#else
+#include "llvm/CodeGen/StableHashing.h"
+#endif
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace proteus {
