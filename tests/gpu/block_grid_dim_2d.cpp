@@ -1,6 +1,8 @@
-// RUN: ./block_grid_dim_2d.%ext | FileCheck %s
-// --check-prefixes=CHECK,CHECK-FIRST Second run uses the object cache. RUN:
-// ./block_grid_dim_2d.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-SECOND
+// clang-format off
+// RUN: ./block_grid_dim_2d.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-FIRST 
+// Second run uses the object cache.
+// RUN: ./block_grid_dim_2d.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-SECOND
+// clang-format on
 
 #include <climits>
 #include <cstdio>
