@@ -10,6 +10,7 @@ jobs:
   cpp-linter:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
@@ -21,7 +22,10 @@ jobs:
         with:
           style: file
           tidy-checks: ''
-          files-changed-only: false
+          files-changed-only: true
+          lines-changed-only: true
+          format-review: true
+          tidy-review: true
           thread-comments: ${{ github.event_name == 'pull_request' && 'update' }}
 
       - name: Fail fast?!
