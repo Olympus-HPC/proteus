@@ -1,0 +1,55 @@
+name: cpp-linter
+
+on:
+  pull_request:
+
+jobs:
+  cpp-linter:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          conda-remove-defaults: true
+      # Install Clang/LLVM using conda
+      - name: Create environment
+        run: |
+          conda install -y -q -c conda-forge \
+            clang=18.1.3 \
+            clangxx=18.1.3 \
+            llvmdev=18.1.3 \
+            lit=18.1.3
+          ln -s ${CONDA_PREFIX}/libexec/llvm/FileCheck ${CONDA_PREFIX}/bin
+      - name: Run cmake to export compilation database
+        run: |
+          mkdir -p build
+          pushd build
+          cmake .. \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=on
+      - uses: cpp-linter/cpp-linter-action@v2
+        id: linter
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          version: 18
+          ignore: .github | tests | scripts
+          style: file
+          tidy-checks: ''
+          database: build
+          lines-changed-only: true
+          format-review: true
+          tidy-review: true
+          passive-reviews: true
+      - name: Check linter status
+        if: steps.linter.outputs.checks-failed != 0
+        run: exit 1
