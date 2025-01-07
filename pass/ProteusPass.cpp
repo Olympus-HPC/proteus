@@ -1067,8 +1067,7 @@ private:
     for (auto &F : M.getFunctionList()) {
       // TODO: Demangle and search for the fully qualified proteus::jit_variable
       // name.
-      if (F.getName().contains("jit_variable")) {
-        JitFunctions.push_back(&F);
+      if (F.getName().contains("jit_variable")) {JitFunctions.push_back(&F);
       }
     }
 
