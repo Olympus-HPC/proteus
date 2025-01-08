@@ -15,7 +15,7 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -27,7 +27,8 @@ jobs:
           conda install -y -c conda-forge \
             clang=18.1.3 \
             clangxx=18.1.3 \
-            llvmdev=18.1.3
+            llvmdev=18.1.3 \
+            lit=18.1.3
 
       - name: Run cmake to export compilation database
         run: |
