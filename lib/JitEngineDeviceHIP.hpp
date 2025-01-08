@@ -89,8 +89,7 @@ public:
 
   void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim);
 
-  std::unique_ptr<MemoryBuffer> extractDeviceBitcode(StringRef KernelName,
-                                                     void *Kernel);
+  Module &extractDeviceBitcode(StringRef KernelName, void *Kernel);
 
   std::unique_ptr<MemoryBuffer> codegenObject(Module &M, StringRef DeviceArch);
 

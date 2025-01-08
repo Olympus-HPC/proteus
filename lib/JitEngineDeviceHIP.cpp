@@ -38,13 +38,21 @@ JitEngineDeviceHIP &JitEngineDeviceHIP::instance() {
   return Jit;
 }
 
-std::unique_ptr<MemoryBuffer>
-JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
+Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
+                                                 void *Kernel) {
   constexpr char OFFLOAD_BUNDLER_MAGIC_STR[] = "__CLANG_OFFLOAD_BUNDLE__";
   size_t Pos = 0;
 
   if (!KernelToHandleMap.contains(Kernel))
-    FATAL_ERROR("Expected Kerne in map");
+    FATAL_ERROR("Expected Kernel in map");
+
+  if (!JITKernelInfoMap.contains(Kernel))
+    FATAL_ERROR("Expected a Kernel Descriptor to exist");
+
+  auto &KInfo = JITKernelInfoMap[Kernel];
+
+  if (KInfo.hasLinkedIR())
+    return KInfo.getLinkedModule();
 
   void *Handle = KernelToHandleMap[Kernel];
   if (!HandleToBinaryInfo.contains(Handle))
@@ -106,8 +114,7 @@ JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
 
   ArrayRef<uint8_t> DeviceBitcode;
   SmallVector<std::unique_ptr<Module>> LinkedModules;
-  auto Ctx = std::make_unique<LLVMContext>();
-  auto JitModule = std::make_unique<llvm::Module>("JitModule", *Ctx);
+  auto &Ctx = getProteusLLVMCtx();
 
   auto extractModuleFromSection = [&DeviceElf, &Ctx](auto &Section,
                                                      StringRef SectionName) {
@@ -120,7 +127,7 @@ JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
                              BitcodeData.size()};
 
     SMDiagnostic Err;
-    auto M = parseIR(MemoryBufferRef{Bitcode, SectionName}, Err, *Ctx);
+    auto M = parseIR(MemoryBufferRef{Bitcode, SectionName}, Err, Ctx);
     if (!M)
       FATAL_ERROR("unexpected");
 
@@ -128,8 +135,8 @@ JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
   };
 
   // We extract bitcode from sections. If there is a .jit.bitcode.lto section
-  // due to RDC compilation that's the only bitcode we need, othewise we collect
-  // all .jit.bitcode sections.
+  // due to RDC compilation that's the only bitcode we need, othewise we
+  // collect all .jit.bitcode sections.
   for (auto Section : *Sections) {
     auto SectionName = DeviceElf->getSectionName(Section);
     if (SectionName.takeError())
@@ -150,14 +157,42 @@ JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
     }
   }
 
-  linkJitModule(JitModule.get(), Ctx.get(), KernelName, LinkedModules);
+  auto JitModule = linkJitModule(KernelName, LinkedModules);
 
-  std::string LinkedDeviceBitcode;
-  raw_string_ostream OS(LinkedDeviceBitcode);
-  WriteBitcodeToFile(*JitModule.get(), OS);
-  OS.flush();
+  // All kernels included in this collection of modules will have an
+  // identical non specialized IR file. Map all Kernels, to this generic IR
+  // file
+  [this, &JitModule, &Handle]() {
+    DenseSet<StringRef> KernelNames;
+    for (auto &Func : *JitModule) {
+      if (Func.getCallingConv() == CallingConv::AMDGPU_KERNEL) {
+        KernelNames.insert(Func.getName());
+      }
+    }
 
-  return MemoryBuffer::getMemBufferCopy(StringRef(LinkedDeviceBitcode));
+    for (const auto &KV : KernelToHandleMap) {
+
+      if (KV.second != Handle)
+        continue;
+
+      // This is likely a not required check.
+      // KV.first is in KernelToHandleMap, so we should have the Descriptor.
+      if (!JITKernelInfoMap.contains(KV.first))
+        continue;
+
+      auto &KDescr = JITKernelInfoMap[KV.first];
+      if (!KernelNames.contains(KDescr.getName()))
+        continue;
+
+      KDescr.setLinkedModule(*JitModule);
+    }
+  }();
+
+  if (!KInfo.hasLinkedIR())
+    FATAL_ERROR("Expected KernelInfo to have updated Linked Modules");
+
+  addLinkedModule(std::move(JitModule));
+  return KInfo.getLinkedModule();
 }
 
 void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
