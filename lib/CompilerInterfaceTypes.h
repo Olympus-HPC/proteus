@@ -42,7 +42,7 @@ struct RuntimeConstant {
   };
   RuntimeConstantType Value;
   int32_t Slot{-1};
-} __attribute__((packed));
+};
 
 } // namespace proteus
 
