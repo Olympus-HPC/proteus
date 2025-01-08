@@ -312,6 +312,6 @@ JitEngineDeviceCUDA::JitEngineDeviceCUDA() {
 
   DBG(Logger::logs("proteus") << "CUDA Arch " << DeviceArch << "\n");
 
-  for (int i = 0; i < 10; ++i)
+  for (int I = 0; I < 10; ++I)
     printf("Senseless code\n");
 }
