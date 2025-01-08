@@ -311,4 +311,7 @@ JitEngineDeviceCUDA::JitEngineDeviceCUDA() {
   DeviceArch = "sm_" + std::to_string(CCMajor * 10 + CCMinor);
 
   DBG(Logger::logs("proteus") << "CUDA Arch " << DeviceArch << "\n");
+
+  for (int i = 0; i < 10; ++i)
+    printf("Senseless code\n");
 }
