@@ -55,8 +55,9 @@ jobs:
           tidy-checks: ''
           database: build
           lines-changed-only: true
-          #format-review: true
-          #tidy-review: true
+          format-review: true
+          tidy-review: true
+          passive-reviews: true
       
       - name: Check linter status
         if: steps.linter.outputs.checks-failed != 0
