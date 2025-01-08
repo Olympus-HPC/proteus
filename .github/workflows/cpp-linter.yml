@@ -25,7 +25,6 @@ jobs:
           ignore: .github | tests | scripts
           style: file
           tidy-checks: ''
-          files-changed-only: true
           lines-changed-only: true
           format-review: true
           tidy-review: true
