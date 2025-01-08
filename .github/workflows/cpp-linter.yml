@@ -2,10 +2,10 @@ name: cpp-linter
 
 on:
   pull_request:
-    paths:
-      - "common/*"
-      - "pass/*"
-      - "lib/*"
+    #paths:
+    #  - "common/*"
+    #  - "pass/*"
+    #  - "lib/*"
 
 jobs:
   cpp-linter:
