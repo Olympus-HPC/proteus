@@ -49,6 +49,7 @@ protected:
 
   void runOptimizationPassPipeline(Module &M, StringRef Arch,
                                    unsigned OptLevel = 3);
+  void runCleanupPassPipeline(Module &M);
 
   JitEngine();
 

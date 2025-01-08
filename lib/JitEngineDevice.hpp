@@ -420,8 +420,7 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
   for (auto &GV : M.globals()) {
     auto Name = GV.getName();
     if (Name.starts_with("__clang_gpu_used_external") ||
-        Name.starts_with("_jit_bitcode") ||
-        Name.starts_with("__hip_cuid")) {
+        Name.starts_with("_jit_bitcode") || Name.starts_with("__hip_cuid")) {
       GlobalsToErase.push_back(&GV);
       removeFromUsedLists(M, [&GV](Constant *C) {
         if (auto *Global = dyn_cast<GlobalVariable>(C))
@@ -465,6 +464,8 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
   if (Config.ENV_PROTEUS_SET_LAUNCH_BOUNDS)
     setLaunchBoundsForKernel(M, *F, GridDim.x * GridDim.y * GridDim.z,
                              BlockDim.x * BlockDim.y * BlockDim.z);
+
+  runCleanupPassPipeline(M);
 
 #if ENABLE_DEBUG
   Logger::logs("proteus") << "=== Final Module\n"
@@ -595,9 +596,11 @@ JitEngineDevice<ImplT>::compileAndRun(
   specializeIR(*JitModule, KernelName, Suffix, BlockDim, GridDim, RCIndices,
                RCsVec.data(), NumRuntimeConstants);
 
-  // For CUDA, run the target-specific optimization pipeline to optimize the
-  // LLVM IR before handing over to the CUDA driver PTX compiler.
+// For CUDA, run the target-specific optimization pipeline to optimize the
+// LLVM IR before handing over to the CUDA driver PTX compiler.
+#if ENABLE_CUDA
   optimizeIR(*JitModule, DeviceArch);
+#endif
 
   SmallString<4096> ModuleBuffer;
   raw_svector_ostream ModuleBufferOS(ModuleBuffer);

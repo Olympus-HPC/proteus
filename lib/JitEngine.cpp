@@ -9,6 +9,9 @@
 //===----------------------------------------------------------------------===//
 
 #include <cstdlib>
+#include <llvm/Transforms/IPO/GlobalDCE.h>
+#include <llvm/Transforms/IPO/StripDeadPrototypes.h>
+#include <llvm/Transforms/IPO/StripSymbols.h>
 #include <memory>
 #include <optional>
 #include <string>
@@ -134,6 +137,27 @@ std::string JitEngine::mangleSuffix(uint64_t HashValue) {
 void JitEngine::optimizeIR(Module &M, StringRef Arch) {
   TIMESCOPE("Optimize IR");
   runOptimizationPassPipeline(M, Arch);
+}
+
+void JitEngine::runCleanupPassPipeline(Module &M) {
+  PassBuilder PB;
+  LoopAnalysisManager LAM;
+  FunctionAnalysisManager FAM;
+  CGSCCAnalysisManager CGAM;
+  ModuleAnalysisManager MAM;
+
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+  ModulePassManager Passes;
+  Passes.addPass(GlobalDCEPass());
+  Passes.addPass(StripDeadDebugInfoPass());
+  Passes.addPass(StripDeadPrototypesPass());
+
+  Passes.run(M, MAM);
 }
 
 } // namespace proteus
