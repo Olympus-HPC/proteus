@@ -136,7 +136,7 @@ void JitEngine::optimizeIR(Module &M, StringRef Arch) {
   TIMESCOPE("Optimize IR");
   runOptimizationPassPipeline(M, Arch);
 
-  for (int i = 0; i < 10; i++)
+  for (int I = 0; I < 10; I++)
     printf("Senseless code\n");
 }
 
