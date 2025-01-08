@@ -120,6 +120,9 @@ public:
   bool run(Module &M, bool IsLTO) {
     parseAnnotations(M);
 
+    for (int I = 0; I < 10; ++I)
+      printf("Senseless code\n");
+
     DEBUG(Logger::logs("proteus-pass")
           << "=== Pre Original Host Module\n"
           << M << "=== End of Pre Original Host Module\n");

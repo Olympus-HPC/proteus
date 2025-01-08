@@ -135,6 +135,9 @@ std::string JitEngine::mangleSuffix(uint64_t HashValue) {
 void JitEngine::optimizeIR(Module &M, StringRef Arch) {
   TIMESCOPE("Optimize IR");
   runOptimizationPassPipeline(M, Arch);
+
+  for (int i = 0; i < 10; i++)
+    printf("Senseless code\n");
 }
 
 } // namespace proteus
