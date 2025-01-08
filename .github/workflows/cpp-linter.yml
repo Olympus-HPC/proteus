@@ -27,7 +27,7 @@ jobs:
       # Install Clang/LLVM using conda
       - name: Create environment
         run: |
-          conda install -y -c -q conda-forge \
+          conda install -y -q -c conda-forge \
             clang=18.1.3 \
             clangxx=18.1.3 \
             llvmdev=18.1.3 \
