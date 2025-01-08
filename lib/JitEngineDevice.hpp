@@ -40,6 +40,7 @@
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Type.h>
 #include <llvm/Transforms/IPO/Internalize.h>
@@ -64,19 +65,23 @@ class JITKernelInfo {
   SmallVector<int32_t> RCTypes;
   SmallVector<int32_t> RCIndices;
   int32_t NumRCs;
+  std::optional<std::reference_wrapper<Module>> LinkedIR;
 
 public:
   JITKernelInfo(char const *Name, int32_t *RCIndices, int32_t *RCTypes,
                 int32_t NumRCs)
       : Name(Name), RCIndices{ArrayRef{RCIndices, static_cast<size_t>(NumRCs)}},
-        RCTypes{ArrayRef{RCTypes, static_cast<size_t>(NumRCs)}},
-        NumRCs(NumRCs) {}
+        RCTypes{ArrayRef{RCTypes, static_cast<size_t>(NumRCs)}}, NumRCs(NumRCs),
+        LinkedIR(std::nullopt) {}
 
   JITKernelInfo() : Name(nullptr), NumRCs(0), RCIndices(), RCTypes() {}
   const auto &getName() const { return Name; }
   const auto &getRCIndices() const { return RCIndices; }
   const auto &getRCTypes() const { return RCTypes; }
   const auto &getNumRCs() const { return NumRCs; }
+  const bool hasLinkedIR() const { return LinkedIR.has_value(); }
+  Module &getLinkedModule() const { return LinkedIR->get(); }
+  void setLinkedModule(llvm::Module &Mod) { LinkedIR = Mod; }
 };
 
 struct FatbinWrapper_t {
@@ -134,6 +139,10 @@ public:
       return std::nullopt;
     }
     return JITKernelInfoMap[Func];
+  }
+
+  void addLinkedModule(std::unique_ptr<Module> Mod) {
+    LinkedIRModules.emplace_back(std::move(Mod));
   }
 
 private:
@@ -287,8 +296,7 @@ private:
                                                                   Image);
   }
 
-  std::unique_ptr<MemoryBuffer> extractDeviceBitcode(StringRef KernelName,
-                                                     void *Kernel) {
+  Module &extractDeviceBitcode(StringRef KernelName, void *Kernel) {
     TIMESCOPE(__FUNCTION__)
     return static_cast<ImplT &>(*this).extractDeviceBitcode(KernelName, Kernel);
   }
@@ -355,11 +363,15 @@ private:
 protected:
   JitEngineDevice() {
     L1Hash = computeDeviceFatBinHash();
+    Ctx = std::make_unique<LLVMContext>();
     DBG(Logger::logs("proteus") << "L1-Hash is " << L1Hash << "\n");
   }
+
   ~JitEngineDevice() {
+    LinkedIRModules.clear();
     CodeCache.printStats();
     StorageCache.printStats();
+    Ctx.reset();
   }
 
   JitCache<KernelFunction_t> CodeCache;
@@ -370,17 +382,18 @@ protected:
   linkJitModule(StringRef KernelName,
                 SmallVector<std::unique_ptr<Module>> &LinkedModules);
 
-  LLVMContext &getProteusLLVMCtx() const {
-    static LLVMContext Ctx;
-    return Ctx;
-  }
+  LLVMContext &getProteusLLVMCtx() const { return *Ctx.get(); }
 
   const stable_hash getL1Hash() const { return L1Hash; }
 
-private:
-  // This map is private and only accessible via the API.
+protected:
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
+
+private:
+  // All the LLVM Modules that have been loaded and linked;
+  SmallVector<std::unique_ptr<Module>> LinkedIRModules;
   stable_hash L1Hash;
+  std::unique_ptr<LLVMContext> Ctx;
 };
 
 template <typename ImplT>
@@ -567,22 +580,16 @@ JitEngineDevice<ImplT>::compileAndRun(
     }
   }
 
-  auto IRBuffer = extractDeviceBitcode(KernelName, Kernel);
-
-  auto parseBitcode = [&]() -> Expected<orc::ThreadSafeModule> {
-    auto Ctx = std::make_unique<LLVMContext>();
-    SMDiagnostic Err;
-    if (auto M = parseIR(IRBuffer->getMemBufferRef(), Err, *Ctx))
-      return orc::ThreadSafeModule(std::move(M), std::move(Ctx));
-
-    return createSMDiagnosticError(Err);
-  };
-
-  auto SafeModule = parseBitcode();
-  if (auto E = SafeModule.takeError())
-    FATAL_ERROR(toString(std::move(E)).c_str());
-
-  auto *JitModule = SafeModule->getModuleUnlocked();
+  // We need to clone, as extractDeviceBitcode returns a generic LLVM IR to be
+  // used by any kernel that will be specialized
+  auto JitModule = llvm::CloneModule(extractDeviceBitcode(KernelName, Kernel));
+  // NOTE: There is potential oportunity here, to reduce some of the JIT costs
+  // further. We can have a specializeIR in which we do not do any RC/Grid/Block
+  // specializations. We only internalize symbols. Then we can use that IR
+  // for all upcoming specializations of dynamic information.
+  // There is a memory trade off in such case, We will need to have a peristent
+  // in memory module, for every annotated kernel. If we have a case of 1000s of
+  // kernels, this can be an issue
 
   specializeIR(*JitModule, KernelName, Suffix, BlockDim, GridDim, RCIndices,
                RCsVec.data(), NumRuntimeConstants);

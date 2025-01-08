@@ -68,21 +68,28 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
   LinkedModules.push_back(std::move(M));
 }
 
-std::unique_ptr<MemoryBuffer>
-JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
+Module &JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName,
+                                                  void *Kernel) {
   CUmodule CUMod;
   CUdeviceptr DevPtr;
   size_t Bytes;
 
   SmallVector<std::unique_ptr<Module>> LinkedModules;
-  auto Ctx = std::make_unique<LLVMContext>();
-  auto JitModule = std::make_unique<llvm::Module>("JitModule", *Ctx);
+  auto &Ctx = getProteusLLVMCtx();
   if (!KernelToHandleMap.contains(Kernel))
     FATAL_ERROR("Expected Kernel in map");
 
   void *Handle = KernelToHandleMap[Kernel];
   if (!HandleToBinaryInfo.contains(Handle))
     FATAL_ERROR("Expected Handle in map");
+
+  if (!JITKernelInfoMap.contains(Kernel))
+    FATAL_ERROR("Expected a Kernel Descriptor to exist");
+
+  auto &KInfo = JITKernelInfoMap[Kernel];
+
+  if (KInfo.hasLinkedIR())
+    return KInfo.getLinkedModule();
 
   FatbinWrapper_t *FatbinWrapper = HandleToBinaryInfo[Handle].FatbinWrapper;
   if (!FatbinWrapper)
@@ -93,21 +100,33 @@ JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName, void *Kernel) {
   cuErrCheck(cuModuleLoadData(&CUMod, FatbinWrapper->Binary));
 
   for (auto &ModuleId : LinkedModuleIds)
-    extractLinkedBitcode(*Ctx.get(), CUMod, LinkedModules, ModuleId);
+    extractLinkedBitcode(Ctx, CUMod, LinkedModules, ModuleId);
 
   for (auto &ModuleId : GlobalLinkedModuleIds)
-    extractLinkedBitcode(*Ctx.get(), CUMod, LinkedModules, ModuleId);
+    extractLinkedBitcode(Ctx, CUMod, LinkedModules, ModuleId);
 
   cuErrCheck(cuModuleUnload(CUMod));
 
-  linkJitModule(JitModule.get(), Ctx.get(), KernelName, LinkedModules);
+  auto JitModule = linkJitModule(KernelName, LinkedModules);
 
-  std::string LinkedDeviceBitcode;
-  raw_string_ostream OS(LinkedDeviceBitcode);
-  WriteBitcodeToFile(*JitModule.get(), OS);
-  OS.flush();
+  // Update modules of all kernels in our map
+  for (const auto &KV : KernelToHandleMap) {
+    // All kernels included in this collection of modules will have an identical
+    // non specialized IR file. Map all Kernels, to this generic IR file
+    if (KV.second != Handle)
+      continue;
+    if (!JITKernelInfoMap.contains(KV.first))
+      continue;
 
-  return MemoryBuffer::getMemBufferCopy(LinkedDeviceBitcode);
+    JITKernelInfoMap[KV.first].setLinkedModule(*JitModule);
+  }
+
+  if (!KInfo.hasLinkedIR())
+    FATAL_ERROR("Expected KernelInfo to have updated Linked Modules");
+
+  addLinkedModule(std::move(JitModule));
+
+  return KInfo.getLinkedModule();
 }
 
 void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module &M, Function &F,
