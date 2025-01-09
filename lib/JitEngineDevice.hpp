@@ -414,6 +414,10 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
   if (auto *GlobalAnnotations = M.getGlobalVariable("llvm.global.annotations"))
     M.eraseGlobalVariable(GlobalAnnotations);
 
+  // Remove llvm.compiler.used
+  if (auto *CompilerUsed = M.getGlobalVariable("llvm.compiler.used"))
+    M.eraseGlobalVariable(CompilerUsed);
+
   // Remove the __clang_gpu_used_external used in HIP RDC compilation and its
   // uses in llvm.used, llvm.compiler.used.
   SmallVector<GlobalVariable *> GlobalsToErase;
