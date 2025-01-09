@@ -9,6 +9,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <cstdlib>
+#include <llvm/IR/DebugInfo.h>
 #include <llvm/Transforms/IPO/GlobalDCE.h>
 #include <llvm/Transforms/IPO/StripDeadPrototypes.h>
 #include <llvm/Transforms/IPO/StripSymbols.h>
@@ -154,10 +155,12 @@ void JitEngine::runCleanupPassPipeline(Module &M) {
 
   ModulePassManager Passes;
   Passes.addPass(GlobalDCEPass());
-  Passes.addPass(StripDeadDebugInfoPass());
+  // Passes.addPass(StripDeadDebugInfoPass());
   Passes.addPass(StripDeadPrototypesPass());
 
   Passes.run(M, MAM);
+
+  StripDebugInfo(M);
 }
 
 } // namespace proteus
