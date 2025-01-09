@@ -433,6 +433,8 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
     M.eraseGlobalVariable(GV);
   }
 
+  runCleanupPassPipeline(M);
+
   // Replace argument uses with runtime constants.
   if (Config.ENV_PROTEUS_SPECIALIZE_ARGS)
     // TODO: change NumRuntimeConstants to size_t at interface.
@@ -464,8 +466,6 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
   if (Config.ENV_PROTEUS_SET_LAUNCH_BOUNDS)
     setLaunchBoundsForKernel(M, *F, GridDim.x * GridDim.y * GridDim.z,
                              BlockDim.x * BlockDim.y * BlockDim.z);
-
-  runCleanupPassPipeline(M);
 
 #if ENABLE_DEBUG
   Logger::logs("proteus") << "=== Final Module\n"
