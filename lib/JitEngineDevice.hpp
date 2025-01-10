@@ -437,6 +437,11 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
     M.eraseGlobalVariable(GV);
   }
 
+  // Remove externaly_initialized attributes.
+  for (auto &GV : M.globals())
+    if (GV.isExternallyInitialized())
+      GV.setExternallyInitialized(false);
+
   // Replace argument uses with runtime constants.
   if (Config.ENV_PROTEUS_SPECIALIZE_ARGS)
     // TODO: change NumRuntimeConstants to size_t at interface.
