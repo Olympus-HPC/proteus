@@ -78,7 +78,6 @@ JitEngine::createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel) {
 
 void JitEngine::runOptimizationPassPipeline(Module &M, StringRef Arch,
                                             unsigned OptLevel) {
-  TIMESCOPE("Run opt passes");
   PipelineTuningOptions PTO;
 
   std::optional<PGOOptions> PGOOpt;

@@ -36,7 +36,6 @@ __jit_launch_kernel_internal(const char *ModuleUniqueId, void *Kernel,
     Logger::logs("proteus") << "=== End Kernel Info\n";
   };
 
-  TIMESCOPE("__jit_launch_kernel");
   DBG(printKernelLaunchInfo());
 
   return Jit.compileAndRun(
