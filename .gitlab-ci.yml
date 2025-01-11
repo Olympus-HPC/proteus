@@ -30,10 +30,10 @@ variables:
 ##### LC GITLAB CONFIGURATION
 # Use an LLNL service user to run CI. This prevents from running pipelines as
 # an actual user.
-  LLNL_SERVICE_USER: ""
+  LLNL_SERVICE_USER: "proteusdev"
 # Use the service user workspace. Solves permission issues, stores everything
 # at the same location whoever triggers a pipeline.
-  CUSTOM_CI_BUILDS_DIR: "/usr/workspace/proteus/gitlab-runner"
+  CUSTOM_CI_BUILDS_DIR: "/usr/workspace/proteusdev/gitlab-runner"
 # Tells Gitlab to recursively update the submodules when cloning the project.
 #  GIT_SUBMODULE_STRATEGY: recursive
 
