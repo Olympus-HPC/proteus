@@ -77,6 +77,15 @@ tioga-build-and-test:
   needs: [tioga-up-check]
   extends: [.build-and-test]
 
+tioga-proteus-benchmarks:
+  variables:
+    CI_MACHINE: "tioga"
+    JOB_CMD:
+      value: "scripts/gitlab/ci-run-benchmarks.sh"
+      expand: false
+  needs: [tioga-up-check]
+  extends: [.run-benchmarks]
+
 # LASSEN
 lassen-up-check:
   variables:
@@ -89,3 +98,11 @@ lassen-build-and-test:
   needs: [lassen-up-check]
   extends: [.build-and-test]
 
+lassen-proteus-benchmarks:
+  variables:
+    CI_MACHINE: "lassen"
+    JOB_CMD:
+      value: "scripts/gitlab/ci-run-benchmarks.sh"
+      expand: false
+  needs: [lassen-up-check]
+  extends: [.run-benchmarks]

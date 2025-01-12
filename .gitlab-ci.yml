@@ -65,6 +65,7 @@ variables:
 stages:
   - prerequisites
   - build-and-test
+  - run-benchmarks
 
 # Template for jobs triggering a build-and-test sub-pipeline:
 .build-and-test:
@@ -82,6 +83,21 @@ stages:
       # - artifact: '${CI_MACHINE}-jobs.yml'
       #   job: 'generate-job-file'
       # (See Umpire CI setup for an example).
+    strategy: depend
+    forward:
+      pipeline_variables: true
+
+.run-benchmarks:
+  stage: run-benchmarks
+  trigger:
+    include:
+      - local: '.gitlab/custom-jobs-and-variables.yml'
+      - project: 'radiuss/radiuss-shared-ci'
+        ref: 'v2024.07.0'
+        file: 'pipelines/${CI_MACHINE}.yml'
+      # Add your jobs
+      # you can use a local file
+      - local: '.gitlab/jobs/${CI_MACHINE}-benchmarks.yml'
     strategy: depend
     forward:
       pipeline_variables: true
