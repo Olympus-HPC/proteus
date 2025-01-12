@@ -210,3 +210,6 @@ CREATE_GPU_TEST_RDC(block_grid_dim_3d block_grid_dim_3d.cpp)
 
 CREATE_GPU_LIBRARY(device_func_lib device_func.cpp)
 CREATE_GPU_TEST_RDC_LIBS(kernel_calls_func_lib device_func_lib kernel_calls_func_lib.cpp)
+
+add_subdirectory(scale100)
+add_subdirectory(scale100-gvar)
