@@ -8,9 +8,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-
-__device__ int gvar0 = 1;
-
+extern __device__ int gvar0;
 
 __global__ void foo0(int *, int *, int);
 __global__ void foo1(int *, int *, int);
