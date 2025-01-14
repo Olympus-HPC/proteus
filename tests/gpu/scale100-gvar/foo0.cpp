@@ -1,7 +1,7 @@
 #include "../gpu_common.h"
 
 
-extern __device__ int gvar0;
+__device__ int gvar0 = 1;
 
 
 __device__ void foo1_device0(int *, int *, int);

@@ -1,7 +1,5 @@
-CREATE_GPU_TEST_RDC(
-    scale100-gvar
-    main.cpp
-
+CREATE_PROTEUS_GPU_LIBRARY(
+    scale100-gvar-foolib
     foo0.cpp
     foo1.cpp
     foo2.cpp
@@ -104,3 +102,8 @@ CREATE_GPU_TEST_RDC(
     foo99.cpp
 )
 
+CREATE_GPU_TEST_LIBS(
+    scale100-gvar
+    scale100-gvar-foolib
+    main.cpp
+)
