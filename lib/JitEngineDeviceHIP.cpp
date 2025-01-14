@@ -26,8 +26,10 @@
 #include "TimeTracing.hpp"
 #include "Utils.h"
 
+#if LLVM_VERSION_MAJOR == 18
 #include "lld/Common/Driver.h"
 LLD_HAS_DRIVER(elf)
+#endif
 
 using namespace proteus;
 using namespace llvm;
@@ -225,7 +227,11 @@ void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
 std::unique_ptr<MemoryBuffer>
 JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
   TIMESCOPE("Codegen object");
+#if LLVM_VERSION_MAJOR == 18
   if (Config.ENV_PROTEUS_USE_HIP_RTC_CODEGEN) {
+#else
+  {
+#endif
     char *BinOut;
     size_t BinSize;
 
@@ -266,6 +272,7 @@ JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
     return MemoryBuffer::getMemBuffer(StringRef{BinOut, BinSize});
   }
 
+#if LLVM_VERSION_MAJOR == 18
   auto TMExpected = createTargetMachine(M, DeviceArch);
   if (!TMExpected)
     FATAL_ERROR(toString(TMExpected.takeError()));
@@ -309,7 +316,6 @@ JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
 
     lld::Result S = lld::lldMain(Args, llvm::outs(), llvm::errs(),
                                  {{lld::Gnu, &lld::elf::link}});
-
     if (S.retCode)
       FATAL_ERROR("Error: lld failed");
   }
@@ -323,6 +329,7 @@ JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
   sys::fs::remove(SharedObjectPath);
 
   return std::move(*Buffer);
+#endif
 }
 
 hipFunction_t
