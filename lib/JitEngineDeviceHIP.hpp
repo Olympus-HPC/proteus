@@ -29,52 +29,64 @@ class JitEngineDeviceHIP : public JitEngineDevice<JitEngineDeviceHIP> {
 public:
   static JitEngineDeviceHIP &instance();
 
-  static const char *gridDimXFnName() {
-    return "_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__XcvjEv";
+  static const SmallVector<StringRef> gridDimXFnName() {
+    return {"_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__XcvjEv",
+            "llvm.amdgcn.num.workgroups.x"};
   };
 
-  static const char *gridDimYFnName() {
-    return "_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__YcvjEv";
+  static const SmallVector<StringRef> gridDimYFnName() {
+    return {"_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__YcvjEv",
+            "llvm.amdgcn.num.workgroups.y"};
   };
 
-  static const char *gridDimZFnName() {
-    return "_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__ZcvjEv";
+  static const SmallVector<StringRef> gridDimZFnName() {
+    return {"_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__ZcvjEv",
+            "llvm.amdgcn.num.workgroups.z"};
   };
 
-  static const char *blockDimXFnName() {
-    return "_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__XcvjEv";
+  static const SmallVector<StringRef> blockDimXFnName() {
+    return {"_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__XcvjEv",
+            "llvm.amdgcn.workgroup.size.x"};
   };
 
-  static const char *blockDimYFnName() {
-    return "_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__YcvjEv";
+  static const SmallVector<StringRef> blockDimYFnName() {
+    return {"_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__YcvjEv",
+            "llvm.amdgcn.workgroup.size.y"};
+  }
+
+  static const SmallVector<StringRef> blockDimZFnName() {
+    return {"_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__ZcvjEv",
+            "llvm.amdgcn.workgroup.size.z"};
   };
 
-  static const char *blockDimZFnName() {
-    return "_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__ZcvjEv";
+  static const SmallVector<StringRef> blockIdxXFnName() {
+    return {"_ZNK17__HIP_CoordinatesI14__HIP_BlockIdxE3__XcvjEv",
+            "llvm.amdgcn.workgroup.id.x"};
   };
 
-  static const char *blockIdxXFnName() {
-    return "_ZNK17__HIP_CoordinatesI14__HIP_BlockIdxE3__XcvjEv";
+  static const SmallVector<StringRef> blockIdxYFnName() {
+    return {"_ZNK17__HIP_CoordinatesI14__HIP_BlockIdxE3__YcvjEv",
+            "llvm.amdgcn.workgroup.id.y"};
   };
 
-  static const char *blockIdxYFnName() {
-    return "_ZNK17__HIP_CoordinatesI14__HIP_BlockIdxE3__YcvjEv";
+  static const SmallVector<StringRef> blockIdxZFnName() {
+    return {"_ZNK17__HIP_CoordinatesI14__HIP_BlockIdxE3__ZcvjEv",
+            "llvm.amdgcn.workgroup.id.z"};
+  }
+
+  static const SmallVector<StringRef> threadIdxXFnName() {
+    return {"_ZNK17__HIP_CoordinatesI15__HIP_ThreadIdxE3__XcvjEv",
+            "llvm.amdgcn.workitem.id.x"};
   };
 
-  static const char *blockIdxZFnName() {
-    return "_ZNK17__HIP_CoordinatesI14__HIP_BlockIdxE3__ZcvjEv";
+  static const SmallVector<StringRef> threadIdxYFnName() {
+    return {"_ZNK17__HIP_CoordinatesI15__HIP_ThreadIdxE3__YcvjEv",
+            "llvm.amdgcn.workitem.id.y"};
   };
 
-  static const char *threadIdxXFnName() {
-    return "_ZNK17__HIP_CoordinatesI15__HIP_ThreadIdxE3__XcvjEv";
-  };
-
-  static const char *threadIdxYFnName() {
-    return "_ZNK17__HIP_CoordinatesI15__HIP_ThreadIdxE3__YcvjEv";
-  };
-
-  static const char *threadIdxZFnName() {
-    return "_ZNK17__HIP_CoordinatesI15__HIP_ThreadIdxE3__ZcvjEv";
+  static const SmallVector<StringRef> threadIdxZFnName() {
+    return {"_ZNK17__HIP_CoordinatesI15__HIP_ThreadIdxE3__ZcvjEv",
+            "llvm.amdgcn.workitem.id.z"};
   };
 
   static bool isHashedSection(StringRef sectionName) {
