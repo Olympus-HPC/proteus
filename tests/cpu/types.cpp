@@ -1,10 +1,9 @@
+// RUN: rm -rf .proteus
 // RUN: ./types | FileCheck %s --check-prefixes=CHECK
 
 #include <cstdlib>
 
-template<typename T>
-__attribute__ ((annotate("jit", 1)))
-void test(T arg) {
+template <typename T> __attribute__((annotate("jit", 1))) void test(T arg) {
   volatile T local;
   local = arg;
 }
@@ -21,7 +20,7 @@ int main(int argc, char **argv) {
   test(1.0l);
   test(true);
   test('a');
-  test((unsigned char) 'a');
+  test((unsigned char)'a');
 }
 
 // CHECK: JitCache hits 0 total 12

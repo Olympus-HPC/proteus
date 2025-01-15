@@ -1,3 +1,4 @@
+// RUN: rm -rf .proteus
 // RUN: ./daxpy | FileCheck %s --check-prefixes=CHECK
 #include <cstddef>
 #include <cstdlib>

@@ -25,8 +25,6 @@ function(CREATE_GPU_TEST exe check_source)
 
     # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
     add_test(NAME ${exe}.${lang} COMMAND ${LIT} -vv -D EXT=${lang} ${check_source})
-    set_tests_properties(${exe}.${lang} PROPERTIES FIXTURES_REQUIRED setupDeleteJitStoredCacheFiles)
-    set_tests_properties(${exe}.${lang} PROPERTIES FIXTURES_REQUIRED cleanupDeleteJitStoredCacheFiles)
 endfunction()
 
 function(CREATE_GPU_TEST_RDC exe check_source)
@@ -79,8 +77,6 @@ function(CREATE_GPU_TEST_RDC exe check_source)
     endif()
 
     add_test(NAME ${exe}.${lang}.rdc COMMAND ${LIT} -vv -D EXT=${lang}.rdc ${check_source})
-    set_tests_properties(${exe}.${lang}.rdc PROPERTIES FIXTURES_REQUIRED setupDeleteJitStoredCacheFiles)
-    set_tests_properties(${exe}.${lang}.rdc PROPERTIES FIXTURES_REQUIRED cleanupDeleteJitStoredCacheFiles)
 endfunction()
 
 function(CREATE_GPU_TEST_RDC_LIBS exe libs check_source)

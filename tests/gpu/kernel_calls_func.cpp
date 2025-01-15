@@ -1,4 +1,5 @@
 // clang-format off
+// RUN: rm -rf .proteus
 // RUN: ./kernel_calls_func.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
 // RUN: ./kernel_calls_func.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-SECOND

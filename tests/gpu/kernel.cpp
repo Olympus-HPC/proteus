@@ -1,3 +1,4 @@
+// RUN: rm -rf .proteus
 // RUN: ./kernel.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
 // RUN: ./kernel.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-SECOND
