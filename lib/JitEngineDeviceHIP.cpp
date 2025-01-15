@@ -172,11 +172,12 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
   }
 
   auto JitModule = linkJitModule(KernelName, LinkedModules);
+  auto ModuleHash = computeModuleHash(*JitModule);
 
   // All kernels included in this collection of modules will have an
   // identical non specialized IR file. Map all Kernels, to this generic IR
   // file
-  [this, &JitModule, &Handle]() {
+  [this, &JitModule, &Handle, &ModuleHash]() {
     DenseSet<StringRef> KernelNames;
     for (auto &Func : *JitModule) {
       if (Func.getCallingConv() == CallingConv::AMDGPU_KERNEL) {
@@ -199,6 +200,8 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
         continue;
 
       KDescr.setLinkedModule(*JitModule);
+      KDescr.setStaticHash(stable_hash_combine(
+          ModuleHash, stable_hash_combine_string(KDescr.getName())));
     }
   }();
 

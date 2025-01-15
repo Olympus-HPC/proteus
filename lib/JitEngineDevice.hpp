@@ -71,13 +71,14 @@ class JITKernelInfo {
   SmallVector<int32_t> RCIndices;
   int32_t NumRCs;
   std::optional<std::reference_wrapper<Module>> LinkedIR;
+  llvm::stable_hash StaticHash;
 
 public:
   JITKernelInfo(char const *Name, int32_t *RCIndices, int32_t *RCTypes,
                 int32_t NumRCs)
       : Name(Name), RCIndices{ArrayRef{RCIndices, static_cast<size_t>(NumRCs)}},
         RCTypes{ArrayRef{RCTypes, static_cast<size_t>(NumRCs)}}, NumRCs(NumRCs),
-        LinkedIR(std::nullopt) {}
+        LinkedIR(std::nullopt), StaticHash{0} {}
 
   JITKernelInfo() : Name(nullptr), NumRCs(0), RCIndices(), RCTypes() {}
   const auto &getName() const { return Name; }
@@ -87,6 +88,10 @@ public:
   const bool hasLinkedIR() const { return LinkedIR.has_value(); }
   Module &getLinkedModule() const { return LinkedIR->get(); }
   void setLinkedModule(llvm::Module &Mod) { LinkedIR = Mod; }
+  void setStaticHash(llvm::stable_hash StaticHash) {
+    this->StaticHash = StaticHash;
+  }
+  llvm::stable_hash getStaticHash() const { return StaticHash; }
 };
 
 struct FatbinWrapper_t {
@@ -105,12 +110,17 @@ public:
   using KernelFunction_t = typename DeviceTraits<ImplT>::KernelFunction_t;
 
   DeviceError_t
-  compileAndRun(StringRef ModuleUniqueId, void *Kernel, StringRef KernelName,
+  compileAndRun(stable_hash StaticHash, void *Kernel, StringRef KernelName,
                 const SmallVector<int32_t> &RCIndices,
                 const SmallVector<int32_t> &RCTypes, int NumRuntimeConstants,
                 dim3 GridDim, dim3 BlockDim, void **KernelArgs,
                 uint64_t ShmemSize,
                 typename DeviceTraits<ImplT>::DeviceStream_t Stream);
+
+  Module &extractDeviceBitcode(StringRef KernelName, void *Kernel) {
+    TIMESCOPE(__FUNCTION__)
+    return static_cast<ImplT &>(*this).extractDeviceBitcode(KernelName, Kernel);
+  }
 
   void insertRegisterVar(const char *VarName, const void *Addr) {
     VarNameToDevPtr[VarName] = Addr;
@@ -139,7 +149,8 @@ public:
     return JITKernelInfoMap.contains(Func);
   }
 
-  std::optional<JITKernelInfo> getJITKernelInfo(const void *Func) {
+  std::optional<std::reference_wrapper<JITKernelInfo>>
+  getJITKernelInfo(const void *Func) {
     if (!containsJITKernelInfo(Func)) {
       return std::nullopt;
     }
@@ -359,10 +370,6 @@ private:
                                                                   Image);
   }
 
-  Module &extractDeviceBitcode(StringRef KernelName, void *Kernel) {
-    TIMESCOPE(__FUNCTION__)
-    return static_cast<ImplT &>(*this).extractDeviceBitcode(KernelName, Kernel);
-  }
   //------------------------------------------------------------------
   // End Methods implemented in the derived device engine class.
   //------------------------------------------------------------------
@@ -378,59 +385,8 @@ private:
       Module &M,
       std::unordered_map<std::string, const void *> &VarNameToDevPtr);
 
-  static stable_hash computeDeviceFatBinHash() {
-    TIMESCOPE("computeDeviceFatBinHash");
-    using namespace llvm::object;
-    stable_hash L1Hash{0};
-    auto ExePath = std::filesystem::canonical("/proc/self/exe");
-
-    PROTEUS_DBG(Logger::logs("proteus")
-                << "Reading file from path " << ExePath.string() << "\n");
-
-    auto bufferOrErr = MemoryBuffer::getFile(ExePath.string());
-    if (!bufferOrErr) {
-      FATAL_ERROR("Failed to open binary file");
-    }
-
-    auto objOrErr =
-        ObjectFile::createELFObjectFile(bufferOrErr.get()->getMemBufferRef());
-    if (!objOrErr) {
-      FATAL_ERROR("Failed to create Object File");
-    }
-
-    ObjectFile &elfObj = **objOrErr;
-
-    for (const SectionRef &section : elfObj.sections()) {
-      auto nameOrErr = section.getName();
-      if (!nameOrErr)
-        FATAL_ERROR("Error getting section name: ");
-
-      StringRef sectionName = nameOrErr.get();
-
-      if (!ImplT::isHashedSection(sectionName))
-        continue;
-
-      PROTEUS_DBG(Logger::logs("proteus")
-                  << "Hashing section " << sectionName.str() << "\n");
-
-      auto contentsOrErr = section.getContents();
-      if (!contentsOrErr) {
-        FATAL_ERROR("Error getting section contents: ");
-        continue;
-      }
-      StringRef sectionContents = contentsOrErr.get();
-      auto sectionHash = stable_hash_combine_string(sectionContents);
-      L1Hash = stable_hash_combine(sectionHash, L1Hash);
-    }
-    return L1Hash;
-  }
-
 protected:
-  JitEngineDevice() {
-    L1Hash = computeDeviceFatBinHash();
-    Ctx = std::make_unique<LLVMContext>();
-    PROTEUS_DBG(Logger::logs("proteus") << "L1-Hash is " << L1Hash << "\n");
-  }
+  JitEngineDevice() { Ctx = std::make_unique<LLVMContext>(); }
 
   ~JitEngineDevice() {
     LinkedIRModules.clear();
@@ -447,9 +403,9 @@ protected:
   linkJitModule(StringRef KernelName,
                 SmallVector<std::unique_ptr<Module>> &LinkedModules);
 
-  LLVMContext &getProteusLLVMCtx() const { return *Ctx.get(); }
+  llvm::stable_hash computeModuleHash(Module &M);
 
-  const stable_hash getL1Hash() const { return L1Hash; }
+  LLVMContext &getProteusLLVMCtx() const { return *Ctx.get(); }
 
 protected:
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
@@ -457,7 +413,6 @@ protected:
 private:
   // All the LLVM Modules that have been loaded and linked;
   SmallVector<std::unique_ptr<Module>> LinkedIRModules;
-  stable_hash L1Hash;
   std::unique_ptr<LLVMContext> Ctx;
 };
 
@@ -606,7 +561,7 @@ void JitEngineDevice<ImplT>::replaceGlobalVariablesWithPointers(
 template <typename ImplT>
 typename DeviceTraits<ImplT>::DeviceError_t
 JitEngineDevice<ImplT>::compileAndRun(
-    StringRef ModuleUniqueId, void *Kernel, StringRef KernelName,
+    llvm::stable_hash StaticHash, void *Kernel, StringRef KernelName,
     const SmallVector<int32_t> &RCIndices, const SmallVector<int32_t> &RCTypes,
     int NumRuntimeConstants, dim3 GridDim, dim3 BlockDim, void **KernelArgs,
     uint64_t ShmemSize, typename DeviceTraits<ImplT>::DeviceStream_t Stream) {
@@ -615,11 +570,10 @@ JitEngineDevice<ImplT>::compileAndRun(
   SmallVector<RuntimeConstant> RCsVec;
 
   getRuntimeConstantValues(KernelArgs, RCIndices, RCTypes, RCsVec);
-  auto L1Hash = getL1Hash();
 
-  uint64_t HashValue = CodeCache.hash(
-      L1Hash, ModuleUniqueId, KernelName, RCsVec.data(), NumRuntimeConstants,
-      GridDim.x, GridDim.y, GridDim.z, BlockDim.x, BlockDim.y, BlockDim.z);
+  uint64_t HashValue = CodeCache.stable_hash(
+      StaticHash, RCsVec.data(), NumRuntimeConstants, GridDim.x, GridDim.y,
+      GridDim.z, BlockDim.x, BlockDim.y, BlockDim.z);
 
   typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc =
       CodeCache.lookup(HashValue);
@@ -820,6 +774,18 @@ std::unique_ptr<Module> JitEngineDevice<ImplT>::linkJitModule(
   }
 
   return LinkedModule;
+}
+
+template <typename ImplT>
+llvm::stable_hash JitEngineDevice<ImplT>::computeModuleHash(Module &M) {
+  std::string StrBuffer;
+  llvm::raw_string_ostream RSO(StrBuffer);
+  // Serialize the module into the string buffer
+  llvm::WriteBitcodeToFile(M, RSO);
+  RSO.flush();
+
+  return llvm::stable_hash_combine_string(
+      llvm::StringRef(StrBuffer.data(), StrBuffer.size()));
 }
 
 } // namespace proteus

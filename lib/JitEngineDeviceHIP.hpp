@@ -89,11 +89,6 @@ public:
             "llvm.amdgcn.workitem.id.z"};
   };
 
-  static bool isHashedSection(StringRef sectionName) {
-    static const std::string Section{".hip_fatbin"};
-    return Section.compare(sectionName) == 0;
-  }
-
   void *resolveDeviceGlobalAddr(const void *Addr);
 
   void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
