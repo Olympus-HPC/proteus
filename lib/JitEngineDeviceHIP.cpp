@@ -36,10 +36,10 @@ static inline const std::string &getArch() {
     hipErrCheck(hipGetDeviceProperties(&DeviceProperties, Device));
 
     // Get the full architecture name (e.g., gfx90a:sramecc+:xnack-)
-    std::string arch_name = DeviceProperties.gcnArchName;
+    std::string ArchName = DeviceProperties.gcnArchName;
 
     // Find the colon (:) to isolate the base architecture
-    auto DevArch = std::string(arch_name.substr(0, arch_name.find(':')));
+    auto DevArch = std::string(ArchName.substr(0, ArchName.find(':')));
     DBG(Logger::logs("proteus")
         << "Device Architecture is " << DevArch << "\n");
     return DevArch;
