@@ -34,6 +34,29 @@ LLD_HAS_DRIVER(elf)
 using namespace proteus;
 using namespace llvm;
 
+static inline const std::string &getArch() {
+  static std::string Arch{[]() {
+    int Device;
+    hipErrCheck(hipInit(0));
+    hipErrCheck(hipGetDevice(&Device));
+    hipDeviceProp_t DeviceProperties;
+
+    // Get properties of the current device
+    hipErrCheck(hipGetDeviceProperties(&DeviceProperties, Device));
+
+    // Get the full architecture name (e.g., gfx90a:sramecc+:xnack-)
+    std::string arch_name = DeviceProperties.gcnArchName;
+
+    // Find the colon (:) to isolate the base architecture
+    auto DevArch = std::string(arch_name.substr(0, arch_name.find(':')));
+    DBG(Logger::logs("proteus")
+        << "Device Architecture is " << DevArch << "\n");
+    return DevArch;
+  }()};
+
+  return Arch;
+}
+
 void *JitEngineDeviceHIP::resolveDeviceGlobalAddr(const void *Addr) {
   void *DevPtr = nullptr;
   hipErrCheck(hipGetSymbolAddress(&DevPtr, HIP_SYMBOL(Addr)));
@@ -105,8 +128,11 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
     DBG(Logger::logs("proteus") << "TripleSize " << TripleSize << "\n");
     DBG(Logger::logs("proteus") << "Triple " << Triple << "\n");
 
-    if (!Triple.contains("amdgcn"))
+    if (!Triple.contains("amdgcn") || !Triple.contains(getArch())) {
+      DBG(Logger::logs("proteus")
+          << "Miss-matching architecture, skipping ...\n");
       continue;
+    }
 
     DeviceBinary = StringRef(Binary + Offset, Size);
     break;
