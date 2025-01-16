@@ -160,7 +160,8 @@ private:
   }
 
   void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
-    auto ReplaceIntrinsicDim = [&](StringRef IntrinsicName, uint32_t DimValue) {
+    auto ReplaceIntrinsicDim = [&](ArrayRef<StringRef> IntrinsicNames,
+                                   uint32_t DimValue) {
       auto CollectCallUsers = [](Function &F) {
         SmallVector<CallInst *> CallUsers;
         for (auto *User : F.users()) {
@@ -172,15 +173,19 @@ private:
 
         return CallUsers;
       };
-      Function *IntrinsicFunction = M.getFunction(IntrinsicName);
-      if (!IntrinsicFunction)
-        return;
 
-      for (auto *Call : CollectCallUsers(*IntrinsicFunction)) {
-        Value *ConstantValue =
-            ConstantInt::get(Type::getInt32Ty(M.getContext()), DimValue);
-        Call->replaceAllUsesWith(ConstantValue);
-        Call->eraseFromParent();
+      for (auto IntrinsicName : IntrinsicNames) {
+
+        Function *IntrinsicFunction = M.getFunction(IntrinsicName);
+        if (!IntrinsicFunction)
+          continue;
+
+        for (auto *Call : CollectCallUsers(*IntrinsicFunction)) {
+          Value *ConstantValue =
+              ConstantInt::get(Type::getInt32Ty(M.getContext()), DimValue);
+          Call->replaceAllUsesWith(ConstantValue);
+          Call->eraseFromParent();
+        }
       }
     };
 
@@ -192,25 +197,27 @@ private:
     ReplaceIntrinsicDim(ImplT::blockDimYFnName(), BlockDim.y);
     ReplaceIntrinsicDim(ImplT::blockDimZFnName(), BlockDim.z);
 
-    auto InsertAssume = [&](StringRef IntrinsicName, int DimValue) {
-      Function *IntrinsicFunction = M.getFunction(IntrinsicName);
-      if (!IntrinsicFunction || IntrinsicFunction->use_empty())
-        return;
-
-      // Iterate over all uses of the intrinsic.
-      for (auto U : IntrinsicFunction->users()) {
-        auto *Call = dyn_cast<CallInst>(U);
-        if (!Call)
+    auto InsertAssume = [&](ArrayRef<StringRef> IntrinsicNames, int DimValue) {
+      for (auto IntrinsicName : IntrinsicNames) {
+        Function *IntrinsicFunction = M.getFunction(IntrinsicName);
+        if (!IntrinsicFunction || IntrinsicFunction->use_empty())
           continue;
 
-        // Insert the llvm.assume intrinsic.
-        IRBuilder<> Builder(Call->getNextNode());
-        Value *Bound = ConstantInt::get(Call->getType(), DimValue);
-        Value *Cmp = Builder.CreateICmpULT(Call, Bound);
+        // Iterate over all uses of the intrinsic.
+        for (auto U : IntrinsicFunction->users()) {
+          auto *Call = dyn_cast<CallInst>(U);
+          if (!Call)
+            continue;
 
-        Function *AssumeIntrinsic =
-            Intrinsic::getDeclaration(&M, Intrinsic::assume);
-        Builder.CreateCall(AssumeIntrinsic, Cmp);
+          // Insert the llvm.assume intrinsic.
+          IRBuilder<> Builder(Call->getNextNode());
+          Value *Bound = ConstantInt::get(Call->getType(), DimValue);
+          Value *Cmp = Builder.CreateICmpULT(Call, Bound);
+
+          Function *AssumeIntrinsic =
+              Intrinsic::getDeclaration(&M, Intrinsic::assume);
+          Builder.CreateCall(AssumeIntrinsic, Cmp);
+        }
       }
     };
 

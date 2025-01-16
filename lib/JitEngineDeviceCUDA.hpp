@@ -31,52 +31,52 @@ class JitEngineDeviceCUDA : public JitEngineDevice<JitEngineDeviceCUDA> {
 public:
   static JitEngineDeviceCUDA &instance();
 
-  static const char *gridDimXFnName() {
-    return "llvm.nvvm.read.ptx.sreg.nctaid.x";
+  static const SmallVector<StringRef> gridDimXFnName() {
+    return {"llvm.nvvm.read.ptx.sreg.nctaid.x"};
   };
 
-  static const char *gridDimYFnName() {
-    return "llvm.nvvm.read.ptx.sreg.nctaid.y";
+  static const SmallVector<StringRef> gridDimYFnName() {
+    return {"llvm.nvvm.read.ptx.sreg.nctaid.y"};
   };
 
-  static const char *gridDimZFnName() {
-    return "llvm.nvvm.read.ptx.sreg.nctaid.z";
+  static const SmallVector<StringRef> gridDimZFnName() {
+    return {"llvm.nvvm.read.ptx.sreg.nctaid.z"};
   };
 
-  static const char *blockDimXFnName() {
-    return "llvm.nvvm.read.ptx.sreg.ntid.x";
+  static const SmallVector<StringRef> blockDimXFnName() {
+    return {"llvm.nvvm.read.ptx.sreg.ntid.x"};
   };
 
-  static const char *blockDimYFnName() {
-    return "llvm.nvvm.read.ptx.sreg.ntid.y";
+  static const SmallVector<StringRef> blockDimYFnName() {
+    return {"llvm.nvvm.read.ptx.sreg.ntid.y"};
   };
 
-  static const char *blockDimZFnName() {
-    return "llvm.nvvm.read.ptx.sreg.ntid.z";
+  static const SmallVector<StringRef> blockDimZFnName() {
+    return {"llvm.nvvm.read.ptx.sreg.ntid.z"};
   };
 
-  static const char *blockIdxXFnName() {
-    return "llvm.nvvm.read.ptx.sreg.ctaid.x";
+  static const SmallVector<StringRef> blockIdxXFnName() {
+    return {"llvm.nvvm.read.ptx.sreg.ctaid.x"};
   };
 
-  static const char *blockIdxYFnName() {
-    return "llvm.nvvm.read.ptx.sreg.ctaid.y";
+  static const SmallVector<StringRef> blockIdxYFnName() {
+    return {"llvm.nvvm.read.ptx.sreg.ctaid.y"};
   };
 
-  static const char *blockIdxZFnName() {
-    return "llvm.nvvm.read.ptx.sreg.ctaid.z";
+  static const SmallVector<StringRef> blockIdxZFnName() {
+    return {"llvm.nvvm.read.ptx.sreg.ctaid.z"};
   };
 
-  static const char *threadIdxXFnName() {
-    return "llvm.nvvm.read.ptx.sreg.tid.x";
+  static const SmallVector<StringRef> threadIdxXFnName() {
+    return {"llvm.nvvm.read.ptx.sreg.tid.x"};
   };
 
-  static const char *threadIdxYFnName() {
-    return "llvm.nvvm.read.ptx.sreg.tid.y";
+  static const SmallVector<StringRef> threadIdxYFnName() {
+    return {"llvm.nvvm.read.ptx.sreg.tid.y"};
   };
 
-  static const char *threadIdxZFnName() {
-    return "llvm.nvvm.read.ptx.sreg.tid.z";
+  static const SmallVector<StringRef> threadIdxZFnName() {
+    return {"llvm.nvvm.read.ptx.sreg.tid.z"};
   };
 
   static bool isHashedSection(StringRef sectionName) {
