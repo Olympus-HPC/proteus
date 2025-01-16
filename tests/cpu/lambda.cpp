@@ -1,5 +1,6 @@
 // RUN: rm -rf .proteus
 // RUN: ./lambda | FileCheck %s --check-prefixes=CHECK
+// RUN: rm -rf .proteus
 
 #include <chrono>
 #include <iostream>
