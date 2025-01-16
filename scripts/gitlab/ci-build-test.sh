@@ -56,5 +56,9 @@ pushd build
 cmake ${CI_PROJECT_DIR} ${CMAKE_OPTIONS}
 make -j
 make test
+# Test also our faster, alternative to HIP RTC codegen.
+if [ "${CI_MACHINE}" == "tioga" ] && [ "${PROTEUS_CI_ROCM_VERSION}" == "6.2.1" ]; then
+  ENV_PROTEUS_USE_HIP_RTC_CODEGEN=0 make test
+fi
 
 popd
