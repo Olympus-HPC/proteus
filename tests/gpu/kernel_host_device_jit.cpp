@@ -1,4 +1,6 @@
+// RUN: rm -rf .proteus
 // RUN: ./kernel_host_device_jit.%ext | FileCheck %s --check-prefixes=CHECK
+// RUN: rm -rf .proteus
 #include <climits>
 #include <cstdio>
 

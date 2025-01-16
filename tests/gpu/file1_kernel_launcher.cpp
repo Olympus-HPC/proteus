@@ -1,7 +1,9 @@
 // clang-format off
+// RUN: rm -rf .proteus
 // RUN: ./multi_file_launcher.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
 // RUN: ./multi_file_launcher.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: rm -rf .proteus
 // clang-format on
 #include <climits>
 #include <cstdio>

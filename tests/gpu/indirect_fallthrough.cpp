@@ -1,5 +1,7 @@
 // clang-format off
+// RUN: rm -rf .proteus
 // RUN: ./indirect_fallthrough.%ext | FileCheck %s --check-prefixes=CHECK
+// RUN: rm -rf .proteus
 // clang-format on
 
 #include <climits>

@@ -1,13 +1,14 @@
+// RUN: rm -rf .proteus
 // RUN: ./types.%ext | FileCheck %s --check-prefixes=CHECK
+// RUN: rm -rf .proteus
 
 #include <cstdio>
 #include <cstdlib>
 
 #include "gpu_common.h"
 
-template<typename T>
-__global__ __attribute__ ((annotate("jit", 1)))
-void kernel(T arg) {
+template <typename T>
+__global__ __attribute__((annotate("jit", 1))) void kernel(T arg) {
   volatile T local;
   local = arg;
 }
@@ -42,7 +43,7 @@ int main(int argc, char **argv) {
   gpuErrCheck(gpuDeviceSynchronize());
   kernel<<<1, 1>>>('a');
   gpuErrCheck(gpuDeviceSynchronize());
-  kernel<<<1, 1>>>((unsigned char) 'a');
+  kernel<<<1, 1>>>((unsigned char)'a');
   gpuErrCheck(gpuDeviceSynchronize());
 }
 

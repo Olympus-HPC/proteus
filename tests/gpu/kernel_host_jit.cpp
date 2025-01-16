@@ -1,15 +1,15 @@
+// RUN: rm -rf .proteus
 // RUN: ./kernel_host_jit.%ext | FileCheck %s --check-prefixes=CHECK
+// RUN: rm -rf .proteus
 #include <climits>
 #include <cstdio>
 
 #include "gpu_common.h"
 
-__global__ void kernel() {
+__global__ void kernel() { printf("Kernel\n"); }
 
-  printf("Kernel\n");
-}
-
-template <typename T> __attribute__((annotate("jit"))) gpuError_t launcher(T kernel_in) {
+template <typename T>
+__attribute__((annotate("jit"))) gpuError_t launcher(T kernel_in) {
   return gpuLaunchKernel((const void *)kernel_in, 1, 1, 0, 0, 0);
 }
 
