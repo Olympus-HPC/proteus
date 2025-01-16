@@ -48,7 +48,7 @@ static inline const std::string &getArch() {
     std::string arch_name = DeviceProperties.gcnArchName;
 
     // Find the colon (:) to isolate the base architecture
-    auto DevArch = std::string(arch_name.substr(0, arch_name.find(':')));
+    auto DevArch = std::string(ArchName.substr(0, ArchName.find(':')));
     DBG(Logger::logs("proteus")
         << "Device Architecture is " << DevArch << "\n");
     return DevArch;
