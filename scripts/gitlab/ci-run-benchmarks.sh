@@ -132,7 +132,7 @@ python driver.py -t benchmarks.toml \
 python driver.py -t benchmarks.toml \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
   --proteus-config \
-  '{"ENV_PROTEUS_USE_STORED_CACHE":["0"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["0"], "ENV_PROTEUS_SPECIALIZE_ARGS":["0"], "ENV_PROTEUS_SPECIALIZE_DIMS":["1"]}' \
+  '{"ENV_PROTEUS_USE_STORED_CACHE":["0"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["0"], "ENV_PROTEUS_SPECIALIZE_ARGS":["0"], "ENV_PROTEUS_SPECIALIZE_DIMS":["0"]}' \
   --suffix "profiler_pc_0_0_0_0" \
   -p profiler -m ${MACHINE} -r 1
 
