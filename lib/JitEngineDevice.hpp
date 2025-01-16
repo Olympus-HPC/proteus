@@ -612,11 +612,12 @@ JitEngineDevice<ImplT>::compileAndRun(
   specializeIR(*JitModule, KernelName, Suffix, BlockDim, GridDim, RCIndices,
                RCsVec.data(), NumRuntimeConstants);
 
-// For CUDA, run the target-specific optimization pipeline to optimize the
-// LLVM IR before handing over to the CUDA driver PTX compiler.
-#if ENABLE_CUDA
-  optimizeIR(*JitModule, DeviceArch);
-#endif
+  // For HIP RTC codegen do not run the optimization pipeline since HIP RTC
+  // internally runs it. For the rest of cases, that is CUDA or HIP with our own
+  // codegen instead of RTC, run the target-specific optimization pipeline to
+  // optimize the LLVM IR before handing over to codegen.
+  if (!Config.ENV_PROTEUS_USE_HIP_RTC_CODEGEN)
+    optimizeIR(*JitModule, DeviceArch);
 
   SmallString<4096> ModuleBuffer;
   raw_svector_ostream ModuleBufferOS(ModuleBuffer);
