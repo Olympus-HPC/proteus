@@ -7,6 +7,8 @@
 #define gpuMallocManaged cudaMallocManaged
 #define gpuFree cudaFree
 #define gpuLaunchKernel cudaLaunchKernel
+#define gpuMemcpyFromSymbol cudaMemcpyFromSymbol
+#define gpuMemcpyDeviceToHost cudaMemcpyDeviceToHost
 #elif ENABLE_HIP
 #include <hip/hip_runtime.h>
 #define gpuError_t hipError_t
@@ -16,6 +18,8 @@
 #define gpuMallocManaged hipMallocManaged
 #define gpuFree hipFree
 #define gpuLaunchKernel hipLaunchKernel
+#define gpuMemcpyFromSymbol hipMemcpyFromSymbol
+#define gpuMemcpyDeviceToHost hipMemcpyDeviceToHost
 #else
 #error "Must provide ENABLE_HIP or ENABLE_CUDA"
 #endif

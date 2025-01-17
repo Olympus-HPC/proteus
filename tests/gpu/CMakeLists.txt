@@ -94,6 +94,19 @@ function(CREATE_GPU_TEST_RDC_LIBS exe libs check_source)
     target_link_libraries(${exe}.${lang}.rdc PRIVATE ${libs})
 endfunction()
 
+function(CREATE_GPU_TEST_LIBS exe libs check_source)
+    if(ENABLE_HIP)
+        SET(lang HIP)
+    elseif(ENABLE_CUDA)
+        SET(lang CUDA)
+    else()
+        message(FATAL_ERROR "ENABLE_HIP or ENABLE_CUDA must be defined for GPU tests")
+    endif()
+
+    CREATE_GPU_TEST(${exe} ${check_source} ${ARGN})
+    target_link_libraries(${exe}.${lang} PRIVATE ${libs})
+endfunction()
+
 # Creates a device library, which can be linked with another test. The library does not
 # apply the pass
 function(CREATE_GPU_LIBRARY lib source)
@@ -120,6 +133,44 @@ function(CREATE_GPU_LIBRARY lib source)
 
         target_link_options(${lib} PUBLIC -fgpu-rdc --hip-link)
     elseif(ENABLE_CUDA)
+        # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
+        set_target_properties(${lib} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    else()
+        message(FATAL_ERROR "ENABLE_HIP or ENABLE_CUDA must be defined for GPU tests")
+    endif()
+endfunction()
+
+function(CREATE_PROTEUS_GPU_LIBRARY lib source)
+    if(ENABLE_HIP)
+        SET(lang HIP)
+    elseif(ENABLE_CUDA)
+        SET(lang CUDA)
+    else()
+        message(FATAL_ERROR "ENABLE_HIP or ENABLE_CUDA must be defined for GPU tests")
+    endif()
+
+    add_library(${lib} ${source} ${ARGN})
+
+    set_source_files_properties(${source} ${ARGN} PROPERTIES LANGUAGE ${lang})
+    target_link_libraries(${lib} PUBLIC proteus)
+
+    if(ENABLE_HIP)
+        # This is unsupported see: https://gitlab.kitware.com/cmake/cmake/-/issues/23210
+        # set_target_properties(${exe}.rdc PROPERTIES HIP_SEPARABLE_COMPILATION on)
+        target_compile_options(
+          ${lib}
+            PUBLIC
+            -fgpu-rdc
+            -fpass-plugin=$<TARGET_FILE:ProteusPass>
+        )
+
+        target_link_options(${lib} PUBLIC -fgpu-rdc --hip-link)
+    elseif(ENABLE_CUDA)
+        target_compile_options(
+            ${lib}
+            PUBLIC
+            -fpass-plugin=$<TARGET_FILE:ProteusPass>
+        )
         # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
         set_target_properties(${lib} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
     else()
@@ -210,3 +261,6 @@ CREATE_GPU_TEST_RDC(block_grid_dim_3d block_grid_dim_3d.cpp)
 
 CREATE_GPU_LIBRARY(device_func_lib device_func.cpp)
 CREATE_GPU_TEST_RDC_LIBS(kernel_calls_func_lib device_func_lib kernel_calls_func_lib.cpp)
+
+add_subdirectory(scale100)
+add_subdirectory(scale100-gvar)

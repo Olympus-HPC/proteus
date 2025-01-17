@@ -11,6 +11,8 @@
 #include <cstddef>
 #include <llvm/ADT/ArrayRef.h>
 #include <llvm/ADT/StringRef.h>
+#include <llvm/Support/FileSystem.h>
+#include <llvm/Support/Path.h>
 #include <string>
 
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -18,9 +20,16 @@
 #include "llvm/Object/ELF.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Target/TargetMachine.h"
 
 #include "JitEngineDeviceHIP.hpp"
+#include "TimeTracing.hpp"
 #include "Utils.h"
+
+#if LLVM_VERSION_MAJOR == 18
+#include "lld/Common/Driver.h"
+LLD_HAS_DRIVER(elf)
+#endif
 
 using namespace proteus;
 using namespace llvm;
@@ -221,40 +230,109 @@ void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
 std::unique_ptr<MemoryBuffer>
 JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
   TIMESCOPE("Codegen object");
-  char *BinOut;
-  size_t BinSize;
+#if LLVM_VERSION_MAJOR == 18
+  if (Config.ENV_PROTEUS_USE_HIP_RTC_CODEGEN) {
+#else
+  {
+#endif
+    char *BinOut;
+    size_t BinSize;
 
-  SmallString<4096> ModuleBuf;
-  raw_svector_ostream ModuleBufOS(ModuleBuf);
-  WriteBitcodeToFile(M, ModuleBufOS);
+    SmallString<4096> ModuleBuf;
+    raw_svector_ostream ModuleBufOS(ModuleBuf);
+    WriteBitcodeToFile(M, ModuleBufOS);
 
-  hiprtcLinkState hip_link_state_ptr;
+    hiprtcLinkState HipLinkStatePtr;
 
-  // NOTE: This code is an example of passing custom, AMD-specific
-  // options to the compiler/linker.
-  // NOTE: Unrolling can have a dramatic (time-consuming) effect on JIT
-  // compilation time and on the resulting optimization, better or worse
-  // depending on code specifics.
-  std::string MArchOpt = ("-march=" + DeviceArch).str();
-  const char *OptArgs[] = {"-mllvm", "-amdgpu-internalize-symbols", "-mllvm",
-                           "-unroll-threshold=1000", MArchOpt.c_str()};
-  std::vector<hiprtcJIT_option> JITOptions = {
-      HIPRTC_JIT_IR_TO_ISA_OPT_EXT, HIPRTC_JIT_IR_TO_ISA_OPT_COUNT_EXT};
-  size_t OptArgsSize = 5;
-  const void *JITOptionsValues[] = {(void *)OptArgs, (void *)(OptArgsSize)};
-  hiprtcErrCheck(hiprtcLinkCreate(JITOptions.size(), JITOptions.data(),
-                                  (void **)JITOptionsValues,
-                                  &hip_link_state_ptr));
-  // NOTE: the following version of te code does not set options.
-  // hiprtcErrCheck(hiprtcLinkCreate(0, nullptr, nullptr, &hip_link_state_ptr));
+    // NOTE: This code is an example of passing custom, AMD-specific
+    // options to the compiler/linker.
+    // NOTE: Unrolling can have a dramatic (time-consuming) effect on JIT
+    // compilation time and on the resulting optimization, better or worse
+    // depending on code specifics.
+    {
+      TIMESCOPE("HIP_RTC")
+      std::string MArchOpt = ("-march=" + DeviceArch).str();
+      const char *OptArgs[] = {"-mllvm", "-unroll-threshold=1000",
+                               MArchOpt.c_str()};
+      std::vector<hiprtcJIT_option> JITOptions = {
+          HIPRTC_JIT_IR_TO_ISA_OPT_EXT, HIPRTC_JIT_IR_TO_ISA_OPT_COUNT_EXT};
+      size_t OptArgsSize = 3;
+      const void *JITOptionsValues[] = {(void *)OptArgs, (void *)(OptArgsSize)};
+      hiprtcErrCheck(hiprtcLinkCreate(JITOptions.size(), JITOptions.data(),
+                                      (void **)JITOptionsValues,
+                                      &HipLinkStatePtr));
+      // NOTE: the following version of te code does not set options.
+      // hiprtcErrCheck(hiprtcLinkCreate(0, nullptr, nullptr,
+      // &hip_link_state_ptr));
 
-  hiprtcErrCheck(hiprtcLinkAddData(
-      hip_link_state_ptr, HIPRTC_JIT_INPUT_LLVM_BITCODE,
-      (void *)ModuleBuf.data(), ModuleBuf.size(), "", 0, nullptr, nullptr));
-  hiprtcErrCheck(
-      hiprtcLinkComplete(hip_link_state_ptr, (void **)&BinOut, &BinSize));
+      hiprtcErrCheck(hiprtcLinkAddData(
+          HipLinkStatePtr, HIPRTC_JIT_INPUT_LLVM_BITCODE,
+          (void *)ModuleBuf.data(), ModuleBuf.size(), "", 0, nullptr, nullptr));
+      hiprtcErrCheck(
+          hiprtcLinkComplete(HipLinkStatePtr, (void **)&BinOut, &BinSize));
+    }
 
-  return MemoryBuffer::getMemBuffer(StringRef{BinOut, BinSize});
+    return MemoryBuffer::getMemBuffer(StringRef{BinOut, BinSize});
+  }
+
+#if LLVM_VERSION_MAJOR == 18
+  auto TMExpected = createTargetMachine(M, DeviceArch);
+  if (!TMExpected)
+    FATAL_ERROR(toString(TMExpected.takeError()));
+
+  std::unique_ptr<TargetMachine> TM = std::move(*TMExpected);
+  TargetLibraryInfoImpl TLII(Triple(M.getTargetTriple()));
+
+  legacy::PassManager PM;
+  PM.add(new TargetLibraryInfoWrapperPass(TLII));
+  MachineModuleInfoWrapperPass *MMIWP = new MachineModuleInfoWrapperPass(
+      reinterpret_cast<LLVMTargetMachine *>(TM.get()));
+
+  SmallVector<char, 4096> ObjectCode;
+  raw_svector_ostream OS(ObjectCode);
+  TM->addPassesToEmitFile(PM, OS, nullptr, CodeGenFileType::ObjectFile,
+                          /* DisableVerify */ true, MMIWP);
+
+  PM.run(M);
+
+  SmallString<64> TempDir;
+  SmallString<64> ObjectPath;
+  SmallString<64> SharedObjectPath;
+  {
+    TIMESCOPE("LLD")
+    sys::path::system_temp_directory(true, TempDir);
+    int ObjectFD;
+    if (auto EC = sys::fs::createUniqueFile(TempDir + "/proteus-jit-%%%%%%%.o",
+                                            ObjectFD, ObjectPath))
+      FATAL_ERROR(EC.message());
+
+    raw_fd_ostream OS(ObjectFD, true);
+    OS << StringRef{ObjectCode.data(), ObjectCode.size()};
+    OS.close();
+
+    if (auto EC = sys::fs::createUniqueFile(TempDir + "/proteus-jit-%%%%%%%.so",
+                                            SharedObjectPath))
+      FATAL_ERROR(EC.message());
+
+    std::vector<const char *> Args{"ld.lld", "-shared", ObjectPath.c_str(),
+                                   "-o", SharedObjectPath.c_str()};
+
+    lld::Result S = lld::lldMain(Args, llvm::outs(), llvm::errs(),
+                                 {{lld::Gnu, &lld::elf::link}});
+    if (S.retCode)
+      FATAL_ERROR("Error: lld failed");
+  }
+
+  ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> Buffer =
+      llvm::MemoryBuffer::getFile(SharedObjectPath);
+  if (!Buffer)
+    FATAL_ERROR("Error reading file: " + Buffer.getError().message());
+
+  sys::fs::remove(ObjectPath);
+  sys::fs::remove(SharedObjectPath);
+
+  return std::move(*Buffer);
+#endif
 }
 
 hipFunction_t
