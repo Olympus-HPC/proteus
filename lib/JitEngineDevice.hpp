@@ -616,8 +616,14 @@ JitEngineDevice<ImplT>::compileAndRun(
   // internally runs it. For the rest of cases, that is CUDA or HIP with our own
   // codegen instead of RTC, run the target-specific optimization pipeline to
   // optimize the LLVM IR before handing over to codegen.
+#if ENABLE_CUDA
+  optimizeIR(*JitModule, DeviceArch);
+#elif ENABLE_HIP
   if (!Config.ENV_PROTEUS_USE_HIP_RTC_CODEGEN)
     optimizeIR(*JitModule, DeviceArch);
+#else
+#error "JitEngineDevice requires ENABLE_CUDA or ENABLE_HIP"
+#endif
 
   SmallString<4096> ModuleBuffer;
   raw_svector_ostream ModuleBufferOS(ModuleBuffer);
