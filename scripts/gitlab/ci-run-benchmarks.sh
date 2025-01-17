@@ -10,9 +10,9 @@ PR_INFO=$(curl -s -L -H "Authorization: Bearer $GITHUB_TOKEN" \
                "https://api.github.com/repos/Olympus-HPC/proteus/pulls?head=Olympus-HPC:${CI_COMMIT_REF_NAME}")
 
 # Check if PR exists.
-if [ -z "${PR_INFO}" ] || [ "${PR_INFO}" = "[]" ]; then
-  echo "No PR found for ref ${CI_COMMIT_REF_NAME}"
-  exit 1
+if [ -z "${PR_INFO}" ] || [ "$(echo "$PR_INFO" | jq length)" = "0" ]; then
+  echo "No PR found for ref ${CI_COMMIT_REF_NAME}, exit"
+  exit 0
 fi
 
 # Extract PR number.
@@ -85,7 +85,7 @@ popd
 # Run under the project directory to avoid deleting artifacts in the
 # after_script.
 cd ${CI_PROJECT_DIR}
-git clone --depth 1 --single-branch --branch main  https://github.com/Olympus-HPC/proteus-benchmarks.git
+git clone --depth 1 --single-branch --branch v0.0.1 https://github.com/Olympus-HPC/proteus-benchmarks.git
 cd proteus-benchmarks
 
 python driver.py -t benchmarks.toml \
