@@ -105,8 +105,11 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
     DBG(Logger::logs("proteus") << "TripleSize " << TripleSize << "\n");
     DBG(Logger::logs("proteus") << "Triple " << Triple << "\n");
 
-    if (!Triple.contains("amdgcn"))
+    if (!Triple.contains("amdgcn") || !Triple.contains(DeviceArch)) {
+      DBG(Logger::logs("proteus")
+          << "mismatching architecture, skipping ...\n");
       continue;
+    }
 
     DeviceBinary = StringRef(Binary + Offset, Size);
     break;

@@ -37,6 +37,7 @@ elif [ "${CI_MACHINE}" == "tioga" ]; then
 
   LLVM_INSTALL_DIR=${ROCM_PATH}/llvm
   CMAKE_OPTIONS_MACHINE=" -DENABLE_HIP=on"
+  CMAKE_OPTIONS_MACHINE+=" -DCMAKE_HIP_ARCHITECTURES=gfx942;gfx90a"
 else
   echo "Unsupported machine ${CI_MACHINE}"
   exit 1
