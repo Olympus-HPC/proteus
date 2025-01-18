@@ -15,7 +15,7 @@
 #include <filesystem>
 #include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/IR/Module.h>
-#include <llvm/Support/Base64.h>
+#include <llvm/Support/ErrorHandling.h>
 #include <llvm/Support/JSON.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/MemoryBufferRef.h>
@@ -42,52 +42,51 @@ public:
     TIMESCOPE("object lookup");
     Accesses++;
 
-    std::string Filepath =
-        StorageDirectory + "/cache-jit-" + std::to_string(HashValue) + ".json";
+    std::string Filebase =
+        StorageDirectory + "/cache-jit-" + std::to_string(HashValue);
 
-    auto MemBuffer = MemoryBuffer::getFile(Filepath);
-    if (!MemBuffer)
+    auto JsonBuffer = MemoryBuffer::getFile(Filebase + ".json");
+    if (!JsonBuffer)
       return nullptr;
 
-    Expected<json::Value> CacheInfo = json::parse(MemBuffer.get()->getBuffer());
+    Expected<json::Value> CacheInfo =
+        json::parse(JsonBuffer.get()->getBuffer());
     if (auto Err = CacheInfo.takeError())
-      FATAL_ERROR("Cannot parse cache info from json file" + Filepath);
+      FATAL_ERROR("Cannot parse cache info from json file" + Filebase +
+                  ".json");
 
     Hits++;
 
     UsesDeviceGlobals =
         CacheInfo->getAsObject()->getBoolean("UsesDeviceGlobals").value();
     if (UsesDeviceGlobals) {
-      auto BitcodeBase64 = CacheInfo->getAsObject()->getString("Bitcode");
-      std::vector<char> Bitcode;
-      if (auto E = decodeBase64(BitcodeBase64.value(), Bitcode))
-        FATAL_ERROR(toString(std::move(E)));
+      auto CacheBuf = MemoryBuffer::getFile(Filebase + ".bc");
+      if (!CacheBuf)
+        FATAL_ERROR("Expected bitcode cache file");
 
-      return MemoryBuffer::getMemBufferCopy(
-          StringRef{Bitcode.data(), Bitcode.size()});
+      return std::move(CacheBuf.get());
     }
 
-    auto ObjectBase64 = CacheInfo->getAsObject()->getString("Object");
-    std::vector<char> Object;
-    if (auto E = decodeBase64(ObjectBase64.value(), Object))
-      FATAL_ERROR(toString(std::move(E)));
+    auto CacheBuf = MemoryBuffer::getFile(Filebase + ".o");
+    if (!CacheBuf)
+      FATAL_ERROR("Expected object cache file");
 
-    return MemoryBuffer::getMemBufferCopy(
-        StringRef{Object.data(), Object.size()});
+    return std::move(CacheBuf.get());
   }
 
-  void store(uint64_t HashValue, bool UsesDeviceGlobals, StringRef BitcodeRef,
+  void store(uint64_t HashValue, bool UsesDeviceGlobals, StringRef Bitcode,
              MemoryBufferRef ObjBufRef) {
     TIMESCOPE("Store cache");
+
+    std::string Filebase =
+        StorageDirectory + "/cache-jit-" + std::to_string(HashValue);
     json::Object CacheInfo;
 
     CacheInfo["UsesDeviceGlobals"] = UsesDeviceGlobals;
-    CacheInfo["Bitcode"] = encodeBase64(BitcodeRef);
-    CacheInfo["Object"] = encodeBase64(
-        StringRef{ObjBufRef.getBufferStart(), ObjBufRef.getBufferSize()});
-    saveToFile((StorageDirectory + "/cache-jit-" + std::to_string(HashValue) +
-                ".json"),
-               json::Value(std::move(CacheInfo)));
+    saveToFile(Filebase + ".json", json::Value(std::move(CacheInfo)));
+    saveToFile(Filebase + ".bc", Bitcode);
+    saveToFile(Filebase + ".o", StringRef{ObjBufRef.getBufferStart(),
+                                          ObjBufRef.getBufferSize()});
   }
 
   void printStats() {
