@@ -10,7 +10,7 @@ __jit_launch_kernel_internal(const char *ModuleUniqueId, void *Kernel,
   using namespace proteus;
   auto &Jit = JitDeviceImplT::instance();
   auto optionalKernelInfo = Jit.getJITKernelInfo(Kernel);
-  if (!optionalKernelInfo) {
+  if (!optionalKernelInfo || Jit.isProteusDisabled()) {
     return Jit.launchKernelDirect(
         Kernel, GridDim, BlockDim, KernelArgs, ShmemSize,
         static_cast<typename JitDeviceImplT::DeviceStream_t>(Stream));

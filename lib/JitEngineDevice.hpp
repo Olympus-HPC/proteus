@@ -93,7 +93,7 @@ struct FatbinWrapper_t {
 
 template <typename ImplT> struct DeviceTraits;
 
-template <typename ImplT> class JitEngineDevice : protected JitEngine {
+template <typename ImplT> class JitEngineDevice : public JitEngine {
 public:
   using DeviceError_t = typename DeviceTraits<ImplT>::DeviceError_t;
   using DeviceStream_t = typename DeviceTraits<ImplT>::DeviceStream_t;
