@@ -11,6 +11,11 @@
 #ifndef PROTEUS_JITENGINEDEVICE_HPP
 #define PROTEUS_JITENGINEDEVICE_HPP
 #include "llvm/Config/llvm-config.h"
+#include <filesystem>
+#include <llvm/IR/GlobalVariable.h>
+#include <llvm/IR/Instruction.h>
+#include <llvm/IR/ReplaceConstant.h>
+#include <llvm/Support/MemoryBuffer.h>
 #if LLVM_VERSION_MAJOR == 18
 #include "llvm/ADT/StableHashing.h"
 #else
@@ -293,6 +298,57 @@ private:
         KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
   }
 
+  void relinkGlobalsObject(MemoryBufferRef Object) {
+    TIMESCOPE(__FUNCTION__);
+
+    Expected<object::ELF64LEObjectFile> DeviceElfOrErr =
+        object::ELF64LEObjectFile::create(Object);
+    if (DeviceElfOrErr.takeError())
+      FATAL_ERROR("Cannot create the device elf");
+    auto &DeviceElf = *DeviceElfOrErr;
+
+    for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
+      for (auto &Symbol : DeviceElf.symbols()) {
+        auto SymbolNameOrErr = Symbol.getName();
+        if (!SymbolNameOrErr)
+          continue;
+        auto SymbolName = *SymbolNameOrErr;
+
+        if (!SymbolName.equals(GlobalName + "$ptr"))
+          continue;
+
+        Expected<uint64_t> ValueOrErr = Symbol.getValue();
+        if (!ValueOrErr)
+          FATAL_ERROR("Expected symbol value");
+        uint64_t SymbolValue = *ValueOrErr;
+
+        // Get the section containing the symbol
+        auto SectionOrErr = Symbol.getSection();
+        if (!SectionOrErr)
+          FATAL_ERROR("Cannot retrieve section");
+        const auto &Section = *SectionOrErr;
+        if (Section == DeviceElf.section_end())
+          FATAL_ERROR("Expected sybmol in section");
+
+        // Get the section's address and data
+        Expected<StringRef> SectionDataOrErr = Section->getContents();
+        if (!SectionDataOrErr)
+          FATAL_ERROR("Error retrieving section data");
+        StringRef SectionData = *SectionDataOrErr;
+
+        // Calculate offset within the section
+        uint64_t SectionAddr = Section->getAddress();
+        uint64_t Offset = SymbolValue - SectionAddr;
+        if (Offset >= SectionData.size())
+          FATAL_ERROR("Expected offset within section size");
+
+        uint64_t *Data = (uint64_t *)(SectionData.data() + Offset);
+        *Data = reinterpret_cast<uint64_t>(resolveDeviceGlobalAddr(HostAddr));
+        break;
+      }
+    }
+  }
+
   std::unique_ptr<MemoryBuffer> codegenObject(Module &M, StringRef DeviceArch) {
     return static_cast<ImplT &>(*this).codegenObject(M, DeviceArch);
   }
@@ -316,9 +372,9 @@ private:
                     const SmallVector<int32_t> &RCIndices, RuntimeConstant *RC,
                     int NumRuntimeConstants);
 
-  void
-  relinkGlobals(Module &M,
-                std::unordered_map<std::string, const void *> &VarNameToDevPtr);
+  void replaceGlobalVariablesWithPointers(
+      Module &M,
+      std::unordered_map<std::string, const void *> &VarNameToDevPtr);
 
   static stable_hash computeDeviceFatBinHash() {
     TIMESCOPE("computeDeviceFatBinHash");
@@ -494,32 +550,43 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
 }
 
 template <typename ImplT>
-void JitEngineDevice<ImplT>::relinkGlobals(
+void JitEngineDevice<ImplT>::replaceGlobalVariablesWithPointers(
     Module &M, std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
   // Re-link globals to fixed addresses provided by registered
   // variables.
   for (auto RegisterVar : VarNameToDevPtr) {
-    // For CUDA we must defer resolving the global symbol address here
-    // instead when registering the variable in the constructor context.
-    void *DevPtr = resolveDeviceGlobalAddr(RegisterVar.second);
     auto &VarName = RegisterVar.first;
     auto *GV = M.getNamedGlobal(VarName);
     // Skip linking if the GV does not exist in the module.
     if (!GV)
       continue;
-    // Remove the re-linked global from llvm.compiler.used since that
-    // use is not replaceable by the fixed addr constant expression.
-    removeFromUsedLists(M, [&GV](Constant *C) {
-      if (GV == C)
-        return true;
 
-      return false;
-    });
+    // This will convert constant users of GV to instructions so that we can
+    // replace with the GV ptr.
+    convertUsersOfConstantsToInstructions({GV});
 
     Constant *Addr =
-        ConstantInt::get(Type::getInt64Ty(M.getContext()), (uint64_t)DevPtr);
-    Value *CE = ConstantExpr::getIntToPtr(Addr, GV->getType());
-    GV->replaceAllUsesWith(CE);
+        ConstantInt::get(Type::getInt64Ty(M.getContext()), 0xDEADBEEFDEADBEEF);
+    auto *CE = ConstantExpr::getIntToPtr(Addr, GV->getType()->getPointerTo());
+    auto *GVarPtr = new GlobalVariable(
+        M, GV->getType()->getPointerTo(), false, GlobalValue::ExternalLinkage,
+        CE, GV->getName() + "$ptr", nullptr, GV->getThreadLocalMode(),
+        GV->getAddressSpace(), true);
+
+    SmallVector<Instruction *> ToReplace;
+    for (auto *User : GV->users()) {
+      auto *Inst = dyn_cast<Instruction>(User);
+      if (!Inst)
+        FATAL_ERROR("Expected Instruction User for GV");
+
+      ToReplace.push_back(Inst);
+    }
+
+    for (auto *Inst : ToReplace) {
+      IRBuilder Builder{Inst};
+      auto *Load = Builder.CreateLoad(GV->getType(), GVarPtr);
+      Inst->replaceUsesOfWith(GV, Load);
+    }
   }
 
 #if ENABLE_DEBUG
@@ -571,24 +638,13 @@ JitEngineDevice<ImplT>::compileAndRun(
     // solution is to keep track of whether a kernel uses gvars (store a flag in
     // the cache file?) and load the object in case it does not use any.
     // TODO: Can we use RTC interfaces for fast linking on object files?
-    bool HasDeviceGlobals = !VarNameToDevPtr.empty();
-    if (auto CacheBuf =
-            (HasDeviceGlobals
-                 ? StorageCache.lookupBitcode(HashValue, KernelMangled)
-                 : StorageCache.lookupObject(HashValue, KernelMangled))) {
-      std::unique_ptr<MemoryBuffer> ObjBuf;
-      if (HasDeviceGlobals) {
-        auto Ctx = std::make_unique<LLVMContext>();
-        SMDiagnostic Err;
-        auto M = parseIR(CacheBuf->getMemBufferRef(), Err, *Ctx);
-        relinkGlobals(*M, VarNameToDevPtr);
-        ObjBuf = codegenObject(*M, DeviceArch);
-      } else {
-        ObjBuf = std::move(CacheBuf);
-      }
+    auto CacheBuf = StorageCache.lookup(HashValue);
+    if (CacheBuf) {
+      if (!Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY)
+        relinkGlobalsObject(CacheBuf->getMemBufferRef());
 
       auto KernelFunc =
-          getKernelFunctionFromImage(KernelMangled, ObjBuf->getBufferStart());
+          getKernelFunctionFromImage(KernelMangled, CacheBuf->getBufferStart());
 
       CodeCache.insert(HashValue, KernelFunc, KernelName, RCsVec.data(),
                        NumRuntimeConstants);
@@ -611,6 +667,7 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   specializeIR(*JitModule, KernelName, Suffix, BlockDim, GridDim, RCIndices,
                RCsVec.data(), NumRuntimeConstants);
+  replaceGlobalVariablesWithPointers(*JitModule, VarNameToDevPtr);
 
   // For HIP RTC codegen do not run the optimization pipeline since HIP RTC
   // internally runs it. For the rest of cases, that is CUDA or HIP with our own
@@ -625,16 +682,26 @@ JitEngineDevice<ImplT>::compileAndRun(
 #error "JitEngineDevice requires ENABLE_CUDA or ENABLE_HIP"
 #endif
 
-  SmallString<4096> ModuleBuffer;
-  raw_svector_ostream ModuleBufferOS(ModuleBuffer);
-  WriteBitcodeToFile(*JitModule, ModuleBufferOS);
-  StorageCache.storeBitcode(HashValue, ModuleBuffer);
+  if (Config.ENV_PROTEUS_DUMP_LLVM_IR) {
+    const auto CreateDumpDirectory = []() {
+      const std::string DumpDirectory = ".proteus-dump";
+      std::filesystem::create_directory(DumpDirectory);
+      return DumpDirectory;
+    };
 
-  relinkGlobals(*JitModule, VarNameToDevPtr);
+    static const std::string DumpDirectory = CreateDumpDirectory();
+
+    saveToFile(DumpDirectory + "/device-jit-" + std::to_string(HashValue) +
+                   ".ll",
+               *JitModule);
+  }
 
   auto ObjBuf = codegenObject(*JitModule, DeviceArch);
-  if (Config.ENV_PROTEUS_USE_STORED_CACHE)
-    StorageCache.storeObject(HashValue, ObjBuf->getMemBufferRef());
+  if (Config.ENV_PROTEUS_USE_STORED_CACHE) {
+    StorageCache.store(HashValue, ObjBuf->getMemBufferRef());
+  }
+  if (!Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY)
+    relinkGlobalsObject(ObjBuf->getMemBufferRef());
 
   KernelFunc =
       getKernelFunctionFromImage(KernelMangled, ObjBuf->getBufferStart());

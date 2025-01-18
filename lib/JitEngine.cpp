@@ -122,6 +122,10 @@ JitEngine::JitEngine() {
       getEnvOrDefaultBool("ENV_PROTEUS_USE_HIP_RTC_CODEGEN", true);
   Config.ENV_PROTEUS_DISABLE =
       getEnvOrDefaultBool("ENV_PROTEUS_DISABLE", false);
+  Config.ENV_PROTEUS_DUMP_LLVM_IR =
+      getEnvOrDefaultBool("ENV_PROTEUS_DUMP_LLVM_IR", false);
+  Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY =
+      getEnvOrDefaultBool("ENV_PROTEUS_RELINK_GLOBALS_BY_COPY", false);
 
 #if ENABLE_DEBUG
   Logger::logs("proteus") << "ENV_PROTEUS_USE_STORED_CACHE "

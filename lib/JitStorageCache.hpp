@@ -13,6 +13,10 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <llvm/Bitcode/BitcodeWriter.h>
+#include <llvm/IR/Module.h>
+#include <llvm/Support/ErrorHandling.h>
+#include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/MemoryBufferRef.h>
 
 #include "llvm/ADT/StringRef.h"
@@ -31,50 +35,30 @@ using namespace llvm;
 template <typename Function_t> class JitStorageCache {
 public:
   JitStorageCache() { std::filesystem::create_directory(StorageDirectory); }
-  std::unique_ptr<MemoryBuffer> lookupObject(uint64_t HashValue,
-                                             StringRef Kernel) {
+
+  std::unique_ptr<MemoryBuffer> lookup(uint64_t HashValue) {
     TIMESCOPE("object lookup");
     Accesses++;
 
-    std::string Filepath =
-        StorageDirectory + "/cache-jit-" + std::to_string(HashValue) + ".o";
+    std::string Filebase =
+        StorageDirectory + "/cache-jit-" + std::to_string(HashValue);
 
-    auto MemBuffer = MemoryBuffer::getFile(Filepath);
-    if (!MemBuffer)
+    auto CacheBuf = MemoryBuffer::getFile(Filebase + ".o");
+    if (!CacheBuf)
       return nullptr;
 
     Hits++;
-    return std::move(MemBuffer.get());
+    return std::move(CacheBuf.get());
   }
 
-  std::unique_ptr<MemoryBuffer> lookupBitcode(uint64_t HashValue,
-                                              StringRef Kernel) {
-    TIMESCOPE("object lookup");
-    Accesses++;
+  void store(uint64_t HashValue, MemoryBufferRef ObjBufRef) {
+    TIMESCOPE("Store cache");
 
-    std::string Filepath =
-        StorageDirectory + "/cache-jit-" + std::to_string(HashValue) + ".bc";
+    std::string Filebase =
+        StorageDirectory + "/cache-jit-" + std::to_string(HashValue);
 
-    auto MemBuffer = MemoryBuffer::getFile(Filepath);
-    if (!MemBuffer)
-      return nullptr;
-
-    Hits++;
-    return std::move(MemBuffer.get());
-  }
-
-  void storeObject(uint64_t HashValue, MemoryBufferRef ObjBufRef) {
-    TIMESCOPE("Store object");
-    saveToFile(
-        (StorageDirectory + "/cache-jit-" + std::to_string(HashValue) + ".o"),
-        HashValue,
-        StringRef{ObjBufRef.getBufferStart(), ObjBufRef.getBufferSize()});
-  }
-
-  void storeBitcode(uint64_t HashValue, StringRef IR) {
-    saveToFile(
-        (StorageDirectory + "/cache-jit-" + std::to_string(HashValue) + ".bc"),
-        HashValue, IR);
+    saveToFile(Filebase + ".o", StringRef{ObjBufRef.getBufferStart(),
+                                          ObjBufRef.getBufferSize()});
   }
 
   void printStats() {
@@ -86,15 +70,6 @@ private:
   uint64_t Hits = 0;
   uint64_t Accesses = 0;
   const std::string StorageDirectory = ".proteus";
-
-  void saveToFile(StringRef Filepath, uint64_t HashValue, StringRef Data) {
-    std::error_code EC;
-    raw_fd_ostream Out(Filepath, EC);
-    if (EC)
-      FATAL_ERROR("Cannot open file" + Filepath);
-    Out << Data;
-    Out.close();
-  }
 };
 
 } // namespace proteus
