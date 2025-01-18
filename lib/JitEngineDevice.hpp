@@ -11,6 +11,7 @@
 #ifndef PROTEUS_JITENGINEDEVICE_HPP
 #define PROTEUS_JITENGINEDEVICE_HPP
 #include "llvm/Config/llvm-config.h"
+#include <llvm/Support/MemoryBuffer.h>
 #if LLVM_VERSION_MAJOR == 18
 #include "llvm/ADT/StableHashing.h"
 #else
@@ -316,7 +317,7 @@ private:
                     const SmallVector<int32_t> &RCIndices, RuntimeConstant *RC,
                     int NumRuntimeConstants);
 
-  void
+  bool
   relinkGlobals(Module &M,
                 std::unordered_map<std::string, const void *> &VarNameToDevPtr);
 
@@ -494,10 +495,11 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
 }
 
 template <typename ImplT>
-void JitEngineDevice<ImplT>::relinkGlobals(
+bool JitEngineDevice<ImplT>::relinkGlobals(
     Module &M, std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
   // Re-link globals to fixed addresses provided by registered
   // variables.
+  bool UsesDeviceGlobals = false;
   for (auto RegisterVar : VarNameToDevPtr) {
     // For CUDA we must defer resolving the global symbol address here
     // instead when registering the variable in the constructor context.
@@ -520,6 +522,8 @@ void JitEngineDevice<ImplT>::relinkGlobals(
         ConstantInt::get(Type::getInt64Ty(M.getContext()), (uint64_t)DevPtr);
     Value *CE = ConstantExpr::getIntToPtr(Addr, GV->getType());
     GV->replaceAllUsesWith(CE);
+
+    UsesDeviceGlobals = true;
   }
 
 #if ENABLE_DEBUG
@@ -529,6 +533,8 @@ void JitEngineDevice<ImplT>::relinkGlobals(
   else
     Logger::logs("proteus") << "Module verified!\n";
 #endif
+
+  return UsesDeviceGlobals;
 }
 
 template <typename ImplT>
@@ -571,13 +577,11 @@ JitEngineDevice<ImplT>::compileAndRun(
     // solution is to keep track of whether a kernel uses gvars (store a flag in
     // the cache file?) and load the object in case it does not use any.
     // TODO: Can we use RTC interfaces for fast linking on object files?
-    bool HasDeviceGlobals = !VarNameToDevPtr.empty();
-    if (auto CacheBuf =
-            (HasDeviceGlobals
-                 ? StorageCache.lookupBitcode(HashValue, KernelMangled)
-                 : StorageCache.lookupObject(HashValue, KernelMangled))) {
+    bool UsesDeviceGlobals;
+    auto CacheBuf = StorageCache.lookup(HashValue, UsesDeviceGlobals);
+    if (CacheBuf) {
       std::unique_ptr<MemoryBuffer> ObjBuf;
-      if (HasDeviceGlobals) {
+      if (UsesDeviceGlobals) {
         auto Ctx = std::make_unique<LLVMContext>();
         SMDiagnostic Err;
         auto M = parseIR(CacheBuf->getMemBufferRef(), Err, *Ctx);
@@ -625,16 +629,17 @@ JitEngineDevice<ImplT>::compileAndRun(
 #error "JitEngineDevice requires ENABLE_CUDA or ENABLE_HIP"
 #endif
 
-  SmallString<4096> ModuleBuffer;
+  SmallString<8 * 1024> ModuleBuffer;
   raw_svector_ostream ModuleBufferOS(ModuleBuffer);
   WriteBitcodeToFile(*JitModule, ModuleBufferOS);
-  StorageCache.storeBitcode(HashValue, ModuleBuffer);
 
-  relinkGlobals(*JitModule, VarNameToDevPtr);
+  bool UsesDeviceGlobals = relinkGlobals(*JitModule, VarNameToDevPtr);
 
   auto ObjBuf = codegenObject(*JitModule, DeviceArch);
-  if (Config.ENV_PROTEUS_USE_STORED_CACHE)
-    StorageCache.storeObject(HashValue, ObjBuf->getMemBufferRef());
+  if (Config.ENV_PROTEUS_USE_STORED_CACHE) {
+    StorageCache.store(HashValue, UsesDeviceGlobals, ModuleBuffer,
+                       ObjBuf->getMemBufferRef());
+  }
 
   KernelFunc =
       getKernelFunctionFromImage(KernelMangled, ObjBuf->getBufferStart());
