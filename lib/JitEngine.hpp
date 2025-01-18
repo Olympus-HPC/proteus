@@ -43,6 +43,8 @@ class JitEngine {
 public:
   void optimizeIR(Module &M, StringRef Arch);
 
+  bool isProteusDisabled() { return Config.ENV_PROTEUS_DISABLE; }
+
 protected:
   Expected<std::unique_ptr<TargetMachine>>
   createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3);
@@ -61,6 +63,7 @@ protected:
     bool ENV_PROTEUS_SPECIALIZE_ARGS;
     bool ENV_PROTEUS_SPECIALIZE_DIMS;
     bool ENV_PROTEUS_USE_HIP_RTC_CODEGEN;
+    bool ENV_PROTEUS_DISABLE;
   } Config;
 };
 

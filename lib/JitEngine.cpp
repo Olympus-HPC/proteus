@@ -120,6 +120,8 @@ JitEngine::JitEngine() {
       getEnvOrDefaultBool("ENV_PROTEUS_SPECIALIZE_DIMS", true);
   Config.ENV_PROTEUS_USE_HIP_RTC_CODEGEN =
       getEnvOrDefaultBool("ENV_PROTEUS_USE_HIP_RTC_CODEGEN", true);
+  Config.ENV_PROTEUS_DISABLE =
+      getEnvOrDefaultBool("ENV_PROTEUS_DISABLE", false);
 
 #if ENABLE_DEBUG
   Logger::logs("proteus") << "ENV_PROTEUS_USE_STORED_CACHE "
