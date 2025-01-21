@@ -104,10 +104,16 @@ set_target_properties(proteus PROPERTIES
 install(
   TARGETS proteus
   EXPORT proteusTargets
-  RUNTIME DESTINATION lib
-  LIBRARY DESTINATION lib
-  ARCHIVE DESTINATION lib)
+  RUNTIME DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+  LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+  ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 
+install(FILES
+  ${HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+
+# Export proteusTargets to a CMake config file
 install(
-  FILES ${HEADERS}
-  DESTINATION include/)
+  EXPORT proteusTargets
+  FILE proteusConfig.cmake
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/proteus"
+)
