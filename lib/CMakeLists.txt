@@ -127,6 +127,5 @@ install(FILES
 install(
   EXPORT proteusTargets
   FILE proteusConfig.cmake
-  NAMESPACE proteus::
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/proteus"
 )
