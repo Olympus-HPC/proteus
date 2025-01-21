@@ -34,6 +34,8 @@ if(ENABLE_DEBUG)
 endif()
 
 include(cmake/SetupLLVM.cmake)
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
 add_subdirectory(lib)
 add_subdirectory(pass)
@@ -43,13 +45,11 @@ if(ENABLE_TESTS)
   add_subdirectory(tests)
 endif()
 
-include(CMakePackageConfigHelpers)
-
 configure_package_config_file(
   "${PROJECT_SOURCE_DIR}/cmake/proteusConfig.cmake.in"
   "${PROJECT_BINARY_DIR}/proteusConfig.cmake"
   INSTALL_DESTINATION
-  lib/cmake/proteus)
+  ${CMAKE_INSTALL_LIBDIR}/cmake/proteus)
 
 write_basic_package_version_file(
   "${PROJECT_BINARY_DIR}/proteusConfigVersion.cmake"
@@ -57,10 +57,10 @@ write_basic_package_version_file(
   COMPATIBILITY AnyNewerVersion)
 
 install(EXPORT proteusTargets
-  DESTINATION lib/cmake/proteus)
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/proteus)
 
 install(FILES
   "${PROJECT_BINARY_DIR}/proteusConfigVersion.cmake"
   "${PROJECT_BINARY_DIR}/proteusConfig.cmake"
   DESTINATION
-  lib/cmake/proteus)
+  ${CMAKE_INSTALL_LIBDIR}/cmake/proteus)
