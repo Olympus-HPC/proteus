@@ -8,7 +8,6 @@ set(SOURCES
 )
 
 set(HEADERS
-  CompilerInterfaceTypes.h
   JitCache.hpp
   JitEngine.hpp
   JitEngineHost.hpp
@@ -26,7 +25,6 @@ list(APPEND SOURCES
 )
 
 list(APPEND HEADERS
-  CompilerInterfaceDevice.h
   JitEngineDevice.hpp
   JitEngineDeviceCUDA.hpp
   UtilsCUDA.h)
@@ -40,11 +38,25 @@ list(APPEND SOURCES
 )
 
 list(APPEND HEADERS
-  CompilerInterfaceDevice.h
   JitEngineDevice.hpp
   JitEngineDeviceHIP.hpp
   UtilsHIP.h)
 endif()
+
+
+# An interface library (HEADER only) to be used by external projects
+add_library(JITEngine INTERFACE)
+target_include_directories(JITEngine INTERFACE ${LLVM_INCLUDE_DIRS})
+target_include_directories(JITEngine INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib>
+    $<INSTALL_INTERFACE:include>
+)
+if (ENABLE_HIP)
+  target_compile_definitions(JITEngine INTERFACE ENABLE_HIP)
+elseif (ENABLE_CUDA)
+  target_compile_definitions(JITEngine INTERFACE ENABLE_CUDA)
+endif()
+
 
 if(BUILD_SHARED)
   if(ENABLE_CUDA)
@@ -102,7 +114,7 @@ set_target_properties(proteus PROPERTIES
   INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 install(
-  TARGETS proteus
+  TARGETS JITEngine proteus
   EXPORT proteusTargets
   RUNTIME DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
@@ -115,5 +127,6 @@ install(FILES
 install(
   EXPORT proteusTargets
   FILE proteusConfig.cmake
+  NAMESPACE proteus::
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/proteus"
 )
