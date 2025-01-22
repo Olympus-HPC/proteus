@@ -43,7 +43,7 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
     LLVMContext &Ctx, CUmodule &CUMod,
     SmallVector<std::unique_ptr<Module>> &LinkedModules,
     std::string &ModuleId) {
-  DBG(Logger::logs("proteus") << "extractLinkedBitcode " << ModuleId << "\n");
+  PROTEUS_DBG(Logger::logs("proteus") << "extractLinkedBitcode " << ModuleId << "\n");
 
   if (!ModuleIdToFatBinary.count(ModuleId))
     FATAL_ERROR("Expected to find module id " + ModuleId + " in map");
@@ -256,7 +256,7 @@ JitEngineDeviceCUDA::codegenObject(Module &M, StringRef DeviceArch) {
   std::string RDCOption = "";
   if (!GlobalLinkedBinaries.empty())
     RDCOption = "-c";
-#if ENABLE_DEBUG
+#if PROTEUS_ENABLE_DEBUG
   const char *CompileOptions[] = {ArchOpt.c_str(), "--verbose",
                                   RDCOption.c_str()};
   size_t NumCompileOptions = 2 + (RDCOption.empty() ? 0 : 1);
@@ -271,7 +271,7 @@ JitEngineDeviceCUDA::codegenObject(Module &M, StringRef DeviceArch) {
   auto ObjBuf = WritableMemoryBuffer::getNewUninitMemBuffer(BinSize);
   nvPTXCompilerErrCheck(
       nvPTXCompilerGetCompiledProgram(PTXCompiler, ObjBuf->getBufferStart()));
-#if ENABLE_DEBUG
+#if PROTEUS_ENABLE_DEBUG
   {
     size_t LogSize;
     nvPTXCompilerErrCheck(nvPTXCompilerGetInfoLogSize(PTXCompiler, &LogSize));
@@ -341,5 +341,5 @@ JitEngineDeviceCUDA::JitEngineDeviceCUDA() {
       &CCMinor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, CUDev));
   DeviceArch = "sm_" + std::to_string(CCMajor * 10 + CCMinor);
 
-  DBG(Logger::logs("proteus") << "CUDA Arch " << DeviceArch << "\n");
+  PROTEUS_DBG(Logger::logs("proteus") << "CUDA Arch " << DeviceArch << "\n");
 }

@@ -242,7 +242,7 @@ private:
                                 const SmallVector<int32_t> &RCTypes,
                                 SmallVector<RuntimeConstant> &RCsVec) {
     for (int I = 0; I < RCIndices.size(); ++I) {
-      DBG(Logger::logs("proteus")
+      PROTEUS_DBG(Logger::logs("proteus")
           << "RC Index " << RCIndices[I] << " Type " << RCTypes[I] << "\n");
       RuntimeConstant RC;
       switch (RCTypes[I]) {
@@ -382,7 +382,7 @@ private:
     stable_hash L1Hash{0};
     auto ExePath = std::filesystem::canonical("/proc/self/exe");
 
-    DBG(Logger::logs("proteus")
+    PROTEUS_DBG(Logger::logs("proteus")
         << "Reading file from path " << ExePath.string() << "\n");
 
     auto bufferOrErr = MemoryBuffer::getFile(ExePath.string());
@@ -408,7 +408,7 @@ private:
       if (!ImplT::isHashedSection(sectionName))
         continue;
 
-      DBG(Logger::logs("proteus")
+      PROTEUS_DBG(Logger::logs("proteus")
           << "Hashing section " << sectionName.str() << "\n");
 
       auto contentsOrErr = section.getContents();
@@ -427,7 +427,7 @@ protected:
   JitEngineDevice() {
     L1Hash = computeDeviceFatBinHash();
     Ctx = std::make_unique<LLVMContext>();
-    DBG(Logger::logs("proteus") << "L1-Hash is " << L1Hash << "\n");
+    PROTEUS_DBG(Logger::logs("proteus") << "L1-Hash is " << L1Hash << "\n");
   }
 
   ~JitEngineDevice() {
@@ -468,7 +468,7 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
                                           int NumRuntimeConstants) {
 
   TIMESCOPE("specializeIR");
-  DBG(Logger::logs("proteus") << "=== Parsed Module\n"
+  PROTEUS_DBG(Logger::logs("proteus") << "=== Parsed Module\n"
                               << M << "=== End of Parsed Module\n");
   Function *F = M.getFunction(FnName);
   assert(F && "Expected non-null function!");
@@ -528,7 +528,7 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
     return false;
   });
 
-  DBG(Logger::logs("proteus") << "=== JIT Module\n"
+  PROTEUS_DBG(Logger::logs("proteus") << "=== JIT Module\n"
                               << M << "=== End of JIT Module\n");
 
   F->setName(FnName + Suffix);
@@ -539,7 +539,7 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
 
   runCleanupPassPipeline(M);
 
-#if ENABLE_DEBUG
+#if PROTEUS_ENABLE_DEBUG
   Logger::logs("proteus") << "=== Final Module\n"
                           << M << "=== End Final Module\n";
   if (verifyModule(M, &errs()))
@@ -589,7 +589,7 @@ void JitEngineDevice<ImplT>::replaceGlobalVariablesWithPointers(
     }
   }
 
-#if ENABLE_DEBUG
+#if PROTEUS_ENABLE_DEBUG
   Logger::logs("proteus") << "=== Linked M\n" << M << "=== End of Linked M\n";
   if (verifyModule(M, &errs()))
     FATAL_ERROR("After linking, broken module found, JIT compilation aborted!");
@@ -673,13 +673,13 @@ JitEngineDevice<ImplT>::compileAndRun(
   // internally runs it. For the rest of cases, that is CUDA or HIP with our own
   // codegen instead of RTC, run the target-specific optimization pipeline to
   // optimize the LLVM IR before handing over to codegen.
-#if ENABLE_CUDA
+#if PROTEUS_ENABLE_CUDA
   optimizeIR(*JitModule, DeviceArch);
-#elif ENABLE_HIP
+#elif PROTEUS_ENABLE_HIP
   if (!Config.ENV_PROTEUS_USE_HIP_RTC_CODEGEN)
     optimizeIR(*JitModule, DeviceArch);
 #else
-#error "JitEngineDevice requires ENABLE_CUDA or ENABLE_HIP"
+#error "JitEngineDevice requires PROTEUS_ENABLE_CUDA or PROTEUS_ENABLE_HIP"
 #endif
 
   if (Config.ENV_PROTEUS_DUMP_LLVM_IR) {
@@ -718,7 +718,7 @@ void JitEngineDevice<ImplT>::registerFatBinary(void *Handle,
                                                FatbinWrapper_t *FatbinWrapper,
                                                const char *ModuleId) {
   CurHandle = Handle;
-  DBG(Logger::logs("proteus")
+  PROTEUS_DBG(Logger::logs("proteus")
       << "Register fatbinary Handle " << Handle << " FatbinWrapper "
       << FatbinWrapper << " Binary " << (void *)FatbinWrapper->Binary
       << " ModuleId " << ModuleId << "\n");
@@ -731,7 +731,7 @@ void JitEngineDevice<ImplT>::registerFatBinary(void *Handle,
     void *Ptr = FatbinWrapper->PrelinkedFatbins[0];
     for (int I = 0; Ptr != nullptr;
          ++I, Ptr = FatbinWrapper->PrelinkedFatbins[I]) {
-      DBG(Logger::logs("proteus")
+      PROTEUS_DBG(Logger::logs("proteus")
           << "I " << I << " PrelinkedFatbin " << Ptr << "\n");
       GlobalLinkedBinaries.insert(Ptr);
     }
@@ -744,7 +744,7 @@ void JitEngineDevice<ImplT>::registerFatBinary(void *Handle,
 }
 
 template <typename ImplT> void JitEngineDevice<ImplT>::registerFatBinaryEnd() {
-  DBG(Logger::logs("proteus") << "Register fatbinary end\n");
+  PROTEUS_DBG(Logger::logs("proteus") << "Register fatbinary end\n");
   // Erase linked binaries for which we have LLVM IR code, those binaries are
   // stored in the ModuleIdToFatBinary map.
   for (auto &[ModuleId, FatbinWrapper] : ModuleIdToFatBinary)
@@ -759,14 +759,14 @@ void JitEngineDevice<ImplT>::registerFunction(void *Handle, void *Kernel,
                                               int32_t *RCIndices,
                                               int32_t *RCTypes,
                                               int32_t NumRCs) {
-  DBG(Logger::logs("proteus")
+  PROTEUS_DBG(Logger::logs("proteus")
       << "Register function " << Kernel << " To Handle " << Handle << "\n");
   // NOTE: HIP RDC might call multiple times the registerFunction for the same
   // kernel, which has weak linkage, when it comes from different translation
   // units. Either the first or the second call can prevail and should be
   // equivalent. We let the first one prevail.
   if (KernelToHandleMap.contains(Kernel)) {
-    DBG(Logger::logs("proteus")
+    PROTEUS_DBG(Logger::logs("proteus")
         << "Warning: duplicate register function for kernel " +
                std::string(KernelName)
         << "\n");
@@ -781,7 +781,7 @@ void JitEngineDevice<ImplT>::registerFunction(void *Handle, void *Kernel,
 template <typename ImplT>
 void JitEngineDevice<ImplT>::registerLinkedBinary(
     FatbinWrapper_t *FatbinWrapper, const char *ModuleId) {
-  DBG(Logger::logs("proteus")
+  PROTEUS_DBG(Logger::logs("proteus")
       << "Register linked binary FatBinary " << FatbinWrapper << " Binary "
       << (void *)FatbinWrapper->Binary << " ModuleId " << ModuleId << "\n");
   if (CurHandle) {

@@ -84,7 +84,7 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
 
   uint64_t NumberOfBundles = Read8ByteIntLE(Binary, Pos);
   Pos += 8;
-  DBG(Logger::logs("proteus") << "NumberOfbundles " << NumberOfBundles << "\n");
+  PROTEUS_DBG(Logger::logs("proteus") << "NumberOfbundles " << NumberOfBundles << "\n");
 
   StringRef DeviceBinary;
   for (uint64_t i = 0; i < NumberOfBundles; ++i) {
@@ -100,13 +100,13 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
     StringRef Triple(Binary + Pos, TripleSize);
     Pos += TripleSize;
 
-    DBG(Logger::logs("proteus") << "Offset " << Offset << "\n");
-    DBG(Logger::logs("proteus") << "Size " << Size << "\n");
-    DBG(Logger::logs("proteus") << "TripleSize " << TripleSize << "\n");
-    DBG(Logger::logs("proteus") << "Triple " << Triple << "\n");
+    PROTEUS_DBG(Logger::logs("proteus") << "Offset " << Offset << "\n");
+    PROTEUS_DBG(Logger::logs("proteus") << "Size " << Size << "\n");
+    PROTEUS_DBG(Logger::logs("proteus") << "TripleSize " << TripleSize << "\n");
+    PROTEUS_DBG(Logger::logs("proteus") << "Triple " << Triple << "\n");
 
     if (!Triple.contains("amdgcn") || !Triple.contains(DeviceArch)) {
-      DBG(Logger::logs("proteus")
+      PROTEUS_DBG(Logger::logs("proteus")
           << "mismatching architecture, skipping ...\n");
       continue;
     }
@@ -153,7 +153,7 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
     auto SectionName = DeviceElf->getSectionName(Section);
     if (SectionName.takeError())
       FATAL_ERROR("Error reading section name");
-    DBG(Logger::logs("proteus") << "SectionName " << *SectionName << "\n");
+    PROTEUS_DBG(Logger::logs("proteus") << "SectionName " << *SectionName << "\n");
 
     if (!SectionName->starts_with(".jit.bitcode"))
       continue;
@@ -221,7 +221,7 @@ void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
   // int WavesPerEU = (GridSize * BlockSize) / 64 / 110 / 4 / 2;
   int WavesPerEU = 0;
   // F->addFnAttr("amdgpu-waves-per-eu", std::to_string(WavesPerEU));
-  DBG(Logger::logs("proteus")
+  PROTEUS_DBG(Logger::logs("proteus")
       << "BlockSize " << BlockSize << " GridSize " << GridSize
       << " => Set Wokgroup size " << BlockSize << " WavesPerEU (unused) "
       << WavesPerEU << "\n");

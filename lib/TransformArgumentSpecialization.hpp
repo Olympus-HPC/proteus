@@ -69,7 +69,7 @@ public:
                     TypeOstream.str());
       }
 
-      DBG(Logger::logs("proteus")
+      PROTEUS_DBG(Logger::logs("proteus")
           << "[ArgSpecial] Replaced Function " << F.getName() + " ArgNo "
           << ArgNo << " with value " << *C << "\n");
       Arg->replaceAllUsesWith(C);

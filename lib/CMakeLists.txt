@@ -18,7 +18,7 @@ set(HEADERS
   TransformArgumentSpecialization.hpp
   Utils.h)
 
-if(ENABLE_CUDA)
+if(PROTEUS_ENABLE_CUDA)
 list(APPEND SOURCES
   CompilerInterfaceDevice.cpp
   CompilerInterfaceDeviceCUDA.cpp
@@ -32,7 +32,7 @@ list(APPEND HEADERS
   UtilsCUDA.h)
 endif()
 
-if(ENABLE_HIP)
+if(PROTEUS_ENABLE_HIP)
 list(APPEND SOURCES
   CompilerInterfaceDevice.cpp
   CompilerInterfaceDeviceHIP.cpp
@@ -47,7 +47,7 @@ list(APPEND HEADERS
 endif()
 
 if(BUILD_SHARED)
-  if(ENABLE_CUDA)
+  if(PROTEUS_ENABLE_CUDA)
     message(FATAL_ERROR "For CUDA, using libproteus as SHARED fails for device globals")
   endif()
 
@@ -76,7 +76,7 @@ else()
   set(libs ${LLVM_AVAILABLE_LIBS})
 endif()
 
-if(ENABLE_HIP)
+if(PROTEUS_ENABLE_HIP)
   target_include_directories(proteus SYSTEM PRIVATE ${hip_INCLUDE_DIRS})
   target_compile_options(proteus PRIVATE -x hip)
   list(APPEND libs hip::host)
@@ -87,7 +87,7 @@ if(ENABLE_HIP)
   list(APPEND libs lldCommon lldELF)
 endif()
 
-if(ENABLE_CUDA)
+if(PROTEUS_ENABLE_CUDA)
   target_include_directories(proteus SYSTEM PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
 
   # list(APPEND libs CUDA::cuda_driver CUDA::cudart)

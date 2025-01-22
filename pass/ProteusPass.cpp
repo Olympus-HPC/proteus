@@ -71,7 +71,7 @@
 #include "GenRuntimeConstantTy.hpp"
 
 #define DEBUG_TYPE "jitpass"
-#ifdef ENABLE_DEBUG
+#ifdef PROTEUS_ENABLE_DEBUG
 #define DEBUG(x) x
 #else
 #define DEBUG(x)
@@ -81,12 +81,12 @@
   report_fatal_error(llvm::Twine(std::string{} + __FILE__ + ":" +              \
                                  std::to_string(__LINE__) + " => " + x))
 
-#if ENABLE_HIP
+#if PROTEUS_ENABLE_HIP
 constexpr char const *RegisterFunctionName = "__hipRegisterFunction";
 constexpr char const *LaunchFunctionName = "hipLaunchKernel";
 constexpr char const *RegisterVarName = "__hipRegisterVar";
 constexpr char const *RegisterFatBinaryName = "__hipRegisterFatBinary";
-#elif ENABLE_CUDA
+#elif PROTEUS_ENABLE_CUDA
 constexpr char const *RegisterFunctionName = "__cudaRegisterFunction";
 constexpr char const *LaunchFunctionName = "cudaLaunchKernel";
 constexpr char const *RegisterVarName = "__cudaRegisterVar";
@@ -571,14 +571,14 @@ private:
     // NOTE: when called by isDeviceKernelHostStub, Operand may not be a global
     // variable point to the stub, so we check and return null in that case.
     Value *V = nullptr;
-#if ENABLE_HIP
+#if PROTEUS_ENABLE_HIP
     // NOTE: Hip creates a global named after the device kernel function that
     // points to the host kernel stub. Because of this, we need to unpeel this
     // indirection to use the host kernel stub for finding the device kernel
     // function name global.
     GlobalVariable *IndirectGV = dyn_cast<GlobalVariable>(Operand);
     V = IndirectGV ? IndirectGV->getInitializer() : nullptr;
-#elif ENABLE_CUDA
+#elif PROTEUS_ENABLE_CUDA
     GlobalValue *DirectGV = dyn_cast<GlobalValue>(Operand);
     V = DirectGV ? DirectGV : nullptr;
 #endif
@@ -616,7 +616,7 @@ private:
 
   SmallPtrSet<Function *, 16> getDeviceKernels(Module &M) {
     SmallPtrSet<Function *, 16> Kernels;
-#if ENABLE_CUDA
+#if PROTEUS_ENABLE_CUDA
     NamedMDNode *MD = M.getOrInsertNamedMetadata("nvvm.annotations");
 
     if (!MD)
@@ -636,7 +636,7 @@ private:
 
       Kernels.insert(KernelFn);
     }
-#elif ENABLE_HIP
+#elif PROTEUS_ENABLE_HIP
     for (Function &F : M)
       if (F.getCallingConv() == CallingConv::AMDGPU_KERNEL)
         Kernels.insert(&F);
@@ -667,13 +667,13 @@ private:
 
   FunctionCallee getJitLaunchKernelFn(Module &M) {
     FunctionType *JitLaunchKernelFnTy = nullptr;
-#if ENABLE_HIP
+#if PROTEUS_ENABLE_HIP
     JitLaunchKernelFnTy =
         FunctionType::get(Int32Ty,
                           {PtrTy, PtrTy, Int64Ty, Int32Ty, Int64Ty, Int32Ty,
                            PtrTy, Int64Ty, PtrTy},
                           /* isVarArg=*/false);
-#elif ENABLE_CUDA
+#elif PROTEUS_ENABLE_CUDA
     // NOTE: CUDA uses an array type for passing grid, block sizes.
     JitLaunchKernelFnTy =
         FunctionType::get(Int32Ty,
@@ -690,7 +690,7 @@ private:
     if (!JitLaunchKernelFnTy)
       FATAL_ERROR(
           "Expected non-null jit entry function type, check "
-          "ENABLE_CUDA|ENABLE_HIP compilation flags for ProteusJitPass");
+          "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags for ProteusJitPass");
 
     FunctionCallee JitLaunchKernelFn =
         M.getOrInsertFunction("__jit_launch_kernel", JitLaunchKernelFnTy);
@@ -708,7 +708,7 @@ private:
     // Insert before the launch kernel call instruction.
     IRBuilder<> Builder(LaunchKernelCB);
     CallBase *CallOrInvoke = nullptr;
-#ifdef ENABLE_HIP
+#ifdef PROTEUS_ENABLE_HIP
     SmallVector<Value *> Args = {ModuleUniqueId,
                                  LaunchKernelCB->getArgOperand(0),
                                  LaunchKernelCB->getArgOperand(1),
@@ -718,7 +718,7 @@ private:
                                  LaunchKernelCB->getArgOperand(5),
                                  LaunchKernelCB->getArgOperand(6),
                                  LaunchKernelCB->getArgOperand(7)};
-#elif ENABLE_CUDA
+#elif PROTEUS_ENABLE_CUDA
     SmallVector<Value *> Args = {
         ModuleUniqueId,
         LaunchKernelCB->getArgOperand(0), // Kernel address
@@ -743,7 +743,7 @@ private:
     if (!CallOrInvoke)
       FATAL_ERROR(
           "Expected non-null jit launch kernel call or invoke, check "
-          "ENABLE_CUDA|ENABLE_HIP compilation flags for ProteusJitPass");
+          "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags for ProteusJitPass");
 
     LaunchKernelCB->replaceAllUsesWith(CallOrInvoke);
     LaunchKernelCB->eraseFromParent();
@@ -754,13 +754,13 @@ private:
     if (!LaunchFunctionName) {
       FATAL_ERROR(
           "Expected non-null LaunchKernelFn, check "
-          "ENABLE_CUDA|ENABLE_HIP compilation flags for ProteusJitPass");
+          "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags for ProteusJitPass");
     }
     LaunchKernelFn = M.getFunction(LaunchFunctionName);
     if (!LaunchKernelFn)
       FATAL_ERROR(
           "Expected non-null LaunchKernelFn, check "
-          "ENABLE_CUDA|ENABLE_HIP compilation flags for ProteusJitPass");
+          "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags for ProteusJitPass");
 
     SmallVector<CallBase *> ToBeReplaced;
     for (User *Usr : LaunchKernelFn->users())
@@ -832,7 +832,7 @@ private:
 
   void instrumentRegisterFatBinaryEnd(Module &M) {
 // This is CUDA specific.
-#if !ENABLE_CUDA
+#if !PROTEUS_ENABLE_CUDA
     return;
 #endif
 
@@ -865,7 +865,7 @@ private:
 
   void instrumentRegisterLinkedBinary(Module &M) {
 // This is CUDA specific.
-#if !ENABLE_CUDA
+#if !PROTEUS_ENABLE_CUDA
     return;
 #endif
 

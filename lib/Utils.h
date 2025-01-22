@@ -19,10 +19,10 @@
 #include "TimeTracing.hpp"
 
 #include "../common/Logger.hpp"
-#if ENABLE_DEBUG
-#define DBG(x) x;
+#if PROTEUS_ENABLE_DEBUG
+#define PROTEUS_DBG(x) x;
 #else
-#define DBG(x)
+#define PROTEUS_DBG(x)
 #endif
 
 #define FATAL_ERROR(x)                                                         \
@@ -38,11 +38,11 @@ template <typename T> void saveToFile(llvm::StringRef Filepath, T &&Data) {
   Out.close();
 }
 
-#if ENABLE_HIP
+#if PROTEUS_ENABLE_HIP
 #include "UtilsHIP.h"
 #endif
 
-#if ENABLE_CUDA
+#if PROTEUS_ENABLE_CUDA
 #include "UtilsCUDA.h"
 #endif
 

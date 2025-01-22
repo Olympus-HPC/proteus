@@ -1,4 +1,4 @@
-#if ENABLE_CUDA
+#if PROTEUS_ENABLE_CUDA
 #include <cuda_runtime.h>
 #define gpuError_t cudaError_t
 #define gpuSuccess cudaSuccess
@@ -9,7 +9,7 @@
 #define gpuLaunchKernel cudaLaunchKernel
 #define gpuMemcpyFromSymbol cudaMemcpyFromSymbol
 #define gpuMemcpyDeviceToHost cudaMemcpyDeviceToHost
-#elif ENABLE_HIP
+#elif PROTEUS_ENABLE_HIP
 #include <hip/hip_runtime.h>
 #define gpuError_t hipError_t
 #define gpuSuccess hipSuccess
@@ -21,7 +21,7 @@
 #define gpuMemcpyFromSymbol hipMemcpyFromSymbol
 #define gpuMemcpyDeviceToHost hipMemcpyDeviceToHost
 #else
-#error "Must provide ENABLE_HIP or ENABLE_CUDA"
+#error "Must provide PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA"
 #endif
 
 #define gpuErrCheck(CALL)                                                      \

@@ -57,23 +57,23 @@ public:
   static void transform(Module &M, Function &F,
                         SmallVector<RuntimeConstant, 8> &RC) {
     auto LambdaClass = F.getArg(0);
-    DBG(Logger::logs("proteus")
+    PROTEUS_DBG(Logger::logs("proteus")
         << "TransformLambdaSpecialization::transform" << "\n");
-    DBG(Logger::logs("proteus") << "\t args" << "\n");
+    PROTEUS_DBG(Logger::logs("proteus") << "\t args" << "\n");
     for (auto &Arg : RC) {
-      DBG(Logger::logs("proteus")
+      PROTEUS_DBG(Logger::logs("proteus")
           << "{" << Arg.Value.Int64Val << ", " << Arg.Slot << " }\n");
     }
 
-    DBG(Logger::logs("proteus") << "\t users" << "\n");
+    PROTEUS_DBG(Logger::logs("proteus") << "\t users" << "\n");
     for (User *User : LambdaClass->users()) {
-      DBG(Logger::logs("proteus") << *User << "\n");
+      PROTEUS_DBG(Logger::logs("proteus") << *User << "\n");
       if (dyn_cast<LoadInst>(User)) {
         for (auto &Arg : RC) {
           if (Arg.Slot == 0) {
             Constant *C = getConstant(M.getContext(), User->getType(), Arg);
             User->replaceAllUsesWith(C);
-            DBG(Logger::logs("proteus") << "[LambdaSpec] Replacing " << *User
+            PROTEUS_DBG(Logger::logs("proteus") << "[LambdaSpec] Replacing " << *User
                                         << " with " << *C << "\n");
           }
         }
@@ -90,7 +90,7 @@ public:
               Type *LoadType = LI->getType();
               Constant *C = getConstant(M.getContext(), LoadType, Arg);
               LI->replaceAllUsesWith(C);
-              DBG(Logger::logs("proteus") << "[LambdaSpec] Replacing " << *User
+              PROTEUS_DBG(Logger::logs("proteus") << "[LambdaSpec] Replacing " << *User
                                           << " with " << *C << "\n");
             }
           }
