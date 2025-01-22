@@ -1,5 +1,6 @@
 @PACKAGE_INIT@
 
+include(CMakeFindDependencyMacro)
 set(PROTEUS_LLVM_DIR "@LLVM_DIR@")
 set(PROTEUS_LLD_DIR "@LLD_DIR@")
 find_dependency(LLVM REQUIRED CONFIG)
