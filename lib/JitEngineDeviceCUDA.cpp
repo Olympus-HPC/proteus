@@ -77,7 +77,7 @@ Module &JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName,
   size_t Bytes;
 
   SmallVector<std::unique_ptr<Module>> LinkedModules;
-  auto &Ctx = getProteusLLVMCtx();
+  auto &Ctx = JitEngineDevice<JitEngineDeviceCUDA>::getProteusLLVMCtx();
   if (!KernelToHandleMap.contains(Kernel))
     FATAL_ERROR("Expected Kernel in map");
 
@@ -109,7 +109,7 @@ Module &JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName,
 
   proteusCuErrCheck(cuModuleUnload(CUMod));
 
-  auto JitModule = linkJitModule(KernelName, LinkedModules);
+  auto JitModule = linkJitModule(KernelName, Ctx, LinkedModules);
 
   // Update modules of all kernels in our map
   for (const auto &KV : KernelToHandleMap) {

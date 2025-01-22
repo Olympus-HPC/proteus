@@ -445,8 +445,8 @@ protected:
   JitStorageCache<KernelFunction_t> StorageCache;
   std::string DeviceArch;
   std::unordered_map<std::string, const void *> VarNameToDevPtr;
-  std::unique_ptr<Module>
-  linkJitModule(StringRef KernelName,
+  static std::unique_ptr<Module>
+  linkJitModule(StringRef KernelName, LLVMContext &ProteusCtx,
                 SmallVector<std::unique_ptr<Module>> &LinkedModules);
 
   LLVMContext &getProteusLLVMCtx() const { return *Ctx.get(); }
@@ -813,12 +813,12 @@ void JitEngineDevice<ImplT>::registerLinkedBinary(
 
 template <typename ImplT>
 std::unique_ptr<Module> JitEngineDevice<ImplT>::linkJitModule(
-    StringRef KernelName, SmallVector<std::unique_ptr<Module>> &LinkedModules) {
+    StringRef KernelName, LLVMContext &ProteusCtx,
+    SmallVector<std::unique_ptr<Module>> &LinkedModules) {
   if (LinkedModules.empty())
     FATAL_ERROR("Expected jit module");
 
-  auto LinkedModule =
-      std::make_unique<llvm::Module>("JitModule", getProteusLLVMCtx());
+  auto LinkedModule = std::make_unique<llvm::Module>("JitModule", ProteusCtx);
   Linker IRLinker(*LinkedModule);
   for (auto &LinkedM : LinkedModules) {
     // Returns true if linking failed.
