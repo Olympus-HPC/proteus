@@ -99,8 +99,6 @@ public:
   static void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
                                        int BlockSize);
 
-  void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim);
-
   Module &extractDeviceBitcode(StringRef KernelName, void *Kernel);
 
   static std::unique_ptr<MemoryBuffer>
