@@ -84,7 +84,8 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
 
   uint64_t NumberOfBundles = Read8ByteIntLE(Binary, Pos);
   Pos += 8;
-  PROTEUS_DBG(Logger::logs("proteus") << "NumberOfbundles " << NumberOfBundles << "\n");
+  PROTEUS_DBG(Logger::logs("proteus")
+              << "NumberOfbundles " << NumberOfBundles << "\n");
 
   StringRef DeviceBinary;
   for (uint64_t i = 0; i < NumberOfBundles; ++i) {
@@ -107,7 +108,7 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
 
     if (!Triple.contains("amdgcn") || !Triple.contains(DeviceArch)) {
       PROTEUS_DBG(Logger::logs("proteus")
-          << "mismatching architecture, skipping ...\n");
+                  << "mismatching architecture, skipping ...\n");
       continue;
     }
 
@@ -153,7 +154,8 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
     auto SectionName = DeviceElf->getSectionName(Section);
     if (SectionName.takeError())
       FATAL_ERROR("Error reading section name");
-    PROTEUS_DBG(Logger::logs("proteus") << "SectionName " << *SectionName << "\n");
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "SectionName " << *SectionName << "\n");
 
     if (!SectionName->starts_with(".jit.bitcode"))
       continue;
@@ -222,9 +224,9 @@ void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
   int WavesPerEU = 0;
   // F->addFnAttr("amdgpu-waves-per-eu", std::to_string(WavesPerEU));
   PROTEUS_DBG(Logger::logs("proteus")
-      << "BlockSize " << BlockSize << " GridSize " << GridSize
-      << " => Set Wokgroup size " << BlockSize << " WavesPerEU (unused) "
-      << WavesPerEU << "\n");
+              << "BlockSize " << BlockSize << " GridSize " << GridSize
+              << " => Set Wokgroup size " << BlockSize
+              << " WavesPerEU (unused) " << WavesPerEU << "\n");
 }
 
 std::unique_ptr<MemoryBuffer>

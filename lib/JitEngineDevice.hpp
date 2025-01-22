@@ -242,8 +242,8 @@ private:
                                 const SmallVector<int32_t> &RCTypes,
                                 SmallVector<RuntimeConstant> &RCsVec) {
     for (int I = 0; I < RCIndices.size(); ++I) {
-      PROTEUS_DBG(Logger::logs("proteus")
-          << "RC Index " << RCIndices[I] << " Type " << RCTypes[I] << "\n");
+      PROTEUS_DBG(Logger::logs("proteus") << "RC Index " << RCIndices[I]
+                                          << " Type " << RCTypes[I] << "\n");
       RuntimeConstant RC;
       switch (RCTypes[I]) {
       case RuntimeConstantTypes::BOOL:
@@ -383,7 +383,7 @@ private:
     auto ExePath = std::filesystem::canonical("/proc/self/exe");
 
     PROTEUS_DBG(Logger::logs("proteus")
-        << "Reading file from path " << ExePath.string() << "\n");
+                << "Reading file from path " << ExePath.string() << "\n");
 
     auto bufferOrErr = MemoryBuffer::getFile(ExePath.string());
     if (!bufferOrErr) {
@@ -409,7 +409,7 @@ private:
         continue;
 
       PROTEUS_DBG(Logger::logs("proteus")
-          << "Hashing section " << sectionName.str() << "\n");
+                  << "Hashing section " << sectionName.str() << "\n");
 
       auto contentsOrErr = section.getContents();
       if (!contentsOrErr) {
@@ -469,7 +469,7 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
 
   TIMESCOPE("specializeIR");
   PROTEUS_DBG(Logger::logs("proteus") << "=== Parsed Module\n"
-                              << M << "=== End of Parsed Module\n");
+                                      << M << "=== End of Parsed Module\n");
   Function *F = M.getFunction(FnName);
   assert(F && "Expected non-null function!");
 
@@ -529,7 +529,7 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
   });
 
   PROTEUS_DBG(Logger::logs("proteus") << "=== JIT Module\n"
-                              << M << "=== End of JIT Module\n");
+                                      << M << "=== End of JIT Module\n");
 
   F->setName(FnName + Suffix);
 
@@ -719,9 +719,9 @@ void JitEngineDevice<ImplT>::registerFatBinary(void *Handle,
                                                const char *ModuleId) {
   CurHandle = Handle;
   PROTEUS_DBG(Logger::logs("proteus")
-      << "Register fatbinary Handle " << Handle << " FatbinWrapper "
-      << FatbinWrapper << " Binary " << (void *)FatbinWrapper->Binary
-      << " ModuleId " << ModuleId << "\n");
+              << "Register fatbinary Handle " << Handle << " FatbinWrapper "
+              << FatbinWrapper << " Binary " << (void *)FatbinWrapper->Binary
+              << " ModuleId " << ModuleId << "\n");
   if (FatbinWrapper->PrelinkedFatbins) {
     // This is RDC compilation, just insert the FatbinWrapper and ignore the
     // ModuleId coming from the link.stub.
@@ -732,7 +732,7 @@ void JitEngineDevice<ImplT>::registerFatBinary(void *Handle,
     for (int I = 0; Ptr != nullptr;
          ++I, Ptr = FatbinWrapper->PrelinkedFatbins[I]) {
       PROTEUS_DBG(Logger::logs("proteus")
-          << "I " << I << " PrelinkedFatbin " << Ptr << "\n");
+                  << "I " << I << " PrelinkedFatbin " << Ptr << "\n");
       GlobalLinkedBinaries.insert(Ptr);
     }
   } else {
@@ -759,17 +759,17 @@ void JitEngineDevice<ImplT>::registerFunction(void *Handle, void *Kernel,
                                               int32_t *RCIndices,
                                               int32_t *RCTypes,
                                               int32_t NumRCs) {
-  PROTEUS_DBG(Logger::logs("proteus")
-      << "Register function " << Kernel << " To Handle " << Handle << "\n");
+  PROTEUS_DBG(Logger::logs("proteus") << "Register function " << Kernel
+                                      << " To Handle " << Handle << "\n");
   // NOTE: HIP RDC might call multiple times the registerFunction for the same
   // kernel, which has weak linkage, when it comes from different translation
   // units. Either the first or the second call can prevail and should be
   // equivalent. We let the first one prevail.
   if (KernelToHandleMap.contains(Kernel)) {
     PROTEUS_DBG(Logger::logs("proteus")
-        << "Warning: duplicate register function for kernel " +
-               std::string(KernelName)
-        << "\n");
+                << "Warning: duplicate register function for kernel " +
+                       std::string(KernelName)
+                << "\n");
     return;
   }
   KernelToHandleMap[Kernel] = Handle;
@@ -782,8 +782,9 @@ template <typename ImplT>
 void JitEngineDevice<ImplT>::registerLinkedBinary(
     FatbinWrapper_t *FatbinWrapper, const char *ModuleId) {
   PROTEUS_DBG(Logger::logs("proteus")
-      << "Register linked binary FatBinary " << FatbinWrapper << " Binary "
-      << (void *)FatbinWrapper->Binary << " ModuleId " << ModuleId << "\n");
+              << "Register linked binary FatBinary " << FatbinWrapper
+              << " Binary " << (void *)FatbinWrapper->Binary << " ModuleId "
+              << ModuleId << "\n");
   if (CurHandle) {
     if (!HandleToBinaryInfo.contains(CurHandle))
       FATAL_ERROR("Expected CurHandle in map");

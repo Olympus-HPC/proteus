@@ -58,11 +58,11 @@ public:
                         SmallVector<RuntimeConstant, 8> &RC) {
     auto LambdaClass = F.getArg(0);
     PROTEUS_DBG(Logger::logs("proteus")
-        << "TransformLambdaSpecialization::transform" << "\n");
+                << "TransformLambdaSpecialization::transform" << "\n");
     PROTEUS_DBG(Logger::logs("proteus") << "\t args" << "\n");
     for (auto &Arg : RC) {
       PROTEUS_DBG(Logger::logs("proteus")
-          << "{" << Arg.Value.Int64Val << ", " << Arg.Slot << " }\n");
+                  << "{" << Arg.Value.Int64Val << ", " << Arg.Slot << " }\n");
     }
 
     PROTEUS_DBG(Logger::logs("proteus") << "\t users" << "\n");
@@ -73,8 +73,9 @@ public:
           if (Arg.Slot == 0) {
             Constant *C = getConstant(M.getContext(), User->getType(), Arg);
             User->replaceAllUsesWith(C);
-            PROTEUS_DBG(Logger::logs("proteus") << "[LambdaSpec] Replacing " << *User
-                                        << " with " << *C << "\n");
+            PROTEUS_DBG(Logger::logs("proteus")
+                        << "[LambdaSpec] Replacing " << *User << " with " << *C
+                        << "\n");
           }
         }
       } else if (auto *GEP = dyn_cast<GetElementPtrInst>(User)) {
@@ -90,8 +91,9 @@ public:
               Type *LoadType = LI->getType();
               Constant *C = getConstant(M.getContext(), LoadType, Arg);
               LI->replaceAllUsesWith(C);
-              PROTEUS_DBG(Logger::logs("proteus") << "[LambdaSpec] Replacing " << *User
-                                          << " with " << *C << "\n");
+              PROTEUS_DBG(Logger::logs("proteus")
+                          << "[LambdaSpec] Replacing " << *User << " with "
+                          << *C << "\n");
             }
           }
         }

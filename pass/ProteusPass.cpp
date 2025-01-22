@@ -688,9 +688,9 @@ private:
 #endif
 
     if (!JitLaunchKernelFnTy)
-      FATAL_ERROR(
-          "Expected non-null jit entry function type, check "
-          "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags for ProteusJitPass");
+      FATAL_ERROR("Expected non-null jit entry function type, check "
+                  "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags "
+                  "for ProteusJitPass");
 
     FunctionCallee JitLaunchKernelFn =
         M.getOrInsertFunction("__jit_launch_kernel", JitLaunchKernelFnTy);
@@ -741,9 +741,9 @@ private:
     }
 
     if (!CallOrInvoke)
-      FATAL_ERROR(
-          "Expected non-null jit launch kernel call or invoke, check "
-          "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags for ProteusJitPass");
+      FATAL_ERROR("Expected non-null jit launch kernel call or invoke, check "
+                  "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags "
+                  "for ProteusJitPass");
 
     LaunchKernelCB->replaceAllUsesWith(CallOrInvoke);
     LaunchKernelCB->eraseFromParent();
@@ -752,15 +752,15 @@ private:
   void emitJitLaunchKernelCall(Module &M) {
     Function *LaunchKernelFn = nullptr;
     if (!LaunchFunctionName) {
-      FATAL_ERROR(
-          "Expected non-null LaunchKernelFn, check "
-          "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags for ProteusJitPass");
+      FATAL_ERROR("Expected non-null LaunchKernelFn, check "
+                  "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags "
+                  "for ProteusJitPass");
     }
     LaunchKernelFn = M.getFunction(LaunchFunctionName);
     if (!LaunchKernelFn)
-      FATAL_ERROR(
-          "Expected non-null LaunchKernelFn, check "
-          "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags for ProteusJitPass");
+      FATAL_ERROR("Expected non-null LaunchKernelFn, check "
+                  "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags "
+                  "for ProteusJitPass");
 
     SmallVector<CallBase *> ToBeReplaced;
     for (User *Usr : LaunchKernelFn->users())

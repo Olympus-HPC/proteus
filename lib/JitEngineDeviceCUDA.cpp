@@ -43,7 +43,8 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
     LLVMContext &Ctx, CUmodule &CUMod,
     SmallVector<std::unique_ptr<Module>> &LinkedModules,
     std::string &ModuleId) {
-  PROTEUS_DBG(Logger::logs("proteus") << "extractLinkedBitcode " << ModuleId << "\n");
+  PROTEUS_DBG(Logger::logs("proteus")
+              << "extractLinkedBitcode " << ModuleId << "\n");
 
   if (!ModuleIdToFatBinary.count(ModuleId))
     FATAL_ERROR("Expected to find module id " + ModuleId + " in map");

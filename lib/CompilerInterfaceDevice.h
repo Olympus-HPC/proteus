@@ -34,7 +34,8 @@ extern "C" hipError_t __jit_launch_kernel(const char *ModuleUniqueId,
                                           uint64_t ShmemSize, void *Stream);
 
 #else
-#error "CompilerInterfaceDevice requires PROTEUS_ENABLE_CUDA or PROTEUS_ENABLE_HIP"
+#error                                                                         \
+    "CompilerInterfaceDevice requires PROTEUS_ENABLE_CUDA or PROTEUS_ENABLE_HIP"
 #endif
 
 #endif

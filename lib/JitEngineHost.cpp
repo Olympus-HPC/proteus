@@ -73,11 +73,12 @@ public:
                                         MaterializationResponsibility &R) {
     TSM.withModuleDo([this](Module &M) {
       PROTEUS_DBG(Logger::logs("proteus") << "=== Begin Before Optimization\n"
-                                  << M << "=== End Before\n");
+                                          << M << "=== End Before\n");
       TIMESCOPE("Run Optimization Transform");
       JitEngineImpl.optimizeIR(M, sys::getHostCPUName());
-      PROTEUS_DBG(Logger::logs("proteus") << "=== Begin After Optimization\n"
-                                  << M << "=== End After Optimization\n");
+      PROTEUS_DBG(Logger::logs("proteus")
+                  << "=== Begin After Optimization\n"
+                  << M << "=== End After Optimization\n");
 #if PROTEUS_ENABLE_DEBUG
       if (verifyModule(M, &errs()))
         FATAL_ERROR(
@@ -92,11 +93,12 @@ public:
   Expected<ThreadSafeModule> operator()(ThreadSafeModule TSM) {
     TSM.withModuleDo([this](Module &M) {
       PROTEUS_DBG(Logger::logs("proteus") << "=== Begin Before Optimization\n"
-                                  << M << "=== End Before\n");
+                                          << M << "=== End Before\n");
       TIMESCOPE("Run Optimization Transform");
       JitEngineImpl.optimizeIR(M, sys::getHostCPUName());
-      PROTEUS_DBG(Logger::logs("proteus") << "=== Begin After Optimization\n"
-                                  << M << "=== End After Optimization\n");
+      PROTEUS_DBG(Logger::logs("proteus")
+                  << "=== Begin After Optimization\n"
+                  << M << "=== End After Optimization\n");
 #if PROTEUS_ENABLE_DEBUG
       if (verifyModule(M, &errs()))
         FATAL_ERROR(
@@ -228,11 +230,13 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
       consumeError(std::move(Error));
 
       PROTEUS_DBG(Logger::logs("proteus")
-          << "Resolve statically missing GV symbol " << GV.getName() << "\n");
+                  << "Resolve statically missing GV symbol " << GV.getName()
+                  << "\n");
 
 #if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
       if (GV.getName() == "__jit_launch_kernel") {
-        PROTEUS_DBG(Logger::logs("proteus") << "Resolving via ORC jit_launch_kernel\n");
+        PROTEUS_DBG(Logger::logs("proteus")
+                    << "Resolving via ORC jit_launch_kernel\n");
         SymbolMap SymbolMap;
         SymbolMap[LLJITPtr->mangleAndIntern("__jit_launch_kernel")] =
             orc::ExecutorSymbolDef(
@@ -253,8 +257,8 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
     // TODO: change NumRuntimeConstants to size_t at interface.
     MDNode *Node = F->getMetadata("jit_arg_nos");
     assert(Node && "Expected metata for jit argument positions");
-    PROTEUS_DBG(Logger::logs("proteus")
-        << "Metadata jit for F " << F->getName() << " = " << *Node << "\n");
+    PROTEUS_DBG(Logger::logs("proteus") << "Metadata jit for F " << F->getName()
+                                        << " = " << *Node << "\n");
 
     // Replace argument uses with runtime constants.
     SmallVector<int32_t> ArgPos;
@@ -314,18 +318,20 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
       ExitOnErr(specializeIR(FnName, Suffix, StrIR, RC, NumRuntimeConstants))));
 
   PROTEUS_DBG(Logger::logs("proteus")
-      << "===\n"
-      << *LLJITPtr->getExecutionSession().getSymbolStringPool() << "===\n");
+              << "===\n"
+              << *LLJITPtr->getExecutionSession().getSymbolStringPool()
+              << "===\n");
 
   // (4) Look up the JIT'd function.
   PROTEUS_DBG(Logger::logs("proteus")
-      << "Lookup FnName " << FnName << " mangled as " << MangledFnName << "\n");
+              << "Lookup FnName " << FnName << " mangled as " << MangledFnName
+              << "\n");
   auto EntryAddr = ExitOnErr(LLJITPtr->lookup(MangledFnName));
 
   JitFnPtr = (void *)EntryAddr.getValue();
   PROTEUS_DBG(Logger::logs("proteus")
-      << "FnName " << FnName << " Mangled " << MangledFnName << " address "
-      << JitFnPtr << "\n");
+              << "FnName " << FnName << " Mangled " << MangledFnName
+              << " address " << JitFnPtr << "\n");
   assert(JitFnPtr && "Expected non-null JIT function pointer");
   CodeCache.insert(HashValue, JitFnPtr, FnName, RC, NumRuntimeConstants);
 
