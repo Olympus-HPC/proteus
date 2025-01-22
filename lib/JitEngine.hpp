@@ -41,22 +41,22 @@ static inline bool getEnvOrDefaultBool(const char *VarName, bool Default) {
 
 class JitEngine {
 public:
-  void optimizeIR(Module &M, StringRef Arch);
+  static void optimizeIR(Module &M, StringRef Arch);
 
   bool isProteusDisabled() { return Config.ENV_PROTEUS_DISABLE; }
 
   static void runCleanupPassPipeline(Module &M);
 
 protected:
-  Expected<std::unique_ptr<TargetMachine>>
+  static Expected<std::unique_ptr<TargetMachine>>
   createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3);
 
-  void runOptimizationPassPipeline(Module &M, StringRef Arch,
-                                   unsigned OptLevel = 3);
+  static void runOptimizationPassPipeline(Module &M, StringRef Arch,
+                                          unsigned OptLevel = 3);
 
   JitEngine();
 
-  std::string mangleSuffix(uint64_t HashValue);
+  static std::string mangleSuffix(uint64_t HashValue);
 
   struct {
     bool ENV_PROTEUS_USE_STORED_CACHE;

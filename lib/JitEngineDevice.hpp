@@ -286,21 +286,21 @@ private:
     }
   }
 
-  DeviceError_t launchKernelDirect(void *KernelFunc, dim3 GridDim,
-                                   dim3 BlockDim, void **KernelArgs,
-                                   uint64_t ShmemSize, DeviceStream_t Stream) {
-    return static_cast<ImplT &>(*this).launchKernelDirect(
-        KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
+  static DeviceError_t launchKernelDirect(void *KernelFunc, dim3 GridDim,
+                                          dim3 BlockDim, void **KernelArgs,
+                                          uint64_t ShmemSize,
+                                          DeviceStream_t Stream) {
+    return ImplT::launchKernelDirect(KernelFunc, GridDim, BlockDim, KernelArgs,
+                                     ShmemSize, Stream);
   }
 
   std::unique_ptr<MemoryBuffer> codegenObject(Module &M, StringRef DeviceArch) {
     return static_cast<ImplT &>(*this).codegenObject(M, DeviceArch);
   }
 
-  KernelFunction_t getKernelFunctionFromImage(StringRef KernelName,
-                                              const void *Image) {
-    return static_cast<ImplT &>(*this).getKernelFunctionFromImage(KernelName,
-                                                                  Image);
+  static KernelFunction_t getKernelFunctionFromImage(StringRef KernelName,
+                                                     const void *Image) {
+    return ImplT::getKernelFunctionFromImage(KernelName, Image);
   }
 
   Module &extractDeviceBitcode(StringRef KernelName, void *Kernel) {
