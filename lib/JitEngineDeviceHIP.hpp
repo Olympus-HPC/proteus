@@ -96,10 +96,10 @@ public:
 
   void *resolveDeviceGlobalAddr(const void *Addr);
 
-  void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
-                                int BlockSize);
+  static void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
+                                       int BlockSize);
 
-  void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim);
+  static void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim);
 
   Module &extractDeviceBitcode(StringRef KernelName, void *Kernel);
 
@@ -108,9 +108,10 @@ public:
   hipFunction_t getKernelFunctionFromImage(StringRef KernelName,
                                            const void *Image);
 
-  hipError_t launchKernelFunction(hipFunction_t KernelFunc, dim3 GridDim,
-                                  dim3 BlockDim, void **KernelArgs,
-                                  uint64_t ShmemSize, hipStream_t Stream);
+  static hipError_t launchKernelFunction(hipFunction_t KernelFunc, dim3 GridDim,
+                                         dim3 BlockDim, void **KernelArgs,
+                                         uint64_t ShmemSize,
+                                         hipStream_t Stream);
 
   hipError_t launchKernelDirect(void *KernelFunc, dim3 GridDim, dim3 BlockDim,
                                 void **KernelArgs, uint64_t ShmemSize,

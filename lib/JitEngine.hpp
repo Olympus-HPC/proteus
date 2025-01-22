@@ -45,7 +45,7 @@ public:
 
   bool isProteusDisabled() { return Config.ENV_PROTEUS_DISABLE; }
 
-  void runCleanupPassPipeline(Module &M);
+  static void runCleanupPassPipeline(Module &M);
 
 protected:
   Expected<std::unique_ptr<TargetMachine>>
