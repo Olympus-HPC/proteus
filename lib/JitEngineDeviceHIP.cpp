@@ -127,7 +127,7 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
 
   ArrayRef<uint8_t> DeviceBitcode;
   SmallVector<std::unique_ptr<Module>> LinkedModules;
-  auto &Ctx = getProteusLLVMCtx();
+  auto &Ctx = JitEngineDevice<JitEngineDeviceHIP>::getProteusLLVMCtx();
 
   auto extractModuleFromSection = [&DeviceElf, &Ctx](auto &Section,
                                                      StringRef SectionName) {
@@ -171,7 +171,7 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
     }
   }
 
-  auto JitModule = linkJitModule(KernelName, LinkedModules);
+  auto JitModule = linkJitModule(KernelName, Ctx, LinkedModules);
 
   // All kernels included in this collection of modules will have an
   // identical non specialized IR file. Map all Kernels, to this generic IR
