@@ -460,7 +460,7 @@ template <typename ImplT>
 Function *JitEngineDevice<ImplT>::pruneIR(Module &M, StringRef FnName) {
   TIMESCOPE("pruneIR");
   PROTEUS_DBG(Logger::logs("proteus") << "=== Parsed Module\n"
-                              << M << "=== End of Parsed Module\n");
+                                      << M << "=== End of Parsed Module\n");
   Function *F = M.getFunction(FnName);
   assert(F && "Expected non-null function!");
 
@@ -640,7 +640,7 @@ JitEngineDevice<ImplT>::compileAndRun(
     setKernelDims(*JitModule, GridDim, BlockDim);
 
   PROTEUS_DBG(Logger::logs("proteus") << "=== JIT Module\n"
-                              << M << "=== End of JIT Module\n");
+                                      << M << "=== End of JIT Module\n");
 
   JitFunction->setName(KernelName + Suffix);
 
