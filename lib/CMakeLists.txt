@@ -57,6 +57,11 @@ else()
 endif()
 
 target_compile_definitions(proteus PRIVATE ${LLVM_DEFINITIONS})
+if (PROTEUS_ENABLE_CUDA)
+  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_CUDA)
+elseif(PROTEUS_ENABLE_HIP)
+  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_HIP)
+endif()
 
 if(ENABLE_TIME_TRACING)
   target_compile_definitions(proteus PRIVATE "-DENABLE_TIME_TRACING")
