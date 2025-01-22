@@ -58,7 +58,7 @@ using namespace proteus;
 using namespace llvm;
 using namespace llvm::orc;
 
-#if ENABLE_HIP || ENABLE_CUDA
+#if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
 #include "CompilerInterfaceDevice.h"
 #endif
 
@@ -72,13 +72,14 @@ public:
   Expected<ThreadSafeModule> operator()(ThreadSafeModule TSM,
                                         MaterializationResponsibility &R) {
     TSM.withModuleDo([this](Module &M) {
-      DBG(Logger::logs("proteus") << "=== Begin Before Optimization\n"
-                                  << M << "=== End Before\n");
+      PROTEUS_DBG(Logger::logs("proteus") << "=== Begin Before Optimization\n"
+                                          << M << "=== End Before\n");
       TIMESCOPE("Run Optimization Transform");
       JitEngineImpl.optimizeIR(M, sys::getHostCPUName());
-      DBG(Logger::logs("proteus") << "=== Begin After Optimization\n"
-                                  << M << "=== End After Optimization\n");
-#if ENABLE_DEBUG
+      PROTEUS_DBG(Logger::logs("proteus")
+                  << "=== Begin After Optimization\n"
+                  << M << "=== End After Optimization\n");
+#if PROTEUS_ENABLE_DEBUG
       if (verifyModule(M, &errs()))
         FATAL_ERROR(
             "Broken module found after optimization, JIT compilation aborted!");
@@ -91,13 +92,14 @@ public:
 
   Expected<ThreadSafeModule> operator()(ThreadSafeModule TSM) {
     TSM.withModuleDo([this](Module &M) {
-      DBG(Logger::logs("proteus") << "=== Begin Before Optimization\n"
-                                  << M << "=== End Before\n");
+      PROTEUS_DBG(Logger::logs("proteus") << "=== Begin Before Optimization\n"
+                                          << M << "=== End Before\n");
       TIMESCOPE("Run Optimization Transform");
       JitEngineImpl.optimizeIR(M, sys::getHostCPUName());
-      DBG(Logger::logs("proteus") << "=== Begin After Optimization\n"
-                                  << M << "=== End After Optimization\n");
-#if ENABLE_DEBUG
+      PROTEUS_DBG(Logger::logs("proteus")
+                  << "=== Begin After Optimization\n"
+                  << M << "=== End After Optimization\n");
+#if PROTEUS_ENABLE_DEBUG
       if (verifyModule(M, &errs()))
         FATAL_ERROR(
             "Broken module found after optimization, JIT compilation aborted!");
@@ -122,7 +124,7 @@ void JitEngineHost::addStaticLibrarySymbols() {
   // Create a SymbolMap for static symbols.
   SymbolMap SymbolMap;
 
-#if ENABLE_CUDA
+#if PROTEUS_ENABLE_CUDA
   // NOTE: For CUDA codes we link the CUDA runtime statically to access device
   // global variables. So, if the host JIT module uses CUDA functions, we
   // need to resolve them statically in the JIT module's linker.
@@ -227,12 +229,14 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
       // Consume the error and fix with static linking.
       consumeError(std::move(Error));
 
-      DBG(Logger::logs("proteus")
-          << "Resolve statically missing GV symbol " << GV.getName() << "\n");
+      PROTEUS_DBG(Logger::logs("proteus")
+                  << "Resolve statically missing GV symbol " << GV.getName()
+                  << "\n");
 
-#if ENABLE_CUDA || ENABLE_HIP
+#if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
       if (GV.getName() == "__jit_launch_kernel") {
-        DBG(Logger::logs("proteus") << "Resolving via ORC jit_launch_kernel\n");
+        PROTEUS_DBG(Logger::logs("proteus")
+                    << "Resolving via ORC jit_launch_kernel\n");
         SymbolMap SymbolMap;
         SymbolMap[LLJITPtr->mangleAndIntern("__jit_launch_kernel")] =
             orc::ExecutorSymbolDef(
@@ -253,8 +257,8 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
     // TODO: change NumRuntimeConstants to size_t at interface.
     MDNode *Node = F->getMetadata("jit_arg_nos");
     assert(Node && "Expected metata for jit argument positions");
-    DBG(Logger::logs("proteus")
-        << "Metadata jit for F " << F->getName() << " = " << *Node << "\n");
+    PROTEUS_DBG(Logger::logs("proteus") << "Metadata jit for F " << F->getName()
+                                        << " = " << *Node << "\n");
 
     // Replace argument uses with runtime constants.
     SmallVector<int32_t> ArgPos;
@@ -279,7 +283,7 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
 
     F->setName(FnName + Suffix);
 
-#if ENABLE_DEBUG
+#if PROTEUS_ENABLE_DEBUG
     Logger::logs("proteus") << "=== Final Module\n"
                             << *M << "=== End Final Module\n";
     if (verifyModule(*M, &errs()))
@@ -313,19 +317,21 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   ExitOnErr(LLJITPtr->addIRModule(
       ExitOnErr(specializeIR(FnName, Suffix, StrIR, RC, NumRuntimeConstants))));
 
-  DBG(Logger::logs("proteus")
-      << "===\n"
-      << *LLJITPtr->getExecutionSession().getSymbolStringPool() << "===\n");
+  PROTEUS_DBG(Logger::logs("proteus")
+              << "===\n"
+              << *LLJITPtr->getExecutionSession().getSymbolStringPool()
+              << "===\n");
 
   // (4) Look up the JIT'd function.
-  DBG(Logger::logs("proteus")
-      << "Lookup FnName " << FnName << " mangled as " << MangledFnName << "\n");
+  PROTEUS_DBG(Logger::logs("proteus")
+              << "Lookup FnName " << FnName << " mangled as " << MangledFnName
+              << "\n");
   auto EntryAddr = ExitOnErr(LLJITPtr->lookup(MangledFnName));
 
   JitFnPtr = (void *)EntryAddr.getValue();
-  DBG(Logger::logs("proteus")
-      << "FnName " << FnName << " Mangled " << MangledFnName << " address "
-      << JitFnPtr << "\n");
+  PROTEUS_DBG(Logger::logs("proteus")
+              << "FnName " << FnName << " Mangled " << MangledFnName
+              << " address " << JitFnPtr << "\n");
   assert(JitFnPtr && "Expected non-null JIT function pointer");
   CodeCache.insert(HashValue, JitFnPtr, FnName, RC, NumRuntimeConstants);
 
@@ -365,7 +371,7 @@ JitEngineHost::JitEngineHost(int argc, char *argv[]) {
                       // Make sure the debug info sections aren't stripped.
                       ObjLinkingLayer->setProcessAllSections(true);
 
-#if defined(ENABLE_DEBUG) || defined(ENABLE_PERFMAP)
+#if defined(PROTEUS_ENABLE_DEBUG) || defined(ENABLE_PERFMAP)
                       ObjLinkingLayer->setNotifyLoaded(notifyLoaded);
 #endif
                       return ObjLinkingLayer;

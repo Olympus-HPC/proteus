@@ -36,7 +36,7 @@ using namespace llvm;
 
 void *JitEngineDeviceHIP::resolveDeviceGlobalAddr(const void *Addr) {
   void *DevPtr = nullptr;
-  hipErrCheck(hipGetSymbolAddress(&DevPtr, HIP_SYMBOL(Addr)));
+  proteusHipErrCheck(hipGetSymbolAddress(&DevPtr, HIP_SYMBOL(Addr)));
   assert(DevPtr && "Expected non-null device pointer for global");
 
   return DevPtr;
@@ -84,7 +84,8 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
 
   uint64_t NumberOfBundles = Read8ByteIntLE(Binary, Pos);
   Pos += 8;
-  DBG(Logger::logs("proteus") << "NumberOfbundles " << NumberOfBundles << "\n");
+  PROTEUS_DBG(Logger::logs("proteus")
+              << "NumberOfbundles " << NumberOfBundles << "\n");
 
   StringRef DeviceBinary;
   for (uint64_t i = 0; i < NumberOfBundles; ++i) {
@@ -100,14 +101,14 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
     StringRef Triple(Binary + Pos, TripleSize);
     Pos += TripleSize;
 
-    DBG(Logger::logs("proteus") << "Offset " << Offset << "\n");
-    DBG(Logger::logs("proteus") << "Size " << Size << "\n");
-    DBG(Logger::logs("proteus") << "TripleSize " << TripleSize << "\n");
-    DBG(Logger::logs("proteus") << "Triple " << Triple << "\n");
+    PROTEUS_DBG(Logger::logs("proteus") << "Offset " << Offset << "\n");
+    PROTEUS_DBG(Logger::logs("proteus") << "Size " << Size << "\n");
+    PROTEUS_DBG(Logger::logs("proteus") << "TripleSize " << TripleSize << "\n");
+    PROTEUS_DBG(Logger::logs("proteus") << "Triple " << Triple << "\n");
 
     if (!Triple.contains("amdgcn") || !Triple.contains(DeviceArch)) {
-      DBG(Logger::logs("proteus")
-          << "mismatching architecture, skipping ...\n");
+      PROTEUS_DBG(Logger::logs("proteus")
+                  << "mismatching architecture, skipping ...\n");
       continue;
     }
 
@@ -153,7 +154,8 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
     auto SectionName = DeviceElf->getSectionName(Section);
     if (SectionName.takeError())
       FATAL_ERROR("Error reading section name");
-    DBG(Logger::logs("proteus") << "SectionName " << *SectionName << "\n");
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "SectionName " << *SectionName << "\n");
 
     if (!SectionName->starts_with(".jit.bitcode"))
       continue;
@@ -221,10 +223,10 @@ void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
   // int WavesPerEU = (GridSize * BlockSize) / 64 / 110 / 4 / 2;
   int WavesPerEU = 0;
   // F->addFnAttr("amdgpu-waves-per-eu", std::to_string(WavesPerEU));
-  DBG(Logger::logs("proteus")
-      << "BlockSize " << BlockSize << " GridSize " << GridSize
-      << " => Set Wokgroup size " << BlockSize << " WavesPerEU (unused) "
-      << WavesPerEU << "\n");
+  PROTEUS_DBG(Logger::logs("proteus")
+              << "BlockSize " << BlockSize << " GridSize " << GridSize
+              << " => Set Wokgroup size " << BlockSize
+              << " WavesPerEU (unused) " << WavesPerEU << "\n");
 }
 
 std::unique_ptr<MemoryBuffer>
@@ -258,17 +260,17 @@ JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
           HIPRTC_JIT_IR_TO_ISA_OPT_EXT, HIPRTC_JIT_IR_TO_ISA_OPT_COUNT_EXT};
       size_t OptArgsSize = 3;
       const void *JITOptionsValues[] = {(void *)OptArgs, (void *)(OptArgsSize)};
-      hiprtcErrCheck(hiprtcLinkCreate(JITOptions.size(), JITOptions.data(),
-                                      (void **)JITOptionsValues,
-                                      &HipLinkStatePtr));
+      proteusHiprtcErrCheck(
+          hiprtcLinkCreate(JITOptions.size(), JITOptions.data(),
+                           (void **)JITOptionsValues, &HipLinkStatePtr));
       // NOTE: the following version of te code does not set options.
-      // hiprtcErrCheck(hiprtcLinkCreate(0, nullptr, nullptr,
+      // proteusHiprtcErrCheck(hiprtcLinkCreate(0, nullptr, nullptr,
       // &hip_link_state_ptr));
 
-      hiprtcErrCheck(hiprtcLinkAddData(
+      proteusHiprtcErrCheck(hiprtcLinkAddData(
           HipLinkStatePtr, HIPRTC_JIT_INPUT_LLVM_BITCODE,
           (void *)ModuleBuf.data(), ModuleBuf.size(), "", 0, nullptr, nullptr));
-      hiprtcErrCheck(
+      proteusHiprtcErrCheck(
           hiprtcLinkComplete(HipLinkStatePtr, (void **)&BinOut, &BinSize));
     }
 
@@ -341,20 +343,20 @@ JitEngineDeviceHIP::getKernelFunctionFromImage(StringRef KernelName,
   hipModule_t HipModule;
   hipFunction_t KernelFunc;
 
-  hipErrCheck(hipModuleLoadData(&HipModule, Image));
+  proteusHipErrCheck(hipModuleLoadData(&HipModule, Image));
   if (Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY) {
     for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
       hipDeviceptr_t Dptr;
       size_t Bytes;
-      hipErrCheck(hipModuleGetGlobal(&Dptr, &Bytes, HipModule,
-                                     (GlobalName + "$ptr").c_str()));
+      proteusHipErrCheck(hipModuleGetGlobal(&Dptr, &Bytes, HipModule,
+                                            (GlobalName + "$ptr").c_str()));
 
       void *DevPtr = resolveDeviceGlobalAddr(HostAddr);
       uint64_t PtrVal = (uint64_t)DevPtr;
-      hipErrCheck(hipMemcpyHtoD(Dptr, &PtrVal, Bytes));
+      proteusHipErrCheck(hipMemcpyHtoD(Dptr, &PtrVal, Bytes));
     }
   }
-  hipErrCheck(
+  proteusHipErrCheck(
       hipModuleGetFunction(&KernelFunc, HipModule, KernelName.str().c_str()));
 
   return KernelFunc;
@@ -386,7 +388,7 @@ JitEngineDeviceHIP::JitEngineDeviceHIP() {
   LLVMInitializeAMDGPUAsmPrinter();
 
   hipDeviceProp_t devProp;
-  hipErrCheck(hipGetDeviceProperties(&devProp, 0));
+  proteusHipErrCheck(hipGetDeviceProperties(&devProp, 0));
 
   DeviceArch = devProp.gcnArchName;
   DeviceArch = DeviceArch.substr(0, DeviceArch.find_first_of(":"));

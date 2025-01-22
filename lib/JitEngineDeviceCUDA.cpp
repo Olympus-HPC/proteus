@@ -28,7 +28,7 @@ using namespace llvm;
 
 void *JitEngineDeviceCUDA::resolveDeviceGlobalAddr(const void *Addr) {
   void *DevPtr = nullptr;
-  cudaErrCheck(cudaGetSymbolAddress(&DevPtr, Addr));
+  proteusCudaErrCheck(cudaGetSymbolAddress(&DevPtr, Addr));
   assert(DevPtr && "Expected non-null device pointer for global");
 
   return DevPtr;
@@ -43,7 +43,8 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
     LLVMContext &Ctx, CUmodule &CUMod,
     SmallVector<std::unique_ptr<Module>> &LinkedModules,
     std::string &ModuleId) {
-  DBG(Logger::logs("proteus") << "extractLinkedBitcode " << ModuleId << "\n");
+  PROTEUS_DBG(Logger::logs("proteus")
+              << "extractLinkedBitcode " << ModuleId << "\n");
 
   if (!ModuleIdToFatBinary.count(ModuleId))
     FATAL_ERROR("Expected to find module id " + ModuleId + " in map");
@@ -52,11 +53,12 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
 
   CUdeviceptr DevPtr;
   size_t Bytes;
-  cuErrCheck(cuModuleGetGlobal(&DevPtr, &Bytes, CUMod, ModuleId.c_str()));
+  proteusCuErrCheck(
+      cuModuleGetGlobal(&DevPtr, &Bytes, CUMod, ModuleId.c_str()));
 
   SmallString<4096> DeviceBitcode;
   DeviceBitcode.reserve(Bytes);
-  cuErrCheck(cuMemcpyDtoH(DeviceBitcode.data(), DevPtr, Bytes));
+  proteusCuErrCheck(cuMemcpyDtoH(DeviceBitcode.data(), DevPtr, Bytes));
 
   SMDiagnostic Err;
   auto M =
@@ -97,7 +99,7 @@ Module &JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName,
 
   auto &LinkedModuleIds = HandleToBinaryInfo[Handle].LinkedModuleIds;
 
-  cuErrCheck(cuModuleLoadData(&CUMod, FatbinWrapper->Binary));
+  proteusCuErrCheck(cuModuleLoadData(&CUMod, FatbinWrapper->Binary));
 
   for (auto &ModuleId : LinkedModuleIds)
     extractLinkedBitcode(Ctx, CUMod, LinkedModules, ModuleId);
@@ -105,7 +107,7 @@ Module &JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName,
   for (auto &ModuleId : GlobalLinkedModuleIds)
     extractLinkedBitcode(Ctx, CUMod, LinkedModules, ModuleId);
 
-  cuErrCheck(cuModuleUnload(CUMod));
+  proteusCuErrCheck(cuModuleUnload(CUMod));
 
   auto JitModule = linkJitModule(KernelName, LinkedModules);
 
@@ -176,20 +178,21 @@ CUfunction JitEngineDeviceCUDA::getKernelFunctionFromImage(StringRef KernelName,
   CUfunction KernelFunc;
   CUmodule Mod;
 
-  cuErrCheck(cuModuleLoadData(&Mod, Image));
+  proteusCuErrCheck(cuModuleLoadData(&Mod, Image));
   if (Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY) {
     for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
       CUdeviceptr Dptr;
       size_t Bytes;
-      cuErrCheck(
+      proteusCuErrCheck(
           cuModuleGetGlobal(&Dptr, &Bytes, Mod, (GlobalName + "$ptr").c_str()));
 
       void *DevPtr = resolveDeviceGlobalAddr(HostAddr);
       uint64_t PtrVal = (uint64_t)DevPtr;
-      cuErrCheck(cuMemcpyHtoD(Dptr, &PtrVal, Bytes));
+      proteusCuErrCheck(cuMemcpyHtoD(Dptr, &PtrVal, Bytes));
     }
   }
-  cuErrCheck(cuModuleGetFunction(&KernelFunc, Mod, KernelName.str().c_str()));
+  proteusCuErrCheck(
+      cuModuleGetFunction(&KernelFunc, Mod, KernelName.str().c_str()));
 
   return KernelFunc;
 }
@@ -250,13 +253,13 @@ JitEngineDeviceCUDA::codegenObject(Module &M, StringRef DeviceArch) {
   PTXStr.push_back('\0');
 
   nvPTXCompilerHandle PTXCompiler;
-  nvPTXCompilerErrCheck(
+  proteusNvPTXCompilerErrCheck(
       nvPTXCompilerCreate(&PTXCompiler, PTXStr.size(), PTXStr.data()));
   std::string ArchOpt = ("--gpu-name=" + DeviceArch).str();
   std::string RDCOption = "";
   if (!GlobalLinkedBinaries.empty())
     RDCOption = "-c";
-#if ENABLE_DEBUG
+#if PROTEUS_ENABLE_DEBUG
   const char *CompileOptions[] = {ArchOpt.c_str(), "--verbose",
                                   RDCOption.c_str()};
   size_t NumCompileOptions = 2 + (RDCOption.empty() ? 0 : 1);
@@ -264,44 +267,46 @@ JitEngineDeviceCUDA::codegenObject(Module &M, StringRef DeviceArch) {
   const char *CompileOptions[] = {ArchOpt.c_str(), RDCOption.c_str()};
   size_t NumCompileOptions = 1 + (RDCOption.empty() ? 0 : 1);
 #endif
-  nvPTXCompilerErrCheck(
+  proteusNvPTXCompilerErrCheck(
       nvPTXCompilerCompile(PTXCompiler, NumCompileOptions, CompileOptions));
-  nvPTXCompilerErrCheck(
+  proteusNvPTXCompilerErrCheck(
       nvPTXCompilerGetCompiledProgramSize(PTXCompiler, &BinSize));
   auto ObjBuf = WritableMemoryBuffer::getNewUninitMemBuffer(BinSize);
-  nvPTXCompilerErrCheck(
+  proteusNvPTXCompilerErrCheck(
       nvPTXCompilerGetCompiledProgram(PTXCompiler, ObjBuf->getBufferStart()));
-#if ENABLE_DEBUG
+#if PROTEUS_ENABLE_DEBUG
   {
     size_t LogSize;
-    nvPTXCompilerErrCheck(nvPTXCompilerGetInfoLogSize(PTXCompiler, &LogSize));
+    proteusNvPTXCompilerErrCheck(
+        nvPTXCompilerGetInfoLogSize(PTXCompiler, &LogSize));
     auto Log = std::make_unique<char[]>(LogSize);
-    nvPTXCompilerErrCheck(nvPTXCompilerGetInfoLog(PTXCompiler, Log.get()));
+    proteusNvPTXCompilerErrCheck(
+        nvPTXCompilerGetInfoLog(PTXCompiler, Log.get()));
     Logger::logs("proteus") << "=== nvPTXCompiler Log\n" << Log.get() << "\n";
   }
 #endif
-  nvPTXCompilerErrCheck(nvPTXCompilerDestroy(&PTXCompiler));
+  proteusNvPTXCompilerErrCheck(nvPTXCompilerDestroy(&PTXCompiler));
 
   std::unique_ptr<MemoryBuffer> FinalObjBuf;
   if (!GlobalLinkedBinaries.empty()) {
     CUlinkState CULinkState;
-    cuErrCheck(cuLinkCreate(0, nullptr, nullptr, &CULinkState));
+    proteusCuErrCheck(cuLinkCreate(0, nullptr, nullptr, &CULinkState));
     for (auto *Ptr : GlobalLinkedBinaries) {
       // We do not know the size of the binary but the CUDA API just needs a
       // non-zero argument.
-      cuErrCheck(cuLinkAddData(CULinkState, CU_JIT_INPUT_FATBINARY, Ptr, 1, "",
-                               0, 0, 0));
+      proteusCuErrCheck(cuLinkAddData(CULinkState, CU_JIT_INPUT_FATBINARY, Ptr,
+                                      1, "", 0, 0, 0));
     }
 
     // Again using a non-zero argument, though we can get the size from the ptx
     // compiler.
-    cuErrCheck(cuLinkAddData(CULinkState, CU_JIT_INPUT_FATBINARY,
-                             static_cast<void *>(ObjBuf->getBufferStart()), 1,
-                             "", 0, 0, 0));
+    proteusCuErrCheck(cuLinkAddData(
+        CULinkState, CU_JIT_INPUT_FATBINARY,
+        static_cast<void *>(ObjBuf->getBufferStart()), 1, "", 0, 0, 0));
 
     void *BinOut;
     size_t BinSize;
-    cuErrCheck(cuLinkComplete(CULinkState, &BinOut, &BinSize));
+    proteusCuErrCheck(cuLinkComplete(CULinkState, &BinOut, &BinSize));
     FinalObjBuf = std::move(MemoryBuffer::getMemBufferCopy(
         StringRef{static_cast<char *>(BinOut), BinSize}));
   } else {
@@ -322,24 +327,24 @@ JitEngineDeviceCUDA::JitEngineDeviceCUDA() {
   CUdevice CUDev;
   CUcontext CUCtx;
 
-  cuErrCheck(cuInit(0));
+  proteusCuErrCheck(cuInit(0));
 
   CUresult CURes = cuCtxGetDevice(&CUDev);
   if (CURes == CUDA_ERROR_INVALID_CONTEXT or !CUDev)
     // TODO: is selecting device 0 correct?
-    cuErrCheck(cuDeviceGet(&CUDev, 0));
+    proteusCuErrCheck(cuDeviceGet(&CUDev, 0));
 
-  cuErrCheck(cuCtxGetCurrent(&CUCtx));
+  proteusCuErrCheck(cuCtxGetCurrent(&CUCtx));
   if (!CUCtx)
-    cuErrCheck(cuCtxCreate(&CUCtx, 0, CUDev));
+    proteusCuErrCheck(cuCtxCreate(&CUCtx, 0, CUDev));
 
   int CCMajor;
-  cuErrCheck(cuDeviceGetAttribute(
+  proteusCuErrCheck(cuDeviceGetAttribute(
       &CCMajor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, CUDev));
   int CCMinor;
-  cuErrCheck(cuDeviceGetAttribute(
+  proteusCuErrCheck(cuDeviceGetAttribute(
       &CCMinor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, CUDev));
   DeviceArch = "sm_" + std::to_string(CCMajor * 10 + CCMinor);
 
-  DBG(Logger::logs("proteus") << "CUDA Arch " << DeviceArch << "\n");
+  PROTEUS_DBG(Logger::logs("proteus") << "CUDA Arch " << DeviceArch << "\n");
 }

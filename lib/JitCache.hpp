@@ -65,14 +65,14 @@ public:
 
   void insert(uint64_t HashValue, Function_t FunctionPtr, StringRef FnName,
               RuntimeConstant *RC, int NumRuntimeConstants) {
-#if ENABLE_DEBUG
+#if PROTEUS_ENABLE_DEBUG
     if (CacheMap.count(HashValue))
       FATAL_ERROR("JitCache collision detected");
 #endif
 
     CacheMap[HashValue] = {FunctionPtr, /* num_execs */ 1};
 
-#if ENABLE_DEBUG
+#if PROTEUS_ENABLE_DEBUG
     CacheMap[HashValue].FnName = FnName.str();
     for (size_t I = 0; I < NumRuntimeConstants; ++I)
       CacheMap[HashValue].RCVector.push_back(RC[I]);
@@ -90,7 +90,7 @@ public:
       // JCE.NumExecs;
       printf("HashValue %lu NumExecs %lu NumHits %lu", HashValue, JCE.NumExecs,
              JCE.NumHits);
-#if ENABLE_DEBUG
+#if PROTEUS_ENABLE_DEBUG
       // outs() << " FnName " << JCE.FnName << " RCs [";
       printf(" FnName %s RCs [", JCE.FnName.c_str());
       for (auto &RC : JCE.RCVector)
@@ -111,7 +111,7 @@ private:
     Function_t FunctionPtr;
     uint64_t NumExecs;
     uint64_t NumHits;
-#if ENABLE_DEBUG
+#if PROTEUS_ENABLE_DEBUG
     std::string FnName;
     SmallVector<RuntimeConstant, 8> RCVector;
 #endif

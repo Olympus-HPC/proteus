@@ -21,7 +21,7 @@ extern "C" __attribute__((used)) void *__jit_entry(char *FnName, char *IR,
                                                    int NumRuntimeConstants) {
   TIMESCOPE("__jit_entry");
   JitEngineHost &Jit = JitEngineHost::instance();
-#if ENABLE_DEBUG
+#if PROTEUS_ENABLE_DEBUG
   Logger::logs("proteus") << "FnName " << FnName << " NumRuntimeConstants "
                           << NumRuntimeConstants << "\n";
   for (int I = 0; I < NumRuntimeConstants; ++I)

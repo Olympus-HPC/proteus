@@ -13,7 +13,7 @@
 
 #include "CompilerInterfaceTypes.h"
 
-#if ENABLE_CUDA
+#if PROTEUS_ENABLE_CUDA
 #include "JitEngineDeviceCUDA.hpp"
 using JitDeviceImplT = proteus::JitEngineDeviceCUDA;
 
@@ -22,7 +22,7 @@ extern "C" cudaError_t __jit_launch_kernel(const char *ModuleUniqueId,
                                            dim3 BlockDim, void **KernelArgs,
                                            uint64_t ShmemSize, void *Stream);
 
-#elif ENABLE_HIP
+#elif PROTEUS_ENABLE_HIP
 #include "JitEngineDeviceHIP.hpp"
 using JitDeviceImplT = proteus::JitEngineDeviceHIP;
 
@@ -34,7 +34,8 @@ extern "C" hipError_t __jit_launch_kernel(const char *ModuleUniqueId,
                                           uint64_t ShmemSize, void *Stream);
 
 #else
-#error "CompilerInterfaceDevice requires ENABLE_CUDA or ENABLE_HIP"
+#error                                                                         \
+    "CompilerInterfaceDevice requires PROTEUS_ENABLE_CUDA or PROTEUS_ENABLE_HIP"
 #endif
 
 #endif

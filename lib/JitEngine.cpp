@@ -127,7 +127,7 @@ JitEngine::JitEngine() {
   Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY =
       getEnvOrDefaultBool("ENV_PROTEUS_RELINK_GLOBALS_BY_COPY", false);
 
-#if ENABLE_DEBUG
+#if PROTEUS_ENABLE_DEBUG
   Logger::logs("proteus") << "ENV_PROTEUS_USE_STORED_CACHE "
                           << Config.ENV_PROTEUS_USE_STORED_CACHE << "\n";
   Logger::logs("proteus") << "ENV_PROTEUS_SET_LAUNCH_BOUNDS "

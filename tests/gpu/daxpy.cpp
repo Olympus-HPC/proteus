@@ -18,15 +18,15 @@ daxpy_impl(double a, double *x, double *y, int N) {
 
 void daxpy(double a, double *x, double *y, int N) {
   const std::size_t grid_size = (((N) + (256) - 1) / (256));
-#if ENABLE_HIP
+#if PROTEUS_ENABLE_HIP
   hipLaunchKernelGGL((daxpy_impl), dim3(grid_size), dim3(256), 0, 0, a, x, y,
                      N);
-#elif ENABLE_CUDA
+#elif PROTEUS_ENABLE_CUDA
   void *args[] = {&a, &x, &y, &N};
   cudaLaunchKernel((const void *)(daxpy_impl), dim3(grid_size), dim3(256), args,
                    0, 0);
 #else
-#error Must provide ENABLE_HIP or ENABLE_CUDA
+#error Must provide PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA
 #endif
 }
 

@@ -44,7 +44,7 @@ jobs:
           version: 18
           ignore: .github | tests | scripts
           database: build
-          extra-args: '-DENABLE_HIP'
+          extra-args: '-DPROTEUS_ENABLE_HIP'
           style: file
           tidy-checks: ''
           lines-changed-only: true

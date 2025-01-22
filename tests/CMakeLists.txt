@@ -30,6 +30,6 @@ endif()
 
 add_subdirectory(cpu)
 
-if(ENABLE_HIP OR ENABLE_CUDA)
+if(PROTEUS_ENABLE_HIP OR PROTEUS_ENABLE_CUDA)
     add_subdirectory(gpu)
 endif()

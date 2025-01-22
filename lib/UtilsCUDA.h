@@ -15,7 +15,7 @@
 #include <cuda_runtime.h>
 #include <nvPTXCompiler.h>
 
-#define cudaErrCheck(CALL)                                                     \
+#define proteusCudaErrCheck(CALL)                                              \
   {                                                                            \
     cudaError_t err = CALL;                                                    \
     if (err != cudaSuccess) {                                                  \
@@ -25,7 +25,7 @@
     }                                                                          \
   }
 
-#define cuErrCheck(CALL)                                                       \
+#define proteusCuErrCheck(CALL)                                                \
   {                                                                            \
     CUresult err = CALL;                                                       \
     if (err != CUDA_SUCCESS) {                                                 \
@@ -36,7 +36,7 @@
     }                                                                          \
   }
 
-#define nvPTXCompilerErrCheck(CALL)                                            \
+#define proteusNvPTXCompilerErrCheck(CALL)                                     \
   {                                                                            \
     nvPTXCompileResult err = CALL;                                             \
     if (err != NVPTXCOMPILE_SUCCESS) {                                         \

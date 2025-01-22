@@ -30,9 +30,9 @@ int main(int argc, char **argv) {
   gpuErrCheck(gpuDeviceSynchronize());
   kernel<<<1, 1>>>(1.0);
   gpuErrCheck(gpuDeviceSynchronize());
-#if ENABLE_HIP
+#if PROTEUS_ENABLE_HIP
   kernel<<<1, 1>>>(1.0l);
-#elif ENABLE_CUDA
+#elif PROTEUS_ENABLE_CUDA
   // CUDA AOT compilation with a `long double` breaks on lassen.
   // We re-test the `double` type with a different value (to avoid caching) to
   // re-use the lit CHECKs below.
