@@ -231,6 +231,7 @@ void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
 
 std::unique_ptr<MemoryBuffer>
 JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch,
+                                  SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
                                   bool UseHIPrtc) {
   TIMESCOPE("Codegen object");
   if (UseHIPrtc) {

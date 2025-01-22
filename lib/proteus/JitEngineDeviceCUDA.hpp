@@ -91,11 +91,13 @@ public:
 
   Module &extractDeviceBitcode(StringRef KernelName, void *Kernel);
 
-  void codegenPTX(Module &M, StringRef DeviceArch,
-                  SmallVectorImpl<char> &PTXStr);
+  static void codegenPTX(Module &M, StringRef DeviceArch,
+                         SmallVectorImpl<char> &PTXStr);
 
   static std::unique_ptr<MemoryBuffer>
-  codegenObject(Module &M, StringRef DeviceArch, bool UseCUDArtc = false);
+  codegenObject(Module &M, StringRef DeviceArch,
+                SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
+                bool UseCUDArtc = false);
 
   cudaError_t
   cudaModuleLaunchKernel(CUfunction f, unsigned int gridDimX,

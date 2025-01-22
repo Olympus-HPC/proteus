@@ -102,7 +102,9 @@ public:
   Module &extractDeviceBitcode(StringRef KernelName, void *Kernel);
 
   static std::unique_ptr<MemoryBuffer>
-  codegenObject(Module &M, StringRef DeviceArch, bool UseHIPrtc = false);
+  codegenObject(Module &M, StringRef DeviceArch,
+                SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
+                bool UseHIPrtc = false);
 
   hipFunction_t getKernelFunctionFromImage(StringRef KernelName,
                                            const void *Image);
