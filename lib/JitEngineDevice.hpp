@@ -145,20 +145,6 @@ public:
     LinkedIRModules.emplace_back(std::move(Mod));
   }
 
-private:
-  //------------------------------------------------------------------
-  // Begin Methods implemented in the derived device engine class.
-  //------------------------------------------------------------------
-  void *resolveDeviceGlobalAddr(const void *Addr) {
-    return static_cast<ImplT &>(*this).resolveDeviceGlobalAddr(Addr);
-  }
-
-  void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
-                                int BlockSize) {
-    static_cast<ImplT &>(*this).setLaunchBoundsForKernel(M, F, GridSize,
-                                                         BlockSize);
-  }
-
   void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
     auto ReplaceIntrinsicDim = [&](ArrayRef<StringRef> IntrinsicNames,
                                    uint32_t DimValue) {
@@ -232,6 +218,29 @@ private:
     InsertAssume(ImplT::blockIdxZFnName(), GridDim.z);
   }
 
+  void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
+                                int BlockSize) {
+    static_cast<ImplT &>(*this).setLaunchBoundsForKernel(M, F, GridSize,
+                                                         BlockSize);
+  }
+
+  DeviceError_t launchKernelFunction(KernelFunction_t KernelFunc, dim3 GridDim,
+                                     dim3 BlockDim, void **KernelArgs,
+                                     uint64_t ShmemSize,
+                                     DeviceStream_t Stream) {
+    TIMESCOPE(__FUNCTION__);
+    return static_cast<ImplT &>(*this).launchKernelFunction(
+        KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
+  }
+
+private:
+  //------------------------------------------------------------------
+  // Begin Methods implemented in the derived device engine class.
+  //------------------------------------------------------------------
+  void *resolveDeviceGlobalAddr(const void *Addr) {
+    return static_cast<ImplT &>(*this).resolveDeviceGlobalAddr(Addr);
+  }
+
   void getRuntimeConstantValues(void **KernelArgs,
                                 const SmallVector<int32_t> &RCIndices,
                                 const SmallVector<int32_t> &RCTypes,
@@ -275,15 +284,6 @@ private:
 
       RCsVec.push_back(RC);
     }
-  }
-
-  DeviceError_t launchKernelFunction(KernelFunction_t KernelFunc, dim3 GridDim,
-                                     dim3 BlockDim, void **KernelArgs,
-                                     uint64_t ShmemSize,
-                                     DeviceStream_t Stream) {
-    TIMESCOPE(__FUNCTION__);
-    return static_cast<ImplT &>(*this).launchKernelFunction(
-        KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
   }
 
   DeviceError_t launchKernelDirect(void *KernelFunc, dim3 GridDim,
@@ -403,6 +403,7 @@ private:
   std::unique_ptr<LLVMContext> Ctx;
 };
 
+// TODO: To be called  as reduced IR
 template <typename ImplT>
 void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
                                           StringRef Suffix, dim3 &BlockDim,
@@ -449,6 +450,16 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
     if (GV.isExternallyInitialized())
       GV.setExternallyInitialized(false);
 
+  // Internalize others besides the kernel function.
+  internalizeModule(M, [&F](const GlobalValue &GV) {
+    // Do not internalize the kernel function.
+    if (&GV == F)
+      return true;
+
+    // Internalize everything else.
+    return false;
+  });
+
   // Replace argument uses with runtime constants.
   if (Config.ENV_PROTEUS_SPECIALIZE_ARGS)
     // TODO: change NumRuntimeConstants to size_t at interface.
@@ -461,16 +472,6 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
   if (Config.ENV_PROTEUS_SPECIALIZE_DIMS) {
     setKernelDims(M, GridDim, BlockDim);
   }
-
-  // Internalize others besides the kernel function.
-  internalizeModule(M, [&F](const GlobalValue &GV) {
-    // Do not internalize the kernel function.
-    if (&GV == F)
-      return true;
-
-    // Internalize everything else.
-    return false;
-  });
 
   DBG(Logger::logs("proteus") << "=== JIT Module\n"
                               << M << "=== End of JIT Module\n");

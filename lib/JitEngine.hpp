@@ -45,13 +45,14 @@ public:
 
   bool isProteusDisabled() { return Config.ENV_PROTEUS_DISABLE; }
 
+  void runCleanupPassPipeline(Module &M);
+
 protected:
   Expected<std::unique_ptr<TargetMachine>>
   createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3);
 
   void runOptimizationPassPipeline(Module &M, StringRef Arch,
                                    unsigned OptLevel = 3);
-  void runCleanupPassPipeline(Module &M);
 
   JitEngine();
 
