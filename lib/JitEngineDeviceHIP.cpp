@@ -230,13 +230,10 @@ void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
 }
 
 std::unique_ptr<MemoryBuffer>
-JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
+JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch,
+                                  bool UseHIPrtc) {
   TIMESCOPE("Codegen object");
-#if LLVM_VERSION_MAJOR == 18
-  if (Config.ENV_PROTEUS_USE_HIP_RTC_CODEGEN) {
-#else
-  {
-#endif
+  if (UseHIPrtc) {
     char *BinOut;
     size_t BinSize;
 

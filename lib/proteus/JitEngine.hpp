@@ -41,17 +41,17 @@ static inline bool getEnvOrDefaultBool(const char *VarName, bool Default) {
 
 class JitEngine {
 public:
-  void optimizeIR(Module &M, StringRef Arch);
+  static void optimizeIR(Module &M, StringRef Arch);
 
   bool isProteusDisabled() { return Config.ENV_PROTEUS_DISABLE; }
 
 protected:
-  Expected<std::unique_ptr<TargetMachine>>
+  static Expected<std::unique_ptr<TargetMachine>>
   createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3);
 
-  void runOptimizationPassPipeline(Module &M, StringRef Arch,
-                                   unsigned OptLevel = 3);
-  void runCleanupPassPipeline(Module &M);
+  static void runOptimizationPassPipeline(Module &M, StringRef Arch,
+                                          unsigned OptLevel = 3);
+  static void runCleanupPassPipeline(Module &M);
 
   JitEngine();
 

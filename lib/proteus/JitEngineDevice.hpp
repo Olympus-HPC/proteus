@@ -158,13 +158,12 @@ private:
     return static_cast<ImplT &>(*this).resolveDeviceGlobalAddr(Addr);
   }
 
-  void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
-                                int BlockSize) {
-    static_cast<ImplT &>(*this).setLaunchBoundsForKernel(M, F, GridSize,
-                                                         BlockSize);
+  static void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
+                                       int BlockSize) {
+    ImplT::setLaunchBoundsForKernel(M, F, GridSize, BlockSize);
   }
 
-  void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
+  static void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
     auto ReplaceIntrinsicDim = [&](ArrayRef<StringRef> IntrinsicNames,
                                    uint32_t DimValue) {
       auto CollectCallUsers = [](Function &F) {
@@ -349,8 +348,9 @@ private:
     }
   }
 
-  std::unique_ptr<MemoryBuffer> codegenObject(Module &M, StringRef DeviceArch) {
-    return static_cast<ImplT &>(*this).codegenObject(M, DeviceArch);
+  static std::unique_ptr<MemoryBuffer>
+  codegenObject(Module &M, StringRef DeviceArch, bool UseRTC = false) {
+    return ImplT::codegenObject(M, DeviceArch, UseRTC);
   }
 
   KernelFunction_t getKernelFunctionFromImage(StringRef KernelName,
@@ -683,9 +683,13 @@ JitEngineDevice<ImplT>::compileAndRun(
   // optimize the LLVM IR before handing over to codegen.
 #if PROTEUS_ENABLE_CUDA
   optimizeIR(*JitModule, DeviceArch);
+  bool UseRTC = false;
 #elif PROTEUS_ENABLE_HIP
-  if (!Config.ENV_PROTEUS_USE_HIP_RTC_CODEGEN)
+  bool UseRTC = true;
+  if (!Config.ENV_PROTEUS_USE_HIP_RTC_CODEGEN) {
+    UseRTC = false;
     optimizeIR(*JitModule, DeviceArch);
+  }
 #else
 #error "JitEngineDevice requires PROTEUS_ENABLE_CUDA or PROTEUS_ENABLE_HIP"
 #endif
@@ -704,7 +708,7 @@ JitEngineDevice<ImplT>::compileAndRun(
                *JitModule);
   }
 
-  auto ObjBuf = codegenObject(*JitModule, DeviceArch);
+  auto ObjBuf = codegenObject(*JitModule, DeviceArch, UseRTC);
   if (Config.ENV_PROTEUS_USE_STORED_CACHE) {
     StorageCache.store(HashValue, ObjBuf->getMemBufferRef());
   }

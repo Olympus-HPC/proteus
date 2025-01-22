@@ -86,15 +86,16 @@ public:
 
   void *resolveDeviceGlobalAddr(const void *Addr);
 
-  void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
-                                int BlockSize);
+  static void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
+                                       int BlockSize);
 
   Module &extractDeviceBitcode(StringRef KernelName, void *Kernel);
 
   void codegenPTX(Module &M, StringRef DeviceArch,
                   SmallVectorImpl<char> &PTXStr);
 
-  std::unique_ptr<MemoryBuffer> codegenObject(Module &M, StringRef DeviceArch);
+  static std::unique_ptr<MemoryBuffer>
+  codegenObject(Module &M, StringRef DeviceArch, bool UseCUDArtc = false);
 
   cudaError_t
   cudaModuleLaunchKernel(CUfunction f, unsigned int gridDimX,
