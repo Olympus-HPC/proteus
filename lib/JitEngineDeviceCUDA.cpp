@@ -53,7 +53,8 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
 
   CUdeviceptr DevPtr;
   size_t Bytes;
-  proteusCuErrCheck(cuModuleGetGlobal(&DevPtr, &Bytes, CUMod, ModuleId.c_str()));
+  proteusCuErrCheck(
+      cuModuleGetGlobal(&DevPtr, &Bytes, CUMod, ModuleId.c_str()));
 
   SmallString<4096> DeviceBitcode;
   DeviceBitcode.reserve(Bytes);
@@ -190,7 +191,8 @@ CUfunction JitEngineDeviceCUDA::getKernelFunctionFromImage(StringRef KernelName,
       proteusCuErrCheck(cuMemcpyHtoD(Dptr, &PtrVal, Bytes));
     }
   }
-  proteusCuErrCheck(cuModuleGetFunction(&KernelFunc, Mod, KernelName.str().c_str()));
+  proteusCuErrCheck(
+      cuModuleGetFunction(&KernelFunc, Mod, KernelName.str().c_str()));
 
   return KernelFunc;
 }
@@ -275,9 +277,11 @@ JitEngineDeviceCUDA::codegenObject(Module &M, StringRef DeviceArch) {
 #if PROTEUS_ENABLE_DEBUG
   {
     size_t LogSize;
-    proteusNvPTXCompilerErrCheck(nvPTXCompilerGetInfoLogSize(PTXCompiler, &LogSize));
+    proteusNvPTXCompilerErrCheck(
+        nvPTXCompilerGetInfoLogSize(PTXCompiler, &LogSize));
     auto Log = std::make_unique<char[]>(LogSize);
-    proteusNvPTXCompilerErrCheck(nvPTXCompilerGetInfoLog(PTXCompiler, Log.get()));
+    proteusNvPTXCompilerErrCheck(
+        nvPTXCompilerGetInfoLog(PTXCompiler, Log.get()));
     Logger::logs("proteus") << "=== nvPTXCompiler Log\n" << Log.get() << "\n";
   }
 #endif
@@ -290,15 +294,15 @@ JitEngineDeviceCUDA::codegenObject(Module &M, StringRef DeviceArch) {
     for (auto *Ptr : GlobalLinkedBinaries) {
       // We do not know the size of the binary but the CUDA API just needs a
       // non-zero argument.
-      proteusCuErrCheck(cuLinkAddData(CULinkState, CU_JIT_INPUT_FATBINARY, Ptr, 1, "",
-                               0, 0, 0));
+      proteusCuErrCheck(cuLinkAddData(CULinkState, CU_JIT_INPUT_FATBINARY, Ptr,
+                                      1, "", 0, 0, 0));
     }
 
     // Again using a non-zero argument, though we can get the size from the ptx
     // compiler.
-    proteusCuErrCheck(cuLinkAddData(CULinkState, CU_JIT_INPUT_FATBINARY,
-                             static_cast<void *>(ObjBuf->getBufferStart()), 1,
-                             "", 0, 0, 0));
+    proteusCuErrCheck(cuLinkAddData(
+        CULinkState, CU_JIT_INPUT_FATBINARY,
+        static_cast<void *>(ObjBuf->getBufferStart()), 1, "", 0, 0, 0));
 
     void *BinOut;
     size_t BinSize;

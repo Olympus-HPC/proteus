@@ -260,9 +260,9 @@ JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
           HIPRTC_JIT_IR_TO_ISA_OPT_EXT, HIPRTC_JIT_IR_TO_ISA_OPT_COUNT_EXT};
       size_t OptArgsSize = 3;
       const void *JITOptionsValues[] = {(void *)OptArgs, (void *)(OptArgsSize)};
-      proteusHiprtcErrCheck(hiprtcLinkCreate(JITOptions.size(), JITOptions.data(),
-                                      (void **)JITOptionsValues,
-                                      &HipLinkStatePtr));
+      proteusHiprtcErrCheck(
+          hiprtcLinkCreate(JITOptions.size(), JITOptions.data(),
+                           (void **)JITOptionsValues, &HipLinkStatePtr));
       // NOTE: the following version of te code does not set options.
       // proteusHiprtcErrCheck(hiprtcLinkCreate(0, nullptr, nullptr,
       // &hip_link_state_ptr));
@@ -349,7 +349,7 @@ JitEngineDeviceHIP::getKernelFunctionFromImage(StringRef KernelName,
       hipDeviceptr_t Dptr;
       size_t Bytes;
       proteusHipErrCheck(hipModuleGetGlobal(&Dptr, &Bytes, HipModule,
-                                     (GlobalName + "$ptr").c_str()));
+                                            (GlobalName + "$ptr").c_str()));
 
       void *DevPtr = resolveDeviceGlobalAddr(HostAddr);
       uint64_t PtrVal = (uint64_t)DevPtr;
