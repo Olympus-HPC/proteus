@@ -245,7 +245,8 @@ void JitEngineDeviceCUDA::codegenPTX(Module &M, StringRef DeviceArch,
 
 std::unique_ptr<MemoryBuffer>
 JitEngineDeviceCUDA::codegenObject(Module &M, StringRef DeviceArch,
-                                   bool useCUDArtc) {
+                                   SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
+                                   bool UseCUDArtc) {
   TIMESCOPE("Codegen object");
   SmallVector<char, 4096> PTXStr;
   size_t BinSize;

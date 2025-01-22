@@ -349,8 +349,10 @@ private:
   }
 
   static std::unique_ptr<MemoryBuffer>
-  codegenObject(Module &M, StringRef DeviceArch, bool UseRTC = false) {
-    return ImplT::codegenObject(M, DeviceArch, UseRTC);
+  codegenObject(Module &M, StringRef DeviceArch,
+                SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
+                bool UseRTC = false) {
+    return ImplT::codegenObject(M, DeviceArch, GlobalLinkedBinaries, UseRTC);
   }
 
   KernelFunction_t getKernelFunctionFromImage(StringRef KernelName,
@@ -708,7 +710,8 @@ JitEngineDevice<ImplT>::compileAndRun(
                *JitModule);
   }
 
-  auto ObjBuf = codegenObject(*JitModule, DeviceArch, UseRTC);
+  auto ObjBuf =
+      codegenObject(*JitModule, DeviceArch, GlobalLinkedBinaries, UseRTC);
   if (Config.ENV_PROTEUS_USE_STORED_CACHE) {
     StorageCache.store(HashValue, ObjBuf->getMemBufferRef());
   }
