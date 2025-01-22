@@ -96,14 +96,15 @@ public:
 
   void *resolveDeviceGlobalAddr(const void *Addr);
 
-  void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
-                                int BlockSize);
+  static void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
+                                       int BlockSize);
 
   void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim);
 
   Module &extractDeviceBitcode(StringRef KernelName, void *Kernel);
 
-  std::unique_ptr<MemoryBuffer> codegenObject(Module &M, StringRef DeviceArch);
+  static std::unique_ptr<MemoryBuffer>
+  codegenObject(Module &M, StringRef DeviceArch, bool UseHIPrtc = false);
 
   hipFunction_t getKernelFunctionFromImage(StringRef KernelName,
                                            const void *Image);
