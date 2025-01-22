@@ -367,10 +367,7 @@ private:
   // End Methods implemented in the derived device engine class.
   //------------------------------------------------------------------
 
-  void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
-                    dim3 &BlockDim, dim3 &GridDim,
-                    const SmallVector<int32_t> &RCIndices, RuntimeConstant *RC,
-                    int NumRuntimeConstants);
+  Function *pruneIR(Module &M, StringRef FnName);
 
   void replaceGlobalVariablesWithPointers(
       Module &M,
@@ -460,16 +457,10 @@ private:
 };
 
 template <typename ImplT>
-void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
-                                          StringRef Suffix, dim3 &BlockDim,
-                                          dim3 &GridDim,
-                                          const SmallVector<int32_t> &RCIndices,
-                                          RuntimeConstant *RC,
-                                          int NumRuntimeConstants) {
-
-  TIMESCOPE("specializeIR");
+Function *JitEngineDevice<ImplT>::pruneIR(Module &M, StringRef FnName) {
+  TIMESCOPE("pruneIR");
   PROTEUS_DBG(Logger::logs("proteus") << "=== Parsed Module\n"
-                                      << M << "=== End of Parsed Module\n");
+                              << M << "=== End of Parsed Module\n");
   Function *F = M.getFunction(FnName);
   assert(F && "Expected non-null function!");
 
@@ -505,48 +496,7 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
     if (GV.isExternallyInitialized())
       GV.setExternallyInitialized(false);
 
-  // Replace argument uses with runtime constants.
-  if (Config.ENV_PROTEUS_SPECIALIZE_ARGS)
-    // TODO: change NumRuntimeConstants to size_t at interface.
-    TransformArgumentSpecialization::transform(
-        M, *F, RCIndices,
-        ArrayRef<RuntimeConstant>{RC,
-                                  static_cast<size_t>(NumRuntimeConstants)});
-
-  // Replace uses of blockDim.* and gridDim.* with constants.
-  if (Config.ENV_PROTEUS_SPECIALIZE_DIMS) {
-    setKernelDims(M, GridDim, BlockDim);
-  }
-
-  // Internalize others besides the kernel function.
-  internalizeModule(M, [&F](const GlobalValue &GV) {
-    // Do not internalize the kernel function.
-    if (&GV == F)
-      return true;
-
-    // Internalize everything else.
-    return false;
-  });
-
-  PROTEUS_DBG(Logger::logs("proteus") << "=== JIT Module\n"
-                                      << M << "=== End of JIT Module\n");
-
-  F->setName(FnName + Suffix);
-
-  if (Config.ENV_PROTEUS_SET_LAUNCH_BOUNDS)
-    setLaunchBoundsForKernel(M, *F, GridDim.x * GridDim.y * GridDim.z,
-                             BlockDim.x * BlockDim.y * BlockDim.z);
-
-  runCleanupPassPipeline(M);
-
-#if PROTEUS_ENABLE_DEBUG
-  Logger::logs("proteus") << "=== Final Module\n"
-                          << M << "=== End Final Module\n";
-  if (verifyModule(M, &errs()))
-    FATAL_ERROR("Broken module found, JIT compilation aborted!");
-  else
-    Logger::logs("proteus") << "Module verified!\n";
-#endif
+  return F;
 }
 
 template <typename ImplT>
@@ -658,15 +608,58 @@ JitEngineDevice<ImplT>::compileAndRun(
   // used by any kernel that will be specialized
   auto JitModule = llvm::CloneModule(extractDeviceBitcode(KernelName, Kernel));
   // NOTE: There is potential oportunity here, to reduce some of the JIT costs
-  // further. We can have a specializeIR in which we do not do any RC/Grid/Block
+  // further. We can have a pruneIR in which we do not do any RC/Grid/Block
   // specializations. We only internalize symbols. Then we can use that IR
   // for all upcoming specializations of dynamic information.
   // There is a memory trade off in such case, We will need to have a peristent
   // in memory module, for every annotated kernel. If we have a case of 1000s of
   // kernels, this can be an issue
 
-  specializeIR(*JitModule, KernelName, Suffix, BlockDim, GridDim, RCIndices,
-               RCsVec.data(), NumRuntimeConstants);
+  auto *JitFunction = pruneIR(*JitModule, KernelName);
+
+  // Internalize others besides the kernel function.
+  internalizeModule(*JitModule, [&JitFunction](const GlobalValue &GV) {
+    // Do not internalize the kernel function.
+    if (&GV == JitFunction)
+      return true;
+
+    // Internalize everything else.
+    return false;
+  });
+
+  // Replace argument uses with runtime constants.
+  if (Config.ENV_PROTEUS_SPECIALIZE_ARGS)
+    // TODO: change NumRuntimeConstants to size_t at interface.
+    TransformArgumentSpecialization::transform(
+        *JitModule, *JitFunction, RCIndices,
+        ArrayRef<RuntimeConstant>{RCsVec.data(),
+                                  static_cast<size_t>(NumRuntimeConstants)});
+
+  // Replace uses of blockDim.* and gridDim.* with constants.
+  if (Config.ENV_PROTEUS_SPECIALIZE_DIMS)
+    setKernelDims(*JitModule, GridDim, BlockDim);
+
+  PROTEUS_DBG(Logger::logs("proteus") << "=== JIT Module\n"
+                              << M << "=== End of JIT Module\n");
+
+  JitFunction->setName(KernelName + Suffix);
+
+  if (Config.ENV_PROTEUS_SET_LAUNCH_BOUNDS)
+    setLaunchBoundsForKernel(*JitModule, *JitFunction,
+                             GridDim.x * GridDim.y * GridDim.z,
+                             BlockDim.x * BlockDim.y * BlockDim.z);
+
+  runCleanupPassPipeline(*JitModule);
+
+#if PROTEUS_ENABLE_DEBUG
+  Logger::logs("proteus") << "=== Final Module\n"
+                          << *JitModule << "=== End Final Module\n";
+  if (verifyModule(*JitModule, &errs()))
+    FATAL_ERROR("Broken module found, JIT compilation aborted!");
+  else
+    Logger::logs("proteus") << "Module verified!\n";
+#endif
+
   replaceGlobalVariablesWithPointers(*JitModule, VarNameToDevPtr);
 
   // For HIP RTC codegen do not run the optimization pipeline since HIP RTC
