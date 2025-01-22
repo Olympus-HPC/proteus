@@ -1,6 +1,12 @@
 @PACKAGE_INIT@
 
+set(PROTEUS_LLVM_DIR @LLVM_DIR@)
 find_package(LLVM REQUIRED CONFIG)
+if (NOT "${LLVM_DIR}" STREQUAL "${PROTEUS_LLVM_DIR}")
+    message(FATAL_ERROR "Mismatch between target LLVM_DIR = ${LLVM_DIR} "
+    "and Proteus LLVM_DIR = ${PROTEUS_LLVM_DIR}. "
+    "Use the same LLVM installation when compiling.")
+endif()
 find_package(LLD REQUIRED)
 
 include("${CMAKE_CURRENT_LIST_DIR}/proteusTargets.cmake")
