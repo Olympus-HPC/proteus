@@ -15,7 +15,7 @@
 #include <hip/hip_runtime_api.h>
 #include <hip/hiprtc.h>
 
-#define hipErrCheck(CALL)                                                      \
+#define proteusHipErrCheck(CALL)                                                      \
   {                                                                            \
     hipError_t err = CALL;                                                     \
     if (err != hipSuccess) {                                                   \
@@ -25,7 +25,7 @@
     }                                                                          \
   }
 
-#define hiprtcErrCheck(CALL)                                                   \
+#define proteusHiprtcErrCheck(CALL)                                                   \
   {                                                                            \
     hiprtcResult err = CALL;                                                   \
     if (err != HIPRTC_SUCCESS) {                                               \

@@ -36,7 +36,7 @@ using namespace llvm;
 
 void *JitEngineDeviceHIP::resolveDeviceGlobalAddr(const void *Addr) {
   void *DevPtr = nullptr;
-  hipErrCheck(hipGetSymbolAddress(&DevPtr, HIP_SYMBOL(Addr)));
+  proteusHipErrCheck(hipGetSymbolAddress(&DevPtr, HIP_SYMBOL(Addr)));
   assert(DevPtr && "Expected non-null device pointer for global");
 
   return DevPtr;
@@ -260,17 +260,17 @@ JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
           HIPRTC_JIT_IR_TO_ISA_OPT_EXT, HIPRTC_JIT_IR_TO_ISA_OPT_COUNT_EXT};
       size_t OptArgsSize = 3;
       const void *JITOptionsValues[] = {(void *)OptArgs, (void *)(OptArgsSize)};
-      hiprtcErrCheck(hiprtcLinkCreate(JITOptions.size(), JITOptions.data(),
+      proteusHiprtcErrCheck(hiprtcLinkCreate(JITOptions.size(), JITOptions.data(),
                                       (void **)JITOptionsValues,
                                       &HipLinkStatePtr));
       // NOTE: the following version of te code does not set options.
-      // hiprtcErrCheck(hiprtcLinkCreate(0, nullptr, nullptr,
+      // proteusHiprtcErrCheck(hiprtcLinkCreate(0, nullptr, nullptr,
       // &hip_link_state_ptr));
 
-      hiprtcErrCheck(hiprtcLinkAddData(
+      proteusHiprtcErrCheck(hiprtcLinkAddData(
           HipLinkStatePtr, HIPRTC_JIT_INPUT_LLVM_BITCODE,
           (void *)ModuleBuf.data(), ModuleBuf.size(), "", 0, nullptr, nullptr));
-      hiprtcErrCheck(
+      proteusHiprtcErrCheck(
           hiprtcLinkComplete(HipLinkStatePtr, (void **)&BinOut, &BinSize));
     }
 
@@ -343,20 +343,20 @@ JitEngineDeviceHIP::getKernelFunctionFromImage(StringRef KernelName,
   hipModule_t HipModule;
   hipFunction_t KernelFunc;
 
-  hipErrCheck(hipModuleLoadData(&HipModule, Image));
+  proteusHipErrCheck(hipModuleLoadData(&HipModule, Image));
   if (Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY) {
     for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
       hipDeviceptr_t Dptr;
       size_t Bytes;
-      hipErrCheck(hipModuleGetGlobal(&Dptr, &Bytes, HipModule,
+      proteusHipErrCheck(hipModuleGetGlobal(&Dptr, &Bytes, HipModule,
                                      (GlobalName + "$ptr").c_str()));
 
       void *DevPtr = resolveDeviceGlobalAddr(HostAddr);
       uint64_t PtrVal = (uint64_t)DevPtr;
-      hipErrCheck(hipMemcpyHtoD(Dptr, &PtrVal, Bytes));
+      proteusHipErrCheck(hipMemcpyHtoD(Dptr, &PtrVal, Bytes));
     }
   }
-  hipErrCheck(
+  proteusHipErrCheck(
       hipModuleGetFunction(&KernelFunc, HipModule, KernelName.str().c_str()));
 
   return KernelFunc;
@@ -388,7 +388,7 @@ JitEngineDeviceHIP::JitEngineDeviceHIP() {
   LLVMInitializeAMDGPUAsmPrinter();
 
   hipDeviceProp_t devProp;
-  hipErrCheck(hipGetDeviceProperties(&devProp, 0));
+  proteusHipErrCheck(hipGetDeviceProperties(&devProp, 0));
 
   DeviceArch = devProp.gcnArchName;
   DeviceArch = DeviceArch.substr(0, DeviceArch.find_first_of(":"));
