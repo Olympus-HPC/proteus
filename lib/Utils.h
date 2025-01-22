@@ -29,7 +29,14 @@
   report_fatal_error(llvm::Twine(std::string{} + __FILE__ + ":" +              \
                                  std::to_string(__LINE__) + " => " + x))
 
-//  #define ENABLE_PERFMAP
+template <typename T> void saveToFile(llvm::StringRef Filepath, T &&Data) {
+  std::error_code EC;
+  llvm::raw_fd_ostream Out(Filepath, EC);
+  if (EC)
+    FATAL_ERROR("Cannot open file" + Filepath);
+  Out << Data;
+  Out.close();
+}
 
 #if ENABLE_HIP
 #include "UtilsHIP.h"

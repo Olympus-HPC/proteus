@@ -342,6 +342,18 @@ JitEngineDeviceHIP::getKernelFunctionFromImage(StringRef KernelName,
   hipFunction_t KernelFunc;
 
   hipErrCheck(hipModuleLoadData(&HipModule, Image));
+  if (Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY) {
+    for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
+      hipDeviceptr_t Dptr;
+      size_t Bytes;
+      hipErrCheck(hipModuleGetGlobal(&Dptr, &Bytes, HipModule,
+                                     (GlobalName + "$ptr").c_str()));
+
+      void *DevPtr = resolveDeviceGlobalAddr(HostAddr);
+      uint64_t PtrVal = (uint64_t)DevPtr;
+      hipErrCheck(hipMemcpyHtoD(Dptr, &PtrVal, Bytes));
+    }
+  }
   hipErrCheck(
       hipModuleGetFunction(&KernelFunc, HipModule, KernelName.str().c_str()));
 
@@ -379,34 +391,3 @@ JitEngineDeviceHIP::JitEngineDeviceHIP() {
   DeviceArch = devProp.gcnArchName;
   DeviceArch = DeviceArch.substr(0, DeviceArch.find_first_of(":"));
 }
-
-// === APPENDIX ===
-// TODO: Dynamic linking is to be supported through hiprtc. Currently
-// the interface is limited and lacks support for linking globals.
-// Indicative code here is for future re-visit.
-#if DYNAMIC_LINK
-std::vector<hiprtcJIT_option> LinkOptions = {HIPRTC_JIT_GLOBAL_SYMBOL_NAMES,
-                                             HIPRTC_JIT_GLOBAL_SYMBOL_ADDRESS,
-                                             HIPRTC_JIT_GLOBAL_SYMBOL_COUNT};
-std::vector<const char *> GlobalNames;
-std::vector<const void *> GlobalAddrs;
-for (auto RegisterVar : VarNameToDevPtr) {
-  auto &VarName = RegisterVar.first;
-  auto DevPtr = RegisterVar.second;
-  GlobalNames.push_back(VarName.c_str());
-  GlobalAddrs.push_back(DevPtr);
-}
-
-std::size_t GlobalSize = GlobalNames.size();
-std::size_t NumOptions = LinkOptions.size();
-const void *LinkOptionsValues[] = {GlobalNames.data(), GlobalAddrs.data(),
-                                   (void *)&GlobalSize};
-hiprtcErrCheck(hiprtcLinkCreate(LinkOptions.size(), LinkOptions.data(),
-                                (void **)&LinkOptionsValues,
-                                &hip_link_state_ptr));
-
-hiprtcErrCheck(hiprtcLinkAddData(
-    hip_link_state_ptr, HIPRTC_JIT_INPUT_LLVM_BITCODE,
-    (void *)ModuleBuffer.data(), ModuleBuffer.size(), KernelName.data(),
-    LinkOptions.size(), LinkOptions.data(), (void **)&LinkOptionsValues));
-#endif

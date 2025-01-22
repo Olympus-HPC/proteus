@@ -177,6 +177,18 @@ CUfunction JitEngineDeviceCUDA::getKernelFunctionFromImage(StringRef KernelName,
   CUmodule Mod;
 
   cuErrCheck(cuModuleLoadData(&Mod, Image));
+  if (Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY) {
+    for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
+      CUdeviceptr Dptr;
+      size_t Bytes;
+      cuErrCheck(
+          cuModuleGetGlobal(&Dptr, &Bytes, Mod, (GlobalName + "$ptr").c_str()));
+
+      void *DevPtr = resolveDeviceGlobalAddr(HostAddr);
+      uint64_t PtrVal = (uint64_t)DevPtr;
+      cuErrCheck(cuMemcpyHtoD(Dptr, &PtrVal, Bytes));
+    }
+  }
   cuErrCheck(cuModuleGetFunction(&KernelFunc, Mod, KernelName.str().c_str()));
 
   return KernelFunc;
