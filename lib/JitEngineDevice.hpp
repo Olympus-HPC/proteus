@@ -639,8 +639,9 @@ JitEngineDevice<ImplT>::compileAndRun(
   if (Config.ENV_PROTEUS_SPECIALIZE_DIMS)
     setKernelDims(*JitModule, GridDim, BlockDim);
 
-  PROTEUS_DBG(Logger::logs("proteus") << "=== JIT Module\n"
-                                      << M << "=== End of JIT Module\n");
+  PROTEUS_DBG(Logger::logs("proteus")
+              << "=== JIT Module\n"
+              << *JitModule << "=== End of JIT Module\n");
 
   JitFunction->setName(KernelName + Suffix);
 
