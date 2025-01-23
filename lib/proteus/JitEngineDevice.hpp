@@ -49,14 +49,14 @@
 #include <optional>
 #include <string>
 
-#include "CompilerInterfaceTypes.h"
 #include "Hashing.hpp"
-#include "JitCache.hpp"
-#include "JitEngine.hpp"
-#include "JitStorageCache.hpp"
-#include "TimeTracing.hpp"
-#include "TransformArgumentSpecialization.hpp"
-#include "Utils.h"
+#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/JitCache.hpp"
+#include "proteus/JitEngine.hpp"
+#include "proteus/JitStorageCache.hpp"
+#include "proteus/TimeTracing.hpp"
+#include "proteus/TransformArgumentSpecialization.hpp"
+#include "proteus/Utils.h"
 
 namespace proteus {
 

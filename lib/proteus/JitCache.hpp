@@ -14,10 +14,10 @@
 #include <cstdint>
 #include <iostream>
 
-#include "CompilerInterfaceTypes.h"
 #include "Hashing.hpp"
 #include "TimeTracing.hpp"
-#include "Utils.h"
+#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Utils.h"
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"

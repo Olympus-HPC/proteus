@@ -8,8 +8,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CompilerInterfaceDevice.h"
-#include "CompilerInterfaceDeviceInternal.hpp"
+#include "proteus/CompilerInterfaceDevice.h"
+#include "proteus/CompilerInterfaceDeviceInternal.hpp"
 
 // NOTE: Using the ABI With scalars for GridDim, BlockDim instead of dim3 to
 // avoid issues with aggregate coercion of parameters. Caller packs XY in a

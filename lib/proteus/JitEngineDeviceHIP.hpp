@@ -11,8 +11,8 @@
 #ifndef PROTEUS_JITENGINEDEVICEHIP_HPP
 #define PROTEUS_JITENGINEDEVICEHIP_HPP
 
-#include "JitEngineDevice.hpp"
-#include "Utils.h"
+#include "proteus/JitEngineDevice.hpp"
+#include "proteus/Utils.h"
 
 namespace proteus {
 

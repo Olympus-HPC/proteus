@@ -19,7 +19,7 @@
 #include "llvm/Target/TargetMachine.h"
 
 #include "Hashing.hpp"
-#include "Utils.h"
+#include "proteus/Utils.h"
 
 namespace proteus {
 

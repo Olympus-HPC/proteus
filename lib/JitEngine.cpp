@@ -30,11 +30,11 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
-#include "JitEngine.hpp"
+#include "proteus/JitEngine.hpp"
 
 #include "Hashing.hpp"
-#include "TimeTracing.hpp"
-#include "Utils.h"
+#include "proteus/TimeTracing.hpp"
+#include "proteus/Utils.h"
 
 // TODO: Used in InitTargetOptionsFromCodeGenFlags. Re-think for a different
 // initialization, especially using static compilation flags forwarded from

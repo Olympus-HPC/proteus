@@ -62,12 +62,12 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/MemoryBufferRef.h>
 
-#include "../common/Logger.hpp"
 #include <iostream>
 #include <string>
 
-#include "../lib/CompilerInterfaceTypes.h"
 #include "../lib/Hashing.hpp"
+#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Logger.hpp"
 
 #include "GenRuntimeConstantTy.hpp"
 

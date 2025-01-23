@@ -8,9 +8,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CompilerInterfaceTypes.h"
-#include "JitEngineHost.hpp"
-#include "Utils.h"
+#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/JitEngineHost.hpp"
+#include "proteus/Utils.h"
 
 using namespace proteus;
 using namespace llvm;

@@ -11,10 +11,10 @@
 #ifndef PROTEUS_COMPILERINTERFACEDEVICE_H
 #define PROTEUS_COMPILERINTERFACEDEVICE_H
 
-#include "CompilerInterfaceTypes.h"
+#include "proteus/CompilerInterfaceTypes.h"
 
 #if PROTEUS_ENABLE_CUDA
-#include "JitEngineDeviceCUDA.hpp"
+#include "proteus/JitEngineDeviceCUDA.hpp"
 using JitDeviceImplT = proteus::JitEngineDeviceCUDA;
 
 extern "C" cudaError_t __jit_launch_kernel(void *Kernel, dim3 GridDim,
@@ -22,7 +22,7 @@ extern "C" cudaError_t __jit_launch_kernel(void *Kernel, dim3 GridDim,
                                            uint64_t ShmemSize, void *Stream);
 
 #elif PROTEUS_ENABLE_HIP
-#include "JitEngineDeviceHIP.hpp"
+#include "proteus/JitEngineDeviceHIP.hpp"
 using JitDeviceImplT = proteus::JitEngineDeviceHIP;
 
 extern "C" hipError_t __jit_launch_kernel(void *Kernel, uint64_t GridDimXY,

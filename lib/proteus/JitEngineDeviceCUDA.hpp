@@ -11,8 +11,8 @@
 #ifndef PROTEUS_JITENGINEDEVICECUDA_HPP
 #define PROTEUS_JITENGINEDEVICECUDA_HPP
 
-#include "JitEngineDevice.hpp"
-#include "Utils.h"
+#include "proteus/JitEngineDevice.hpp"
+#include "proteus/Utils.h"
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/SmallVector.h>
 #include <memory>

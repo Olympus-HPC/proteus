@@ -1,8 +1,8 @@
 #ifndef PROTEUS_HASHING_HPP
 #define PROTEUS_HASHING_HPP
 
-#include "CompilerInterfaceTypes.h"
-#include "TimeTracing.hpp"
+#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/TimeTracing.hpp"
 
 #include <llvm/ADT/ArrayRef.h>
 #include <string>
