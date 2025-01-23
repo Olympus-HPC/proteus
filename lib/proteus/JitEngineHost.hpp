@@ -17,9 +17,9 @@
 
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 
-#include "CompilerInterfaceTypes.h"
-#include "JitCache.hpp"
-#include "JitEngine.hpp"
+#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/JitCache.hpp"
+#include "proteus/JitEngine.hpp"
 
 namespace proteus {
 

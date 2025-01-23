@@ -2,7 +2,7 @@
 # proteus::RuntimeConstant.  It embeds the module in a header used by
 # ProteusPass to match its definition of the RuntimeConstant type to the one
 # expected on the target platform.
-set(GEN_SOURCE_CODE "#include \"${CMAKE_SOURCE_DIR}/lib/CompilerInterfaceTypes.h\"\nstatic proteus::RuntimeConstant RC;")
+set(GEN_SOURCE_CODE "#include \"${CMAKE_SOURCE_DIR}/lib/proteus/CompilerInterfaceTypes.h\"\nstatic proteus::RuntimeConstant RC;")
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/cmake-gen.cpp "${GEN_SOURCE_CODE}")
 set(OUTPUT_FILE ${CMAKE_CURRENT_BINARY_DIR}/cmake-out.ll)
 set(HEADER_FILE ${CMAKE_CURRENT_BINARY_DIR}/GenCompilerInterfaceTypes.h)
@@ -10,7 +10,7 @@ set(HEADER_FILE ${CMAKE_CURRENT_BINARY_DIR}/GenCompilerInterfaceTypes.h)
 add_custom_command(
     OUTPUT ${OUTPUT_FILE}
     COMMAND ${CMAKE_CXX_COMPILER} ${CMAKE_CURRENT_BINARY_DIR}/cmake-gen.cpp -emit-llvm -S -o ${OUTPUT_FILE}
-    DEPENDS ${PROJECT_SOURCE_DIR}/lib/CompilerInterfaceTypes.h
+    DEPENDS ${PROJECT_SOURCE_DIR}/lib/proteus/CompilerInterfaceTypes.h
     COMMENT "Generating CompilerInterfaceTypes LLVM IR module file"
     VERBATIM
 )
@@ -33,7 +33,7 @@ add_library(ProteusPass SHARED ProteusPass.cpp)
 
 add_dependencies(ProteusPass GenerateRuntimeConstantTyHeader)
 target_include_directories(ProteusPass
-  PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+  PRIVATE ${PROJECT_SOURCE_DIR}/lib ${CMAKE_CURRENT_BINARY_DIR})
 
 target_include_directories(ProteusPass
   SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})

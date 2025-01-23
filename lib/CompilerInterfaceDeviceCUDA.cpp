@@ -8,8 +8,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CompilerInterfaceDevice.h"
-#include "CompilerInterfaceDeviceInternal.hpp"
+#include "proteus/CompilerInterfaceDevice.h"
+#include "proteus/CompilerInterfaceDeviceInternal.hpp"
 
 using namespace proteus;
 

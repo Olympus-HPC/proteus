@@ -22,9 +22,9 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 
-#include "JitEngineDeviceHIP.hpp"
-#include "TimeTracing.hpp"
-#include "Utils.h"
+#include "proteus/JitEngineDeviceHIP.hpp"
+#include "proteus/TimeTracing.hpp"
+#include "proteus/Utils.h"
 
 #if LLVM_VERSION_MAJOR == 18
 #include "lld/Common/Driver.h"

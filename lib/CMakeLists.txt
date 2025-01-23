@@ -8,15 +8,15 @@ set(SOURCES
 )
 
 set(HEADERS
-  CompilerInterfaceTypes.h
-  JitCache.hpp
-  JitEngine.hpp
-  JitEngineHost.hpp
-  JitStorageCache.hpp
-  JitVariable.hpp
-  TimeTracing.hpp
-  TransformArgumentSpecialization.hpp
-  Utils.h)
+  proteus/CompilerInterfaceTypes.h
+  proteus/JitCache.hpp
+  proteus/JitEngine.hpp
+  proteus/JitEngineHost.hpp
+  proteus/JitStorageCache.hpp
+  proteus/JitVariable.hpp
+  proteus/TimeTracing.hpp
+  proteus/TransformArgumentSpecialization.hpp
+  proteus/Utils.h)
 
 if(PROTEUS_ENABLE_CUDA)
 list(APPEND SOURCES
@@ -26,10 +26,10 @@ list(APPEND SOURCES
 )
 
 list(APPEND HEADERS
-  CompilerInterfaceDevice.h
-  JitEngineDevice.hpp
-  JitEngineDeviceCUDA.hpp
-  UtilsCUDA.h)
+  proteus/CompilerInterfaceDevice.h
+  proteus/JitEngineDevice.hpp
+  proteus/JitEngineDeviceCUDA.hpp
+  proteus/UtilsCUDA.h)
 endif()
 
 if(PROTEUS_ENABLE_HIP)
@@ -40,10 +40,10 @@ list(APPEND SOURCES
 )
 
 list(APPEND HEADERS
-  CompilerInterfaceDevice.h
-  JitEngineDevice.hpp
-  JitEngineDeviceHIP.hpp
-  UtilsHIP.h)
+  proteus/CompilerInterfaceDevice.h
+  proteus/JitEngineDevice.hpp
+  proteus/JitEngineDeviceHIP.hpp
+  proteus/UtilsHIP.h)
 endif()
 
 if(BUILD_SHARED)

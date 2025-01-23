@@ -15,8 +15,8 @@
 #include <filesystem>
 #include <iostream>
 
-#include "CompilerInterfaceTypes.h"
-#include "Utils.h"
+#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Utils.h"
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Config/llvm-config.h"
