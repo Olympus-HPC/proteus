@@ -16,8 +16,8 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/Support/Casting.h>
 
-#include "CompilerInterfaceTypes.h"
-#include "Utils.h"
+#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Utils.h"
 
 namespace proteus {
 

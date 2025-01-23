@@ -16,9 +16,9 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/SourceMgr.h"
 
-#include "TimeTracing.hpp"
+#include "proteus/TimeTracing.hpp"
 
-#include "../common/Logger.hpp"
+#include "proteus/Logger.hpp"
 #if PROTEUS_ENABLE_DEBUG
 #define PROTEUS_DBG(x) x;
 #else
