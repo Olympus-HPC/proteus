@@ -110,10 +110,3 @@ install(
 
 install(FILES
   ${HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-
-# Export proteusTargets to a CMake config file
-install(
-  EXPORT proteusTargets
-  FILE proteusConfig.cmake
-  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/proteus"
-)
