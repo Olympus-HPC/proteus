@@ -8,6 +8,7 @@ set(SOURCES
 )
 
 set(HEADERS
+  proteus/Logger.hpp
   proteus/CompilerInterfaceTypes.h
   CoreDevice.hp
   Hashing.hpp
@@ -81,7 +82,7 @@ target_include_directories(proteus
 target_include_directories(proteus
   PUBLIC
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/lib>
-  $<INSTALL_INTERFACE:include>)
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 if(LLVM_LINK_LLVM_DYLIB)
   llvm_config(proteus USE_SHARED)
@@ -122,4 +123,5 @@ install(
   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 
 install(FILES
-  ${HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+  ${HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/proteus/")
+
