@@ -45,14 +45,15 @@ public:
 
   bool isProteusDisabled() { return Config.ENV_PROTEUS_DISABLE; }
 
-protected:
   static Expected<std::unique_ptr<TargetMachine>>
   createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3);
 
-  static void runOptimizationPassPipeline(Module &M, StringRef Arch,
-                                          unsigned OptLevel = 3);
   static void runCleanupPassPipeline(Module &M);
 
+  static void runOptimizationPassPipeline(Module &M, StringRef Arch,
+                                          unsigned OptLevel = 3);
+
+protected:
   JitEngine();
 
   std::string mangleSuffix(uint64_t HashValue);

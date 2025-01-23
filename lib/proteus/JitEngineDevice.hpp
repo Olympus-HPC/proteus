@@ -150,19 +150,6 @@ public:
     LinkedIRModules.emplace_back(std::move(Mod));
   }
 
-private:
-  //------------------------------------------------------------------
-  // Begin Methods implemented in the derived device engine class.
-  //------------------------------------------------------------------
-  void *resolveDeviceGlobalAddr(const void *Addr) {
-    return static_cast<ImplT &>(*this).resolveDeviceGlobalAddr(Addr);
-  }
-
-  static void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
-                                       int BlockSize) {
-    ImplT::setLaunchBoundsForKernel(M, F, GridSize, BlockSize);
-  }
-
   static void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
     auto ReplaceIntrinsicDim = [&](ArrayRef<StringRef> IntrinsicNames,
                                    uint32_t DimValue) {
@@ -234,6 +221,30 @@ private:
     InsertAssume(ImplT::blockIdxXFnName(), GridDim.x);
     InsertAssume(ImplT::blockIdxYFnName(), GridDim.y);
     InsertAssume(ImplT::blockIdxZFnName(), GridDim.z);
+  }
+
+  static void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
+                                       int BlockSize) {
+    ImplT::setLaunchBoundsForKernel(M, F, GridSize, BlockSize);
+  }
+
+  static std::unique_ptr<Module>
+  linkJitModule(LLVMContext &ProteusCtx,
+                SmallVector<std::unique_ptr<Module>> &LinkedModules);
+
+  static std::unique_ptr<MemoryBuffer>
+  codegenObject(Module &M, StringRef DeviceArch,
+                SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
+                bool UseRTC = false) {
+    return ImplT::codegenObject(M, DeviceArch, GlobalLinkedBinaries, UseRTC);
+  }
+
+private:
+  //------------------------------------------------------------------
+  // Begin Methods implemented in the derived device engine class.
+  //------------------------------------------------------------------
+  void *resolveDeviceGlobalAddr(const void *Addr) {
+    return static_cast<ImplT &>(*this).resolveDeviceGlobalAddr(Addr);
   }
 
   void getRuntimeConstantValues(void **KernelArgs,
@@ -348,13 +359,6 @@ private:
     }
   }
 
-  static std::unique_ptr<MemoryBuffer>
-  codegenObject(Module &M, StringRef DeviceArch,
-                SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
-                bool UseRTC = false) {
-    return ImplT::codegenObject(M, DeviceArch, GlobalLinkedBinaries, UseRTC);
-  }
-
   KernelFunction_t getKernelFunctionFromImage(StringRef KernelName,
                                               const void *Image) {
     return static_cast<ImplT &>(*this).getKernelFunctionFromImage(KernelName,
@@ -445,9 +449,6 @@ protected:
   JitStorageCache<KernelFunction_t> StorageCache;
   std::string DeviceArch;
   std::unordered_map<std::string, const void *> VarNameToDevPtr;
-  static std::unique_ptr<Module>
-  linkJitModule(StringRef KernelName, LLVMContext &ProteusCtx,
-                SmallVector<std::unique_ptr<Module>> &LinkedModules);
 
   LLVMContext &getProteusLLVMCtx() const { return *Ctx.get(); }
 
@@ -813,7 +814,7 @@ void JitEngineDevice<ImplT>::registerLinkedBinary(
 
 template <typename ImplT>
 std::unique_ptr<Module> JitEngineDevice<ImplT>::linkJitModule(
-    StringRef KernelName, LLVMContext &ProteusCtx,
+    LLVMContext &ProteusCtx,
     SmallVector<std::unique_ptr<Module>> &LinkedModules) {
   if (LinkedModules.empty())
     FATAL_ERROR("Expected jit module");

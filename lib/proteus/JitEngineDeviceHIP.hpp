@@ -101,11 +101,6 @@ public:
 
   Module &extractDeviceBitcode(StringRef KernelName, void *Kernel);
 
-  static std::unique_ptr<MemoryBuffer>
-  codegenObject(Module &M, StringRef DeviceArch,
-                SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
-                bool UseHIPrtc = false);
-
   hipFunction_t getKernelFunctionFromImage(StringRef KernelName,
                                            const void *Image);
 
@@ -116,6 +111,11 @@ public:
   hipError_t launchKernelDirect(void *KernelFunc, dim3 GridDim, dim3 BlockDim,
                                 void **KernelArgs, uint64_t ShmemSize,
                                 hipStream_t Stream);
+
+  static std::unique_ptr<MemoryBuffer>
+  codegenObject(Module &M, StringRef DeviceArch,
+                SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
+                bool UseHIPrtc = false);
 
 private:
   JitEngineDeviceHIP();

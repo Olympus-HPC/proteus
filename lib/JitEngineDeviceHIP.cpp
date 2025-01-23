@@ -171,7 +171,7 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
     }
   }
 
-  auto JitModule = linkJitModule(KernelName, Ctx, LinkedModules);
+  auto JitModule = linkJitModule(Ctx, LinkedModules);
 
   // All kernels included in this collection of modules will have an
   // identical non specialized IR file. Map all Kernels, to this generic IR
