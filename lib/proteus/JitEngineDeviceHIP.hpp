@@ -117,6 +117,8 @@ public:
                 SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
                 bool UseHIPrtc = false);
 
+  static void InitLLVM();
+
 private:
   JitEngineDeviceHIP();
   JitEngineDeviceHIP(JitEngineDeviceHIP &) = delete;

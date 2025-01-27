@@ -379,15 +379,17 @@ hipError_t JitEngineDeviceHIP::launchKernelDirect(void *KernelFunc,
                          Stream);
 }
 
-JitEngineDeviceHIP::JitEngineDeviceHIP() {
+void JitEngineDeviceHIP::InitLLVM() {
   LLVMInitializeAMDGPUTargetInfo();
   LLVMInitializeAMDGPUTarget();
   LLVMInitializeAMDGPUTargetMC();
   LLVMInitializeAMDGPUAsmPrinter();
+}
 
+JitEngineDeviceHIP::JitEngineDeviceHIP() {
+  InitLLVM();
   hipDeviceProp_t devProp;
   proteusHipErrCheck(hipGetDeviceProperties(&devProp, 0));
-
   DeviceArch = devProp.gcnArchName;
   DeviceArch = DeviceArch.substr(0, DeviceArch.find_first_of(":"));
 }
