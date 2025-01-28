@@ -273,13 +273,13 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
         *M, *F, ArgPos,
         ArrayRef<RuntimeConstant>{RC,
                                   static_cast<size_t>(NumRuntimeConstants)});
-    if (!JitVariables.empty())
-      TransformLambdaSpecialization::transform(*M, *F, JitVariables);
+    if (!JitVariableMap.empty())
+      TransformLambdaSpecialization::transform(*M, *F, JitVariableMap);
 
     // Logger::logs("proteus") << "=== JIT Module\n" << *M << "=== End of JIT
     // Module\n";
 
-    JitVariables.clear();
+    JitVariableMap.clear();
 
     F->setName(FnName + Suffix);
 
@@ -397,5 +397,14 @@ JitEngineHost::JitEngineHost(int argc, char *argv[]) {
 }
 
 void JitEngineHost::pushJitVariable(RuntimeConstant RC) {
-  JitVariables.push_back(RC);
+  PendingJitVariables.push_back(RC);
+}
+
+void  JitEngineHost::registerLambda(const char* Symbol) {
+  const StringRef SymbolStr(Symbol);
+  for (auto V : PendingJitVariables) {
+    JitVariableMap[SymbolStr].push_back(V);
+  }
+
+  PendingJitVariables.clear();
 }

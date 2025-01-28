@@ -7,7 +7,10 @@
 
 #include "proteus/JitVariable.hpp"
 
-template <typename F> void run(F &&f) { f(); }
+template <typename F> void run(F &&f) { 
+  proteus::register_lambda(f);
+  f(); 
+}
 
 int main(int argc, char **argv) {
   int N = 1024;

@@ -14,7 +14,11 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/Support/Casting.h>
+<<<<<<< HEAD:include/proteus/TransformLambdaSpecialization.hpp
 #include <llvm/Support/Debug.h>
+=======
+#include <llvm/Demangle/Demangle.h>
+>>>>>>> 43151fc (Initial refactoring to pass in lambda symbol):lib/TransformLambdaSpecialization.hpp
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Utils.h"
@@ -55,12 +59,25 @@ static inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
 class TransformLambdaSpecialization {
 public:
   static void transform(Module &M, Function &F,
-                        SmallVector<RuntimeConstant, 8> &RC) {
+                        DenseMap<StringRef, SmallVector<RuntimeConstant, 4>> &RCMap) {
     auto LambdaClass = F.getArg(0);
     PROTEUS_DBG(Logger::logs("proteus")
                 << "TransformLambdaSpecialization::transform" << "\n");
     PROTEUS_DBG(Logger::logs("proteus") << "\t args" << "\n");
-    for (auto &Arg : RC) {
+
+    const std::string Operator{llvm::demangle(F.getName())};
+    std::size_t Sep = Operator.find("::");
+    std::size_t SecondSep = Operator.find("::", Sep+1);
+
+    const std::string Symbol = Operator.substr(0, SecondSep);
+
+    PROTEUS_DBG(Logger::logs("proteus") << "Function: " << Symbol << "\n");
+
+    const auto RC = RCMap.find(Symbol);
+    if (RC == RCMap.end())
+      return;
+
+    for (auto &Arg : RC->second) {
       PROTEUS_DBG(Logger::logs("proteus")
                   << "{" << Arg.Value.Int64Val << ", " << Arg.Slot << " }\n");
     }
@@ -69,7 +86,7 @@ public:
     for (User *User : LambdaClass->users()) {
       PROTEUS_DBG(Logger::logs("proteus") << *User << "\n");
       if (dyn_cast<LoadInst>(User)) {
-        for (auto &Arg : RC) {
+        for (auto &Arg : RC->second) {
           if (Arg.Slot == 0) {
             Constant *C = getConstant(M.getContext(), User->getType(), Arg);
             User->replaceAllUsesWith(C);
@@ -82,7 +99,7 @@ public:
         auto GEPSlot = GEP->getOperand(User->getNumOperands() - 1);
         ConstantInt *CI = dyn_cast<ConstantInt>(GEPSlot);
         int Slot = CI->getZExtValue();
-        for (auto &Arg : RC) {
+        for (auto &Arg : RC->second) {
           if (Arg.Slot == Slot) {
             for (auto *GEPUser : GEP->users()) {
               auto *LI = dyn_cast<LoadInst>(GEPUser);

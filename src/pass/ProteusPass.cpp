@@ -25,6 +25,28 @@
 //
 //===----------------------------------------------------------------------===//
 
+<<<<<<< HEAD:src/pass/ProteusPass.cpp
+=======
+#include "llvm/Analysis/CallGraph.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
+#include <llvm/Demangle/Demangle.h>
+#include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/Mangler.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Verifier.h"
+#include "llvm/Object/ELF.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/PassPlugin.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/IPO.h"
+#include "llvm/Transforms/IPO/AlwaysInliner.h"
+#include "llvm/Transforms/IPO/GlobalDCE.h"
+#include "llvm/Transforms/IPO/StripDeadPrototypes.h"
+#include "llvm/Transforms/IPO/StripSymbols.h"
+#include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/ModuleUtils.h"
+>>>>>>> 43151fc (Initial refactoring to pass in lambda symbol):pass/ProteusPass.cpp
 #include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Analysis/CallGraph.h>
@@ -153,6 +175,7 @@ public:
     instrumentRegisterFatBinaryEnd(M);
     instrumentRegisterVar(M);
     findJitVariables(M);
+    registerLambdaFunctions(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
       getKernelHostStubs(M);
@@ -1091,6 +1114,41 @@ private:
           CB->setArgOperand(1, C);
         }
       }
+    }
+  }
+
+  void registerLambdaFunctions(Module &M) {
+      DEBUG(Logger::logs("proteus-pass") << "registering lambda functions" << "\n");
+
+      SmallVector<Function *, 16> LambdaFunctions;
+      for (auto &F : M.getFunctionList()) {
+        // TODO: Demangle and search for the fully qualified proteus::jit_variable
+        // name.
+        if (F.getName().contains("register_lambda")) {
+          LambdaFunctions.push_back(&F);
+        }
+      }
+
+      for (auto Function : LambdaFunctions) {
+        auto DemangledName = llvm::demangle(Function->getName());
+
+        std::size_t L = DemangledName.find("<");
+        std::size_t R = DemangledName.find(">"); 
+        const std::string Lambda = DemangledName.substr(L+1, R-L-2);
+        StringRef LambdaSymbol{Lambda};
+
+        DEBUG(Logger::logs("proteus-pass") << Function->getName() << " " << DemangledName << " " << LambdaSymbol << "\n");
+
+        for (auto User : Function->users()) {
+          CallBase *CB = dyn_cast<CallBase>(User);
+          if (!CB)
+            FATAL_ERROR(
+                "Expected CallBase as user of proteus::register_lambda function");
+
+          IRBuilder<> Builder(CB);
+          auto *LambdaNameGlobal = Builder.CreateGlobalString(LambdaSymbol);
+          CB->setArgOperand(1, LambdaNameGlobal);
+        }
     }
   }
 };

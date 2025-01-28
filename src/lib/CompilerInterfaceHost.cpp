@@ -43,3 +43,8 @@ extern "C" __attribute__((used)) void __jit_push_variable(RuntimeConstant RC) {
   Jit.pushJitVariable(RC);
   return;
 }
+
+extern "C" __attribute__((used)) void __jit_register_fn(const char *Symbol) {
+  JitEngineHost &Jit = JitEngineHost::instance();
+  Jit.registerLambda(Symbol);
+}
