@@ -48,12 +48,14 @@ public:
                        RuntimeConstant *RC, int NumRuntimeConstants);
 
   void pushJitVariable(RuntimeConstant RC);
+  void registerLambda(const char* Symbol);
 
 private:
   JitEngineHost(int argc, char *argv[]);
   void addStaticLibrarySymbols();
   JitCache<void *> CodeCache;
-  SmallVector<RuntimeConstant, 8> JitVariables;
+  SmallVector<RuntimeConstant, 8> PendingJitVariables;
+  DenseMap<StringRef, SmallVector<RuntimeConstant, 4>> JitVariableMap;
 };
 
 } // namespace proteus
