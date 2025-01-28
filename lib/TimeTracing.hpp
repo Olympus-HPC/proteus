@@ -29,7 +29,7 @@ struct TimeTracerRAII {
   }
 };
 
-#if ENABLE_TIME_TRACING
+#if PROTEUS_ENABLE_TIME_TRACING
 #define TIMESCOPE(x) TimeTraceScope T(x);
 #else
 #define TIMESCOPE(x)

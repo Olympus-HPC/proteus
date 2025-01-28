@@ -56,14 +56,23 @@ else()
   add_library(proteus STATIC ${SOURCES})
 endif()
 
-target_compile_definitions(proteus PRIVATE ${LLVM_DEFINITIONS})
+target_compile_definitions(proteus PUBLIC ${LLVM_DEFINITIONS})
+if(PROTEUS_ENABLE_HIP)
+  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_HIP)
+elseif(PROTEUS_ENABLE_CUDA)
+  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_CUDA)
+endif()
 
-if(ENABLE_TIME_TRACING)
-  target_compile_definitions(proteus PRIVATE "-DENABLE_TIME_TRACING")
+if (PROTEUS_ENABLE_DEBUG)
+  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_DEBUG)
+endif()
+
+if(PROTEUS_ENABLE_TIME_TRACING)
+  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_TIME_TRACING)
 endif()
 
 target_include_directories(proteus
-  SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
+  SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS})
 
 target_include_directories(proteus
   PUBLIC

@@ -10,7 +10,7 @@ set(CMAKE_CXX_EXTENSIONS NO)
 option(PROTEUS_ENABLE_HIP "Enable HIP" OFF)
 option(PROTEUS_ENABLE_CUDA "Enable CUDA" OFF)
 option(PROTEUS_ENABLE_DEBUG "Enable debugging output" OFF)
-option(ENABLE_TIME_TRACING "Enable time tracing for the JIT engine" OFF)
+option(PROTEUS_ENABLE_TIME_TRACING "Enable time tracing for the JIT engine" OFF)
 option(BUILD_SHARED "Builds the JIT library as shared" OFF)
 option(ENABLE_TESTS "Enable tests" ON)
 

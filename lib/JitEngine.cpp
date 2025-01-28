@@ -41,7 +41,7 @@
 static llvm::codegen::RegisterCodeGenFlags CFG;
 namespace proteus {
 
-#if ENABLE_TIME_TRACING
+#if PROTEUS_ENABLE_TIME_TRACING
 TimeTracerRAII TimeTracer;
 #endif
 
