@@ -67,8 +67,8 @@ if (PROTEUS_ENABLE_DEBUG)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_DEBUG)
 endif()
 
-if(ENABLE_TIME_TRACING)
-  target_compile_definitions(proteus PUBLIC ENABLE_TIME_TRACING)
+if(PROTEUS_ENABLE_TIME_TRACING)
+  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_TIME_TRACING)
 endif()
 
 target_include_directories(proteus
