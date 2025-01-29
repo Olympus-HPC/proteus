@@ -27,6 +27,7 @@
 
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
+#include <llvm/Demangle/Demangle.h>
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/Mangler.h"
 #include "llvm/IR/Module.h"
@@ -152,6 +153,7 @@ public:
     instrumentRegisterFatBinaryEnd(M);
     instrumentRegisterVar(M);
     findJitVariables(M);
+    registerLambdaFunctions(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
       getKernelHostStubs(M);
@@ -250,10 +252,11 @@ private:
       if (isDeviceCompilation(M)) {
         ModuleDeviceKernels = getDeviceKernels(M);
         if (!isDeviceKernel(Fn))
-          FATAL_ERROR(std::string{} + __FILE__ + ":" +
-                      std::to_string(__LINE__) +
-                      " => Expected the annotated Fn " + Fn->getName() +
-                      " to be a kernel function!");
+          return;
+          // FATAL_ERROR(std::string{} + __FILE__ + ":" +
+          //             std::to_string(__LINE__) +
+          //             " => Expected the annotated Fn " + Fn->getName() +
+          //             " to be a kernel function!");
       }
 
       if (JitFunctionInfoMap.contains(Fn)) {
@@ -1107,6 +1110,41 @@ private:
           CB->setArgOperand(1, C);
         }
       }
+    }
+  }
+
+  void registerLambdaFunctions(Module &M) {
+      DEBUG(Logger::logs("proteus-pass") << "registering lambda functions" << "\n");
+
+      SmallVector<Function *, 16> LambdaFunctions;
+      for (auto &F : M.getFunctionList()) {
+        // TODO: Demangle and search for the fully qualified proteus::jit_variable
+        // name.
+        if (F.getName().contains("register_lambda")) {
+          LambdaFunctions.push_back(&F);
+        }
+      }
+
+      for (auto Function : LambdaFunctions) {
+        auto DemangledName = llvm::demangle(Function->getName());
+
+        std::size_t L = DemangledName.find("<");
+        std::size_t R = DemangledName.find(">"); 
+        const std::string Lambda = DemangledName.substr(L+1, R-L-2);
+        StringRef LambdaSymbol{Lambda};
+
+        DEBUG(Logger::logs("proteus-pass") << Function->getName() << " " << DemangledName << " " << LambdaSymbol << "\n");
+
+        for (auto User : Function->users()) {
+          CallBase *CB = dyn_cast<CallBase>(User);
+          if (!CB)
+            FATAL_ERROR(
+                "Expected CallBase as user of proteus::register_lambda function");
+
+          IRBuilder<> Builder(CB);
+          auto *LambdaNameGlobal = Builder.CreateGlobalString(LambdaSymbol);
+          CB->setArgOperand(1, LambdaNameGlobal);
+        }
     }
   }
 };
