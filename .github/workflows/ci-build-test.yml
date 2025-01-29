@@ -41,8 +41,12 @@ jobs:
             -DCMAKE_CXX_COMPILER=clang++ \
             -DLLVM_INSTALL_DIR=$(llvm-config --prefix) \
             -DPROTEUS_ENABLE_DEBUG=${{ matrix.enable_debug }} \
-            -DENABLE_TIME_TRACING=${{ matrix.enable_time_tracing }} \
-            -DBUILD_SHARED=${{ matrix.build_shared }}
+            -DPROTEUS_ENABLE_TIME_TRACING=${{ matrix.enable_time_tracing }} \
+            -DBUILD_SHARED=${{ matrix.build_shared }} |& tee cmake_output.log
+          if grep -q "Manually-specified variables were not used by the project:" cmake_output.log; then
+            echo "Error: Unused variables detected"
+            exit 1
+          fi
           make -j
           popd
       - name: Test
