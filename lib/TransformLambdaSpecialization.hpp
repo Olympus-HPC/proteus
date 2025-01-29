@@ -113,6 +113,8 @@ public:
         }
       }
     }
+    
+    RCMap.erase(RC);
   }
 };
 

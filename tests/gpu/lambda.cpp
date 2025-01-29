@@ -14,6 +14,7 @@ __global__ __attribute__((annotate("jit"))) void kernel(T LB) {
 
 template <typename T> 
 void run(T&& LB) {
+  proteus::register_lambda(LB);
   kernel<<<1,1>>>(LB);
   gpuErrCheck(gpuDeviceSynchronize());
 }
@@ -23,7 +24,7 @@ int main(int argc, char **argv) {
   double *x;
   gpuErrCheck(gpuMallocManaged(&x, sizeof(double)*2));
 
-  run([=, a = proteus::jit_variable(a)] __device__ () { x[0] = a; });
+  run([=, a = proteus::jit_variable(a)] __device__ __attribute__((annotate("jit"))) () { x[0] = a; });
 
   gpuErrCheck(gpuFree(x));
 }
