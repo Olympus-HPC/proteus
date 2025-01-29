@@ -116,6 +116,8 @@ public:
         }
       }
     }
+    
+    RCMap.erase(RC);
   }
 };
 

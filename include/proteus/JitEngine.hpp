@@ -46,6 +46,9 @@ public:
 
   bool isProteusDisabled() { return Config.ENV_PROTEUS_DISABLE; }
 
+  void pushJitVariable(RuntimeConstant RC);
+  void registerLambda(const char* Symbol);
+
 protected:
   Expected<std::unique_ptr<TargetMachine>>
   createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3);
@@ -69,6 +72,33 @@ protected:
     bool ENV_PROTEUS_RELINK_GLOBALS_BY_COPY;
   } Config;
 };
+
+inline
+SmallVector<RuntimeConstant, 8>& getPendingJitVariables() {
+  static SmallVector<RuntimeConstant, 8> PendingJitVariables;
+  return PendingJitVariables;
+}
+
+inline
+DenseMap<StringRef, SmallVector<RuntimeConstant, 4>>& getJitVariableMap() {
+  static DenseMap<StringRef, SmallVector<RuntimeConstant, 4>> JitVariableMap;
+  return JitVariableMap;
+}
+
+inline void pushJitVariable(RuntimeConstant RC) {
+  getPendingJitVariables().push_back(RC);
+}
+
+inline void  registerLambda(const char* Symbol) {
+  const StringRef SymbolStr(Symbol);
+  auto& JitVariables = getPendingJitVariables();
+  auto& VariableMap = getJitVariableMap();
+  for (auto V : JitVariables) {
+    VariableMap[SymbolStr].push_back(V);
+  }
+
+  JitVariables.clear();
+}
 
 } // namespace proteus
 

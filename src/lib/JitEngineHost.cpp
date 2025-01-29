@@ -273,13 +273,12 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
         *M, *F, ArgPos,
         ArrayRef<RuntimeConstant>{RC,
                                   static_cast<size_t>(NumRuntimeConstants)});
-    if (!JitVariableMap.empty())
-      TransformLambdaSpecialization::transform(*M, *F, JitVariableMap);
+    if (!getJitVariableMap().empty())
+      TransformLambdaSpecialization::transform(*M, *F, getJitVariableMap());
 
     // Logger::logs("proteus") << "=== JIT Module\n" << *M << "=== End of JIT
     // Module\n";
 
-    JitVariableMap.clear();
 
     F->setName(FnName + Suffix);
 
@@ -394,17 +393,4 @@ JitEngineHost::JitEngineHost(int argc, char *argv[]) {
 
   // (3) Install transform to optimize modules when they're materialized.
   LLJITPtr->getIRTransformLayer().setTransform(OptimizationTransform(*this));
-}
-
-void JitEngineHost::pushJitVariable(RuntimeConstant RC) {
-  PendingJitVariables.push_back(RC);
-}
-
-void  JitEngineHost::registerLambda(const char* Symbol) {
-  const StringRef SymbolStr(Symbol);
-  for (auto V : PendingJitVariables) {
-    JitVariableMap[SymbolStr].push_back(V);
-  }
-
-  PendingJitVariables.clear();
 }

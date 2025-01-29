@@ -489,6 +489,13 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
         M, *F, RCIndices,
         ArrayRef<RuntimeConstant>{RC,
                                   static_cast<size_t>(NumRuntimeConstants)});
+  
+  if (! getJitVariableMap().empty() ) {
+    for (auto& F : M.getFunctionList()) {
+      if (llvm::demangle(F.getName()).find("lambda") != std::string::npos)
+          TransformLambdaSpecialization::transform(M, F, getJitVariableMap());
+    } 
+  }
 
   // Replace uses of blockDim.* and gridDim.* with constants.
   if (Config.ENV_PROTEUS_SPECIALIZE_DIMS) {

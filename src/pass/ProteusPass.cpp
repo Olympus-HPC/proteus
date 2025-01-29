@@ -273,10 +273,11 @@ private:
       if (isDeviceCompilation(M)) {
         ModuleDeviceKernels = getDeviceKernels(M);
         if (!isDeviceKernel(Fn))
-          FATAL_ERROR(std::string{} + __FILE__ + ":" +
-                      std::to_string(__LINE__) +
-                      " => Expected the annotated Fn " + Fn->getName() +
-                      " to be a kernel function!");
+          return;
+          // FATAL_ERROR(std::string{} + __FILE__ + ":" +
+          //             std::to_string(__LINE__) +
+          //             " => Expected the annotated Fn " + Fn->getName() +
+          //             " to be a kernel function!");
       }
 
       if (JitFunctionInfoMap.contains(Fn)) {
