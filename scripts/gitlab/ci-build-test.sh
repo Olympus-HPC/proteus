@@ -46,7 +46,7 @@ fi
 CMAKE_OPTIONS="-DLLVM_INSTALL_DIR=$LLVM_INSTALL_DIR"
 CMAKE_OPTIONS+=" -DCMAKE_C_COMPILER=$LLVM_INSTALL_DIR/bin/clang -DCMAKE_CXX_COMPILER=$LLVM_INSTALL_DIR/bin/clang++"
 CMAKE_OPTIONS+=${CMAKE_OPTIONS_MACHINE}
-CMAKE_OPTIONS+=" -DPROTEUS_ENABLE_DEBUG=${PROTEUS_CI_ENABLE_DEBUG} -DENABLE_TIME_TRACING=${PROTEUS_CI_ENABLE_TIME_TRACING}"
+CMAKE_OPTIONS+=" -DPROTEUS_ENABLE_DEBUG=${PROTEUS_CI_ENABLE_DEBUG} -DPROTEUS_ENABLE_TIME_TRACING=${PROTEUS_CI_ENABLE_TIME_TRACING}"
 if [ -n "${PROTEUS_CI_BUILD_SHARED}" ]; then
   CMAKE_OPTIONS+=" -DBUILD_SHARED=${PROTEUS_CI_BUILD_SHARED}"
 fi
@@ -54,7 +54,11 @@ fi
 mkdir build
 pushd build
 
-cmake ${CI_PROJECT_DIR} ${CMAKE_OPTIONS}
+cmake ${CI_PROJECT_DIR} ${CMAKE_OPTIONS} |& tee cmake_output.log
+if grep -q "Manually-specified variables were not used by the project:" cmake_output.log; then
+    echo "Error: Unused variables detected"
+    exit 1
+fi
 make -j
 make test
 # Test also our faster, alternative to HIP RTC codegen.
