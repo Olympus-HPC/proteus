@@ -48,18 +48,18 @@
 #include <llvm/Support/ErrorHandling.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
-#include "CompilerInterfaceTypes.h"
-#include "JitEngineHost.hpp"
-#include "TransformArgumentSpecialization.hpp"
-#include "TransformLambdaSpecialization.hpp"
-#include "Utils.h"
+#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/JitEngineHost.hpp"
+#include "proteus/TransformArgumentSpecialization.hpp"
+#include "proteus/TransformLambdaSpecialization.hpp"
+#include "proteus/Utils.h"
 
 using namespace proteus;
 using namespace llvm;
 using namespace llvm::orc;
 
 #if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
-#include "CompilerInterfaceDevice.h"
+#include "proteus/CompilerInterfaceDevice.h"
 #endif
 
 // A function object that creates a simple pass pipeline to apply to each

@@ -5,7 +5,7 @@
 #include <chrono>
 #include <iostream>
 
-#include "JitVariable.hpp"
+#include "proteus/JitVariable.hpp"
 
 template <typename F> void run(F &&f) { f(); }
 

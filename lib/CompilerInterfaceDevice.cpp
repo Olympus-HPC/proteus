@@ -8,8 +8,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "CompilerInterfaceDevice.h"
-#include "JitEngineDevice.hpp"
+#include "proteus/CompilerInterfaceDevice.h"
+#include "proteus/JitEngineDevice.hpp"
 
 using namespace proteus;
 

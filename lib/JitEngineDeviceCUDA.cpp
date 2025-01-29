@@ -16,10 +16,10 @@
 #include <llvm/Support/MemoryBufferRef.h>
 #include <memory>
 
-#include "JitEngineDevice.hpp"
-#include "JitEngineDeviceCUDA.hpp"
-#include "Utils.h"
-#include "UtilsCUDA.h"
+#include "proteus/JitEngineDevice.hpp"
+#include "proteus/JitEngineDeviceCUDA.hpp"
+#include "proteus/Utils.h"
+#include "proteus/UtilsCUDA.h"
 #include <cuda_runtime.h>
 #include <sys/types.h>
 

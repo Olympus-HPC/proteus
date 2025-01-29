@@ -14,8 +14,8 @@
 #include "llvm/Support/Debug.h"
 #include <llvm/IR/IRBuilder.h>
 
-#include "CompilerInterfaceTypes.h"
-#include "Utils.h"
+#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Utils.h"
 
 namespace proteus {
 

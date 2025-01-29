@@ -18,7 +18,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Target/TargetMachine.h"
 
-#include "Utils.h"
+#include "proteus/Utils.h"
 
 namespace proteus {
 
