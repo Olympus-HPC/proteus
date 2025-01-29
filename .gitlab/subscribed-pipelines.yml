@@ -77,6 +77,15 @@ tioga-build-and-test:
   needs: [tioga-up-check]
   extends: [.build-and-test]
 
+tioga-test-integration:
+  variables:
+    CI_MACHINE: "tioga"
+    JOB_CMD:
+      value: "tests/integration/hip/ci-test-integration.sh"
+      expand: false
+  needs: [tioga-up-check]
+  extends: [.test-integration]
+
 tioga-proteus-benchmarks:
   variables:
     CI_MACHINE: "tioga"
