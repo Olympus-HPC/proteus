@@ -127,7 +127,7 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
 
   ArrayRef<uint8_t> DeviceBitcode;
   SmallVector<std::unique_ptr<Module>> LinkedModules;
-  auto &Ctx = getProteusLLVMCtx();
+  auto &Ctx = JitEngineDevice<JitEngineDeviceHIP>::getProteusLLVMCtx();
 
   auto extractModuleFromSection = [&DeviceElf, &Ctx](auto &Section,
                                                      StringRef SectionName) {
@@ -171,7 +171,7 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
     }
   }
 
-  auto JitModule = linkJitModule(KernelName, LinkedModules);
+  auto JitModule = linkJitModule(KernelName, Ctx, LinkedModules);
 
   // All kernels included in this collection of modules will have an
   // identical non specialized IR file. Map all Kernels, to this generic IR
@@ -230,13 +230,11 @@ void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
 }
 
 std::unique_ptr<MemoryBuffer>
-JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
+JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch,
+                                  SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
+                                  bool UseHIPrtc) {
   TIMESCOPE("Codegen object");
-#if LLVM_VERSION_MAJOR == 18
-  if (Config.ENV_PROTEUS_USE_HIP_RTC_CODEGEN) {
-#else
-  {
-#endif
+  if (UseHIPrtc) {
     char *BinOut;
     size_t BinSize;
 

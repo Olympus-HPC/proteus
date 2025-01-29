@@ -158,13 +158,12 @@ private:
     return static_cast<ImplT &>(*this).resolveDeviceGlobalAddr(Addr);
   }
 
-  void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
-                                int BlockSize) {
-    static_cast<ImplT &>(*this).setLaunchBoundsForKernel(M, F, GridSize,
-                                                         BlockSize);
+  static void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
+                                       int BlockSize) {
+    ImplT::setLaunchBoundsForKernel(M, F, GridSize, BlockSize);
   }
 
-  void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
+  static void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
     auto ReplaceIntrinsicDim = [&](ArrayRef<StringRef> IntrinsicNames,
                                    uint32_t DimValue) {
       auto CollectCallUsers = [](Function &F) {
@@ -349,8 +348,11 @@ private:
     }
   }
 
-  std::unique_ptr<MemoryBuffer> codegenObject(Module &M, StringRef DeviceArch) {
-    return static_cast<ImplT &>(*this).codegenObject(M, DeviceArch);
+  static std::unique_ptr<MemoryBuffer>
+  codegenObject(Module &M, StringRef DeviceArch,
+                SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
+                bool UseRTC = false) {
+    return ImplT::codegenObject(M, DeviceArch, GlobalLinkedBinaries, UseRTC);
   }
 
   KernelFunction_t getKernelFunctionFromImage(StringRef KernelName,
@@ -443,8 +445,8 @@ protected:
   JitStorageCache<KernelFunction_t> StorageCache;
   std::string DeviceArch;
   std::unordered_map<std::string, const void *> VarNameToDevPtr;
-  std::unique_ptr<Module>
-  linkJitModule(StringRef KernelName,
+  static std::unique_ptr<Module>
+  linkJitModule(StringRef KernelName, LLVMContext &ProteusCtx,
                 SmallVector<std::unique_ptr<Module>> &LinkedModules);
 
   LLVMContext &getProteusLLVMCtx() const { return *Ctx.get(); }
@@ -683,9 +685,13 @@ JitEngineDevice<ImplT>::compileAndRun(
   // optimize the LLVM IR before handing over to codegen.
 #if PROTEUS_ENABLE_CUDA
   optimizeIR(*JitModule, DeviceArch);
+  bool UseRTC = false;
 #elif PROTEUS_ENABLE_HIP
-  if (!Config.ENV_PROTEUS_USE_HIP_RTC_CODEGEN)
+  bool UseRTC = true;
+  if (!Config.ENV_PROTEUS_USE_HIP_RTC_CODEGEN) {
+    UseRTC = false;
     optimizeIR(*JitModule, DeviceArch);
+  }
 #else
 #error "JitEngineDevice requires PROTEUS_ENABLE_CUDA or PROTEUS_ENABLE_HIP"
 #endif
@@ -704,7 +710,8 @@ JitEngineDevice<ImplT>::compileAndRun(
                *JitModule);
   }
 
-  auto ObjBuf = codegenObject(*JitModule, DeviceArch);
+  auto ObjBuf =
+      codegenObject(*JitModule, DeviceArch, GlobalLinkedBinaries, UseRTC);
   if (Config.ENV_PROTEUS_USE_STORED_CACHE) {
     StorageCache.store(HashValue, ObjBuf->getMemBufferRef());
   }
@@ -806,12 +813,12 @@ void JitEngineDevice<ImplT>::registerLinkedBinary(
 
 template <typename ImplT>
 std::unique_ptr<Module> JitEngineDevice<ImplT>::linkJitModule(
-    StringRef KernelName, SmallVector<std::unique_ptr<Module>> &LinkedModules) {
+    StringRef KernelName, LLVMContext &ProteusCtx,
+    SmallVector<std::unique_ptr<Module>> &LinkedModules) {
   if (LinkedModules.empty())
     FATAL_ERROR("Expected jit module");
 
-  auto LinkedModule =
-      std::make_unique<llvm::Module>("JitModule", getProteusLLVMCtx());
+  auto LinkedModule = std::make_unique<llvm::Module>("JitModule", ProteusCtx);
   Linker IRLinker(*LinkedModule);
   for (auto &LinkedM : LinkedModules) {
     // Returns true if linking failed.
