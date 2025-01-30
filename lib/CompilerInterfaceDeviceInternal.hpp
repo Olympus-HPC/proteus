@@ -1,5 +1,7 @@
 #include "CompilerInterfaceDevice.h"
 
+#include "CoreDevice.hpp"
+
 // Return "auto" should resolve to cudaError_t or hipError_t.
 static inline auto
 __jit_launch_kernel_internal(const char *ModuleUniqueId, void *Kernel,
@@ -8,15 +10,24 @@ __jit_launch_kernel_internal(const char *ModuleUniqueId, void *Kernel,
 
   using namespace llvm;
   using namespace proteus;
-  auto &Jit = JitDeviceImplT::instance();
-  auto optionalKernelInfo = Jit.getJITKernelInfo(Kernel);
-  if (!optionalKernelInfo || Jit.isProteusDisabled()) {
-    return Jit.launchKernelDirect(
+
+  static bool IsProteusDisabled =
+      getEnvOrDefaultBool("ENV_PROTEUS_DISABLE", false);
+  if (IsProteusDisabled) {
+    return proteus::launchKernelDirect(
         Kernel, GridDim, BlockDim, KernelArgs, ShmemSize,
         static_cast<typename JitDeviceImplT::DeviceStream_t>(Stream));
   }
 
-  const auto &KernelInfo = optionalKernelInfo.value();
+  auto &Jit = JitDeviceImplT::instance();
+  auto OptionalKernelInfo = Jit.getJITKernelInfo(Kernel);
+  if (!OptionalKernelInfo) {
+    return proteus::launchKernelDirect(
+        Kernel, GridDim, BlockDim, KernelArgs, ShmemSize,
+        static_cast<typename JitDeviceImplT::DeviceStream_t>(Stream));
+  }
+
+  const auto &KernelInfo = OptionalKernelInfo.value();
   const char *KernelName = KernelInfo.getName();
   int32_t NumRuntimeConstants = KernelInfo.getNumRCs();
   auto RCIndices = KernelInfo.getRCIndices();
