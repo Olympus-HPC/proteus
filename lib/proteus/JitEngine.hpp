@@ -41,7 +41,7 @@ static inline bool getEnvOrDefaultBool(const char *VarName, bool Default) {
 
 class JitEngine {
 public:
-  static void optimizeIR(Module &M, StringRef Arch);
+  static void optimizeIR(Module &M, StringRef Arch, unsigned OptLevel = 3);
 
   bool isProteusDisabled() { return Config.ENV_PROTEUS_DISABLE; }
 

@@ -145,9 +145,9 @@ std::string JitEngine::mangleSuffix(uint64_t HashValue) {
   return "$jit$" + std::to_string(HashValue) + "$";
 }
 
-void JitEngine::optimizeIR(Module &M, StringRef Arch) {
+void JitEngine::optimizeIR(Module &M, StringRef Arch, unsigned OptLevel) {
   TIMESCOPE("Optimize IR");
-  runOptimizationPassPipeline(M, Arch);
+  runOptimizationPassPipeline(M, Arch, OptLevel);
 }
 
 void JitEngine::runCleanupPassPipeline(Module &M) {
