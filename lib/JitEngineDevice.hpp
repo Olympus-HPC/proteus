@@ -369,13 +369,6 @@ private:
         KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
   }
 
-  DeviceError_t launchKernelDirect(void *KernelFunc, dim3 GridDim,
-                                   dim3 BlockDim, void **KernelArgs,
-                                   uint64_t ShmemSize, DeviceStream_t Stream) {
-    return static_cast<ImplT &>(*this).launchKernelDirect(
-        KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
-  }
-
   void relinkGlobalsObject(MemoryBufferRef Object) {
     TIMESCOPE(__FUNCTION__);
 
