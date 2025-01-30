@@ -110,6 +110,7 @@ Module &JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName,
   proteusCuErrCheck(cuModuleUnload(CUMod));
 
   auto JitModule = linkJitModule(KernelName, LinkedModules);
+  auto ModuleHash = computeModuleHash(*JitModule);
 
   // Update modules of all kernels in our map
   for (const auto &KV : KernelToHandleMap) {
@@ -120,7 +121,10 @@ Module &JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName,
     if (!JITKernelInfoMap.contains(KV.first))
       continue;
 
-    JITKernelInfoMap[KV.first].setLinkedModule(*JitModule);
+    auto &KDescr = JITKernelInfoMap[KV.first];
+    KDescr.setLinkedModule(*JitModule);
+    KDescr.setStaticHash(stable_hash_combine(
+        ModuleHash, stable_hash_combine_string(KDescr.getName())));
   }
 
   if (!KInfo.hasLinkedIR())

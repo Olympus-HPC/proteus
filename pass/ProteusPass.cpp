@@ -155,7 +155,6 @@ public:
 
     if (hasDeviceLaunchKernelCalls(M)) {
       getKernelHostStubs(M);
-      emitModuleUniqueIdGlobal(M);
       instrumentRegisterFunction(M);
       emitJitLaunchKernelCall(M);
     }
@@ -477,17 +476,6 @@ private:
     JitF.setMetadata("jit_arg_nos", Node);
   }
 
-  GlobalVariable *emitModuleUniqueIdGlobal(Module &M) {
-    Constant *ModuleUniqueId =
-        ConstantDataArray::getString(M.getContext(), getUniqueModuleId(&M));
-    auto *GV = new GlobalVariable(M, ModuleUniqueId->getType(), true,
-                                  GlobalValue::PrivateLinkage, ModuleUniqueId,
-                                  "__module_unique_id");
-    appendToUsed(M, {GV});
-
-    return GV;
-  }
-
   FunctionCallee getJitEntryFn(Module &M) {
     FunctionType *JitEntryFnTy = FunctionType::get(
         PtrTy,
@@ -668,17 +656,15 @@ private:
   FunctionCallee getJitLaunchKernelFn(Module &M) {
     FunctionType *JitLaunchKernelFnTy = nullptr;
 #if PROTEUS_ENABLE_HIP
-    JitLaunchKernelFnTy =
-        FunctionType::get(Int32Ty,
-                          {PtrTy, PtrTy, Int64Ty, Int32Ty, Int64Ty, Int32Ty,
-                           PtrTy, Int64Ty, PtrTy},
-                          /* isVarArg=*/false);
+    JitLaunchKernelFnTy = FunctionType::get(
+        Int32Ty,
+        {PtrTy, Int64Ty, Int32Ty, Int64Ty, Int32Ty, PtrTy, Int64Ty, PtrTy},
+        /* isVarArg=*/false);
 #elif PROTEUS_ENABLE_CUDA
     // NOTE: CUDA uses an array type for passing grid, block sizes.
     JitLaunchKernelFnTy =
         FunctionType::get(Int32Ty,
-                          {PtrTy,                      // Module unique id
-                           PtrTy,                      // Kernel address
+                          {PtrTy,                      // Kernel address
                            ArrayType::get(Int64Ty, 2), // Grid dim array
                            ArrayType::get(Int64Ty, 2), // Block dim array
                            PtrTy,                      // Kernel args
@@ -699,28 +685,19 @@ private:
   }
 
   void replaceWithJitLaunchKernel(Module &M, CallBase *LaunchKernelCB) {
-    GlobalVariable *ModuleUniqueId =
-        M.getGlobalVariable("__module_unique_id", true);
-    assert(ModuleUniqueId && "Expected ModuleUniqueId global to be defined");
-
     FunctionCallee JitLaunchKernelFn = getJitLaunchKernelFn(M);
 
     // Insert before the launch kernel call instruction.
     IRBuilder<> Builder(LaunchKernelCB);
     CallBase *CallOrInvoke = nullptr;
 #ifdef PROTEUS_ENABLE_HIP
-    SmallVector<Value *> Args = {ModuleUniqueId,
-                                 LaunchKernelCB->getArgOperand(0),
-                                 LaunchKernelCB->getArgOperand(1),
-                                 LaunchKernelCB->getArgOperand(2),
-                                 LaunchKernelCB->getArgOperand(3),
-                                 LaunchKernelCB->getArgOperand(4),
-                                 LaunchKernelCB->getArgOperand(5),
-                                 LaunchKernelCB->getArgOperand(6),
-                                 LaunchKernelCB->getArgOperand(7)};
+    SmallVector<Value *> Args = {
+        LaunchKernelCB->getArgOperand(0), LaunchKernelCB->getArgOperand(1),
+        LaunchKernelCB->getArgOperand(2), LaunchKernelCB->getArgOperand(3),
+        LaunchKernelCB->getArgOperand(4), LaunchKernelCB->getArgOperand(5),
+        LaunchKernelCB->getArgOperand(6), LaunchKernelCB->getArgOperand(7)};
 #elif PROTEUS_ENABLE_CUDA
     SmallVector<Value *> Args = {
-        ModuleUniqueId,
         LaunchKernelCB->getArgOperand(0), // Kernel address
         LaunchKernelCB->getArgOperand(1), // Grid dim
         LaunchKernelCB->getArgOperand(2), // Block dim

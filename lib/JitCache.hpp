@@ -40,12 +40,10 @@ inline hash_code hash_value(const proteus::RuntimeConstant &RC) {
 template <typename Function_t> class JitCache {
 public:
   template <typename... Ts>
-  uint64_t hash(stable_hash L1Hash, StringRef ModuleUniqueId, StringRef FnName,
-                const RuntimeConstant *RC, int NumRuntimeConstants,
-                Ts... args) const {
+  uint64_t stable_hash(stable_hash StaticHash, const RuntimeConstant *RC,
+                       int NumRuntimeConstants, Ts... args) const {
     ArrayRef<RuntimeConstant> Data(RC, NumRuntimeConstants);
-    auto HashValue =
-        hash_combine(L1Hash, ModuleUniqueId, FnName, Data, args...);
+    auto HashValue = hash_combine(StaticHash, Data, args...);
     return HashValue;
   }
 

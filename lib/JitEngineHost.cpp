@@ -39,6 +39,11 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/TargetParser/Host.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#if LLVM_VERSION_MAJOR == 18
+#include "llvm/ADT/StableHashing.h"
+#else
+#include "llvm/CodeGen/StableHashing.h"
+#endif
 #include <llvm/ExecutionEngine/Orc/Core.h>
 #include <llvm/ExecutionEngine/Orc/Shared/ExecutorAddress.h>
 #include <llvm/IR/Constants.h>
@@ -304,7 +309,8 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 
   // TODO: implement ModuleUniqueId for host code.
   // TODO: implement l1hash for host code
-  uint64_t HashValue = CodeCache.hash({}, "", FnName, RC, NumRuntimeConstants);
+  uint64_t HashValue = CodeCache.stable_hash(
+      llvm::stable_hash_combine_string(FnName), RC, NumRuntimeConstants);
   void *JitFnPtr = CodeCache.lookup(HashValue);
   if (JitFnPtr)
     return JitFnPtr;

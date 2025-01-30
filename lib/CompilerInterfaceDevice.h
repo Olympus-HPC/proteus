@@ -17,8 +17,7 @@
 #include "JitEngineDeviceCUDA.hpp"
 using JitDeviceImplT = proteus::JitEngineDeviceCUDA;
 
-extern "C" cudaError_t __jit_launch_kernel(const char *ModuleUniqueId,
-                                           void *Kernel, dim3 GridDim,
+extern "C" cudaError_t __jit_launch_kernel(void *Kernel, dim3 GridDim,
                                            dim3 BlockDim, void **KernelArgs,
                                            uint64_t ShmemSize, void *Stream);
 
@@ -26,8 +25,7 @@ extern "C" cudaError_t __jit_launch_kernel(const char *ModuleUniqueId,
 #include "JitEngineDeviceHIP.hpp"
 using JitDeviceImplT = proteus::JitEngineDeviceHIP;
 
-extern "C" hipError_t __jit_launch_kernel(const char *ModuleUniqueId,
-                                          void *Kernel, uint64_t GridDimXY,
+extern "C" hipError_t __jit_launch_kernel(void *Kernel, uint64_t GridDimXY,
                                           uint32_t GridDimZ,
                                           uint64_t BlockDim_XY,
                                           uint32_t BlockDimZ, void **KernelArgs,

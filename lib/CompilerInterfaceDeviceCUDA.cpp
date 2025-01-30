@@ -14,9 +14,8 @@
 using namespace proteus;
 
 extern "C" __attribute__((used)) cudaError_t
-__jit_launch_kernel(const char *ModuleUniqueId, void *Kernel, dim3 GridDim,
-                    dim3 BlockDim, void **KernelArgs, uint64_t ShmemSize,
-                    void *Stream) {
-  return __jit_launch_kernel_internal(ModuleUniqueId, Kernel, GridDim, BlockDim,
-                                      KernelArgs, ShmemSize, Stream);
+__jit_launch_kernel(void *Kernel, dim3 GridDim, dim3 BlockDim,
+                    void **KernelArgs, uint64_t ShmemSize, void *Stream) {
+  return __jit_launch_kernel_internal(Kernel, GridDim, BlockDim, KernelArgs,
+                                      ShmemSize, Stream);
 }
