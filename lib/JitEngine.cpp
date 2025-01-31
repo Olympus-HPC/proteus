@@ -32,6 +32,7 @@
 
 #include "JitEngine.hpp"
 
+#include "Hashing.hpp"
 #include "TimeTracing.hpp"
 #include "Utils.h"
 
@@ -141,8 +142,8 @@ JitEngine::JitEngine() {
 #endif
 }
 
-std::string JitEngine::mangleSuffix(uint64_t HashValue) {
-  return "$jit$" + std::to_string(HashValue) + "$";
+std::string JitEngine::mangleSuffix(HashT &HashValue) {
+  return "$jit$" + HashValue.toString() + "$";
 }
 
 void JitEngine::optimizeIR(Module &M, StringRef Arch) {

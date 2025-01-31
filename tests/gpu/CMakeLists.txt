@@ -152,6 +152,10 @@ function(CREATE_PROTEUS_GPU_LIBRARY lib source)
     add_library(${lib} ${source} ${ARGN})
 
     set_source_files_properties(${source} ${ARGN} PROPERTIES LANGUAGE ${lang})
+    set_source_files_properties(${source} ${ARGN} PROPERTIES
+        LANGUAGE ${lang}
+        OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/pass/ProteusPass.cpp
+    )
     target_link_libraries(${lib} PUBLIC proteus)
 
     if(PROTEUS_ENABLE_HIP)

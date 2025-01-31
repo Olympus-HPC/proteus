@@ -15,6 +15,7 @@
 #include "Utils.h"
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/SmallVector.h>
+#include <memory>
 
 namespace proteus {
 
@@ -84,7 +85,7 @@ public:
   void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
                                 int BlockSize);
 
-  Module &extractDeviceBitcode(StringRef KernelName, void *Kernel);
+  std::unique_ptr<Module> extractModule(BinaryInfo &BinInfo);
 
   void codegenPTX(Module &M, StringRef DeviceArch,
                   SmallVectorImpl<char> &PTXStr);
@@ -108,6 +109,8 @@ public:
   cudaError_t launchKernelDirect(void *KernelFunc, dim3 GridDim, dim3 BlockDim,
                                  void **KernelArgs, uint64_t ShmemSize,
                                  CUstream Stream);
+
+  HashT getModuleHash(BinaryInfo &BinInfo);
 
 private:
   JitEngineDeviceCUDA();

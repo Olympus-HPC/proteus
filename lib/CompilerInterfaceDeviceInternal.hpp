@@ -10,29 +10,19 @@ static inline auto __jit_launch_kernel_internal(void *Kernel, dim3 GridDim,
   using namespace llvm;
   using namespace proteus;
   auto &Jit = JitDeviceImplT::instance();
-  auto optionalKernelInfo = Jit.getJITKernelInfo(Kernel);
-  if (!optionalKernelInfo || Jit.isProteusDisabled()) {
+  auto OptionalKernelInfo = Jit.getJITKernelInfo(Kernel);
+  if (!OptionalKernelInfo || Jit.isProteusDisabled()) {
     return Jit.launchKernelDirect(
         Kernel, GridDim, BlockDim, KernelArgs, ShmemSize,
         static_cast<typename JitDeviceImplT::DeviceStream_t>(Stream));
   }
 
-  const auto &KernelInfo = optionalKernelInfo.value().get();
-  const char *KernelName = KernelInfo.getName();
-  int32_t NumRuntimeConstants = KernelInfo.getNumRCs();
-  auto RCIndices = KernelInfo.getRCIndices();
-  auto RCTypes = KernelInfo.getRCTypes();
+  auto &KernelInfo = OptionalKernelInfo.value().get();
 
-  // This will happen in practice once. Cause we will need to load the module
-  // to compute the hash.
-  if (!KernelInfo.hasLinkedIR()) {
-    Jit.extractDeviceBitcode(KernelName, Kernel);
-  }
-
-  auto printKernelLaunchInfo = [&]() {
+  auto PrintKernelLaunchInfo = [&]() {
     Logger::logs("proteus") << "JIT Launch Kernel\n";
     Logger::logs("proteus") << "=== Kernel Info\n";
-    Logger::logs("proteus") << "KernelName " << KernelName << "\n";
+    Logger::logs("proteus") << "KernelName " << KernelInfo.getName() << "\n";
     Logger::logs("proteus") << "Grid " << GridDim.x << ", " << GridDim.y << ", "
                             << GridDim.z << "\n";
     Logger::logs("proteus") << "Block " << BlockDim.x << ", " << BlockDim.y
@@ -43,10 +33,9 @@ static inline auto __jit_launch_kernel_internal(void *Kernel, dim3 GridDim,
     Logger::logs("proteus") << "=== End Kernel Info\n";
   };
 
-  PROTEUS_DBG(printKernelLaunchInfo());
+  PROTEUS_DBG(PrintKernelLaunchInfo());
 
   return Jit.compileAndRun(
-      KernelInfo.getStaticHash(), Kernel, KernelName, RCIndices, RCTypes,
-      NumRuntimeConstants, GridDim, BlockDim, KernelArgs, ShmemSize,
+      KernelInfo, GridDim, BlockDim, KernelArgs, ShmemSize,
       static_cast<typename JitDeviceImplT::DeviceStream_t>(Stream));
 }

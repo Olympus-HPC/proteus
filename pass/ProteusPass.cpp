@@ -67,6 +67,7 @@
 #include <string>
 
 #include "../lib/CompilerInterfaceTypes.h"
+#include "../lib/Hashing.hpp"
 
 #include "GenRuntimeConstantTy.hpp"
 
@@ -441,9 +442,11 @@ private:
   }
 
   void emitJitModuleDevice(Module &M, bool IsLTO) {
-    std::string BitcodeStr;
-    raw_string_ostream OS(BitcodeStr);
+    SmallVector<char, 4096> Bitcode;
+    raw_svector_ostream OS(Bitcode);
     WriteBitcodeToFile(M, OS);
+
+    HashT HashValue = hash(StringRef{Bitcode.data(), Bitcode.size()});
 
     std::string GVName =
         (IsLTO ? "__jit_bitcode_lto" : getJitBitcodeUniqueName(M));
@@ -451,13 +454,17 @@ private:
     //  IR. CUDA does not, hence we parse the IR by reading the global from the
     //  device memory.
     Constant *JitModule = ConstantDataArray::get(
-        M.getContext(), ArrayRef<uint8_t>((const uint8_t *)BitcodeStr.data(),
-                                          BitcodeStr.size()));
+        M.getContext(),
+        ArrayRef<uint8_t>((const uint8_t *)Bitcode.data(), Bitcode.size()));
     auto *GV =
         new GlobalVariable(M, JitModule->getType(), /* isConstant */ true,
                            GlobalValue::ExternalLinkage, JitModule, GVName);
     appendToUsed(M, {GV});
-    GV->setSection(".jit.bitcode" + (IsLTO ? ".lto" : getUniqueModuleId(&M)));
+    // We append the hash value to the section name and retrieve it in HIP JIT
+    // compilation to avoid hashing at runtime.
+    GV->setSection(".jit.bitcode" +
+                   (IsLTO ? ".lto." : (getUniqueModuleId(&M) + ".")) +
+                   HashValue.toString());
     DEBUG(Logger::logs("proteus-pass")
           << "Emit jit bitcode GV " << GVName << "\n");
   }

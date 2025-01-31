@@ -18,6 +18,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Target/TargetMachine.h"
 
+#include "Hashing.hpp"
 #include "Utils.h"
 
 namespace proteus {
@@ -55,7 +56,7 @@ protected:
 
   JitEngine();
 
-  std::string mangleSuffix(uint64_t HashValue);
+  std::string mangleSuffix(HashT &HashValue);
 
   struct {
     bool ENV_PROTEUS_USE_STORED_CACHE;
