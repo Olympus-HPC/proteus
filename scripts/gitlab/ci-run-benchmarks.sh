@@ -28,9 +28,10 @@ COMMENTS_BODY=$(echo ${COMMENTS_INFO} | jq -r '.[].body')
 if [[ "${COMMENTS_BODY}" == *"/run-benchmarks-hecbench"* ]]; then
   echo "=> Benchmarks triggered <=";
   EXTRA_BENCHMARK_OPTIONS=""
-else if [[ "${COMMENTS_BODY}" == *"/run-benchmarks-rajaperf"* ]]; then
+elif [[ "${COMMENTS_BODY}" == *"/run-benchmarks-rajaperf"* ]]; then
   echo "=> Benchmarks triggered <=";
-  EXTRA_BENCHMARK_OPTIONS="-DBUILD_SHARED=On \"
+  EXTRA_BENCHMARK_OPTIONS="-DBUILD_SHARED=On\
+  "
 else
   echo "=> Benchmarks will not run, trigger with /run-benchmarks <="
   exit 0
