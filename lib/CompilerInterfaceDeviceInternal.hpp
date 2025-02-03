@@ -12,7 +12,7 @@ static inline auto __jit_launch_kernel_internal(void *Kernel, dim3 GridDim,
   using namespace llvm;
   using namespace proteus;
 
-  static bool IsProteusDisabled =
+  static const bool IsProteusDisabled =
       getEnvOrDefaultBool("ENV_PROTEUS_DISABLE", false);
   if (IsProteusDisabled) {
     return proteus::launchKernelDirect(
