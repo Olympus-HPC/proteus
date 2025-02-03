@@ -46,7 +46,7 @@ BENCHMARKS_TOML=""
 if [ "${CI_MACHINE}" == "lassen" ]; then
   if [[ "${COMMENTS_BODY}" == *"/run-benchmarks-rajaperf"* ]]; then
     echo "RAJAPerf benchmarks can only run on tioga.  Exiting"
-    exit(0)
+    exit 0
   fi
   ml load cuda/12.2.2
 
