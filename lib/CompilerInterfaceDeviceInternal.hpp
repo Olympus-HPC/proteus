@@ -1,5 +1,7 @@
 #include "CompilerInterfaceDevice.h"
 
+#include "CoreDevice.hpp"
+
 // Return "auto" should resolve to cudaError_t or hipError_t.
 static inline auto __jit_launch_kernel_internal(void *Kernel, dim3 GridDim,
                                                 dim3 BlockDim,
@@ -9,10 +11,19 @@ static inline auto __jit_launch_kernel_internal(void *Kernel, dim3 GridDim,
 
   using namespace llvm;
   using namespace proteus;
+
+  static const bool IsProteusDisabled =
+      getEnvOrDefaultBool("ENV_PROTEUS_DISABLE", false);
+  if (IsProteusDisabled) {
+    return proteus::launchKernelDirect(
+        Kernel, GridDim, BlockDim, KernelArgs, ShmemSize,
+        static_cast<typename JitDeviceImplT::DeviceStream_t>(Stream));
+  }
+
   auto &Jit = JitDeviceImplT::instance();
   auto OptionalKernelInfo = Jit.getJITKernelInfo(Kernel);
-  if (!OptionalKernelInfo || Jit.isProteusDisabled()) {
-    return Jit.launchKernelDirect(
+  if (!OptionalKernelInfo) {
+    return proteus::launchKernelDirect(
         Kernel, GridDim, BlockDim, KernelArgs, ShmemSize,
         static_cast<typename JitDeviceImplT::DeviceStream_t>(Stream));
   }

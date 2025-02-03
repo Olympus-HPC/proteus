@@ -9,6 +9,7 @@ set(SOURCES
 
 set(HEADERS
   CompilerInterfaceTypes.h
+  CoreDevice.hpp
   Hashing.hpp
   JitCache.hpp
   JitEngine.hpp
@@ -28,6 +29,7 @@ list(APPEND SOURCES
 
 list(APPEND HEADERS
   CompilerInterfaceDevice.h
+  CoreDeviceCUDA.hpp
   JitEngineDevice.hpp
   JitEngineDeviceCUDA.hpp
   UtilsCUDA.h)
@@ -42,6 +44,7 @@ list(APPEND SOURCES
 
 list(APPEND HEADERS
   CompilerInterfaceDevice.h
+  CoreDeviceHIP.hpp
   JitEngineDevice.hpp
   JitEngineDeviceHIP.hpp
   UtilsHIP.h)

@@ -386,15 +386,6 @@ hipError_t JitEngineDeviceHIP::launchKernelFunction(hipFunction_t KernelFunc,
                                Stream, KernelArgs, nullptr);
 }
 
-hipError_t JitEngineDeviceHIP::launchKernelDirect(void *KernelFunc,
-                                                  dim3 GridDim, dim3 BlockDim,
-                                                  void **KernelArgs,
-                                                  uint64_t ShmemSize,
-                                                  hipStream_t Stream) {
-  return hipLaunchKernel(KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize,
-                         Stream);
-}
-
 JitEngineDeviceHIP::JitEngineDeviceHIP() {
   LLVMInitializeAMDGPUTargetInfo();
   LLVMInitializeAMDGPUTarget();
