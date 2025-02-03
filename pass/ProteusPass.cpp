@@ -67,6 +67,7 @@
 #include <string>
 
 #include "../lib/CompilerInterfaceTypes.h"
+#include "../lib/Hashing.hpp"
 
 #include "GenRuntimeConstantTy.hpp"
 
@@ -155,7 +156,6 @@ public:
 
     if (hasDeviceLaunchKernelCalls(M)) {
       getKernelHostStubs(M);
-      emitModuleUniqueIdGlobal(M);
       instrumentRegisterFunction(M);
       emitJitLaunchKernelCall(M);
     }
@@ -442,9 +442,11 @@ private:
   }
 
   void emitJitModuleDevice(Module &M, bool IsLTO) {
-    std::string BitcodeStr;
-    raw_string_ostream OS(BitcodeStr);
+    SmallVector<char, 4096> Bitcode;
+    raw_svector_ostream OS(Bitcode);
     WriteBitcodeToFile(M, OS);
+
+    HashT HashValue = hash(StringRef{Bitcode.data(), Bitcode.size()});
 
     std::string GVName =
         (IsLTO ? "__jit_bitcode_lto" : getJitBitcodeUniqueName(M));
@@ -452,13 +454,17 @@ private:
     //  IR. CUDA does not, hence we parse the IR by reading the global from the
     //  device memory.
     Constant *JitModule = ConstantDataArray::get(
-        M.getContext(), ArrayRef<uint8_t>((const uint8_t *)BitcodeStr.data(),
-                                          BitcodeStr.size()));
+        M.getContext(),
+        ArrayRef<uint8_t>((const uint8_t *)Bitcode.data(), Bitcode.size()));
     auto *GV =
         new GlobalVariable(M, JitModule->getType(), /* isConstant */ true,
                            GlobalValue::ExternalLinkage, JitModule, GVName);
     appendToUsed(M, {GV});
-    GV->setSection(".jit.bitcode" + (IsLTO ? ".lto" : getUniqueModuleId(&M)));
+    // We append the hash value to the section name and retrieve it in HIP JIT
+    // compilation to avoid hashing at runtime.
+    GV->setSection(".jit.bitcode" +
+                   (IsLTO ? ".lto." : (getUniqueModuleId(&M) + ".")) +
+                   HashValue.toString());
     DEBUG(Logger::logs("proteus-pass")
           << "Emit jit bitcode GV " << GVName << "\n");
   }
@@ -475,17 +481,6 @@ private:
     }
     MDNode *Node = MDNode::get(Ctx, ConstArgNos);
     JitF.setMetadata("jit_arg_nos", Node);
-  }
-
-  GlobalVariable *emitModuleUniqueIdGlobal(Module &M) {
-    Constant *ModuleUniqueId =
-        ConstantDataArray::getString(M.getContext(), getUniqueModuleId(&M));
-    auto *GV = new GlobalVariable(M, ModuleUniqueId->getType(), true,
-                                  GlobalValue::PrivateLinkage, ModuleUniqueId,
-                                  "__module_unique_id");
-    appendToUsed(M, {GV});
-
-    return GV;
   }
 
   FunctionCallee getJitEntryFn(Module &M) {
@@ -668,17 +663,15 @@ private:
   FunctionCallee getJitLaunchKernelFn(Module &M) {
     FunctionType *JitLaunchKernelFnTy = nullptr;
 #if PROTEUS_ENABLE_HIP
-    JitLaunchKernelFnTy =
-        FunctionType::get(Int32Ty,
-                          {PtrTy, PtrTy, Int64Ty, Int32Ty, Int64Ty, Int32Ty,
-                           PtrTy, Int64Ty, PtrTy},
-                          /* isVarArg=*/false);
+    JitLaunchKernelFnTy = FunctionType::get(
+        Int32Ty,
+        {PtrTy, Int64Ty, Int32Ty, Int64Ty, Int32Ty, PtrTy, Int64Ty, PtrTy},
+        /* isVarArg=*/false);
 #elif PROTEUS_ENABLE_CUDA
     // NOTE: CUDA uses an array type for passing grid, block sizes.
     JitLaunchKernelFnTy =
         FunctionType::get(Int32Ty,
-                          {PtrTy,                      // Module unique id
-                           PtrTy,                      // Kernel address
+                          {PtrTy,                      // Kernel address
                            ArrayType::get(Int64Ty, 2), // Grid dim array
                            ArrayType::get(Int64Ty, 2), // Block dim array
                            PtrTy,                      // Kernel args
@@ -699,28 +692,19 @@ private:
   }
 
   void replaceWithJitLaunchKernel(Module &M, CallBase *LaunchKernelCB) {
-    GlobalVariable *ModuleUniqueId =
-        M.getGlobalVariable("__module_unique_id", true);
-    assert(ModuleUniqueId && "Expected ModuleUniqueId global to be defined");
-
     FunctionCallee JitLaunchKernelFn = getJitLaunchKernelFn(M);
 
     // Insert before the launch kernel call instruction.
     IRBuilder<> Builder(LaunchKernelCB);
     CallBase *CallOrInvoke = nullptr;
 #ifdef PROTEUS_ENABLE_HIP
-    SmallVector<Value *> Args = {ModuleUniqueId,
-                                 LaunchKernelCB->getArgOperand(0),
-                                 LaunchKernelCB->getArgOperand(1),
-                                 LaunchKernelCB->getArgOperand(2),
-                                 LaunchKernelCB->getArgOperand(3),
-                                 LaunchKernelCB->getArgOperand(4),
-                                 LaunchKernelCB->getArgOperand(5),
-                                 LaunchKernelCB->getArgOperand(6),
-                                 LaunchKernelCB->getArgOperand(7)};
+    SmallVector<Value *> Args = {
+        LaunchKernelCB->getArgOperand(0), LaunchKernelCB->getArgOperand(1),
+        LaunchKernelCB->getArgOperand(2), LaunchKernelCB->getArgOperand(3),
+        LaunchKernelCB->getArgOperand(4), LaunchKernelCB->getArgOperand(5),
+        LaunchKernelCB->getArgOperand(6), LaunchKernelCB->getArgOperand(7)};
 #elif PROTEUS_ENABLE_CUDA
     SmallVector<Value *> Args = {
-        ModuleUniqueId,
         LaunchKernelCB->getArgOperand(0), // Kernel address
         LaunchKernelCB->getArgOperand(1), // Grid dim
         LaunchKernelCB->getArgOperand(2), // Block dim

@@ -30,7 +30,7 @@ __jit_register_fatbinary(void *Handle, void *FatbinWrapper,
                          const char *ModuleId) {
   auto &Jit = JitDeviceImplT::instance();
   Jit.registerFatBinary(
-      Handle, reinterpret_cast<FatbinWrapper_t *>(FatbinWrapper), ModuleId);
+      Handle, reinterpret_cast<FatbinWrapperT *>(FatbinWrapper), ModuleId);
 }
 
 extern "C" __attribute__((used)) void __jit_register_fatbinary_end(void *) {
@@ -41,7 +41,7 @@ extern "C" __attribute__((used)) void __jit_register_fatbinary_end(void *) {
 extern "C" __attribute__((used)) void
 __jit_register_linked_binary(void *FatbinWrapper, const char *ModuleId) {
   auto &Jit = JitDeviceImplT::instance();
-  Jit.registerLinkedBinary(reinterpret_cast<FatbinWrapper_t *>(FatbinWrapper),
+  Jit.registerLinkedBinary(reinterpret_cast<FatbinWrapperT *>(FatbinWrapper),
                            ModuleId);
 }
 

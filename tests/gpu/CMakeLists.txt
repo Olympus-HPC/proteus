@@ -152,6 +152,10 @@ function(CREATE_PROTEUS_GPU_LIBRARY lib source)
     add_library(${lib} ${source} ${ARGN})
 
     set_source_files_properties(${source} ${ARGN} PROPERTIES LANGUAGE ${lang})
+    set_source_files_properties(${source} ${ARGN} PROPERTIES
+        LANGUAGE ${lang}
+        OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/pass/ProteusPass.cpp
+    )
     target_link_libraries(${lib} PUBLIC proteus)
 
     if(PROTEUS_ENABLE_HIP)
@@ -255,6 +259,7 @@ CREATE_GPU_TEST_RDC(kernel_repeat kernel_repeat.cpp)
 CREATE_GPU_TEST_RDC(kernel_launch_exception kernel_launch_exception.cpp)
 CREATE_GPU_TEST_RDC(kernel_preset_bounds kernel_preset_bounds.cpp)
 CREATE_GPU_TEST_RDC(multi_file_launcher file1_kernel_launcher.cpp file2_kernel_launcher.cpp)
+CREATE_GPU_TEST_RDC(multi_file file1_kernel.cpp file2_kernel.cpp)
 CREATE_GPU_TEST_RDC(block_grid_dim_1d block_grid_dim_1d.cpp)
 CREATE_GPU_TEST_RDC(block_grid_dim_2d block_grid_dim_2d.cpp)
 CREATE_GPU_TEST_RDC(block_grid_dim_3d block_grid_dim_3d.cpp)

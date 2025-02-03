@@ -21,6 +21,7 @@
 
 #include "llvm/ADT/StringRef.h"
 
+#include "Hashing.hpp"
 #include "Utils.h"
 
 namespace proteus {
@@ -36,12 +37,12 @@ template <typename Function_t> class JitStorageCache {
 public:
   JitStorageCache() { std::filesystem::create_directory(StorageDirectory); }
 
-  std::unique_ptr<MemoryBuffer> lookup(uint64_t HashValue) {
+  std::unique_ptr<MemoryBuffer> lookup(HashT &HashValue) {
     TIMESCOPE("object lookup");
     Accesses++;
 
     std::string Filebase =
-        StorageDirectory + "/cache-jit-" + std::to_string(HashValue);
+        StorageDirectory + "/cache-jit-" + HashValue.toString();
 
     auto CacheBuf = MemoryBuffer::getFile(Filebase + ".o");
     if (!CacheBuf)
@@ -51,11 +52,11 @@ public:
     return std::move(CacheBuf.get());
   }
 
-  void store(uint64_t HashValue, MemoryBufferRef ObjBufRef) {
+  void store(HashT &HashValue, MemoryBufferRef ObjBufRef) {
     TIMESCOPE("Store cache");
 
     std::string Filebase =
-        StorageDirectory + "/cache-jit-" + std::to_string(HashValue);
+        StorageDirectory + "/cache-jit-" + HashValue.toString();
 
     saveToFile(Filebase + ".o", StringRef{ObjBufRef.getBufferStart(),
                                           ObjBufRef.getBufferSize()});

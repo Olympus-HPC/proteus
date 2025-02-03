@@ -89,11 +89,6 @@ public:
             "llvm.amdgcn.workitem.id.z"};
   };
 
-  static bool isHashedSection(StringRef sectionName) {
-    static const std::string Section{".hip_fatbin"};
-    return Section.compare(sectionName) == 0;
-  }
-
   void *resolveDeviceGlobalAddr(const void *Addr);
 
   void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
@@ -101,7 +96,7 @@ public:
 
   void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim);
 
-  Module &extractDeviceBitcode(StringRef KernelName, void *Kernel);
+  std::unique_ptr<Module> extractModule(BinaryInfo &BinInfo);
 
   std::unique_ptr<MemoryBuffer> codegenObject(Module &M, StringRef DeviceArch);
 
@@ -115,6 +110,8 @@ public:
   hipError_t launchKernelDirect(void *KernelFunc, dim3 GridDim, dim3 BlockDim,
                                 void **KernelArgs, uint64_t ShmemSize,
                                 hipStream_t Stream);
+
+  HashT getModuleHash(BinaryInfo &BinInfo);
 
 private:
   JitEngineDeviceHIP();

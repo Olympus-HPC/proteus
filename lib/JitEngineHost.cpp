@@ -303,8 +303,9 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   TIMESCOPE("compileAndLink");
 
   // TODO: implement ModuleUniqueId for host code.
-  // TODO: implement l1hash for host code
-  uint64_t HashValue = CodeCache.hash({}, "", FnName, RC, NumRuntimeConstants);
+  StringRef StrIR(IR, IRSize);
+  ArrayRef RCArray{RC, static_cast<size_t>(NumRuntimeConstants)};
+  HashT HashValue = hash(StrIR, FnName, RCArray);
   void *JitFnPtr = CodeCache.lookup(HashValue);
   if (JitFnPtr)
     return JitFnPtr;
@@ -312,7 +313,6 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   std::string Suffix = mangleSuffix(HashValue);
   std::string MangledFnName = FnName.str() + Suffix;
 
-  StringRef StrIR(IR, IRSize);
   // (3) Add modules.
   ExitOnErr(LLJITPtr->addIRModule(
       ExitOnErr(specializeIR(FnName, Suffix, StrIR, RC, NumRuntimeConstants))));
@@ -336,8 +336,9 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   CodeCache.insert(HashValue, JitFnPtr, FnName, RC, NumRuntimeConstants);
 
   Logger::logs("proteus") << "=== JIT compile: " << FnName << " Mangled "
-                          << MangledFnName << " RC HashValue " << HashValue
-                          << " Addr " << JitFnPtr << "\n";
+                          << MangledFnName << " RC HashValue "
+                          << HashValue.toString() << " Addr " << JitFnPtr
+                          << "\n";
   return JitFnPtr;
 }
 

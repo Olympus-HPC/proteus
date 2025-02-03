@@ -49,8 +49,6 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
   if (!ModuleIdToFatBinary.count(ModuleId))
     FATAL_ERROR("Expected to find module id " + ModuleId + " in map");
 
-  FatbinWrapper_t *ModuleFatBinWrapper = ModuleIdToFatBinary[ModuleId];
-
   CUdeviceptr DevPtr;
   size_t Bytes;
   proteusCuErrCheck(
@@ -70,34 +68,56 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
   LinkedModules.push_back(std::move(M));
 }
 
-Module &JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName,
-                                                  void *Kernel) {
+HashT JitEngineDeviceCUDA::getModuleHash(BinaryInfo &BinInfo) {
+  if (BinInfo.hasModuleHash())
+    return BinInfo.getModuleHash();
+
+  CUmodule CUMod;
+  FatbinWrapperT *FatbinWrapper = BinInfo.getFatbinWrapper();
+  if (!FatbinWrapper)
+    FATAL_ERROR("Expected FatbinWrapper in map");
+
+  auto &LinkedModuleIds = BinInfo.getModuleIds();
+
+  proteusCuErrCheck(cuModuleLoadData(&CUMod, FatbinWrapper->Binary));
+
+  auto ExtractLinkedBitcodeHash = [&CUMod](std::string &ModuleId) {
+    CUdeviceptr DevPtr;
+    size_t Bytes;
+    proteusCuErrCheck(
+        cuModuleGetGlobal(&DevPtr, &Bytes, CUMod, ModuleId.c_str()));
+
+    SmallVector<char, 4096> DeviceBitcode;
+    DeviceBitcode.reserve(Bytes);
+    proteusCuErrCheck(cuMemcpyDtoH(DeviceBitcode.data(), DevPtr, Bytes));
+    return hash(StringRef{DeviceBitcode.data(), Bytes});
+  };
+
+  for (auto &ModuleId : LinkedModuleIds)
+    BinInfo.updateModuleHash(ExtractLinkedBitcodeHash(ModuleId));
+
+  for (auto &ModuleId : GlobalLinkedModuleIds)
+    BinInfo.updateModuleHash(ExtractLinkedBitcodeHash(ModuleId));
+
+  proteusCuErrCheck(cuModuleUnload(CUMod));
+
+  return BinInfo.getModuleHash();
+}
+
+std::unique_ptr<Module>
+JitEngineDeviceCUDA::extractModule(BinaryInfo &BinInfo) {
   CUmodule CUMod;
   CUdeviceptr DevPtr;
   size_t Bytes;
 
-  SmallVector<std::unique_ptr<Module>> LinkedModules;
-  auto &Ctx = getProteusLLVMCtx();
-  if (!KernelToHandleMap.contains(Kernel))
-    FATAL_ERROR("Expected Kernel in map");
-
-  void *Handle = KernelToHandleMap[Kernel];
-  if (!HandleToBinaryInfo.contains(Handle))
-    FATAL_ERROR("Expected Handle in map");
-
-  if (!JITKernelInfoMap.contains(Kernel))
-    FATAL_ERROR("Expected a Kernel Descriptor to exist");
-
-  auto &KInfo = JITKernelInfoMap[Kernel];
-
-  if (KInfo.hasLinkedIR())
-    return KInfo.getLinkedModule();
-
-  FatbinWrapper_t *FatbinWrapper = HandleToBinaryInfo[Handle].FatbinWrapper;
+  FatbinWrapperT *FatbinWrapper = BinInfo.getFatbinWrapper();
   if (!FatbinWrapper)
     FATAL_ERROR("Expected FatbinWrapper in map");
 
-  auto &LinkedModuleIds = HandleToBinaryInfo[Handle].LinkedModuleIds;
+  SmallVector<std::unique_ptr<Module>> LinkedModules;
+  auto &Ctx = getLLVMContext();
+
+  auto &LinkedModuleIds = BinInfo.getModuleIds();
 
   proteusCuErrCheck(cuModuleLoadData(&CUMod, FatbinWrapper->Binary));
 
@@ -109,26 +129,7 @@ Module &JitEngineDeviceCUDA::extractDeviceBitcode(StringRef KernelName,
 
   proteusCuErrCheck(cuModuleUnload(CUMod));
 
-  auto JitModule = linkJitModule(KernelName, LinkedModules);
-
-  // Update modules of all kernels in our map
-  for (const auto &KV : KernelToHandleMap) {
-    // All kernels included in this collection of modules will have an identical
-    // non specialized IR file. Map all Kernels, to this generic IR file
-    if (KV.second != Handle)
-      continue;
-    if (!JITKernelInfoMap.contains(KV.first))
-      continue;
-
-    JITKernelInfoMap[KV.first].setLinkedModule(*JitModule);
-  }
-
-  if (!KInfo.hasLinkedIR())
-    FATAL_ERROR("Expected KernelInfo to have updated Linked Modules");
-
-  addLinkedModule(std::move(JitModule));
-
-  return KInfo.getLinkedModule();
+  return linkJitModule(LinkedModules);
 }
 
 void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module &M, Function &F,

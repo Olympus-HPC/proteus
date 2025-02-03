@@ -13,6 +13,7 @@
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/Path.h>
+#include <memory>
 #include <string>
 
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -22,6 +23,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 
+#include "JitEngineDevice.hpp"
 #include "JitEngineDeviceHIP.hpp"
 #include "TimeTracing.hpp"
 #include "Utils.h"
@@ -47,36 +49,18 @@ JitEngineDeviceHIP &JitEngineDeviceHIP::instance() {
   return Jit;
 }
 
-Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
-                                                 void *Kernel) {
-  constexpr char OFFLOAD_BUNDLER_MAGIC_STR[] = "__CLANG_OFFLOAD_BUNDLE__";
+static StringRef getDeviceBinary(BinaryInfo &BinInfo, StringRef DeviceArch) {
+  FatbinWrapperT *FatbinWrapper = BinInfo.getFatbinWrapper();
+
+  constexpr char OffloadBundlerMagicStr[] = "__CLANG_OFFLOAD_BUNDLE__";
   size_t Pos = 0;
-
-  if (!KernelToHandleMap.contains(Kernel))
-    FATAL_ERROR("Expected Kernel in map");
-
-  if (!JITKernelInfoMap.contains(Kernel))
-    FATAL_ERROR("Expected a Kernel Descriptor to exist");
-
-  auto &KInfo = JITKernelInfoMap[Kernel];
-
-  if (KInfo.hasLinkedIR())
-    return KInfo.getLinkedModule();
-
-  void *Handle = KernelToHandleMap[Kernel];
-  if (!HandleToBinaryInfo.contains(Handle))
-    FATAL_ERROR("Expected Handle in map");
-
-  FatbinWrapper_t *FatbinWrapper = HandleToBinaryInfo[Handle].FatbinWrapper;
-  if (!FatbinWrapper)
-    FATAL_ERROR("Expected FatbinWrapper in map");
 
   const char *Binary = FatbinWrapper->Binary;
 
-  StringRef Magic(Binary, sizeof(OFFLOAD_BUNDLER_MAGIC_STR) - 1);
-  if (!Magic.equals(OFFLOAD_BUNDLER_MAGIC_STR))
+  StringRef Magic(Binary, sizeof(OffloadBundlerMagicStr) - 1);
+  if (!Magic.equals(OffloadBundlerMagicStr))
     FATAL_ERROR("Error missing magic string");
-  Pos += sizeof(OFFLOAD_BUNDLER_MAGIC_STR) - 1;
+  Pos += sizeof(OffloadBundlerMagicStr) - 1;
 
   auto Read8ByteIntLE = [](const char *S, size_t Pos) {
     return support::endian::read64le(S + Pos);
@@ -88,7 +72,7 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
               << "NumberOfbundles " << NumberOfBundles << "\n");
 
   StringRef DeviceBinary;
-  for (uint64_t i = 0; i < NumberOfBundles; ++i) {
+  for (uint64_t I = 0; I < NumberOfBundles; ++I) {
     uint64_t Offset = Read8ByteIntLE(Binary, Pos);
     Pos += 8;
 
@@ -112,12 +96,77 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
       continue;
     }
 
-    DeviceBinary = StringRef(Binary + Offset, Size);
+    DeviceBinary = StringRef{Binary + Offset, Size};
     break;
   }
 
+  return DeviceBinary;
+}
+
+HashT JitEngineDeviceHIP::getModuleHash(BinaryInfo &BinInfo) {
+  if (BinInfo.hasModuleHash())
+    return BinInfo.getModuleHash();
+
   Expected<object::ELF64LEFile> DeviceElf =
-      object::ELF64LEFile::create(DeviceBinary);
+      object::ELF64LEFile::create(getDeviceBinary(BinInfo, DeviceArch));
+  if (DeviceElf.takeError())
+    FATAL_ERROR("Cannot create the device elf");
+
+  auto Sections = DeviceElf->sections();
+  if (Sections.takeError())
+    FATAL_ERROR("Error reading sections");
+
+  ArrayRef<uint8_t> DeviceBitcode;
+
+  // NOTE: This code hashes the bitcode of the section. Leaving it here in case
+  // there is a reason to revert to computing the hash at runtime instead of
+  // compilation time.
+  /*
+  auto HashSectionBitcode = [&DeviceElf](auto &Section, StringRef
+   SectionName) {
+    ArrayRef<uint8_t> BitcodeData;
+    auto SectionContents = DeviceElf->getSectionContents(Section);
+    if (SectionContents.takeError())
+      FATAL_ERROR("Error reading section contents");
+    BitcodeData = *SectionContents;
+    auto Bitcode = StringRef{reinterpret_cast<const char
+    *>(BitcodeData.data()),
+                             BitcodeData.size()};
+    return hash(Bitcode);
+  };
+  */
+
+  // We comibine hash values from sections storing bitcodes. If there is a
+  // .jit.bitcode.lto section due to RDC compilation that's the only hash we
+  // need.
+  for (auto Section : *Sections) {
+    auto SectionName = DeviceElf->getSectionName(Section);
+    if (SectionName.takeError())
+      FATAL_ERROR("Error reading section name");
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "SectionName " << *SectionName << "\n");
+
+    if (!SectionName->starts_with(".jit.bitcode"))
+      continue;
+
+    auto SectionHashStr =
+        SectionName->slice(SectionName->find_last_of(".") + 1, StringRef::npos);
+    HashT SectionHashValue{SectionHashStr};
+
+    if (SectionName->starts_with(".jit.bitcode.lto")) {
+      BinInfo.setModuleHash(SectionHashValue);
+      break;
+    }
+
+    BinInfo.updateModuleHash(SectionHashValue);
+  }
+
+  return BinInfo.getModuleHash();
+}
+
+std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
+  Expected<object::ELF64LEFile> DeviceElf =
+      object::ELF64LEFile::create(getDeviceBinary(BinInfo, DeviceArch));
   if (DeviceElf.takeError())
     FATAL_ERROR("Cannot create the device elf");
 
@@ -127,9 +176,9 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
 
   ArrayRef<uint8_t> DeviceBitcode;
   SmallVector<std::unique_ptr<Module>> LinkedModules;
-  auto &Ctx = getProteusLLVMCtx();
+  auto &Ctx = getLLVMContext();
 
-  auto extractModuleFromSection = [&DeviceElf, &Ctx](auto &Section,
+  auto ExtractModuleFromSection = [&DeviceElf, &Ctx](auto &Section,
                                                      StringRef SectionName) {
     ArrayRef<uint8_t> BitcodeData;
     auto SectionContents = DeviceElf->getSectionContents(Section);
@@ -160,53 +209,18 @@ Module &JitEngineDeviceHIP::extractDeviceBitcode(StringRef KernelName,
     if (!SectionName->starts_with(".jit.bitcode"))
       continue;
 
-    auto M = extractModuleFromSection(Section, *SectionName);
+    auto M = ExtractModuleFromSection(Section, *SectionName);
 
-    if (SectionName->equals(".jit.bitcode.lto")) {
+    if (SectionName->starts_with(".jit.bitcode.lto")) {
       LinkedModules.clear();
       LinkedModules.push_back(std::move(M));
       break;
-    } else {
-      LinkedModules.push_back(std::move(M));
     }
+
+    LinkedModules.push_back(std::move(M));
   }
 
-  auto JitModule = linkJitModule(KernelName, LinkedModules);
-
-  // All kernels included in this collection of modules will have an
-  // identical non specialized IR file. Map all Kernels, to this generic IR
-  // file
-  [this, &JitModule, &Handle]() {
-    DenseSet<StringRef> KernelNames;
-    for (auto &Func : *JitModule) {
-      if (Func.getCallingConv() == CallingConv::AMDGPU_KERNEL) {
-        KernelNames.insert(Func.getName());
-      }
-    }
-
-    for (const auto &KV : KernelToHandleMap) {
-
-      if (KV.second != Handle)
-        continue;
-
-      // This is likely a not required check.
-      // KV.first is in KernelToHandleMap, so we should have the Descriptor.
-      if (!JITKernelInfoMap.contains(KV.first))
-        continue;
-
-      auto &KDescr = JITKernelInfoMap[KV.first];
-      if (!KernelNames.contains(KDescr.getName()))
-        continue;
-
-      KDescr.setLinkedModule(*JitModule);
-    }
-  }();
-
-  if (!KInfo.hasLinkedIR())
-    FATAL_ERROR("Expected KernelInfo to have updated Linked Modules");
-
-  addLinkedModule(std::move(JitModule));
-  return KInfo.getLinkedModule();
+  return linkJitModule(LinkedModules);
 }
 
 void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
