@@ -41,14 +41,11 @@ static HashT inline hashValue(const std::string &S) {
   return stable_hash_combine_string(S);
 }
 
-static HashT inline hashValue(unsigned long &V) {
+template <typename T>
+static inline std::enable_if_t<std::is_scalar<T>::value, HashT>
+hashValue(const T &V) {
   return stable_hash_combine_string(
-      StringRef{reinterpret_cast<char *>(&V), sizeof(unsigned long)});
-}
-
-static HashT inline hashValue(unsigned int &V) {
-  return stable_hash_combine_string(
-      StringRef{reinterpret_cast<char *>(&V), sizeof(unsigned int)});
+      StringRef{reinterpret_cast<const char *>(&V), sizeof(T)});
 }
 
 static HashT inline hashArrayRefElement(const RuntimeConstant &RC) {
