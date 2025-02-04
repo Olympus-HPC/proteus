@@ -176,6 +176,9 @@ public:
     std::unique_ptr<Module> ExtractedModule =
         static_cast<ImplT &>(*this).extractModule(BinInfo);
 
+    pruneIR(*ExtractedModule, KernelInfo.getName());
+    runCleanupPassPipeline(*ExtractedModule);
+
     BinInfo.setModule(std::move(ExtractedModule));
     KernelInfo.setModule(BinInfo.getModule());
     return KernelInfo.getModule();
@@ -667,15 +670,6 @@ JitEngineDevice<ImplT>::compileAndRun(
   // We need to clone, as getModule returns a generic LLVM IR to be
   // used by any kernel that will be specialized
   auto JitModule = llvm::CloneModule(getModule(KernelInfo));
-  // NOTE: There is potential oportunity here, to reduce some of the JIT costs
-  // further. We can have a pruneIR in which we do not do any RC/Grid/Block
-  // specializations. We only internalize symbols. Then we can use that IR
-  // for all upcoming specializations of dynamic information.
-  // There is a memory trade off in such case, We will need to have a peristent
-  // in memory module, for every annotated kernel. If we have a case of 1000s of
-  // kernels, this can be an issue
-
-  pruneIR(*JitModule, KernelInfo.getName());
 
   specializeIR(*JitModule, KernelInfo.getName(), Suffix, BlockDim, GridDim,
                KernelInfo.getRCIndices(), RCsVec.data(),
