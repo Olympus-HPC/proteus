@@ -176,7 +176,7 @@ public:
     std::unique_ptr<Module> ExtractedModule =
         static_cast<ImplT &>(*this).extractModule(BinInfo);
 
-    pruneIR(*ExtractedModule, KernelInfo.getName());
+    pruneIR(*ExtractedModule);
     runCleanupPassPipeline(*ExtractedModule);
 
     BinInfo.setModule(std::move(ExtractedModule));
@@ -438,7 +438,7 @@ private:
   // End Methods implemented in the derived device engine class.
   //------------------------------------------------------------------
 
-  void pruneIR(Module &M, StringRef FnName);
+  void pruneIR(Module &M);
 
   void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
                     dim3 &BlockDim, dim3 &GridDim,
@@ -526,7 +526,7 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
 }
 
 template <typename ImplT>
-void JitEngineDevice<ImplT>::pruneIR(Module &M, StringRef FnName) {
+void JitEngineDevice<ImplT>::pruneIR(Module &M) {
   TIMESCOPE("pruneIR");
   PROTEUS_DBG(Logger::logs("proteus") << "=== Parsed Module\n"
                                       << M << "=== End of Parsed Module\n");
