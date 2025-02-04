@@ -11,8 +11,8 @@
 #ifndef PROTEUS_TRANSFORM_ARGUMENT_SPECIALIZATION_HPP
 #define PROTEUS_TRANSFORM_ARGUMENT_SPECIALIZATION_HPP
 
-#include "llvm/Support/Debug.h"
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/Support/Debug.h>
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Utils.h"

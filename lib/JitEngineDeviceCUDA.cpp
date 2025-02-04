@@ -8,12 +8,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Bitcode/BitcodeWriter.h"
-#include "llvm/IR/Metadata.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Target/TargetMachine.h"
+#include <llvm/Bitcode/BitcodeWriter.h>
+#include <llvm/IR/Metadata.h>
 #include <llvm/Linker/Linker.h>
 #include <llvm/Support/MemoryBufferRef.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/Target/TargetMachine.h>
 #include <memory>
 
 #include "proteus/JitEngineDevice.hpp"

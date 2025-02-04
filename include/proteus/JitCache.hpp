@@ -19,10 +19,10 @@
 #include "proteus/TimeTracing.hpp"
 #include "proteus/Utils.h"
 
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Config/llvm-config.h"
+#include <llvm/ADT/DenseMap.h>
+#include <llvm/ADT/SmallVector.h>
+#include <llvm/ADT/StringRef.h>
+#include <llvm/Config/llvm-config.h>
 
 namespace proteus {
 

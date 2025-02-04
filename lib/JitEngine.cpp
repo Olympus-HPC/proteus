@@ -17,17 +17,17 @@
 #include <optional>
 #include <string>
 
-#include "llvm/CodeGen/CommandFlags.h"
-#include "llvm/CodeGen/MachineModuleInfo.h"
-#include "llvm/IR/LegacyPassManager.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/IRReader/IRReader.h"
-#include "llvm/MC/TargetRegistry.h"
-#include "llvm/Passes/PassBuilder.h"
-#include "llvm/Target/TargetMachine.h"
-#include "llvm/TargetParser/SubtargetFeature.h"
+#include <llvm/CodeGen/CommandFlags.h>
+#include <llvm/CodeGen/MachineModuleInfo.h>
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Verifier.h>
+#include <llvm/IRReader/IRReader.h>
+#include <llvm/MC/TargetRegistry.h>
+#include <llvm/Passes/PassBuilder.h>
+#include <llvm/Target/TargetMachine.h>
+#include <llvm/TargetParser/SubtargetFeature.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
 #include "proteus/JitEngine.hpp"

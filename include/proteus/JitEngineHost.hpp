@@ -15,7 +15,7 @@
 
 #include <string>
 
-#include "llvm/ExecutionEngine/Orc/LLJIT.h"
+#include <llvm/ExecutionEngine/Orc/LLJIT.h>
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/JitCache.hpp"

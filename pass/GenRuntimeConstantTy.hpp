@@ -11,14 +11,14 @@
 #ifndef PROTEUS_GEN_RUNTIME_CONSTANT_TY_HPP
 #define PROTEUS_GEN_RUNTIME_CONSTANT_TY_HPP
 
-#include "llvm/AsmParser/Parser.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Module.h"
-#include "llvm/Support/Error.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/raw_ostream.h"
+#include <llvm/AsmParser/Parser.h>
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/Support/Error.h>
+#include <llvm/Support/ErrorHandling.h>
+#include <llvm/Support/SourceMgr.h>
+#include <llvm/Support/raw_ostream.h>
 
 #include "GenCompilerInterfaceTypes.h"
 

@@ -15,8 +15,8 @@
 #include <memory>
 #include <string>
 
-#include "llvm/IR/Module.h"
-#include "llvm/Target/TargetMachine.h"
+#include <llvm/IR/Module.h>
+#include <llvm/Target/TargetMachine.h>
 
 #include "proteus/Hashing.hpp"
 #include "proteus/Utils.h"

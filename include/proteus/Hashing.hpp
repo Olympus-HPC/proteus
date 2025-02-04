@@ -7,9 +7,9 @@
 #include <llvm/ADT/ArrayRef.h>
 #include <string>
 #if LLVM_VERSION_MAJOR == 18
-#include "llvm/ADT/StableHashing.h"
+#include <llvm/ADT/StableHashing.h>
 #else
-#include "llvm/CodeGen/StableHashing.h"
+#include <llvm/CodeGen/StableHashing.h>
 #endif
 
 namespace proteus {

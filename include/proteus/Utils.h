@@ -13,8 +13,8 @@
 
 #include <string>
 
-#include "llvm/ADT/Twine.h"
-#include "llvm/Support/SourceMgr.h"
+#include <llvm/ADT/Twine.h>
+#include <llvm/Support/SourceMgr.h>
 
 #include "proteus/TimeTracing.hpp"
 

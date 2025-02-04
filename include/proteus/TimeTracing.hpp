@@ -11,7 +11,7 @@
 #ifndef PROTEUS_TIME_TRACING_HPP
 #define PROTEUS_TIME_TRACING_HPP
 
-#include "llvm/Support/TimeProfiler.h"
+#include <llvm/Support/TimeProfiler.h>
 
 namespace proteus {
 

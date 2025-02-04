@@ -19,7 +19,7 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/MemoryBufferRef.h>
 
-#include "llvm/ADT/StringRef.h"
+#include <llvm/ADT/StringRef.h>
 
 #include "proteus/Hashing.hpp"
 #include "proteus/Utils.h"
