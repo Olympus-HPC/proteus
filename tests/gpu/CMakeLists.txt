@@ -11,7 +11,7 @@ function(CREATE_GPU_TEST exe check_source)
     add_executable(${exe}.${lang} ${check_source} ${ARGN})
     set_source_files_properties(${check_source} ${ARGN} PROPERTIES
         LANGUAGE ${lang}
-        OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/pass/ProteusPass.cpp
+        OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/src/pass/ProteusPass.cpp
     )
     add_dependencies(${exe}.${lang} ProteusPass)
 
@@ -39,7 +39,7 @@ function(CREATE_GPU_TEST_RDC exe check_source)
     add_executable(${exe}.${lang}.rdc ${check_source} ${ARGN})
     set_source_files_properties(${check_source} ${ARGN} PROPERTIES
         LANGUAGE ${lang}
-        OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/pass/ProteusPass.cpp
+        OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/src/pass/ProteusPass.cpp
     )
 
     target_link_libraries(${exe}.${lang}.rdc PUBLIC proteus)
@@ -154,7 +154,7 @@ function(CREATE_PROTEUS_GPU_LIBRARY lib source)
     set_source_files_properties(${source} ${ARGN} PROPERTIES LANGUAGE ${lang})
     set_source_files_properties(${source} ${ARGN} PROPERTIES
         LANGUAGE ${lang}
-        OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/pass/ProteusPass.cpp
+        OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/src/pass/ProteusPass.cpp
     )
     target_link_libraries(${lib} PUBLIC proteus)
 

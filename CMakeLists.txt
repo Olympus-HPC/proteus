@@ -37,8 +37,7 @@ include(cmake/SetupLLVM.cmake)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
-add_subdirectory(lib)
-add_subdirectory(pass)
+add_subdirectory(src)
 
 if(ENABLE_TESTS)
   enable_testing()
