@@ -18,7 +18,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Target/TargetMachine.h"
 
-#include "Hashing.hpp"
+#include "proteus/Hashing.hpp"
 #include "proteus/Utils.h"
 
 namespace proteus {

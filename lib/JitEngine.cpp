@@ -32,7 +32,7 @@
 
 #include "proteus/JitEngine.hpp"
 
-#include "Hashing.hpp"
+#include "proteus/Hashing.hpp"
 #include "proteus/TimeTracing.hpp"
 #include "proteus/Utils.h"
 

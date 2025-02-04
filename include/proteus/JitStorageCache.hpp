@@ -21,7 +21,7 @@
 
 #include "llvm/ADT/StringRef.h"
 
-#include "Hashing.hpp"
+#include "proteus/Hashing.hpp"
 #include "proteus/Utils.h"
 
 namespace proteus {

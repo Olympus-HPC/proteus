@@ -14,9 +14,9 @@
 #include <cstdint>
 #include <iostream>
 
-#include "Hashing.hpp"
-#include "TimeTracing.hpp"
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Hashing.hpp"
+#include "proteus/TimeTracing.hpp"
 #include "proteus/Utils.h"
 
 #include "llvm/ADT/DenseMap.h"

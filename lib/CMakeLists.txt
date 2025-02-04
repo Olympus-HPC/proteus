@@ -7,19 +7,21 @@ set(SOURCES
   JitEngineHost.cpp
 )
 
+set(PROTEUS_PROJECT_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
+
 set(HEADERS
-  proteus/Logger.hpp
-  proteus/CompilerInterfaceTypes.h
-  CoreDevice.hp
-  Hashing.hpp
-  proteus/JitCache.hpp
-  proteus/JitEngine.hpp
-  proteus/JitEngineHost.hpp
-  proteus/JitStorageCache.hpp
-  proteus/JitVariable.hpp
-  proteus/TimeTracing.hpp
-  proteus/TransformArgumentSpecialization.hpp
-  proteus/Utils.h)
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Logger.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilerInterfaceTypes.h
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreDevice.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Hashing.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitCache.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngine.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngineHost.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitStorageCache.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitVariable.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/TimeTracing.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/TransformArgumentSpecialization.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Utils.h)
 
 if(PROTEUS_ENABLE_CUDA)
 list(APPEND SOURCES
@@ -29,11 +31,11 @@ list(APPEND SOURCES
 )
 
 list(APPEND HEADERS
-  proteus/CompilerInterfaceDevice.h
-  CoreDeviceCUDA.hpp
-  proteus/JitEngineDevice.hpp
-  proteus/JitEngineDeviceCUDA.hpp
-  proteus/UtilsCUDA.h)
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilerInterfaceDevice.h
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreDeviceCUDA.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngineDevice.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngineDeviceCUDA.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/UtilsCUDA.h)
 endif()
 
 if(PROTEUS_ENABLE_HIP)
@@ -44,11 +46,11 @@ list(APPEND SOURCES
 )
 
 list(APPEND HEADERS
-  proteus/CompilerInterfaceDevice.h
-  CoreDeviceHIP.hpp
-  proteus/JitEngineDevice.hpp
-  proteus/JitEngineDeviceHIP.hpp
-  proteus/UtilsHIP.h)
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilerInterfaceDevice.h
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreDeviceHIP.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngineDevice.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngineDeviceHIP.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/UtilsHIP.h)
 endif()
 
 if(BUILD_SHARED)
@@ -81,7 +83,7 @@ target_include_directories(proteus
 
 target_include_directories(proteus
   PUBLIC
-  $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/lib>
+  $<BUILD_INTERFACE:${PROTEUS_PROJECT_INCLUDE_DIR}>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 if(LLVM_LINK_LLVM_DYLIB)
@@ -123,5 +125,5 @@ install(
   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 
 install(FILES
-  ${HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/proteus/")
-
+  ${HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/proteus"
+)

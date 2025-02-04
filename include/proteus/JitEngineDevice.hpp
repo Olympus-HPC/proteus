@@ -49,8 +49,8 @@
 #include <optional>
 #include <string>
 
-#include "Hashing.hpp"
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Hashing.hpp"
 #include "proteus/JitCache.hpp"
 #include "proteus/JitEngine.hpp"
 #include "proteus/JitStorageCache.hpp"

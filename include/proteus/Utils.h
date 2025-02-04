@@ -39,11 +39,11 @@ template <typename T> void saveToFile(llvm::StringRef Filepath, T &&Data) {
 }
 
 #if PROTEUS_ENABLE_HIP
-#include "UtilsHIP.h"
+#include "proteus/UtilsHIP.h"
 #endif
 
 #if PROTEUS_ENABLE_CUDA
-#include "UtilsCUDA.h"
+#include "proteus/UtilsCUDA.h"
 #endif
 
 #endif

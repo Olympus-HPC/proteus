@@ -65,8 +65,8 @@
 #include <iostream>
 #include <string>
 
-#include "../lib/Hashing.hpp"
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Hashing.hpp"
 #include "proteus/Logger.hpp"
 
 #include "GenRuntimeConstantTy.hpp"
