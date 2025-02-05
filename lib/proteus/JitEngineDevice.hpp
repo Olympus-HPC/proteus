@@ -239,6 +239,8 @@ public:
     return ImplT::codegenObject(M, DeviceArch, GlobalLinkedBinaries, UseRTC);
   }
 
+  static void pruneIR(Module &M);
+
 private:
   //------------------------------------------------------------------
   // Begin Methods implemented in the derived device engine class.
@@ -372,8 +374,6 @@ private:
   //------------------------------------------------------------------
   // End Methods implemented in the derived device engine class.
   //------------------------------------------------------------------
-
-  void pruneIR(Module &M, StringRef FnName);
 
   void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
                     dim3 &BlockDim, dim3 &GridDim,
@@ -519,8 +519,7 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
 #endif
 }
 
-template <typename ImplT>
-void JitEngineDevice<ImplT>::pruneIR(Module &M, StringRef FnName) {
+template <typename ImplT> void JitEngineDevice<ImplT>::pruneIR(Module &M) {
   TIMESCOPE("pruneIR");
   PROTEUS_DBG(Logger::logs("proteus") << "=== Parsed Module\n"
                                       << M << "=== End of Parsed Module\n");
@@ -673,7 +672,7 @@ JitEngineDevice<ImplT>::compileAndRun(
   // in memory module, for every annotated kernel. If we have a case of 1000s of
   // kernels, this can be an issue
 
-  pruneIR(*JitModule, KernelName);
+  pruneIR(*JitModule);
 
   specializeIR(*JitModule, KernelName, Suffix, BlockDim, GridDim, RCIndices,
                RCsVec.data(), NumRuntimeConstants);
