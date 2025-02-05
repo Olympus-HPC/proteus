@@ -176,6 +176,9 @@ public:
     std::unique_ptr<Module> ExtractedModule =
         static_cast<ImplT &>(*this).extractModule(BinInfo);
 
+    pruneIR(*ExtractedModule);
+    runCleanupPassPipeline(*ExtractedModule);
+
     BinInfo.setModule(std::move(ExtractedModule));
     KernelInfo.setModule(BinInfo.getModule());
     return KernelInfo.getModule();
@@ -435,7 +438,7 @@ private:
   // End Methods implemented in the derived device engine class.
   //------------------------------------------------------------------
 
-  void pruneIR(Module &M, StringRef FnName);
+  void pruneIR(Module &M);
 
   void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
                     dim3 &BlockDim, dim3 &GridDim,
@@ -523,7 +526,7 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
 }
 
 template <typename ImplT>
-void JitEngineDevice<ImplT>::pruneIR(Module &M, StringRef FnName) {
+void JitEngineDevice<ImplT>::pruneIR(Module &M) {
   TIMESCOPE("pruneIR");
   PROTEUS_DBG(Logger::logs("proteus") << "=== Parsed Module\n"
                                       << M << "=== End of Parsed Module\n");
@@ -667,15 +670,6 @@ JitEngineDevice<ImplT>::compileAndRun(
   // We need to clone, as getModule returns a generic LLVM IR to be
   // used by any kernel that will be specialized
   auto JitModule = llvm::CloneModule(getModule(KernelInfo));
-  // NOTE: There is potential oportunity here, to reduce some of the JIT costs
-  // further. We can have a pruneIR in which we do not do any RC/Grid/Block
-  // specializations. We only internalize symbols. Then we can use that IR
-  // for all upcoming specializations of dynamic information.
-  // There is a memory trade off in such case, We will need to have a peristent
-  // in memory module, for every annotated kernel. If we have a case of 1000s of
-  // kernels, this can be an issue
-
-  pruneIR(*JitModule, KernelInfo.getName());
 
   specializeIR(*JitModule, KernelInfo.getName(), Suffix, BlockDim, GridDim,
                KernelInfo.getRCIndices(), RCsVec.data(),
