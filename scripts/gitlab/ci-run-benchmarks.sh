@@ -99,13 +99,13 @@ popd
 # Run under the project directory to avoid deleting artifacts in the
 # after_script.
 cd ${CI_PROJECT_DIR}
-git clone --depth 1 --single-branch --branch v0.0.1 https://github.com/Olympus-HPC/proteus-benchmarks.git
+git clone https://github.com/Olympus-HPC/proteus-benchmarks.git
 cd proteus-benchmarks
 git checkout add-raja-perf
 git submodule update --init --recursive
 
 
-python driver.py -t benchmarks.toml \
+python driver.py -t ${BENCHMARKS_TOML} \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x aot -p direct -m ${MACHINE} -r 1
 python driver.py -t ${BENCHMARKS_TOML} \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x aot -p profiler -m ${MACHINE} -r 1
