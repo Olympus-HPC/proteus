@@ -9,10 +9,11 @@
 //===----------------------------------------------------------------------===//
 #include "proteus/CompilerInterfaceTypes.h"
 
+#include <cassert>
 #include <cstring>
 
 extern "C" void __jit_push_variable(proteus::RuntimeConstant RC);
-extern "C" void __jit_register_fn(const char* Symbol);
+extern "C" void __jit_register_fn(const char *Symbol);
 
 namespace proteus {
 
@@ -25,8 +26,8 @@ template <typename T> T jit_variable(T v, int pos = -1) {
   return v;
 }
 
-template <typename T>
-void register_lambda(T&& t, const char* Symbol="") {
+template <typename T> void register_lambda(T &&t, const char *Symbol = "") {
+  assert(Symbol && "Expected non-null Symbol");
   __jit_register_fn(Symbol);
 }
 } // namespace proteus

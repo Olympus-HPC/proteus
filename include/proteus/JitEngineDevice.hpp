@@ -33,6 +33,7 @@
 #include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/CodeGen/CommandFlags.h>
 #include <llvm/CodeGen/MachineModuleInfo.h>
+#include <llvm/Demangle/Demangle.h>
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/LegacyPassManager.h>
@@ -56,6 +57,7 @@
 #include "proteus/JitStorageCache.hpp"
 #include "proteus/TimeTracing.hpp"
 #include "proteus/TransformArgumentSpecialization.hpp"
+#include "proteus/TransformLambdaSpecialization.hpp"
 #include "proteus/Utils.h"
 
 namespace proteus {
@@ -489,12 +491,15 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
         M, *F, RCIndices,
         ArrayRef<RuntimeConstant>{RC,
                                   static_cast<size_t>(NumRuntimeConstants)});
-  
-  if (! getJitVariableMap().empty() ) {
-    for (auto& F : M.getFunctionList()) {
-      if (llvm::demangle(F.getName()).find("lambda") != std::string::npos)
-          TransformLambdaSpecialization::transform(M, F, getJitVariableMap());
-    } 
+
+  if (!getJitVariableMap().empty()) {
+    for (auto &F : M.getFunctionList()) {
+      if (auto OptionalRCVec = matchJitVariableMap(F.getName())) {
+        TransformLambdaSpecialization::transform(M, F, OptionalRCVec.value());
+        getJitVariableMap().erase(F.getName());
+        break;
+      }
+    }
   }
 
   // Replace uses of blockDim.* and gridDim.* with constants.

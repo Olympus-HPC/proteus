@@ -25,32 +25,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-<<<<<<< HEAD:src/pass/ProteusPass.cpp
-=======
-#include "llvm/Analysis/CallGraph.h"
-#include "llvm/Bitcode/BitcodeWriter.h"
-#include <llvm/Demangle/Demangle.h>
-#include "llvm/IR/DebugInfo.h"
-#include "llvm/IR/Mangler.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/Object/ELF.h"
-#include "llvm/Passes/PassBuilder.h"
-#include "llvm/Passes/PassPlugin.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/IPO.h"
-#include "llvm/Transforms/IPO/AlwaysInliner.h"
-#include "llvm/Transforms/IPO/GlobalDCE.h"
-#include "llvm/Transforms/IPO/StripDeadPrototypes.h"
-#include "llvm/Transforms/IPO/StripSymbols.h"
-#include "llvm/Transforms/Utils/Cloning.h"
-#include "llvm/Transforms/Utils/ModuleUtils.h"
->>>>>>> 43151fc (Initial refactoring to pass in lambda symbol):pass/ProteusPass.cpp
 #include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Analysis/CallGraph.h>
 #include <llvm/Bitcode/BitcodeWriter.h>
+#include <llvm/Demangle/Demangle.h>
 #include <llvm/IR/CallingConv.h>
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
@@ -240,6 +219,12 @@ private:
     return false;
   }
 
+  bool isLambdaFunction(const Function &F) {
+    std::string DemangledName = demangle(F.getName());
+    return StringRef{DemangledName}.contains("'lambda") &&
+           StringRef{DemangledName}.contains("'()::operator()()");
+  }
+
   std::string getJitBitcodeUniqueName(Module &M) {
     llvm::sys::fs::UniqueID ID;
     if (auto EC = llvm::sys::fs::getUniqueID(M.getSourceFileName(), ID))
@@ -269,15 +254,16 @@ private:
 
       assert(Fn && "Expected function in entry operands");
 
-      // Check the annotated functions is a kernel function.
+      // Check the annotated functions is a kernel function or a device lambda.
       if (isDeviceCompilation(M)) {
         ModuleDeviceKernels = getDeviceKernels(M);
-        if (!isDeviceKernel(Fn))
-          return;
-          // FATAL_ERROR(std::string{} + __FILE__ + ":" +
-          //             std::to_string(__LINE__) +
-          //             " => Expected the annotated Fn " + Fn->getName() +
-          //             " to be a kernel function!");
+        if (!isDeviceKernel(Fn) && !isLambdaFunction(*Fn))
+          FATAL_ERROR(std::string{} + __FILE__ + ":" +
+                      std::to_string(__LINE__) +
+                      " => Expected the annotated Fn " + Fn->getName() +
+                      " to be a kernel function or device lambda function!");
+
+        continue;
       }
 
       if (JitFunctionInfoMap.contains(Fn)) {
@@ -1119,37 +1105,40 @@ private:
   }
 
   void registerLambdaFunctions(Module &M) {
-      DEBUG(Logger::logs("proteus-pass") << "registering lambda functions" << "\n");
+    DEBUG(Logger::logs("proteus-pass")
+          << "registering lambda functions" << "\n");
 
-      SmallVector<Function *, 16> LambdaFunctions;
-      for (auto &F : M.getFunctionList()) {
-        // TODO: Demangle and search for the fully qualified proteus::jit_variable
-        // name.
-        if (F.getName().contains("register_lambda")) {
-          LambdaFunctions.push_back(&F);
-        }
+    SmallVector<Function *, 16> LambdaFunctions;
+    for (auto &F : M.getFunctionList()) {
+      // TODO: Demangle and search for the fully qualified proteus::jit_variable
+      // name.
+      if (StringRef{demangle(F.getName())}.contains(
+              "proteus::register_lambda")) {
+        LambdaFunctions.push_back(&F);
       }
+    }
 
-      for (auto Function : LambdaFunctions) {
-        auto DemangledName = llvm::demangle(Function->getName());
+    for (auto *Function : LambdaFunctions) {
+      auto DemangledName = llvm::demangle(Function->getName());
 
-        std::size_t L = DemangledName.find("<");
-        std::size_t R = DemangledName.find(">"); 
-        const std::string Lambda = DemangledName.substr(L+1, R-L-2);
-        StringRef LambdaSymbol{Lambda};
+      std::size_t L = DemangledName.find_first_of('<');
+      std::size_t R = DemangledName.find_first_of('>');
+      StringRef LambdaSymbol = StringRef{DemangledName}.slice(L + 1, R - 1);
 
-        DEBUG(Logger::logs("proteus-pass") << Function->getName() << " " << DemangledName << " " << LambdaSymbol << "\n");
+      DEBUG(Logger::logs("proteus-pass")
+            << Function->getName() << " " << DemangledName << " "
+            << LambdaSymbol << "\n");
 
-        for (auto User : Function->users()) {
-          CallBase *CB = dyn_cast<CallBase>(User);
-          if (!CB)
-            FATAL_ERROR(
-                "Expected CallBase as user of proteus::register_lambda function");
+      for (auto *User : Function->users()) {
+        CallBase *CB = dyn_cast<CallBase>(User);
+        if (!CB)
+          FATAL_ERROR(
+              "Expected CallBase as user of proteus::register_lambda function");
 
-          IRBuilder<> Builder(CB);
-          auto *LambdaNameGlobal = Builder.CreateGlobalString(LambdaSymbol);
-          CB->setArgOperand(1, LambdaNameGlobal);
-        }
+        IRBuilder<> Builder(CB);
+        auto *LambdaNameGlobal = Builder.CreateGlobalString(LambdaSymbol);
+        CB->setArgOperand(1, LambdaNameGlobal);
+      }
     }
   }
 };

@@ -12,12 +12,17 @@
 #define PROTEUS_JITENGINE_HPP
 
 #include <cstdlib>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
+#include <llvm/Demangle/Demangle.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Target/TargetMachine.h>
+#include <type_traits>
 
+#include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Hashing.hpp"
 #include "proteus/Utils.h"
 
@@ -46,8 +51,8 @@ public:
 
   bool isProteusDisabled() { return Config.ENV_PROTEUS_DISABLE; }
 
-  void pushJitVariable(RuntimeConstant RC);
-  void registerLambda(const char* Symbol);
+  void pushJitVariable(RuntimeConstant &RC);
+  void registerLambda(const char *Symbol);
 
 protected:
   Expected<std::unique_ptr<TargetMachine>>
@@ -73,26 +78,46 @@ protected:
   } Config;
 };
 
-inline
-SmallVector<RuntimeConstant, 8>& getPendingJitVariables() {
-  static SmallVector<RuntimeConstant, 8> PendingJitVariables;
+inline SmallVector<RuntimeConstant> &getPendingJitVariables() {
+  static SmallVector<RuntimeConstant> PendingJitVariables;
   return PendingJitVariables;
 }
 
-inline
-DenseMap<StringRef, SmallVector<RuntimeConstant, 4>>& getJitVariableMap() {
-  static DenseMap<StringRef, SmallVector<RuntimeConstant, 4>> JitVariableMap;
+inline DenseMap<StringRef, SmallVector<RuntimeConstant>> &getJitVariableMap() {
+  static DenseMap<StringRef, SmallVector<RuntimeConstant>> JitVariableMap;
   return JitVariableMap;
+}
+
+inline std::optional<std::reference_wrapper<SmallVector<RuntimeConstant>>>
+matchJitVariableMap(StringRef FnName) {
+  std::string Operator = llvm::demangle(FnName);
+
+  std::size_t Sep = Operator.find("::");
+  if (Sep == std::string::npos)
+    return std::nullopt;
+
+  std::size_t SecondSep = Operator.find("::", Sep + 1);
+  if (SecondSep == std::string::npos)
+    return std::nullopt;
+
+  StringRef Symbol = StringRef{Operator}.slice(0, SecondSep);
+
+  const auto SymToRC = getJitVariableMap().find(Symbol);
+
+  if (SymToRC == getJitVariableMap().end())
+    return std::nullopt;
+
+  return SymToRC->second;
 }
 
 inline void pushJitVariable(RuntimeConstant RC) {
   getPendingJitVariables().push_back(RC);
 }
 
-inline void  registerLambda(const char* Symbol) {
+inline void registerLambda(const char *Symbol) {
   const StringRef SymbolStr(Symbol);
-  auto& JitVariables = getPendingJitVariables();
-  auto& VariableMap = getJitVariableMap();
+  auto &JitVariables = getPendingJitVariables();
+  auto &VariableMap = getJitVariableMap();
   for (auto V : JitVariables) {
     VariableMap[SymbolStr].push_back(V);
   }

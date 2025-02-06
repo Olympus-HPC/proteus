@@ -49,6 +49,7 @@
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/JitEngine.hpp"
 #include "proteus/JitEngineHost.hpp"
 #include "proteus/TransformArgumentSpecialization.hpp"
 #include "proteus/TransformLambdaSpecialization.hpp"
@@ -273,12 +274,16 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
         *M, *F, ArgPos,
         ArrayRef<RuntimeConstant>{RC,
                                   static_cast<size_t>(NumRuntimeConstants)});
-    if (!getJitVariableMap().empty())
-      TransformLambdaSpecialization::transform(*M, *F, getJitVariableMap());
+
+    if (!getJitVariableMap().empty()) {
+      if (auto OptionalRCVec = matchJitVariableMap(F->getName())) {
+        TransformLambdaSpecialization::transform(*M, *F, OptionalRCVec.value());
+        getJitVariableMap().erase(FnName);
+      }
+    }
 
     // Logger::logs("proteus") << "=== JIT Module\n" << *M << "=== End of JIT
     // Module\n";
-
 
     F->setName(FnName + Suffix);
 
