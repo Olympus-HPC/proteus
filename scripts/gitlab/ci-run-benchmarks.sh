@@ -99,12 +99,18 @@ popd
 # Run under the project directory to avoid deleting artifacts in the
 # after_script.
 cd ${CI_PROJECT_DIR}
+echo "begin clone"
 git clone https://github.com/Olympus-HPC/proteus-benchmarks.git
+echo "end clone"
 cd proteus-benchmarks
+echo "begin checkout"
 git checkout add-raja-perf
+echo "end checkout"
+echo "begin submodule update"
 git submodule update --init --recursive
+echo "end submodule update"
 
-
+echo "begin py script"
 python driver.py -t ${BENCHMARKS_TOML} \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x aot -p direct -m ${MACHINE} -r 1
 echo "RAN AOT"
