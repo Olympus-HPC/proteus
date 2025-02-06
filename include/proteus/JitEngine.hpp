@@ -84,6 +84,8 @@ inline SmallVector<RuntimeConstant> &getPendingJitVariables() {
 }
 
 inline DenseMap<StringRef, SmallVector<RuntimeConstant>> &getJitVariableMap() {
+  // NOTE: The StringRef key refers to the global variable string of the lambda
+  // class symbol created in the proteus pass.
   static DenseMap<StringRef, SmallVector<RuntimeConstant>> JitVariableMap;
   return JitVariableMap;
 }
@@ -115,10 +117,10 @@ inline void pushJitVariable(RuntimeConstant RC) {
 }
 
 inline void registerLambda(const char *Symbol) {
-  const StringRef SymbolStr(Symbol);
+  const StringRef SymbolStr{Symbol};
   auto &JitVariables = getPendingJitVariables();
   auto &VariableMap = getJitVariableMap();
-  for (auto V : JitVariables) {
+  for (auto &V : JitVariables) {
     VariableMap[SymbolStr].push_back(V);
   }
 
