@@ -107,16 +107,17 @@ git submodule update --init --recursive
 
 python driver.py -t ${BENCHMARKS_TOML} \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x aot -p direct -m ${MACHINE} -r 1
+echo "Ran AOT benchmarks\n"
 python driver.py -t ${BENCHMARKS_TOML} \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x aot -p profiler -m ${MACHINE} -r 1
-
+echo "Ran AOT benchmarks with profiler\n"
 python driver.py -t ${BENCHMARKS_TOML} \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
   --proteus-config \
   '{"ENV_PROTEUS_USE_STORED_CACHE":["0","1"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["1"], "ENV_PROTEUS_SPECIALIZE_ARGS":["1"], "ENV_PROTEUS_SPECIALIZE_DIMS":["1"]}' \
   --suffix "direct_pc_01_1_1_1" \
   -p direct -m ${MACHINE} -r 1
-if [[ "${COMMENTS_BODY}" != *"/run-benchmarks-rajaperf"* ]]; then
+if [[ "${COMMENTS_BODY}" == *"/run-benchmarks-hecbench"* ]]; then
   python driver.py -t ${BENCHMARKS_TOML} \
     -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
     --proteus-config \
@@ -154,6 +155,9 @@ if [[ "${COMMENTS_BODY}" != *"/run-benchmarks-rajaperf"* ]]; then
     --suffix "profiler_pc_0_0_0_0" \
     -p profiler -m ${MACHINE} -r 1
 fi
+
+echo "End run benchmarks..."
+
 python vis/plot-bar-end2end-speedup.py --dir results --plot-dir plots -m ${MACHINE} -f png --plot-title ${CI_MACHINE}
 python vis/plot-bar-end2end-speedup-noopt.py --dir results --plot-dir plots -m ${MACHINE} -f png --plot-title ${CI_MACHINE}
 python vis/plot-bar-compilation-slowdown.py  --dir results --plot-dir plots -m ${MACHINE} -f png --plot-title ${CI_MACHINE}
