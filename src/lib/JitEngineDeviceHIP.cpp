@@ -329,8 +329,9 @@ JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
                                             SharedObjectPath))
       FATAL_ERROR(EC.message());
 
-    std::vector<const char *> Args{"ld.lld", "-shared", ObjectPath.c_str(),
-                                   "-o", SharedObjectPath.c_str()};
+    std::vector<const char *> Args{"ld.lld",  "--no-undefined",
+                                   "-shared", ObjectPath.c_str(),
+                                   "-o",      SharedObjectPath.c_str()};
 
     lld::Result S = lld::lldMain(Args, llvm::outs(), llvm::errs(),
                                  {{lld::Gnu, &lld::elf::link}});
@@ -338,8 +339,8 @@ JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
       FATAL_ERROR("Error: lld failed");
   }
 
-  ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> Buffer =
-      llvm::MemoryBuffer::getFile(SharedObjectPath);
+  ErrorOr<std::unique_ptr<MemoryBuffer>> Buffer =
+      MemoryBuffer::getFileAsStream(SharedObjectPath);
   if (!Buffer)
     FATAL_ERROR("Error reading file: " + Buffer.getError().message());
 
