@@ -221,7 +221,7 @@ private:
   }
 
   bool isLambdaFunction(const Function &F) {
-    std::string DemangledName = demangle(F.getName());
+    std::string DemangledName = demangle(F.getName().str());
     return StringRef{DemangledName}.contains("'lambda") &&
            StringRef{DemangledName}.contains("'()::operator()");
   }
@@ -1161,14 +1161,14 @@ private:
 
     SmallVector<Function *, 16> LambdaFunctions;
     for (auto &F : M.getFunctionList()) {
-      if (StringRef{demangle(F.getName())}.contains(
+      if (StringRef{demangle(F.getName().str())}.contains(
               "proteus::register_lambda")) {
         LambdaFunctions.push_back(&F);
       }
     }
 
     for (auto *Function : LambdaFunctions) {
-      auto DemangledName = llvm::demangle(Function->getName());
+      auto DemangledName = llvm::demangle(Function->getName().str());
       StringRef LambdaType = parseLambdaType(DemangledName);
 
       DEBUG(Logger::logs("proteus-pass")

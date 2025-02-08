@@ -91,7 +91,7 @@ inline DenseMap<StringRef, SmallVector<RuntimeConstant>> &getJitVariableMap() {
 inline std::optional<
     DenseMap<StringRef, SmallVector<RuntimeConstant>>::iterator>
 matchJitVariableMap(StringRef FnName) {
-  std::string Operator = llvm::demangle(FnName);
+  std::string Operator = llvm::demangle(FnName.str());
   std::size_t Sep = Operator.rfind("::operator()");
   if (Sep == std::string::npos) {
     PROTEUS_DBG(Logger::logs("proteus") << "... SKIP ::operator() not found\n");
