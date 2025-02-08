@@ -462,7 +462,8 @@ protected:
   std::string DeviceArch;
   std::unordered_map<std::string, const void *> VarNameToDevPtr;
   std::unique_ptr<Module>
-  linkJitModule(SmallVector<std::unique_ptr<Module>> &LinkedModules);
+  linkJitModule(SmallVector<std::unique_ptr<Module>> &LinkedModules,
+                std::unique_ptr<Module> LTOModule = nullptr);
 
   LLVMContext &getLLVMContext() { return Ctx; }
 
@@ -808,16 +809,35 @@ void JitEngineDevice<ImplT>::registerLinkedBinary(FatbinWrapperT *FatbinWrapper,
 
 template <typename ImplT>
 std::unique_ptr<Module> JitEngineDevice<ImplT>::linkJitModule(
-    SmallVector<std::unique_ptr<Module>> &LinkedModules) {
+    SmallVector<std::unique_ptr<Module>> &LinkedModules,
+    std::unique_ptr<Module> LTOModule) {
   if (LinkedModules.empty())
     FATAL_ERROR("Expected jit module");
 
   auto LinkedModule =
       std::make_unique<llvm::Module>("JitModule", getLLVMContext());
   Linker IRLinker(*LinkedModule);
+  // Link in all the proteus-enabled extracted modules.
   for (auto &LinkedM : LinkedModules) {
     // Returns true if linking failed.
     if (IRLinker.linkInModule(std::move(LinkedM)))
+      FATAL_ERROR("Linking failed");
+  }
+
+  // Last, link in the LTO module, if there is one. The LTO module includes code
+  // post-optimization, which reduces specialization opportunities for proteus
+  // (e.g., due to inlining). Due to that, we selectively link as needed from
+  // it, to import definitions outside the proteus-compiled bitcode.
+  if (LTOModule) {
+    // Remove internal linkage from functions in the LTO module to make them
+    // linkable.
+    for (auto &F : *LTOModule) {
+      if (F.hasInternalLinkage())
+        F.setLinkage(GlobalValue::ExternalLinkage);
+    }
+
+    if (IRLinker.linkInModule(std::move(LTOModule),
+                              Linker::Flags::LinkOnlyNeeded))
       FATAL_ERROR("Linking failed");
   }
 

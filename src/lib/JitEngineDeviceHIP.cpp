@@ -152,11 +152,8 @@ HashT JitEngineDeviceHIP::getModuleHash(BinaryInfo &BinInfo) {
         SectionName->slice(SectionName->find_last_of(".") + 1, StringRef::npos);
     HashT SectionHashValue{SectionHashStr};
 
-    if (SectionName->starts_with(".jit.bitcode.lto")) {
-      BinInfo.setModuleHash(SectionHashValue);
-      break;
-    }
-
+    // NOTE: We include the hash value of the LTO section, which encodes changes
+    // to non-proteus compiled external modules.
     BinInfo.updateModuleHash(SectionHashValue);
   }
 
@@ -196,8 +193,9 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
   };
 
   // We extract bitcode from sections. If there is a .jit.bitcode.lto section
-  // due to RDC compilation that's the only bitcode we need, othewise we
-  // collect all .jit.bitcode sections.
+  // due to RDC compilation, we keep it separately to import definitions as
+  // needed at linking.
+  std::unique_ptr<Module> LTOModule = nullptr;
   for (auto Section : *Sections) {
     auto SectionName = DeviceElf->getSectionName(Section);
     if (SectionName.takeError())
@@ -211,15 +209,16 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
     auto M = ExtractModuleFromSection(Section, *SectionName);
 
     if (SectionName->starts_with(".jit.bitcode.lto")) {
-      LinkedModules.clear();
-      LinkedModules.push_back(std::move(M));
-      break;
+      if (LTOModule)
+        FATAL_ERROR("Expected single LTO Module");
+      LTOModule = std::move(M);
+      continue;
     }
 
     LinkedModules.push_back(std::move(M));
   }
 
-  return linkJitModule(LinkedModules);
+  return linkJitModule(LinkedModules, std::move(LTOModule));
 }
 
 void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
