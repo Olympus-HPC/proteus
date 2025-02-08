@@ -496,10 +496,10 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
     PROTEUS_DBG(Logger::logs("proteus")
                 << "=== LAMBDA MATCHING\n"
                 << "F trigger " << F->getName() << " -> "
-                << demangle(F->getName()) << "\n");
+                << demangle(F->getName().str()) << "\n");
     for (auto &F : M.getFunctionList()) {
       PROTEUS_DBG(Logger::logs("proteus")
-                  << " Trying F " << demangle(F.getName()) << "\n ");
+                  << " Trying F " << demangle(F.getName().str()) << "\n ");
       if (auto OptionalMapIt = matchJitVariableMap(F.getName())) {
         auto &RCVec = OptionalMapIt.value()->getSecond();
         TransformLambdaSpecialization::transform(M, F, RCVec);
