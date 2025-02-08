@@ -493,13 +493,22 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
                                   static_cast<size_t>(NumRuntimeConstants)});
 
   if (!getJitVariableMap().empty()) {
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "=== LAMBDA MATCHING\n"
+                << "F trigger " << F->getName() << " -> "
+                << demangle(F->getName()) << "\n");
     for (auto &F : M.getFunctionList()) {
-      if (auto OptionalRCVec = matchJitVariableMap(F.getName())) {
-        TransformLambdaSpecialization::transform(M, F, OptionalRCVec.value());
-        getJitVariableMap().erase(F.getName());
+      PROTEUS_DBG(Logger::logs("proteus")
+                  << " Trying F " << demangle(F.getName()) << "\n ");
+      if (auto OptionalMapIt = matchJitVariableMap(F.getName())) {
+        auto &RCVec = OptionalMapIt.value()->getSecond();
+        TransformLambdaSpecialization::transform(M, F, RCVec);
+        getJitVariableMap().erase(OptionalMapIt.value());
+        PROTEUS_DBG(Logger::logs("proteus") << "Found match!\n");
         break;
       }
     }
+    PROTEUS_DBG(Logger::logs("proteus") << "=== END OF MATCHING\n");
   }
 
   // Replace uses of blockDim.* and gridDim.* with constants.
@@ -538,8 +547,7 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
 #endif
 }
 
-template <typename ImplT>
-void JitEngineDevice<ImplT>::pruneIR(Module &M) {
+template <typename ImplT> void JitEngineDevice<ImplT>::pruneIR(Module &M) {
   TIMESCOPE("pruneIR");
   PROTEUS_DBG(Logger::logs("proteus") << "=== Parsed Module\n"
                                       << M << "=== End of Parsed Module\n");

@@ -11,13 +11,15 @@
 
 #include <cassert>
 #include <cstring>
+#include <utility>
 
 extern "C" void __jit_push_variable(proteus::RuntimeConstant RC);
 extern "C" void __jit_register_lambda(const char *Symbol);
 
 namespace proteus {
 
-template <typename T> T jit_variable(T v, int pos = -1) {
+template <typename T>
+static __attribute__((noinline)) T jit_variable(T v, int pos = -1) {
   RuntimeConstant RC;
   std::memcpy(&RC, &v, sizeof(T));
   RC.Slot = pos;
@@ -26,8 +28,11 @@ template <typename T> T jit_variable(T v, int pos = -1) {
   return v;
 }
 
-template <typename T> void register_lambda(T &&t, const char *Symbol = "") {
+template <typename T>
+static __attribute__((noinline)) T &&register_lambda(T &&t,
+                                                     const char *Symbol = "") {
   assert(Symbol && "Expected non-null Symbol");
   __jit_register_lambda(Symbol);
+  return std::forward<T>(t);
 }
 } // namespace proteus

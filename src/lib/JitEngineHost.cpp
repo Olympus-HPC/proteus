@@ -276,9 +276,10 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
                                   static_cast<size_t>(NumRuntimeConstants)});
 
     if (!getJitVariableMap().empty()) {
-      if (auto OptionalRCVec = matchJitVariableMap(F->getName())) {
-        TransformLambdaSpecialization::transform(*M, *F, OptionalRCVec.value());
-        getJitVariableMap().erase(FnName);
+      if (auto OptionalMapIt = matchJitVariableMap(F->getName())) {
+        auto &RCVec = OptionalMapIt.value()->getSecond();
+        TransformLambdaSpecialization::transform(*M, *F, RCVec);
+        getJitVariableMap().erase(OptionalMapIt.value());
       }
     }
 

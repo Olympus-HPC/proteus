@@ -58,7 +58,9 @@ public:
   static void transform(Module &M, Function &F,
                         SmallVector<RuntimeConstant> &RCVec) {
     auto *LambdaClass = F.getArg(0);
-    PROTEUS_DBG(Logger::logs("proteus") << "Function: " << F.getName() << "\n");
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "[LambdaSpec] Function: " << F.getName() << " RCVec size "
+                << RCVec.size() << "\n");
     PROTEUS_DBG(Logger::logs("proteus")
                 << "TransformLambdaSpecialization::transform" << "\n");
     PROTEUS_DBG(Logger::logs("proteus") << "\t args" << "\n");

@@ -12,15 +12,13 @@
 #define PROTEUS_JITENGINE_HPP
 
 #include <cstdlib>
-#include <functional>
-#include <memory>
-#include <optional>
-#include <string>
-
+#include <llvm/ADT/DenseMap.h>
 #include <llvm/Demangle/Demangle.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Target/TargetMachine.h>
-#include <type_traits>
+#include <memory>
+#include <optional>
+#include <string>
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Hashing.hpp"
@@ -90,26 +88,32 @@ inline DenseMap<StringRef, SmallVector<RuntimeConstant>> &getJitVariableMap() {
   return JitVariableMap;
 }
 
-inline std::optional<std::reference_wrapper<SmallVector<RuntimeConstant>>>
+inline std::optional<
+    DenseMap<StringRef, SmallVector<RuntimeConstant>>::iterator>
 matchJitVariableMap(StringRef FnName) {
   std::string Operator = llvm::demangle(FnName);
-
-  std::size_t Sep = Operator.find("::");
-  if (Sep == std::string::npos)
+  std::size_t Sep = Operator.rfind("::operator()");
+  if (Sep == std::string::npos) {
+    PROTEUS_DBG(Logger::logs("proteus") << "... SKIP ::operator() not found\n");
     return std::nullopt;
+  }
 
-  std::size_t SecondSep = Operator.find("::", Sep + 1);
-  if (SecondSep == std::string::npos)
-    return std::nullopt;
-
-  StringRef Symbol = StringRef{Operator}.slice(0, SecondSep);
+  StringRef Symbol = StringRef{Operator}.slice(0, Sep);
+#if PROTEUS_ENABLE_DEBUG
+  Logger::logs("proteus") << "Operator " << Operator << "\n=> Symbol to match "
+                          << Symbol << "\n";
+  Logger::logs("proteus") << "Available Keys\n";
+  for (auto &[Key, Val] : getJitVariableMap()) {
+    Logger::logs("proteus") << "\tKey: " << Key << "\n";
+  }
+  Logger::logs("proteus") << "===\n";
+#endif
 
   const auto SymToRC = getJitVariableMap().find(Symbol);
-
   if (SymToRC == getJitVariableMap().end())
     return std::nullopt;
 
-  return SymToRC->second;
+  return SymToRC;
 }
 
 inline void pushJitVariable(RuntimeConstant RC) {
@@ -118,12 +122,11 @@ inline void pushJitVariable(RuntimeConstant RC) {
 
 inline void registerLambda(const char *Symbol) {
   const StringRef SymbolStr{Symbol};
+  PROTEUS_DBG(Logger::logs("proteus")
+              << "=> RegisterLambda " << Symbol << "\n");
   auto &JitVariables = getPendingJitVariables();
   auto &VariableMap = getJitVariableMap();
-  for (auto &V : JitVariables) {
-    VariableMap[SymbolStr].push_back(V);
-  }
-
+  VariableMap[SymbolStr] = JitVariables;
   JitVariables.clear();
 }
 
