@@ -32,7 +32,6 @@
 
 #include "proteus/Hashing.hpp"
 #include "proteus/JitEngine.hpp"
-#include "proteus/JitVariable.hpp"
 #include "proteus/TimeTracing.hpp"
 #include "proteus/Utils.h"
 

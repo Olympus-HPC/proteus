@@ -7,6 +7,10 @@
 //===----------------------------------------------------------------------===//
 //
 //===----------------------------------------------------------------------===//
+
+#ifndef PROTEUS_JIT_INTERFACE_HPP
+#define PROTEUS_JIT_INTERFACE_HPP
+
 #include "proteus/CompilerInterfaceTypes.h"
 
 #include <cassert>
@@ -36,3 +40,5 @@ static __attribute__((noinline)) T &&register_lambda(T &&t,
   return std::forward<T>(t);
 }
 } // namespace proteus
+
+#endif

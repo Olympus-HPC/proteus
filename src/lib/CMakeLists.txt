@@ -17,8 +17,8 @@ set(HEADERS
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitCache.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngine.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngineHost.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitInterface.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitStorageCache.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitVariable.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/TimeTracing.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/TransformArgumentSpecialization.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Utils.h)

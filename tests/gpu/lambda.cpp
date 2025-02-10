@@ -6,7 +6,7 @@
 
 #include <iostream>
 
-#include "proteus/JitVariable.hpp"
+#include "proteus/JitInterface.hpp"
 
 #include "gpu_common.h"
 
