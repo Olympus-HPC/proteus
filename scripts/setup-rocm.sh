@@ -1,9 +1,9 @@
 #!/bin/sh
 
-if [ $# -eq 0 ]; then
-    ROCM_VERSION="5.7.1"
-else
-    ROCM_VERSION=$1
+ROCM_VERSION=$1
+if [ $# -lt 1 ]; then
+    echo "Usage: source setup-rocm.sh <ROCm version>"
+    return 0
 fi
 
 ml load rocm/${ROCM_VERSION}
@@ -19,6 +19,7 @@ cmake .. \
 -DCMAKE_CXX_COMPILER=${LLVM_INSTALL_DIR}/bin/clang++ \
 -DPROTEUS_ENABLE_HIP=on \
 -DCMAKE_INSTALL_PREFIX=../install-rocm-${ROCM_VERSION} \
--DCMAKE_EXPORT_COMPILE_COMMANDS=on
+-DCMAKE_EXPORT_COMPILE_COMMANDS=on \
+"${@:2}"
 
 popd
