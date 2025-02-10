@@ -68,6 +68,12 @@ elif [ "${CI_MACHINE}" == "tioga" ]; then
   CMAKE_MACHINE_OPTIONS="\
     -DPROTEUS_ENABLE_HIP=on \
   "
+  # We need to build shared for tioga
+  if [[ "${COMMENTS_BODY}" == *"/run-benchmarks-rajaperf"* ]]; then
+    CMAKE_MACHINE_OPTIONS+="\
+      -DBUILD_SHARED=ON \
+      "
+  fi
 
   PROTEUS_CC=hipcc
   MACHINE=amd
