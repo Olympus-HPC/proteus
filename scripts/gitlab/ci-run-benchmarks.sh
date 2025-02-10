@@ -110,13 +110,13 @@ echo "begin submodule update"
 git submodule update --init --recursive
 echo "end submodule update"
 
-echo "begin py script"
+echo "Running AOT"
 python driver.py -t ${BENCHMARKS_TOML} \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x aot -p direct -m ${MACHINE} -r 1
-
+echo "Running profiler AOT"
 python driver.py -t ${BENCHMARKS_TOML} \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x aot -p profiler -m ${MACHINE} -r 1
-
+echo "Running proteus"
 python driver.py -t ${BENCHMARKS_TOML} \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
   --proteus-config \
