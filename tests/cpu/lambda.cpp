@@ -2,12 +2,14 @@
 // RUN: ./lambda | FileCheck %s --check-prefixes=CHECK
 // RUN: rm -rf .proteus
 
-#include <chrono>
 #include <iostream>
 
-#include "proteus/JitVariable.hpp"
+#include "proteus/JitInterface.hpp"
 
-template <typename F> void run(F &&f) { f(); }
+template <typename F> void run(F &&f) {
+  proteus::register_lambda(f);
+  f();
+}
 
 int main(int argc, char **argv) {
   int N = 1024;

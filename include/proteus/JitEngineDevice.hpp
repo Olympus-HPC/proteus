@@ -33,6 +33,7 @@
 #include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/CodeGen/CommandFlags.h>
 #include <llvm/CodeGen/MachineModuleInfo.h>
+#include <llvm/Demangle/Demangle.h>
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/LegacyPassManager.h>
@@ -56,6 +57,7 @@
 #include "proteus/JitStorageCache.hpp"
 #include "proteus/TimeTracing.hpp"
 #include "proteus/TransformArgumentSpecialization.hpp"
+#include "proteus/TransformLambdaSpecialization.hpp"
 #include "proteus/Utils.h"
 
 namespace proteus {
@@ -490,6 +492,25 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
         ArrayRef<RuntimeConstant>{RC,
                                   static_cast<size_t>(NumRuntimeConstants)});
 
+  if (!getJitVariableMap().empty()) {
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "=== LAMBDA MATCHING\n"
+                << "F trigger " << F->getName() << " -> "
+                << demangle(F->getName().str()) << "\n");
+    for (auto &F : M.getFunctionList()) {
+      PROTEUS_DBG(Logger::logs("proteus")
+                  << " Trying F " << demangle(F.getName().str()) << "\n ");
+      if (auto OptionalMapIt = matchJitVariableMap(F.getName())) {
+        auto &RCVec = OptionalMapIt.value()->getSecond();
+        TransformLambdaSpecialization::transform(M, F, RCVec);
+        getJitVariableMap().erase(OptionalMapIt.value());
+        PROTEUS_DBG(Logger::logs("proteus") << "Found match!\n");
+        break;
+      }
+    }
+    PROTEUS_DBG(Logger::logs("proteus") << "=== END OF MATCHING\n");
+  }
+
   // Replace uses of blockDim.* and gridDim.* with constants.
   if (Config.ENV_PROTEUS_SPECIALIZE_DIMS) {
     setKernelDims(M, GridDim, BlockDim);
@@ -526,8 +547,7 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
 #endif
 }
 
-template <typename ImplT>
-void JitEngineDevice<ImplT>::pruneIR(Module &M) {
+template <typename ImplT> void JitEngineDevice<ImplT>::pruneIR(Module &M) {
   TIMESCOPE("pruneIR");
   PROTEUS_DBG(Logger::logs("proteus") << "=== Parsed Module\n"
                                       << M << "=== End of Parsed Module\n");

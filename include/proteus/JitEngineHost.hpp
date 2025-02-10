@@ -47,13 +47,10 @@ public:
   void *compileAndLink(StringRef FnName, char *IR, int IRSize,
                        RuntimeConstant *RC, int NumRuntimeConstants);
 
-  void pushJitVariable(RuntimeConstant RC);
-
 private:
   JitEngineHost(int argc, char *argv[]);
   void addStaticLibrarySymbols();
   JitCache<void *> CodeCache;
-  SmallVector<RuntimeConstant, 8> JitVariables;
 };
 
 } // namespace proteus

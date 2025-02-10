@@ -29,6 +29,7 @@
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Analysis/CallGraph.h>
 #include <llvm/Bitcode/BitcodeWriter.h>
+#include <llvm/Demangle/Demangle.h>
 #include <llvm/IR/CallingConv.h>
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
@@ -39,6 +40,7 @@
 #include <llvm/IR/GlobalValue.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/InstrTypes.h>
+#include <llvm/IR/Instruction.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Mangler.h>
 #include <llvm/IR/Module.h>
@@ -153,6 +155,7 @@ public:
     instrumentRegisterFatBinaryEnd(M);
     instrumentRegisterVar(M);
     findJitVariables(M);
+    registerLambdaFunctions(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
       getKernelHostStubs(M);
@@ -217,6 +220,12 @@ private:
     return false;
   }
 
+  bool isLambdaFunction(const Function &F) {
+    std::string DemangledName = demangle(F.getName().str());
+    return StringRef{DemangledName}.contains("'lambda") &&
+           StringRef{DemangledName}.contains("'()::operator()");
+  }
+
   std::string getJitBitcodeUniqueName(Module &M) {
     llvm::sys::fs::UniqueID ID;
     if (auto EC = llvm::sys::fs::getUniqueID(M.getSourceFileName(), ID))
@@ -246,14 +255,16 @@ private:
 
       assert(Fn && "Expected function in entry operands");
 
-      // Check the annotated functions is a kernel function.
+      // Check the annotated functions is a kernel function or a device lambda.
       if (isDeviceCompilation(M)) {
         ModuleDeviceKernels = getDeviceKernels(M);
-        if (!isDeviceKernel(Fn))
+        if (!isDeviceKernel(Fn) && !isLambdaFunction(*Fn))
           FATAL_ERROR(std::string{} + __FILE__ + ":" +
                       std::to_string(__LINE__) +
                       " => Expected the annotated Fn " + Fn->getName() +
-                      " to be a kernel function!");
+                      " to be a kernel function or device lambda function!");
+
+        continue;
       }
 
       if (JitFunctionInfoMap.contains(Fn)) {
@@ -1061,27 +1072,44 @@ private:
       }
     }
 
-    for (auto Function : JitFunctions) {
-      for (auto User : Function->users()) {
+    auto FindStorePtr = [&](CallBase *CB) {
+      // Find the store instruction user of the JitVariableCB to extract the
+      // pointer to the lambda anonymous class object.
+      Value *Ptr = nullptr;
+      Value *V = CB;
+      while (!Ptr) {
+        if (!V->hasOneUser())
+          FATAL_ERROR("Expected single user");
 
+        StoreInst *S = dyn_cast<StoreInst>(*(V->users().begin()));
+        if (S) {
+          DEBUG(Logger::logs("proteus-pass") << "store: " << *S << "\n");
+          Ptr = S->getPointerOperand();
+          break;
+        }
+
+        // Recurse to the next user.
+        V = *V->users().begin();
+      }
+
+      return Ptr;
+    };
+
+    for (auto *Function : JitFunctions) {
+      for (auto *User : Function->users()) {
         CallBase *CB = dyn_cast<CallBase>(User);
         if (!CB)
           FATAL_ERROR(
               "Expected CallBase as user of proteus::jit_variable function");
 
         DEBUG(Logger::logs("proteus-pass") << "call: " << *CB << "\n");
-        if (!CB->hasOneUser())
-          FATAL_ERROR("Expected single user");
-        StoreInst *S = dyn_cast<StoreInst>(*(CB->users().begin()));
-        if (!S)
-          FATAL_ERROR("Expected StoreInst");
-        DEBUG(Logger::logs("proteus-pass") << "store: " << *S << "\n");
-        Value *V = S->getPointerOperand();
+
+        Value *V = FindStorePtr(CB);
 
         GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(V);
         if (GEP) {
           DEBUG(Logger::logs("proteus-pass") << "gep: " << *GEP << "\n");
-          auto Slot = GEP->getOperand(GEP->getNumOperands() - 1);
+          auto *Slot = GEP->getOperand(GEP->getNumOperands() - 1);
           DEBUG(Logger::logs("proteus-pass") << "slot: " << *Slot << "\n");
           CB->setArgOperand(1, Slot);
         } else {
@@ -1090,6 +1118,72 @@ private:
           Constant *C = ConstantInt::get(Int32Ty, 0);
           CB->setArgOperand(1, C);
         }
+      }
+    }
+  }
+
+  StringRef parseLambdaType(StringRef DemangledName) {
+    int L = -1;
+    int R = -1;
+    int Level = 0;
+    // Start after the function symbol to avoid parsing its templated return
+    // type.
+    size_t Start = DemangledName.find("proteus::register_lambda");
+    for (size_t I = Start, E = DemangledName.size(); I < E; ++I) {
+      const char C = DemangledName[I];
+      if (C == '<') {
+        Level++;
+        if (Level == 1)
+          L = I;
+      }
+
+      if (C == '>') {
+        if (Level == 1) {
+          R = I;
+          break;
+        }
+        Level--;
+      }
+    }
+
+    assert(L > 0 && R > L && "Expected non-zero L, R for slicing");
+    // Remove reference character '&', if it exists.
+    if (DemangledName[R - 1] == '&')
+      R--;
+    // Slicing returns characters [Start, End).
+    return DemangledName.slice(L + 1, R);
+    ;
+  }
+
+  void registerLambdaFunctions(Module &M) {
+    DEBUG(Logger::logs("proteus-pass")
+          << "registering lambda functions" << "\n");
+
+    SmallVector<Function *, 16> LambdaFunctions;
+    for (auto &F : M.getFunctionList()) {
+      if (StringRef{demangle(F.getName().str())}.contains(
+              "proteus::register_lambda")) {
+        LambdaFunctions.push_back(&F);
+      }
+    }
+
+    for (auto *Function : LambdaFunctions) {
+      auto DemangledName = llvm::demangle(Function->getName().str());
+      StringRef LambdaType = parseLambdaType(DemangledName);
+
+      DEBUG(Logger::logs("proteus-pass")
+            << Function->getName() << " " << DemangledName << " " << LambdaType
+            << "\n");
+
+      for (auto *User : Function->users()) {
+        CallBase *CB = dyn_cast<CallBase>(User);
+        if (!CB)
+          FATAL_ERROR(
+              "Expected CallBase as user of proteus::register_lambda function");
+
+        IRBuilder<> Builder(CB);
+        auto *LambdaNameGlobal = Builder.CreateGlobalString(LambdaType);
+        CB->setArgOperand(1, LambdaNameGlobal);
       }
     }
   }

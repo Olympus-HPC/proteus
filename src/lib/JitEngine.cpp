@@ -30,9 +30,8 @@
 #include <llvm/TargetParser/SubtargetFeature.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
-#include "proteus/JitEngine.hpp"
-
 #include "proteus/Hashing.hpp"
+#include "proteus/JitEngine.hpp"
 #include "proteus/TimeTracing.hpp"
 #include "proteus/Utils.h"
 

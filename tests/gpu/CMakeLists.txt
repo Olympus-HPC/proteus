@@ -239,6 +239,7 @@ CREATE_GPU_TEST(multi_file_launcher file1_kernel_launcher.cpp file2_kernel_launc
 CREATE_GPU_TEST(block_grid_dim_1d block_grid_dim_1d.cpp)
 CREATE_GPU_TEST(block_grid_dim_2d block_grid_dim_2d.cpp)
 CREATE_GPU_TEST(block_grid_dim_3d block_grid_dim_3d.cpp)
+CREATE_GPU_TEST(lambda lambda.cpp)
 
 CREATE_GPU_TEST_RDC(kernel kernel.cpp)
 CREATE_GPU_TEST_RDC(kernel_cache kernel_cache.cpp)
@@ -265,6 +266,7 @@ CREATE_GPU_TEST_RDC(multi_file file1_kernel.cpp file2_kernel.cpp)
 CREATE_GPU_TEST_RDC(block_grid_dim_1d block_grid_dim_1d.cpp)
 CREATE_GPU_TEST_RDC(block_grid_dim_2d block_grid_dim_2d.cpp)
 CREATE_GPU_TEST_RDC(block_grid_dim_3d block_grid_dim_3d.cpp)
+CREATE_GPU_TEST_RDC(lambda lambda.cpp)
 
 CREATE_GPU_LIBRARY(device_func_lib device_func.cpp)
 CREATE_GPU_TEST_RDC_LIBS(kernel_calls_func_lib device_func_lib kernel_calls_func_lib.cpp)

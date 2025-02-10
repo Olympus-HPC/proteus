@@ -49,6 +49,7 @@
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/JitEngine.hpp"
 #include "proteus/JitEngineHost.hpp"
 #include "proteus/TransformArgumentSpecialization.hpp"
 #include "proteus/TransformLambdaSpecialization.hpp"
@@ -273,13 +274,17 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
         *M, *F, ArgPos,
         ArrayRef<RuntimeConstant>{RC,
                                   static_cast<size_t>(NumRuntimeConstants)});
-    if (!JitVariables.empty())
-      TransformLambdaSpecialization::transform(*M, *F, JitVariables);
+
+    if (!getJitVariableMap().empty()) {
+      if (auto OptionalMapIt = matchJitVariableMap(F->getName())) {
+        auto &RCVec = OptionalMapIt.value()->getSecond();
+        TransformLambdaSpecialization::transform(*M, *F, RCVec);
+        getJitVariableMap().erase(OptionalMapIt.value());
+      }
+    }
 
     // Logger::logs("proteus") << "=== JIT Module\n" << *M << "=== End of JIT
     // Module\n";
-
-    JitVariables.clear();
 
     F->setName(FnName + Suffix);
 
@@ -394,8 +399,4 @@ JitEngineHost::JitEngineHost(int argc, char *argv[]) {
 
   // (3) Install transform to optimize modules when they're materialized.
   LLJITPtr->getIRTransformLayer().setTransform(OptimizationTransform(*this));
-}
-
-void JitEngineHost::pushJitVariable(RuntimeConstant RC) {
-  JitVariables.push_back(RC);
 }

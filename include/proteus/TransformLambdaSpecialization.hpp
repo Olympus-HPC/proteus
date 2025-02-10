@@ -11,6 +11,7 @@
 #ifndef PROTEUS_TRANSFORM_LAMBDA_SPECIALIZATION_HPP
 #define PROTEUS_TRANSFORM_LAMBDA_SPECIALIZATION_HPP
 
+#include <llvm/Demangle/Demangle.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/Support/Casting.h>
@@ -55,12 +56,15 @@ static inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
 class TransformLambdaSpecialization {
 public:
   static void transform(Module &M, Function &F,
-                        SmallVector<RuntimeConstant, 8> &RC) {
-    auto LambdaClass = F.getArg(0);
+                        SmallVector<RuntimeConstant> &RCVec) {
+    auto *LambdaClass = F.getArg(0);
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "[LambdaSpec] Function: " << F.getName() << " RCVec size "
+                << RCVec.size() << "\n");
     PROTEUS_DBG(Logger::logs("proteus")
                 << "TransformLambdaSpecialization::transform" << "\n");
     PROTEUS_DBG(Logger::logs("proteus") << "\t args" << "\n");
-    for (auto &Arg : RC) {
+    for (auto &Arg : RCVec) {
       PROTEUS_DBG(Logger::logs("proteus")
                   << "{" << Arg.Value.Int64Val << ", " << Arg.Slot << " }\n");
     }
@@ -68,8 +72,8 @@ public:
     PROTEUS_DBG(Logger::logs("proteus") << "\t users" << "\n");
     for (User *User : LambdaClass->users()) {
       PROTEUS_DBG(Logger::logs("proteus") << *User << "\n");
-      if (dyn_cast<LoadInst>(User)) {
-        for (auto &Arg : RC) {
+      if (isa<LoadInst>(User)) {
+        for (auto &Arg : RCVec) {
           if (Arg.Slot == 0) {
             Constant *C = getConstant(M.getContext(), User->getType(), Arg);
             User->replaceAllUsesWith(C);
@@ -79,10 +83,10 @@ public:
           }
         }
       } else if (auto *GEP = dyn_cast<GetElementPtrInst>(User)) {
-        auto GEPSlot = GEP->getOperand(User->getNumOperands() - 1);
+        auto *GEPSlot = GEP->getOperand(User->getNumOperands() - 1);
         ConstantInt *CI = dyn_cast<ConstantInt>(GEPSlot);
         int Slot = CI->getZExtValue();
-        for (auto &Arg : RC) {
+        for (auto &Arg : RCVec) {
           if (Arg.Slot == Slot) {
             for (auto *GEPUser : GEP->users()) {
               auto *LI = dyn_cast<LoadInst>(GEPUser);
