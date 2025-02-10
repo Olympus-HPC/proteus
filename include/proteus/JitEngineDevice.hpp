@@ -112,7 +112,7 @@ class JITKernelInfo {
   SmallVector<int32_t> RCTypes;
   SmallVector<int32_t> RCIndices;
   int32_t NumRCs;
-  std::optional<std::reference_wrapper<Module>> ExtractedModule;
+  std::optional<std::unique_ptr<Module>> ExtractedModule;
   std::optional<std::reference_wrapper<BinaryInfo>> BinInfo;
   std::optional<HashT> StaticHash;
 
@@ -130,9 +130,9 @@ public:
   const auto &getRCTypes() const { return RCTypes; }
   const auto &getNumRCs() const { return NumRCs; }
   const bool hasModule() const { return ExtractedModule.has_value(); }
-  Module &getModule() const { return ExtractedModule->get(); }
+  Module &getModule() const { return *ExtractedModule->get(); }
   BinaryInfo &getBinaryInfo() const { return BinInfo.value(); }
-  void setModule(llvm::Module &Mod) { ExtractedModule = Mod; }
+  void setModule(std::unique_ptr<llvm::Module> Mod) { ExtractedModule = std::move(Mod); }
   const bool hasStaticHash() const { return StaticHash.has_value(); }
   const HashT getStaticHash() const { return StaticHash.value(); }
   void createStaticHash(HashT ModuleHash) {
@@ -168,19 +168,23 @@ public:
 
     BinaryInfo &BinInfo = KernelInfo.getBinaryInfo();
 
-    if (BinInfo.hasModule()) {
-      KernelInfo.setModule(BinInfo.getModule());
-      return KernelInfo.getModule();
+    if (! BinInfo.hasModule()) {
+      std::unique_ptr<Module> ExtractedModule =
+          static_cast<ImplT &>(*this).extractModule(BinInfo);
+
+      pruneIR(*ExtractedModule);
+      runCleanupPassPipeline(*ExtractedModule);
+
+      BinInfo.setModule(std::move(ExtractedModule));
     }
 
-    std::unique_ptr<Module> ExtractedModule =
-        static_cast<ImplT &>(*this).extractModule(BinInfo);
+    std::unique_ptr<Module> KernelModule = llvm::CloneModule(BinInfo.getModule());
 
-    pruneIR(*ExtractedModule);
-    runCleanupPassPipeline(*ExtractedModule);
+    pruneKernelIR(*KernelModule, KernelInfo.getName());
+    pruneIR(*KernelModule);
+    runCleanupPassPipeline(*KernelModule);
 
-    BinInfo.setModule(std::move(ExtractedModule));
-    KernelInfo.setModule(BinInfo.getModule());
+    KernelInfo.setModule(std::move(KernelModule));
     return KernelInfo.getModule();
   }
 
@@ -440,6 +444,8 @@ private:
 
   void pruneIR(Module &M);
 
+  void pruneKernelIR(Module &M, StringRef KernelName);
+
   void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
                     dim3 &BlockDim, dim3 &GridDim,
                     const SmallVector<int32_t> &RCIndices, RuntimeConstant *RC,
@@ -494,16 +500,6 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
   if (Config.ENV_PROTEUS_SPECIALIZE_DIMS) {
     setKernelDims(M, GridDim, BlockDim);
   }
-
-  // Internalize others besides the kernel function.
-  internalizeModule(M, [&F](const GlobalValue &GV) {
-    // Do not internalize the kernel function.
-    if (&GV == F)
-      return true;
-
-    // Internalize everything else.
-    return false;
-  });
 
   PROTEUS_DBG(Logger::logs("proteus") << "=== JIT Module\n"
                                       << M << "=== End of JIT Module\n");
@@ -563,6 +559,21 @@ void JitEngineDevice<ImplT>::pruneIR(Module &M) {
     if (GV.isExternallyInitialized())
       GV.setExternallyInitialized(false);
 }
+
+template <typename ImplT>
+void JitEngineDevice<ImplT>::pruneKernelIR(Module &M, StringRef KernelName) {
+  auto F = M.getFunction(KernelName);
+  // Internalize others besides the kernel function.
+  internalizeModule(M, [&F](const GlobalValue &GV) {
+    // Do not internalize the kernel function.
+    if (&GV == F)
+      return true;
+
+    // Internalize everything else.
+    return false;
+  });
+}
+
 
 template <typename ImplT>
 void JitEngineDevice<ImplT>::replaceGlobalVariablesWithPointers(
