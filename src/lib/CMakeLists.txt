@@ -26,7 +26,6 @@ set(HEADERS
 if(PROTEUS_ENABLE_CUDA)
 list(APPEND SOURCES
   CompilerInterfaceDevice.cpp
-  CompilerInterfaceDeviceCUDA.cpp
   JitEngineDeviceCUDA.cpp
 )
 
@@ -41,7 +40,6 @@ endif()
 if(PROTEUS_ENABLE_HIP)
 list(APPEND SOURCES
   CompilerInterfaceDevice.cpp
-  CompilerInterfaceDeviceHIP.cpp
   JitEngineDeviceHIP.cpp
 )
 

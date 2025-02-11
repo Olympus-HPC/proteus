@@ -673,12 +673,16 @@ private:
 
   FunctionCallee getJitLaunchKernelFn(Module &M) {
     FunctionType *JitLaunchKernelFnTy = nullptr;
-#if PROTEUS_ENABLE_HIP
+
+// The ABI of __jit_launch_kernel (which mirrors device-specific launchKernel)
+// depends on the host architecture, hence, we guard the expected function
+// prototype using architecture-specific, compiler-defined macros.
+#if __x86_64__
     JitLaunchKernelFnTy = FunctionType::get(
         Int32Ty,
         {PtrTy, Int64Ty, Int32Ty, Int64Ty, Int32Ty, PtrTy, Int64Ty, PtrTy},
         /* isVarArg=*/false);
-#elif PROTEUS_ENABLE_CUDA
+#elif __powerpc64__
     // NOTE: CUDA uses an array type for passing grid, block sizes.
     JitLaunchKernelFnTy =
         FunctionType::get(Int32Ty,
@@ -689,6 +693,8 @@ private:
                            Int64Ty,                    // Shared mem size
                            PtrTy},
                           /* isVarArg=*/false);
+#else
+#error "Unsupported ABI for __jit_launch_kernel. Please contact the developers.
 #endif
 
     if (!JitLaunchKernelFnTy)
@@ -708,13 +714,13 @@ private:
     // Insert before the launch kernel call instruction.
     IRBuilder<> Builder(LaunchKernelCB);
     CallBase *CallOrInvoke = nullptr;
-#ifdef PROTEUS_ENABLE_HIP
+#if __x86_64__
     SmallVector<Value *> Args = {
         LaunchKernelCB->getArgOperand(0), LaunchKernelCB->getArgOperand(1),
         LaunchKernelCB->getArgOperand(2), LaunchKernelCB->getArgOperand(3),
         LaunchKernelCB->getArgOperand(4), LaunchKernelCB->getArgOperand(5),
         LaunchKernelCB->getArgOperand(6), LaunchKernelCB->getArgOperand(7)};
-#elif PROTEUS_ENABLE_CUDA
+#elif __powerpc64__
     SmallVector<Value *> Args = {
         LaunchKernelCB->getArgOperand(0), // Kernel address
         LaunchKernelCB->getArgOperand(1), // Grid dim
@@ -724,7 +730,7 @@ private:
         LaunchKernelCB->getArgOperand(5)  // Stream
     };
 #else
-    SmallVector<Value *> Args;
+#error "Unsupported ABI for __jit_launch_kernel. Please contact the developers.
 #endif
 
     if (auto *CallI = dyn_cast<CallInst>(LaunchKernelCB)) {

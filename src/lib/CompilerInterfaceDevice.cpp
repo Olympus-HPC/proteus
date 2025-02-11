@@ -9,6 +9,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "proteus/CompilerInterfaceDevice.h"
+#include "proteus/CompilerInterfaceDeviceInternal.hpp"
 #include "proteus/JitEngineDevice.hpp"
 
 using namespace proteus;
@@ -51,3 +52,31 @@ __jit_register_function(void *Handle, void *Kernel, char *KernelName,
   auto &Jit = JitDeviceImplT::instance();
   Jit.registerFunction(Handle, Kernel, KernelName, RCIndices, RCTypes, NumRCs);
 }
+
+#if defined(__x86_64__)
+
+extern "C" proteus::DeviceTraits<JitDeviceImplT>::DeviceError_t
+__jit_launch_kernel(void *Kernel, uint64_t GridDimXY, uint32_t GridDimZ,
+                    uint64_t BlockDimXY, uint32_t BlockDimZ, void **KernelArgs,
+                    uint64_t ShmemSize, void *Stream) {
+  dim3 GridDim = {*(uint32_t *)&GridDimXY, *(((uint32_t *)&GridDimXY) + 1),
+                  GridDimZ};
+  dim3 BlockDim = {*(uint32_t *)&BlockDimXY, *(((uint32_t *)&BlockDimXY) + 1),
+                   BlockDimZ};
+
+  return __jit_launch_kernel_internal(Kernel, GridDim, BlockDim, KernelArgs,
+                                      ShmemSize, Stream);
+}
+
+#elif defined(__powerpc64__)
+
+extern "C" proteus::DeviceTraits<JitDeviceImplT>::DeviceError_t
+__jit_launch_kernel(void *Kernel, dim3 GridDim, dim3 BlockDim,
+                    void **KernelArgs, uint64_t ShmemSize, void *Stream) {
+  return __jit_launch_kernel_internal(Kernel, GridDim, BlockDim, KernelArgs,
+                                      ShmemSize, Stream);
+}
+
+#else
+#error "Unsupported ABI for __jit_launch_kernel. Please contact the developers."
+#endif
