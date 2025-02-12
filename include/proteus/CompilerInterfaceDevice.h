@@ -11,29 +11,25 @@
 #ifndef PROTEUS_COMPILERINTERFACEDEVICE_H
 #define PROTEUS_COMPILERINTERFACEDEVICE_H
 
-#include "proteus/CompilerInterfaceTypes.h"
-
 #if PROTEUS_ENABLE_CUDA
+
 #include "proteus/JitEngineDeviceCUDA.hpp"
 using JitDeviceImplT = proteus::JitEngineDeviceCUDA;
 
-extern "C" cudaError_t __jit_launch_kernel(void *Kernel, dim3 GridDim,
-                                           dim3 BlockDim, void **KernelArgs,
-                                           uint64_t ShmemSize, void *Stream);
-
 #elif PROTEUS_ENABLE_HIP
+
 #include "proteus/JitEngineDeviceHIP.hpp"
 using JitDeviceImplT = proteus::JitEngineDeviceHIP;
-
-extern "C" hipError_t __jit_launch_kernel(void *Kernel, uint64_t GridDimXY,
-                                          uint32_t GridDimZ,
-                                          uint64_t BlockDim_XY,
-                                          uint32_t BlockDimZ, void **KernelArgs,
-                                          uint64_t ShmemSize, void *Stream);
 
 #else
 #error                                                                         \
     "CompilerInterfaceDevice requires PROTEUS_ENABLE_CUDA or PROTEUS_ENABLE_HIP"
 #endif
+
+// The ABI of __jit_launch_kernel mirrors device-specific launchKernel and
+// depends on the host arch: https://github.com/Olympus-HPC/proteus/issues/47.
+extern "C" proteus::DeviceTraits<JitDeviceImplT>::DeviceError_t
+__jit_launch_kernel(void *Kernel, dim3 GridDim, dim3 BlockDim,
+                    void **KernelArgs, uint64_t ShmemSize, void *Stream);
 
 #endif

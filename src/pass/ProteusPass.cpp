@@ -673,23 +673,15 @@ private:
 
   FunctionCallee getJitLaunchKernelFn(Module &M) {
     FunctionType *JitLaunchKernelFnTy = nullptr;
-#if PROTEUS_ENABLE_HIP
-    JitLaunchKernelFnTy = FunctionType::get(
-        Int32Ty,
-        {PtrTy, Int64Ty, Int32Ty, Int64Ty, Int32Ty, PtrTy, Int64Ty, PtrTy},
-        /* isVarArg=*/false);
-#elif PROTEUS_ENABLE_CUDA
-    // NOTE: CUDA uses an array type for passing grid, block sizes.
-    JitLaunchKernelFnTy =
-        FunctionType::get(Int32Ty,
-                          {PtrTy,                      // Kernel address
-                           ArrayType::get(Int64Ty, 2), // Grid dim array
-                           ArrayType::get(Int64Ty, 2), // Block dim array
-                           PtrTy,                      // Kernel args
-                           Int64Ty,                    // Shared mem size
-                           PtrTy},
-                          /* isVarArg=*/false);
-#endif
+
+    assert(LaunchFunctionName && "Expected valid launch function name");
+    Function *LaunchKernelFn = M.getFunction(LaunchFunctionName);
+    assert(LaunchKernelFn && "Expected non-null launch kernel function");
+
+    // The ABI of __jit_launch_kernel mirrors the device-specific
+    // launchKernel. Note the ABI can be different depending on the host
+    // architecture.
+    JitLaunchKernelFnTy = LaunchKernelFn->getFunctionType();
 
     if (!JitLaunchKernelFnTy)
       FATAL_ERROR("Expected non-null jit entry function type, check "
@@ -708,24 +700,9 @@ private:
     // Insert before the launch kernel call instruction.
     IRBuilder<> Builder(LaunchKernelCB);
     CallBase *CallOrInvoke = nullptr;
-#ifdef PROTEUS_ENABLE_HIP
-    SmallVector<Value *> Args = {
-        LaunchKernelCB->getArgOperand(0), LaunchKernelCB->getArgOperand(1),
-        LaunchKernelCB->getArgOperand(2), LaunchKernelCB->getArgOperand(3),
-        LaunchKernelCB->getArgOperand(4), LaunchKernelCB->getArgOperand(5),
-        LaunchKernelCB->getArgOperand(6), LaunchKernelCB->getArgOperand(7)};
-#elif PROTEUS_ENABLE_CUDA
-    SmallVector<Value *> Args = {
-        LaunchKernelCB->getArgOperand(0), // Kernel address
-        LaunchKernelCB->getArgOperand(1), // Grid dim
-        LaunchKernelCB->getArgOperand(2), // Block dim
-        LaunchKernelCB->getArgOperand(3), // Kernel args
-        LaunchKernelCB->getArgOperand(4), // Shmem size
-        LaunchKernelCB->getArgOperand(5)  // Stream
-    };
-#else
-    SmallVector<Value *> Args;
-#endif
+
+    SmallVector<Value *> Args = {LaunchKernelCB->arg_begin(),
+                                 LaunchKernelCB->arg_end()};
 
     if (auto *CallI = dyn_cast<CallInst>(LaunchKernelCB)) {
       CallOrInvoke = Builder.CreateCall(JitLaunchKernelFn, Args);
