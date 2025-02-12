@@ -223,7 +223,7 @@ private:
   bool isLambdaFunction(const Function &F) {
     std::string DemangledName = demangle(F.getName().str());
     return StringRef{DemangledName}.contains("'lambda") &&
-           StringRef{DemangledName}.contains("'()::operator()");
+           StringRef{DemangledName}.contains(")::operator()");
   }
 
   std::string getJitBitcodeUniqueName(Module &M) {
@@ -261,8 +261,9 @@ private:
         if (!isDeviceKernel(Fn) && !isLambdaFunction(*Fn))
           FATAL_ERROR(std::string{} + __FILE__ + ":" +
                       std::to_string(__LINE__) +
-                      " => Expected the annotated Fn " + Fn->getName() +
-                      " to be a kernel function or device lambda function!");
+                      " => Expected the annotated Fn " + Fn->getName() + " (" +
+                      demangle(Fn->getName().str()) +
+                      ") to be a kernel function or device lambda function!");
 
         continue;
       }
