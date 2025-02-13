@@ -1,8 +1,6 @@
 #ifndef PROTEUS_CORE_LLVM_DEVICE_HPP
 #define PROTEUS_CORE_LLVM_DEVICE_HPP
 
-#endif
-
 #if PROTEUS_ENABLE_HIP
 #include "proteus/CoreLLVMHIP.hpp"
 #endif
@@ -11,6 +9,7 @@
 #include "proteus/CoreLLVMCUDA.hpp"
 #endif
 
+#if defined(PROTEUS_ENABLE_HIP) || defined(PROTEUS_ENABLE_CUDA)
 namespace proteus {
 
 static inline void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
@@ -87,3 +86,7 @@ static inline void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
 }
 
 } // namespace proteus
+
+#endif
+
+#endif
