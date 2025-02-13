@@ -16,18 +16,9 @@
 #include <llvm/ADT/Twine.h>
 #include <llvm/Support/SourceMgr.h>
 
-#include "proteus/TimeTracing.hpp"
-
+#include "proteus/Error.h"
 #include "proteus/Logger.hpp"
-#if PROTEUS_ENABLE_DEBUG
-#define PROTEUS_DBG(x) x;
-#else
-#define PROTEUS_DBG(x)
-#endif
-
-#define FATAL_ERROR(x)                                                         \
-  report_fatal_error(llvm::Twine(std::string{} + __FILE__ + ":" +              \
-                                 std::to_string(__LINE__) + " => " + x))
+#include "proteus/TimeTracing.hpp"
 
 template <typename T> void saveToFile(llvm::StringRef Filepath, T &&Data) {
   std::error_code EC;

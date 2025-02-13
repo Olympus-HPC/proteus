@@ -13,6 +13,8 @@ set(HEADERS
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Logger.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilerInterfaceTypes.h
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreDevice.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreLLVM.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreLLVMDevice.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Hashing.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitCache.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngine.hpp
@@ -32,6 +34,7 @@ list(APPEND SOURCES
 list(APPEND HEADERS
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilerInterfaceDevice.h
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreDeviceCUDA.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreLLVMCUDA.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngineDevice.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngineDeviceCUDA.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/UtilsCUDA.h)
@@ -46,6 +49,7 @@ list(APPEND SOURCES
 list(APPEND HEADERS
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilerInterfaceDevice.h
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreDeviceHIP.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreLLVMHIP.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngineDevice.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngineDeviceHIP.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/UtilsHIP.h)

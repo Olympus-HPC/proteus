@@ -21,8 +21,8 @@
 #include <string>
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Debug.h"
 #include "proteus/Hashing.hpp"
-#include "proteus/Utils.h"
 
 namespace proteus {
 
@@ -45,7 +45,8 @@ static inline bool getEnvOrDefaultBool(const char *VarName, bool Default) {
 
 class JitEngine {
 public:
-  void optimizeIR(Module &M, StringRef Arch);
+  void optimizeIR(Module &M, StringRef Arch, char OptLevel = '3',
+                  unsigned CodegenOptLevel = 3);
 
   bool isProteusDisabled() { return Config.ENV_PROTEUS_DISABLE; }
 
@@ -53,11 +54,6 @@ public:
   void registerLambda(const char *Symbol);
 
 protected:
-  Expected<std::unique_ptr<TargetMachine>>
-  createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3);
-
-  void runOptimizationPassPipeline(Module &M, StringRef Arch,
-                                   unsigned OptLevel = 3);
   void runCleanupPassPipeline(Module &M);
 
   JitEngine();
