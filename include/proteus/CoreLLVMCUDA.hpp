@@ -6,6 +6,7 @@
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Module.h>
 
+#include "proteus/Logger.hpp"
 #include "proteus/UtilsCUDA.h"
 
 namespace proteus {
