@@ -10,47 +10,49 @@
 
 #ifndef PROTEUS_JITENGINEDEVICE_HPP
 #define PROTEUS_JITENGINEDEVICE_HPP
-#include <filesystem>
-#include <functional>
-#include <llvm/Config/llvm-config.h>
-#include <llvm/IR/GlobalVariable.h>
-#include <llvm/IR/Instruction.h>
-#include <llvm/IR/ReplaceConstant.h>
-#include <llvm/Support/MemoryBuffer.h>
 
 #include <cstdint>
+#include <filesystem>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <string>
+
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
-#include <llvm/IR/Instructions.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/Linker/Linker.h>
-#include <llvm/Object/ELFObjectFile.h>
-#include <llvm/Support/Error.h>
-#include <llvm/Support/MemoryBufferRef.h>
-#include <memory>
-
 #include <llvm/Analysis/TargetTransformInfo.h>
 #include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/CodeGen/CommandFlags.h>
 #include <llvm/CodeGen/MachineModuleInfo.h>
+#include <llvm/Config/llvm-config.h>
 #include <llvm/Demangle/Demangle.h>
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/GlobalVariable.h>
+#include <llvm/IR/Instruction.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/ReplaceConstant.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/IRReader/IRReader.h>
+#include <llvm/Linker/Linker.h>
 #include <llvm/MC/TargetRegistry.h>
+#include <llvm/Object/ELFObjectFile.h>
 #include <llvm/Passes/PassBuilder.h>
+#include <llvm/Support/Error.h>
+#include <llvm/Support/MemoryBuffer.h>
+#include <llvm/Support/MemoryBufferRef.h>
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/Transforms/IPO/Internalize.h>
 #include <llvm/Transforms/Utils/Cloning.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
-#include <optional>
-#include <string>
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/CoreLLVM.hpp"
+#include "proteus/Debug.h"
 #include "proteus/Hashing.hpp"
 #include "proteus/JitCache.hpp"
 #include "proteus/JitEngine.hpp"
@@ -253,76 +255,7 @@ private:
   }
 
   void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
-    auto ReplaceIntrinsicDim = [&](ArrayRef<StringRef> IntrinsicNames,
-                                   uint32_t DimValue) {
-      auto CollectCallUsers = [](Function &F) {
-        SmallVector<CallInst *> CallUsers;
-        for (auto *User : F.users()) {
-          auto *Call = dyn_cast<CallInst>(User);
-          if (!Call)
-            continue;
-          CallUsers.push_back(Call);
-        }
-
-        return CallUsers;
-      };
-
-      for (auto IntrinsicName : IntrinsicNames) {
-
-        Function *IntrinsicFunction = M.getFunction(IntrinsicName);
-        if (!IntrinsicFunction)
-          continue;
-
-        for (auto *Call : CollectCallUsers(*IntrinsicFunction)) {
-          Value *ConstantValue =
-              ConstantInt::get(Type::getInt32Ty(M.getContext()), DimValue);
-          Call->replaceAllUsesWith(ConstantValue);
-          Call->eraseFromParent();
-        }
-      }
-    };
-
-    ReplaceIntrinsicDim(ImplT::gridDimXFnName(), GridDim.x);
-    ReplaceIntrinsicDim(ImplT::gridDimYFnName(), GridDim.y);
-    ReplaceIntrinsicDim(ImplT::gridDimZFnName(), GridDim.z);
-
-    ReplaceIntrinsicDim(ImplT::blockDimXFnName(), BlockDim.x);
-    ReplaceIntrinsicDim(ImplT::blockDimYFnName(), BlockDim.y);
-    ReplaceIntrinsicDim(ImplT::blockDimZFnName(), BlockDim.z);
-
-    auto InsertAssume = [&](ArrayRef<StringRef> IntrinsicNames, int DimValue) {
-      for (auto IntrinsicName : IntrinsicNames) {
-        Function *IntrinsicFunction = M.getFunction(IntrinsicName);
-        if (!IntrinsicFunction || IntrinsicFunction->use_empty())
-          continue;
-
-        // Iterate over all uses of the intrinsic.
-        for (auto U : IntrinsicFunction->users()) {
-          auto *Call = dyn_cast<CallInst>(U);
-          if (!Call)
-            continue;
-
-          // Insert the llvm.assume intrinsic.
-          IRBuilder<> Builder(Call->getNextNode());
-          Value *Bound = ConstantInt::get(Call->getType(), DimValue);
-          Value *Cmp = Builder.CreateICmpULT(Call, Bound);
-
-          Function *AssumeIntrinsic =
-              Intrinsic::getDeclaration(&M, Intrinsic::assume);
-          Builder.CreateCall(AssumeIntrinsic, Cmp);
-        }
-      }
-    };
-
-    // Inform LLVM about the range of possible values of threadIdx.*.
-    InsertAssume(ImplT::threadIdxXFnName(), BlockDim.x);
-    InsertAssume(ImplT::threadIdxYFnName(), BlockDim.y);
-    InsertAssume(ImplT::threadIdxZFnName(), BlockDim.z);
-
-    // Inform LLVM about the range of possible values of blockIdx.*.
-    InsertAssume(ImplT::blockIdxXFnName(), GridDim.x);
-    InsertAssume(ImplT::blockIdxYFnName(), GridDim.y);
-    InsertAssume(ImplT::blockIdxZFnName(), GridDim.z);
+    proteus::setKernelDims(M, GridDim, BlockDim);
   }
 
   void getRuntimeConstantValues(void **KernelArgs,
@@ -547,39 +480,7 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
 
 template <typename ImplT> void JitEngineDevice<ImplT>::pruneIR(Module &M) {
   TIMESCOPE("pruneIR");
-  PROTEUS_DBG(Logger::logs("proteus") << "=== Parsed Module\n"
-                                      << M << "=== End of Parsed Module\n");
-  // Remove llvm.global.annotations now that we have read them.
-  if (auto *GlobalAnnotations = M.getGlobalVariable("llvm.global.annotations"))
-    M.eraseGlobalVariable(GlobalAnnotations);
-
-  // Remove llvm.compiler.used
-  if (auto *CompilerUsed = M.getGlobalVariable("llvm.compiler.used"))
-    M.eraseGlobalVariable(CompilerUsed);
-
-  // Remove the __clang_gpu_used_external used in HIP RDC compilation and its
-  // uses in llvm.used, llvm.compiler.used.
-  SmallVector<GlobalVariable *> GlobalsToErase;
-  for (auto &GV : M.globals()) {
-    auto Name = GV.getName();
-    if (Name.starts_with("__clang_gpu_used_external") ||
-        Name.starts_with("_jit_bitcode") || Name.starts_with("__hip_cuid")) {
-      GlobalsToErase.push_back(&GV);
-      removeFromUsedLists(M, [&GV](Constant *C) {
-        if (auto *Global = dyn_cast<GlobalVariable>(C))
-          return Global == &GV;
-        return false;
-      });
-    }
-  }
-  for (auto GV : GlobalsToErase) {
-    M.eraseGlobalVariable(GV);
-  }
-
-  // Remove externaly_initialized attributes.
-  for (auto &GV : M.globals())
-    if (GV.isExternallyInitialized())
-      GV.setExternallyInitialized(false);
+  proteus::pruneIR(M);
 }
 
 template <typename ImplT>
@@ -846,21 +747,14 @@ std::unique_ptr<Module> JitEngineDevice<ImplT>::linkJitModule(
   if (LinkedModules.empty())
     FATAL_ERROR("Expected jit module");
 
-  auto LinkedModule =
-      std::make_unique<llvm::Module>("JitModule", getLLVMContext());
-  Linker IRLinker(*LinkedModule);
-  // Link in all the proteus-enabled extracted modules.
-  for (auto &LinkedM : LinkedModules) {
-    // Returns true if linking failed.
-    if (IRLinker.linkInModule(std::move(LinkedM)))
-      FATAL_ERROR("Linking failed");
-  }
+  auto LinkedModule = proteus::linkModules(getLLVMContext(), LinkedModules);
 
   // Last, link in the LTO module, if there is one. The LTO module includes code
   // post-optimization, which reduces specialization opportunities for proteus
   // (e.g., due to inlining). Due to that, we selectively link as needed from
   // it, to import definitions outside the proteus-compiled bitcode.
   if (LTOModule) {
+    Linker IRLinker(*LinkedModule);
     // Remove internal linkage from functions in the LTO module to make them
     // linkable.
     for (auto &F : *LTOModule) {

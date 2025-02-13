@@ -32,54 +32,6 @@ class JitEngineDeviceCUDA : public JitEngineDevice<JitEngineDeviceCUDA> {
 public:
   static JitEngineDeviceCUDA &instance();
 
-  static const SmallVector<StringRef> gridDimXFnName() {
-    return {"llvm.nvvm.read.ptx.sreg.nctaid.x"};
-  };
-
-  static const SmallVector<StringRef> gridDimYFnName() {
-    return {"llvm.nvvm.read.ptx.sreg.nctaid.y"};
-  };
-
-  static const SmallVector<StringRef> gridDimZFnName() {
-    return {"llvm.nvvm.read.ptx.sreg.nctaid.z"};
-  };
-
-  static const SmallVector<StringRef> blockDimXFnName() {
-    return {"llvm.nvvm.read.ptx.sreg.ntid.x"};
-  };
-
-  static const SmallVector<StringRef> blockDimYFnName() {
-    return {"llvm.nvvm.read.ptx.sreg.ntid.y"};
-  };
-
-  static const SmallVector<StringRef> blockDimZFnName() {
-    return {"llvm.nvvm.read.ptx.sreg.ntid.z"};
-  };
-
-  static const SmallVector<StringRef> blockIdxXFnName() {
-    return {"llvm.nvvm.read.ptx.sreg.ctaid.x"};
-  };
-
-  static const SmallVector<StringRef> blockIdxYFnName() {
-    return {"llvm.nvvm.read.ptx.sreg.ctaid.y"};
-  };
-
-  static const SmallVector<StringRef> blockIdxZFnName() {
-    return {"llvm.nvvm.read.ptx.sreg.ctaid.z"};
-  };
-
-  static const SmallVector<StringRef> threadIdxXFnName() {
-    return {"llvm.nvvm.read.ptx.sreg.tid.x"};
-  };
-
-  static const SmallVector<StringRef> threadIdxYFnName() {
-    return {"llvm.nvvm.read.ptx.sreg.tid.y"};
-  };
-
-  static const SmallVector<StringRef> threadIdxZFnName() {
-    return {"llvm.nvvm.read.ptx.sreg.tid.z"};
-  };
-
   void *resolveDeviceGlobalAddr(const void *Addr);
 
   void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
