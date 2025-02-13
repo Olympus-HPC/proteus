@@ -16,13 +16,13 @@
 #include <llvm/Demangle/Demangle.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Target/TargetMachine.h>
-#include <memory>
 #include <optional>
 #include <string>
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Debug.h"
 #include "proteus/Hashing.hpp"
+#include "proteus/Logger.hpp"
 
 namespace proteus {
 
