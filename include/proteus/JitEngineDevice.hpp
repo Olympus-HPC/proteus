@@ -134,7 +134,9 @@ public:
   const bool hasModule() const { return ExtractedModule.has_value(); }
   Module &getModule() const { return *ExtractedModule->get(); }
   BinaryInfo &getBinaryInfo() const { return BinInfo.value(); }
-  void setModule(std::unique_ptr<llvm::Module> Mod) { ExtractedModule = std::move(Mod); }
+  void setModule(std::unique_ptr<llvm::Module> Mod) {
+    ExtractedModule = std::move(Mod);
+  }
   const bool hasStaticHash() const { return StaticHash.has_value(); }
   const HashT getStaticHash() const { return StaticHash.value(); }
   void createStaticHash(HashT ModuleHash) {
@@ -170,7 +172,7 @@ public:
 
     BinaryInfo &BinInfo = KernelInfo.getBinaryInfo();
 
-    if (! BinInfo.hasModule()) {
+    if (!BinInfo.hasModule()) {
       std::unique_ptr<Module> ExtractedModule =
           static_cast<ImplT &>(*this).extractModule(BinInfo);
 
@@ -180,7 +182,8 @@ public:
       BinInfo.setModule(std::move(ExtractedModule));
     }
 
-    std::unique_ptr<Module> KernelModule = llvm::CloneModule(BinInfo.getModule());
+    std::unique_ptr<Module> KernelModule =
+        llvm::CloneModule(BinInfo.getModule());
 
     pruneKernelIR(*KernelModule, KernelInfo.getName());
     pruneIR(*KernelModule);
@@ -593,7 +596,6 @@ void JitEngineDevice<ImplT>::pruneKernelIR(Module &M, StringRef KernelName) {
     return false;
   });
 }
-
 
 template <typename ImplT>
 void JitEngineDevice<ImplT>::replaceGlobalVariablesWithPointers(
