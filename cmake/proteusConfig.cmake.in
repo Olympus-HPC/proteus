@@ -2,7 +2,6 @@
 
 include(CMakeFindDependencyMacro)
 set(PROTEUS_LLVM_DIR "@LLVM_DIR@")
-set(PROTEUS_LLD_DIR "@LLD_DIR@")
 find_dependency(LLVM REQUIRED CONFIG)
 
 if (NOT "${LLVM_DIR}" STREQUAL "${PROTEUS_LLVM_DIR}")
@@ -11,13 +10,6 @@ if (NOT "${LLVM_DIR}" STREQUAL "${PROTEUS_LLVM_DIR}")
     "Use the same LLVM installation when compiling.")
 endif()
 message(STATUS "LLVM DIR = ${LLVM_DIR}")
-
-get_property(enabled_languages GLOBAL PROPERTY ENABLED_LANGUAGES)
-message(STATUS "Enabled languages: ${enabled_languages}")
-if("HIP" IN_LIST enabled_languages)
-    find_dependency(LLD NO_DEFAULT_PATH PATHS ${PROTEUS_LLD_DIR} REQUIRED)
-    message(STATUS "LLD DIR = ${LLD_DIR}")
-endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/proteusTargets.cmake")
 check_required_components("@PROJECT_NAME@")
