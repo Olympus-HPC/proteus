@@ -129,44 +129,42 @@ python driver.py -t ${BENCHMARKS_TOML} \
   '{"ENV_PROTEUS_USE_STORED_CACHE":["0","1"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["1"], "ENV_PROTEUS_SPECIALIZE_ARGS":["1"], "ENV_PROTEUS_SPECIALIZE_DIMS":["1"]}' \
   --suffix "direct_pc_01_1_1_1" \
   -p direct -m ${MACHINE} -r 1
-  python driver.py -t ${BENCHMARKS_TOML} \
-    -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
-    --proteus-config \
-    '{"ENV_PROTEUS_USE_STORED_CACHE":["0","1"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["0"], "ENV_PROTEUS_SPECIALIZE_ARGS":["0"], "ENV_PROTEUS_SPECIALIZE_DIMS":["0"]}' \
-    --suffix "direct_pc_01_0_0_0" \
-    -p direct -m ${MACHINE} -r 1
-  python driver.py -t ${BENCHMARKS_TOML} \
-    -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
-    --proteus-config \
-    '{"ENV_PROTEUS_USE_STORED_CACHE":["0"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["1"], "ENV_PROTEUS_SPECIALIZE_ARGS":["1"], "ENV_PROTEUS_SPECIALIZE_DIMS":["1"]}' \
-    --suffix "profiler_pc_0_1_1_1" \
-    -p profiler -m ${MACHINE} -r 1
-  python driver.py -t ${BENCHMARKS_TOML} \
-    -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
-    --proteus-config \
-    '{"ENV_PROTEUS_USE_STORED_CACHE":["0"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["1"], "ENV_PROTEUS_SPECIALIZE_ARGS":["0"], "ENV_PROTEUS_SPECIALIZE_DIMS":["0"]}' \
-    --suffix "profiler_pc_0_1_0_0" \
-    -p profiler -m ${MACHINE} -r 1
-if [[ "${COMMENTS_BODY}" == *"/run-benchmarks-hecbench"* ]]; then
-  python driver.py -t ${BENCHMARKS_TOML} \
-    -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
-    --proteus-config \
-    '{"ENV_PROTEUS_USE_STORED_CACHE":["0"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["0"], "ENV_PROTEUS_SPECIALIZE_ARGS":["1"], "ENV_PROTEUS_SPECIALIZE_DIMS":["0"]}' \
-    --suffix "profiler_pc_0_0_1_0" \
-    -p profiler -m ${MACHINE} -r 1
-  python driver.py -t ${BENCHMARKS_TOML} \
-    -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
-    --proteus-config \
-    '{"ENV_PROTEUS_USE_STORED_CACHE":["0"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["0"], "ENV_PROTEUS_SPECIALIZE_ARGS":["0"], "ENV_PROTEUS_SPECIALIZE_DIMS":["1"]}' \
-    --suffix "profiler_pc_0_0_0_1" \
-    -p profiler -m ${MACHINE} -r 1
-  python driver.py -t ${BENCHMARKS_TOML} \
-    -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
-    --proteus-config \
-    '{"ENV_PROTEUS_USE_STORED_CACHE":["0"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["0"], "ENV_PROTEUS_SPECIALIZE_ARGS":["0"], "ENV_PROTEUS_SPECIALIZE_DIMS":["0"]}' \
-    --suffix "profiler_pc_0_0_0_0" \
-    -p profiler -m ${MACHINE} -r 1
-fi
+python driver.py -t ${BENCHMARKS_TOML} \
+  -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
+  --proteus-config \
+  '{"ENV_PROTEUS_USE_STORED_CACHE":["0","1"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["0"], "ENV_PROTEUS_SPECIALIZE_ARGS":["0"], "ENV_PROTEUS_SPECIALIZE_DIMS":["0"]}' \
+  --suffix "direct_pc_01_0_0_0" \
+  -p direct -m ${MACHINE} -r 1
+python driver.py -t ${BENCHMARKS_TOML} \
+  -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
+  --proteus-config \
+  '{"ENV_PROTEUS_USE_STORED_CACHE":["0"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["1"], "ENV_PROTEUS_SPECIALIZE_ARGS":["1"], "ENV_PROTEUS_SPECIALIZE_DIMS":["1"]}' \
+  --suffix "profiler_pc_0_1_1_1" \
+  -p profiler -m ${MACHINE} -r 1
+python driver.py -t ${BENCHMARKS_TOML} \
+  -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
+  --proteus-config \
+  '{"ENV_PROTEUS_USE_STORED_CACHE":["0"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["1"], "ENV_PROTEUS_SPECIALIZE_ARGS":["0"], "ENV_PROTEUS_SPECIALIZE_DIMS":["0"]}' \
+  --suffix "profiler_pc_0_1_0_0" \
+  -p profiler -m ${MACHINE} -r 1
+python driver.py -t ${BENCHMARKS_TOML} \
+  -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
+  --proteus-config \
+  '{"ENV_PROTEUS_USE_STORED_CACHE":["0"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["0"], "ENV_PROTEUS_SPECIALIZE_ARGS":["1"], "ENV_PROTEUS_SPECIALIZE_DIMS":["0"]}' \
+  --suffix "profiler_pc_0_0_1_0" \
+  -p profiler -m ${MACHINE} -r 1
+python driver.py -t ${BENCHMARKS_TOML} \
+  -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
+  --proteus-config \
+  '{"ENV_PROTEUS_USE_STORED_CACHE":["0"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["0"], "ENV_PROTEUS_SPECIALIZE_ARGS":["0"], "ENV_PROTEUS_SPECIALIZE_DIMS":["1"]}' \
+  --suffix "profiler_pc_0_0_0_1" \
+  -p profiler -m ${MACHINE} -r 1
+python driver.py -t ${BENCHMARKS_TOML} \
+  -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
+  --proteus-config \
+  '{"ENV_PROTEUS_USE_STORED_CACHE":["0"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["0"], "ENV_PROTEUS_SPECIALIZE_ARGS":["0"], "ENV_PROTEUS_SPECIALIZE_DIMS":["0"]}' \
+  --suffix "profiler_pc_0_0_0_0" \
+  -p profiler -m ${MACHINE} -r 1
 
 echo "End run benchmarks..."
 
