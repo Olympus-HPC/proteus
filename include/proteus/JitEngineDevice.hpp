@@ -185,8 +185,7 @@ public:
     std::unique_ptr<Module> KernelModule =
         llvm::CloneModule(BinInfo.getModule());
 
-    pruneKernelIR(*KernelModule, KernelInfo.getName());
-    pruneIR(*KernelModule);
+    internalize(*KernelModule, KernelInfo.getName());
     runCleanupPassPipeline(*KernelModule);
 
     KernelInfo.setModule(std::move(KernelModule));
@@ -449,7 +448,7 @@ private:
 
   void pruneIR(Module &M);
 
-  void pruneKernelIR(Module &M, StringRef KernelName);
+  void internalize(Module &M, StringRef KernelName);
 
   void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
                     dim3 &BlockDim, dim3 &GridDim,
@@ -584,8 +583,8 @@ template <typename ImplT> void JitEngineDevice<ImplT>::pruneIR(Module &M) {
 }
 
 template <typename ImplT>
-void JitEngineDevice<ImplT>::pruneKernelIR(Module &M, StringRef KernelName) {
-  auto F = M.getFunction(KernelName);
+void JitEngineDevice<ImplT>::internalize(Module &M, StringRef KernelName) {
+  auto *F = M.getFunction(KernelName);
   // Internalize others besides the kernel function.
   internalizeModule(M, [&F](const GlobalValue &GV) {
     // Do not internalize the kernel function.
