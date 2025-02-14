@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
   std::cout << "x[0] = " << x[0] << "\n";
 
   register_run(
-      2, [ =, c = proteus::jit_variable(a) ] __device__
+      2, [ =, c = proteus::jit_variable(c) ] __device__
       __attribute__((annotate("jit"))) (int i) { x[i] = c; });
 
   std::cout << "x[0:1] = " << x[0] << "," << x[1] << "\n";
@@ -77,9 +77,10 @@ int main(int argc, char **argv) {
 }
 
 // CHECK: x[0] = 3.14
+// CHECK: x[0:1] = 4.56,4.56
 // CHECK: x[0] = 4.37
 // CHECK: x[0] = 6.56
-// CHECK: JitCache hits 0 total 3
+// CHECK: JitCache hits 0 total 4
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: JitStorageCache hits 0 total 3
-// CHECK-SECOND: JitStorageCache hits 3 total 3
+// CHECK-FIRST: JitStorageCache hits 0 total 4
+// CHECK-SECOND: JitStorageCache hits 4 total 4
