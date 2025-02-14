@@ -199,7 +199,7 @@ public:
 
   void *CurHandle = nullptr;
   std::unordered_map<std::string, FatbinWrapperT *> ModuleIdToFatBinary;
-  DenseMap<const void *, BinaryInfo> HandleToBinaryInfo;
+  std::unordered_map<const void *, BinaryInfo> HandleToBinaryInfo;
   SmallVector<std::string> GlobalLinkedModuleIds;
   SmallPtrSet<void *, 8> GlobalLinkedBinaries;
 
@@ -801,7 +801,7 @@ void JitEngineDevice<ImplT>::registerFunction(void *Handle, void *Kernel,
     return;
   }
 
-  if (!HandleToBinaryInfo.contains(Handle))
+  if (!HandleToBinaryInfo.count(Handle))
     FATAL_ERROR("Expected Handle in map");
   BinaryInfo &BinInfo = HandleToBinaryInfo[Handle];
 
@@ -817,7 +817,7 @@ void JitEngineDevice<ImplT>::registerLinkedBinary(FatbinWrapperT *FatbinWrapper,
               << " Binary " << (void *)FatbinWrapper->Binary << " ModuleId "
               << ModuleId << "\n");
   if (CurHandle) {
-    if (!HandleToBinaryInfo.contains(CurHandle))
+    if (!HandleToBinaryInfo.count(CurHandle))
       FATAL_ERROR("Expected CurHandle in map");
 
     HandleToBinaryInfo[CurHandle].addModuleId(ModuleId);
