@@ -95,10 +95,9 @@ if(PROTEUS_ENABLE_HIP)
   target_compile_options(proteus PRIVATE -x hip)
   list(APPEND libs hip::host)
 
-  # Link with LLD for non-RTC codegen.
-  find_package(LLD REQUIRED NO_DEFAULT_PATH PATHS ${LLVM_INSTALL_DIR} CONFIG)
-  message(STATUS "Found LLD DIR ${LLD_DIR}")
-  list(APPEND libs lldCommon lldELF)
+  # Link with LLD libraries for non-RTC codegen. Use explicit location to avoid
+  # importing from system directories.
+  list(APPEND libs ${LLVM_INSTALL_DIR}/lib/liblldCommon.a ${LLVM_INSTALL_DIR}/lib/liblldELF.a)
 endif()
 
 if(PROTEUS_ENABLE_CUDA)
