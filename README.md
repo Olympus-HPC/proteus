@@ -122,7 +122,7 @@ Where `target` is the name of your library or executable target.
 ## Contributing
 
 We welcome contributions to Proteus in the form of pull requests targeting the
-`main` branch of the repo, as well as questions, feature requrests, or bug reports
+`main` branch of the repo, as well as questions, feature requests, or bug reports
 via issues.
 
 ## Code of Conduct
