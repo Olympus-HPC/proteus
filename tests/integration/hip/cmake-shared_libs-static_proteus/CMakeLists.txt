@@ -48,3 +48,5 @@ target_link_options(main
 )
 target_link_libraries(main PUBLIC libfoo libbar)
 add_proteus(main)
+
+install(TARGETS main libfoo libbar)
