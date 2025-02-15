@@ -112,7 +112,9 @@ endif()
 
 target_link_libraries(proteus PRIVATE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 set_target_properties(proteus PROPERTIES
-  INSTALL_RPATH_USE_LINK_PATH TRUE)
+  INSTALL_RPATH_USE_LINK_PATH TRUE
+  INTERFACE_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}"
+)
 
 install(
   TARGETS proteus

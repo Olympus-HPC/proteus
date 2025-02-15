@@ -13,9 +13,13 @@ pushd build-proteus
 make -j install
 popd
 
-cmake -S ${TEST_DIR} -B build -Dproteus_DIR="${PWD}/install-proteus"
+cmake -S ${TEST_DIR} -B build \
+    -Dproteus_DIR="${PWD}/install-proteus" \
+    -DCMAKE_INSTALL_PREFIX="${PWD}/install"
 pushd build
-make -j
+make -j install
 ./main
 popd
 
+# Run from install directory.
+install/bin/main
