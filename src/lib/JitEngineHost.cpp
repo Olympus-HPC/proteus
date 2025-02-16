@@ -12,11 +12,6 @@
 
 #include <memory>
 
-#include <llvm/ADT/StringRef.h>
-#include <llvm/Analysis/TargetTransformInfo.h>
-#include <llvm/Bitcode/BitcodeWriter.h>
-#include <llvm/CodeGen/CommandFlags.h>
-#include <llvm/CodeGen/MachineModuleInfo.h>
 #include <llvm/ExecutionEngine/JITEventListener.h>
 #include <llvm/ExecutionEngine/Orc/Core.h>
 #include <llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h>
@@ -24,31 +19,14 @@
 #include <llvm/ExecutionEngine/Orc/Shared/ExecutorAddress.h>
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm/ExecutionEngine/SectionMemoryManager.h>
-#include <llvm/IR/Constants.h>
-#include <llvm/IR/DebugInfo.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/Instructions.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/LegacyPassManager.h>
-#include <llvm/IR/Module.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/IRReader/IRReader.h>
-#include <llvm/MC/TargetRegistry.h>
 #include <llvm/Object/SymbolSize.h>
-#include <llvm/Pass.h>
-#include <llvm/Passes/OptimizationLevel.h>
-#include <llvm/Passes/PassBuilder.h>
-#include <llvm/Support/Error.h>
-#include <llvm/Support/ErrorHandling.h>
 #include <llvm/Support/InitLLVM.h>
-#include <llvm/Support/TargetSelect.h>
-#include <llvm/Support/raw_ostream.h>
-#include <llvm/Target/TargetMachine.h>
 #include <llvm/TargetParser/Host.h>
-#include <llvm/Transforms/Utils/Cloning.h>
-#include <llvm/Transforms/Utils/ModuleUtils.h>
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/CoreLLVM.hpp"
 #include "proteus/JitEngine.hpp"
 #include "proteus/JitEngineHost.hpp"
 #include "proteus/TransformArgumentSpecialization.hpp"
