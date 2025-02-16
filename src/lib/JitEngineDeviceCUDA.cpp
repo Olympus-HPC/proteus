@@ -14,8 +14,8 @@
 #include <llvm/Support/MemoryBufferRef.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Target/TargetMachine.h>
-#include <memory>
 
+#include "proteus/CoreLLVM.hpp"
 #include "proteus/JitEngineDevice.hpp"
 #include "proteus/JitEngineDeviceCUDA.hpp"
 #include "proteus/Utils.h"
@@ -47,7 +47,7 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
               << "extractLinkedBitcode " << ModuleId << "\n");
 
   if (!ModuleIdToFatBinary.count(ModuleId))
-    FATAL_ERROR("Expected to find module id " + ModuleId + " in map");
+    PROTEUS_FATAL_ERROR("Expected to find module id " + ModuleId + " in map");
 
   CUdeviceptr DevPtr;
   size_t Bytes;
@@ -63,7 +63,7 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
       parseIR(MemoryBufferRef(StringRef(DeviceBitcode.data(), Bytes), ModuleId),
               Err, Ctx);
   if (!M)
-    FATAL_ERROR("unexpected");
+    PROTEUS_FATAL_ERROR("unexpected");
 
   LinkedModules.push_back(std::move(M));
 }
@@ -75,7 +75,7 @@ HashT JitEngineDeviceCUDA::getModuleHash(BinaryInfo &BinInfo) {
   CUmodule CUMod;
   FatbinWrapperT *FatbinWrapper = BinInfo.getFatbinWrapper();
   if (!FatbinWrapper)
-    FATAL_ERROR("Expected FatbinWrapper in map");
+    PROTEUS_FATAL_ERROR("Expected FatbinWrapper in map");
 
   auto &LinkedModuleIds = BinInfo.getModuleIds();
 
@@ -112,7 +112,7 @@ JitEngineDeviceCUDA::extractModule(BinaryInfo &BinInfo) {
 
   FatbinWrapperT *FatbinWrapper = BinInfo.getFatbinWrapper();
   if (!FatbinWrapper)
-    FATAL_ERROR("Expected FatbinWrapper in map");
+    PROTEUS_FATAL_ERROR("Expected FatbinWrapper in map");
 
   SmallVector<std::unique_ptr<Module>> LinkedModules;
   auto &Ctx = getLLVMContext();
@@ -188,10 +188,7 @@ JitEngineDeviceCUDA::codegenObject(Module &M, StringRef DeviceArch) {
 }
 
 JitEngineDeviceCUDA::JitEngineDeviceCUDA() {
-  LLVMInitializeNVPTXTargetInfo();
-  LLVMInitializeNVPTXTarget();
-  LLVMInitializeNVPTXTargetMC();
-  LLVMInitializeNVPTXAsmPrinter();
+  proteus::InitNVPTXTarget();
 
   // Initialize CUDA and retrieve the compute capability, needed for later
   // operations.

@@ -296,8 +296,8 @@ private:
         RC.Value.PtrVal = (void *)KernelArgs[RCIndices[I]];
         break;
       default:
-        FATAL_ERROR("JIT Incompatible type in runtime constant: " +
-                    std::to_string(RCTypes[I]));
+        PROTEUS_FATAL_ERROR("JIT Incompatible type in runtime constant: " +
+                            std::to_string(RCTypes[I]));
       }
 
       RCsVec.push_back(RC);
@@ -319,7 +319,7 @@ private:
     Expected<object::ELF64LEObjectFile> DeviceElfOrErr =
         object::ELF64LEObjectFile::create(Object);
     if (DeviceElfOrErr.takeError())
-      FATAL_ERROR("Cannot create the device elf");
+      PROTEUS_FATAL_ERROR("Cannot create the device elf");
     auto &DeviceElf = *DeviceElfOrErr;
 
     for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
@@ -334,28 +334,28 @@ private:
 
         Expected<uint64_t> ValueOrErr = Symbol.getValue();
         if (!ValueOrErr)
-          FATAL_ERROR("Expected symbol value");
+          PROTEUS_FATAL_ERROR("Expected symbol value");
         uint64_t SymbolValue = *ValueOrErr;
 
         // Get the section containing the symbol
         auto SectionOrErr = Symbol.getSection();
         if (!SectionOrErr)
-          FATAL_ERROR("Cannot retrieve section");
+          PROTEUS_FATAL_ERROR("Cannot retrieve section");
         const auto &Section = *SectionOrErr;
         if (Section == DeviceElf.section_end())
-          FATAL_ERROR("Expected sybmol in section");
+          PROTEUS_FATAL_ERROR("Expected sybmol in section");
 
         // Get the section's address and data
         Expected<StringRef> SectionDataOrErr = Section->getContents();
         if (!SectionDataOrErr)
-          FATAL_ERROR("Error retrieving section data");
+          PROTEUS_FATAL_ERROR("Error retrieving section data");
         StringRef SectionData = *SectionDataOrErr;
 
         // Calculate offset within the section
         uint64_t SectionAddr = Section->getAddress();
         uint64_t Offset = SymbolValue - SectionAddr;
         if (Offset >= SectionData.size())
-          FATAL_ERROR("Expected offset within section size");
+          PROTEUS_FATAL_ERROR("Expected offset within section size");
 
         uint64_t *Data = (uint64_t *)(SectionData.data() + Offset);
         *Data = reinterpret_cast<uint64_t>(resolveDeviceGlobalAddr(HostAddr));
@@ -472,7 +472,7 @@ void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
   Logger::logs("proteus") << "=== Final Module\n"
                           << M << "=== End Final Module\n";
   if (verifyModule(M, &errs()))
-    FATAL_ERROR("Broken module found, JIT compilation aborted!");
+    PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
   else
     Logger::logs("proteus") << "Module verified!\n";
 #endif
@@ -526,7 +526,7 @@ void JitEngineDevice<ImplT>::replaceGlobalVariablesWithPointers(
     for (auto *User : GV->users()) {
       auto *Inst = dyn_cast<Instruction>(User);
       if (!Inst)
-        FATAL_ERROR("Expected Instruction User for GV");
+        PROTEUS_FATAL_ERROR("Expected Instruction User for GV");
 
       ToReplace.push_back(Inst);
     }
@@ -541,7 +541,8 @@ void JitEngineDevice<ImplT>::replaceGlobalVariablesWithPointers(
 #if PROTEUS_ENABLE_DEBUG
   Logger::logs("proteus") << "=== Linked M\n" << M << "=== End of Linked M\n";
   if (verifyModule(M, &errs()))
-    FATAL_ERROR("After linking, broken module found, JIT compilation aborted!");
+    PROTEUS_FATAL_ERROR(
+        "After linking, broken module found, JIT compilation aborted!");
   else
     Logger::logs("proteus") << "Module verified!\n";
 #endif
@@ -715,7 +716,7 @@ void JitEngineDevice<ImplT>::registerFunction(void *Handle, void *Kernel,
   }
 
   if (!HandleToBinaryInfo.count(Handle))
-    FATAL_ERROR("Expected Handle in map");
+    PROTEUS_FATAL_ERROR("Expected Handle in map");
   BinaryInfo &BinInfo = HandleToBinaryInfo[Handle];
 
   JITKernelInfoMap[Kernel] =
@@ -731,7 +732,7 @@ void JitEngineDevice<ImplT>::registerLinkedBinary(FatbinWrapperT *FatbinWrapper,
               << ModuleId << "\n");
   if (CurHandle) {
     if (!HandleToBinaryInfo.count(CurHandle))
-      FATAL_ERROR("Expected CurHandle in map");
+      PROTEUS_FATAL_ERROR("Expected CurHandle in map");
 
     HandleToBinaryInfo[CurHandle].addModuleId(ModuleId);
   } else
@@ -745,7 +746,7 @@ std::unique_ptr<Module> JitEngineDevice<ImplT>::linkJitModule(
     SmallVector<std::unique_ptr<Module>> &LinkedModules,
     std::unique_ptr<Module> LTOModule) {
   if (LinkedModules.empty())
-    FATAL_ERROR("Expected jit module");
+    PROTEUS_FATAL_ERROR("Expected jit module");
 
   auto LinkedModule = proteus::linkModules(getLLVMContext(), LinkedModules);
 
@@ -764,7 +765,7 @@ std::unique_ptr<Module> JitEngineDevice<ImplT>::linkJitModule(
 
     if (IRLinker.linkInModule(std::move(LTOModule),
                               Linker::Flags::LinkOnlyNeeded))
-      FATAL_ERROR("Linking failed");
+      PROTEUS_FATAL_ERROR("Linking failed");
   }
 
   return LinkedModule;

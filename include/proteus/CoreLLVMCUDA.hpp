@@ -3,8 +3,12 @@
 
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
-#include <llvm/IR/Constant.h>
+#include <llvm/CodeGen/MachineModuleInfo.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
+#include <llvm/Support/MemoryBufferRef.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/Target/TargetMachine.h>
 
 #include "proteus/Logger.hpp"
 #include "proteus/UtilsCUDA.h"
@@ -15,70 +19,80 @@ using namespace llvm;
 
 namespace detail {
 
-static const SmallVector<StringRef> &gridDimXFnName() {
+inline const SmallVector<StringRef> &gridDimXFnName() {
   static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.nctaid.x"};
   return Names;
 }
 
-static const SmallVector<StringRef> &gridDimYFnName() {
+inline const SmallVector<StringRef> &gridDimYFnName() {
   static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.nctaid.y"};
   return Names;
 }
 
-static const SmallVector<StringRef> &gridDimZFnName() {
+inline const SmallVector<StringRef> &gridDimZFnName() {
   static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.nctaid.z"};
   return Names;
 }
 
-static const SmallVector<StringRef> &blockDimXFnName() {
+inline const SmallVector<StringRef> &blockDimXFnName() {
   static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.ntid.x"};
   return Names;
 }
 
-static const SmallVector<StringRef> &blockDimYFnName() {
+inline const SmallVector<StringRef> &blockDimYFnName() {
   static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.ntid.y"};
   return Names;
 }
 
-static const SmallVector<StringRef> &blockDimZFnName() {
+inline const SmallVector<StringRef> &blockDimZFnName() {
   static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.ntid.z"};
   return Names;
 }
 
-static const SmallVector<StringRef> &blockIdxXFnName() {
+inline const SmallVector<StringRef> &blockIdxXFnName() {
   static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.ctaid.x"};
   return Names;
 }
 
-static const SmallVector<StringRef> &blockIdxYFnName() {
+inline const SmallVector<StringRef> &blockIdxYFnName() {
   static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.ctaid.y"};
   return Names;
 }
 
-static const SmallVector<StringRef> &blockIdxZFnName() {
+inline const SmallVector<StringRef> &blockIdxZFnName() {
   static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.ctaid.z"};
   return Names;
 }
 
-static const SmallVector<StringRef> &threadIdxXFnName() {
+inline const SmallVector<StringRef> &threadIdxXFnName() {
   static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.tid.x"};
   return Names;
 }
 
-static const SmallVector<StringRef> &threadIdxYFnName() {
+inline const SmallVector<StringRef> &threadIdxYFnName() {
   static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.tid.y"};
   return Names;
 }
 
-static const SmallVector<StringRef> &threadIdxZFnName() {
+inline const SmallVector<StringRef> &threadIdxZFnName() {
   static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.tid.z"};
   return Names;
 }
 
 } // namespace detail
 
-static inline void setLaunchBoundsForKernel(Module &M, Function &F,
-                                            size_t GridSize, int BlockSize) {
+inline void InitNVPTXTarget() {
+  static std::once_flag Flag;
+  std::call_once(Flag, []() {
+    LLVMInitializeNVPTXTargetInfo();
+    LLVMInitializeNVPTXTarget();
+    LLVMInitializeNVPTXTargetMC();
+    LLVMInitializeNVPTXAsmPrinter();
+  });
+}
+
+inline void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
+                                     int BlockSize) {
   NamedMDNode *NvvmAnnotations = M.getNamedMetadata("nvvm.annotations");
   assert(NvvmAnnotations && "Expected non-null nvvm.annotations metadata");
   // TODO: fix hardcoded 1024 as the maximum, by reading device
@@ -107,8 +121,8 @@ static inline void setLaunchBoundsForKernel(Module &M, Function &F,
   Metadata *MDVals[] = {FuncMetadata, MaxntidxMetadata, MaxThreadsMetadata};
   NvvmAnnotations->addOperand(MDNode::get(M.getContext(), MDVals));
 }
-static inline void codegenPTX(Module &M, StringRef DeviceArch,
-                              SmallVectorImpl<char> &PTXStr) {
+inline void codegenPTX(Module &M, StringRef DeviceArch,
+                       SmallVectorImpl<char> &PTXStr) {
   // TODO: It is possbile to use PTX directly through the CUDA PTX JIT
   // interface. Maybe useful if we can re-link globals using the CUDA API.
   // Check this reference for PTX JIT caching:
@@ -117,7 +131,7 @@ static inline void codegenPTX(Module &M, StringRef DeviceArch,
   // CUDA_CACHE_PATH, CUDA_FORCE_PTX_JIT.
   auto TMExpected = proteus::detail::createTargetMachine(M, DeviceArch);
   if (!TMExpected)
-    FATAL_ERROR(toString(TMExpected.takeError()));
+    PROTEUS_FATAL_ERROR(toString(TMExpected.takeError()));
 
   std::unique_ptr<TargetMachine> TM = std::move(*TMExpected);
   TargetLibraryInfoImpl TLII(Triple(M.getTargetTriple()));
@@ -134,7 +148,7 @@ static inline void codegenPTX(Module &M, StringRef DeviceArch,
   PM.run(M);
 }
 
-static inline std::unique_ptr<MemoryBuffer>
+inline std::unique_ptr<MemoryBuffer>
 codegenObject(Module &M, StringRef DeviceArch,
               SmallPtrSetImpl<void *> &GlobalLinkedBinaries) {
   SmallVector<char, 4096> PTXStr;

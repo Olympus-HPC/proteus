@@ -63,6 +63,15 @@ using namespace llvm::orc;
 #include "proteus/CompilerInterfaceDevice.h"
 #endif
 
+inline Error createSMDiagnosticError(SMDiagnostic &Diag) {
+  std::string Msg;
+  {
+    raw_string_ostream OS(Msg);
+    Diag.print("", OS);
+  }
+  return make_error<StringError>(std::move(Msg), inconvertibleErrorCode());
+}
+
 // A function object that creates a simple pass pipeline to apply to each
 // module as it passes through the IRTransformLayer.
 class OptimizationTransform {
@@ -82,7 +91,7 @@ public:
                   << M << "=== End After Optimization\n");
 #if PROTEUS_ENABLE_DEBUG
       if (verifyModule(M, &errs()))
-        FATAL_ERROR(
+        PROTEUS_FATAL_ERROR(
             "Broken module found after optimization, JIT compilation aborted!");
       else
         Logger::logs("proteus") << "Module after optimization verified!\n";
@@ -102,7 +111,7 @@ public:
                   << M << "=== End After Optimization\n");
 #if PROTEUS_ENABLE_DEBUG
       if (verifyModule(M, &errs()))
-        FATAL_ERROR(
+        PROTEUS_FATAL_ERROR(
             "Broken module found after optimization, JIT compilation aborted!");
       else
         Logger::logs("proteus") << "Module after optimization verified!\n";
@@ -157,7 +166,7 @@ void JitEngineHost::dumpSymbolInfo(
   raw_fd_ostream ofd("/tmp/perf-" + std::to_string(pid) + ".map", EC,
                      sys::fs::OF_Append);
   if (EC)
-    FATAL_ERROR("Cannot open perf map file");
+    PROTEUS_FATAL_ERROR("Cannot open perf map file");
   for (auto symSizePair : object::computeSymbolSizes(loadedObj)) {
     auto sym = symSizePair.first;
     auto size = symSizePair.second;
@@ -252,7 +261,8 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
       }
 #endif
 
-      FATAL_ERROR("Unknown global value" + GV.getName() + " to resolve");
+      PROTEUS_FATAL_ERROR("Unknown global value" + GV.getName() +
+                          " to resolve");
     }
     // Replace argument uses with runtime constants.
     // TODO: change NumRuntimeConstants to size_t at interface.
@@ -292,7 +302,7 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
     Logger::logs("proteus") << "=== Final Module\n"
                             << *M << "=== End Final Module\n";
     if (verifyModule(*M, &errs()))
-      FATAL_ERROR("Broken module found, JIT compilation aborted!");
+      PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
     else
       Logger::logs("proteus") << "Module verified!\n";
 #endif

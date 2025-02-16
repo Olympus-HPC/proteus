@@ -23,12 +23,12 @@ using namespace llvm;
 
 namespace detail {
 
-static inline Expected<std::unique_ptr<TargetMachine>>
+inline Expected<std::unique_ptr<TargetMachine>>
 createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3) {
   Triple TT(M.getTargetTriple());
   auto CGOptLevel = CodeGenOpt::getLevel(OptLevel);
   if (CGOptLevel == std::nullopt)
-    FATAL_ERROR("Invalid opt level");
+    PROTEUS_FATAL_ERROR("Invalid opt level");
 
   std::string Msg;
   const Target *T = TargetRegistry::lookupTarget(M.getTargetTriple(), Msg);
@@ -56,9 +56,9 @@ createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3) {
   return TM;
 }
 
-static inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
-                                               char OptLevel = '3',
-                                               unsigned CodegenOptLevel = 3) {
+inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
+                                        char OptLevel = '3',
+                                        unsigned CodegenOptLevel = 3) {
   PipelineTuningOptions PTO;
 
   std::optional<PGOOptions> PGOOpt;
@@ -102,7 +102,7 @@ static inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
     OptSetting = OptimizationLevel::Oz;
     break;
   default:
-    FATAL_ERROR("Unsupported optimization level " + OptLevel);
+    PROTEUS_FATAL_ERROR("Unsupported optimization level " + OptLevel);
   };
 
   ModulePassManager Passes = PB.buildPerModuleDefaultPipeline(OptSetting);
@@ -111,16 +111,16 @@ static inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
 
 } // namespace detail
 
-static inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
-                              unsigned CodegenOptLevel) {
+inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
+                       unsigned CodegenOptLevel) {
   detail::runOptimizationPassPipeline(M, Arch, OptLevel, CodegenOptLevel);
 }
 
-static inline std::unique_ptr<Module>
+inline std::unique_ptr<Module>
 linkModules(LLVMContext &Ctx,
             SmallVector<std::unique_ptr<Module>> &LinkedModules) {
   if (LinkedModules.empty())
-    FATAL_ERROR("Expected jit module");
+    PROTEUS_FATAL_ERROR("Expected jit module");
 
   auto LinkedModule = std::make_unique<llvm::Module>("JitModule", Ctx);
   Linker IRLinker(*LinkedModule);
@@ -128,13 +128,13 @@ linkModules(LLVMContext &Ctx,
   for (auto &LinkedM : LinkedModules) {
     // Returns true if linking failed.
     if (IRLinker.linkInModule(std::move(LinkedM)))
-      FATAL_ERROR("Linking failed");
+      PROTEUS_FATAL_ERROR("Linking failed");
   }
 
   return LinkedModule;
 }
 
-static inline void runCleanupPassPipeline(Module &M) {
+inline void runCleanupPassPipeline(Module &M) {
   PassBuilder PB;
   LoopAnalysisManager LAM;
   FunctionAnalysisManager FAM;
@@ -157,7 +157,7 @@ static inline void runCleanupPassPipeline(Module &M) {
   StripDebugInfo(M);
 }
 
-static inline void pruneIR(Module &M) {
+inline void pruneIR(Module &M) {
   // Remove llvm.global.annotations now that we have read them.
   if (auto *GlobalAnnotations = M.getGlobalVariable("llvm.global.annotations"))
     M.eraseGlobalVariable(GlobalAnnotations);
