@@ -10,6 +10,7 @@
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Target/TargetMachine.h>
 
+#include "proteus/CoreDeviceCUDA.hpp"
 #include "proteus/Logger.hpp"
 #include "proteus/UtilsCUDA.h"
 
@@ -150,7 +151,9 @@ inline void codegenPTX(Module &M, StringRef DeviceArch,
 
 inline std::unique_ptr<MemoryBuffer>
 codegenObject(Module &M, StringRef DeviceArch,
-              SmallPtrSetImpl<void *> &GlobalLinkedBinaries) {
+              SmallPtrSetImpl<void *> &GlobalLinkedBinaries,
+              bool UseRTC = true) {
+  assert(UseRTC && "Expected RTC compilation true for CUDA");
   SmallVector<char, 4096> PTXStr;
   size_t BinSize;
 

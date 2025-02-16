@@ -115,7 +115,6 @@ class JITKernelInfo {
   std::string Name;
   SmallVector<int32_t> RCTypes;
   SmallVector<int32_t> RCIndices;
-  int32_t NumRCs;
   std::optional<std::unique_ptr<Module>> ExtractedModule;
   std::optional<std::reference_wrapper<BinaryInfo>> BinInfo;
   std::optional<HashT> StaticHash;
@@ -125,14 +124,13 @@ public:
                 int32_t *RCTypes, int32_t NumRCs)
       : BinInfo(BinInfo), Name(Name),
         RCIndices{ArrayRef{RCIndices, static_cast<size_t>(NumRCs)}},
-        RCTypes{ArrayRef{RCTypes, static_cast<size_t>(NumRCs)}}, NumRCs(NumRCs),
+        RCTypes{ArrayRef{RCTypes, static_cast<size_t>(NumRCs)}},
         ExtractedModule(std::nullopt) {}
 
   JITKernelInfo() = default;
   const std::string &getName() const { return Name; }
   const auto &getRCIndices() const { return RCIndices; }
   const auto &getRCTypes() const { return RCTypes; }
-  const auto &getNumRCs() const { return NumRCs; }
   const bool hasModule() const { return ExtractedModule.has_value(); }
   Module &getModule() const { return *ExtractedModule->get(); }
   BinaryInfo &getBinaryInfo() const { return BinInfo.value(); }
@@ -261,7 +259,7 @@ private:
   void getRuntimeConstantValues(void **KernelArgs,
                                 const SmallVector<int32_t> &RCIndices,
                                 const SmallVector<int32_t> &RCTypes,
-                                SmallVector<RuntimeConstant> &RCsVec) {
+                                SmallVector<RuntimeConstant> &RCVec) {
     TIMESCOPE(__FUNCTION__);
     for (int I = 0; I < RCIndices.size(); ++I) {
       PROTEUS_DBG(Logger::logs("proteus") << "RC Index " << RCIndices[I]
@@ -300,7 +298,7 @@ private:
                             std::to_string(RCTypes[I]));
       }
 
-      RCsVec.push_back(RC);
+      RCVec.push_back(RC);
     }
   }
 
@@ -315,53 +313,7 @@ private:
 
   void relinkGlobalsObject(MemoryBufferRef Object) {
     TIMESCOPE(__FUNCTION__);
-
-    Expected<object::ELF64LEObjectFile> DeviceElfOrErr =
-        object::ELF64LEObjectFile::create(Object);
-    if (DeviceElfOrErr.takeError())
-      PROTEUS_FATAL_ERROR("Cannot create the device elf");
-    auto &DeviceElf = *DeviceElfOrErr;
-
-    for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
-      for (auto &Symbol : DeviceElf.symbols()) {
-        auto SymbolNameOrErr = Symbol.getName();
-        if (!SymbolNameOrErr)
-          continue;
-        auto SymbolName = *SymbolNameOrErr;
-
-        if (!SymbolName.equals(GlobalName + "$ptr"))
-          continue;
-
-        Expected<uint64_t> ValueOrErr = Symbol.getValue();
-        if (!ValueOrErr)
-          PROTEUS_FATAL_ERROR("Expected symbol value");
-        uint64_t SymbolValue = *ValueOrErr;
-
-        // Get the section containing the symbol
-        auto SectionOrErr = Symbol.getSection();
-        if (!SectionOrErr)
-          PROTEUS_FATAL_ERROR("Cannot retrieve section");
-        const auto &Section = *SectionOrErr;
-        if (Section == DeviceElf.section_end())
-          PROTEUS_FATAL_ERROR("Expected sybmol in section");
-
-        // Get the section's address and data
-        Expected<StringRef> SectionDataOrErr = Section->getContents();
-        if (!SectionDataOrErr)
-          PROTEUS_FATAL_ERROR("Error retrieving section data");
-        StringRef SectionData = *SectionDataOrErr;
-
-        // Calculate offset within the section
-        uint64_t SectionAddr = Section->getAddress();
-        uint64_t Offset = SymbolValue - SectionAddr;
-        if (Offset >= SectionData.size())
-          PROTEUS_FATAL_ERROR("Expected offset within section size");
-
-        uint64_t *Data = (uint64_t *)(SectionData.data() + Offset);
-        *Data = reinterpret_cast<uint64_t>(resolveDeviceGlobalAddr(HostAddr));
-        break;
-      }
-    }
+    proteus::relinkGlobalsObject(Object, VarNameToDevPtr);
   }
 
   std::unique_ptr<MemoryBuffer> codegenObject(Module &M, StringRef DeviceArch) {
@@ -385,12 +337,10 @@ private:
 
   void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
                     dim3 &BlockDim, dim3 &GridDim,
-                    const SmallVector<int32_t> &RCIndices, RuntimeConstant *RC,
-                    int NumRuntimeConstants);
+                    const SmallVector<int32_t> &RCIndices,
+                    const SmallVector<RuntimeConstant> &RCVec);
 
-  void replaceGlobalVariablesWithPointers(
-      Module &M,
-      std::unordered_map<std::string, const void *> &VarNameToDevPtr);
+  void replaceGlobalVariablesWithPointers(Module &M);
 
 protected:
   JitEngineDevice() {}
@@ -415,23 +365,17 @@ protected:
 };
 
 template <typename ImplT>
-void JitEngineDevice<ImplT>::specializeIR(Module &M, StringRef FnName,
-                                          StringRef Suffix, dim3 &BlockDim,
-                                          dim3 &GridDim,
-                                          const SmallVector<int32_t> &RCIndices,
-                                          RuntimeConstant *RC,
-                                          int NumRuntimeConstants) {
+void JitEngineDevice<ImplT>::specializeIR(
+    Module &M, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
+    dim3 &GridDim, const SmallVector<int32_t> &RCIndices,
+    const SmallVector<RuntimeConstant> &RCVec) {
   TIMESCOPE("specializeIR");
   Function *F = M.getFunction(FnName);
 
   assert(F && "Expected non-null function!");
   // Replace argument uses with runtime constants.
   if (Config.ENV_PROTEUS_SPECIALIZE_ARGS)
-    // TODO: change NumRuntimeConstants to size_t at interface.
-    TransformArgumentSpecialization::transform(
-        M, *F, RCIndices,
-        ArrayRef<RuntimeConstant>{RC,
-                                  static_cast<size_t>(NumRuntimeConstants)});
+    TransformArgumentSpecialization::transform(M, *F, RCIndices, RCVec);
 
   if (!getJitVariableMap().empty()) {
     PROTEUS_DBG(Logger::logs("proteus")
@@ -485,58 +429,14 @@ template <typename ImplT> void JitEngineDevice<ImplT>::pruneIR(Module &M) {
 
 template <typename ImplT>
 void JitEngineDevice<ImplT>::internalize(Module &M, StringRef KernelName) {
-  auto *F = M.getFunction(KernelName);
-  // Internalize others besides the kernel function.
-  internalizeModule(M, [&F](const GlobalValue &GV) {
-    // Do not internalize the kernel function.
-    if (&GV == F)
-      return true;
-
-    // Internalize everything else.
-    return false;
-  });
+  proteus::internalize(M, KernelName);
 }
 
 template <typename ImplT>
-void JitEngineDevice<ImplT>::replaceGlobalVariablesWithPointers(
-    Module &M, std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
+void JitEngineDevice<ImplT>::replaceGlobalVariablesWithPointers(Module &M) {
   TIMESCOPE(__FUNCTION__)
-  // Re-link globals to fixed addresses provided by registered
-  // variables.
-  for (auto RegisterVar : VarNameToDevPtr) {
-    auto &VarName = RegisterVar.first;
-    auto *GV = M.getNamedGlobal(VarName);
-    // Skip linking if the GV does not exist in the module.
-    if (!GV)
-      continue;
 
-    // This will convert constant users of GV to instructions so that we can
-    // replace with the GV ptr.
-    convertUsersOfConstantsToInstructions({GV});
-
-    Constant *Addr =
-        ConstantInt::get(Type::getInt64Ty(M.getContext()), 0xDEADBEEFDEADBEEF);
-    auto *CE = ConstantExpr::getIntToPtr(Addr, GV->getType()->getPointerTo());
-    auto *GVarPtr = new GlobalVariable(
-        M, GV->getType()->getPointerTo(), false, GlobalValue::ExternalLinkage,
-        CE, GV->getName() + "$ptr", nullptr, GV->getThreadLocalMode(),
-        GV->getAddressSpace(), true);
-
-    SmallVector<Instruction *> ToReplace;
-    for (auto *User : GV->users()) {
-      auto *Inst = dyn_cast<Instruction>(User);
-      if (!Inst)
-        PROTEUS_FATAL_ERROR("Expected Instruction User for GV");
-
-      ToReplace.push_back(Inst);
-    }
-
-    for (auto *Inst : ToReplace) {
-      IRBuilder Builder{Inst};
-      auto *Load = Builder.CreateLoad(GV->getType(), GVarPtr);
-      Inst->replaceUsesOfWith(GV, Load);
-    }
-  }
+  proteus::replaceGlobalVariablesWithPointers(M, VarNameToDevPtr);
 
 #if PROTEUS_ENABLE_DEBUG
   Logger::logs("proteus") << "=== Linked M\n" << M << "=== End of Linked M\n";
@@ -555,14 +455,13 @@ JitEngineDevice<ImplT>::compileAndRun(
     uint64_t ShmemSize, typename DeviceTraits<ImplT>::DeviceStream_t Stream) {
   TIMESCOPE("compileAndRun");
 
-  SmallVector<RuntimeConstant> RCsVec;
+  SmallVector<RuntimeConstant> RCVec;
 
   getRuntimeConstantValues(KernelArgs, KernelInfo.getRCIndices(),
-                           KernelInfo.getRCTypes(), RCsVec);
+                           KernelInfo.getRCTypes(), RCVec);
 
-  HashT HashValue =
-      hash(getStaticHash(KernelInfo), RCsVec, GridDim.x, GridDim.y, GridDim.z,
-           BlockDim.x, BlockDim.y, BlockDim.z);
+  HashT HashValue = hash(getStaticHash(KernelInfo), RCVec, GridDim.x, GridDim.y,
+                         GridDim.z, BlockDim.x, BlockDim.y, BlockDim.z);
 
   typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc =
       CodeCache.lookup(HashValue);
@@ -594,8 +493,7 @@ JitEngineDevice<ImplT>::compileAndRun(
       auto KernelFunc =
           getKernelFunctionFromImage(KernelMangled, CacheBuf->getBufferStart());
 
-      CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName(),
-                       RCsVec.data(), KernelInfo.getNumRCs());
+      CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName(), RCVec);
 
       return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                                   ShmemSize, Stream);
@@ -607,10 +505,9 @@ JitEngineDevice<ImplT>::compileAndRun(
   auto JitModule = llvm::CloneModule(getModule(KernelInfo));
 
   specializeIR(*JitModule, KernelInfo.getName(), Suffix, BlockDim, GridDim,
-               KernelInfo.getRCIndices(), RCsVec.data(),
-               KernelInfo.getNumRCs());
+               KernelInfo.getRCIndices(), RCVec);
 
-  replaceGlobalVariablesWithPointers(*JitModule, VarNameToDevPtr);
+  replaceGlobalVariablesWithPointers(*JitModule);
 
   // For HIP RTC codegen do not run the optimization pipeline since HIP RTC
   // internally runs it. For the rest of cases, that is CUDA or HIP with our own
@@ -648,8 +545,7 @@ JitEngineDevice<ImplT>::compileAndRun(
   KernelFunc =
       getKernelFunctionFromImage(KernelMangled, ObjBuf->getBufferStart());
 
-  CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName(), RCsVec.data(),
-                   KernelInfo.getNumRCs());
+  CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName(), RCVec);
 
   return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                               ShmemSize, Stream);

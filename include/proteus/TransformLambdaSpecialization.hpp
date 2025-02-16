@@ -24,8 +24,8 @@ namespace proteus {
 
 using namespace llvm;
 
-static inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
-                                    RuntimeConstant &RC) {
+inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
+                             RuntimeConstant &RC) {
   if (ArgType->isIntegerTy(1)) {
     return ConstantInt::get(ArgType, RC.Value.BoolVal);
   } else if (ArgType->isIntegerTy(8)) {

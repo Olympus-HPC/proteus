@@ -28,7 +28,7 @@ namespace proteus {
 
 using namespace llvm;
 
-static inline bool getEnvOrDefaultBool(const char *VarName, bool Default) {
+inline bool getEnvOrDefaultBool(const char *VarName, bool Default) {
 
   const char *EnvValue = std::getenv(VarName);
   return EnvValue ? static_cast<bool>(std::stoi(EnvValue)) : Default;

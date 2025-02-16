@@ -8,9 +8,11 @@
 #include <llvm/Linker/Linker.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Passes/PassBuilder.h>
+#include <llvm/Support/TargetSelect.h>
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/TargetParser/SubtargetFeature.h>
 #include <llvm/Transforms/IPO/GlobalDCE.h>
+#include <llvm/Transforms/IPO/Internalize.h>
 #include <llvm/Transforms/IPO/StripDeadPrototypes.h>
 #include <llvm/Transforms/IPO/StripSymbols.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
@@ -111,6 +113,15 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
 
 } // namespace detail
 
+inline void InitNativeTarget() {
+  static std::once_flag Flag;
+  std::call_once(Flag, []() {
+    InitializeNativeTarget();
+    InitializeNativeTargetAsmPrinter();
+    InitializeNativeTargetAsmParser();
+  });
+}
+
 inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
                        unsigned CodegenOptLevel) {
   detail::runOptimizationPassPipeline(M, Arch, OptLevel, CodegenOptLevel);
@@ -189,6 +200,19 @@ inline void pruneIR(Module &M) {
   for (auto &GV : M.globals())
     if (GV.isExternallyInitialized())
       GV.setExternallyInitialized(false);
+}
+
+inline void internalize(Module &M, StringRef PreserveFunctionName) {
+  auto *F = M.getFunction(PreserveFunctionName);
+  // Internalize others besides the kernel function.
+  internalizeModule(M, [&F](const GlobalValue &GV) {
+    // Do not internalize the kernel function.
+    if (&GV == F)
+      return true;
+
+    // Internalize everything else.
+    return false;
+  });
 }
 
 } // namespace proteus

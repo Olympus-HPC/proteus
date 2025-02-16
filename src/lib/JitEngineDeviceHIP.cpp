@@ -33,11 +33,7 @@ using namespace proteus;
 using namespace llvm;
 
 void *JitEngineDeviceHIP::resolveDeviceGlobalAddr(const void *Addr) {
-  void *DevPtr = nullptr;
-  proteusHipErrCheck(hipGetSymbolAddress(&DevPtr, HIP_SYMBOL(Addr)));
-  assert(DevPtr && "Expected non-null device pointer for global");
-
-  return DevPtr;
+  return proteus::resolveDeviceGlobalAddr(Addr);
 }
 
 JitEngineDeviceHIP &JitEngineDeviceHIP::instance() {
@@ -227,33 +223,16 @@ void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
 std::unique_ptr<MemoryBuffer>
 JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
   TIMESCOPE("Codegen object");
-  return proteus::codegenObject(M, DeviceArch,
+  return proteus::codegenObject(M, DeviceArch, GlobalLinkedBinaries,
                                 Config.ENV_PROTEUS_USE_HIP_RTC_CODEGEN);
 }
 
 hipFunction_t
 JitEngineDeviceHIP::getKernelFunctionFromImage(StringRef KernelName,
                                                const void *Image) {
-  hipModule_t HipModule;
-  hipFunction_t KernelFunc;
-
-  proteusHipErrCheck(hipModuleLoadData(&HipModule, Image));
-  if (Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY) {
-    for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
-      hipDeviceptr_t Dptr;
-      size_t Bytes;
-      proteusHipErrCheck(hipModuleGetGlobal(&Dptr, &Bytes, HipModule,
-                                            (GlobalName + "$ptr").c_str()));
-
-      void *DevPtr = resolveDeviceGlobalAddr(HostAddr);
-      uint64_t PtrVal = (uint64_t)DevPtr;
-      proteusHipErrCheck(hipMemcpyHtoD(Dptr, &PtrVal, Bytes));
-    }
-  }
-  proteusHipErrCheck(
-      hipModuleGetFunction(&KernelFunc, HipModule, KernelName.str().c_str()));
-
-  return KernelFunc;
+  return proteus::getKernelFunctionFromImage(
+      KernelName, Image, Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY,
+      VarNameToDevPtr);
 }
 
 hipError_t JitEngineDeviceHIP::launchKernelFunction(hipFunction_t KernelFunc,

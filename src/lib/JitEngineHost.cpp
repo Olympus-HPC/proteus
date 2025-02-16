@@ -348,7 +348,9 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
               << "FnName " << FnName << " Mangled " << MangledFnName
               << " address " << JitFnPtr << "\n");
   assert(JitFnPtr && "Expected non-null JIT function pointer");
-  CodeCache.insert(HashValue, JitFnPtr, FnName, RC, NumRuntimeConstants);
+  CodeCache.insert(
+      HashValue, JitFnPtr, FnName,
+      ArrayRef<RuntimeConstant>{RC, static_cast<size_t>(NumRuntimeConstants)});
 
   Logger::logs("proteus") << "=== JIT compile: " << FnName << " Mangled "
                           << MangledFnName << " RC HashValue "
@@ -357,12 +359,10 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   return JitFnPtr;
 }
 
-JitEngineHost::JitEngineHost(int argc, char *argv[]) {
-  InitLLVM X(argc, argv);
+JitEngineHost::JitEngineHost(int Argc, char *Argv[]) {
+  InitLLVM X(Argc, Argv);
 
-  InitializeNativeTarget();
-  InitializeNativeTargetAsmPrinter();
-  InitializeNativeTargetAsmParser();
+  proteus::InitNativeTarget();
 
   ExitOnErr.setBanner("JIT: ");
   // Create the LLJIT instance.
