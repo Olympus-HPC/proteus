@@ -15,6 +15,8 @@ set(HEADERS
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreDevice.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreLLVM.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreLLVMDevice.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Debug.h
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Error.h
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Hashing.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitCache.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngine.hpp
