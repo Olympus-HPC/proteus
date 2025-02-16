@@ -6,6 +6,7 @@
 #include <llvm/ADT/StringRef.h>
 
 #include "proteus/UtilsHIP.h"
+
 namespace proteus {
 
 using namespace llvm;
