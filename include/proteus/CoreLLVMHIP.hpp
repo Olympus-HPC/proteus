@@ -248,7 +248,7 @@ codegenObject(Module &M, StringRef DeviceArch,
 
   return std::move(*Buffer);
 #else
-#error "Expected LLVM18 for non-RTC codegen"
+  PROTEUS_FATAL_ERROR("Expected LLVM18 for non-RTC codegen");
 #endif
 }
 
