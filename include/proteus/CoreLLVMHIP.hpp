@@ -18,6 +18,7 @@
 LLD_HAS_DRIVER(elf)
 #endif
 
+#include "proteus/CoreDeviceHIP.hpp"
 #include "proteus/CoreLLVM.hpp"
 #include "proteus/Debug.h"
 #include "proteus/Error.h"
@@ -146,7 +147,11 @@ inline void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
 }
 
 inline std::unique_ptr<MemoryBuffer>
-codegenObject(Module &M, StringRef DeviceArch, bool UseRTC = true) {
+codegenObject(Module &M, StringRef DeviceArch,
+              SmallPtrSetImpl<void *> &GlobalLinkedBinaries,
+              bool UseRTC = true) {
+  assert(GlobalLinkedBinaries.empty() &&
+         "Expected empty linked binaries for HIP");
   if (UseRTC) {
     char *BinOut;
     size_t BinSize;

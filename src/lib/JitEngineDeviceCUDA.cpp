@@ -27,11 +27,7 @@ using namespace proteus;
 using namespace llvm;
 
 void *JitEngineDeviceCUDA::resolveDeviceGlobalAddr(const void *Addr) {
-  void *DevPtr = nullptr;
-  proteusCudaErrCheck(cudaGetSymbolAddress(&DevPtr, Addr));
-  assert(DevPtr && "Expected non-null device pointer for global");
-
-  return DevPtr;
+  return proteus::resolveDeviceGlobalAddr(Addr);
 }
 
 JitEngineDeviceCUDA &JitEngineDeviceCUDA::instance() {
@@ -150,26 +146,9 @@ cudaError_t JitEngineDeviceCUDA::cudaModuleLaunchKernel(
 
 CUfunction JitEngineDeviceCUDA::getKernelFunctionFromImage(StringRef KernelName,
                                                            const void *Image) {
-  CUfunction KernelFunc;
-  CUmodule Mod;
-
-  proteusCuErrCheck(cuModuleLoadData(&Mod, Image));
-  if (Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY) {
-    for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
-      CUdeviceptr Dptr;
-      size_t Bytes;
-      proteusCuErrCheck(
-          cuModuleGetGlobal(&Dptr, &Bytes, Mod, (GlobalName + "$ptr").c_str()));
-
-      void *DevPtr = resolveDeviceGlobalAddr(HostAddr);
-      uint64_t PtrVal = (uint64_t)DevPtr;
-      proteusCuErrCheck(cuMemcpyHtoD(Dptr, &PtrVal, Bytes));
-    }
-  }
-  proteusCuErrCheck(
-      cuModuleGetFunction(&KernelFunc, Mod, KernelName.str().c_str()));
-
-  return KernelFunc;
+  return proteus::getKernelFunctionFromImage(
+      KernelName, Image, Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY,
+      VarNameToDevPtr);
 }
 
 cudaError_t
