@@ -20,6 +20,7 @@
 #include <llvm/Target/TargetMachine.h>
 
 #include "proteus/CoreLLVM.hpp"
+#include "proteus/CoreLLVMHIP.hpp"
 #include "proteus/JitEngineDeviceHIP.hpp"
 #include "proteus/TimeTracing.hpp"
 
@@ -54,7 +55,7 @@ static StringRef getDeviceBinary(BinaryInfo &BinInfo, StringRef DeviceArch) {
 
   StringRef Magic(Binary, sizeof(OffloadBundlerMagicStr) - 1);
   if (!Magic.equals(OffloadBundlerMagicStr))
-    FATAL_ERROR("Error missing magic string");
+    PROTEUS_FATAL_ERROR("Error missing magic string");
   Pos += sizeof(OffloadBundlerMagicStr) - 1;
 
   auto Read8ByteIntLE = [](const char *S, size_t Pos) {
@@ -105,11 +106,11 @@ HashT JitEngineDeviceHIP::getModuleHash(BinaryInfo &BinInfo) {
   Expected<object::ELF64LEFile> DeviceElf =
       object::ELF64LEFile::create(getDeviceBinary(BinInfo, DeviceArch));
   if (DeviceElf.takeError())
-    FATAL_ERROR("Cannot create the device elf");
+    PROTEUS_FATAL_ERROR("Cannot create the device elf");
 
   auto Sections = DeviceElf->sections();
   if (Sections.takeError())
-    FATAL_ERROR("Error reading sections");
+    PROTEUS_FATAL_ERROR("Error reading sections");
 
   ArrayRef<uint8_t> DeviceBitcode;
 
@@ -122,7 +123,7 @@ HashT JitEngineDeviceHIP::getModuleHash(BinaryInfo &BinInfo) {
     ArrayRef<uint8_t> BitcodeData;
     auto SectionContents = DeviceElf->getSectionContents(Section);
     if (SectionContents.takeError())
-      FATAL_ERROR("Error reading section contents");
+      PROTEUS_FATAL_ERROR("Error reading section contents");
     BitcodeData = *SectionContents;
     auto Bitcode = StringRef{reinterpret_cast<const char
     *>(BitcodeData.data()),
@@ -137,7 +138,7 @@ HashT JitEngineDeviceHIP::getModuleHash(BinaryInfo &BinInfo) {
   for (auto Section : *Sections) {
     auto SectionName = DeviceElf->getSectionName(Section);
     if (SectionName.takeError())
-      FATAL_ERROR("Error reading section name");
+      PROTEUS_FATAL_ERROR("Error reading section name");
     PROTEUS_DBG(Logger::logs("proteus")
                 << "SectionName " << *SectionName << "\n");
 
@@ -160,11 +161,11 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
   Expected<object::ELF64LEFile> DeviceElf =
       object::ELF64LEFile::create(getDeviceBinary(BinInfo, DeviceArch));
   if (DeviceElf.takeError())
-    FATAL_ERROR("Cannot create the device elf");
+    PROTEUS_FATAL_ERROR("Cannot create the device elf");
 
   auto Sections = DeviceElf->sections();
   if (Sections.takeError())
-    FATAL_ERROR("Error reading sections");
+    PROTEUS_FATAL_ERROR("Error reading sections");
 
   ArrayRef<uint8_t> DeviceBitcode;
   SmallVector<std::unique_ptr<Module>> LinkedModules;
@@ -175,7 +176,7 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
     ArrayRef<uint8_t> BitcodeData;
     auto SectionContents = DeviceElf->getSectionContents(Section);
     if (SectionContents.takeError())
-      FATAL_ERROR("Error reading section contents");
+      PROTEUS_FATAL_ERROR("Error reading section contents");
     BitcodeData = *SectionContents;
     auto Bitcode = StringRef{reinterpret_cast<const char *>(BitcodeData.data()),
                              BitcodeData.size()};
@@ -183,7 +184,7 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
     SMDiagnostic Err;
     auto M = parseIR(MemoryBufferRef{Bitcode, SectionName}, Err, Ctx);
     if (!M)
-      FATAL_ERROR("unexpected");
+      PROTEUS_FATAL_ERROR("unexpected");
 
     return M;
   };
@@ -195,7 +196,7 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
   for (auto Section : *Sections) {
     auto SectionName = DeviceElf->getSectionName(Section);
     if (SectionName.takeError())
-      FATAL_ERROR("Error reading section name");
+      PROTEUS_FATAL_ERROR("Error reading section name");
     PROTEUS_DBG(Logger::logs("proteus")
                 << "SectionName " << *SectionName << "\n");
 
@@ -206,7 +207,7 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
 
     if (SectionName->starts_with(".jit.bitcode.lto")) {
       if (LTOModule)
-        FATAL_ERROR("Expected single LTO Module");
+        PROTEUS_FATAL_ERROR("Expected single LTO Module");
       LTOModule = std::move(M);
       continue;
     }
@@ -266,14 +267,10 @@ hipError_t JitEngineDeviceHIP::launchKernelFunction(hipFunction_t KernelFunc,
 }
 
 JitEngineDeviceHIP::JitEngineDeviceHIP() {
-  LLVMInitializeAMDGPUTargetInfo();
-  LLVMInitializeAMDGPUTarget();
-  LLVMInitializeAMDGPUTargetMC();
-  LLVMInitializeAMDGPUAsmPrinter();
+  proteus::InitAMDGPUTarget();
+  hipDeviceProp_t DevProp;
+  proteusHipErrCheck(hipGetDeviceProperties(&DevProp, 0));
 
-  hipDeviceProp_t devProp;
-  proteusHipErrCheck(hipGetDeviceProperties(&devProp, 0));
-
-  DeviceArch = devProp.gcnArchName;
+  DeviceArch = DevProp.gcnArchName;
   DeviceArch = DeviceArch.substr(0, DeviceArch.find_first_of(":"));
 }

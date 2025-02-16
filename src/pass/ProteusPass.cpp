@@ -68,6 +68,7 @@
 #include <string>
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Error.h"
 #include "proteus/Hashing.hpp"
 #include "proteus/Logger.hpp"
 
@@ -79,10 +80,6 @@
 #else
 #define DEBUG(x)
 #endif
-
-#define FATAL_ERROR(x)                                                         \
-  report_fatal_error(llvm::Twine(std::string{} + __FILE__ + ":" +              \
-                                 std::to_string(__LINE__) + " => " + x))
 
 #if PROTEUS_ENABLE_HIP
 constexpr char const *RegisterFunctionName = "__hipRegisterFunction";
@@ -121,8 +118,8 @@ public:
 
     auto ExpecedRuntimeConstantTy = getRuntimeConstantTy(M.getContext());
     if (auto E = ExpecedRuntimeConstantTy.takeError())
-      FATAL_ERROR("Expected valid generated RuntimeConstantTy: " +
-                  toString(std::move(E)));
+      PROTEUS_FATAL_ERROR("Expected valid generated RuntimeConstantTy: " +
+                          toString(std::move(E)));
 
     RuntimeConstantTy = ExpecedRuntimeConstantTy.get();
   }
@@ -180,7 +177,7 @@ public:
           << M << "=== End Post Original Host Module\n");
 
     if (verifyModule(M, &errs()))
-      FATAL_ERROR("Broken original module found, compilation aborted!");
+      PROTEUS_FATAL_ERROR("Broken original module found, compilation aborted!");
 
     return true;
   }
@@ -229,7 +226,7 @@ private:
   std::string getJitBitcodeUniqueName(Module &M) {
     llvm::sys::fs::UniqueID ID;
     if (auto EC = llvm::sys::fs::getUniqueID(M.getSourceFileName(), ID))
-      FATAL_ERROR("Cound not get unique id");
+      PROTEUS_FATAL_ERROR("Cound not get unique id");
 
     SmallString<64> Out;
     llvm::raw_svector_ostream OutStr(Out);
@@ -259,11 +256,11 @@ private:
       if (isDeviceCompilation(M)) {
         ModuleDeviceKernels = getDeviceKernels(M);
         if (!isDeviceKernel(Fn) && !isLambdaFunction(*Fn))
-          FATAL_ERROR(std::string{} + __FILE__ + ":" +
-                      std::to_string(__LINE__) +
-                      " => Expected the annotated Fn " + Fn->getName() + " (" +
-                      demangle(Fn->getName().str()) +
-                      ") to be a kernel function or device lambda function!");
+          PROTEUS_FATAL_ERROR(
+              std::string{} + __FILE__ + ":" + std::to_string(__LINE__) +
+              " => Expected the annotated Fn " + Fn->getName() + " (" +
+              demangle(Fn->getName().str()) +
+              ") to be a kernel function or device lambda function!");
 
         continue;
       }
@@ -305,7 +302,7 @@ private:
           auto *Index = cast<ConstantInt>(AnnotArgs->getOperand(I));
           uint64_t ArgNo = Index->getValue().getZExtValue();
           if (ArgNo > Fn->arg_size())
-            FATAL_ERROR(
+            PROTEUS_FATAL_ERROR(
                 Twine("Error: JIT annotation runtime constant argument " +
                       std::to_string(ArgNo) +
                       " is greater than number of arguments " +
@@ -442,7 +439,7 @@ private:
     emitJitFunctionArgMetadata(*JitMod, JFI, *JitF);
 
     if (verifyModule(*JitMod, &errs()))
-      FATAL_ERROR("Broken JIT module found, compilation aborted!");
+      PROTEUS_FATAL_ERROR("Broken JIT module found, compilation aborted!");
 
     raw_string_ostream OS(JFI.ModuleIR);
     WriteBitcodeToFile(*JitMod, OS);
@@ -596,8 +593,8 @@ private:
   void getKernelHostStubs(Module &M) {
     Function *RegisterFunction = nullptr;
     if (!RegisterFunctionName) {
-      FATAL_ERROR("getKernelHostStubs only callable with `EnableHIP or "
-                  "EnableCUDA set.");
+      PROTEUS_FATAL_ERROR("getKernelHostStubs only callable with `EnableHIP or "
+                          "EnableCUDA set.");
       return;
     }
     RegisterFunction = M.getFunction(RegisterFunctionName);
@@ -685,9 +682,10 @@ private:
     JitLaunchKernelFnTy = LaunchKernelFn->getFunctionType();
 
     if (!JitLaunchKernelFnTy)
-      FATAL_ERROR("Expected non-null jit entry function type, check "
-                  "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags "
-                  "for ProteusJitPass");
+      PROTEUS_FATAL_ERROR(
+          "Expected non-null jit entry function type, check "
+          "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags "
+          "for ProteusJitPass");
 
     FunctionCallee JitLaunchKernelFn =
         M.getOrInsertFunction("__jit_launch_kernel", JitLaunchKernelFnTy);
@@ -714,9 +712,10 @@ private:
     }
 
     if (!CallOrInvoke)
-      FATAL_ERROR("Expected non-null jit launch kernel call or invoke, check "
-                  "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags "
-                  "for ProteusJitPass");
+      PROTEUS_FATAL_ERROR(
+          "Expected non-null jit launch kernel call or invoke, check "
+          "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags "
+          "for ProteusJitPass");
 
     LaunchKernelCB->replaceAllUsesWith(CallOrInvoke);
     LaunchKernelCB->eraseFromParent();
@@ -725,15 +724,17 @@ private:
   void emitJitLaunchKernelCall(Module &M) {
     Function *LaunchKernelFn = nullptr;
     if (!LaunchFunctionName) {
-      FATAL_ERROR("Expected non-null LaunchKernelFn, check "
-                  "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags "
-                  "for ProteusJitPass");
+      PROTEUS_FATAL_ERROR(
+          "Expected non-null LaunchKernelFn, check "
+          "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags "
+          "for ProteusJitPass");
     }
     LaunchKernelFn = M.getFunction(LaunchFunctionName);
     if (!LaunchKernelFn)
-      FATAL_ERROR("Expected non-null LaunchKernelFn, check "
-                  "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags "
-                  "for ProteusJitPass");
+      PROTEUS_FATAL_ERROR(
+          "Expected non-null LaunchKernelFn, check "
+          "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags "
+          "for ProteusJitPass");
 
     SmallVector<CallBase *> ToBeReplaced;
     for (User *Usr : LaunchKernelFn->users())
@@ -927,8 +928,9 @@ private:
   /// runtime registration with __jit_register_function.
   void instrumentRegisterFunction(Module &M) {
     if (!RegisterFunctionName) {
-      FATAL_ERROR("instrumentRegisterJITFunc only callable with `EnableHIP or "
-                  "EnableCUDA set.");
+      PROTEUS_FATAL_ERROR(
+          "instrumentRegisterJITFunc only callable with `EnableHIP or "
+          "EnableCUDA set.");
       return;
     }
 
@@ -972,7 +974,7 @@ private:
           std::string TypeString;
           raw_string_ostream TypeOstream(TypeString);
           Ty->print(TypeOstream);
-          FATAL_ERROR("Unknown Type " + TypeOstream.str());
+          PROTEUS_FATAL_ERROR("Unknown Type " + TypeOstream.str());
         }
       };
 
@@ -1057,7 +1059,7 @@ private:
       Value *V = CB;
       while (!Ptr) {
         if (!V->hasOneUser())
-          FATAL_ERROR("Expected single user");
+          PROTEUS_FATAL_ERROR("Expected single user");
 
         StoreInst *S = dyn_cast<StoreInst>(*(V->users().begin()));
         if (S) {
@@ -1077,7 +1079,7 @@ private:
       for (auto *User : Function->users()) {
         CallBase *CB = dyn_cast<CallBase>(User);
         if (!CB)
-          FATAL_ERROR(
+          PROTEUS_FATAL_ERROR(
               "Expected CallBase as user of proteus::jit_variable function");
 
         DEBUG(Logger::logs("proteus-pass") << "call: " << *CB << "\n");
@@ -1156,7 +1158,7 @@ private:
       for (auto *User : Function->users()) {
         CallBase *CB = dyn_cast<CallBase>(User);
         if (!CB)
-          FATAL_ERROR(
+          PROTEUS_FATAL_ERROR(
               "Expected CallBase as user of proteus::register_lambda function");
 
         IRBuilder<> Builder(CB);

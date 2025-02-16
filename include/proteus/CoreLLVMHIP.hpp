@@ -10,6 +10,7 @@
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/Path.h>
+#include <llvm/Support/TargetSelect.h>
 #include <llvm/Target/TargetMachine.h>
 
 #if LLVM_VERSION_MAJOR == 18
@@ -29,84 +30,84 @@ using namespace llvm;
 
 namespace detail {
 
-static const SmallVector<StringRef> &gridDimXFnName() {
+inline const SmallVector<StringRef> &gridDimXFnName() {
   static SmallVector<StringRef> Names = {
       "_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__XcvjEv",
       "llvm.amdgcn.num.workgroups.x"};
   return Names;
 }
 
-static const SmallVector<StringRef> &gridDimYFnName() {
+inline const SmallVector<StringRef> &gridDimYFnName() {
   static SmallVector<StringRef> Names = {
       "_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__YcvjEv",
       "llvm.amdgcn.num.workgroups.y"};
   return Names;
 }
 
-static const SmallVector<StringRef> &gridDimZFnName() {
+inline const SmallVector<StringRef> &gridDimZFnName() {
   static SmallVector<StringRef> Names = {
       "_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__ZcvjEv",
       "llvm.amdgcn.num.workgroups.z"};
   return Names;
 }
 
-static const SmallVector<StringRef> &blockDimXFnName() {
+inline const SmallVector<StringRef> &blockDimXFnName() {
   static SmallVector<StringRef> Names = {
       "_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__XcvjEv",
       "llvm.amdgcn.workgroup.size.x"};
   return Names;
 }
 
-static const SmallVector<StringRef> &blockDimYFnName() {
+inline const SmallVector<StringRef> &blockDimYFnName() {
   static SmallVector<StringRef> Names = {
       "_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__YcvjEv",
       "llvm.amdgcn.workgroup.size.y"};
   return Names;
 }
 
-static const SmallVector<StringRef> &blockDimZFnName() {
+inline const SmallVector<StringRef> &blockDimZFnName() {
   static SmallVector<StringRef> Names = {
       "_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__ZcvjEv",
       "llvm.amdgcn.workgroup.size.z"};
   return Names;
 }
 
-static const SmallVector<StringRef> &blockIdxXFnName() {
+inline const SmallVector<StringRef> &blockIdxXFnName() {
   static SmallVector<StringRef> Names = {
       "_ZNK17__HIP_CoordinatesI14__HIP_BlockIdxE3__XcvjEv",
       "llvm.amdgcn.workgroup.id.x"};
   return Names;
 };
 
-static const SmallVector<StringRef> &blockIdxYFnName() {
+inline const SmallVector<StringRef> &blockIdxYFnName() {
   static SmallVector<StringRef> Names = {
       "_ZNK17__HIP_CoordinatesI14__HIP_BlockIdxE3__YcvjEv",
       "llvm.amdgcn.workgroup.id.y"};
   return Names;
 };
 
-static const SmallVector<StringRef> &blockIdxZFnName() {
+inline const SmallVector<StringRef> &blockIdxZFnName() {
   static SmallVector<StringRef> Names = {
       "_ZNK17__HIP_CoordinatesI14__HIP_BlockIdxE3__ZcvjEv",
       "llvm.amdgcn.workgroup.id.z"};
   return Names;
 }
 
-static const SmallVector<StringRef> &threadIdxXFnName() {
+inline const SmallVector<StringRef> &threadIdxXFnName() {
   static SmallVector<StringRef> Names = {
       "_ZNK17__HIP_CoordinatesI15__HIP_ThreadIdxE3__XcvjEv",
       "llvm.amdgcn.workitem.id.x"};
   return Names;
 };
 
-static const SmallVector<StringRef> &threadIdxYFnName() {
+inline const SmallVector<StringRef> &threadIdxYFnName() {
   static SmallVector<StringRef> Names = {
       "_ZNK17__HIP_CoordinatesI15__HIP_ThreadIdxE3__YcvjEv",
       "llvm.amdgcn.workitem.id.y"};
   return Names;
 };
 
-static const SmallVector<StringRef> &threadIdxZFnName() {
+inline const SmallVector<StringRef> &threadIdxZFnName() {
   static SmallVector<StringRef> Names = {
       "_ZNK17__HIP_CoordinatesI15__HIP_ThreadIdxE3__ZcvjEv",
       "llvm.amdgcn.workitem.id.z"};
@@ -115,8 +116,18 @@ static const SmallVector<StringRef> &threadIdxZFnName() {
 
 } // namespace detail
 
-static inline void setLaunchBoundsForKernel(Module &M, Function &F,
-                                            size_t GridSize, int BlockSize) {
+inline void InitAMDGPUTarget() {
+  static std::once_flag Flag;
+  std::call_once(Flag, []() {
+    LLVMInitializeAMDGPUTargetInfo();
+    LLVMInitializeAMDGPUTarget();
+    LLVMInitializeAMDGPUTargetMC();
+    LLVMInitializeAMDGPUAsmPrinter();
+  });
+}
+
+inline void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
+                                     int BlockSize) {
   // TODO: fix calculation of launch bounds.
   // TODO: find maximum (hardcoded 1024) from device info.
   // TODO: Setting as 1, BlockSize to replicate launch bounds settings
@@ -134,7 +145,7 @@ static inline void setLaunchBoundsForKernel(Module &M, Function &F,
               << " WavesPerEU (unused) " << WavesPerEU << "\n");
 }
 
-static inline std::unique_ptr<MemoryBuffer>
+inline std::unique_ptr<MemoryBuffer>
 codegenObject(Module &M, StringRef DeviceArch, bool UseRTC = true) {
   if (UseRTC) {
     char *BinOut;
@@ -177,7 +188,7 @@ codegenObject(Module &M, StringRef DeviceArch, bool UseRTC = true) {
 #if LLVM_VERSION_MAJOR == 18
   auto TMExpected = proteus::detail::createTargetMachine(M, DeviceArch);
   if (!TMExpected)
-    FATAL_ERROR(toString(TMExpected.takeError()));
+    PROTEUS_FATAL_ERROR(toString(TMExpected.takeError()));
 
   std::unique_ptr<TargetMachine> TM = std::move(*TMExpected);
   TargetLibraryInfoImpl TLII(Triple(M.getTargetTriple()));
@@ -202,7 +213,7 @@ codegenObject(Module &M, StringRef DeviceArch, bool UseRTC = true) {
     int ObjectFD;
     if (auto EC = sys::fs::createUniqueFile(TempDir + "/proteus-jit-%%%%%%%.o",
                                             ObjectFD, ObjectPath))
-      FATAL_ERROR(EC.message());
+      PROTEUS_FATAL_ERROR(EC.message());
 
     raw_fd_ostream OS(ObjectFD, true);
     OS << StringRef{ObjectCode.data(), ObjectCode.size()};
@@ -210,7 +221,7 @@ codegenObject(Module &M, StringRef DeviceArch, bool UseRTC = true) {
 
     if (auto EC = sys::fs::createUniqueFile(TempDir + "/proteus-jit-%%%%%%%.so",
                                             SharedObjectPath))
-      FATAL_ERROR(EC.message());
+      PROTEUS_FATAL_ERROR(EC.message());
 
     std::vector<const char *> Args{"ld.lld",  "--no-undefined",
                                    "-shared", ObjectPath.c_str(),
@@ -219,13 +230,13 @@ codegenObject(Module &M, StringRef DeviceArch, bool UseRTC = true) {
     lld::Result S = lld::lldMain(Args, llvm::outs(), llvm::errs(),
                                  {{lld::Gnu, &lld::elf::link}});
     if (S.retCode)
-      FATAL_ERROR("Error: lld failed");
+      PROTEUS_FATAL_ERROR("Error: lld failed");
   }
 
   ErrorOr<std::unique_ptr<MemoryBuffer>> Buffer =
       MemoryBuffer::getFileAsStream(SharedObjectPath);
   if (!Buffer)
-    FATAL_ERROR("Error reading file: " + Buffer.getError().message());
+    PROTEUS_FATAL_ERROR("Error reading file: " + Buffer.getError().message());
 
   sys::fs::remove(ObjectPath);
   sys::fs::remove(SharedObjectPath);

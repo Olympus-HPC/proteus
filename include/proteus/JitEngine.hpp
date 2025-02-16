@@ -28,15 +28,6 @@ namespace proteus {
 
 using namespace llvm;
 
-static inline Error createSMDiagnosticError(SMDiagnostic &Diag) {
-  std::string Msg;
-  {
-    raw_string_ostream OS(Msg);
-    Diag.print("", OS);
-  }
-  return make_error<StringError>(std::move(Msg), inconvertibleErrorCode());
-}
-
 static inline bool getEnvOrDefaultBool(const char *VarName, bool Default) {
 
   const char *EnvValue = std::getenv(VarName);

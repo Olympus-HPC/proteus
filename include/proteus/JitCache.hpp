@@ -48,7 +48,7 @@ public:
               RuntimeConstant *RC, int NumRuntimeConstants) {
 #if PROTEUS_ENABLE_DEBUG
     if (CacheMap.count(HashValue))
-      FATAL_ERROR("JitCache collision detected");
+      PROTEUS_FATAL_ERROR("JitCache collision detected");
 #endif
 
     CacheMap[HashValue] = {FunctionPtr, /* num_execs */ 1};
