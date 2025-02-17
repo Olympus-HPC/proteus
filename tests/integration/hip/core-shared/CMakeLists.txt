@@ -4,6 +4,8 @@ project(
     main VERSION 0.0.1
     LANGUAGES HIP CXX C)
 
+set(CMAKE_CXX_STANDARD 17)
+
 find_package(hip REQUIRED CONFIG)
 find_package(proteus REQUIRED CONFIG HINTS ${proteus_DIR})
 

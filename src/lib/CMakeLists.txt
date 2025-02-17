@@ -72,6 +72,8 @@ add_library(proteusCore INTERFACE)
 
 target_compile_definitions(proteus PUBLIC ${LLVM_DEFINITIONS})
 target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
+
+target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
 if(PROTEUS_ENABLE_HIP)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_HIP)
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_HIP)
@@ -111,6 +113,11 @@ if(LLVM_LINK_LLVM_DYLIB)
   llvm_config(proteus USE_SHARED)
 else()
   set(libs ${LLVM_AVAILABLE_LIBS})
+endif()
+
+
+if(NOT LLVM_ENABLE_RTTI)
+  target_compile_options(proteusCore INTERFACE -fno-rtti)
 endif()
 
 if(PROTEUS_ENABLE_HIP)
