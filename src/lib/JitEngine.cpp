@@ -11,29 +11,12 @@
 #include <cstdlib>
 #include <string>
 
-#include <llvm/CodeGen/CommandFlags.h>
-#include <llvm/CodeGen/MachineModuleInfo.h>
-#include <llvm/IR/Constants.h>
-#include <llvm/IR/LegacyPassManager.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/Verifier.h>
-#include <llvm/IRReader/IRReader.h>
-#include <llvm/MC/TargetRegistry.h>
-#include <llvm/Passes/PassBuilder.h>
-#include <llvm/Target/TargetMachine.h>
-#include <llvm/TargetParser/SubtargetFeature.h>
-#include <llvm/Transforms/Utils/ModuleUtils.h>
-
 #include "proteus/CoreLLVM.hpp"
 #include "proteus/Hashing.hpp"
 #include "proteus/JitEngine.hpp"
 #include "proteus/TimeTracing.hpp"
 #include "proteus/Utils.h"
 
-// TODO: Used in InitTargetOptionsFromCodeGenFlags. Re-think for a different
-// initialization, especially using static compilation flags forwarded from
-// ProteusPass.
-static llvm::codegen::RegisterCodeGenFlags CFG;
 namespace proteus {
 
 #if PROTEUS_ENABLE_TIME_TRACING

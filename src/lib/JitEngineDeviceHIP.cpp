@@ -12,13 +12,6 @@
 #include <memory>
 #include <string>
 
-#include <llvm/Bitcode/BitcodeWriter.h>
-#include <llvm/Linker/Linker.h>
-#include <llvm/Object/ELF.h>
-#include <llvm/Support/MemoryBuffer.h>
-#include <llvm/Support/TargetSelect.h>
-#include <llvm/Target/TargetMachine.h>
-
 #include "proteus/CoreLLVM.hpp"
 #include "proteus/CoreLLVMHIP.hpp"
 #include "proteus/JitEngineDeviceHIP.hpp"

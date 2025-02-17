@@ -8,18 +8,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <llvm/Bitcode/BitcodeWriter.h>
-#include <llvm/IR/Metadata.h>
-#include <llvm/Linker/Linker.h>
-#include <llvm/Support/MemoryBufferRef.h>
-#include <llvm/Support/TargetSelect.h>
-#include <llvm/Target/TargetMachine.h>
-
+#include "proteus/JitEngineDeviceCUDA.hpp"
 #include "proteus/CoreLLVM.hpp"
 #include "proteus/JitEngineDevice.hpp"
-#include "proteus/JitEngineDeviceCUDA.hpp"
 #include "proteus/Utils.h"
 #include "proteus/UtilsCUDA.h"
+
 #include <cuda_runtime.h>
 #include <sys/types.h>
 

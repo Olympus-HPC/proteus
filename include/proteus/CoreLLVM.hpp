@@ -10,7 +10,24 @@
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Target/TargetMachine.h>
+
+#if LLVM_VERSION_MAJOR == 18
 #include <llvm/TargetParser/SubtargetFeature.h>
+// This convoluted logic below is because AMD ROCm 5.7.1 identifies as LLVM 17
+// but includes the header SubtargetFeature.h to a different directory than
+// upstream LLVM 17. We basically detect if it's the HIP version and include it
+// from the expected MC directory, otherwise from TargetParser.
+#elif LLVM_VERSION_MAJOR == 17
+#if defined(HIP_VERSION_MAJOR)
+#include <llvm/MC/SubtargetFeature.h>
+#else
+#include <llvm/TargetParser/SubtargetFeature.h>
+#endif
+#else
+#define STRINGIFY_HELPER(x) #x
+#define STRINGIFY(x) STRINGIFY_HELPER(x)
+#error "LLVM version is " STRINGIFY(LLVM_VERSION)
+#endif
 #include <llvm/Transforms/IPO/GlobalDCE.h>
 #include <llvm/Transforms/IPO/Internalize.h>
 #include <llvm/Transforms/IPO/StripDeadPrototypes.h>
@@ -47,8 +64,10 @@ createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3) {
 
   std::optional<CodeModel::Model> CodeModel = M.getCodeModel();
 
-  TargetOptions Options = codegen::InitTargetOptionsFromCodeGenFlags(TT);
-
+  // Use default target options.
+  // TODO: Customize based on AOT compilation flags or by creating a constructor
+  // that sets target options based on the triple.
+  TargetOptions Options;
   std::unique_ptr<TargetMachine> TM(T->createTargetMachine(
       M.getTargetTriple(), Arch, Features.getString(), Options, RelocModel,
       CodeModel, CGOptLevel.value()));
