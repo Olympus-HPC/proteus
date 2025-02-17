@@ -12,11 +12,6 @@
 
 #include <memory>
 
-#include <llvm/ADT/StringRef.h>
-#include <llvm/Analysis/TargetTransformInfo.h>
-#include <llvm/Bitcode/BitcodeWriter.h>
-#include <llvm/CodeGen/CommandFlags.h>
-#include <llvm/CodeGen/MachineModuleInfo.h>
 #include <llvm/ExecutionEngine/JITEventListener.h>
 #include <llvm/ExecutionEngine/Orc/Core.h>
 #include <llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h>
@@ -24,31 +19,14 @@
 #include <llvm/ExecutionEngine/Orc/Shared/ExecutorAddress.h>
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm/ExecutionEngine/SectionMemoryManager.h>
-#include <llvm/IR/Constants.h>
-#include <llvm/IR/DebugInfo.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/Instructions.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/LegacyPassManager.h>
-#include <llvm/IR/Module.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/IRReader/IRReader.h>
-#include <llvm/MC/TargetRegistry.h>
 #include <llvm/Object/SymbolSize.h>
-#include <llvm/Pass.h>
-#include <llvm/Passes/OptimizationLevel.h>
-#include <llvm/Passes/PassBuilder.h>
-#include <llvm/Support/Error.h>
-#include <llvm/Support/ErrorHandling.h>
 #include <llvm/Support/InitLLVM.h>
-#include <llvm/Support/TargetSelect.h>
-#include <llvm/Support/raw_ostream.h>
-#include <llvm/Target/TargetMachine.h>
 #include <llvm/TargetParser/Host.h>
-#include <llvm/Transforms/Utils/Cloning.h>
-#include <llvm/Transforms/Utils/ModuleUtils.h>
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/CoreLLVM.hpp"
 #include "proteus/JitEngine.hpp"
 #include "proteus/JitEngineHost.hpp"
 #include "proteus/TransformArgumentSpecialization.hpp"
@@ -62,6 +40,15 @@ using namespace llvm::orc;
 #if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
 #include "proteus/CompilerInterfaceDevice.h"
 #endif
+
+inline Error createSMDiagnosticError(SMDiagnostic &Diag) {
+  std::string Msg;
+  {
+    raw_string_ostream OS(Msg);
+    Diag.print("", OS);
+  }
+  return make_error<StringError>(std::move(Msg), inconvertibleErrorCode());
+}
 
 // A function object that creates a simple pass pipeline to apply to each
 // module as it passes through the IRTransformLayer.
@@ -82,7 +69,7 @@ public:
                   << M << "=== End After Optimization\n");
 #if PROTEUS_ENABLE_DEBUG
       if (verifyModule(M, &errs()))
-        FATAL_ERROR(
+        PROTEUS_FATAL_ERROR(
             "Broken module found after optimization, JIT compilation aborted!");
       else
         Logger::logs("proteus") << "Module after optimization verified!\n";
@@ -102,7 +89,7 @@ public:
                   << M << "=== End After Optimization\n");
 #if PROTEUS_ENABLE_DEBUG
       if (verifyModule(M, &errs()))
-        FATAL_ERROR(
+        PROTEUS_FATAL_ERROR(
             "Broken module found after optimization, JIT compilation aborted!");
       else
         Logger::logs("proteus") << "Module after optimization verified!\n";
@@ -157,7 +144,7 @@ void JitEngineHost::dumpSymbolInfo(
   raw_fd_ostream ofd("/tmp/perf-" + std::to_string(pid) + ".map", EC,
                      sys::fs::OF_Append);
   if (EC)
-    FATAL_ERROR("Cannot open perf map file");
+    PROTEUS_FATAL_ERROR("Cannot open perf map file");
   for (auto symSizePair : object::computeSymbolSizes(loadedObj)) {
     auto sym = symSizePair.first;
     auto size = symSizePair.second;
@@ -252,7 +239,8 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
       }
 #endif
 
-      FATAL_ERROR("Unknown global value" + GV.getName() + " to resolve");
+      PROTEUS_FATAL_ERROR("Unknown global value" + GV.getName() +
+                          " to resolve");
     }
     // Replace argument uses with runtime constants.
     // TODO: change NumRuntimeConstants to size_t at interface.
@@ -292,7 +280,7 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
     Logger::logs("proteus") << "=== Final Module\n"
                             << *M << "=== End Final Module\n";
     if (verifyModule(*M, &errs()))
-      FATAL_ERROR("Broken module found, JIT compilation aborted!");
+      PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
     else
       Logger::logs("proteus") << "Module verified!\n";
 #endif
@@ -338,7 +326,9 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
               << "FnName " << FnName << " Mangled " << MangledFnName
               << " address " << JitFnPtr << "\n");
   assert(JitFnPtr && "Expected non-null JIT function pointer");
-  CodeCache.insert(HashValue, JitFnPtr, FnName, RC, NumRuntimeConstants);
+  CodeCache.insert(
+      HashValue, JitFnPtr, FnName,
+      ArrayRef<RuntimeConstant>{RC, static_cast<size_t>(NumRuntimeConstants)});
 
   Logger::logs("proteus") << "=== JIT compile: " << FnName << " Mangled "
                           << MangledFnName << " RC HashValue "
@@ -347,12 +337,10 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   return JitFnPtr;
 }
 
-JitEngineHost::JitEngineHost(int argc, char *argv[]) {
-  InitLLVM X(argc, argv);
+JitEngineHost::JitEngineHost(int Argc, char *Argv[]) {
+  InitLLVM X(Argc, Argv);
 
-  InitializeNativeTarget();
-  InitializeNativeTargetAsmPrinter();
-  InitializeNativeTargetAsmParser();
+  proteus::InitNativeTarget();
 
   ExitOnErr.setBanner("JIT: ");
   // Create the LLJIT instance.

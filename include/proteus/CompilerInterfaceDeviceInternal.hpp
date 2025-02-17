@@ -3,11 +3,9 @@
 #include "proteus/CoreDevice.hpp"
 
 // Return "auto" should resolve to cudaError_t or hipError_t.
-static inline auto __jit_launch_kernel_internal(void *Kernel, dim3 GridDim,
-                                                dim3 BlockDim,
-                                                void **KernelArgs,
-                                                uint64_t ShmemSize,
-                                                void *Stream) {
+inline auto __jit_launch_kernel_internal(void *Kernel, dim3 GridDim,
+                                         dim3 BlockDim, void **KernelArgs,
+                                         uint64_t ShmemSize, void *Stream) {
 
   using namespace llvm;
   using namespace proteus;
