@@ -68,28 +68,44 @@ else()
   add_library(proteus STATIC ${SOURCES})
 endif()
 
+add_library(proteusCore INTERFACE)
+
 target_compile_definitions(proteus PUBLIC ${LLVM_DEFINITIONS})
+target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
 if(PROTEUS_ENABLE_HIP)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_HIP)
+  target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_HIP)
 elseif(PROTEUS_ENABLE_CUDA)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_CUDA)
+  target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_CUDA)
 endif()
 
 if (PROTEUS_ENABLE_DEBUG)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_DEBUG)
+  target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_DEBUG)
 endif()
 
 if(PROTEUS_ENABLE_TIME_TRACING)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_TIME_TRACING)
+  target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_TIME_TRACING)
 endif()
 
 target_include_directories(proteus
   SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS})
+target_include_directories(proteusCore
+  SYSTEM INTERFACE ${LLVM_INCLUDE_DIRS})
+
 
 target_include_directories(proteus
   PUBLIC
   $<BUILD_INTERFACE:${PROTEUS_PROJECT_INCLUDE_DIR}>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+
+target_include_directories(proteusCore
+  INTERFACE 
+  $<BUILD_INTERFACE:${PROTEUS_PROJECT_INCLUDE_DIR}>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+
 
 if(LLVM_LINK_LLVM_DYLIB)
   llvm_config(proteus USE_SHARED)
@@ -99,7 +115,9 @@ endif()
 
 if(PROTEUS_ENABLE_HIP)
   target_include_directories(proteus SYSTEM PRIVATE ${hip_INCLUDE_DIRS})
+  target_include_directories(proteusCore SYSTEM INTERFACE ${hip_INCLUDE_DIRS})
   target_compile_options(proteus PRIVATE -x hip)
+  target_compile_options(proteusCore INTERFACE -x hip)
   list(APPEND libs hip::host)
 
   # Link with LLD libraries for non-RTC codegen. Use explicit location to avoid
@@ -109,6 +127,7 @@ endif()
 
 if(PROTEUS_ENABLE_CUDA)
   target_include_directories(proteus SYSTEM PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+  target_include_directories(proteusCore SYSTEM INTERFACE ${CUDAToolkit_INCLUDE_DIRS})
 
   # list(APPEND libs CUDA::cuda_driver CUDA::cudart)
   # TODO: update cmake requirement to > 3.26 to supports the nvPTXCompiler target.
@@ -118,6 +137,8 @@ if(PROTEUS_ENABLE_CUDA)
 endif()
 
 target_link_libraries(proteus PRIVATE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+target_link_libraries(proteusCore INTERFACE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+
 set_target_properties(proteus PROPERTIES
   INSTALL_RPATH_USE_LINK_PATH TRUE
   INTERFACE_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}"
@@ -129,6 +150,14 @@ install(
   RUNTIME DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+
+install(
+  TARGETS proteusCore
+  EXPORT proteusTargets
+  RUNTIME DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+  LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+  ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+
 
 install(FILES
   ${HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/proteus"
