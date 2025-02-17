@@ -12,12 +12,13 @@
 #define PROTEUS_JITENGINE_HPP
 
 #include <cstdlib>
+#include <optional>
+#include <string>
+
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/Demangle/Demangle.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Target/TargetMachine.h>
-#include <optional>
-#include <string>
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Debug.h"
