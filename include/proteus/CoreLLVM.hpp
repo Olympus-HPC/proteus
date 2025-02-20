@@ -187,7 +187,7 @@ inline void runCleanupPassPipeline(Module &M) {
   StripDebugInfo(M);
 }
 
-inline void pruneIR(Module &M, bool setExternal = true) {
+inline void pruneIR(Module &M, bool UnsetExternallyInitialized = true) {
   // Remove llvm.global.annotations now that we have read them.
   if (auto *GlobalAnnotations = M.getGlobalVariable("llvm.global.annotations"))
     M.eraseGlobalVariable(GlobalAnnotations);
@@ -216,7 +216,7 @@ inline void pruneIR(Module &M, bool setExternal = true) {
   }
 
   // Remove externaly_initialized attributes.
-  if (setExternal)
+  if (UnsetExternallyInitialized)
     for (auto &GV : M.globals())
       if (GV.isExternallyInitialized())
         GV.setExternallyInitialized(false);
