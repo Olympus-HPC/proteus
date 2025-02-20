@@ -94,7 +94,7 @@ popd
 # Run under the project directory to avoid deleting artifacts in the
 # after_script.
 cd ${CI_PROJECT_DIR}
-git clone --depth 1 --recursive --single-branch --branch add-raja-perf https://github.com/Olympus-HPC/proteus-benchmarks.git
+git clone --depth 1 --recursive --single-branch --branch proteus-ci-testing https://github.com/Olympus-HPC/proteus-benchmarks.git
 
 cd proteus-benchmarks
 
