@@ -27,8 +27,10 @@ COMMENTS_INFO=$(curl -L \
 COMMENTS_BODY=$(echo ${COMMENTS_INFO} | jq -r '.[].body')
 if [[ "${COMMENTS_BODY}" == *"/run-benchmarks-hecbench"* ]]; then
   echo "=> Run hecbench benchmarks triggered <=";
+  BENCHMARKS_TOML="hecbench.toml"
 elif [[ "${COMMENTS_BODY}" == *"/run-benchmarks-rajaperf"* ]]; then
   echo "=> Run rajaperf benchmarks triggered <=";
+  BENCHMARKS_TOML="rajaperf.toml"
 else
   echo "=> Benchmarks will not run, trigger with /run-benchmarks-{hecbench|rajaperf} <="
   exit 0
@@ -39,8 +41,8 @@ source /usr/workspace/proteusdev/${CI_MACHINE}/miniconda3/bin/activate
 conda activate proteus
 
 if [ "${CI_MACHINE}" == "lassen" ]; then
-  if [[ "${COMMENTS_BODY}" == *"/run-benchmarks-rajaperf"* ]]; then
-    echo "RAJAPerf benchmarks can only run on tioga.  Exiting"
+  if [ "${BENCHMARKS_TOML}" == "rajaperf.toml" ]; then
+    echo "RAJAPerf benchmarks can only run on tioga.  Exiting."
     exit 0
   fi
   ml load cuda/12.2.2
@@ -54,7 +56,6 @@ if [ "${CI_MACHINE}" == "lassen" ]; then
   "
   PROTEUS_CC=${CONDA_PREFIX}/bin/clang++
   MACHINE=nvidia
-  BENCHMARKS_TOML="hecbench.toml"
 elif [ "${CI_MACHINE}" == "tioga" ]; then
   ml load rocm/6.2.1
 
@@ -66,7 +67,6 @@ elif [ "${CI_MACHINE}" == "tioga" ]; then
 
   PROTEUS_CC=hipcc
   MACHINE=amd
-  BENCHMARKS_TOML="rajaperf.toml"
 else
   echo "Unsupported machine ${CI_MACHINE}"
   exit 1
