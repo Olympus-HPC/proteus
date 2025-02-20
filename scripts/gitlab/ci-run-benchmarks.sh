@@ -25,10 +25,14 @@ COMMENTS_INFO=$(curl -L \
   -H "X-GitHub-Api-Version: 2022-11-28" \
   "https://api.github.com/repos/Olympus-HPC/proteus/issues/${PR_ID}/comments")
 COMMENTS_BODY=$(echo ${COMMENTS_INFO} | jq -r '.[].body')
-if [[ "${COMMENTS_BODY}" == *"/run-benchmarks"* ]]; then
-  echo "=> Benchmarks triggered <=";
+if [[ "${COMMENTS_BODY}" == *"/run-benchmarks-hecbench"* ]]; then
+  echo "=> Run hecbench benchmarks triggered <=";
+  BENCHMARKS_TOML="hecbench.toml"
+elif [[ "${COMMENTS_BODY}" == *"/run-benchmarks-rajaperf"* ]]; then
+  echo "=> Run rajaperf benchmarks triggered <=";
+  BENCHMARKS_TOML="rajaperf.toml"
 else
-  echo "=> Benchmarks will not run, trigger with /run-benchmarks <="
+  echo "=> Benchmarks will not run, trigger with /run-benchmarks-{hecbench|rajaperf} <="
   exit 0
 fi
 
@@ -37,6 +41,10 @@ source /usr/workspace/proteusdev/${CI_MACHINE}/miniconda3/bin/activate
 conda activate proteus
 
 if [ "${CI_MACHINE}" == "lassen" ]; then
+  if [ "${BENCHMARKS_TOML}" == "rajaperf.toml" ]; then
+    echo "RAJAPerf benchmarks can only run on tioga.  Exiting."
+    exit 0
+  fi
   ml load cuda/12.2.2
 
   LLVM_INSTALL_DIR=$(llvm-config --prefix)
@@ -77,6 +85,7 @@ CMAKE_OPTIONS="\
   -DCMAKE_CXX_COMPILER=${LLVM_INSTALL_DIR}/bin/clang++ \
   -DENABLE_TESTS=off \
 "
+
 CMAKE_OPTIONS+=${CMAKE_MACHINE_OPTIONS}
 cmake ${CI_PROJECT_DIR} ${CMAKE_OPTIONS}
 make -j install
@@ -85,56 +94,61 @@ popd
 # Run under the project directory to avoid deleting artifacts in the
 # after_script.
 cd ${CI_PROJECT_DIR}
-git clone --depth 1 --single-branch --branch v0.0.1 https://github.com/Olympus-HPC/proteus-benchmarks.git
+git clone --depth 1 --recursive --single-branch --branch proteus-ci-testing https://github.com/Olympus-HPC/proteus-benchmarks.git
+
 cd proteus-benchmarks
 
-python driver.py -t benchmarks.toml \
+echo "Running AOT"
+python driver.py -t ${BENCHMARKS_TOML} \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x aot -p direct -m ${MACHINE} -r 1
-python driver.py -t benchmarks.toml \
+echo "Running profiler AOT"
+python driver.py -t ${BENCHMARKS_TOML} \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x aot -p profiler -m ${MACHINE} -r 1
-
-python driver.py -t benchmarks.toml \
+echo "Running proteus"
+python driver.py -t ${BENCHMARKS_TOML} \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
   --proteus-config \
   '{"ENV_PROTEUS_USE_STORED_CACHE":["0","1"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["1"], "ENV_PROTEUS_SPECIALIZE_ARGS":["1"], "ENV_PROTEUS_SPECIALIZE_DIMS":["1"]}' \
   --suffix "direct_pc_01_1_1_1" \
   -p direct -m ${MACHINE} -r 1
-python driver.py -t benchmarks.toml \
+python driver.py -t ${BENCHMARKS_TOML} \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
   --proteus-config \
   '{"ENV_PROTEUS_USE_STORED_CACHE":["0","1"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["0"], "ENV_PROTEUS_SPECIALIZE_ARGS":["0"], "ENV_PROTEUS_SPECIALIZE_DIMS":["0"]}' \
   --suffix "direct_pc_01_0_0_0" \
   -p direct -m ${MACHINE} -r 1
-python driver.py -t benchmarks.toml \
+python driver.py -t ${BENCHMARKS_TOML} \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
   --proteus-config \
   '{"ENV_PROTEUS_USE_STORED_CACHE":["0"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["1"], "ENV_PROTEUS_SPECIALIZE_ARGS":["1"], "ENV_PROTEUS_SPECIALIZE_DIMS":["1"]}' \
   --suffix "profiler_pc_0_1_1_1" \
   -p profiler -m ${MACHINE} -r 1
-python driver.py -t benchmarks.toml \
+python driver.py -t ${BENCHMARKS_TOML} \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
   --proteus-config \
   '{"ENV_PROTEUS_USE_STORED_CACHE":["0"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["1"], "ENV_PROTEUS_SPECIALIZE_ARGS":["0"], "ENV_PROTEUS_SPECIALIZE_DIMS":["0"]}' \
   --suffix "profiler_pc_0_1_0_0" \
   -p profiler -m ${MACHINE} -r 1
-python driver.py -t benchmarks.toml \
+python driver.py -t ${BENCHMARKS_TOML} \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
   --proteus-config \
   '{"ENV_PROTEUS_USE_STORED_CACHE":["0"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["0"], "ENV_PROTEUS_SPECIALIZE_ARGS":["1"], "ENV_PROTEUS_SPECIALIZE_DIMS":["0"]}' \
   --suffix "profiler_pc_0_0_1_0" \
   -p profiler -m ${MACHINE} -r 1
-python driver.py -t benchmarks.toml \
+python driver.py -t ${BENCHMARKS_TOML} \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
   --proteus-config \
   '{"ENV_PROTEUS_USE_STORED_CACHE":["0"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["0"], "ENV_PROTEUS_SPECIALIZE_ARGS":["0"], "ENV_PROTEUS_SPECIALIZE_DIMS":["1"]}' \
   --suffix "profiler_pc_0_0_0_1" \
   -p profiler -m ${MACHINE} -r 1
-python driver.py -t benchmarks.toml \
+python driver.py -t ${BENCHMARKS_TOML} \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
   --proteus-config \
   '{"ENV_PROTEUS_USE_STORED_CACHE":["0"], "ENV_PROTEUS_SET_LAUNCH_BOUNDS":["0"], "ENV_PROTEUS_SPECIALIZE_ARGS":["0"], "ENV_PROTEUS_SPECIALIZE_DIMS":["0"]}' \
   --suffix "profiler_pc_0_0_0_0" \
   -p profiler -m ${MACHINE} -r 1
+
+echo "End run benchmarks..."
 
 python vis/plot-bar-end2end-speedup.py --dir results --plot-dir plots -m ${MACHINE} -f png --plot-title ${CI_MACHINE}
 python vis/plot-bar-end2end-speedup-noopt.py --dir results --plot-dir plots -m ${MACHINE} -f png --plot-title ${CI_MACHINE}
