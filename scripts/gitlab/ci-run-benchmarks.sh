@@ -26,20 +26,17 @@ COMMENTS_INFO=$(curl -L \
   "https://api.github.com/repos/Olympus-HPC/proteus/issues/${PR_ID}/comments")
 COMMENTS_BODY=$(echo ${COMMENTS_INFO} | jq -r '.[].body')
 if [[ "${COMMENTS_BODY}" == *"/run-benchmarks-hecbench"* ]]; then
-  echo "=> Benchmarks triggered <=";
-  EXTRA_BENCHMARK_OPTIONS=""
+  echo "=> Run hecbench benchmarks triggered <=";
 elif [[ "${COMMENTS_BODY}" == *"/run-benchmarks-rajaperf"* ]]; then
-  echo "=> Benchmarks triggered <=";
+  echo "=> Run rajaperf benchmarks triggered <=";
 else
-  echo "=> Benchmarks will not run, trigger with /run-benchmarks <="
+  echo "=> Benchmarks will not run, trigger with /run-benchmarks-{hecbench|rajaperf} <="
   exit 0
 fi
 
 echo "Activate proteus environment..."
 source /usr/workspace/proteusdev/${CI_MACHINE}/miniconda3/bin/activate
 conda activate proteus
-
-BENCHMARKS_TOML=""
 
 if [ "${CI_MACHINE}" == "lassen" ]; then
   if [[ "${COMMENTS_BODY}" == *"/run-benchmarks-rajaperf"* ]]; then
@@ -57,7 +54,7 @@ if [ "${CI_MACHINE}" == "lassen" ]; then
   "
   PROTEUS_CC=${CONDA_PREFIX}/bin/clang++
   MACHINE=nvidia
-  BENCHMARKS_TOML="benchmarks.toml"
+  BENCHMARKS_TOML="hecbench.toml"
 elif [ "${CI_MACHINE}" == "tioga" ]; then
   ml load rocm/6.2.1
 
@@ -66,16 +63,10 @@ elif [ "${CI_MACHINE}" == "tioga" ]; then
   CMAKE_MACHINE_OPTIONS="\
     -DPROTEUS_ENABLE_HIP=on \
   "
-  # We need to build shared for tioga
-  if [[ "${COMMENTS_BODY}" == *"/run-benchmarks-rajaperf"* ]]; then
-    CMAKE_MACHINE_OPTIONS+="\
-      -DBUILD_SHARED=ON \
-      "
-  fi
 
   PROTEUS_CC=hipcc
   MACHINE=amd
-  BENCHMARKS_TOML="raja-perf-benchmarks.toml"
+  BENCHMARKS_TOML="rajaperf.toml"
 else
   echo "Unsupported machine ${CI_MACHINE}"
   exit 1
@@ -93,11 +84,9 @@ CMAKE_OPTIONS="\
   -DCMAKE_C_COMPILER=${LLVM_INSTALL_DIR}/bin/clang \
   -DCMAKE_CXX_COMPILER=${LLVM_INSTALL_DIR}/bin/clang++ \
   -DENABLE_TESTS=off \
-  -DPROTEUS_ENABLE_HIP=on \
 "
 
 CMAKE_OPTIONS+=${CMAKE_MACHINE_OPTIONS}
-CMAKE_OPTIONS+=${EXTRA_BENCHMARK_OPTIONS}
 cmake ${CI_PROJECT_DIR} ${CMAKE_OPTIONS}
 make -j install
 popd
@@ -105,16 +94,9 @@ popd
 # Run under the project directory to avoid deleting artifacts in the
 # after_script.
 cd ${CI_PROJECT_DIR}
-echo "begin clone"
-git clone https://github.com/Olympus-HPC/proteus-benchmarks.git
-echo "end clone"
+git clone --depth 1 --recursive --single-branch --branch add-raja-perf https://github.com/Olympus-HPC/proteus-benchmarks.git
+
 cd proteus-benchmarks
-echo "begin checkout"
-git checkout add-raja-perf
-echo "end checkout"
-echo "begin submodule update"
-git submodule update --init --recursive
-echo "end submodule update"
 
 echo "Running AOT"
 python driver.py -t ${BENCHMARKS_TOML} \
