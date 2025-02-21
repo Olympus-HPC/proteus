@@ -1,6 +1,9 @@
 #ifndef PROTEUS_CORE_LLVM_HPP
 #define PROTEUS_CORE_LLVM_HPP
 
+static_assert(__cplusplus >= 201703L,
+              "This header requires C++17 or later due to LLVM.");
+
 #include <llvm/CodeGen/CommandFlags.h>
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/Module.h>
@@ -18,7 +21,7 @@
 // upstream LLVM 17. We basically detect if it's the HIP version and include it
 // from the expected MC directory, otherwise from TargetParser.
 #elif LLVM_VERSION_MAJOR == 17
-#if defined(HIP_VERSION_MAJOR)
+#if defined(__HIP_PLATFORM_HCC__) || defined(HIP_VERSION_MAJOR)
 #include <llvm/MC/SubtargetFeature.h>
 #else
 #include <llvm/TargetParser/SubtargetFeature.h>
@@ -26,7 +29,7 @@
 #else
 #define STRINGIFY_HELPER(x) #x
 #define STRINGIFY(x) STRINGIFY_HELPER(x)
-#error "LLVM version is " STRINGIFY(LLVM_VERSION)
+#error "Unsupported LLVM version " STRINGIFY(LLVM_VERSION)
 #endif
 #include <llvm/Transforms/IPO/GlobalDCE.h>
 #include <llvm/Transforms/IPO/Internalize.h>
@@ -37,7 +40,6 @@
 #include "proteus/Error.h"
 
 namespace proteus {
-
 using namespace llvm;
 
 namespace detail {
@@ -65,8 +67,8 @@ createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3) {
   std::optional<CodeModel::Model> CodeModel = M.getCodeModel();
 
   // Use default target options.
-  // TODO: Customize based on AOT compilation flags or by creating a constructor
-  // that sets target options based on the triple.
+  // TODO: Customize based on AOT compilation flags or by creating a
+  // constructor that sets target options based on the triple.
   TargetOptions Options;
   std::unique_ptr<TargetMachine> TM(T->createTargetMachine(
       M.getTargetTriple(), Arch, Features.getString(), Options, RelocModel,

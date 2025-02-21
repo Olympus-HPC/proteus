@@ -104,7 +104,7 @@ target_include_directories(proteus
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 target_include_directories(proteusCore
-  INTERFACE 
+  INTERFACE
   $<BUILD_INTERFACE:${PROTEUS_PROJECT_INCLUDE_DIR}>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
@@ -123,8 +123,11 @@ endif()
 if(PROTEUS_ENABLE_HIP)
   target_include_directories(proteus SYSTEM PRIVATE ${hip_INCLUDE_DIRS})
   target_include_directories(proteusCore SYSTEM INTERFACE ${hip_INCLUDE_DIRS})
-  target_compile_options(proteus PRIVATE -x hip)
-  target_compile_options(proteusCore INTERFACE -x hip)
+  # NOTE: HIP compilation (-x hip) is needed to include the HIP_SYMBOL macro,
+  # which depends on the target architecture AMD or NVIDIA.  We define this
+  # macro for HIP compilation in our headers to avoid forcing HIP compilation.
+  #target_compile_options(proteus PRIVATE -x hip)
+  #target_compile_options(proteusCore INTERFACE -x hip)
   list(APPEND libs hip::host)
 
   # Link with LLD libraries for non-RTC codegen. Use explicit location to avoid

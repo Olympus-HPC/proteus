@@ -7,6 +7,14 @@
 
 #include "proteus/UtilsHIP.h"
 
+// NOTE: HIP_SYMBOL is defined only if HIP compilation is enabled (-x hip),
+// although it shouldn't be necessary since HIP RTC can JIT compile code.  Also,
+// HIP_SYMBOL is defined differently depending on whether ROCm compiles for AMD
+// or NVIDIA.  We repeat the AMD definition here for non-HIP compilation.
+#ifndef HIP_SYMBOL
+#define HIP_SYMBOL(x) x
+#endif
+
 namespace proteus {
 
 using namespace llvm;
