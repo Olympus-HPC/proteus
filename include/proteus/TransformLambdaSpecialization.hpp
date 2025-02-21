@@ -24,8 +24,8 @@ namespace proteus {
 
 using namespace llvm;
 
-static inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
-                                    RuntimeConstant &RC) {
+inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
+                             RuntimeConstant &RC) {
   if (ArgType->isIntegerTy(1)) {
     return ConstantInt::get(ArgType, RC.Value.BoolVal);
   } else if (ArgType->isIntegerTy(8)) {
@@ -48,8 +48,8 @@ static inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
     std::string TypeString;
     raw_string_ostream TypeOstream(TypeString);
     ArgType->print(TypeOstream);
-    FATAL_ERROR("JIT Incompatible type in runtime constant: " +
-                TypeOstream.str());
+    PROTEUS_FATAL_ERROR("JIT Incompatible type in runtime constant: " +
+                        TypeOstream.str());
   }
 }
 
@@ -91,7 +91,7 @@ public:
             for (auto *GEPUser : GEP->users()) {
               auto *LI = dyn_cast<LoadInst>(GEPUser);
               if (!LI)
-                FATAL_ERROR("Expected load instruction");
+                PROTEUS_FATAL_ERROR("Expected load instruction");
               Type *LoadType = LI->getType();
               Constant *C = getConstant(M.getContext(), LoadType, Arg);
               LI->replaceAllUsesWith(C);

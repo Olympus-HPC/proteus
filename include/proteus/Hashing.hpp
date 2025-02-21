@@ -31,29 +31,26 @@ public:
   }
 };
 
-static HashT inline hashValue(HashT &H) { return H; }
+inline HashT hashValue(HashT &H) { return H; }
 
-static HashT inline hashValue(StringRef &S) {
-  return stable_hash_combine_string(S);
-}
+inline HashT hashValue(StringRef &S) { return stable_hash_combine_string(S); }
 
-static HashT inline hashValue(const std::string &S) {
+inline HashT hashValue(const std::string &S) {
   return stable_hash_combine_string(S);
 }
 
 template <typename T>
-static inline std::enable_if_t<std::is_scalar<T>::value, HashT>
-hashValue(const T &V) {
+inline std::enable_if_t<std::is_scalar<T>::value, HashT> hashValue(const T &V) {
   return stable_hash_combine_string(
       StringRef{reinterpret_cast<const char *>(&V), sizeof(T)});
 }
 
-static HashT inline hashArrayRefElement(const RuntimeConstant &RC) {
+inline HashT hashArrayRefElement(const RuntimeConstant &RC) {
   return stable_hash_combine_string(
       StringRef{reinterpret_cast<const char *>(&RC.Value), sizeof(RC.Value)});
 }
 
-static HashT inline hashValue(const ArrayRef<RuntimeConstant> &Arr) {
+inline HashT hashValue(const ArrayRef<RuntimeConstant> &Arr) {
   if (Arr.empty())
     return 0;
 
@@ -65,12 +62,12 @@ static HashT inline hashValue(const ArrayRef<RuntimeConstant> &Arr) {
   return HashValue;
 }
 
-static HashT inline hashCombine(HashT A, HashT B) {
+inline HashT hashCombine(HashT A, HashT B) {
   return stable_hash_combine(A.getValue(), B.getValue());
 }
 
 template <typename FirstT, typename... RestTs>
-static HashT inline hash(FirstT &&First, RestTs &&...Rest) {
+inline HashT hash(FirstT &&First, RestTs &&...Rest) {
   TIMESCOPE(__FUNCTION__);
   HashT HashValue = hashValue(First);
 
@@ -84,7 +81,7 @@ static HashT inline hash(FirstT &&First, RestTs &&...Rest) {
   return HashValue;
 }
 
-template <typename T> static HashT inline hash(T &&Data) {
+template <typename T> inline HashT hash(T &&Data) {
   HashT HashValue = hashValue(Data);
   return HashValue;
 }

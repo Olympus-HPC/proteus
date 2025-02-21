@@ -65,8 +65,8 @@ public:
         std::string TypeString;
         raw_string_ostream TypeOstream(TypeString);
         ArgType->print(TypeOstream);
-        FATAL_ERROR("JIT Incompatible type in runtime constant: " +
-                    TypeOstream.str());
+        PROTEUS_FATAL_ERROR("JIT Incompatible type in runtime constant: " +
+                            TypeOstream.str());
       }
 
       PROTEUS_DBG(Logger::logs("proteus") << "[ArgSpecial] Replaced Function "

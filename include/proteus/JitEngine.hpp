@@ -12,32 +12,24 @@
 #define PROTEUS_JITENGINE_HPP
 
 #include <cstdlib>
+#include <optional>
+#include <string>
+
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/Demangle/Demangle.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Target/TargetMachine.h>
-#include <memory>
-#include <optional>
-#include <string>
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Debug.h"
 #include "proteus/Hashing.hpp"
-#include "proteus/Utils.h"
+#include "proteus/Logger.hpp"
 
 namespace proteus {
 
 using namespace llvm;
 
-static inline Error createSMDiagnosticError(SMDiagnostic &Diag) {
-  std::string Msg;
-  {
-    raw_string_ostream OS(Msg);
-    Diag.print("", OS);
-  }
-  return make_error<StringError>(std::move(Msg), inconvertibleErrorCode());
-}
-
-static inline bool getEnvOrDefaultBool(const char *VarName, bool Default) {
+inline bool getEnvOrDefaultBool(const char *VarName, bool Default) {
 
   const char *EnvValue = std::getenv(VarName);
   return EnvValue ? static_cast<bool>(std::stoi(EnvValue)) : Default;
@@ -45,7 +37,8 @@ static inline bool getEnvOrDefaultBool(const char *VarName, bool Default) {
 
 class JitEngine {
 public:
-  void optimizeIR(Module &M, StringRef Arch);
+  void optimizeIR(Module &M, StringRef Arch, char OptLevel = '3',
+                  unsigned CodegenOptLevel = 3);
 
   bool isProteusDisabled() { return Config.ENV_PROTEUS_DISABLE; }
 
@@ -53,11 +46,6 @@ public:
   void registerLambda(const char *Symbol);
 
 protected:
-  Expected<std::unique_ptr<TargetMachine>>
-  createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3);
-
-  void runOptimizationPassPipeline(Module &M, StringRef Arch,
-                                   unsigned OptLevel = 3);
   void runCleanupPassPipeline(Module &M);
 
   JitEngine();

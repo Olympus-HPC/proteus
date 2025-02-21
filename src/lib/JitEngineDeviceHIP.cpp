@@ -9,26 +9,16 @@
 //===----------------------------------------------------------------------===//
 
 #include <cstddef>
-#include <llvm/ADT/ArrayRef.h>
-#include <llvm/ADT/StringRef.h>
-#include <llvm/Support/FileSystem.h>
-#include <llvm/Support/Path.h>
 #include <memory>
 #include <string>
 
-#include <llvm/Bitcode/BitcodeWriter.h>
-#include <llvm/Linker/Linker.h>
-#include <llvm/Object/ELF.h>
-#include <llvm/Support/MemoryBuffer.h>
-#include <llvm/Support/TargetSelect.h>
-#include <llvm/Target/TargetMachine.h>
-
+#include "proteus/CoreLLVM.hpp"
+#include "proteus/CoreLLVMHIP.hpp"
 #include "proteus/JitEngineDeviceHIP.hpp"
 #include "proteus/TimeTracing.hpp"
-#include "proteus/Utils.h"
 
 #if LLVM_VERSION_MAJOR == 18
-#include "lld/Common/Driver.h"
+#include <lld/Common/Driver.h>
 LLD_HAS_DRIVER(elf)
 #endif
 
@@ -36,11 +26,7 @@ using namespace proteus;
 using namespace llvm;
 
 void *JitEngineDeviceHIP::resolveDeviceGlobalAddr(const void *Addr) {
-  void *DevPtr = nullptr;
-  proteusHipErrCheck(hipGetSymbolAddress(&DevPtr, HIP_SYMBOL(Addr)));
-  assert(DevPtr && "Expected non-null device pointer for global");
-
-  return DevPtr;
+  return proteus::resolveDeviceGlobalAddr(Addr);
 }
 
 JitEngineDeviceHIP &JitEngineDeviceHIP::instance() {
@@ -58,7 +44,7 @@ static StringRef getDeviceBinary(BinaryInfo &BinInfo, StringRef DeviceArch) {
 
   StringRef Magic(Binary, sizeof(OffloadBundlerMagicStr) - 1);
   if (!Magic.equals(OffloadBundlerMagicStr))
-    FATAL_ERROR("Error missing magic string");
+    PROTEUS_FATAL_ERROR("Error missing magic string");
   Pos += sizeof(OffloadBundlerMagicStr) - 1;
 
   auto Read8ByteIntLE = [](const char *S, size_t Pos) {
@@ -109,11 +95,11 @@ HashT JitEngineDeviceHIP::getModuleHash(BinaryInfo &BinInfo) {
   Expected<object::ELF64LEFile> DeviceElf =
       object::ELF64LEFile::create(getDeviceBinary(BinInfo, DeviceArch));
   if (DeviceElf.takeError())
-    FATAL_ERROR("Cannot create the device elf");
+    PROTEUS_FATAL_ERROR("Cannot create the device elf");
 
   auto Sections = DeviceElf->sections();
   if (Sections.takeError())
-    FATAL_ERROR("Error reading sections");
+    PROTEUS_FATAL_ERROR("Error reading sections");
 
   ArrayRef<uint8_t> DeviceBitcode;
 
@@ -126,7 +112,7 @@ HashT JitEngineDeviceHIP::getModuleHash(BinaryInfo &BinInfo) {
     ArrayRef<uint8_t> BitcodeData;
     auto SectionContents = DeviceElf->getSectionContents(Section);
     if (SectionContents.takeError())
-      FATAL_ERROR("Error reading section contents");
+      PROTEUS_FATAL_ERROR("Error reading section contents");
     BitcodeData = *SectionContents;
     auto Bitcode = StringRef{reinterpret_cast<const char
     *>(BitcodeData.data()),
@@ -141,7 +127,7 @@ HashT JitEngineDeviceHIP::getModuleHash(BinaryInfo &BinInfo) {
   for (auto Section : *Sections) {
     auto SectionName = DeviceElf->getSectionName(Section);
     if (SectionName.takeError())
-      FATAL_ERROR("Error reading section name");
+      PROTEUS_FATAL_ERROR("Error reading section name");
     PROTEUS_DBG(Logger::logs("proteus")
                 << "SectionName " << *SectionName << "\n");
 
@@ -164,11 +150,11 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
   Expected<object::ELF64LEFile> DeviceElf =
       object::ELF64LEFile::create(getDeviceBinary(BinInfo, DeviceArch));
   if (DeviceElf.takeError())
-    FATAL_ERROR("Cannot create the device elf");
+    PROTEUS_FATAL_ERROR("Cannot create the device elf");
 
   auto Sections = DeviceElf->sections();
   if (Sections.takeError())
-    FATAL_ERROR("Error reading sections");
+    PROTEUS_FATAL_ERROR("Error reading sections");
 
   ArrayRef<uint8_t> DeviceBitcode;
   SmallVector<std::unique_ptr<Module>> LinkedModules;
@@ -179,7 +165,7 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
     ArrayRef<uint8_t> BitcodeData;
     auto SectionContents = DeviceElf->getSectionContents(Section);
     if (SectionContents.takeError())
-      FATAL_ERROR("Error reading section contents");
+      PROTEUS_FATAL_ERROR("Error reading section contents");
     BitcodeData = *SectionContents;
     auto Bitcode = StringRef{reinterpret_cast<const char *>(BitcodeData.data()),
                              BitcodeData.size()};
@@ -187,7 +173,7 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
     SMDiagnostic Err;
     auto M = parseIR(MemoryBufferRef{Bitcode, SectionName}, Err, Ctx);
     if (!M)
-      FATAL_ERROR("unexpected");
+      PROTEUS_FATAL_ERROR("unexpected");
 
     return M;
   };
@@ -199,7 +185,7 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
   for (auto Section : *Sections) {
     auto SectionName = DeviceElf->getSectionName(Section);
     if (SectionName.takeError())
-      FATAL_ERROR("Error reading section name");
+      PROTEUS_FATAL_ERROR("Error reading section name");
     PROTEUS_DBG(Logger::logs("proteus")
                 << "SectionName " << *SectionName << "\n");
 
@@ -210,7 +196,7 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
 
     if (SectionName->starts_with(".jit.bitcode.lto")) {
       if (LTOModule)
-        FATAL_ERROR("Expected single LTO Module");
+        PROTEUS_FATAL_ERROR("Expected single LTO Module");
       LTOModule = std::move(M);
       continue;
     }
@@ -224,155 +210,22 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
 void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
                                                   size_t GridSize,
                                                   int BlockSize) {
-  // TODO: fix calculation of launch bounds.
-  // TODO: find maximum (hardcoded 1024) from device info.
-  // TODO: Setting as 1, BlockSize to replicate launch bounds settings
-  // Does setting it as BlockSize, BlockSize help?
-  // Setting the attribute override any previous setting.
-  F.addFnAttr("amdgpu-flat-work-group-size",
-              "1," + std::to_string(std::min(1024, BlockSize)));
-  // TODO: find warp size (hardcoded 64) from device info.
-  // int WavesPerEU = (GridSize * BlockSize) / 64 / 110 / 4 / 2;
-  int WavesPerEU = 0;
-  // F->addFnAttr("amdgpu-waves-per-eu", std::to_string(WavesPerEU));
-  PROTEUS_DBG(Logger::logs("proteus")
-              << "BlockSize " << BlockSize << " GridSize " << GridSize
-              << " => Set Wokgroup size " << BlockSize
-              << " WavesPerEU (unused) " << WavesPerEU << "\n");
+  proteus::setLaunchBoundsForKernel(M, F, GridSize, BlockSize);
 }
 
 std::unique_ptr<MemoryBuffer>
 JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
   TIMESCOPE("Codegen object");
-#if LLVM_VERSION_MAJOR == 18
-  if (Config.ENV_PROTEUS_USE_HIP_RTC_CODEGEN) {
-#else
-  {
-#endif
-    char *BinOut;
-    size_t BinSize;
-
-    SmallString<4096> ModuleBuf;
-    raw_svector_ostream ModuleBufOS(ModuleBuf);
-    WriteBitcodeToFile(M, ModuleBufOS);
-
-    hiprtcLinkState HipLinkStatePtr;
-
-    // NOTE: This code is an example of passing custom, AMD-specific
-    // options to the compiler/linker.
-    // NOTE: Unrolling can have a dramatic (time-consuming) effect on JIT
-    // compilation time and on the resulting optimization, better or worse
-    // depending on code specifics.
-    {
-      TIMESCOPE("HIP_RTC")
-      std::string MArchOpt = ("-march=" + DeviceArch).str();
-      const char *OptArgs[] = {"-mllvm", "-unroll-threshold=1000",
-                               MArchOpt.c_str()};
-      std::vector<hiprtcJIT_option> JITOptions = {
-          HIPRTC_JIT_IR_TO_ISA_OPT_EXT, HIPRTC_JIT_IR_TO_ISA_OPT_COUNT_EXT};
-      size_t OptArgsSize = 3;
-      const void *JITOptionsValues[] = {(void *)OptArgs, (void *)(OptArgsSize)};
-      proteusHiprtcErrCheck(
-          hiprtcLinkCreate(JITOptions.size(), JITOptions.data(),
-                           (void **)JITOptionsValues, &HipLinkStatePtr));
-      // NOTE: the following version of te code does not set options.
-      // proteusHiprtcErrCheck(hiprtcLinkCreate(0, nullptr, nullptr,
-      // &hip_link_state_ptr));
-
-      proteusHiprtcErrCheck(hiprtcLinkAddData(
-          HipLinkStatePtr, HIPRTC_JIT_INPUT_LLVM_BITCODE,
-          (void *)ModuleBuf.data(), ModuleBuf.size(), "", 0, nullptr, nullptr));
-      proteusHiprtcErrCheck(
-          hiprtcLinkComplete(HipLinkStatePtr, (void **)&BinOut, &BinSize));
-    }
-
-    return MemoryBuffer::getMemBuffer(StringRef{BinOut, BinSize});
-  }
-
-#if LLVM_VERSION_MAJOR == 18
-  auto TMExpected = createTargetMachine(M, DeviceArch);
-  if (!TMExpected)
-    FATAL_ERROR(toString(TMExpected.takeError()));
-
-  std::unique_ptr<TargetMachine> TM = std::move(*TMExpected);
-  TargetLibraryInfoImpl TLII(Triple(M.getTargetTriple()));
-
-  legacy::PassManager PM;
-  PM.add(new TargetLibraryInfoWrapperPass(TLII));
-  MachineModuleInfoWrapperPass *MMIWP = new MachineModuleInfoWrapperPass(
-      reinterpret_cast<LLVMTargetMachine *>(TM.get()));
-
-  SmallVector<char, 4096> ObjectCode;
-  raw_svector_ostream OS(ObjectCode);
-  TM->addPassesToEmitFile(PM, OS, nullptr, CodeGenFileType::ObjectFile,
-                          /* DisableVerify */ true, MMIWP);
-
-  PM.run(M);
-
-  SmallString<64> TempDir;
-  SmallString<64> ObjectPath;
-  SmallString<64> SharedObjectPath;
-  {
-    TIMESCOPE("LLD")
-    sys::path::system_temp_directory(true, TempDir);
-    int ObjectFD;
-    if (auto EC = sys::fs::createUniqueFile(TempDir + "/proteus-jit-%%%%%%%.o",
-                                            ObjectFD, ObjectPath))
-      FATAL_ERROR(EC.message());
-
-    raw_fd_ostream OS(ObjectFD, true);
-    OS << StringRef{ObjectCode.data(), ObjectCode.size()};
-    OS.close();
-
-    if (auto EC = sys::fs::createUniqueFile(TempDir + "/proteus-jit-%%%%%%%.so",
-                                            SharedObjectPath))
-      FATAL_ERROR(EC.message());
-
-    std::vector<const char *> Args{"ld.lld",  "--no-undefined",
-                                   "-shared", ObjectPath.c_str(),
-                                   "-o",      SharedObjectPath.c_str()};
-
-    lld::Result S = lld::lldMain(Args, llvm::outs(), llvm::errs(),
-                                 {{lld::Gnu, &lld::elf::link}});
-    if (S.retCode)
-      FATAL_ERROR("Error: lld failed");
-  }
-
-  ErrorOr<std::unique_ptr<MemoryBuffer>> Buffer =
-      MemoryBuffer::getFileAsStream(SharedObjectPath);
-  if (!Buffer)
-    FATAL_ERROR("Error reading file: " + Buffer.getError().message());
-
-  sys::fs::remove(ObjectPath);
-  sys::fs::remove(SharedObjectPath);
-
-  return std::move(*Buffer);
-#endif
+  return proteus::codegenObject(M, DeviceArch, GlobalLinkedBinaries,
+                                Config.ENV_PROTEUS_USE_HIP_RTC_CODEGEN);
 }
 
 hipFunction_t
 JitEngineDeviceHIP::getKernelFunctionFromImage(StringRef KernelName,
                                                const void *Image) {
-  hipModule_t HipModule;
-  hipFunction_t KernelFunc;
-
-  proteusHipErrCheck(hipModuleLoadData(&HipModule, Image));
-  if (Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY) {
-    for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
-      hipDeviceptr_t Dptr;
-      size_t Bytes;
-      proteusHipErrCheck(hipModuleGetGlobal(&Dptr, &Bytes, HipModule,
-                                            (GlobalName + "$ptr").c_str()));
-
-      void *DevPtr = resolveDeviceGlobalAddr(HostAddr);
-      uint64_t PtrVal = (uint64_t)DevPtr;
-      proteusHipErrCheck(hipMemcpyHtoD(Dptr, &PtrVal, Bytes));
-    }
-  }
-  proteusHipErrCheck(
-      hipModuleGetFunction(&KernelFunc, HipModule, KernelName.str().c_str()));
-
-  return KernelFunc;
+  return proteus::getKernelFunctionFromImage(
+      KernelName, Image, Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY,
+      VarNameToDevPtr);
 }
 
 hipError_t JitEngineDeviceHIP::launchKernelFunction(hipFunction_t KernelFunc,
@@ -380,20 +233,15 @@ hipError_t JitEngineDeviceHIP::launchKernelFunction(hipFunction_t KernelFunc,
                                                     void **KernelArgs,
                                                     uint64_t ShmemSize,
                                                     hipStream_t Stream) {
-  return hipModuleLaunchKernel(KernelFunc, GridDim.x, GridDim.y, GridDim.z,
-                               BlockDim.x, BlockDim.y, BlockDim.z, ShmemSize,
-                               Stream, KernelArgs, nullptr);
+  return proteus::launchKernelFunction(KernelFunc, GridDim, BlockDim,
+                                       KernelArgs, ShmemSize, Stream);
 }
 
 JitEngineDeviceHIP::JitEngineDeviceHIP() {
-  LLVMInitializeAMDGPUTargetInfo();
-  LLVMInitializeAMDGPUTarget();
-  LLVMInitializeAMDGPUTargetMC();
-  LLVMInitializeAMDGPUAsmPrinter();
+  proteus::InitAMDGPUTarget();
+  hipDeviceProp_t DevProp;
+  proteusHipErrCheck(hipGetDeviceProperties(&DevProp, 0));
 
-  hipDeviceProp_t devProp;
-  proteusHipErrCheck(hipGetDeviceProperties(&devProp, 0));
-
-  DeviceArch = devProp.gcnArchName;
+  DeviceArch = DevProp.gcnArchName;
   DeviceArch = DeviceArch.substr(0, DeviceArch.find_first_of(":"));
 }

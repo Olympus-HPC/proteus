@@ -1,11 +1,15 @@
+#ifndef PROTEUS_LOGGER_HPP
+#define PROTEUS_LOGGER_HPP
+
 #include <filesystem>
-#include <llvm/Support/Error.h>
-#include <llvm/Support/FileSystem.h>
-#include <llvm/Support/raw_ostream.h>
 #include <stdexcept>
 #include <string>
 #include <system_error>
 #include <unistd.h>
+
+#include <llvm/Support/Error.h>
+#include <llvm/Support/FileSystem.h>
+#include <llvm/Support/raw_ostream.h>
 
 namespace proteus {
 
@@ -33,3 +37,5 @@ private:
 };
 
 } // namespace proteus
+
+#endif
