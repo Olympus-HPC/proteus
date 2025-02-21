@@ -14,7 +14,7 @@ set(BC_FILE "${CMAKE_CURRENT_BINARY_DIR}/test.bc")
 
 add_custom_command(
     OUTPUT ${BC_FILE}
-    COMMAND ${CLANG_EXECUTABLE} -O1 -emit-llvm --cuda-device-only -c ${SRC_FILE} -o ${BC_FILE}
+    COMMAND ${CLANG_EXECUTABLE} -emit-llvm --offload-arch=gfx90a --offload-device-only -c ${SRC_FILE} -o ${BC_FILE}
     DEPENDS ${SRC_FILE}
     COMMENT "Generating LLVM bitcode for ${SRC_FILE}"
     VERBATIM
@@ -26,6 +26,5 @@ add_executable(main jit.cpp)
 target_link_libraries(main PRIVATE proteusCore hip::host)
 target_link_options(main PRIVATE --no-undefined)
 set_target_properties(main PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
-
 
 install(TARGETS main)
