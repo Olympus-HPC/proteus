@@ -58,8 +58,8 @@ int main(int argc, char **argv) {
 
   int Arg = 42;
   void *KernelArgs[] = {&Arg};
-  proteusHipErrCheck(hipModuleLaunchKernel(JitKernelFunc, 1, 1, 1, 1, 1, 1, 0,
-                                           0, KernelArgs, nullptr));
+  proteusHipErrCheck(proteus::launchKernelFunction(
+      JitKernelFunc, dim3{1}, dim3{1}, KernelArgs, 0, nullptr));
 
   proteusHipErrCheck(hipDeviceSynchronize());
 

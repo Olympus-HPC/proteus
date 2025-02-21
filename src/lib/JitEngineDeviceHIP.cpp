@@ -233,9 +233,8 @@ hipError_t JitEngineDeviceHIP::launchKernelFunction(hipFunction_t KernelFunc,
                                                     void **KernelArgs,
                                                     uint64_t ShmemSize,
                                                     hipStream_t Stream) {
-  return hipModuleLaunchKernel(KernelFunc, GridDim.x, GridDim.y, GridDim.z,
-                               BlockDim.x, BlockDim.y, BlockDim.z, ShmemSize,
-                               Stream, KernelArgs, nullptr);
+  return proteus::launchKernelFunction(KernelFunc, GridDim, BlockDim,
+                                       KernelArgs, ShmemSize, Stream);
 }
 
 JitEngineDeviceHIP::JitEngineDeviceHIP() {

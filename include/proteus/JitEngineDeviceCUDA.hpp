@@ -44,13 +44,6 @@ public:
 
   std::unique_ptr<MemoryBuffer> codegenObject(Module &M, StringRef DeviceArch);
 
-  cudaError_t
-  cudaModuleLaunchKernel(CUfunction f, unsigned int gridDimX,
-                         unsigned int gridDimY, unsigned int gridDimZ,
-                         unsigned int blockDimX, unsigned int blockDimY,
-                         unsigned int blockDimZ, unsigned int sharedMemBytes,
-                         CUstream hStream, void **kernelParams, void **extra);
-
   CUfunction getKernelFunctionFromImage(StringRef KernelName,
                                         const void *Image);
 

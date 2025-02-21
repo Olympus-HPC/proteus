@@ -128,16 +128,6 @@ void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module &M, Function &F,
   proteus::setLaunchBoundsForKernel(M, F, GridSize, BlockSize);
 }
 
-cudaError_t JitEngineDeviceCUDA::cudaModuleLaunchKernel(
-    CUfunction f, unsigned int gridDimX, unsigned int gridDimY,
-    unsigned int gridDimZ, unsigned int blockDimX, unsigned int blockDimY,
-    unsigned int blockDimZ, unsigned int sharedMemBytes, CUstream hStream,
-    void **kernelParams, void **extra) {
-  cuLaunchKernel(f, gridDimX, gridDimY, gridDimZ, blockDimX, blockDimY,
-                 blockDimZ, sharedMemBytes, hStream, kernelParams, extra);
-  return cudaGetLastError();
-}
-
 CUfunction JitEngineDeviceCUDA::getKernelFunctionFromImage(StringRef KernelName,
                                                            const void *Image) {
   return proteus::getKernelFunctionFromImage(
@@ -149,9 +139,8 @@ cudaError_t
 JitEngineDeviceCUDA::launchKernelFunction(CUfunction KernelFunc, dim3 GridDim,
                                           dim3 BlockDim, void **KernelArgs,
                                           uint64_t ShmemSize, CUstream Stream) {
-  return cudaModuleLaunchKernel(KernelFunc, GridDim.x, GridDim.y, GridDim.z,
-                                BlockDim.x, BlockDim.y, BlockDim.z, ShmemSize,
-                                Stream, KernelArgs, nullptr);
+  return proteus::launchKernelFunction(KernelFunc, GridDim, BlockDim,
+                                       KernelArgs, ShmemSize, Stream);
 }
 
 std::unique_ptr<MemoryBuffer>

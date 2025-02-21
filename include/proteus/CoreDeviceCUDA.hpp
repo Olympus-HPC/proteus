@@ -49,6 +49,15 @@ inline CUfunction getKernelFunctionFromImage(
   return KernelFunc;
 }
 
+inline cudaError_t launchKernelFunction(CUfunction KernelFunc, dim3 GridDim,
+                                        dim3 BlockDim, void **KernelArgs,
+                                        uint64_t ShmemSize, CUstream Stream) {
+  cuLaunchKernel(KernelFunc, GridDim.x, GridDim.y, GridDim.z, BlockDim.x,
+                 BlockDim.y, BlockDim.z, ShmemSize, Stream, KernelArgs,
+                 nullptr);
+  return cudaGetLastError();
+}
+
 } // namespace proteus
 
 #endif
