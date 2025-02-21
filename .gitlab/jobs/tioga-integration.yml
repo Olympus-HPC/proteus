@@ -16,6 +16,7 @@
         - cmake-static_proteus
         - make-static_proteus
         - make-shared_proteus
+        - cmake-proteusCore
         PROTEUS_CI_ROCM_VERSION: ["5.7.1", "6.2.1"]
 
 test-integration-tioga:
