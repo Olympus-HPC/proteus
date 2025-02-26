@@ -23,6 +23,7 @@ set(HEADERS
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngineHost.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitInterface.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitStorageCache.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/LambdaRegistry.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/TimeTracing.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/TransformArgumentSpecialization.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/TransformLambdaSpecialization.hpp

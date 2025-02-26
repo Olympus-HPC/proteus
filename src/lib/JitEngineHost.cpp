@@ -29,6 +29,7 @@
 #include "proteus/CoreLLVM.hpp"
 #include "proteus/JitEngine.hpp"
 #include "proteus/JitEngineHost.hpp"
+#include "proteus/LambdaRegistry.hpp"
 #include "proteus/TransformArgumentSpecialization.hpp"
 #include "proteus/TransformLambdaSpecialization.hpp"
 #include "proteus/Utils.h"
@@ -263,11 +264,12 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
         ArrayRef<RuntimeConstant>{RC,
                                   static_cast<size_t>(NumRuntimeConstants)});
 
-    if (!getJitVariableMap().empty()) {
-      if (auto OptionalMapIt = matchJitVariableMap(F->getName())) {
+    if (!LambdaRegistry::instance().empty()) {
+      if (auto OptionalMapIt =
+              LambdaRegistry::instance().matchJitVariableMap(F->getName())) {
         auto &RCVec = OptionalMapIt.value()->getSecond();
         TransformLambdaSpecialization::transform(*M, *F, RCVec);
-        getJitVariableMap().erase(OptionalMapIt.value());
+        LambdaRegistry::instance().erase(OptionalMapIt.value());
       }
     }
 

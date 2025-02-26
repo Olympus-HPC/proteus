@@ -57,6 +57,7 @@
 #include "proteus/JitCache.hpp"
 #include "proteus/JitEngine.hpp"
 #include "proteus/JitStorageCache.hpp"
+#include "proteus/LambdaRegistry.hpp"
 #include "proteus/TimeTracing.hpp"
 #include "proteus/TransformArgumentSpecialization.hpp"
 #include "proteus/TransformLambdaSpecialization.hpp"
@@ -377,7 +378,7 @@ void JitEngineDevice<ImplT>::specializeIR(
   if (Config.ENV_PROTEUS_SPECIALIZE_ARGS)
     TransformArgumentSpecialization::transform(M, *F, RCIndices, RCVec);
 
-  if (!getJitVariableMap().empty()) {
+  if (!LambdaRegistry::instance().empty()) {
     PROTEUS_DBG(Logger::logs("proteus")
                 << "=== LAMBDA MATCHING\n"
                 << "F trigger " << F->getName() << " -> "
@@ -385,10 +386,11 @@ void JitEngineDevice<ImplT>::specializeIR(
     for (auto &F : M.getFunctionList()) {
       PROTEUS_DBG(Logger::logs("proteus")
                   << " Trying F " << demangle(F.getName().str()) << "\n ");
-      if (auto OptionalMapIt = matchJitVariableMap(F.getName())) {
+      if (auto OptionalMapIt =
+              LambdaRegistry::instance().matchJitVariableMap(F.getName())) {
         auto &RCVec = OptionalMapIt.value()->getSecond();
         TransformLambdaSpecialization::transform(M, F, RCVec);
-        getJitVariableMap().erase(OptionalMapIt.value());
+        LambdaRegistry::instance().erase(OptionalMapIt.value());
         PROTEUS_DBG(Logger::logs("proteus") << "Found match!\n");
         break;
       }
