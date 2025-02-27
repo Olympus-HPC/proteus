@@ -10,6 +10,7 @@
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/JitEngineHost.hpp"
+#include "proteus/LambdaRegistry.hpp"
 #include "proteus/Utils.h"
 
 using namespace proteus;
@@ -39,10 +40,10 @@ extern "C" __attribute__((used)) void *__jit_entry(char *FnName, char *IR,
 }
 
 extern "C" __attribute__((used)) void __jit_push_variable(RuntimeConstant RC) {
-  proteus::pushJitVariable(RC);
+  LambdaRegistry::instance().pushJitVariable(RC);
 }
 
 extern "C" __attribute__((used)) void
 __jit_register_lambda(const char *Symbol) {
-  proteus::registerLambda(Symbol);
+  LambdaRegistry::instance().registerLambda(Symbol);
 }
