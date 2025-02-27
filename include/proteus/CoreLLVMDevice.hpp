@@ -14,6 +14,10 @@
 #include <llvm/IR/ReplaceConstant.h>
 #include <llvm/Object/ELFObjectFile.h>
 
+#include "proteus/LambdaRegistry.hpp"
+#include "proteus/TransformArgumentSpecialization.hpp"
+#include "proteus/TransformLambdaSpecialization.hpp"
+
 namespace proteus {
 
 inline void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
@@ -179,6 +183,55 @@ inline void relinkGlobalsObject(
       break;
     }
   }
+}
+
+inline void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
+                         dim3 &BlockDim, dim3 &GridDim,
+                         const SmallVector<int32_t> &RCIndices,
+                         const SmallVector<RuntimeConstant> &RCVec,
+                         bool SpecializeArgs, bool SpecializeDims,
+                         bool SpecializeLaunchBounds) {
+  Function *F = M.getFunction(FnName);
+
+  assert(F && "Expected non-null function!");
+  // Replace argument uses with runtime constants.
+  if (SpecializeArgs)
+    TransformArgumentSpecialization::transform(M, *F, RCIndices, RCVec);
+
+  if (!LambdaRegistry::instance().empty()) {
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "=== LAMBDA MATCHING\n"
+                << "F trigger " << F->getName() << " -> "
+                << demangle(F->getName().str()) << "\n");
+    for (auto &F : M.getFunctionList()) {
+      PROTEUS_DBG(Logger::logs("proteus")
+                  << " Trying F " << demangle(F.getName().str()) << "\n ");
+      if (auto OptionalMapIt =
+              LambdaRegistry::instance().matchJitVariableMap(F.getName())) {
+        auto &RCVec = OptionalMapIt.value()->getSecond();
+        TransformLambdaSpecialization::transform(M, F, RCVec);
+        LambdaRegistry::instance().erase(OptionalMapIt.value());
+        PROTEUS_DBG(Logger::logs("proteus") << "Found match!\n");
+        break;
+      }
+    }
+    PROTEUS_DBG(Logger::logs("proteus") << "=== END OF MATCHING\n");
+  }
+
+  // Replace uses of blockDim.* and gridDim.* with constants.
+  if (SpecializeDims)
+    setKernelDims(M, GridDim, BlockDim);
+
+  PROTEUS_DBG(Logger::logs("proteus") << "=== JIT Module\n"
+                                      << M << "=== End of JIT Module\n");
+
+  F->setName(FnName + Suffix);
+
+  if (SpecializeLaunchBounds)
+    setLaunchBoundsForKernel(M, *F, GridDim.x * GridDim.y * GridDim.z,
+                             BlockDim.x * BlockDim.y * BlockDim.z);
+
+  runCleanupPassPipeline(M);
 }
 
 } // namespace proteus

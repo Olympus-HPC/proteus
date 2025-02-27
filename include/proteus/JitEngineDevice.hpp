@@ -57,10 +57,7 @@
 #include "proteus/JitCache.hpp"
 #include "proteus/JitEngine.hpp"
 #include "proteus/JitStorageCache.hpp"
-#include "proteus/LambdaRegistry.hpp"
 #include "proteus/TimeTracing.hpp"
-#include "proteus/TransformArgumentSpecialization.hpp"
-#include "proteus/TransformLambdaSpecialization.hpp"
 #include "proteus/Utils.h"
 
 namespace proteus {
@@ -371,48 +368,11 @@ void JitEngineDevice<ImplT>::specializeIR(
     dim3 &GridDim, const SmallVector<int32_t> &RCIndices,
     const SmallVector<RuntimeConstant> &RCVec) {
   TIMESCOPE("specializeIR");
-  Function *F = M.getFunction(FnName);
 
-  assert(F && "Expected non-null function!");
-  // Replace argument uses with runtime constants.
-  if (Config.PROTEUS_SPECIALIZE_ARGS)
-    TransformArgumentSpecialization::transform(M, *F, RCIndices, RCVec);
-
-  if (!LambdaRegistry::instance().empty()) {
-    PROTEUS_DBG(Logger::logs("proteus")
-                << "=== LAMBDA MATCHING\n"
-                << "F trigger " << F->getName() << " -> "
-                << demangle(F->getName().str()) << "\n");
-    for (auto &F : M.getFunctionList()) {
-      PROTEUS_DBG(Logger::logs("proteus")
-                  << " Trying F " << demangle(F.getName().str()) << "\n ");
-      if (auto OptionalMapIt =
-              LambdaRegistry::instance().matchJitVariableMap(F.getName())) {
-        auto &RCVec = OptionalMapIt.value()->getSecond();
-        TransformLambdaSpecialization::transform(M, F, RCVec);
-        LambdaRegistry::instance().erase(OptionalMapIt.value());
-        PROTEUS_DBG(Logger::logs("proteus") << "Found match!\n");
-        break;
-      }
-    }
-    PROTEUS_DBG(Logger::logs("proteus") << "=== END OF MATCHING\n");
-  }
-
-  // Replace uses of blockDim.* and gridDim.* with constants.
-  if (Config.PROTEUS_SPECIALIZE_DIMS) {
-    setKernelDims(M, GridDim, BlockDim);
-  }
-
-  PROTEUS_DBG(Logger::logs("proteus") << "=== JIT Module\n"
-                                      << M << "=== End of JIT Module\n");
-
-  F->setName(FnName + Suffix);
-
-  if (Config.PROTEUS_SET_LAUNCH_BOUNDS)
-    setLaunchBoundsForKernel(M, *F, GridDim.x * GridDim.y * GridDim.z,
-                             BlockDim.x * BlockDim.y * BlockDim.z);
-
-  runCleanupPassPipeline(M);
+  proteus::specializeIR(M, FnName, Suffix, BlockDim, GridDim, RCIndices, RCVec,
+                        Config.PROTEUS_SPECIALIZE_ARGS,
+                        Config.PROTEUS_SPECIALIZE_DIMS,
+                        Config.PROTEUS_SET_LAUNCH_BOUNDS);
 
 #if PROTEUS_ENABLE_DEBUG
   Logger::logs("proteus") << "=== Final Module\n"
