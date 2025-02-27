@@ -11,7 +11,7 @@ inline auto __jit_launch_kernel_internal(void *Kernel, dim3 GridDim,
   using namespace proteus;
 
   static const bool IsProteusDisabled =
-      getEnvOrDefaultBool("ENV_PROTEUS_DISABLE", false);
+      getEnvOrDefaultBool("PROTEUS_DISABLE", false);
   if (IsProteusDisabled) {
     return proteus::launchKernelDirect(
         Kernel, GridDim, BlockDim, KernelArgs, ShmemSize,
