@@ -131,7 +131,7 @@ void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module &M, Function &F,
 CUfunction JitEngineDeviceCUDA::getKernelFunctionFromImage(StringRef KernelName,
                                                            const void *Image) {
   return proteus::getKernelFunctionFromImage(
-      KernelName, Image, Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY,
+      KernelName, Image, Config.PROTEUS_RELINK_GLOBALS_BY_COPY,
       VarNameToDevPtr);
 }
 

@@ -375,7 +375,7 @@ void JitEngineDevice<ImplT>::specializeIR(
 
   assert(F && "Expected non-null function!");
   // Replace argument uses with runtime constants.
-  if (Config.ENV_PROTEUS_SPECIALIZE_ARGS)
+  if (Config.PROTEUS_SPECIALIZE_ARGS)
     TransformArgumentSpecialization::transform(M, *F, RCIndices, RCVec);
 
   if (!LambdaRegistry::instance().empty()) {
@@ -399,7 +399,7 @@ void JitEngineDevice<ImplT>::specializeIR(
   }
 
   // Replace uses of blockDim.* and gridDim.* with constants.
-  if (Config.ENV_PROTEUS_SPECIALIZE_DIMS) {
+  if (Config.PROTEUS_SPECIALIZE_DIMS) {
     setKernelDims(M, GridDim, BlockDim);
   }
 
@@ -408,7 +408,7 @@ void JitEngineDevice<ImplT>::specializeIR(
 
   F->setName(FnName + Suffix);
 
-  if (Config.ENV_PROTEUS_SET_LAUNCH_BOUNDS)
+  if (Config.PROTEUS_SET_LAUNCH_BOUNDS)
     setLaunchBoundsForKernel(M, *F, GridDim.x * GridDim.y * GridDim.z,
                              BlockDim.x * BlockDim.y * BlockDim.z);
 
@@ -477,7 +477,7 @@ JitEngineDevice<ImplT>::compileAndRun(
   std::string Suffix = mangleSuffix(HashValue);
   std::string KernelMangled = (KernelInfo.getName() + Suffix);
 
-  if (Config.ENV_PROTEUS_USE_STORED_CACHE) {
+  if (Config.PROTEUS_USE_STORED_CACHE) {
     // If there device global variables, lookup the IR and codegen object
     // before launching. Else, if there aren't device global variables, lookup
     // the object and launch.
@@ -489,7 +489,7 @@ JitEngineDevice<ImplT>::compileAndRun(
     // TODO: Can we use RTC interfaces for fast linking on object files?
     auto CacheBuf = StorageCache.lookup(HashValue);
     if (CacheBuf) {
-      if (!Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY)
+      if (!Config.PROTEUS_RELINK_GLOBALS_BY_COPY)
         relinkGlobalsObject(CacheBuf->getMemBufferRef());
 
       auto KernelFunc =
@@ -518,13 +518,13 @@ JitEngineDevice<ImplT>::compileAndRun(
 #if PROTEUS_ENABLE_CUDA
   optimizeIR(*JitModule, DeviceArch);
 #elif PROTEUS_ENABLE_HIP
-  if (!Config.ENV_PROTEUS_USE_HIP_RTC_CODEGEN)
+  if (!Config.PROTEUS_USE_HIP_RTC_CODEGEN)
     optimizeIR(*JitModule, DeviceArch);
 #else
 #error "JitEngineDevice requires PROTEUS_ENABLE_CUDA or PROTEUS_ENABLE_HIP"
 #endif
 
-  if (Config.ENV_PROTEUS_DUMP_LLVM_IR) {
+  if (Config.PROTEUS_DUMP_LLVM_IR) {
     const auto CreateDumpDirectory = []() {
       const std::string DumpDirectory = ".proteus-dump";
       std::filesystem::create_directory(DumpDirectory);
@@ -538,10 +538,10 @@ JitEngineDevice<ImplT>::compileAndRun(
   }
 
   auto ObjBuf = codegenObject(*JitModule, DeviceArch);
-  if (Config.ENV_PROTEUS_USE_STORED_CACHE) {
+  if (Config.PROTEUS_USE_STORED_CACHE) {
     StorageCache.store(HashValue, ObjBuf->getMemBufferRef());
   }
-  if (!Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY)
+  if (!Config.PROTEUS_RELINK_GLOBALS_BY_COPY)
     relinkGlobalsObject(ObjBuf->getMemBufferRef());
 
   KernelFunc =

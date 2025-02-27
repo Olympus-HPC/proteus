@@ -40,7 +40,7 @@ public:
   void optimizeIR(Module &M, StringRef Arch, char OptLevel = '3',
                   unsigned CodegenOptLevel = 3);
 
-  bool isProteusDisabled() { return Config.ENV_PROTEUS_DISABLE; }
+  bool isProteusDisabled() { return Config.PROTEUS_DISABLE; }
 
   void pushJitVariable(RuntimeConstant &RC);
   void registerLambda(const char *Symbol);
@@ -53,14 +53,14 @@ protected:
   std::string mangleSuffix(HashT &HashValue);
 
   struct {
-    bool ENV_PROTEUS_USE_STORED_CACHE;
-    bool ENV_PROTEUS_SET_LAUNCH_BOUNDS;
-    bool ENV_PROTEUS_SPECIALIZE_ARGS;
-    bool ENV_PROTEUS_SPECIALIZE_DIMS;
-    bool ENV_PROTEUS_USE_HIP_RTC_CODEGEN;
-    bool ENV_PROTEUS_DISABLE;
-    bool ENV_PROTEUS_DUMP_LLVM_IR;
-    bool ENV_PROTEUS_RELINK_GLOBALS_BY_COPY;
+    bool PROTEUS_USE_STORED_CACHE;
+    bool PROTEUS_SET_LAUNCH_BOUNDS;
+    bool PROTEUS_SPECIALIZE_ARGS;
+    bool PROTEUS_SPECIALIZE_DIMS;
+    bool PROTEUS_USE_HIP_RTC_CODEGEN;
+    bool PROTEUS_DISABLE;
+    bool PROTEUS_DUMP_LLVM_IR;
+    bool PROTEUS_RELINK_GLOBALS_BY_COPY;
   } Config;
 };
 

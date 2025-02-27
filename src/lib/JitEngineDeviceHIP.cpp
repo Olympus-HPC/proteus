@@ -217,14 +217,14 @@ std::unique_ptr<MemoryBuffer>
 JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
   TIMESCOPE("Codegen object");
   return proteus::codegenObject(M, DeviceArch, GlobalLinkedBinaries,
-                                Config.ENV_PROTEUS_USE_HIP_RTC_CODEGEN);
+                                Config.PROTEUS_USE_HIP_RTC_CODEGEN);
 }
 
 hipFunction_t
 JitEngineDeviceHIP::getKernelFunctionFromImage(StringRef KernelName,
                                                const void *Image) {
   return proteus::getKernelFunctionFromImage(
-      KernelName, Image, Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY,
+      KernelName, Image, Config.PROTEUS_RELINK_GLOBALS_BY_COPY,
       VarNameToDevPtr);
 }
 

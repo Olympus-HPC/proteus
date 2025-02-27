@@ -26,34 +26,33 @@ TimeTracerRAII TimeTracer;
 using namespace llvm;
 
 JitEngine::JitEngine() {
-  Config.ENV_PROTEUS_USE_STORED_CACHE =
-      getEnvOrDefaultBool("ENV_PROTEUS_USE_STORED_CACHE", true);
-  Config.ENV_PROTEUS_SET_LAUNCH_BOUNDS =
-      getEnvOrDefaultBool("ENV_PROTEUS_SET_LAUNCH_BOUNDS", true);
-  Config.ENV_PROTEUS_SPECIALIZE_ARGS =
-      getEnvOrDefaultBool("ENV_PROTEUS_SPECIALIZE_ARGS", true);
-  Config.ENV_PROTEUS_SPECIALIZE_DIMS =
-      getEnvOrDefaultBool("ENV_PROTEUS_SPECIALIZE_DIMS", true);
-  Config.ENV_PROTEUS_USE_HIP_RTC_CODEGEN =
-      getEnvOrDefaultBool("ENV_PROTEUS_USE_HIP_RTC_CODEGEN", true);
-  Config.ENV_PROTEUS_DISABLE =
-      getEnvOrDefaultBool("ENV_PROTEUS_DISABLE", false);
-  Config.ENV_PROTEUS_DUMP_LLVM_IR =
-      getEnvOrDefaultBool("ENV_PROTEUS_DUMP_LLVM_IR", false);
-  Config.ENV_PROTEUS_RELINK_GLOBALS_BY_COPY =
-      getEnvOrDefaultBool("ENV_PROTEUS_RELINK_GLOBALS_BY_COPY", false);
+  Config.PROTEUS_USE_STORED_CACHE =
+      getEnvOrDefaultBool("PROTEUS_USE_STORED_CACHE", true);
+  Config.PROTEUS_SET_LAUNCH_BOUNDS =
+      getEnvOrDefaultBool("PROTEUS_SET_LAUNCH_BOUNDS", true);
+  Config.PROTEUS_SPECIALIZE_ARGS =
+      getEnvOrDefaultBool("PROTEUS_SPECIALIZE_ARGS", true);
+  Config.PROTEUS_SPECIALIZE_DIMS =
+      getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS", true);
+  Config.PROTEUS_USE_HIP_RTC_CODEGEN =
+      getEnvOrDefaultBool("PROTEUS_USE_HIP_RTC_CODEGEN", true);
+  Config.PROTEUS_DISABLE = getEnvOrDefaultBool("PROTEUS_DISABLE", false);
+  Config.PROTEUS_DUMP_LLVM_IR =
+      getEnvOrDefaultBool("PROTEUS_DUMP_LLVM_IR", false);
+  Config.PROTEUS_RELINK_GLOBALS_BY_COPY =
+      getEnvOrDefaultBool("PROTEUS_RELINK_GLOBALS_BY_COPY", false);
 
 #if PROTEUS_ENABLE_DEBUG
-  Logger::logs("proteus") << "ENV_PROTEUS_USE_STORED_CACHE "
-                          << Config.ENV_PROTEUS_USE_STORED_CACHE << "\n";
-  Logger::logs("proteus") << "ENV_PROTEUS_SET_LAUNCH_BOUNDS "
-                          << Config.ENV_PROTEUS_SET_LAUNCH_BOUNDS << "\n";
-  Logger::logs("proteus") << "ENV_PROTEUS_SPECIALIZE_ARGS "
-                          << Config.ENV_PROTEUS_SPECIALIZE_ARGS << "\n";
-  Logger::logs("proteus") << "ENV_PROTEUS_SPECIALIZE_DIMS "
-                          << Config.ENV_PROTEUS_SPECIALIZE_DIMS << "\n";
-  Logger::logs("proteus") << "ENV_PROTEUS_USE_HIP_RTC_CODEGEN "
-                          << Config.ENV_PROTEUS_USE_HIP_RTC_CODEGEN << "\n";
+  Logger::logs("proteus") << "PROTEUS_USE_STORED_CACHE "
+                          << Config.PROTEUS_USE_STORED_CACHE << "\n";
+  Logger::logs("proteus") << "PROTEUS_SET_LAUNCH_BOUNDS "
+                          << Config.PROTEUS_SET_LAUNCH_BOUNDS << "\n";
+  Logger::logs("proteus") << "PROTEUS_SPECIALIZE_ARGS "
+                          << Config.PROTEUS_SPECIALIZE_ARGS << "\n";
+  Logger::logs("proteus") << "PROTEUS_SPECIALIZE_DIMS "
+                          << Config.PROTEUS_SPECIALIZE_DIMS << "\n";
+  Logger::logs("proteus") << "PROTEUS_USE_HIP_RTC_CODEGEN "
+                          << Config.PROTEUS_USE_HIP_RTC_CODEGEN << "\n";
 #endif
 }
 
