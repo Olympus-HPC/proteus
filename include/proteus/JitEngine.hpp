@@ -20,7 +20,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/Target/TargetMachine.h>
 
-#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/CoreLLVM.hpp"
 #include "proteus/Debug.h"
 #include "proteus/Hashing.hpp"
 #include "proteus/Logger.hpp"
@@ -35,15 +35,19 @@ inline bool getEnvOrDefaultBool(const char *VarName, bool Default) {
   return EnvValue ? static_cast<bool>(std::stoi(EnvValue)) : Default;
 }
 
+inline int getEnvOrDefaultInt(const char *VarName, int Default) {
+
+  const char *EnvValue = std::getenv(VarName);
+  return EnvValue ? std::stoi(EnvValue) : Default;
+}
+
 class JitEngine {
 public:
+  InitLLVMTargets Init;
   void optimizeIR(Module &M, StringRef Arch, char OptLevel = '3',
                   unsigned CodegenOptLevel = 3);
 
   bool isProteusDisabled() { return Config.PROTEUS_DISABLE; }
-
-  void pushJitVariable(RuntimeConstant &RC);
-  void registerLambda(const char *Symbol);
 
 protected:
   void runCleanupPassPipeline(Module &M);
@@ -61,6 +65,8 @@ protected:
     bool PROTEUS_DISABLE;
     bool PROTEUS_DUMP_LLVM_IR;
     bool PROTEUS_RELINK_GLOBALS_BY_COPY;
+    bool PROTEUS_ASYNC_COMPILATION;
+    int PROTEUS_ASYNC_THREADS;
   } Config;
 };
 

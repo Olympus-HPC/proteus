@@ -134,14 +134,15 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
 
 } // namespace detail
 
-inline void InitNativeTarget() {
-  static std::once_flag Flag;
-  std::call_once(Flag, []() {
-    InitializeNativeTarget();
-    InitializeNativeTargetAsmPrinter();
-    InitializeNativeTargetAsmParser();
-  });
-}
+struct InitLLVMTargets {
+  InitLLVMTargets() {
+    InitializeAllTargetInfos();
+    InitializeAllTargets();
+    InitializeAllTargetMCs();
+    InitializeAllAsmParsers();
+    InitializeAllAsmPrinters();
+  }
+};
 
 inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
                        unsigned CodegenOptLevel) {

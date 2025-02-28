@@ -47,3 +47,7 @@ extern "C" __attribute__((used)) void
 __jit_register_lambda(const char *Symbol) {
   LambdaRegistry::instance().registerLambda(Symbol);
 }
+
+extern "C" void __jit_init_host() {}
+
+extern "C" void __jit_finalize_host() {}
