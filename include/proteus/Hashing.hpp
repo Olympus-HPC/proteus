@@ -29,6 +29,10 @@ public:
   inline bool operator==(const HashT &Other) const {
     return Value == Other.Value;
   }
+
+  inline bool operator<(const HashT &Other) const {
+    return Value < Other.Value;
+  }
 };
 
 inline HashT hashValue(HashT &H) { return H; }

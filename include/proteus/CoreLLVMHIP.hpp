@@ -201,6 +201,8 @@ codegenObject(Module &M, StringRef DeviceArch,
   SmallString<64> TempDir;
   SmallString<64> ObjectPath;
   SmallString<64> SharedObjectPath;
+  // The LLD linker interfaces are not thread-safe, so we use a mutex.
+  static std::mutex Mutex;
   {
     sys::path::system_temp_directory(true, TempDir);
     int ObjectFD;
@@ -220,10 +222,13 @@ codegenObject(Module &M, StringRef DeviceArch,
                                    "-shared", ObjectPath.c_str(),
                                    "-o",      SharedObjectPath.c_str()};
 
-    lld::Result S = lld::lldMain(Args, llvm::outs(), llvm::errs(),
-                                 {{lld::Gnu, &lld::elf::link}});
-    if (S.retCode)
-      PROTEUS_FATAL_ERROR("Error: lld failed");
+    {
+      std::lock_guard LockGuard{Mutex};
+      lld::Result S = lld::lldMain(Args, llvm::outs(), llvm::errs(),
+                                   {{lld::Gnu, &lld::elf::link}});
+      if (S.retCode)
+        PROTEUS_FATAL_ERROR("Error: lld failed");
+    }
   }
 
   ErrorOr<std::unique_ptr<MemoryBuffer>> Buffer =

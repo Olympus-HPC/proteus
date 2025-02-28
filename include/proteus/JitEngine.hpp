@@ -35,6 +35,12 @@ inline bool getEnvOrDefaultBool(const char *VarName, bool Default) {
   return EnvValue ? static_cast<bool>(std::stoi(EnvValue)) : Default;
 }
 
+inline int getEnvOrDefaultInt(const char *VarName, int Default) {
+
+  const char *EnvValue = std::getenv(VarName);
+  return EnvValue ? std::stoi(EnvValue) : Default;
+}
+
 class JitEngine {
 public:
   InitLLVMTargets Init;
@@ -59,6 +65,9 @@ protected:
     bool PROTEUS_DISABLE;
     bool PROTEUS_DUMP_LLVM_IR;
     bool PROTEUS_RELINK_GLOBALS_BY_COPY;
+    bool PROTEUS_ASYNC_COMPILATION;
+    int PROTEUS_ASYNC_THREADS;
+    bool PROTEUS_ASYNC_TEST_BLOCKING;
   } Config;
 };
 

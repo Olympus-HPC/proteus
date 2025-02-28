@@ -32,13 +32,12 @@ inline CUfunction getKernelFunctionFromImage(
 
   proteusCuErrCheck(cuModuleLoadData(&Mod, Image));
   if (RelinkGlobalsByCopy) {
-    for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
+    for (auto &[GlobalName, DevPtr] : VarNameToDevPtr) {
       CUdeviceptr Dptr;
       size_t Bytes;
       proteusCuErrCheck(
           cuModuleGetGlobal(&Dptr, &Bytes, Mod, (GlobalName + "$ptr").c_str()));
 
-      void *DevPtr = resolveDeviceGlobalAddr(HostAddr);
       uint64_t PtrVal = (uint64_t)DevPtr;
       proteusCuErrCheck(cuMemcpyHtoD(Dptr, &PtrVal, Bytes));
     }

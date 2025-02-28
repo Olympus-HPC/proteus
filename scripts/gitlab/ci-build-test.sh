@@ -60,10 +60,24 @@ if grep -q "Manually-specified variables were not used by the project:" cmake_ou
     exit 1
 fi
 make -j
+# Test synchronous compilation by default.
+echo "### TESTING SYNC COMPILATION ###"
 make test
+echo "### END TESTING SYNC COMPILATION ###"
+# Test asynchronous compilation.
+echo "### TESTING (BLOCKING) ASYNC COMPILATION ###"
+PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 make test
+echo "### END TESTING (BLOCKING) ASYNC COMPILATION ###"
+
 # Test also our faster, alternative to HIP RTC codegen.
 if [ "${CI_MACHINE}" == "tioga" ] && [ "${PROTEUS_CI_ROCM_VERSION}" == "6.2.1" ]; then
+  echo "### TESTING SYNC COMPILATION WITH PROTEUS HIP CODEGEN ###"
   PROTEUS_USE_HIP_RTC_CODEGEN=0 make test
+  echo "### END TESTING SYNC COMPILATION WITH PROTEUS HIP CODEGEN ###"
+
+  echo "### TESTING (BLOCKING) ASYNC COMPILATION WITH PROTEUS HIP CODEGEN ###"
+  PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 PROTEUS_USE_HIP_RTC_CODEGEN=0 make test
+  echo "### END TESTING (BLOCKING) ASYNC COMPILATION WITH PROTEUS HIP CODEGEN ###"
 fi
 
 popd
