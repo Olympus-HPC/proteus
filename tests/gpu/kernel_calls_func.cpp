@@ -10,15 +10,15 @@
 #include <cstdio>
 
 // Forward declaration
-extern __device__ void device_function(int a);
+extern __device__ void deviceFunction(int A);
 
-__global__ __attribute__((annotate("jit", 1))) void kernel_function(int a) {
-  device_function(a);
-  printf("Kernel %d\n", a);
+__global__ __attribute__((annotate("jit", 1))) void kernelFunction(int A) {
+  deviceFunction(A);
+  printf("Kernel %d\n", A);
 };
 
 int main() {
-  kernel_function<<<1, 1>>>(1);
+  kernelFunction<<<1, 1>>>(1);
   gpuErrCheck(gpuDeviceSynchronize());
   return 0;
 }

@@ -42,7 +42,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           version: 18
-          ignore: .github | tests | scripts
+          ignore: .github | scripts
           database: build
           extra-args: '-DPROTEUS_ENABLE_HIP'
           style: file

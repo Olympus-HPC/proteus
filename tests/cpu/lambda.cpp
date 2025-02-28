@@ -6,39 +6,39 @@
 
 #include "proteus/JitInterface.hpp"
 
-template <typename F> void run(F &&f) {
-  proteus::register_lambda(f);
-  f();
+template <typename F> void run(F &&Func) {
+  proteus::register_lambda(Func);
+  Func();
 }
 
 int main(int argc, char **argv) {
   int N = 1024;
-  double a = 3.14;
-  double b = 1.484;
+  double A = 3.14;
+  double B = 1.484;
 
-  double *x = static_cast<double *>(malloc(sizeof(double) * N));
-  double *y = static_cast<double *>(malloc(sizeof(double) * N));
+  double *X = static_cast<double *>(malloc(sizeof(double) * N));
+  double *Y = static_cast<double *>(malloc(sizeof(double) * N));
 
-  for (std::size_t i{0}; i < N; i++) {
-    x[i] = 0.31414 * i;
-    y[i] = 0.0;
+  for (std::size_t I{0}; I < N; I++) {
+    X[I] = 0.31414 * I;
+    Y[I] = 0.0;
   }
 
-  std::cout << y[1] << std::endl;
+  std::cout << Y[1] << std::endl;
 
   run([
-    =, N = proteus::jit_variable(N), a = proteus::jit_variable(a),
-    b = proteus::jit_variable(b)
+    =, N = proteus::jit_variable(N), A = proteus::jit_variable(A),
+    B = proteus::jit_variable(B)
   ]() __attribute__((annotate("jit"))) {
-    for (std::size_t i{0}; i < N; ++i) {
-      y[i] += a * b * x[i];
+    for (std::size_t I{0}; I < N; ++I) {
+      Y[I] += A * B * X[I];
     }
   });
 
-  std::cout << y[1] << std::endl;
+  std::cout << Y[1] << std::endl;
 
-  free(x);
-  free(y);
+  free(X);
+  free(Y);
 }
 
 // CHECK: 0

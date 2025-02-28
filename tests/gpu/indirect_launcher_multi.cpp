@@ -15,17 +15,17 @@ __global__ __attribute__((annotate("jit"))) void kernel() {
   printf("Kernel one\n");
 }
 
-__global__ __attribute__((annotate("jit"))) void kernel_two() {
+__global__ __attribute__((annotate("jit"))) void kernelTwo() {
   printf("Kernel two\n");
 }
 
-gpuError_t launcher(const void *kernel_in) {
-  return gpuLaunchKernel(kernel_in, 1, 1, 0, 0, 0);
+gpuError_t launcher(const void *KernelIn) {
+  return gpuLaunchKernel(KernelIn, 1, 1, 0, 0, 0);
 }
 
 int main() {
   gpuErrCheck(launcher((const void *)kernel));
-  gpuErrCheck(launcher((const void *)kernel_two));
+  gpuErrCheck(launcher((const void *)kernelTwo));
   gpuErrCheck(gpuDeviceSynchronize());
   return 0;
 }

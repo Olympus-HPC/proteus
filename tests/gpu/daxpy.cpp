@@ -8,22 +8,21 @@
 #include "gpu_common.h"
 
 __global__ __attribute__((annotate("jit", 4), noinline)) void
-daxpy_impl(double a, double *x, double *y, int N) {
-  std::size_t i = blockIdx.x * 256 + threadIdx.x;
-  if (i < N) {
-    for (int j = 0; j < N; ++j)
-      y[i] += x[i] * a;
+daxpyImpl(double A, double *X, double *Y, int N) {
+  std::size_t I = blockIdx.x * 256 + threadIdx.x;
+  if (I < N) {
+    for (int J = 0; J < N; ++J)
+      Y[I] += X[I] * A;
   }
 }
 
-void daxpy(double a, double *x, double *y, int N) {
-  const std::size_t grid_size = (((N) + (256) - 1) / (256));
+void daxpy(double A, double *X, double *Y, int N) {
+  const std::size_t GridSize = (((N) + (256) - 1) / (256));
 #if PROTEUS_ENABLE_HIP
-  hipLaunchKernelGGL((daxpy_impl), dim3(grid_size), dim3(256), 0, 0, a, x, y,
-                     N);
+  hipLaunchKernelGGL((daxpyImpl), dim3(GridSize), dim3(256), 0, 0, A, X, Y, N);
 #elif PROTEUS_ENABLE_CUDA
-  void *args[] = {&a, &x, &y, &N};
-  cudaLaunchKernel((const void *)(daxpy_impl), dim3(grid_size), dim3(256), args,
+  void *Args[] = {&A, &X, &Y, &N};
+  cudaLaunchKernel((const void *)(daxpyImpl), dim3(GridSize), dim3(256), Args,
                    0, 0);
 #else
 #error Must provide PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA
@@ -32,27 +31,27 @@ void daxpy(double a, double *x, double *y, int N) {
 
 int main(int argc, char **argv) {
   int N = 1024;
-  double *x;
-  double *y;
+  double *X;
+  double *Y;
 
-  gpuErrCheck(gpuMallocManaged(&x, sizeof(double) * N));
-  gpuErrCheck(gpuMallocManaged(&y, sizeof(double) * N));
+  gpuErrCheck(gpuMallocManaged(&X, sizeof(double) * N));
+  gpuErrCheck(gpuMallocManaged(&Y, sizeof(double) * N));
 
-  for (std::size_t i{0}; i < N; i++) {
-    x[i] = 0.31414 * i;
-    y[i] = 0.0;
+  for (std::size_t I{0}; I < N; I++) {
+    X[I] = 0.31414 * I;
+    Y[I] = 0.0;
   }
 
-  std::cout << y[10] << std::endl;
-  daxpy(6.2, x, y, N);
+  std::cout << Y[10] << std::endl;
+  daxpy(6.2, X, Y, N);
   gpuErrCheck(gpuDeviceSynchronize());
-  std::cout << y[10] << std::endl;
-  daxpy(6.2, x, y, N);
+  std::cout << Y[10] << std::endl;
+  daxpy(6.2, X, Y, N);
   gpuErrCheck(gpuDeviceSynchronize());
-  std::cout << y[10] << std::endl;
+  std::cout << Y[10] << std::endl;
 
-  gpuErrCheck(gpuFree(x));
-  gpuErrCheck(gpuFree(y));
+  gpuErrCheck(gpuFree(X));
+  gpuErrCheck(gpuFree(Y));
 }
 
 // CHECK: 0

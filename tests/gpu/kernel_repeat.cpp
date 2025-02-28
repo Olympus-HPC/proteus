@@ -8,12 +8,12 @@
 
 #include "gpu_common.h"
 
-__global__ __attribute__((annotate("jit", 1))) void kernel(int i) {
-  printf("Kernel i %d\n", i);
+__global__ __attribute__((annotate("jit", 1))) void kernel(int I) {
+  printf("Kernel i %d\n", I);
 }
 
 int main() {
-  for (int i = 0; i < 1000; i++)
+  for (int I = 0; I < 1000; I++)
     kernel<<<1, 1>>>(42);
   gpuErrCheck(gpuDeviceSynchronize());
   return 0;

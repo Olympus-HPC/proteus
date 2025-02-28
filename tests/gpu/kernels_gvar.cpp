@@ -8,21 +8,21 @@
 
 #include "gpu_common.h"
 
-__device__ int gvar = 23;
+__device__ int Gvar = 23;
 
 __global__ __attribute__((annotate("jit"))) void kernel() {
-  gvar++;
-  printf("Kernel gvar %d addr %p\n", gvar, &gvar);
+  Gvar++;
+  printf("Kernel gvar %d addr %p\n", Gvar, &Gvar);
 }
 
 __global__ __attribute__((annotate("jit"))) void kernel2() {
-  gvar++;
-  printf("Kernel2 gvar %d addr %p\n", gvar, &gvar);
+  Gvar++;
+  printf("Kernel2 gvar %d addr %p\n", Gvar, &Gvar);
 }
 
 __global__ void kernel3() {
-  gvar++;
-  printf("Kernel3 gvar %d addr %p\n", gvar, &gvar);
+  Gvar++;
+  printf("Kernel3 gvar %d addr %p\n", Gvar, &Gvar);
 }
 
 int main() {

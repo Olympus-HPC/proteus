@@ -11,13 +11,13 @@
 
 #include "gpu_common.h"
 
-__global__ __attribute__((annotate("jit", 1))) void kernel(int a) {
-  printf("Kernel %d\n", a);
+__global__ __attribute__((annotate("jit", 1))) void kernel(int A) {
+  printf("Kernel %d\n", A);
 }
 
-template <typename T> gpuError_t launcher(T kernel_in, int a) {
-  void *args[] = {&a};
-  return gpuLaunchKernel((const void *)kernel_in, 1, 1, args, 0, 0);
+template <typename T> gpuError_t launcher(T KernelIn, int A) {
+  void *Args[] = {&A};
+  return gpuLaunchKernel((const void *)KernelIn, 1, 1, Args, 0, 0);
 }
 
 int main() {

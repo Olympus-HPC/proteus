@@ -10,7 +10,7 @@
 
 #include "gpu_common.h"
 
-extern __global__ void kernel_gvar();
+extern __global__ void kernelGvar();
 
 __global__ __attribute__((annotate("jit"))) void kernel() {
   printf("Kernel\n");
@@ -19,7 +19,7 @@ __global__ __attribute__((annotate("jit"))) void kernel() {
 int main() {
   kernel<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
-  kernel_gvar<<<1, 1>>>();
+  kernelGvar<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
   return 0;
 }

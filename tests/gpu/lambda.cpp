@@ -12,29 +12,29 @@
 
 template <typename T>
 __global__ __attribute__((annotate("jit"))) void kernel(T LB) {
-  std::size_t i = blockIdx.x + threadIdx.x;
-  if (i == 0)
+  std::size_t I = blockIdx.x + threadIdx.x;
+  if (I == 0)
     LB();
 }
 
 template <typename T>
-__global__ __attribute__((annotate("jit"))) void kernel(int n, T LB) {
-  std::size_t i = blockDim.x * blockIdx.x + threadIdx.x;
-  if (i < n)
-    LB(i);
+__global__ __attribute__((annotate("jit"))) void kernel(int N, T LB) {
+  std::size_t I = blockDim.x * blockIdx.x + threadIdx.x;
+  if (I < N)
+    LB(I);
 }
 
-template <typename T> void register_run(T &&LB) {
+template <typename T> void registerRun(T &&LB) {
   proteus::register_lambda(LB);
   kernel<<<1, 1>>>(LB);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
-template <typename T> void register_run(int n, T &&LB) {
+template <typename T> void registerRun(int N, T &&LB) {
   proteus::register_lambda(LB);
-  constexpr int block_size = 256;
-  const int num_blocks = (n + block_size - 1) / block_size;
-  kernel<<<num_blocks, block_size>>>(n, LB);
+  constexpr int BlockSize = 256;
+  const int NumBlocks = (N + BlockSize - 1) / BlockSize;
+  kernel<<<NumBlocks, BlockSize>>>(N, LB);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
@@ -43,37 +43,37 @@ template <typename T> void run(T &&LB) {
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
-inline void launch(double c, double *x) {
-  register_run([ =, c = proteus::jit_variable(c) ] __device__
-               __attribute__((annotate("jit"))) () { x[0] = c + 2; });
-  std::cout << "x[0] = " << x[0] << "\n";
+inline void launch(double C, double *X) {
+  registerRun([ =, C = proteus::jit_variable(C) ] __device__
+              __attribute__((annotate("jit"))) () { X[0] = C + 2; });
+  std::cout << "x[0] = " << X[0] << "\n";
 }
 
 int main(int argc, char **argv) {
-  double a{3.14};
-  double b{1.23};
-  double c{4.56};
-  double *x;
-  gpuErrCheck(gpuMallocManaged(&x, sizeof(double) * 2));
+  double A{3.14};
+  double B{1.23};
+  double C{4.56};
+  double *X;
+  gpuErrCheck(gpuMallocManaged(&X, sizeof(double) * 2));
 
-  register_run([ =, a = proteus::jit_variable(a) ] __device__
-               __attribute__((annotate("jit"))) () { x[0] = a; });
+  registerRun([ =, A = proteus::jit_variable(A) ] __device__
+              __attribute__((annotate("jit"))) () { X[0] = A; });
 
-  std::cout << "x[0] = " << x[0] << "\n";
+  std::cout << "x[0] = " << X[0] << "\n";
 
-  register_run(
-      2, [ =, c = proteus::jit_variable(c) ] __device__
-      __attribute__((annotate("jit"))) (int i) { x[i] = c; });
+  registerRun(
+      2, [ =, C = proteus::jit_variable(C) ] __device__
+      __attribute__((annotate("jit"))) (int I) { X[I] = C; });
 
-  std::cout << "x[0:1] = " << x[0] << "," << x[1] << "\n";
+  std::cout << "x[0:1] = " << X[0] << "," << X[1] << "\n";
 
   run(proteus::register_lambda([
-    =, a = proteus::jit_variable(a), b = proteus::jit_variable(b)
-  ] __device__ __attribute__((annotate("jit"))) () { x[0] = a + b; }));
-  std::cout << "x[0] = " << x[0] << "\n";
+    =, A = proteus::jit_variable(A), B = proteus::jit_variable(B)
+  ] __device__ __attribute__((annotate("jit"))) () { X[0] = A + B; }));
+  std::cout << "x[0] = " << X[0] << "\n";
 
-  launch(c, x);
-  gpuErrCheck(gpuFree(x));
+  launch(C, X);
+  gpuErrCheck(gpuFree(X));
 }
 
 // CHECK: x[0] = 3.14

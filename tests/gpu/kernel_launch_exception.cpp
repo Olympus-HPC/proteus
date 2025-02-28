@@ -22,8 +22,8 @@ int main() {
   try {
     if (gpuLaunchKernel((const void *)&kernel, 1, 1, 0, 0, 0) != gpuSuccess)
       throw std::runtime_error("Launch failed");
-  } catch (const std::exception &e) {
-    std::cerr << "Exception " << e.what() << "\n";
+  } catch (const std::exception &E) {
+    std::cerr << "Exception " << E.what() << "\n";
   }
   gpuErrCheck(gpuDeviceSynchronize());
   return 0;
