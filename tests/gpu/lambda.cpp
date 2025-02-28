@@ -9,6 +9,7 @@
 #include "proteus/JitInterface.hpp"
 
 #include "gpu_common.h"
+#include <proteus/JitInterface.hpp>
 
 template <typename T>
 __global__ __attribute__((annotate("jit"))) void kernel(T LB) {
@@ -50,6 +51,8 @@ inline void launch(double C, double *X) {
 }
 
 int main(int argc, char **argv) {
+  proteus::init();
+
   double A{3.14};
   double B{1.23};
   double C{4.56};

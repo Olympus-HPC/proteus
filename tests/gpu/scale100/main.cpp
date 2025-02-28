@@ -8,6 +8,8 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include <proteus/JitInterface.hpp>
+
 __global__ void foo0(int *, int *, int);
 __global__ void foo1(int *, int *, int);
 __global__ void foo2(int *, int *, int);
@@ -110,6 +112,8 @@ __global__ void foo98(int *, int *, int);
 __global__ void foo99(int *, int *, int);
 
 int main() {
+  proteus::init();
+
   int *A = nullptr;
   gpuErrCheck(gpuMallocManaged(&A, sizeof(int) * 100));
   int *B = nullptr;
@@ -243,6 +247,8 @@ int main() {
       fprintf(stdout, "Gvar failed gvar%d = %d != 102\n", NGvar, HostGvar);
     fprintf(stdout, "Verification failed\n");
   }
+
+  proteus::finalize();
   return 0;
 }
 

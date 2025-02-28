@@ -20,8 +20,7 @@ int main(int argc, char **argv) {
   std::string BitcodeFN(argv[1]);
   const char *KernelSym = argv[2];
 
-  proteus::InitNativeTarget();
-  proteus::InitAMDGPUTarget();
+  proteus::InitLLVMTargets Init;
 
   std::string DeviceArch;
   hipDeviceProp_t DevProp;
@@ -64,5 +63,6 @@ int main(int argc, char **argv) {
   proteusHipErrCheck(hipDeviceSynchronize());
 
   std::cout << "Success \n";
+
   return 0;
 }
