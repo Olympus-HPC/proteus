@@ -8,9 +8,9 @@
 #include "gpu_common.h"
 
 template <typename T>
-__global__ __attribute__((annotate("jit", 1))) void kernel(T arg) {
-  volatile T local;
-  local = arg;
+__global__ __attribute__((annotate("jit", 1))) void kernel(T Arg) {
+  volatile T Local;
+  Local = Arg;
 }
 
 int main(int argc, char **argv) {

@@ -9,12 +9,10 @@
 
 #include "gpu_common.h"
 
-__global__ void kernel() {
-  printf("Kernel\n");
-}
+__global__ void kernel() { printf("Kernel\n"); }
 
-template <typename T> gpuError_t launcher(T kernel_in) {
-  return gpuLaunchKernel((const void *)kernel_in, 1, 1, 0, 0, 0);
+template <typename T> gpuError_t launcher(T KernelIn) {
+  return gpuLaunchKernel((const void *)KernelIn, 1, 1, 0, 0, 0);
 }
 
 int main() {

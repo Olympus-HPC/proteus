@@ -1,26 +1,21 @@
 #include "../gpu_common.h"
 
+__device__ void foo88Device0(int *, int *, int);
 
+__device__ void foo87Device0(int *A, int *B, int N) {
+  int Idx = blockIdx.x * blockDim.x + threadIdx.x;
+  int Stride = gridDim.x * blockDim.x;
 
-__device__ void foo88_device0(int *, int *, int);
-
-__device__ void foo87_device0(int *a, int *b, int n) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = gridDim.x * blockDim.x;
-
-    for(int i=idx; i<n; i+=stride)
-        a[i] = a[i] + b[i];
+  for (int I = Idx; I < N; I += Stride)
+    A[I] = A[I] + B[I];
 }
 
-__global__ __attribute__((annotate("jit"))) void foo87 (int *a, int *b, int n) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = gridDim.x * blockDim.x;
+__global__ __attribute__((annotate("jit"))) void foo87(int *A, int *B, int N) {
+  int Idx = blockIdx.x * blockDim.x + threadIdx.x;
+  int Stride = gridDim.x * blockDim.x;
 
-    for(int i=idx; i<n; i+=stride)
-        a[i] = a[i] + b[i];
+  for (int I = Idx; I < N; I += Stride)
+    A[I] = A[I] + B[I];
 
-    foo88_device0(a, b, n);
-
-    
+  foo88Device0(A, B, N);
 }
-

@@ -1,33 +1,28 @@
 #include "../gpu_common.h"
 
+extern __device__ int Gvar0;
 
-extern __device__ int gvar0;
+__device__ void foo18Device0(int *, int *, int);
 
+__device__ void foo17Device0(int *A, int *B, int N) {
+  int Idx = blockIdx.x * blockDim.x + threadIdx.x;
+  int Stride = gridDim.x * blockDim.x;
 
-__device__ void foo18_device0(int *, int *, int);
-
-__device__ void foo17_device0(int *a, int *b, int n) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = gridDim.x * blockDim.x;
-
-    for(int i=idx; i<n; i+=stride)
-        a[i] = a[i] + b[i];
+  for (int I = Idx; I < N; I += Stride)
+    A[I] = A[I] + B[I];
 }
 
-__global__ __attribute__((annotate("jit"))) void foo17 (int *a, int *b, int n) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = gridDim.x * blockDim.x;
+__global__ __attribute__((annotate("jit"))) void foo17(int *A, int *B, int N) {
+  int Idx = blockIdx.x * blockDim.x + threadIdx.x;
+  int Stride = gridDim.x * blockDim.x;
 
-    for(int i=idx; i<n; i+=stride)
-        a[i] = a[i] + b[i];
+  for (int I = Idx; I < N; I += Stride)
+    A[I] = A[I] + B[I];
 
-    foo18_device0(a, b, n);
+  foo18Device0(A, B, N);
 
-    
-    if(idx == 0) {
-        
-        atomicAdd(&gvar0, 1);
-    }
-    
+  if (Idx == 0) {
+
+    atomicAdd(&Gvar0, 1);
+  }
 }
-

@@ -10,18 +10,18 @@
 
 #include "gpu_common.h"
 
-__global__ __attribute__((annotate("jit"))) void kernel(int a, int b) {
-  a += 1;
-  b += 2;
-  printf("Kernel %d %d\n", a, b);
+__global__ __attribute__((annotate("jit"))) void kernel(int A, int B) {
+  A += 1;
+  B += 2;
+  printf("Kernel %d %d\n", A, B);
 }
 
 int main() {
-  int a = 23;
-  int b = 42;
-  kernel<<<1, 1>>>(a, b);
-  void *args[] = {&a, &b};
-  gpuErrCheck(gpuLaunchKernel((const void *)kernel, 1, 1, args, 0, 0));
+  int A = 23;
+  int B = 42;
+  kernel<<<1, 1>>>(A, B);
+  void *Args[] = {&A, &B};
+  gpuErrCheck(gpuLaunchKernel((const void *)kernel, 1, 1, Args, 0, 0));
   gpuErrCheck(gpuDeviceSynchronize());
   return 0;
 }

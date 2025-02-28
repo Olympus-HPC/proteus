@@ -8,9 +8,6 @@
 #include <cstdio>
 #include <cstdlib>
 
-
-
-
 __global__ void foo0(int *, int *, int);
 __global__ void foo1(int *, int *, int);
 __global__ void foo2(int *, int *, int);
@@ -113,141 +110,140 @@ __global__ void foo98(int *, int *, int);
 __global__ void foo99(int *, int *, int);
 
 int main() {
-    int *a = nullptr;
-    gpuErrCheck(gpuMallocManaged(&a, sizeof(int)*100));
-    int *b = nullptr;
-    gpuErrCheck(gpuMallocManaged(&b, sizeof(int)*100));
-    for(int i=0; i<100; ++i) {
-        a[i] = 0;
-        b[i] = 1;
+  int *A = nullptr;
+  gpuErrCheck(gpuMallocManaged(&A, sizeof(int) * 100));
+  int *B = nullptr;
+  gpuErrCheck(gpuMallocManaged(&B, sizeof(int) * 100));
+  for (int I = 0; I < 100; ++I) {
+    A[I] = 0;
+    B[I] = 1;
+  }
+
+  int NumBlocks = std::max(1, 100 / 256);
+
+  foo0<<<NumBlocks, 256>>>(A, B, 100);
+  foo1<<<NumBlocks, 256>>>(A, B, 100);
+  foo2<<<NumBlocks, 256>>>(A, B, 100);
+  foo3<<<NumBlocks, 256>>>(A, B, 100);
+  foo4<<<NumBlocks, 256>>>(A, B, 100);
+  foo5<<<NumBlocks, 256>>>(A, B, 100);
+  foo6<<<NumBlocks, 256>>>(A, B, 100);
+  foo7<<<NumBlocks, 256>>>(A, B, 100);
+  foo8<<<NumBlocks, 256>>>(A, B, 100);
+  foo9<<<NumBlocks, 256>>>(A, B, 100);
+  foo10<<<NumBlocks, 256>>>(A, B, 100);
+  foo11<<<NumBlocks, 256>>>(A, B, 100);
+  foo12<<<NumBlocks, 256>>>(A, B, 100);
+  foo13<<<NumBlocks, 256>>>(A, B, 100);
+  foo14<<<NumBlocks, 256>>>(A, B, 100);
+  foo15<<<NumBlocks, 256>>>(A, B, 100);
+  foo16<<<NumBlocks, 256>>>(A, B, 100);
+  foo17<<<NumBlocks, 256>>>(A, B, 100);
+  foo18<<<NumBlocks, 256>>>(A, B, 100);
+  foo19<<<NumBlocks, 256>>>(A, B, 100);
+  foo20<<<NumBlocks, 256>>>(A, B, 100);
+  foo21<<<NumBlocks, 256>>>(A, B, 100);
+  foo22<<<NumBlocks, 256>>>(A, B, 100);
+  foo23<<<NumBlocks, 256>>>(A, B, 100);
+  foo24<<<NumBlocks, 256>>>(A, B, 100);
+  foo25<<<NumBlocks, 256>>>(A, B, 100);
+  foo26<<<NumBlocks, 256>>>(A, B, 100);
+  foo27<<<NumBlocks, 256>>>(A, B, 100);
+  foo28<<<NumBlocks, 256>>>(A, B, 100);
+  foo29<<<NumBlocks, 256>>>(A, B, 100);
+  foo30<<<NumBlocks, 256>>>(A, B, 100);
+  foo31<<<NumBlocks, 256>>>(A, B, 100);
+  foo32<<<NumBlocks, 256>>>(A, B, 100);
+  foo33<<<NumBlocks, 256>>>(A, B, 100);
+  foo34<<<NumBlocks, 256>>>(A, B, 100);
+  foo35<<<NumBlocks, 256>>>(A, B, 100);
+  foo36<<<NumBlocks, 256>>>(A, B, 100);
+  foo37<<<NumBlocks, 256>>>(A, B, 100);
+  foo38<<<NumBlocks, 256>>>(A, B, 100);
+  foo39<<<NumBlocks, 256>>>(A, B, 100);
+  foo40<<<NumBlocks, 256>>>(A, B, 100);
+  foo41<<<NumBlocks, 256>>>(A, B, 100);
+  foo42<<<NumBlocks, 256>>>(A, B, 100);
+  foo43<<<NumBlocks, 256>>>(A, B, 100);
+  foo44<<<NumBlocks, 256>>>(A, B, 100);
+  foo45<<<NumBlocks, 256>>>(A, B, 100);
+  foo46<<<NumBlocks, 256>>>(A, B, 100);
+  foo47<<<NumBlocks, 256>>>(A, B, 100);
+  foo48<<<NumBlocks, 256>>>(A, B, 100);
+  foo49<<<NumBlocks, 256>>>(A, B, 100);
+  foo50<<<NumBlocks, 256>>>(A, B, 100);
+  foo51<<<NumBlocks, 256>>>(A, B, 100);
+  foo52<<<NumBlocks, 256>>>(A, B, 100);
+  foo53<<<NumBlocks, 256>>>(A, B, 100);
+  foo54<<<NumBlocks, 256>>>(A, B, 100);
+  foo55<<<NumBlocks, 256>>>(A, B, 100);
+  foo56<<<NumBlocks, 256>>>(A, B, 100);
+  foo57<<<NumBlocks, 256>>>(A, B, 100);
+  foo58<<<NumBlocks, 256>>>(A, B, 100);
+  foo59<<<NumBlocks, 256>>>(A, B, 100);
+  foo60<<<NumBlocks, 256>>>(A, B, 100);
+  foo61<<<NumBlocks, 256>>>(A, B, 100);
+  foo62<<<NumBlocks, 256>>>(A, B, 100);
+  foo63<<<NumBlocks, 256>>>(A, B, 100);
+  foo64<<<NumBlocks, 256>>>(A, B, 100);
+  foo65<<<NumBlocks, 256>>>(A, B, 100);
+  foo66<<<NumBlocks, 256>>>(A, B, 100);
+  foo67<<<NumBlocks, 256>>>(A, B, 100);
+  foo68<<<NumBlocks, 256>>>(A, B, 100);
+  foo69<<<NumBlocks, 256>>>(A, B, 100);
+  foo70<<<NumBlocks, 256>>>(A, B, 100);
+  foo71<<<NumBlocks, 256>>>(A, B, 100);
+  foo72<<<NumBlocks, 256>>>(A, B, 100);
+  foo73<<<NumBlocks, 256>>>(A, B, 100);
+  foo74<<<NumBlocks, 256>>>(A, B, 100);
+  foo75<<<NumBlocks, 256>>>(A, B, 100);
+  foo76<<<NumBlocks, 256>>>(A, B, 100);
+  foo77<<<NumBlocks, 256>>>(A, B, 100);
+  foo78<<<NumBlocks, 256>>>(A, B, 100);
+  foo79<<<NumBlocks, 256>>>(A, B, 100);
+  foo80<<<NumBlocks, 256>>>(A, B, 100);
+  foo81<<<NumBlocks, 256>>>(A, B, 100);
+  foo82<<<NumBlocks, 256>>>(A, B, 100);
+  foo83<<<NumBlocks, 256>>>(A, B, 100);
+  foo84<<<NumBlocks, 256>>>(A, B, 100);
+  foo85<<<NumBlocks, 256>>>(A, B, 100);
+  foo86<<<NumBlocks, 256>>>(A, B, 100);
+  foo87<<<NumBlocks, 256>>>(A, B, 100);
+  foo88<<<NumBlocks, 256>>>(A, B, 100);
+  foo89<<<NumBlocks, 256>>>(A, B, 100);
+  foo90<<<NumBlocks, 256>>>(A, B, 100);
+  foo91<<<NumBlocks, 256>>>(A, B, 100);
+  foo92<<<NumBlocks, 256>>>(A, B, 100);
+  foo93<<<NumBlocks, 256>>>(A, B, 100);
+  foo94<<<NumBlocks, 256>>>(A, B, 100);
+  foo95<<<NumBlocks, 256>>>(A, B, 100);
+  foo96<<<NumBlocks, 256>>>(A, B, 100);
+  foo97<<<NumBlocks, 256>>>(A, B, 100);
+  foo98<<<NumBlocks, 256>>>(A, B, 100);
+  foo99<<<NumBlocks, 256>>>(A, B, 100);
+  gpuErrCheck(gpuDeviceSynchronize());
+
+  bool VecaddSuccess = true;
+  for (int I = 0; I < 100; ++I)
+    if (A[I] != 200) {
+      VecaddSuccess = false;
+      break;
     }
 
-    int num_blocks = std::max(1, 100/256);
-    
-    foo0<<<num_blocks, 256>>>(a, b, 100);
-    foo1<<<num_blocks, 256>>>(a, b, 100);
-    foo2<<<num_blocks, 256>>>(a, b, 100);
-    foo3<<<num_blocks, 256>>>(a, b, 100);
-    foo4<<<num_blocks, 256>>>(a, b, 100);
-    foo5<<<num_blocks, 256>>>(a, b, 100);
-    foo6<<<num_blocks, 256>>>(a, b, 100);
-    foo7<<<num_blocks, 256>>>(a, b, 100);
-    foo8<<<num_blocks, 256>>>(a, b, 100);
-    foo9<<<num_blocks, 256>>>(a, b, 100);
-    foo10<<<num_blocks, 256>>>(a, b, 100);
-    foo11<<<num_blocks, 256>>>(a, b, 100);
-    foo12<<<num_blocks, 256>>>(a, b, 100);
-    foo13<<<num_blocks, 256>>>(a, b, 100);
-    foo14<<<num_blocks, 256>>>(a, b, 100);
-    foo15<<<num_blocks, 256>>>(a, b, 100);
-    foo16<<<num_blocks, 256>>>(a, b, 100);
-    foo17<<<num_blocks, 256>>>(a, b, 100);
-    foo18<<<num_blocks, 256>>>(a, b, 100);
-    foo19<<<num_blocks, 256>>>(a, b, 100);
-    foo20<<<num_blocks, 256>>>(a, b, 100);
-    foo21<<<num_blocks, 256>>>(a, b, 100);
-    foo22<<<num_blocks, 256>>>(a, b, 100);
-    foo23<<<num_blocks, 256>>>(a, b, 100);
-    foo24<<<num_blocks, 256>>>(a, b, 100);
-    foo25<<<num_blocks, 256>>>(a, b, 100);
-    foo26<<<num_blocks, 256>>>(a, b, 100);
-    foo27<<<num_blocks, 256>>>(a, b, 100);
-    foo28<<<num_blocks, 256>>>(a, b, 100);
-    foo29<<<num_blocks, 256>>>(a, b, 100);
-    foo30<<<num_blocks, 256>>>(a, b, 100);
-    foo31<<<num_blocks, 256>>>(a, b, 100);
-    foo32<<<num_blocks, 256>>>(a, b, 100);
-    foo33<<<num_blocks, 256>>>(a, b, 100);
-    foo34<<<num_blocks, 256>>>(a, b, 100);
-    foo35<<<num_blocks, 256>>>(a, b, 100);
-    foo36<<<num_blocks, 256>>>(a, b, 100);
-    foo37<<<num_blocks, 256>>>(a, b, 100);
-    foo38<<<num_blocks, 256>>>(a, b, 100);
-    foo39<<<num_blocks, 256>>>(a, b, 100);
-    foo40<<<num_blocks, 256>>>(a, b, 100);
-    foo41<<<num_blocks, 256>>>(a, b, 100);
-    foo42<<<num_blocks, 256>>>(a, b, 100);
-    foo43<<<num_blocks, 256>>>(a, b, 100);
-    foo44<<<num_blocks, 256>>>(a, b, 100);
-    foo45<<<num_blocks, 256>>>(a, b, 100);
-    foo46<<<num_blocks, 256>>>(a, b, 100);
-    foo47<<<num_blocks, 256>>>(a, b, 100);
-    foo48<<<num_blocks, 256>>>(a, b, 100);
-    foo49<<<num_blocks, 256>>>(a, b, 100);
-    foo50<<<num_blocks, 256>>>(a, b, 100);
-    foo51<<<num_blocks, 256>>>(a, b, 100);
-    foo52<<<num_blocks, 256>>>(a, b, 100);
-    foo53<<<num_blocks, 256>>>(a, b, 100);
-    foo54<<<num_blocks, 256>>>(a, b, 100);
-    foo55<<<num_blocks, 256>>>(a, b, 100);
-    foo56<<<num_blocks, 256>>>(a, b, 100);
-    foo57<<<num_blocks, 256>>>(a, b, 100);
-    foo58<<<num_blocks, 256>>>(a, b, 100);
-    foo59<<<num_blocks, 256>>>(a, b, 100);
-    foo60<<<num_blocks, 256>>>(a, b, 100);
-    foo61<<<num_blocks, 256>>>(a, b, 100);
-    foo62<<<num_blocks, 256>>>(a, b, 100);
-    foo63<<<num_blocks, 256>>>(a, b, 100);
-    foo64<<<num_blocks, 256>>>(a, b, 100);
-    foo65<<<num_blocks, 256>>>(a, b, 100);
-    foo66<<<num_blocks, 256>>>(a, b, 100);
-    foo67<<<num_blocks, 256>>>(a, b, 100);
-    foo68<<<num_blocks, 256>>>(a, b, 100);
-    foo69<<<num_blocks, 256>>>(a, b, 100);
-    foo70<<<num_blocks, 256>>>(a, b, 100);
-    foo71<<<num_blocks, 256>>>(a, b, 100);
-    foo72<<<num_blocks, 256>>>(a, b, 100);
-    foo73<<<num_blocks, 256>>>(a, b, 100);
-    foo74<<<num_blocks, 256>>>(a, b, 100);
-    foo75<<<num_blocks, 256>>>(a, b, 100);
-    foo76<<<num_blocks, 256>>>(a, b, 100);
-    foo77<<<num_blocks, 256>>>(a, b, 100);
-    foo78<<<num_blocks, 256>>>(a, b, 100);
-    foo79<<<num_blocks, 256>>>(a, b, 100);
-    foo80<<<num_blocks, 256>>>(a, b, 100);
-    foo81<<<num_blocks, 256>>>(a, b, 100);
-    foo82<<<num_blocks, 256>>>(a, b, 100);
-    foo83<<<num_blocks, 256>>>(a, b, 100);
-    foo84<<<num_blocks, 256>>>(a, b, 100);
-    foo85<<<num_blocks, 256>>>(a, b, 100);
-    foo86<<<num_blocks, 256>>>(a, b, 100);
-    foo87<<<num_blocks, 256>>>(a, b, 100);
-    foo88<<<num_blocks, 256>>>(a, b, 100);
-    foo89<<<num_blocks, 256>>>(a, b, 100);
-    foo90<<<num_blocks, 256>>>(a, b, 100);
-    foo91<<<num_blocks, 256>>>(a, b, 100);
-    foo92<<<num_blocks, 256>>>(a, b, 100);
-    foo93<<<num_blocks, 256>>>(a, b, 100);
-    foo94<<<num_blocks, 256>>>(a, b, 100);
-    foo95<<<num_blocks, 256>>>(a, b, 100);
-    foo96<<<num_blocks, 256>>>(a, b, 100);
-    foo97<<<num_blocks, 256>>>(a, b, 100);
-    foo98<<<num_blocks, 256>>>(a, b, 100);
-    foo99<<<num_blocks, 256>>>(a, b, 100);
-    gpuErrCheck(gpuDeviceSynchronize());
+  bool GvarSuccess = true;
+  int HostGvar;
+  int NGvar = 0;
 
-    bool vecaddSuccess = true;
-    for(int i=0; i<100; ++i)
-        if(a[i] != 200) {
-            vecaddSuccess = false;
-            break;
-        }
-
-    bool gvarSuccess = true;
-    int host_gvar;
-    int n_gvar = 0;
-    
-
-    if(vecaddSuccess && gvarSuccess)
-        fprintf(stdout, "Verification successful\n");
-    else {
-        if(!vecaddSuccess)
-            fprintf(stdout, "Vecadd failed\n");
-        if(!gvarSuccess)
-            fprintf(stdout, "Gvar failed gvar%d = %d != 102\n", n_gvar, host_gvar);
-        fprintf(stdout, "Verification failed\n");
-    }
-    return 0;
+  if (VecaddSuccess && GvarSuccess)
+    fprintf(stdout, "Verification successful\n");
+  else {
+    if (!VecaddSuccess)
+      fprintf(stdout, "Vecadd failed\n");
+    if (!GvarSuccess)
+      fprintf(stdout, "Gvar failed gvar%d = %d != 102\n", NGvar, HostGvar);
+    fprintf(stdout, "Verification failed\n");
+  }
+  return 0;
 }
 
 // CHECK: Verification successful
@@ -255,4 +251,3 @@ int main() {
 // CHECK-COUNT-100: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: JitStorageCache hits 0 total 100
 // CHECK-SECOND: JitStorageCache hits 100 total 100
-

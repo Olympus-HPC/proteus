@@ -13,7 +13,7 @@ __global__ __attribute__((annotate("jit"))) void kernel() {
 }
 
 int main() {
-  for (int i = 0; i < 10; ++i) {
+  for (int I = 0; I < 10; ++I) {
     kernel<<<1, 1>>>();
     gpuErrCheck(gpuDeviceSynchronize());
   }

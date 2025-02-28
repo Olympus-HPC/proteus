@@ -4,9 +4,9 @@
 
 #include <cstdlib>
 
-template <typename T> __attribute__((annotate("jit", 1))) void test(T arg) {
-  volatile T local;
-  local = arg;
+template <typename T> __attribute__((annotate("jit", 1))) void test(T Arg) {
+  volatile T Local;
+  Local = Arg;
 }
 
 int main(int argc, char **argv) {

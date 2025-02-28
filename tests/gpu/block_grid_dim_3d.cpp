@@ -12,8 +12,8 @@
 #include "gpu_common.h"
 
 __global__ __attribute__((annotate("jit"))) void kernel() {
-  int idx = threadIdx.z + blockIdx.z * blockDim.z;
-  if (idx == gridDim.z * blockDim.z - 1) {
+  int Idx = threadIdx.z + blockIdx.z * blockDim.z;
+  if (Idx == gridDim.z * blockDim.z - 1) {
     printf("ThreadId: (%d %d %d) BlockID: (%d %d %d) BlockDim: (%d %d %d) "
            "GridDim: (%d %d %d)\n",
            (int)threadIdx.x, (int)threadIdx.y, (int)threadIdx.z,
@@ -24,10 +24,10 @@ __global__ __attribute__((annotate("jit"))) void kernel() {
 }
 
 int main() {
-  for (int tid = 1; tid <= 2; tid++) {
-    dim3 blockDim(1, 1, tid * 32);
-    dim3 gridDim(1, 1, tid);
-    kernel<<<gridDim, blockDim>>>();
+  for (int Tid = 1; Tid <= 2; Tid++) {
+    dim3 BlockDim(1, 1, Tid * 32);
+    dim3 GridDim(1, 1, Tid);
+    kernel<<<GridDim, BlockDim>>>();
     gpuErrCheck(gpuDeviceSynchronize());
   }
   return 0;

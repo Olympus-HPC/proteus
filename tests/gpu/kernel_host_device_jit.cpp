@@ -11,8 +11,8 @@ __global__ __attribute__((annotate("jit"))) void kernel() {
 }
 
 template <typename T>
-__attribute__((annotate("jit"))) gpuError_t launcher(T kernel_in) {
-  return gpuLaunchKernel((const void *)kernel_in, 1, 1, 0, 0, 0);
+__attribute__((annotate("jit"))) gpuError_t launcher(T KernelIn) {
+  return gpuLaunchKernel((const void *)KernelIn, 1, 1, 0, 0, 0);
 }
 
 int main() {

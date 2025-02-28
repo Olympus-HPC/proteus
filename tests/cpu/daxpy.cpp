@@ -6,31 +6,31 @@
 #include <cstdlib>
 #include <iostream>
 
-__attribute__((annotate("jit", 1, 4))) void my_daxpy(double a, double *x,
-                                                     double *y, int N) {
-  for (std::size_t i{0}; i < N; i++) {
-    y[i] += x[i] * a;
+__attribute__((annotate("jit", 1, 4))) void myDaxpy(double A, double *X,
+                                                    double *Y, int N) {
+  for (std::size_t I{0}; I < N; I++) {
+    Y[I] += X[I] * A;
   }
 }
 
 int main(int argc, char **argv) {
   int N = 1024;
-  double *x = static_cast<double *>(malloc(sizeof(double) * N));
-  double *y = static_cast<double *>(malloc(sizeof(double) * N));
+  double *X = static_cast<double *>(malloc(sizeof(double) * N));
+  double *Y = static_cast<double *>(malloc(sizeof(double) * N));
 
-  for (std::size_t i{0}; i < N; i++) {
-    x[i] = 0.31414 * i;
-    y[i] = 0.0;
+  for (std::size_t I{0}; I < N; I++) {
+    X[I] = 0.31414 * I;
+    Y[I] = 0.0;
   }
 
-  std::cout << y[10] << std::endl;
-  my_daxpy(6.2, x, y, N);
-  std::cout << y[10] << std::endl;
-  my_daxpy(1.0, x, y, N);
-  std::cout << y[10] << std::endl;
+  std::cout << Y[10] << std::endl;
+  myDaxpy(6.2, X, Y, N);
+  std::cout << Y[10] << std::endl;
+  myDaxpy(1.0, X, Y, N);
+  std::cout << Y[10] << std::endl;
 
-  free(x);
-  free(y);
+  free(X);
+  free(Y);
 }
 
 // CHECK: 0

@@ -11,22 +11,22 @@
 
 #include "gpu_common.h"
 
-__global__ __attribute__((annotate("jit", 1)))void kernel(int arg) {
-  printf("Kernel one; arg = %d\n", arg);
+__global__ __attribute__((annotate("jit", 1))) void kernel(int Arg) {
+  printf("Kernel one; arg = %d\n", Arg);
 }
 
-__global__ __attribute__((annotate("jit", 1))) void kernel_two(int arg) {
-  printf("Kernel two; arg = %d\n", arg);
+__global__ __attribute__((annotate("jit", 1))) void kernelTwo(int Arg) {
+  printf("Kernel two; arg = %d\n", Arg);
 }
 
-gpuError_t launcher(const void *kernel_in, int a) {
-  void *args[] = {&a};
-  return gpuLaunchKernel(kernel_in, 1, 1, args, 0, 0);
+gpuError_t launcher(const void *KernelIn, int A) {
+  void *Args[] = {&A};
+  return gpuLaunchKernel(KernelIn, 1, 1, Args, 0, 0);
 }
 
 int main() {
   gpuErrCheck(launcher((const void *)kernel, 42));
-  gpuErrCheck(launcher((const void *)kernel_two, 24));
+  gpuErrCheck(launcher((const void *)kernelTwo, 24));
   gpuErrCheck(gpuDeviceSynchronize());
   return 0;
 }

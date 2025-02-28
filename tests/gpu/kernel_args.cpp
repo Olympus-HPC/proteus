@@ -9,8 +9,8 @@
 #include "gpu_common.h"
 
 __global__ __attribute__((annotate("jit", 1, 2, 3))) void
-kernel(int arg1, int arg2, int arg3) {
-  printf("Kernel arg %d\n", arg1 + arg2 + arg3);
+kernel(int Arg1, int Arg2, int Arg3) {
+  printf("Kernel arg %d\n", Arg1 + Arg2 + Arg3);
 }
 
 int main() {
