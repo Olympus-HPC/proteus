@@ -5,6 +5,7 @@
 #include <cstdio>
 
 #include "gpu_common.h"
+#include <proteus/JitInterface.hpp>
 
 __global__ __attribute__((annotate("jit"))) void kernel() {
   printf("Kernel\n");
@@ -16,10 +17,13 @@ __attribute__((annotate("jit"))) gpuError_t launcher(T KernelIn) {
 }
 
 int main() {
+  proteus::init();
+
   kernel<<<1, 1>>>();
   gpuErrCheck(launcher(kernel));
   gpuErrCheck(gpuDeviceSynchronize());
 
+  proteus::finalize();
   return 0;
 }
 

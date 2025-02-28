@@ -8,6 +8,7 @@
 
 #include "gpu_common.h"
 #include <cstdio>
+#include <proteus/JitInterface.hpp>
 
 // Forward declaration
 extern __device__ void deviceFunction(int A);
@@ -18,8 +19,12 @@ __global__ __attribute__((annotate("jit", 1))) void kernelFunction(int A) {
 };
 
 int main() {
+  proteus::init();
+
   kernelFunction<<<1, 1>>>(1);
   gpuErrCheck(gpuDeviceSynchronize());
+
+  proteus::finalize();
   return 0;
 }
 
