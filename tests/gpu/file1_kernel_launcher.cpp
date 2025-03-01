@@ -10,14 +10,19 @@
 
 #include "gpu_common.h"
 #include "launcher.hpp"
+#include <proteus/JitInterface.hpp>
 
 void foo();
 
 int main() {
+  proteus::init();
+
   gpuErrCheck(launcher(kernel_body));
   gpuErrCheck(gpuDeviceSynchronize());
   foo();
   gpuErrCheck(gpuDeviceSynchronize());
+
+  proteus::finalize();
   return 0;
 }
 

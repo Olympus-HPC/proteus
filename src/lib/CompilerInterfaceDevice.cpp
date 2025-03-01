@@ -59,3 +59,10 @@ __jit_launch_kernel(void *Kernel, dim3 GridDim, dim3 BlockDim,
   return __jit_launch_kernel_internal(Kernel, GridDim, BlockDim, KernelArgs,
                                       ShmemSize, Stream);
 }
+
+extern "C" void __jit_init_device() {}
+
+extern "C" void __jit_finalize_device() {
+  auto &Jit = JitDeviceImplT::instance();
+  Jit.finalize();
+}

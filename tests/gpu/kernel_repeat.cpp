@@ -7,15 +7,20 @@
 #include <cstdio>
 
 #include "gpu_common.h"
+#include <proteus/JitInterface.hpp>
 
 __global__ __attribute__((annotate("jit", 1))) void kernel(int I) {
   printf("Kernel i %d\n", I);
 }
 
 int main() {
+  proteus::init();
+
   for (int I = 0; I < 1000; I++)
     kernel<<<1, 1>>>(42);
   gpuErrCheck(gpuDeviceSynchronize());
+
+  proteus::finalize();
   return 0;
 }
 

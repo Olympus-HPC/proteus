@@ -4,7 +4,7 @@
 
 #include <iostream>
 
-#include "proteus/JitInterface.hpp"
+#include <proteus/JitInterface.hpp>
 
 template <typename F> void run(F &&Func) {
   proteus::register_lambda(Func);
@@ -12,6 +12,8 @@ template <typename F> void run(F &&Func) {
 }
 
 int main(int argc, char **argv) {
+  proteus::init();
+
   int N = 1024;
   double A = 3.14;
   double B = 1.484;
@@ -39,6 +41,9 @@ int main(int argc, char **argv) {
 
   free(X);
   free(Y);
+
+  proteus::finalize();
+  return 0;
 }
 
 // CHECK: 0

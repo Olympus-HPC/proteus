@@ -6,6 +6,7 @@
 #include <iostream>
 
 #include "gpu_common.h"
+#include <proteus/JitInterface.hpp>
 
 __global__ __attribute__((annotate("jit", 4), noinline)) void
 daxpyImpl(double A, double *X, double *Y, int N) {
@@ -30,6 +31,8 @@ void daxpy(double A, double *X, double *Y, int N) {
 }
 
 int main(int argc, char **argv) {
+  proteus::init();
+
   int N = 1024;
   double *X;
   double *Y;

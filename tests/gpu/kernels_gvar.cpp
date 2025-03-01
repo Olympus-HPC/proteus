@@ -7,6 +7,7 @@
 #include <cstdio>
 
 #include "gpu_common.h"
+#include <proteus/JitInterface.hpp>
 
 __device__ int Gvar = 23;
 
@@ -26,12 +27,16 @@ __global__ void kernel3() {
 }
 
 int main() {
+  proteus::init();
+
   kernel<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
   kernel2<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
   kernel3<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
+
+  proteus::finalize();
   return 0;
 }
 
