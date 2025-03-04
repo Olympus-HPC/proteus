@@ -22,7 +22,6 @@
 #include <llvm/IR/Verifier.h>
 #include <llvm/IRReader/IRReader.h>
 #include <llvm/Object/SymbolSize.h>
-#include <llvm/Support/InitLLVM.h>
 #include <llvm/TargetParser/Host.h>
 
 #include "proteus/CompilerInterfaceTypes.h"
@@ -340,10 +339,6 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 }
 
 JitEngineHost::JitEngineHost(int Argc, char *Argv[]) {
-  InitLLVM X(Argc, Argv);
-
-  proteus::InitNativeTarget();
-
   ExitOnErr.setBanner("JIT: ");
   // Create the LLJIT instance.
   // TODO: Fix support for debugging jitted code. This appears to be

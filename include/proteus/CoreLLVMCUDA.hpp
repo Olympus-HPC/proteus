@@ -82,16 +82,6 @@ inline const SmallVector<StringRef> &threadIdxZFnName() {
 
 } // namespace detail
 
-inline void InitNVPTXTarget() {
-  static std::once_flag Flag;
-  std::call_once(Flag, []() {
-    LLVMInitializeNVPTXTargetInfo();
-    LLVMInitializeNVPTXTarget();
-    LLVMInitializeNVPTXTargetMC();
-    LLVMInitializeNVPTXAsmPrinter();
-  });
-}
-
 inline void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
                                      int BlockSize) {
   NamedMDNode *NvvmAnnotations = M.getNamedMetadata("nvvm.annotations");
