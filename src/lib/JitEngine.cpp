@@ -46,6 +46,8 @@ JitEngine::JitEngine() {
   Config.PROTEUS_ASYNC_TEST_BLOCKING =
       getEnvOrDefaultBool("PROTEUS_ASYNC_TEST_BLOCKING", false);
   Config.PROTEUS_ASYNC_THREADS = getEnvOrDefaultInt("PROTEUS_ASYNC_THREADS", 1);
+  Config.PROTEUS_USE_LIGHTWEIGHT_KERNEL_CLONE = 
+      getEnvOrDefaultBool("PROTEUS_USE_LIGHTWEIGHT_KERNEL_CLONE", true);
 
 #if PROTEUS_ENABLE_DEBUG
   Logger::logs("proteus") << "PROTEUS_USE_STORED_CACHE "
