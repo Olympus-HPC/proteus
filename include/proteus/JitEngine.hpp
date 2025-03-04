@@ -61,6 +61,7 @@ protected:
     bool PROTEUS_DISABLE;
     bool PROTEUS_DUMP_LLVM_IR;
     bool PROTEUS_RELINK_GLOBALS_BY_COPY;
+    bool PROTEUS_USE_LIGHTWEIGHT_KERNEL_CLONE;
   } Config;
 };
 

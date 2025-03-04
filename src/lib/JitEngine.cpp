@@ -41,6 +41,8 @@ JitEngine::JitEngine() {
       getEnvOrDefaultBool("PROTEUS_DUMP_LLVM_IR", false);
   Config.PROTEUS_RELINK_GLOBALS_BY_COPY =
       getEnvOrDefaultBool("PROTEUS_RELINK_GLOBALS_BY_COPY", false);
+  Config.PROTEUS_USE_LIGHTWEIGHT_KERNEL_CLONE = 
+      getEnvOrDefaultBool("PROTEUS_USE_LIGHTWEIGHT_KERNEL_CLONE", true);
 
 #if PROTEUS_ENABLE_DEBUG
   Logger::logs("proteus") << "PROTEUS_USE_STORED_CACHE "
