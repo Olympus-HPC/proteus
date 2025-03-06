@@ -14,12 +14,14 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <llvm/ADT/SmallPtrSet.h>
 #include <memory>
 #include <optional>
 #include <string>
 
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
+#include <llvm/Analysis/CallGraph.h>
 #include <llvm/Analysis/TargetTransformInfo.h>
 #include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/CodeGen/CommandFlags.h>
@@ -180,8 +182,14 @@ public:
       BinInfo.setModule(std::move(ExtractedModule));
     }
 
-    std::unique_ptr<Module> KernelModule =
-        llvm::CloneModule(BinInfo.getModule());
+    auto &BinModule = BinInfo.getModule();
+    std::unique_ptr<Module> KernelModule{nullptr};
+
+    if (Config.PROTEUS_USE_LIGHTWEIGHT_KERNEL_CLONE) {
+      KernelModule = std::move(proteus::cloneKernelFromModule(BinModule, KernelInfo.getName()));
+    } else {
+      KernelModule = std::move(llvm::CloneModule(BinModule));
+    }
 
     internalize(*KernelModule, KernelInfo.getName());
     runCleanupPassPipeline(*KernelModule);
