@@ -18,8 +18,6 @@
 LLD_HAS_DRIVER(elf)
 #endif
 
-#include "proteus/CoreDeviceHIP.hpp"
-#include "proteus/CoreLLVM.hpp"
 #include "proteus/Debug.h"
 #include "proteus/Error.h"
 #include "proteus/Logger.hpp"
@@ -116,16 +114,6 @@ inline const SmallVector<StringRef> &threadIdxZFnName() {
 };
 
 } // namespace detail
-
-inline void InitAMDGPUTarget() {
-  static std::once_flag Flag;
-  std::call_once(Flag, []() {
-    LLVMInitializeAMDGPUTargetInfo();
-    LLVMInitializeAMDGPUTarget();
-    LLVMInitializeAMDGPUTargetMC();
-    LLVMInitializeAMDGPUAsmPrinter();
-  });
-}
 
 inline void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
                                      int BlockSize) {

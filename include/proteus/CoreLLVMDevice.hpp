@@ -14,6 +14,7 @@
 #include <llvm/IR/ReplaceConstant.h>
 #include <llvm/Object/ELFObjectFile.h>
 
+#include "proteus/CoreDevice.hpp"
 #include "proteus/LambdaRegistry.hpp"
 #include "proteus/TransformArgumentSpecialization.hpp"
 #include "proteus/TransformLambdaSpecialization.hpp"

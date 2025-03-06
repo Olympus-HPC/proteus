@@ -20,7 +20,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/Target/TargetMachine.h>
 
-#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/CoreLLVM.hpp"
 #include "proteus/Debug.h"
 #include "proteus/Hashing.hpp"
 #include "proteus/Logger.hpp"
@@ -37,13 +37,11 @@ inline bool getEnvOrDefaultBool(const char *VarName, bool Default) {
 
 class JitEngine {
 public:
+  InitLLVMTargets Init;
   void optimizeIR(Module &M, StringRef Arch, char OptLevel = '3',
                   unsigned CodegenOptLevel = 3);
 
   bool isProteusDisabled() { return Config.PROTEUS_DISABLE; }
-
-  void pushJitVariable(RuntimeConstant &RC);
-  void registerLambda(const char *Symbol);
 
 protected:
   void runCleanupPassPipeline(Module &M);

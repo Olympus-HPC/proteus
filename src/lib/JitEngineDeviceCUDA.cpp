@@ -150,8 +150,6 @@ JitEngineDeviceCUDA::codegenObject(Module &M, StringRef DeviceArch) {
 }
 
 JitEngineDeviceCUDA::JitEngineDeviceCUDA() {
-  proteus::InitNVPTXTarget();
-
   // Initialize CUDA and retrieve the compute capability, needed for later
   // operations.
   CUdevice CUDev;

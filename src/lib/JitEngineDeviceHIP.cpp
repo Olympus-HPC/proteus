@@ -12,6 +12,7 @@
 #include <memory>
 #include <string>
 
+#include "proteus/CoreDevice.hpp"
 #include "proteus/CoreLLVM.hpp"
 #include "proteus/CoreLLVMHIP.hpp"
 #include "proteus/JitEngineDeviceHIP.hpp"
@@ -238,7 +239,6 @@ hipError_t JitEngineDeviceHIP::launchKernelFunction(hipFunction_t KernelFunc,
 }
 
 JitEngineDeviceHIP::JitEngineDeviceHIP() {
-  proteus::InitAMDGPUTarget();
   hipDeviceProp_t DevProp;
   proteusHipErrCheck(hipGetDeviceProperties(&DevProp, 0));
 
