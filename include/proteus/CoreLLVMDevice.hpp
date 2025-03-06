@@ -11,8 +11,11 @@
 
 #if defined(PROTEUS_ENABLE_HIP) || defined(PROTEUS_ENABLE_CUDA)
 
+#include <llvm/Analysis/CallGraph.h>
 #include <llvm/IR/ReplaceConstant.h>
+#include <llvm/IR/Verifier.h>
 #include <llvm/Object/ELFObjectFile.h>
+#include <llvm/Transforms/Utils/Cloning.h>
 
 #include "proteus/CoreDevice.hpp"
 #include "proteus/LambdaRegistry.hpp"
@@ -227,6 +230,129 @@ inline void specializeIR(
                              BlockDim.x * BlockDim.y * BlockDim.z);
 
   runCleanupPassPipeline(M);
+}
+
+inline std::unique_ptr<Module> cloneKernelFromModule(Module& M, const std::string& name) {
+      auto KernelModule = std::make_unique<Module>("JitModule", M.getContext());
+      KernelModule->setSourceFileName(M.getSourceFileName());
+      KernelModule->setDataLayout(M.getDataLayout());
+      KernelModule->setTargetTriple(M.getTargetTriple());
+      KernelModule->setModuleInlineAsm(M.getModuleInlineAsm());
+      KernelModule->IsNewDbgInfoFormat = M.IsNewDbgInfoFormat;
+
+      auto KernelFunction =
+          M.getFunction(name);
+
+      SmallPtrSet<Function *, 8> ReachableFunctions;
+      SmallPtrSet<GlobalVariable *, 16> ReachableGlobals;
+      SmallPtrSet<Function *, 8> ReachableDeclarations;
+      SmallVector<Function *, 8> ToVisit;
+      ReachableFunctions.insert(KernelFunction);
+      ToVisit.push_back(KernelFunction);
+      CallGraphWrapperPass CG;
+      CG.runOnModule(M);
+      while (!ToVisit.empty()) {
+        Function *VisitF = ToVisit.pop_back_val();
+        CallGraphNode *CGNode = CG[VisitF];
+
+        for (const auto &Callee : *CGNode) {
+          Function *CalleeF = Callee.second->getFunction();
+
+          if (!CalleeF)
+            continue;
+
+          if (CalleeF->isDeclaration()) {
+            ReachableDeclarations.insert(CalleeF);
+            continue;
+          }
+
+          if (ReachableFunctions.contains(CalleeF))
+            continue;
+
+          ReachableFunctions.insert(CalleeF);
+          ToVisit.push_back(CalleeF);
+        }
+      }
+
+      auto process_instruction = [&](GlobalVariable &GV, const Instruction *I) {
+        const Function *ParentF = I->getParent()->getParent();
+        if (ReachableFunctions.contains(ParentF))
+          ReachableGlobals.insert(&GV);
+      };
+
+      for (auto &GV : M.globals()) {
+        for (const User *Usr : GV.users()) {
+          const Instruction *I = dyn_cast<Instruction>(Usr);
+
+          if (I) {
+            process_instruction(GV, I);
+          } else {
+            for (const User *NextUser : Usr->users()) {
+              I = dyn_cast<Instruction>(NextUser);
+              if (I)
+                process_instruction(GV, I);
+
+            }
+          }
+        }
+      }
+
+      ValueToValueMapTy VMap;
+
+      for (auto GV : ReachableGlobals) {
+        GlobalVariable *NewGV = new GlobalVariable(
+            *KernelModule, GV->getValueType(), GV->isConstant(),
+            GV->getLinkage(),
+            GV->hasInitializer() ? GV->getInitializer() : nullptr,
+            GV->getName(),
+            nullptr,
+            llvm::GlobalValue::NotThreadLocal,
+            GV->getAddressSpace());
+        NewGV->copyAttributesFrom(GV);
+        VMap[GV] = NewGV;
+      }
+
+      for (auto F : ReachableFunctions) {
+        auto NewFunction = Function::Create(
+            F->getFunctionType(), F->getLinkage(), F->getAddressSpace(),
+            F->getName(), KernelModule.get());
+        NewFunction->copyAttributesFrom(F);
+        VMap[F] = NewFunction;
+      }
+
+      for (auto F : ReachableDeclarations) {
+        auto NewFunction = Function::Create(
+            F->getFunctionType(), F->getLinkage(), F->getAddressSpace(),
+            F->getName(), KernelModule.get());
+        NewFunction->copyAttributesFrom(F);
+        NewFunction->setLinkage(GlobalValue::ExternalLinkage);
+        VMap[F] = NewFunction;
+      }
+
+      for (auto F : ReachableFunctions) {
+        SmallVector<ReturnInst *, 8> Returns;
+        auto NewFunction = dyn_cast<Function>(VMap[F]);
+
+        Function::arg_iterator DestI = NewFunction->arg_begin();
+        for (const Argument &I : F->args())
+          if (VMap.count(&I) == 0) {     // Is this argument preserved?
+            DestI->setName(I.getName()); // Copy the name over...
+            VMap[&I] = &*DestI++;        // Add mapping to VMap
+          }
+
+        llvm::CloneFunctionInto(NewFunction, F, VMap,
+                                CloneFunctionChangeType::DifferentModule,
+                                Returns);
+      }
+
+
+      if (verifyModule(*KernelModule, &errs()))
+        PROTEUS_FATAL_ERROR(
+            "Broken mini-module found, JIT compilation aborted!");
+#if PROTEUS_ENABLE_DEBUG
+      Logger::logs("proteus") << "Mini-module \n" << *KernelModule << "\n";
+#endif
+    return std::move(KernelModule);
 }
 
 } // namespace proteus
