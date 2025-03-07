@@ -144,7 +144,7 @@ inline void relinkGlobalsObject(
     PROTEUS_FATAL_ERROR("Cannot create the device elf");
   auto &DeviceElf = *DeviceElfOrErr;
 
-  for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
+  for (auto &[GlobalName, DevPtr] : VarNameToDevPtr) {
     for (auto &Symbol : DeviceElf.symbols()) {
       auto SymbolNameOrErr = Symbol.getName();
       if (!SymbolNameOrErr)
@@ -180,7 +180,7 @@ inline void relinkGlobalsObject(
         PROTEUS_FATAL_ERROR("Expected offset within section size");
 
       uint64_t *Data = (uint64_t *)(SectionData.data() + Offset);
-      *Data = reinterpret_cast<uint64_t>(resolveDeviceGlobalAddr(HostAddr));
+      *Data = reinterpret_cast<uint64_t>(DevPtr);
       break;
     }
   }

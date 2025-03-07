@@ -19,6 +19,10 @@
 
 extern "C" void __jit_push_variable(proteus::RuntimeConstant RC);
 extern "C" void __jit_register_lambda(const char *Symbol);
+extern "C" void __jit_init_host();
+extern "C" void __jit_init_device();
+extern "C" void __jit_finalize_host();
+extern "C" void __jit_finalize_device();
 
 namespace proteus {
 
@@ -39,6 +43,21 @@ static __attribute__((noinline)) T &&register_lambda(T &&t,
   __jit_register_lambda(Symbol);
   return std::forward<T>(t);
 }
+
+inline void init() {
+  __jit_init_host();
+#if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
+  __jit_init_device();
+#endif
+}
+
+inline void finalize() {
+  __jit_finalize_host();
+#if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
+  __jit_finalize_device();
+#endif
+}
+
 } // namespace proteus
 
 #endif

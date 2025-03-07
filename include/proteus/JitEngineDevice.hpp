@@ -12,7 +12,6 @@
 #define PROTEUS_JITENGINEDEVICE_HPP
 
 #include <cstdint>
-#include <filesystem>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -50,7 +49,10 @@
 #include <llvm/Transforms/Utils/Cloning.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
+#include "proteus/CompilerAsync.hpp"
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/CompilerSync.hpp"
+#include "proteus/CoreDevice.hpp"
 #include "proteus/CoreLLVM.hpp"
 #include "proteus/Debug.h"
 #include "proteus/Hashing.hpp"
@@ -110,6 +112,7 @@ public:
 };
 
 class JITKernelInfo {
+  std::optional<void *> Kernel;
   std::string Name;
   SmallVector<int32_t> RCTypes;
   SmallVector<int32_t> RCIndices;
@@ -118,14 +121,18 @@ class JITKernelInfo {
   std::optional<HashT> StaticHash;
 
 public:
-  JITKernelInfo(BinaryInfo &BinInfo, char const *Name, int32_t *RCIndices,
-                int32_t *RCTypes, int32_t NumRCs)
-      : BinInfo(BinInfo), Name(Name),
+  JITKernelInfo(void *Kernel, BinaryInfo &BinInfo, char const *Name,
+                int32_t *RCIndices, int32_t *RCTypes, int32_t NumRCs)
+      : Kernel(Kernel), BinInfo(BinInfo), Name(Name),
         RCIndices{ArrayRef{RCIndices, static_cast<size_t>(NumRCs)}},
         RCTypes{ArrayRef{RCTypes, static_cast<size_t>(NumRCs)}},
         ExtractedModule(std::nullopt) {}
 
   JITKernelInfo() = default;
+  void *getKernel() const {
+    assert(Kernel.has_value() && "Expected Kernel is inited");
+    return Kernel.value();
+  }
   const std::string &getName() const { return Name; }
   const auto &getRCIndices() const { return RCIndices; }
   const auto &getRCTypes() const { return RCTypes; }
@@ -234,6 +241,11 @@ public:
 
     KernelInfo.createStaticHash(BinInfo.getModuleHash());
     return KernelInfo.getStaticHash();
+  }
+
+  void finalize() {
+    if (Config.PROTEUS_ASYNC_COMPILATION)
+      CompilerAsync::instance(Config.PROTEUS_ASYNC_THREADS).joinAllThreads();
   }
 
 private:
@@ -358,7 +370,6 @@ protected:
 
   LLVMContext &getLLVMContext() { return Ctx; }
 
-protected:
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
 };
 
@@ -417,6 +428,18 @@ JitEngineDevice<ImplT>::compileAndRun(
     uint64_t ShmemSize, typename DeviceTraits<ImplT>::DeviceStream_t Stream) {
   TIMESCOPE("compileAndRun");
 
+  // Lazy initialize the map of device global variables to device pointers by
+  // resolving the host address to the device address. For HIP it is fine to do
+  // this earlier (e.g., instertRegisterVar), but CUDA can't. So, we initialize
+  // this here the first time we need to compile a kernel.
+  static std::once_flag Flag;
+  std::call_once(Flag, [&]() {
+    for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
+      void *DevPtr = resolveDeviceGlobalAddr(HostAddr);
+      VarNameToDevPtr.at(GlobalName) = DevPtr;
+    }
+  });
+
   SmallVector<RuntimeConstant> RCVec;
 
   getRuntimeConstantValues(KernelArgs, KernelInfo.getRCIndices(),
@@ -462,52 +485,56 @@ JitEngineDevice<ImplT>::compileAndRun(
     }
   }
 
-  // We need to clone, as getModule returns a generic LLVM IR to be
-  // used by any kernel that will be specialized
-  auto JitModule = llvm::CloneModule(getModule(KernelInfo));
+  Module &KernelModule = getModule(KernelInfo);
+  std::unique_ptr<MemoryBuffer> ObjBuf = nullptr;
 
-  specializeIR(*JitModule, KernelInfo.getName(), Suffix, BlockDim, GridDim,
-               KernelInfo.getRCIndices(), RCVec);
+  if (Config.PROTEUS_ASYNC_COMPILATION) {
+    auto &Compiler = CompilerAsync::instance(Config.PROTEUS_ASYNC_THREADS);
+    // If there is no compilation pending for the specialization, post the
+    // compilation task to the compiler.
+    if (!Compiler.isCompilationPending(HashValue)) {
+      PROTEUS_DBG(Logger::logs("proteus") << "Compile async for HashValue "
+                                          << HashValue.toString() << "\n");
 
-  replaceGlobalVariablesWithPointers(*JitModule);
+      Compiler.compile(CompilationTask{
+          KernelModule, HashValue, KernelInfo.getName(), Suffix, BlockDim,
+          GridDim, KernelInfo.getRCIndices(), RCVec, VarNameToDevPtr,
+          GlobalLinkedBinaries, DeviceArch,
+          /* UseRTC */ Config.PROTEUS_USE_HIP_RTC_CODEGEN,
+          /* DumpIR */ Config.PROTEUS_DUMP_LLVM_IR,
+          /* UseStorageCache */ Config.PROTEUS_USE_STORED_CACHE,
+          /* RelinkGlobalsByCopy */ Config.PROTEUS_RELINK_GLOBALS_BY_COPY});
+    }
 
-  // For HIP RTC codegen do not run the optimization pipeline since HIP RTC
-  // internally runs it. For the rest of cases, that is CUDA or HIP with our own
-  // codegen instead of RTC, run the target-specific optimization pipeline to
-  // optimize the LLVM IR before handing over to codegen.
-#if PROTEUS_ENABLE_CUDA
-  optimizeIR(*JitModule, DeviceArch);
-#elif PROTEUS_ENABLE_HIP
-  if (!Config.PROTEUS_USE_HIP_RTC_CODEGEN)
-    optimizeIR(*JitModule, DeviceArch);
-#else
-#error "JitEngineDevice requires PROTEUS_ENABLE_CUDA or PROTEUS_ENABLE_HIP"
-#endif
-
-  if (Config.PROTEUS_DUMP_LLVM_IR) {
-    const auto CreateDumpDirectory = []() {
-      const std::string DumpDirectory = ".proteus-dump";
-      std::filesystem::create_directory(DumpDirectory);
-      return DumpDirectory;
-    };
-
-    static const std::string DumpDirectory = CreateDumpDirectory();
-
-    saveToFile(DumpDirectory + "/device-jit-" + HashValue.toString() + ".ll",
-               *JitModule);
+    // Compilation is pending, try to get the compilation result buffer. If
+    // buffer is null, compilation is not done, so execute the AOT version
+    // directly.
+    ObjBuf = Compiler.takeCompilationResult(HashValue,
+                                            Config.PROTEUS_ASYNC_TEST_BLOCKING);
+    if (!ObjBuf) {
+      return launchKernelDirect(KernelInfo.getKernel(), GridDim, BlockDim,
+                                KernelArgs, ShmemSize, Stream);
+    }
+  } else {
+    // Process through synchronous compilation.
+    ObjBuf = CompilerSync::instance().compile(CompilationTask{
+        KernelModule, HashValue, KernelInfo.getName(), Suffix, BlockDim,
+        GridDim, KernelInfo.getRCIndices(), RCVec, VarNameToDevPtr,
+        GlobalLinkedBinaries, DeviceArch,
+        /* UseRTC */ Config.PROTEUS_USE_HIP_RTC_CODEGEN,
+        /* DumpIR */ Config.PROTEUS_DUMP_LLVM_IR,
+        /* UseStorageCache */ Config.PROTEUS_USE_STORED_CACHE,
+        /* RelinkGlobalsByCopy */ Config.PROTEUS_RELINK_GLOBALS_BY_COPY});
   }
 
-  auto ObjBuf = codegenObject(*JitModule, DeviceArch);
+  KernelFunc = proteus::getKernelFunctionFromImage(
+      KernelMangled, ObjBuf->getBufferStart(),
+      Config.PROTEUS_RELINK_GLOBALS_BY_COPY, VarNameToDevPtr);
+
+  CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName(), RCVec);
   if (Config.PROTEUS_USE_STORED_CACHE) {
     StorageCache.store(HashValue, ObjBuf->getMemBufferRef());
   }
-  if (!Config.PROTEUS_RELINK_GLOBALS_BY_COPY)
-    relinkGlobalsObject(ObjBuf->getMemBufferRef());
-
-  KernelFunc =
-      getKernelFunctionFromImage(KernelMangled, ObjBuf->getBufferStart());
-
-  CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName(), RCVec);
 
   return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                               ShmemSize, Stream);
@@ -578,7 +605,7 @@ void JitEngineDevice<ImplT>::registerFunction(void *Handle, void *Kernel,
   BinaryInfo &BinInfo = HandleToBinaryInfo[Handle];
 
   JITKernelInfoMap[Kernel] =
-      JITKernelInfo{BinInfo, KernelName, RCIndices, RCTypes, NumRCs};
+      JITKernelInfo{Kernel, BinInfo, KernelName, RCIndices, RCTypes, NumRCs};
 }
 
 template <typename ImplT>

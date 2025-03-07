@@ -9,6 +9,7 @@
 #include <cstdio>
 
 #include "gpu_common.h"
+#include <proteus/JitInterface.hpp>
 
 __global__ __attribute__((annotate("jit"))) __launch_bounds__(128,
                                                               4) void kernel() {
@@ -16,8 +17,12 @@ __global__ __attribute__((annotate("jit"))) __launch_bounds__(128,
 }
 
 int main() {
+  proteus::init();
+
   kernel<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
+
+  proteus::finalize();
   return 0;
 }
 

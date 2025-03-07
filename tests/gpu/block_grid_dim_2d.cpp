@@ -1,6 +1,6 @@
 // clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./block_grid_dim_2d.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-FIRST 
+// RUN: ./block_grid_dim_2d.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
 // RUN: ./block_grid_dim_2d.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
@@ -10,6 +10,7 @@
 #include <cstdio>
 
 #include "gpu_common.h"
+#include <proteus/JitInterface.hpp>
 
 __global__ __attribute__((annotate("jit"))) void kernel() {
   int Idx = threadIdx.y + blockIdx.y * blockDim.y;
@@ -24,12 +25,16 @@ __global__ __attribute__((annotate("jit"))) void kernel() {
 }
 
 int main() {
+  proteus::init();
+
   for (int Tid = 1; Tid <= 32; Tid++) {
     dim3 BlockDim(1, Tid * 32, 1);
     dim3 GridDim(1, Tid, 1);
     kernel<<<GridDim, BlockDim>>>();
   }
   gpuErrCheck(gpuDeviceSynchronize());
+
+  proteus::finalize();
   return 0;
 }
 

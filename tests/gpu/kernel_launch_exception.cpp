@@ -13,12 +13,15 @@
 #include <sys/cdefs.h>
 
 #include "gpu_common.h"
+#include <proteus/JitInterface.hpp>
 
 __global__ __attribute__((annotate("jit"))) void kernel() {
   printf("Kernel launch with exception\n");
 }
 
 int main() {
+  proteus::init();
+
   try {
     if (gpuLaunchKernel((const void *)&kernel, 1, 1, 0, 0, 0) != gpuSuccess)
       throw std::runtime_error("Launch failed");
@@ -26,6 +29,8 @@ int main() {
     std::cerr << "Exception " << E.what() << "\n";
   }
   gpuErrCheck(gpuDeviceSynchronize());
+
+  proteus::finalize();
   return 0;
 }
 

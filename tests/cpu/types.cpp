@@ -4,12 +4,16 @@
 
 #include <cstdlib>
 
+#include <proteus/JitInterface.hpp>
+
 template <typename T> __attribute__((annotate("jit", 1))) void test(T Arg) {
   volatile T Local;
   Local = Arg;
 }
 
 int main(int argc, char **argv) {
+  proteus::init();
+
   test(1);
   test(1l);
   test(1u);
@@ -22,6 +26,9 @@ int main(int argc, char **argv) {
   test(true);
   test('a');
   test((unsigned char)'a');
+
+  proteus::finalize();
+  return 0;
 }
 
 // CHECK: JitCache hits 0 total 12

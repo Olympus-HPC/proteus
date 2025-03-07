@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <iostream>
+#include <mutex>
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Hashing.hpp"

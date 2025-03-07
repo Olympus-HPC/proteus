@@ -41,6 +41,11 @@ JitEngine::JitEngine() {
       getEnvOrDefaultBool("PROTEUS_DUMP_LLVM_IR", false);
   Config.PROTEUS_RELINK_GLOBALS_BY_COPY =
       getEnvOrDefaultBool("PROTEUS_RELINK_GLOBALS_BY_COPY", false);
+  Config.PROTEUS_ASYNC_COMPILATION =
+      getEnvOrDefaultBool("PROTEUS_ASYNC_COMPILATION", false);
+  Config.PROTEUS_ASYNC_TEST_BLOCKING =
+      getEnvOrDefaultBool("PROTEUS_ASYNC_TEST_BLOCKING", false);
+  Config.PROTEUS_ASYNC_THREADS = getEnvOrDefaultInt("PROTEUS_ASYNC_THREADS", 1);
 
 #if PROTEUS_ENABLE_DEBUG
   Logger::logs("proteus") << "PROTEUS_USE_STORED_CACHE "

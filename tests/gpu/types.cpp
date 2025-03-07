@@ -6,6 +6,7 @@
 #include <cstdlib>
 
 #include "gpu_common.h"
+#include <proteus/JitInterface.hpp>
 
 template <typename T>
 __global__ __attribute__((annotate("jit", 1))) void kernel(T Arg) {
@@ -14,6 +15,8 @@ __global__ __attribute__((annotate("jit", 1))) void kernel(T Arg) {
 }
 
 int main(int argc, char **argv) {
+  proteus::init();
+
   kernel<<<1, 1>>>(1);
   gpuErrCheck(gpuDeviceSynchronize());
   kernel<<<1, 1>>>(1l);

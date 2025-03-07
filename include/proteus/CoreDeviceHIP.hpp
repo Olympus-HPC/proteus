@@ -42,13 +42,12 @@ inline hipFunction_t getKernelFunctionFromImage(
 
   proteusHipErrCheck(hipModuleLoadData(&HipModule, Image));
   if (RelinkGlobalsByCopy) {
-    for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
+    for (auto &[GlobalName, DevPtr] : VarNameToDevPtr) {
       hipDeviceptr_t Dptr;
       size_t Bytes;
       proteusHipErrCheck(hipModuleGetGlobal(&Dptr, &Bytes, HipModule,
                                             (GlobalName + "$ptr").c_str()));
 
-      void *DevPtr = resolveDeviceGlobalAddr(HostAddr);
       uint64_t PtrVal = (uint64_t)DevPtr;
       proteusHipErrCheck(hipMemcpyHtoD(Dptr, &PtrVal, Bytes));
     }

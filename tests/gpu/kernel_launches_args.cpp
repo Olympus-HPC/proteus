@@ -9,6 +9,7 @@
 #include <cstdio>
 
 #include "gpu_common.h"
+#include <proteus/JitInterface.hpp>
 
 __global__ __attribute__((annotate("jit"))) void kernel(int A, int B) {
   A += 1;
@@ -17,12 +18,16 @@ __global__ __attribute__((annotate("jit"))) void kernel(int A, int B) {
 }
 
 int main() {
+  proteus::init();
+
   int A = 23;
   int B = 42;
   kernel<<<1, 1>>>(A, B);
   void *Args[] = {&A, &B};
   gpuErrCheck(gpuLaunchKernel((const void *)kernel, 1, 1, Args, 0, 0));
   gpuErrCheck(gpuDeviceSynchronize());
+
+  proteus::finalize();
   return 0;
 }
 
