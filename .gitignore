@@ -4,4 +4,6 @@ __pycache__
 .vscode
 .cache
 miniconda3*
-install*
+install-*
+docs/doxygen*
+site

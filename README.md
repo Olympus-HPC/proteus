@@ -1,7 +1,7 @@
 [![Build and test](https://github.com/Olympus-HPC/proteus/actions/workflows/ci-build-test.yml/badge.svg)](https://github.com/Olympus-HPC/proteus/actions/workflows/ci-build-test.yml)
 ![License: Apache 2.0 with LLVM exceptions](https://img.shields.io/badge/license-Apache%202.0%20with%20LLVM%20exceptions-blue.svg)
 
-# <img src="assets/proteus-logo.png" width="128" align="middle" /> Proteus
+# <img src="docs/assets/proteus-logo.png" width="128" align="middle" /> Proteus
 
 Proteus optimizes C/C++ code execution, including CUDA/HIP kernels, using
 Just-In-Time (JIT) compilation powered by LLVM, to apply runtime optimizations
