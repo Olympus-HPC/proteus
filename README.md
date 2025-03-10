@@ -1,3 +1,4 @@
+[![docs (gh-pages)](https://github.com/Olympus-HPC/proteus/actions/workflows/gh-pages-docs.yml/badge.svg)](https://github.com/Olympus-HPC/proteus/actions/workflows/gh-pages-docs.yml)
 [![Build and test](https://github.com/Olympus-HPC/proteus/actions/workflows/ci-build-test.yml/badge.svg)](https://github.com/Olympus-HPC/proteus/actions/workflows/ci-build-test.yml)
 ![License: Apache 2.0 with LLVM exceptions](https://img.shields.io/badge/license-Apache%202.0%20with%20LLVM%20exceptions-blue.svg)
 
@@ -118,6 +119,11 @@ add_proteus(target)
 ```
 
 Where `target` is the name of your library or executable target.
+
+## Documentation
+
+The [Proteus documentation](https://olympus-hpc.github.io/proteus/) has more extensive information,
+including a user's guide and developer manual.
 
 ## Contributing
 
