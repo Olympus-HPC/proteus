@@ -1,0 +1,31 @@
+site_name: Proteus
+
+nav:
+  - Home: index.md
+  - User's guide: 
+      - Installation: user/install.md
+      - User Interface: user/interface.md
+      - Integration: user/integration.md
+      - Runtime Configuration: user/config.md
+      - Resources : user/resources.md
+  - Developer's manual: 
+    - Concepts: dev/concepts.md
+    - Creating a PR: dev/pr.md
+    - API Reference: dev/api.md
+repo_url: https://github.com/Olympus-HPC/proteus
+theme: 
+  name: material 
+  features:
+    - toc.integrate
+  logo: assets/proteus-logo.png
+  favicon: assets/proteus-logo.png
+  palette:
+    scheme: default
+    primary: light blue
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+extra_css:
+  - stylesheets/extra.css
+copyright: Copyright &copy; 2024 - 2025 Lawrence Livermore National Security, LLC and Proteus project contributors.
