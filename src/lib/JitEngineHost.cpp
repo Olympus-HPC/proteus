@@ -186,7 +186,7 @@ JitEngineHost::~JitEngineHost() { CodeCache.printStats(); }
 
 Expected<orc::ThreadSafeModule>
 JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
-                            RuntimeConstant *RC, int NumRuntimeConstants) {
+                            const SmallVector<RuntimeConstant> &RCVec) {
   TIMESCOPE("specializeIR");
   auto Ctx = std::make_unique<LLVMContext>();
   SMDiagnostic Err;
@@ -258,10 +258,7 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
       ArgPos.push_back(ArgNo);
     }
 
-    TransformArgumentSpecialization::transform(
-        *M, *F, ArgPos,
-        ArrayRef<RuntimeConstant>{RC,
-                                  static_cast<size_t>(NumRuntimeConstants)});
+    TransformArgumentSpecialization::transform(*M, *F, ArgPos, RCVec);
 
     if (!LambdaRegistry::instance().empty()) {
       if (auto OptionalMapIt =
@@ -292,14 +289,19 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
 }
 
 void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
-                                    RuntimeConstant *RC,
-                                    int NumRuntimeConstants) {
+                                    void **Args, int32_t *RCIndices,
+                                    int32_t *RCTypes, int NumRuntimeConstants) {
   TIMESCOPE("compileAndLink");
 
   // TODO: implement ModuleUniqueId for host code.
   StringRef StrIR(IR, IRSize);
-  ArrayRef RCArray{RC, static_cast<size_t>(NumRuntimeConstants)};
-  HashT HashValue = hash(StrIR, FnName, RCArray);
+
+  SmallVector<RuntimeConstant> RCVec;
+  getRuntimeConstantValues(
+      Args, ArrayRef{RCIndices, static_cast<size_t>(NumRuntimeConstants)},
+      ArrayRef{RCTypes, static_cast<size_t>(NumRuntimeConstants)}, RCVec);
+
+  HashT HashValue = hash(StrIR, FnName, RCVec);
   void *JitFnPtr = CodeCache.lookup(HashValue);
   if (JitFnPtr)
     return JitFnPtr;
@@ -309,7 +311,7 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 
   // (3) Add modules.
   ExitOnErr(LLJITPtr->addIRModule(
-      ExitOnErr(specializeIR(FnName, Suffix, StrIR, RC, NumRuntimeConstants))));
+      ExitOnErr(specializeIR(FnName, Suffix, StrIR, RCVec))));
 
   PROTEUS_DBG(Logger::logs("proteus")
               << "===\n"
@@ -327,9 +329,7 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
               << "FnName " << FnName << " Mangled " << MangledFnName
               << " address " << JitFnPtr << "\n");
   assert(JitFnPtr && "Expected non-null JIT function pointer");
-  CodeCache.insert(
-      HashValue, JitFnPtr, FnName,
-      ArrayRef<RuntimeConstant>{RC, static_cast<size_t>(NumRuntimeConstants)});
+  CodeCache.insert(HashValue, JitFnPtr, FnName, RCVec);
 
   Logger::logs("proteus") << "=== JIT compile: " << FnName << " Mangled "
                           << MangledFnName << " RC HashValue "

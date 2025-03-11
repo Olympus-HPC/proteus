@@ -39,13 +39,13 @@ public:
                            const RuntimeDyld::LoadedObjectInfo &LOI);
   ~JitEngineHost();
 
-  Expected<orc::ThreadSafeModule> specializeIR(StringRef FnName,
-                                               StringRef Suffix, StringRef IR,
-                                               RuntimeConstant *RC,
-                                               int NumRuntimeConstants);
+  Expected<orc::ThreadSafeModule>
+  specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
+               const SmallVector<RuntimeConstant> &RCVec);
 
-  void *compileAndLink(StringRef FnName, char *IR, int IRSize,
-                       RuntimeConstant *RC, int NumRuntimeConstants);
+  void *compileAndLink(StringRef FnName, char *IR, int IRSize, void **Args,
+                       int32_t *RCIndices, int32_t *RCTypes,
+                       int NumRuntimeConstants);
 
 private:
   JitEngineHost(int argc, char *argv[]);

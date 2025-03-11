@@ -50,6 +50,11 @@ public:
   bool isProteusDisabled() { return Config.PROTEUS_DISABLE; }
 
 protected:
+  void getRuntimeConstantValues(void **KernelArgs,
+                                const ArrayRef<int32_t> RCIndices,
+                                const ArrayRef<int32_t> RCTypes,
+                                SmallVector<RuntimeConstant> &RCVec);
+
   void runCleanupPassPipeline(Module &M);
 
   JitEngine();
