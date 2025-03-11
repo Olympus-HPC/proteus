@@ -266,52 +266,6 @@ private:
     proteus::setKernelDims(M, GridDim, BlockDim);
   }
 
-  void getRuntimeConstantValues(void **KernelArgs,
-                                const SmallVector<int32_t> &RCIndices,
-                                const SmallVector<int32_t> &RCTypes,
-                                SmallVector<RuntimeConstant> &RCVec) {
-    TIMESCOPE(__FUNCTION__);
-    for (int I = 0; I < RCIndices.size(); ++I) {
-      PROTEUS_DBG(Logger::logs("proteus") << "RC Index " << RCIndices[I]
-                                          << " Type " << RCTypes[I] << "\n");
-      RuntimeConstant RC;
-      switch (RCTypes[I]) {
-      case RuntimeConstantTypes::BOOL:
-        RC.Value.BoolVal = *(bool *)KernelArgs[RCIndices[I]];
-        break;
-      case RuntimeConstantTypes::INT8:
-        RC.Value.Int8Val = *(int8_t *)KernelArgs[RCIndices[I]];
-        break;
-      case RuntimeConstantTypes::INT32:
-        RC.Value.Int32Val = *(int32_t *)KernelArgs[RCIndices[I]];
-        break;
-      case RuntimeConstantTypes::INT64:
-        RC.Value.Int64Val = *(int64_t *)KernelArgs[RCIndices[I]];
-        break;
-      case RuntimeConstantTypes::FLOAT:
-        RC.Value.FloatVal = *(float *)KernelArgs[RCIndices[I]];
-        break;
-      case RuntimeConstantTypes::DOUBLE:
-        RC.Value.DoubleVal = *(double *)KernelArgs[RCIndices[I]];
-        break;
-      // NOTE: long double on device should correspond to plain double.
-      // XXX: CUDA with a long double SILENTLY fails to create a working
-      // kernel in AOT compilation, with or without JIT.
-      case RuntimeConstantTypes::LONG_DOUBLE:
-        RC.Value.LongDoubleVal = *(long double *)KernelArgs[RCIndices[I]];
-        break;
-      case RuntimeConstantTypes::PTR:
-        RC.Value.PtrVal = (void *)KernelArgs[RCIndices[I]];
-        break;
-      default:
-        PROTEUS_FATAL_ERROR("JIT Incompatible type in runtime constant: " +
-                            std::to_string(RCTypes[I]));
-      }
-
-      RCVec.push_back(RC);
-    }
-  }
-
   DeviceError_t launchKernelFunction(KernelFunction_t KernelFunc, dim3 GridDim,
                                      dim3 BlockDim, void **KernelArgs,
                                      uint64_t ShmemSize,
