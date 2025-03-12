@@ -22,5 +22,5 @@ function(add_proteus target)
     target_link_options(${target} PUBLIC
         "SHELL:\$<\$<LINK_LANGUAGE:HIP>:-Xoffload-linker --load-pass-plugin=\$<TARGET_FILE:ProteusPass>>")
 
-    target_link_libraries(${target} PUBLIC proteus)
+    target_link_libraries(${target} PRIVATE proteus)
 endfunction()
