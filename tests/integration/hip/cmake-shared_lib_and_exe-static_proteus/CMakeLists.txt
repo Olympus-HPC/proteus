@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(libdaxpy LANGUAGES CXX HIP)
+project(libdaxpy LANGUAGES C CXX HIP)
 
 find_package(HIP REQUIRED)
 find_package(proteus REQUIRED CONFIG HINTS ${proteus_DIR})

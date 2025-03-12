@@ -14,8 +14,8 @@ int main(int argc, char **argv) {
   double *X;
   double *Y;
 
-  gpuErrCheck(gpuMallocManaged(&x, sizeof(double) * N));
-  gpuErrCheck(gpuMallocManaged(&y, sizeof(double) * N));
+  gpuErrCheck(gpuMallocManaged(&X, sizeof(double) * N));
+  gpuErrCheck(gpuMallocManaged(&Y, sizeof(double) * N));
 
   for (std::size_t I{0}; I < N; I++) {
     X[I] = 0.31414 * I;
@@ -30,8 +30,8 @@ int main(int argc, char **argv) {
   gpuErrCheck(gpuDeviceSynchronize());
   std::cout << Y[10] << std::endl;
 
-  gpuErrCheck(gpuFree(x));
-  gpuErrCheck(gpuFree(y));
+  gpuErrCheck(gpuFree(X));
+  gpuErrCheck(gpuFree(Y));
 }
 
 // CHECK: 0
