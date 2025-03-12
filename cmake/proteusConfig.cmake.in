@@ -22,5 +22,14 @@ function(add_proteus target)
     target_link_options(${target} PUBLIC
         "SHELL:\$<\$<LINK_LANGUAGE:HIP>:-Xoffload-linker --load-pass-plugin=\$<TARGET_FILE:ProteusPass>>")
 
-    target_link_libraries(${target} PRIVATE proteus)
+    get_target_property(target_type ${target} TYPE)
+    if(NOT target_type)
+        message(FATAL_ERROR "Target ${target} not found or does not have a TYPE property!")
+    endif()
+
+    if(target_type STREQUAL "SHARED_LIBRARY")
+        target_link_libraries(${target} INTERFACE proteus)
+    else()
+        target_link_libraries(${target} PRIVATE proteus)
+    endif()
 endfunction()

@@ -1,13 +1,5 @@
 set -e
 
-cat <<EOF
-*********************************************************
- This test expectedly fails because of static LLVM init,
- see https://github.com/Olympus-HPC/proteus/issues/134
-*********************************************************
-EOF
-exit 0
-
 cmake -S ${CI_PROJECT_DIR} -B build-proteus \
     -DLLVM_INSTALL_DIR="${LLVM_INSTALL_DIR}" \
     -DCMAKE_C_COMPILER="${LLVM_INSTALL_DIR}/bin/clang" \
