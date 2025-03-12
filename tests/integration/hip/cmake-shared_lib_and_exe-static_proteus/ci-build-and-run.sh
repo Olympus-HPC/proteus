@@ -15,6 +15,7 @@ make -j install
 popd
 
 cmake -S ${TEST_DIR} -B build \
+    -DCMAKE_CXX_COMPILER="${LLVM_INSTALL_DIR}/bin/clang++" \
     -Dproteus_DIR="${PWD}/install-proteus" \
     -DCMAKE_INSTALL_PREFIX="${PWD}/install"
 pushd build
@@ -23,4 +24,4 @@ make -j install
 ./main
 popd
 
-LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/install/lib install/bin/main
+install/bin/main
