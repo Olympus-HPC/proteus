@@ -37,7 +37,7 @@ function(add_proteus target)
     # initialization errors. Instead propagate the dependency of static
     # libproteus and its LLVM dependencies using INTERFACE.
     if(target_type STREQUAL "SHARED_LIBRARY" AND proteus_target_type STREQUAL "STATIC_LIBRARY")
-        target_link_libraries(${target} INTERFACE proteus)
+        target_link_libraries(${target} INTERFACE -Wl,--allow-shlib-undefined proteus)
     else()
         target_link_libraries(${target} PRIVATE proteus)
     endif()
