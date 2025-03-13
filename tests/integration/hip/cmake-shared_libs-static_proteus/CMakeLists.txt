@@ -13,11 +13,12 @@ add_library(libfoo SHARED libfoo.cpp)
 target_compile_options(libfoo PRIVATE -fgpu-rdc)
 target_link_options(libfoo
     PRIVATE
-    --no-undefined
     -fgpu-rdc
     --hip-link
 )
 target_link_libraries(libfoo PUBLIC hip::device)
+set_target_properties(libfoo PROPERTIES
+  INTERFACE_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib")
 add_proteus(libfoo)
 
 # libbar
@@ -26,11 +27,12 @@ add_library(libbar SHARED libbar.cpp)
 target_compile_options(libbar PRIVATE -fgpu-rdc)
 target_link_options(libbar
     PRIVATE
-    --no-undefined
     -fgpu-rdc
     --hip-link
 )
 target_link_libraries(libbar PUBLIC hip::device)
+set_target_properties(libbar PROPERTIES
+  INTERFACE_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib")
 add_proteus(libbar)
 
 # main
@@ -47,6 +49,7 @@ target_link_options(main
     --hip-link
 )
 target_link_libraries(main PUBLIC libfoo libbar)
+set_target_properties(main PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
 add_proteus(main)
 
 install(TARGETS main libfoo libbar)
