@@ -18,6 +18,7 @@
 #include "proteus/LambdaRegistry.hpp"
 #include "proteus/TransformArgumentSpecialization.hpp"
 #include "proteus/TransformLambdaSpecialization.hpp"
+#include "proteus/TransformSharedArray.hpp"
 
 namespace proteus {
 
@@ -218,6 +219,10 @@ inline void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
     }
     PROTEUS_DBG(Logger::logs("proteus") << "=== END OF MATCHING\n");
   }
+
+  // Run the shared array transform after any value specialization (arguments,
+  // captures) to propagate any constants.
+  TransformSharedArray::transform(M);
 
   // Replace uses of blockDim.* and gridDim.* with constants.
   if (SpecializeDims)

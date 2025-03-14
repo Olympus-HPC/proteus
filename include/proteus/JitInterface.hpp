@@ -44,6 +44,14 @@ static __attribute__((noinline)) T &&register_lambda(T &&t,
   return std::forward<T>(t);
 }
 
+#if defined(__CUDACC__) || defined(__HIP__)
+template <typename T>
+__device__ __attribute__((noinline)) T *
+shared_array(size_t N, size_t ElemSize = sizeof(T)) {
+  __builtin_trap();
+}
+#endif
+
 inline void init() {
   __jit_init_host();
 #if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
