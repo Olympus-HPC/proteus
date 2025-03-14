@@ -40,7 +40,7 @@ public:
             PROTEUS_FATAL_ERROR("Expected call user");
 
           CallBase *CB = cast<CallBase>(Usr);
-          assert(CB->arg_size == 2 && "Expected 2 arguments: N and sizeof");
+          assert(CB->arg_size() == 2 && "Expected 2 arguments: N and sizeof");
           int64_t N;
           int64_t Sizeof;
           if (!getConstantValue(CB->getArgOperand(0), N, M.getDataLayout()))
