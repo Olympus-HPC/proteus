@@ -222,7 +222,7 @@ inline void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
 
   // Run the shared array transform after any value specialization (arguments,
   // captures) to propagate any constants.
-  TransformSharedArray::transform(M, *F);
+  TransformSharedArray::transform(M);
 
   // Replace uses of blockDim.* and gridDim.* with constants.
   if (SpecializeDims)

@@ -27,9 +27,9 @@ using namespace llvm;
 
 class TransformSharedArray {
 public:
-  static void transform(Module &M, Function &F) {
+  static void transform(Module &M) {
     for (auto &Func : M.functions()) {
-      std::string DemangledName = llvm::demangle(Func.getName());
+      std::string DemangledName = llvm::demangle(Func.getName().str());
       StringRef StrRef{DemangledName};
       if (StrRef.contains("proteus::shared_array")) {
 
