@@ -30,6 +30,7 @@ set(HEADERS
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/TimeTracing.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/TransformArgumentSpecialization.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/TransformLambdaSpecialization.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/TransformSharedArray.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Utils.h)
 
 if(PROTEUS_ENABLE_CUDA)
