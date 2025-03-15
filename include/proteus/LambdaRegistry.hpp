@@ -7,12 +7,19 @@
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Debug.h"
-#include "proteus/Hashing.hpp"
+#include "proteus/Error.h"
 #include "proteus/Logger.hpp"
 
 namespace proteus {
 
 using namespace llvm;
+
+// The LambdaRegistry stores the unique lambda type symbol and JIT member
+// variables. We assume there is always ONLY ONE pending lambda registration
+// which is used up when JIT compiling the caller kernel or running its cached
+// instance. The helper class LambdaRegistryRAII clears the registration upon
+// compilation or running from cache. The single pending lambda assumption is
+// checked at runtime to abort execution with an error.
 
 class LambdaRegistry {
 public:
@@ -21,7 +28,7 @@ public:
     return Singleton;
   }
 
-  std::optional<DenseMap<StringRef, SmallVector<RuntimeConstant>>::iterator>
+  std::optional<const std::reference_wrapper<SmallVector<RuntimeConstant>>>
   matchJitVariableMap(StringRef FnName) {
     std::string Operator = llvm::demangle(FnName.str());
     std::size_t Sep = Operator.rfind("::operator()");
@@ -42,35 +49,49 @@ public:
     Logger::logs("proteus") << "===\n";
 #endif
 
-    const auto SymToRC = JitVariableMap.find(Symbol);
-    if (SymToRC == JitVariableMap.end())
-      return std::nullopt;
+    if (SymbolRef == Symbol)
+      return PendingJitVariables;
 
-    return SymToRC;
+    return std::nullopt;
   }
 
   void pushJitVariable(RuntimeConstant &RC) {
     PendingJitVariables.emplace_back(RC);
   }
 
+  // The Symbol input argument is created as a global variable in the
+  // ProteusPass, thus it has program-wide lifetime. Hence it is valid for
+  // SymbolRef to store a reference to it.
   inline void registerLambda(const char *Symbol) {
-    const StringRef SymbolStr{Symbol};
+    if (!empty())
+      PROTEUS_FATAL_ERROR("Expected a single lambda registration");
+
+    SymbolRef = Symbol;
     PROTEUS_DBG(Logger::logs("proteus")
                 << "=> RegisterLambda " << Symbol << "\n");
-    JitVariableMap[SymbolStr] = PendingJitVariables;
-    PendingJitVariables.clear();
   }
 
-  bool empty() { return JitVariableMap.empty(); }
+  bool empty() { return (SymbolRef == std::nullopt); }
 
-  void erase(DenseMap<StringRef, SmallVector<RuntimeConstant>>::iterator It) {
-    JitVariableMap.erase(It);
+  const SmallVector<RuntimeConstant> &getPendingJitVariables() const {
+    return PendingJitVariables;
+  }
+
+  void clear() {
+    SymbolRef = std::nullopt;
+    PendingJitVariables.clear();
   }
 
 private:
   explicit LambdaRegistry() = default;
+  std::optional<StringRef> SymbolRef;
   SmallVector<RuntimeConstant> PendingJitVariables;
-  DenseMap<StringRef, SmallVector<RuntimeConstant>> JitVariableMap;
+};
+
+class LambdaRegistryRAII {
+public:
+  explicit LambdaRegistryRAII() = default;
+  ~LambdaRegistryRAII() { LambdaRegistry::instance().clear(); }
 };
 
 } // namespace proteus

@@ -261,11 +261,9 @@ JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
     TransformArgumentSpecialization::transform(*M, *F, ArgPos, RCVec);
 
     if (!LambdaRegistry::instance().empty()) {
-      if (auto OptionalMapIt =
+      if (auto RCVec =
               LambdaRegistry::instance().matchJitVariableMap(F->getName())) {
-        auto &RCVec = OptionalMapIt.value()->getSecond();
-        TransformLambdaSpecialization::transform(*M, *F, RCVec);
-        LambdaRegistry::instance().erase(OptionalMapIt.value());
+        TransformLambdaSpecialization::transform(*M, *F, RCVec.value());
       }
     }
 
@@ -292,6 +290,8 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
                                     void **Args, int32_t *RCIndices,
                                     int32_t *RCTypes, int NumRuntimeConstants) {
   TIMESCOPE("compileAndLink");
+
+  LambdaRegistryRAII LRAII;
 
   // TODO: implement ModuleUniqueId for host code.
   StringRef StrIR(IR, IRSize);

@@ -207,11 +207,9 @@ inline void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
     for (auto &F : M.getFunctionList()) {
       PROTEUS_DBG(Logger::logs("proteus")
                   << " Trying F " << demangle(F.getName().str()) << "\n ");
-      if (auto OptionalMapIt =
+      if (auto RCVec =
               LambdaRegistry::instance().matchJitVariableMap(F.getName())) {
-        auto &RCVec = OptionalMapIt.value()->getSecond();
-        TransformLambdaSpecialization::transform(M, F, RCVec);
-        LambdaRegistry::instance().erase(OptionalMapIt.value());
+        TransformLambdaSpecialization::transform(M, F, RCVec.value());
         PROTEUS_DBG(Logger::logs("proteus") << "Found match!\n");
         break;
       }

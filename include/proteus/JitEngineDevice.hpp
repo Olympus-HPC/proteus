@@ -394,13 +394,17 @@ JitEngineDevice<ImplT>::compileAndRun(
     }
   });
 
+  LambdaRegistryRAII LRAII;
+
   SmallVector<RuntimeConstant> RCVec;
 
   getRuntimeConstantValues(KernelArgs, KernelInfo.getRCIndices(),
                            KernelInfo.getRCTypes(), RCVec);
 
-  HashT HashValue = hash(getStaticHash(KernelInfo), RCVec, GridDim.x, GridDim.y,
-                         GridDim.z, BlockDim.x, BlockDim.y, BlockDim.z);
+  HashT HashValue =
+      hash(getStaticHash(KernelInfo), RCVec,
+           LambdaRegistry::instance().getPendingJitVariables(), GridDim.x,
+           GridDim.x, GridDim.y, GridDim.z, BlockDim.x, BlockDim.y, BlockDim.z);
 
   typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc =
       CodeCache.lookup(HashValue);
