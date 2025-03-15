@@ -41,12 +41,8 @@ public:
     StringRef Symbol = StringRef{Operator}.slice(0, Sep);
 #if PROTEUS_ENABLE_DEBUG
     Logger::logs("proteus")
-        << "Operator " << Operator << "\n=> Symbol to match " << Symbol << "\n";
-    Logger::logs("proteus") << "Available Keys\n";
-    for (auto &[Key, Val] : JitVariableMap) {
-      Logger::logs("proteus") << "\tKey: " << Key << "\n";
-    }
-    Logger::logs("proteus") << "===\n";
+        << "Operator " << Operator << "\n=> Symbol to match " << Symbol
+        << " <-> Registered Symbol " << SymbolRef << "\n";
 #endif
 
     if (SymbolRef == Symbol)
