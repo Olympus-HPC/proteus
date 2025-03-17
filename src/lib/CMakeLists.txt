@@ -24,6 +24,7 @@ set(HEADERS
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitCache.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngine.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngineHost.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitFrontend.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitInterface.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitStorageCache.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/LambdaRegistry.hpp
