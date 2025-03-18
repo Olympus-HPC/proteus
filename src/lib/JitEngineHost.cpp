@@ -280,14 +280,13 @@ void getLambdaJitValues(Module &M, StringRef FnName,
   if (LR.empty())
     return;
 
-  PROTEUS_DBG(Logger::logs("proteus")
-              << "=== Host LAMBDA MATCHING\n"
-              << "Caller trigger " << KernelInfo.getName() << " -> "
-              << demangle(KernelInfo.getName()) << "\n");
+  PROTEUS_DBG(Logger::logs("proteus") << "=== Host LAMBDA MATCHING\n"
+                                      << "Caller trigger " << FnName << " -> "
+                                      << demangle(FnName) << "\n");
 
   SmallVector<StringRef> LambdaCalleeInfo;
   PROTEUS_DBG(Logger::logs("proteus")
-              << " Trying F " << demangle(F.getName().str()) << "\n ");
+              << " Trying F " << demangle(FnName.str()) << "\n ");
   auto OptionalMapIt = LambdaRegistry::instance().matchJitVariableMap(FnName);
   if (!OptionalMapIt)
     return;

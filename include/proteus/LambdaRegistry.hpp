@@ -36,7 +36,8 @@ public:
     StringRef LambdaType = StringRef{Operator}.slice(0, Sep);
 #if PROTEUS_ENABLE_DEBUG
     Logger::logs("proteus")
-        << "Operator " << Operator << "\n=> Symbol to match " << Symbol << "\n";
+        << "Operator " << Operator << "\n=> LambdaType to match " << LambdaType
+        << "\n";
     Logger::logs("proteus") << "Available Keys\n";
     for (auto &[Key, Val] : JitVariableMap) {
       Logger::logs("proteus") << "\tKey: " << Key << "\n";
