@@ -20,7 +20,6 @@
 
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
-#include <llvm/Analysis/CallGraph.h>
 #include <llvm/Analysis/TargetTransformInfo.h>
 #include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/CodeGen/CommandFlags.h>
@@ -202,7 +201,7 @@ public:
     std::unique_ptr<Module> KernelModule{nullptr};
 
     if (Config.PROTEUS_USE_LIGHTWEIGHT_KERNEL_CLONE) {
-      KernelModule = std::move(proteus::cloneKernelFromModule(BinModule, KernelInfo.getName()));
+      KernelModule = std::move(proteus::cloneKernelFromModule(BinModule, getLLVMContext(), KernelInfo.getName()));
     } else {
       KernelModule = std::move(llvm::CloneModule(BinModule));
     }

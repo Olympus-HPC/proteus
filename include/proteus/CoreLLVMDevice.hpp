@@ -232,8 +232,8 @@ inline void specializeIR(
   runCleanupPassPipeline(M);
 }
 
-inline std::unique_ptr<Module> cloneKernelFromModule(Module& M, const std::string& name) {
-      auto KernelModule = std::make_unique<Module>("JitModule", M.getContext());
+inline std::unique_ptr<Module> cloneKernelFromModule(Module& M, Context& C, const std::string& Name) {
+      auto KernelModule = std::make_unique<Module>("JitModule", C));
       KernelModule->setSourceFileName(M.getSourceFileName());
       KernelModule->setDataLayout(M.getDataLayout());
       KernelModule->setTargetTriple(M.getTargetTriple());
@@ -242,6 +242,9 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module& M, const std::strin
 
       auto KernelFunction =
           M.getFunction(name);
+
+      if (!KernelFunction)
+        PROTEUS_FATAL_ERROR("Expected function " + name);
 
       SmallPtrSet<Function *, 8> ReachableFunctions;
       SmallPtrSet<GlobalVariable *, 16> ReachableGlobals;
@@ -306,7 +309,7 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module& M, const std::strin
             GV->hasInitializer() ? GV->getInitializer() : nullptr,
             GV->getName(),
             nullptr,
-            llvm::GlobalValue::NotThreadLocal,
+            GV->getThreadLocalMode(),
             GV->getAddressSpace());
         NewGV->copyAttributesFrom(GV);
         VMap[GV] = NewGV;
