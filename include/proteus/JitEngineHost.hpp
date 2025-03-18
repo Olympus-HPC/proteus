@@ -40,7 +40,8 @@ public:
   ~JitEngineHost();
 
   Expected<orc::ThreadSafeModule>
-  specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
+  specializeIR(std::unique_ptr<Module> M, std::unique_ptr<LLVMContext> Ctx,
+               StringRef FnName, StringRef Suffix,
                const SmallVector<RuntimeConstant> &RCVec);
 
   void *compileAndLink(StringRef FnName, char *IR, int IRSize, void **Args,

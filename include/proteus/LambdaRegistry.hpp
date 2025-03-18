@@ -7,13 +7,15 @@
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Debug.h"
-#include "proteus/Hashing.hpp"
+#include "proteus/Error.h"
 #include "proteus/Logger.hpp"
 
 namespace proteus {
 
 using namespace llvm;
 
+// The LambdaRegistry stores the unique lambda type symbol and the values of Jit
+// member variables in a map for retrieval by the Jit engines.
 class LambdaRegistry {
 public:
   static LambdaRegistry &instance() {
@@ -31,7 +33,7 @@ public:
       return std::nullopt;
     }
 
-    StringRef Symbol = StringRef{Operator}.slice(0, Sep);
+    StringRef LambdaType = StringRef{Operator}.slice(0, Sep);
 #if PROTEUS_ENABLE_DEBUG
     Logger::logs("proteus")
         << "Operator " << Operator << "\n=> Symbol to match " << Symbol << "\n";
@@ -42,30 +44,37 @@ public:
     Logger::logs("proteus") << "===\n";
 #endif
 
-    const auto SymToRC = JitVariableMap.find(Symbol);
-    if (SymToRC == JitVariableMap.end())
+    const auto It = JitVariableMap.find(LambdaType);
+    if (It == JitVariableMap.end())
       return std::nullopt;
 
-    return SymToRC;
+    return It;
   }
 
   void pushJitVariable(RuntimeConstant &RC) {
     PendingJitVariables.emplace_back(RC);
   }
 
-  inline void registerLambda(const char *Symbol) {
-    const StringRef SymbolStr{Symbol};
+  // The LambdaType input argument is created as a global variable in the
+  // ProteusPass, thus it has program-wide lifetime. Hence it is valid for
+  // LambdaTypeRef to store a reference to it.
+  inline void registerLambda(const char *LambdaType) {
+    const StringRef LambdaTypeRef{LambdaType};
     PROTEUS_DBG(Logger::logs("proteus")
-                << "=> RegisterLambda " << Symbol << "\n");
-    JitVariableMap[SymbolStr] = PendingJitVariables;
-    PendingJitVariables.clear();
+                << "=> RegisterLambda " << LambdaTypeRef << "\n");
+    // Copy PendingJitVariables if there were changed, otherwise the runtime
+    // values for the lambda definition have not changed.
+    if (!PendingJitVariables.empty()) {
+      JitVariableMap[LambdaTypeRef] = PendingJitVariables;
+      PendingJitVariables.clear();
+    }
+  }
+
+  const SmallVector<RuntimeConstant> &getJitVariables(StringRef LambdaTypeRef) {
+    return JitVariableMap[LambdaTypeRef];
   }
 
   bool empty() { return JitVariableMap.empty(); }
-
-  void erase(DenseMap<StringRef, SmallVector<RuntimeConstant>>::iterator It) {
-    JitVariableMap.erase(It);
-  }
 
 private:
   explicit LambdaRegistry() = default;

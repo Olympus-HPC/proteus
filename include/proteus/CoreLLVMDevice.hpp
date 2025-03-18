@@ -187,12 +187,12 @@ inline void relinkGlobalsObject(
   }
 }
 
-inline void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
-                         dim3 &BlockDim, dim3 &GridDim,
-                         const SmallVector<int32_t> &RCIndices,
-                         const SmallVector<RuntimeConstant> &RCVec,
-                         bool SpecializeArgs, bool SpecializeDims,
-                         bool SpecializeLaunchBounds) {
+inline void specializeIR(
+    Module &M, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
+    dim3 &GridDim, const SmallVector<int32_t> &RCIndices,
+    const SmallVector<RuntimeConstant> &RCVec,
+    const SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo,
+    bool SpecializeArgs, bool SpecializeDims, bool SpecializeLaunchBounds) {
   Function *F = M.getFunction(FnName);
 
   assert(F && "Expected non-null function!");
@@ -200,24 +200,13 @@ inline void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
   if (SpecializeArgs)
     TransformArgumentSpecialization::transform(M, *F, RCIndices, RCVec);
 
-  if (!LambdaRegistry::instance().empty()) {
-    PROTEUS_DBG(Logger::logs("proteus")
-                << "=== LAMBDA MATCHING\n"
-                << "F trigger " << F->getName() << " -> "
-                << demangle(F->getName().str()) << "\n");
-    for (auto &F : M.getFunctionList()) {
-      PROTEUS_DBG(Logger::logs("proteus")
-                  << " Trying F " << demangle(F.getName().str()) << "\n ");
-      if (auto OptionalMapIt =
-              LambdaRegistry::instance().matchJitVariableMap(F.getName())) {
-        auto &RCVec = OptionalMapIt.value()->getSecond();
-        TransformLambdaSpecialization::transform(M, F, RCVec);
-        LambdaRegistry::instance().erase(OptionalMapIt.value());
-        PROTEUS_DBG(Logger::logs("proteus") << "Found match!\n");
-        break;
-      }
-    }
-    PROTEUS_DBG(Logger::logs("proteus") << "=== END OF MATCHING\n");
+  auto &LR = LambdaRegistry::instance();
+  for (auto &[FnName, LambdaType] : LambdaCalleeInfo) {
+    const SmallVector<RuntimeConstant> &RCVec = LR.getJitVariables(LambdaType);
+    Function *F = M.getFunction(FnName);
+    if (!F)
+      PROTEUS_FATAL_ERROR("Expected non-null Function");
+    TransformLambdaSpecialization::transform(M, *F, RCVec);
   }
 
   // Run the shared array transform after any value specialization (arguments,

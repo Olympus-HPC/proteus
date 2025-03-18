@@ -24,6 +24,7 @@ private:
   dim3 GridDim;
   SmallVector<int32_t> RCIndices;
   SmallVector<RuntimeConstant> RCVec;
+  SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo;
   std::unordered_map<std::string, const void *> VarNameToDevPtr;
   SmallPtrSet<void *, 8> GlobalLinkedBinaries;
   std::string DeviceArch;
@@ -52,13 +53,15 @@ public:
       std::string &Suffix, dim3 BlockDim, dim3 GridDim,
       const SmallVector<int32_t> &RCIndices,
       const SmallVector<RuntimeConstant> &RCVec,
+      const SmallVector<std::pair<std::string, StringRef>> &LambdaCalleeInfo,
       const std::unordered_map<std::string, const void *> &VarNameToDevPtr,
       const SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
       const std::string &DeviceArch, bool UseRTC, bool DumpIR,
       bool UseStoredCache, bool RelinkGlobalsByCopy)
       : KernelModule(Mod), HashValue(HashValue), KernelName(KernelName),
         Suffix(Suffix), BlockDim(BlockDim), GridDim(GridDim),
-        RCIndices(RCIndices), RCVec(RCVec), VarNameToDevPtr(VarNameToDevPtr),
+        RCIndices(RCIndices), RCVec(RCVec), LambdaCalleeInfo(LambdaCalleeInfo),
+        VarNameToDevPtr(VarNameToDevPtr),
         GlobalLinkedBinaries(GlobalLinkedBinaries), DeviceArch(DeviceArch),
         UseRTC(UseRTC), DumpIR(DumpIR), UseStoredCache(UseStoredCache),
         RelinkGlobalsByCopy(RelinkGlobalsByCopy) {}
@@ -84,7 +87,7 @@ public:
     std::string KernelMangled = (KernelName + Suffix);
 
     proteus::specializeIR(*M, KernelName, Suffix, BlockDim, GridDim, RCIndices,
-                          RCVec, true, true, true);
+                          RCVec, LambdaCalleeInfo, true, true, true);
 
     replaceGlobalVariablesWithPointers(*M, VarNameToDevPtr);
 
