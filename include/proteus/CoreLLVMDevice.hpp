@@ -232,7 +232,7 @@ inline void specializeIR(
   runCleanupPassPipeline(M);
 }
 
-inline std::unique_ptr<Module> cloneKernelFromModule(Module& M, Context& C, const std::string& Name) {
+inline std::unique_ptr<Module> cloneKernelFromModule(Module& M, LLVMContext& C, const std::string& Name) {
       auto KernelModule = std::make_unique<Module>("JitModule", C));
       KernelModule->setSourceFileName(M.getSourceFileName());
       KernelModule->setDataLayout(M.getDataLayout());
