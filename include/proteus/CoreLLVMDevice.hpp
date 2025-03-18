@@ -233,7 +233,7 @@ inline void specializeIR(
 }
 
 inline std::unique_ptr<Module> cloneKernelFromModule(Module& M, LLVMContext& C, const std::string& Name) {
-      auto KernelModule = std::make_unique<Module>("JitModule", C));
+      auto KernelModule = std::make_unique<Module>("JitModule", C);
       KernelModule->setSourceFileName(M.getSourceFileName());
       KernelModule->setDataLayout(M.getDataLayout());
       KernelModule->setTargetTriple(M.getTargetTriple());
@@ -241,10 +241,10 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module& M, LLVMContext& C, 
       KernelModule->IsNewDbgInfoFormat = M.IsNewDbgInfoFormat;
 
       auto KernelFunction =
-          M.getFunction(name);
+          M.getFunction(Name);
 
       if (!KernelFunction)
-        PROTEUS_FATAL_ERROR("Expected function " + name);
+        PROTEUS_FATAL_ERROR("Expected function " + Name);
 
       SmallPtrSet<Function *, 8> ReachableFunctions;
       SmallPtrSet<GlobalVariable *, 16> ReachableGlobals;
@@ -277,7 +277,7 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module& M, LLVMContext& C, 
         }
       }
 
-      auto process_instruction = [&](GlobalVariable &GV, const Instruction *I) {
+      auto ProcessInstruction = [&](GlobalVariable &GV, const Instruction *I) {
         const Function *ParentF = I->getParent()->getParent();
         if (ReachableFunctions.contains(ParentF))
           ReachableGlobals.insert(&GV);
@@ -288,12 +288,12 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module& M, LLVMContext& C, 
           const Instruction *I = dyn_cast<Instruction>(Usr);
 
           if (I) {
-            process_instruction(GV, I);
+            ProcessInstruction(GV, I);
           } else {
             for (const User *NextUser : Usr->users()) {
               I = dyn_cast<Instruction>(NextUser);
               if (I)
-                process_instruction(GV, I);
+                ProcessInstruction(GV, I);
 
             }
           }
