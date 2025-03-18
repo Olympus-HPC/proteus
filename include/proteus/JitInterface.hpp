@@ -23,6 +23,10 @@ extern "C" void __jit_init_host();
 extern "C" void __jit_init_device();
 extern "C" void __jit_finalize_host();
 extern "C" void __jit_finalize_device();
+extern "C" void __jit_enable_host();
+extern "C" void __jit_enable_device();
+extern "C" void __jit_disable_host();
+extern "C" void __jit_disable_device();
 
 namespace proteus {
 
@@ -51,6 +55,16 @@ shared_array(size_t N, size_t ElemSize = sizeof(T)) {
   __builtin_trap();
 }
 #endif
+
+inline void enable() {
+  __jit_enable_host();
+  __jit_enable_device();
+}
+
+inline void disable() {
+  __jit_disable_host();
+  __jit_disable_device();
+}
 
 inline void init() {
   __jit_init_host();

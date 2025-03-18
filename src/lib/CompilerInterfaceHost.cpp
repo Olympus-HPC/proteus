@@ -39,3 +39,13 @@ __jit_register_lambda(const char *Symbol) {
 extern "C" void __jit_init_host() {}
 
 extern "C" void __jit_finalize_host() {}
+
+extern "C" void __jit_enable_host() {
+  JitEngineHost &Jit = JitEngineHost::instance();
+  Jit.enable();
+}
+
+extern "C" void __jit_disable_host() {
+  JitEngineHost &Jit = JitEngineHost::instance();
+  Jit.disable();
+}
