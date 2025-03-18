@@ -239,7 +239,9 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
   KernelModule->setDataLayout(M.getDataLayout());
   KernelModule->setTargetTriple(M.getTargetTriple());
   KernelModule->setModuleInlineAsm(M.getModuleInlineAsm());
+#if LLVM_VERSION_MAJOR >= 18
   KernelModule->IsNewDbgInfoFormat = M.IsNewDbgInfoFormat;
+#endif
 
   auto KernelFunction = M.getFunction(Name);
 
