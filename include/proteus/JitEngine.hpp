@@ -49,9 +49,9 @@ public:
 
   bool isProteusDisabled() { return Config.PROTEUS_DISABLE; }
 
-  void enable() { Config.PROTEUS_DISABLE = false;}
+  void enable() { Config.PROTEUS_DISABLE = false; }
 
-  void disable() { Config.PROTEUS_DISABLE = true;}
+  void disable() { Config.PROTEUS_DISABLE = true; }
 
 protected:
   void getRuntimeConstantValues(void **KernelArgs,
