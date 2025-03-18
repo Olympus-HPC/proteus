@@ -1,7 +1,7 @@
 // RUN: rm -rf .proteus
-// RUN: ./kernel.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: ./enable_disable.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./kernel.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: ./enable_disable.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
 #include <climits>
 #include <cstdio>
@@ -33,6 +33,7 @@ int main() {
 // CHECK: Kernel
 // CHECK: Kernel
 // CHECK: Kernel
+// CHECK: JitCache hits 0 total 0
 // CHECK: JitCache hits 0 total 2
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
