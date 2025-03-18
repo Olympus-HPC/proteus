@@ -10,6 +10,15 @@ inline auto __jit_launch_kernel_internal(void *Kernel, dim3 GridDim,
   using namespace llvm;
   using namespace proteus;
 
+  static const bool IsProteusDisabledEnvVar =
+      getEnvOrDefaultBool("PROTEUS_DISABLE", false);
+
+  if (IsProteusDisabledEnvVar) {
+    return proteus::launchKernelDirect(
+        Kernel, GridDim, BlockDim, KernelArgs, ShmemSize,
+        static_cast<typename JitDeviceImplT::DeviceStream_t>(Stream));
+  }
+
   auto &Jit = JitDeviceImplT::instance();
   if (Jit.isProteusDisabled()) {
     return proteus::launchKernelDirect(
