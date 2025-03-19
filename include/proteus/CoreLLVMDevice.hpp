@@ -234,6 +234,9 @@ inline void specializeIR(
 
 inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
                                                      const std::string &Name) {
+#if PROTEUS_ENABLE_DEBUG
+  Logger::logs("proteus") << "Full module \n" << M << "\n";
+#endif
   auto KernelModule = std::make_unique<Module>("JitModule", C);
   KernelModule->setSourceFileName(M.getSourceFileName());
   KernelModule->setDataLayout(M.getDataLayout());
@@ -243,8 +246,21 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
   KernelModule->IsNewDbgInfoFormat = M.IsNewDbgInfoFormat;
 #endif
 
-  auto KernelFunction = M.getFunction(Name);
+  const std::string AnnotationsToCopy[] = {"llvm.annotations",
+                                           "nvvm.annotations", "nvvmir.version",
+                                           "llvm.module.flags"};
+  // Copy annotations from M into KernelModule
+  for (auto &AnnotationName : AnnotationsToCopy) {
+    if (auto *Annotations = M.getNamedMetadata(AnnotationName)) {
+      auto *KernelAnnotations =
+          KernelModule->getOrInsertNamedMetadata(AnnotationName);
+      for (unsigned i = 0, e = Annotations->getNumOperands(); i < e; ++i) {
+        KernelAnnotations->addOperand(Annotations->getOperand(i));
+      }
+    }
+  }
 
+  auto KernelFunction = M.getFunction(Name);
   if (!KernelFunction)
     PROTEUS_FATAL_ERROR("Expected function " + Name);
 
@@ -262,18 +278,14 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
 
     for (const auto &Callee : *CGNode) {
       Function *CalleeF = Callee.second->getFunction();
-
       if (!CalleeF)
         continue;
-
       if (CalleeF->isDeclaration()) {
         ReachableDeclarations.insert(CalleeF);
         continue;
       }
-
       if (ReachableFunctions.contains(CalleeF))
         continue;
-
       ReachableFunctions.insert(CalleeF);
       ToVisit.push_back(CalleeF);
     }
@@ -332,23 +344,27 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
   for (auto F : ReachableFunctions) {
     SmallVector<ReturnInst *, 8> Returns;
     auto NewFunction = dyn_cast<Function>(VMap[F]);
-
     Function::arg_iterator DestI = NewFunction->arg_begin();
     for (const Argument &I : F->args())
-      if (VMap.count(&I) == 0) {     // Is this argument preserved?
-        DestI->setName(I.getName()); // Copy the name over...
-        VMap[&I] = &*DestI++;        // Add mapping to VMap
+      if (VMap.count(&I) == 0) {
+        DestI->setName(I.getName());
+        VMap[&I] = &*DestI++;
       }
-
     llvm::CloneFunctionInto(NewFunction, F, VMap,
                             CloneFunctionChangeType::DifferentModule, Returns);
   }
 
+  if (auto *DbgCU = KernelModule->getNamedMetadata("llvm.dbg.cu")) {
+    KernelModule->eraseNamedMetadata(DbgCU);
+  }
+
   if (verifyModule(*KernelModule, &errs()))
     PROTEUS_FATAL_ERROR("Broken mini-module found, JIT compilation aborted!");
+
 #if PROTEUS_ENABLE_DEBUG
   Logger::logs("proteus") << "Mini-module \n" << *KernelModule << "\n";
 #endif
+
   return std::move(KernelModule);
 }
 
