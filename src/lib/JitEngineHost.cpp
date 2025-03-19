@@ -282,7 +282,7 @@ void getLambdaJitValues(Module &M, StringRef FnName,
 
   PROTEUS_DBG(Logger::logs("proteus") << "=== Host LAMBDA MATCHING\n"
                                       << "Caller trigger " << FnName << " -> "
-                                      << demangle(FnName) << "\n");
+                                      << demangle(FnName.str()) << "\n");
 
   SmallVector<StringRef> LambdaCalleeInfo;
   PROTEUS_DBG(Logger::logs("proteus")
