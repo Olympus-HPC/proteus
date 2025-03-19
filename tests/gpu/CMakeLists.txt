@@ -52,6 +52,7 @@ function(CREATE_GPU_TEST_RDC exe check_source)
         target_compile_options(
             ${exe}.${lang}.rdc
             PUBLIC
+            -Werror
             -fgpu-rdc
             -fpass-plugin=$<TARGET_FILE:ProteusPass>
         )
@@ -240,6 +241,7 @@ CREATE_GPU_TEST(block_grid_dim_1d block_grid_dim_1d.cpp)
 CREATE_GPU_TEST(block_grid_dim_2d block_grid_dim_2d.cpp)
 CREATE_GPU_TEST(block_grid_dim_3d block_grid_dim_3d.cpp)
 CREATE_GPU_TEST(lambda lambda.cpp)
+CREATE_GPU_TEST(lambda_calls_func_with_shmem lambda_calls_func_with_shmem.cpp)
 CREATE_GPU_TEST(shared_array shared_array.cpp)
 CREATE_GPU_TEST(enable_disable enable_disable.cpp)
 
@@ -269,6 +271,7 @@ CREATE_GPU_TEST_RDC(block_grid_dim_1d block_grid_dim_1d.cpp)
 CREATE_GPU_TEST_RDC(block_grid_dim_2d block_grid_dim_2d.cpp)
 CREATE_GPU_TEST_RDC(block_grid_dim_3d block_grid_dim_3d.cpp)
 CREATE_GPU_TEST_RDC(lambda lambda.cpp)
+CREATE_GPU_TEST_RDC(lambda_calls_func_with_shmem lambda_calls_func_with_shmem.cpp)
 CREATE_GPU_TEST_RDC(shared_array shared_array.cpp)
 CREATE_GPU_TEST_RDC(enable_disable enable_disable.cpp)
 
