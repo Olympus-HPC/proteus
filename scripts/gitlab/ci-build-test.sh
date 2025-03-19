@@ -63,21 +63,21 @@ fi
 make -j
 # Test synchronous compilation by default.
 echo "### TESTING SYNC COMPILATION ###"
-make test
+ctest -T test --output-on-failure
 echo "### END TESTING SYNC COMPILATION ###"
 # Test asynchronous compilation.
 echo "### TESTING (BLOCKING) ASYNC COMPILATION ###"
-PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 make test
+PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 ctest -T test --output-on-failure
 echo "### END TESTING (BLOCKING) ASYNC COMPILATION ###"
 
 # Test also our faster, alternative to HIP RTC codegen.
 if [ "${CI_MACHINE}" == "tioga" ] && [ "${PROTEUS_CI_ROCM_VERSION}" == "6.2.1" ]; then
   echo "### TESTING SYNC COMPILATION WITH PROTEUS HIP CODEGEN ###"
-  PROTEUS_USE_HIP_RTC_CODEGEN=0 make test
+  PROTEUS_USE_HIP_RTC_CODEGEN=0 ctest -T test --output-on-failure
   echo "### END TESTING SYNC COMPILATION WITH PROTEUS HIP CODEGEN ###"
 
   echo "### TESTING (BLOCKING) ASYNC COMPILATION WITH PROTEUS HIP CODEGEN ###"
-  PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 PROTEUS_USE_HIP_RTC_CODEGEN=0 make test
+  PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 PROTEUS_USE_HIP_RTC_CODEGEN=0 ctest -T test --output-on-failure
   echo "### END TESTING (BLOCKING) ASYNC COMPILATION WITH PROTEUS HIP CODEGEN ###"
 fi
 

@@ -66,3 +66,13 @@ extern "C" void __jit_finalize_device() {
   auto &Jit = JitDeviceImplT::instance();
   Jit.finalize();
 }
+
+extern "C" void __jit_enable_device() {
+  auto &Jit = JitDeviceImplT::instance();
+  Jit.enable();
+}
+
+extern "C" void __jit_disable_device() {
+  auto &Jit = JitDeviceImplT::instance();
+  Jit.disable();
+}
