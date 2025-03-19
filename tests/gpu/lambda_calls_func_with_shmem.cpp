@@ -27,14 +27,6 @@ __device__ void square(double * v)
    v[0] = v[0] * v[0];
 }
 
-void test()
-{
-   launch([=] __device__ __attribute__((annotate("jit"))) () {
-      __shared__ double sm[1];
-      square(sm);
-   });
-}
-
 int main(int argc, char **argv) {
   proteus::init();
 
