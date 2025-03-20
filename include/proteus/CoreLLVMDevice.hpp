@@ -246,7 +246,7 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
   KernelModule->IsNewDbgInfoFormat = M.IsNewDbgInfoFormat;
 #endif
 
-  auto KernelFunction = M.getFunction(Name);
+  auto *KernelFunction = M.getFunction(Name);
   if (!KernelFunction)
     PROTEUS_FATAL_ERROR("Expected function " + Name);
 
@@ -278,7 +278,7 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
   }
 
   auto ProcessInstruction = [&](GlobalVariable &GV, const Instruction *I) {
-    const Function *ParentF = I->getParent()->getParent();
+    const Function *ParentF = I->getFunction();
     if (ReachableFunctions.contains(ParentF))
       ReachableGlobals.insert(&GV);
   };
@@ -289,12 +289,19 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
 
       if (I) {
         ProcessInstruction(GV, I);
-      } else {
-        for (const User *NextUser : Usr->users()) {
-          I = dyn_cast<Instruction>(NextUser);
-          if (I)
-            ProcessInstruction(GV, I);
-        }
+        continue;
+      }
+
+      // We follow non-instructions users to process them if those are
+      // instructions.
+      // TODO: We may need to follow deeper than just users of user and also
+      // expand to non-instruction users.
+      for (const User *NextUser : Usr->users()) {
+        I = dyn_cast<Instruction>(NextUser);
+        if (!I)
+          continue;
+
+        ProcessInstruction(GV, I);
       }
     }
   }
@@ -347,22 +354,20 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
   }
 
   // Copy annotations from M into KernelModule now that VMap has been populated.
-  const std::string AnnotationsToCopy[] = {"llvm.annotations",
-                                           "nvvm.annotations", "nvvmir.version",
-                                           "llvm.module.flags"};
-  for (auto &AnnotationName : AnnotationsToCopy) {
-    NamedMDNode *Annotations = M.getNamedMetadata(AnnotationName);
-    if (!Annotations)
+  const std::string MetadataToCopy[] = {"llvm.annotations", "nvvm.annotations",
+                                        "nvvmir.version", "llvm.module.flags"};
+  for (auto &MetadataName : MetadataToCopy) {
+    NamedMDNode *NamedMD = M.getNamedMetadata(MetadataName);
+    if (!NamedMD)
       continue;
 
-    auto *KernelAnnotations =
-        KernelModule->getOrInsertNamedMetadata(AnnotationName);
-    for (unsigned I = 0, E = Annotations->getNumOperands(); I < E; ++I) {
-      auto *Annotation = Annotations->getOperand(I);
+    auto *NewNamedMD = KernelModule->getOrInsertNamedMetadata(MetadataName);
+    for (unsigned I = 0, E = NamedMD->getNumOperands(); I < E; ++I) {
+      MDNode *MDEntry = NamedMD->getOperand(I);
       bool ShouldClone = true;
       // Skip if the operands of an MDNode refer to non-existing,
       // unreachable global values.
-      for (auto &Operand : Annotation->operands()) {
+      for (auto &Operand : MDEntry->operands()) {
         Metadata *MD = Operand.get();
         auto *CMD = dyn_cast<ConstantAsMetadata>(MD);
         if (!CMD)
@@ -381,15 +386,14 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
       if (!ShouldClone)
         continue;
 
-      KernelAnnotations->addOperand(
-          MapMetadata(Annotations->getOperand(I), VMap));
+      NewNamedMD->addOperand(MapMetadata(MDEntry, VMap));
     }
   }
 
+#if PROTEUS_ENABLE_DEBUG
   if (verifyModule(*KernelModule, &errs()))
     PROTEUS_FATAL_ERROR("Broken mini-module found, JIT compilation aborted!");
 
-#if PROTEUS_ENABLE_DEBUG
   Logger::logs("proteus") << "Mini-module \n" << *KernelModule << "\n";
 #endif
 
