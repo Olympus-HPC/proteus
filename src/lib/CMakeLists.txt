@@ -5,6 +5,8 @@ set(SOURCES
   CompilerInterfaceHost.cpp
   JitEngine.cpp
   JitEngineHost.cpp
+  Frontend/Func.cpp
+  Frontend/Var.cpp
 )
 
 set(PROTEUS_PROJECT_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")

@@ -14,84 +14,61 @@
 namespace proteus {
 using namespace llvm;
 
-template <typename T> struct LLVMTypeMap;
+template <typename T> struct TypeMap;
 
-template <> struct LLVMTypeMap<double> {
+template <> struct TypeMap<double> {
   static Type *get(llvm::LLVMContext &Ctx) { return Type::getDoubleTy(Ctx); }
 };
 
+struct Func;
+
+struct Var {
+  AllocaInst *Alloca;
+  Func &Fn;
+
+  Var(AllocaInst *Alloca, Func &Fn);
+
+  Var &operator+(Var &Other);
+  Var &operator+(const double &ConstValue);
+
+  Var &operator>(const double &ConstValue);
+
+  Var &operator=(const Var &Other);
+
+  Var &operator=(const double &ConstValue);
+};
+struct Func {
+  FunctionCallee FC;
+  IRBuilder<> IRB;
+  IRBuilderBase::InsertPoint IP;
+  std::deque<Var> Variables;
+  std::vector<IRBuilderBase::InsertPoint> BlockIPs;
+
+  Func(FunctionCallee FC);
+
+  Function *getFunction();
+
+  template <typename T> Var &declVar(StringRef Name) {
+    Function *F = getFunction();
+    auto AllocaIP = IRBuilderBase::InsertPoint(&F->getEntryBlock(),
+                                               F->getEntryBlock().begin());
+    IRB.restoreIP(AllocaIP);
+    auto *Alloca =
+        IRB.CreateAlloca(TypeMap<T>::get(F->getContext()), nullptr, Name);
+    Variables.emplace_back(Alloca, *this);
+    return Variables.back();
+  }
+
+  Var &arg(unsigned int ArgNo);
+
+  void beginIf(Var &CondVar);
+  void endIf();
+
+  void ret(std::optional<std::reference_wrapper<Var>> OptRet = std::nullopt);
+};
+
 class JitModule {
-
 private:
-  struct Func;
-
-  struct Var {
-    AllocaInst *Alloca;
-    Func &Fn;
-
-    Var(AllocaInst *Alloca, Func &Fn) : Alloca(Alloca), Fn(Fn) {}
-
-    Var &operator+(Var &Other) {
-      Function *F = Fn.getFunction();
-      IRBuilder IRB{&F->getEntryBlock()};
-      auto *ResultAlloca =
-          IRB.CreateAlloca(Alloca->getAllocatedType(), nullptr, "res");
-      IRB.SetInsertPoint(&F->back());
-      auto *LHS = IRB.CreateLoad(Alloca->getAllocatedType(), Alloca);
-      auto *RHS =
-          IRB.CreateLoad(Other.Alloca->getAllocatedType(), Other.Alloca);
-      auto *Result = IRB.CreateFAdd(LHS, RHS);
-      IRB.CreateStore(Result, ResultAlloca);
-
-      Fn.Variables.emplace_back(ResultAlloca, Fn);
-      return Fn.Variables.back();
-    }
-
-    Var &operator=(const Var &Other) {
-      Function *F = Fn.getFunction();
-      IRBuilder IRB{&F->back()};
-      auto *RHS =
-          IRB.CreateLoad(Other.Alloca->getAllocatedType(), Other.Alloca);
-      IRB.CreateStore(RHS, Alloca);
-      return *this;
-    }
-
-    Var &operator=(const double &ConstValue) {
-      Function *F = Fn.getFunction();
-      IRBuilder IRB{&F->back()};
-      IRB.CreateStore(ConstantFP::get(Alloca->getAllocatedType(), ConstValue),
-                      Alloca);
-      return *this;
-    }
-  };
-
-  struct Func {
-    FunctionCallee FC;
-    std::deque<Var> Variables;
-
-    Func(FunctionCallee FC) : FC(FC) {}
-
-    Function *getFunction() {
-      Function *F = dyn_cast<Function>(FC.getCallee());
-      if (!F)
-        PROTEUS_FATAL_ERROR("Expected LLVM Function");
-      return F;
-    }
-
-    void
-    addRet(std::optional<std::reference_wrapper<Var>> OptRet = std::nullopt) {
-      IRBuilder IRB{&getFunction()->back()};
-      if (OptRet == std::nullopt) {
-        IRB.CreateRetVoid();
-        return;
-      }
-
-      auto *RetAlloca = OptRet->get().Alloca;
-      auto *Ret = IRB.CreateLoad(RetAlloca->getAllocatedType(), RetAlloca);
-      IRB.CreateRet(Ret);
-    }
-  };
-
   std::unique_ptr<LLVMContext> Ctx;
   std::unique_ptr<Module> Mod;
 
@@ -106,10 +83,10 @@ public:
     Mod->setTargetTriple(sys::getProcessTriple());
     FunctionCallee FC;
     if constexpr (sizeof...(ArgT) == 0)
-      FC = Mod->getOrInsertFunction(Name, RetT::get(*Ctx));
+      FC = Mod->getOrInsertFunction(Name, TypeMap<RetT>::get(*Ctx));
     else
-      FC = Mod->getOrInsertFunction(Name, RetT::get(*Ctx),
-                                    (ArgT::get(*Ctx), ...));
+      FC = Mod->getOrInsertFunction(Name, TypeMap<RetT>::get(*Ctx),
+                                    (TypeMap<ArgT>::get(*Ctx), ...));
     Function *F = dyn_cast<Function>(FC.getCallee());
     if (!F)
       PROTEUS_FATAL_ERROR("Unexpected");
@@ -118,15 +95,8 @@ public:
     return Functions.back();
   }
 
-  template <typename VarT> Var &addVariable(StringRef Name, Func &Fn) {
-    Function *F = Fn.getFunction();
-    IRBuilder IRB{&F->getEntryBlock()};
-    auto *Alloca = IRB.CreateAlloca(VarT::get(*Ctx), nullptr, Name);
-    Fn.Variables.emplace_back(Alloca, Fn);
-    return Fn.Variables.back();
-  }
-
   void *compile() {
+    dbgs() << "To Verify " << *Mod << "\n";
     if (verifyModule(*Mod, &errs()))
       PROTEUS_FATAL_ERROR(
           "Broken module found after optimization, JIT compilation aborted!");
