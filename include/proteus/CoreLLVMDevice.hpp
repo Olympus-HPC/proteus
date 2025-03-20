@@ -246,20 +246,6 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
   KernelModule->IsNewDbgInfoFormat = M.IsNewDbgInfoFormat;
 #endif
 
-  const std::string AnnotationsToCopy[] = {"llvm.annotations",
-                                           "nvvm.annotations", "nvvmir.version",
-                                           "llvm.module.flags"};
-  // Copy annotations from M into KernelModule
-  for (auto &AnnotationName : AnnotationsToCopy) {
-    if (auto *Annotations = M.getNamedMetadata(AnnotationName)) {
-      auto *KernelAnnotations =
-          KernelModule->getOrInsertNamedMetadata(AnnotationName);
-      for (unsigned i = 0, e = Annotations->getNumOperands(); i < e; ++i) {
-        KernelAnnotations->addOperand(Annotations->getOperand(i));
-      }
-    }
-  }
-
   auto KernelFunction = M.getFunction(Name);
   if (!KernelFunction)
     PROTEUS_FATAL_ERROR("Expected function " + Name);
@@ -315,35 +301,41 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
 
   ValueToValueMapTy VMap;
 
-  for (auto GV : ReachableGlobals) {
-    GlobalVariable *NewGV = new GlobalVariable(
-        *KernelModule, GV->getValueType(), GV->isConstant(), GV->getLinkage(),
-        GV->hasInitializer() ? GV->getInitializer() : nullptr, GV->getName(),
-        nullptr, GV->getThreadLocalMode(), GV->getAddressSpace());
+  for (auto *GV : ReachableGlobals) {
+    // We will set the initializer later, after VMap has been populated.
+    GlobalVariable *NewGV =
+        new GlobalVariable(*KernelModule, GV->getValueType(), GV->isConstant(),
+                           GV->getLinkage(), nullptr, GV->getName(), nullptr,
+                           GV->getThreadLocalMode(), GV->getAddressSpace());
     NewGV->copyAttributesFrom(GV);
     VMap[GV] = NewGV;
   }
 
-  for (auto F : ReachableFunctions) {
-    auto NewFunction = Function::Create(F->getFunctionType(), F->getLinkage(),
-                                        F->getAddressSpace(), F->getName(),
-                                        KernelModule.get());
+  for (auto *F : ReachableFunctions) {
+    auto *NewFunction = Function::Create(F->getFunctionType(), F->getLinkage(),
+                                         F->getAddressSpace(), F->getName(),
+                                         KernelModule.get());
     NewFunction->copyAttributesFrom(F);
     VMap[F] = NewFunction;
   }
 
-  for (auto F : ReachableDeclarations) {
-    auto NewFunction = Function::Create(F->getFunctionType(), F->getLinkage(),
-                                        F->getAddressSpace(), F->getName(),
-                                        KernelModule.get());
+  for (auto *F : ReachableDeclarations) {
+    auto *NewFunction = Function::Create(F->getFunctionType(), F->getLinkage(),
+                                         F->getAddressSpace(), F->getName(),
+                                         KernelModule.get());
     NewFunction->copyAttributesFrom(F);
     NewFunction->setLinkage(GlobalValue::ExternalLinkage);
     VMap[F] = NewFunction;
   }
 
-  for (auto F : ReachableFunctions) {
+  for (GlobalVariable *GV : ReachableGlobals) {
+    GlobalVariable *NewGV = cast<GlobalVariable>(VMap[GV]);
+    NewGV->setInitializer(MapValue(GV->getInitializer(), VMap));
+  }
+
+  for (auto *F : ReachableFunctions) {
     SmallVector<ReturnInst *, 8> Returns;
-    auto NewFunction = dyn_cast<Function>(VMap[F]);
+    auto *NewFunction = dyn_cast<Function>(VMap[F]);
     Function::arg_iterator DestI = NewFunction->arg_begin();
     for (const Argument &I : F->args())
       if (VMap.count(&I) == 0) {
@@ -354,8 +346,44 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
                             CloneFunctionChangeType::DifferentModule, Returns);
   }
 
-  if (auto *DbgCU = KernelModule->getNamedMetadata("llvm.dbg.cu")) {
-    KernelModule->eraseNamedMetadata(DbgCU);
+  // Copy annotations from M into KernelModule now that VMap has been populated.
+  const std::string AnnotationsToCopy[] = {"llvm.annotations",
+                                           "nvvm.annotations", "nvvmir.version",
+                                           "llvm.module.flags"};
+  for (auto &AnnotationName : AnnotationsToCopy) {
+    NamedMDNode *Annotations = M.getNamedMetadata(AnnotationName);
+    if (!Annotations)
+      continue;
+
+    auto *KernelAnnotations =
+        KernelModule->getOrInsertNamedMetadata(AnnotationName);
+    for (unsigned I = 0, E = Annotations->getNumOperands(); I < E; ++I) {
+      auto *Annotation = Annotations->getOperand(I);
+      bool ShouldClone = true;
+      // Skip if the operands of an MDNode refer to non-existing,
+      // unreachable global values.
+      for (auto &Operand : Annotation->operands()) {
+        Metadata *MD = Operand.get();
+        auto *CMD = dyn_cast<ConstantAsMetadata>(MD);
+        if (!CMD)
+          continue;
+
+        auto *GV = dyn_cast<GlobalValue>(CMD->getValue());
+        if (!GV)
+          continue;
+
+        if (!VMap.count(GV)) {
+          ShouldClone = false;
+          break;
+        }
+      }
+
+      if (!ShouldClone)
+        continue;
+
+      KernelAnnotations->addOperand(
+          MapMetadata(Annotations->getOperand(I), VMap));
+    }
   }
 
   if (verifyModule(*KernelModule, &errs()))
