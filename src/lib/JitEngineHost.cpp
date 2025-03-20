@@ -185,107 +185,113 @@ void JitEngineHost::notifyLoaded(MaterializationResponsibility &R,
 JitEngineHost::~JitEngineHost() { CodeCache.printStats(); }
 
 Expected<orc::ThreadSafeModule>
-JitEngineHost::specializeIR(StringRef FnName, StringRef Suffix, StringRef IR,
+JitEngineHost::specializeIR(std::unique_ptr<Module> M,
+                            std::unique_ptr<LLVMContext> Ctx, StringRef FnName,
+                            StringRef Suffix,
                             const SmallVector<RuntimeConstant> &RCVec) {
   TIMESCOPE("specializeIR");
-  auto Ctx = std::make_unique<LLVMContext>();
-  SMDiagnostic Err;
-  if (auto M = parseIR(MemoryBufferRef(IR, ("Mod-" + FnName + Suffix).str()),
-                       Err, *Ctx)) {
-    // Logger::logs("proteus") << "=== Parsed Module\n" << *M << "=== End of
-    // Parsed Module\n ";
-    Function *F = M->getFunction(FnName);
-    assert(F && "Expected non-null function!");
+  Function *F = M->getFunction(FnName);
+  assert(F && "Expected non-null function!");
 
-    // Find GlobalValue declarations that are externally defined. Resolve them
-    // statically as absolute symbols in the ORC linker. Required for resolving
-    // __jit_launch_kernel for a host JIT function when libproteus is compiled
-    // as a static library. For other non-resolved symbols, return a fatal error
-    // to investigate.
-    for (auto &GV : M->global_values()) {
-      if (!GV.isDeclaration())
+  // Find GlobalValue declarations that are externally defined. Resolve them
+  // statically as absolute symbols in the ORC linker. Required for resolving
+  // __jit_launch_kernel for a host JIT function when libproteus is compiled
+  // as a static library. For other non-resolved symbols, return a fatal error
+  // to investigate.
+  for (auto &GV : M->global_values()) {
+    if (!GV.isDeclaration())
+      continue;
+
+    if (Function *F = dyn_cast<Function>(&GV))
+      if (F->isIntrinsic())
         continue;
 
-      if (Function *F = dyn_cast<Function>(&GV))
-        if (F->isIntrinsic())
-          continue;
+    auto ExecutorAddr = LLJITPtr->lookup(GV.getName());
+    auto Error = ExecutorAddr.takeError();
+    if (!Error)
+      continue;
+    // Consume the error and fix with static linking.
+    consumeError(std::move(Error));
 
-      auto ExecutorAddr = LLJITPtr->lookup(GV.getName());
-      auto Error = ExecutorAddr.takeError();
-      if (!Error)
-        continue;
-      // Consume the error and fix with static linking.
-      consumeError(std::move(Error));
-
-      PROTEUS_DBG(Logger::logs("proteus")
-                  << "Resolve statically missing GV symbol " << GV.getName()
-                  << "\n");
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "Resolve statically missing GV symbol " << GV.getName()
+                << "\n");
 
 #if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
-      if (GV.getName() == "__jit_launch_kernel") {
-        PROTEUS_DBG(Logger::logs("proteus")
-                    << "Resolving via ORC jit_launch_kernel\n");
-        SymbolMap SymbolMap;
-        SymbolMap[LLJITPtr->mangleAndIntern("__jit_launch_kernel")] =
-            orc::ExecutorSymbolDef(
-                orc::ExecutorAddr{
-                    reinterpret_cast<uintptr_t>(__jit_launch_kernel)},
-                JITSymbolFlags::Exported);
+    if (GV.getName() == "__jit_launch_kernel") {
+      PROTEUS_DBG(Logger::logs("proteus")
+                  << "Resolving via ORC jit_launch_kernel\n");
+      SymbolMap SymbolMap;
+      SymbolMap[LLJITPtr->mangleAndIntern("__jit_launch_kernel")] =
+          orc::ExecutorSymbolDef(orc::ExecutorAddr{reinterpret_cast<uintptr_t>(
+                                     __jit_launch_kernel)},
+                                 JITSymbolFlags::Exported);
 
-        cantFail(
-            LLJITPtr->getMainJITDylib().define(absoluteSymbols(SymbolMap)));
+      cantFail(LLJITPtr->getMainJITDylib().define(absoluteSymbols(SymbolMap)));
 
-        continue;
-      }
+      continue;
+    }
 #endif
 
-      PROTEUS_FATAL_ERROR("Unknown global value" + GV.getName() +
-                          " to resolve");
-    }
-    // Replace argument uses with runtime constants.
-    // TODO: change NumRuntimeConstants to size_t at interface.
-    MDNode *Node = F->getMetadata("jit_arg_nos");
-    assert(Node && "Expected metata for jit argument positions");
-    PROTEUS_DBG(Logger::logs("proteus") << "Metadata jit for F " << F->getName()
-                                        << " = " << *Node << "\n");
+    PROTEUS_FATAL_ERROR("Unknown global value" + GV.getName() + " to resolve");
+  }
+  // Replace argument uses with runtime constants.
+  // TODO: change NumRuntimeConstants to size_t at interface.
+  MDNode *Node = F->getMetadata("jit_arg_nos");
+  assert(Node && "Expected metata for jit argument positions");
+  PROTEUS_DBG(Logger::logs("proteus") << "Metadata jit for F " << F->getName()
+                                      << " = " << *Node << "\n");
 
-    // Replace argument uses with runtime constants.
-    SmallVector<int32_t> ArgPos;
-    for (int I = 0; I < Node->getNumOperands(); ++I) {
-      ConstantAsMetadata *CAM = cast<ConstantAsMetadata>(Node->getOperand(I));
-      ConstantInt *ConstInt = cast<ConstantInt>(CAM->getValue());
-      int ArgNo = ConstInt->getZExtValue();
-      ArgPos.push_back(ArgNo);
-    }
-
-    TransformArgumentSpecialization::transform(*M, *F, ArgPos, RCVec);
-
-    if (!LambdaRegistry::instance().empty()) {
-      if (auto OptionalMapIt =
-              LambdaRegistry::instance().matchJitVariableMap(F->getName())) {
-        auto &RCVec = OptionalMapIt.value()->getSecond();
-        TransformLambdaSpecialization::transform(*M, *F, RCVec);
-        LambdaRegistry::instance().erase(OptionalMapIt.value());
-      }
-    }
-
-    // Logger::logs("proteus") << "=== JIT Module\n" << *M << "=== End of JIT
-    // Module\n";
-
-    F->setName(FnName + Suffix);
-
-#if PROTEUS_ENABLE_DEBUG
-    Logger::logs("proteus") << "=== Final Module\n"
-                            << *M << "=== End Final Module\n";
-    if (verifyModule(*M, &errs()))
-      PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
-    else
-      Logger::logs("proteus") << "Module verified!\n";
-#endif
-    return ThreadSafeModule(std::move(M), std::move(Ctx));
+  // Replace argument uses with runtime constants.
+  SmallVector<int32_t> ArgPos;
+  for (int I = 0; I < Node->getNumOperands(); ++I) {
+    ConstantAsMetadata *CAM = cast<ConstantAsMetadata>(Node->getOperand(I));
+    ConstantInt *ConstInt = cast<ConstantInt>(CAM->getValue());
+    int ArgNo = ConstInt->getZExtValue();
+    ArgPos.push_back(ArgNo);
   }
 
-  return createSMDiagnosticError(Err);
+  TransformArgumentSpecialization::transform(*M, *F, ArgPos, RCVec);
+
+  if (!LambdaRegistry::instance().empty()) {
+    if (auto OptionalMapIt =
+            LambdaRegistry::instance().matchJitVariableMap(F->getName())) {
+      auto &RCVec = OptionalMapIt.value()->getSecond();
+      TransformLambdaSpecialization::transform(*M, *F, RCVec);
+    }
+  }
+
+  F->setName(FnName + Suffix);
+
+#if PROTEUS_ENABLE_DEBUG
+  Logger::logs("proteus") << "=== Final Module\n"
+                          << *M << "=== End Final Module\n";
+  if (verifyModule(*M, &errs()))
+    PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
+  else
+    Logger::logs("proteus") << "Module verified!\n";
+#endif
+  return ThreadSafeModule(std::move(M), std::move(Ctx));
+}
+
+void getLambdaJitValues(Module &M, StringRef FnName,
+                        SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
+  LambdaRegistry LR = LambdaRegistry::instance();
+  if (LR.empty())
+    return;
+
+  PROTEUS_DBG(Logger::logs("proteus") << "=== Host LAMBDA MATCHING\n"
+                                      << "Caller trigger " << FnName << " -> "
+                                      << demangle(FnName.str()) << "\n");
+
+  SmallVector<StringRef> LambdaCalleeInfo;
+  PROTEUS_DBG(Logger::logs("proteus")
+              << " Trying F " << demangle(FnName.str()) << "\n ");
+  auto OptionalMapIt = LambdaRegistry::instance().matchJitVariableMap(FnName);
+  if (!OptionalMapIt)
+    return;
+
+  LambdaJitValuesVec = OptionalMapIt.value()->getSecond();
 }
 
 void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
@@ -293,15 +299,30 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
                                     int32_t *RCTypes, int NumRuntimeConstants) {
   TIMESCOPE("compileAndLink");
 
-  // TODO: implement ModuleUniqueId for host code.
   StringRef StrIR(IR, IRSize);
+  auto Ctx = std::make_unique<LLVMContext>();
+  SMDiagnostic Diag;
+  auto M = parseIR(MemoryBufferRef(StrIR, "JitModule"), Diag, *Ctx);
+  if (!M)
+    PROTEUS_FATAL_ERROR("Error parsing IR: " + Diag.getMessage());
 
   SmallVector<RuntimeConstant> RCVec;
+  SmallVector<RuntimeConstant> LambdaJitValuesVec;
   getRuntimeConstantValues(
       Args, ArrayRef{RCIndices, static_cast<size_t>(NumRuntimeConstants)},
       ArrayRef{RCTypes, static_cast<size_t>(NumRuntimeConstants)}, RCVec);
+  getLambdaJitValues(*M, FnName, LambdaJitValuesVec);
 
-  HashT HashValue = hash(StrIR, FnName, RCVec);
+  HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesVec);
+#if PROTEUS_ENABLE_DEBUG
+  Logger::logs("proteus") << "Hashing: " << " FnName " << FnName << " RCVec [ ";
+  for (auto &RC : RCVec)
+    Logger::logs("proteus") << RC.Value.Int64Val << ",";
+  Logger::logs("proteus") << " ] LambdaVec [ ";
+  for (auto &RC : LambdaJitValuesVec)
+    Logger::logs("proteus") << RC.Value.Int64Val << ",";
+  Logger::logs("proteus") << " ] -> Hash " << HashValue.getValue() << "\n";
+#endif
   void *JitFnPtr = CodeCache.lookup(HashValue);
   if (JitFnPtr)
     return JitFnPtr;
@@ -310,8 +331,8 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   std::string MangledFnName = FnName.str() + Suffix;
 
   // (3) Add modules.
-  ExitOnErr(LLJITPtr->addIRModule(
-      ExitOnErr(specializeIR(FnName, Suffix, StrIR, RCVec))));
+  ExitOnErr(LLJITPtr->addIRModule(ExitOnErr(
+      specializeIR(std::move(M), std::move(Ctx), FnName, Suffix, RCVec))));
 
   PROTEUS_DBG(Logger::logs("proteus")
               << "===\n"

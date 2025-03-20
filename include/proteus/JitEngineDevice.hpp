@@ -119,6 +119,8 @@ class JITKernelInfo {
   std::optional<std::unique_ptr<Module>> ExtractedModule;
   std::optional<std::reference_wrapper<BinaryInfo>> BinInfo;
   std::optional<HashT> StaticHash;
+  std::optional<SmallVector<std::pair<std::string, StringRef>>>
+      LambdaCalleeInfo;
 
 public:
   JITKernelInfo(void *Kernel, BinaryInfo &BinInfo, char const *Name,
@@ -126,7 +128,7 @@ public:
       : Kernel(Kernel), BinInfo(BinInfo), Name(Name),
         RCIndices{ArrayRef{RCIndices, static_cast<size_t>(NumRCs)}},
         RCTypes{ArrayRef{RCTypes, static_cast<size_t>(NumRCs)}},
-        ExtractedModule(std::nullopt) {}
+        ExtractedModule(std::nullopt), LambdaCalleeInfo(std::nullopt) {}
 
   JITKernelInfo() = default;
   void *getKernel() const {
@@ -147,6 +149,13 @@ public:
   void createStaticHash(HashT ModuleHash) {
     StaticHash = hash(Name);
     StaticHash = hashCombine(StaticHash.value(), ModuleHash);
+  }
+
+  const bool hasLambdaCalleeInfo() { return LambdaCalleeInfo.has_value(); }
+  const auto &getLambdaCalleeInfo() { return LambdaCalleeInfo.value(); }
+  void setLambdaCalleeInfo(
+      SmallVector<std::pair<std::string, StringRef>> &&LambdaInfo) {
+    LambdaCalleeInfo = std::move(LambdaInfo);
   }
 };
 
@@ -195,6 +204,43 @@ public:
 
     KernelInfo.setModule(std::move(KernelModule));
     return KernelInfo.getModule();
+  }
+
+  void getLambdaJitValues(JITKernelInfo &KernelInfo,
+                          SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
+    LambdaRegistry LR = LambdaRegistry::instance();
+    if (LR.empty()) {
+      KernelInfo.setLambdaCalleeInfo({});
+      return;
+    }
+
+    if (!KernelInfo.hasLambdaCalleeInfo()) {
+      Module &KernelModule = getModule(KernelInfo);
+      PROTEUS_DBG(Logger::logs("proteus")
+                  << "=== LAMBDA MATCHING\n"
+                  << "Caller trigger " << KernelInfo.getName() << " -> "
+                  << demangle(KernelInfo.getName()) << "\n");
+
+      SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo;
+      for (auto &F : KernelModule.getFunctionList()) {
+        PROTEUS_DBG(Logger::logs("proteus")
+                    << " Trying F " << demangle(F.getName().str()) << "\n ");
+        auto OptionalMapIt =
+            LambdaRegistry::instance().matchJitVariableMap(F.getName());
+        if (OptionalMapIt)
+          LambdaCalleeInfo.emplace_back(F.getName(),
+                                        OptionalMapIt.value()->first);
+      }
+
+      KernelInfo.setLambdaCalleeInfo(std::move(LambdaCalleeInfo));
+    }
+
+    for (auto &[FnName, LambdaType] : KernelInfo.getLambdaCalleeInfo()) {
+      const SmallVector<RuntimeConstant> &Values =
+          LR.getJitVariables(LambdaType);
+      LambdaJitValuesVec.insert(LambdaJitValuesVec.end(), Values.begin(),
+                                Values.end());
+    }
   }
 
   void insertRegisterVar(const char *VarName, const void *Addr) {
@@ -395,12 +441,15 @@ JitEngineDevice<ImplT>::compileAndRun(
   });
 
   SmallVector<RuntimeConstant> RCVec;
+  SmallVector<RuntimeConstant> LambdaJitValuesVec;
 
   getRuntimeConstantValues(KernelArgs, KernelInfo.getRCIndices(),
                            KernelInfo.getRCTypes(), RCVec);
+  getLambdaJitValues(KernelInfo, LambdaJitValuesVec);
 
-  HashT HashValue = hash(getStaticHash(KernelInfo), RCVec, GridDim.x, GridDim.y,
-                         GridDim.z, BlockDim.x, BlockDim.y, BlockDim.z);
+  HashT HashValue =
+      hash(getStaticHash(KernelInfo), RCVec, LambdaJitValuesVec, GridDim.x,
+           GridDim.x, GridDim.y, GridDim.z, BlockDim.x, BlockDim.y, BlockDim.z);
 
   typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc =
       CodeCache.lookup(HashValue);
@@ -452,7 +501,8 @@ JitEngineDevice<ImplT>::compileAndRun(
 
       Compiler.compile(CompilationTask{
           KernelModule, HashValue, KernelInfo.getName(), Suffix, BlockDim,
-          GridDim, KernelInfo.getRCIndices(), RCVec, VarNameToDevPtr,
+          GridDim, KernelInfo.getRCIndices(), RCVec,
+          KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr,
           GlobalLinkedBinaries, DeviceArch,
           /* UseRTC */ Config.PROTEUS_USE_HIP_RTC_CODEGEN,
           /* DumpIR */ Config.PROTEUS_DUMP_LLVM_IR,
@@ -473,8 +523,9 @@ JitEngineDevice<ImplT>::compileAndRun(
     // Process through synchronous compilation.
     ObjBuf = CompilerSync::instance().compile(CompilationTask{
         KernelModule, HashValue, KernelInfo.getName(), Suffix, BlockDim,
-        GridDim, KernelInfo.getRCIndices(), RCVec, VarNameToDevPtr,
-        GlobalLinkedBinaries, DeviceArch,
+        GridDim, KernelInfo.getRCIndices(), RCVec,
+        KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr, GlobalLinkedBinaries,
+        DeviceArch,
         /* UseRTC */ Config.PROTEUS_USE_HIP_RTC_CODEGEN,
         /* DumpIR */ Config.PROTEUS_DUMP_LLVM_IR,
         /* UseStorageCache */ Config.PROTEUS_USE_STORED_CACHE,

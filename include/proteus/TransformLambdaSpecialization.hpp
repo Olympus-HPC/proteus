@@ -18,6 +18,7 @@
 #include <llvm/Support/Debug.h>
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Debug.h"
 #include "proteus/Utils.h"
 
 namespace proteus {
@@ -25,7 +26,7 @@ namespace proteus {
 using namespace llvm;
 
 inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
-                             RuntimeConstant &RC) {
+                             const RuntimeConstant &RC) {
   if (ArgType->isIntegerTy(1)) {
     return ConstantInt::get(ArgType, RC.Value.BoolVal);
   } else if (ArgType->isIntegerTy(8)) {
@@ -56,7 +57,7 @@ inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
 class TransformLambdaSpecialization {
 public:
   static void transform(Module &M, Function &F,
-                        SmallVector<RuntimeConstant> &RCVec) {
+                        const SmallVector<RuntimeConstant> &RCVec) {
     auto *LambdaClass = F.getArg(0);
     PROTEUS_DBG(Logger::logs("proteus")
                 << "[LambdaSpec] Function: " << F.getName() << " RCVec size "

@@ -41,3 +41,5 @@ config.test_exec_root = '${CMAKE_CURRENT_BINARY_DIR}'
 CREATE_CPU_TEST(daxpy daxpy.cpp)
 CREATE_CPU_TEST(types types.cpp)
 CREATE_CPU_TEST(lambda lambda.cpp)
+CREATE_CPU_TEST(lambda_def lambda_def.cpp)
+CREATE_CPU_TEST(lambda_multiple lambda_multiple.cpp)
