@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <llvm/ADT/SmallPtrSet.h>
 #include <memory>
 #include <optional>
 #include <string>
@@ -196,8 +197,15 @@ public:
       BinInfo.setModule(std::move(ExtractedModule));
     }
 
-    std::unique_ptr<Module> KernelModule =
-        llvm::CloneModule(BinInfo.getModule());
+    auto &BinModule = BinInfo.getModule();
+    std::unique_ptr<Module> KernelModule{nullptr};
+
+    if (Config.PROTEUS_USE_LIGHTWEIGHT_KERNEL_CLONE) {
+      KernelModule = std::move(proteus::cloneKernelFromModule(
+          BinModule, getLLVMContext(), KernelInfo.getName()));
+    } else {
+      KernelModule = std::move(llvm::CloneModule(BinModule));
+    }
 
     internalize(*KernelModule, KernelInfo.getName());
     runCleanupPassPipeline(*KernelModule);
