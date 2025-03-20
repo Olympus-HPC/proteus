@@ -234,9 +234,6 @@ inline void specializeIR(
 
 inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
                                                      const std::string &Name) {
-#if PROTEUS_ENABLE_DEBUG
-  Logger::logs("proteus") << "Full module \n" << M << "\n";
-#endif
   auto KernelModule = std::make_unique<Module>("JitModule", C);
   KernelModule->setSourceFileName(M.getSourceFileName());
   KernelModule->setDataLayout(M.getDataLayout());
@@ -391,10 +388,9 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
   }
 
 #if PROTEUS_ENABLE_DEBUG
+  Logger::logs("proteus") << "Mini-module \n" << *KernelModule << "\n";
   if (verifyModule(*KernelModule, &errs()))
     PROTEUS_FATAL_ERROR("Broken mini-module found, JIT compilation aborted!");
-
-  Logger::logs("proteus") << "Mini-module \n" << *KernelModule << "\n";
 #endif
 
   return std::move(KernelModule);
