@@ -338,6 +338,26 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   return JitFnPtr;
 }
 
+void *JitEngineHost::compileJitModule(StringRef FnName,
+                                      std::unique_ptr<Module> M,
+                                      std::unique_ptr<LLVMContext> Ctx) {
+  TIMESCOPE("compileAndLink");
+
+  auto TSM = ThreadSafeModule{std::move(M), std::move(Ctx)};
+  // (3) Add modules.
+  ExitOnErr(LLJITPtr->addIRModule(std::move(TSM)));
+
+  // (4) Look up the JIT'd function.
+  auto EntryAddr = ExitOnErr(LLJITPtr->lookup(FnName));
+
+  void *JitFnPtr = (void *)EntryAddr.getValue();
+  PROTEUS_DBG(Logger::logs("proteus")
+              << "FnName " << FnName << " address " << JitFnPtr << "\n");
+  assert(JitFnPtr && "Expected non-null JIT function pointer");
+
+  return JitFnPtr;
+}
+
 JitEngineHost::JitEngineHost(int Argc, char *Argv[]) {
   ExitOnErr.setBanner("JIT: ");
   // Create the LLJIT instance.
