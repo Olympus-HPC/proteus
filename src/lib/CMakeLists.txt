@@ -114,12 +114,38 @@ target_include_directories(proteusCore
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 
-if(LLVM_LINK_LLVM_DYLIB)
-  llvm_config(proteus USE_SHARED)
+if(PROTEUS_LINK_SHARED_LLVM)
+  if(LLVM_LINK_LLVM_DYLIB)
+    llvm_config(proteus USE_SHARED)
+  else()
+    find_library(LLVM_SHARED_LIB
+      NAMES LLVM
+      PATHS "${LLVM_LIBRARY_DIR}"
+      NO_DEFAULT_PATH
+    )
+    if(LLVM_SHARED_LIB)
+      message(STATUS "Found libLLVM.so: ${LLVM_SHARED_LIB}")
+      set(libs ${LLVM_SHARED_LIB})
+    else()
+      message(FATAL_ERROR "The LLVM installation at ${LLVM_DIR} does not provide libLLVM.so, required due to "
+      "PROTEUS_LINK_SHARED_LLVM=ON.
+      Change PROTEUS_LINK_SHARED_LLVM to OFF.
+      ")
+    endif()
+  endif()
 else()
+  if(LLVM_LINK_LLVM_DYLIB)
+    message(FATAL_ERROR "The LLVM installation at ${LLVM_DIR} requires to link with "
+    "the LLVM shared library, but PROTEUS_LINK_SHARED_LLVM=OFF.
+    Change PROTEUS_LINK_SHARED_LLVM to ON.")
+  endif()
   set(libs ${LLVM_AVAILABLE_LIBS})
+    # Some LLVM installations include an LLVM DSO lib alongside static libraries
+    # in the LLVM_AVAILABLE_LIBS. The LLVM DSO lib bundles those static library
+    # and we have to remove it to avoid static initialization errors from
+    # linking with both.
+  list(REMOVE_ITEM libs "LLVM")
 endif()
-
 
 if(NOT LLVM_ENABLE_RTTI)
   target_compile_options(proteusCore INTERFACE -fno-rtti)
