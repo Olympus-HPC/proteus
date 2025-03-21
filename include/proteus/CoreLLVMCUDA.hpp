@@ -133,8 +133,13 @@ inline void codegenPTX(Module &M, StringRef DeviceArch,
       reinterpret_cast<LLVMTargetMachine *>(TM.get()));
 
   raw_svector_ostream PTXOS(PTXStr);
+#if LLVM_VERSION_MAJOR >= 18
+  TM->addPassesToEmitFile(PM, PTXOS, nullptr, CodeGenFileType::AssemblyFile,
+                          /* DisableVerify */ false, MMIWP);
+#else
   TM->addPassesToEmitFile(PM, PTXOS, nullptr, CGFT_AssemblyFile,
                           /* DisableVerify */ false, MMIWP);
+#endif
 
   PM.run(M);
 }
