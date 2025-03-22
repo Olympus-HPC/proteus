@@ -140,10 +140,10 @@ else()
     Change PROTEUS_LINK_SHARED_LLVM to ON.")
   endif()
   set(libs ${LLVM_AVAILABLE_LIBS})
-    # Some LLVM installations include an LLVM DSO lib alongside static libraries
-    # in the LLVM_AVAILABLE_LIBS. The LLVM DSO lib bundles those static library
-    # and we have to remove it to avoid static initialization errors from
-    # linking with both.
+    # Some LLVM installations include in the LLVM_AVAILABLE_LIBS both an LLVM
+    # shared library AND static libraries. The LLVM shared library bundles those
+    # static libraries and we have to remove it to avoid static initialization
+    # errors from linking with both.
   list(REMOVE_ITEM libs "LLVM")
 endif()
 
