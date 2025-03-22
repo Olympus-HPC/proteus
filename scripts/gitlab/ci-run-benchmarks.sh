@@ -50,6 +50,7 @@ if [ "${CI_MACHINE}" == "lassen" ]; then
   LLVM_INSTALL_DIR=$(llvm-config --prefix)
 
   CMAKE_MACHINE_OPTIONS="\
+    -DPROTEUS_LINK_SHARED_LLVM=on \
     -DPROTEUS_ENABLE_CUDA=on \
     -DCMAKE_CUDA_ARCHITECTURES=70 \
     -DCMAKE_CUDA_COMPILER=${LLVM_INSTALL_DIR}/bin/clang++ \
