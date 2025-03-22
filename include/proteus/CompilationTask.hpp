@@ -30,8 +30,10 @@ private:
   std::string DeviceArch;
   bool UseRTC;
   bool DumpIR;
-  bool UseStoredCache;
   bool RelinkGlobalsByCopy;
+  bool SpecializeArgs;
+  bool SpecializeDims;
+  bool SpecializeLaunchBounds;
 
   std::unique_ptr<Module> cloneKernelModule(LLVMContext &Ctx) {
     SmallVector<char, 4096> ModuleStr;
@@ -57,14 +59,17 @@ public:
       const std::unordered_map<std::string, const void *> &VarNameToDevPtr,
       const SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
       const std::string &DeviceArch, bool UseRTC, bool DumpIR,
-      bool UseStoredCache, bool RelinkGlobalsByCopy)
+      bool RelinkGlobalsByCopy, bool SpecializeArgs, bool SpecializeDims,
+      bool SpecializeLaunchBounds)
       : KernelModule(Mod), HashValue(HashValue), KernelName(KernelName),
         Suffix(Suffix), BlockDim(BlockDim), GridDim(GridDim),
         RCIndices(RCIndices), RCVec(RCVec), LambdaCalleeInfo(LambdaCalleeInfo),
         VarNameToDevPtr(VarNameToDevPtr),
         GlobalLinkedBinaries(GlobalLinkedBinaries), DeviceArch(DeviceArch),
-        UseRTC(UseRTC), DumpIR(DumpIR), UseStoredCache(UseStoredCache),
-        RelinkGlobalsByCopy(RelinkGlobalsByCopy) {}
+        UseRTC(UseRTC), DumpIR(DumpIR),
+        RelinkGlobalsByCopy(RelinkGlobalsByCopy),
+        SpecializeArgs(SpecializeArgs), SpecializeDims(SpecializeDims),
+        SpecializeLaunchBounds(SpecializeLaunchBounds) {}
 
   // Delete copy operations.
   CompilationTask(const CompilationTask &) = delete;
@@ -87,7 +92,8 @@ public:
     std::string KernelMangled = (KernelName + Suffix);
 
     proteus::specializeIR(*M, KernelName, Suffix, BlockDim, GridDim, RCIndices,
-                          RCVec, LambdaCalleeInfo, true, true, true);
+                          RCVec, LambdaCalleeInfo, SpecializeArgs,
+                          SpecializeDims, SpecializeLaunchBounds);
 
     replaceGlobalVariablesWithPointers(*M, VarNameToDevPtr);
 
