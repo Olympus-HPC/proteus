@@ -26,12 +26,12 @@ jobs:
             clangxx=18.1.3 \
             llvmdev=18.1.3 \
             lit=18.1.3
-          ln -s ${CONDA_PREFIX}/libexec/llvm/FileCheck ${CONDA_PREFIX}/bin
       - name: Run cmake to export compilation database
         run: |
           mkdir -p build
           pushd build
           cmake .. \
+            -DLLVM_INSTALL_DIR=$(llvm-config --prefix) \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=on

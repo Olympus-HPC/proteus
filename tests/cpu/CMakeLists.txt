@@ -21,7 +21,7 @@ function(CREATE_CPU_TEST exe check_source)
         ${NATIVE_OPT_FLAGS}
     )
 
-    add_test(NAME ${exe} COMMAND ${LIT} -vv ${check_source})
+    add_test(NAME ${exe} COMMAND ${LIT} -vv -D FILECHECK=${FILECHECK} ${check_source})
 endfunction()
 
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/lit.cfg.py "
@@ -35,6 +35,8 @@ config.environment = os.environ.copy()
 config.suffixes = ['.cpp']
 config.test_source_root = '${CMAKE_CURRENT_SOURCE_DIR}'
 config.test_exec_root = '${CMAKE_CURRENT_BINARY_DIR}'
+FILECHECK = lit_config.params['FILECHECK']
+config.substitutions.append(('%FILECHECK', FILECHECK))
 "
 )
 

@@ -20,9 +20,6 @@ if [ "${CI_MACHINE}" == "lassen" ]; then
       python=3.10 clang=17.0.5 clangxx=17.0.5 llvmdev=17.0.5 lit=17.0.5
   conda activate proteus
 
-  # Fix to expose the FileCheck executable, needed for building proteus tests.
-  ln -s ${CONDA_PREFIX}/libexec/llvm/FileCheck ${CONDA_PREFIX}/bin
-
   LLVM_INSTALL_DIR=$(llvm-config --prefix)
   CMAKE_OPTIONS_MACHINE=" -DPROTEUS_ENABLE_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=70 -DCMAKE_CUDA_COMPILER=$LLVM_INSTALL_DIR/bin/clang++"
 elif [ "${CI_MACHINE}" == "tioga" ]; then

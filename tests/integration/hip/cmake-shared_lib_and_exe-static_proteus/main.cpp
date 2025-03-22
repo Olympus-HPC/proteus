@@ -1,6 +1,8 @@
-// RUN: ./daxpy.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-FIRST
+// rm -rf .proteus
+// RUN: ./daxpy.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./daxpy.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: ./daxpy.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// rm -rf .proteus
 #include <cstddef>
 #include <cstdlib>
 #include <iostream>

@@ -1,8 +1,8 @@
 // clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./lambda_multiple.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: ./lambda_multiple.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./lambda_multiple.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: ./lambda_multiple.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
 // clang-format on
 
