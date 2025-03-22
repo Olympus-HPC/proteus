@@ -24,7 +24,7 @@ function(CREATE_GPU_TEST exe check_source)
     )
 
     # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
-    add_test(NAME ${exe}.${lang} COMMAND ${LIT} -vv -D EXT=${lang} ${check_source})
+    add_test(NAME ${exe}.${lang} COMMAND ${LIT} -vv -D EXT=${lang} -DFILECHECK=${FILECHECK} ${check_source})
 endfunction()
 
 function(CREATE_GPU_TEST_RDC exe check_source)
@@ -76,7 +76,7 @@ function(CREATE_GPU_TEST_RDC exe check_source)
         message(FATAL_ERROR "PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA must be defined for GPU tests")
     endif()
 
-    add_test(NAME ${exe}.${lang}.rdc COMMAND ${LIT} -vv -D EXT=${lang}.rdc ${check_source})
+    add_test(NAME ${exe}.${lang}.rdc COMMAND ${LIT} -vv -D EXT=${lang}.rdc -DFILECHECK=${FILECHECK} ${check_source})
 endfunction()
 
 function(CREATE_GPU_TEST_RDC_LIBS exe libs check_source)
@@ -209,7 +209,9 @@ config.suffixes = ['.cpp']
 config.test_source_root = '${CMAKE_CURRENT_SOURCE_DIR}'
 config.test_exec_root = '${CMAKE_CURRENT_BINARY_DIR}'
 ext = lit_config.params['EXT']
+FILECHECK = lit_config.params['FILECHECK']
 config.substitutions.append(('%ext', ext))
+config.substitutions.append(('%FILECHECK', FILECHECK))
 "
 )
 

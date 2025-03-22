@@ -1,5 +1,5 @@
 // RUN: rm -rf .proteus
-// RUN: ./lambda_def | FileCheck %s --check-prefixes=CHECK
+// RUN: ./lambda_def | %FILECHECK %s --check-prefixes=CHECK
 // RUN: rm -rf .proteus
 
 #include <cstdio>

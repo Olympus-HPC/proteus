@@ -1,7 +1,7 @@
 // RUN: rm -rf .proteus
-// RUN: ./shared_array.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: ./shared_array.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./shared_array.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: ./shared_array.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
 #include <climits>
 #include <cstdio>

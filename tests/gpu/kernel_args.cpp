@@ -1,7 +1,7 @@
 // RUN: rm -rf .proteus
-// RUN: ./kernel_args.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: ./kernel_args.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./kernel_args.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: ./kernel_args.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
 #include <climits>
 #include <cstdio>

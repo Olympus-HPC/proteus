@@ -1,6 +1,6 @@
 // clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./lambda_multiple | FileCheck %s --check-prefixes=CHECK
+// RUN: ./lambda_multiple | %FILECHECK %s --check-prefixes=CHECK
 // RUN: rm -rf .proteus
 // clang-format on
 
