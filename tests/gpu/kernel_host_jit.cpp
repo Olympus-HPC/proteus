@@ -1,5 +1,5 @@
 // RUN: rm -rf .proteus
-// RUN: ./kernel_host_jit.%ext | FileCheck %s --check-prefixes=CHECK
+// RUN: ./kernel_host_jit.%ext | %FILECHECK %s --check-prefixes=CHECK
 // RUN: rm -rf .proteus
 #include <climits>
 #include <cstdio>

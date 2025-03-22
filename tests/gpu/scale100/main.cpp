@@ -1,7 +1,7 @@
 // RUN: rm -rf .proteus
-// RUN: ./scale100.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: ./scale100.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./scale100.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: ./scale100.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
 
 #include "../gpu_common.h"

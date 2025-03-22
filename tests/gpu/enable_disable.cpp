@@ -1,8 +1,11 @@
+// clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./enable_disable.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: ./enable_disable.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./enable_disable.%ext | FileCheck %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: ./enable_disable.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
+// clang-format on
+
 #include <climits>
 #include <cstdio>
 

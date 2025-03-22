@@ -31,7 +31,6 @@ jobs:
             clangxx=${{ matrix.llvm }} \
             llvmdev=${{ matrix.llvm }} \
             lit=${{ matrix.llvm }}
-          ln -s ${CONDA_PREFIX}/libexec/llvm/FileCheck ${CONDA_PREFIX}/bin
       - name: Build enable_debug=${{ matrix.enable_debug }} enable_time_tracing=${{ matrix.enable_time_tracing }} build_shared=${{ matrix.build_shared }}
         run: |
           mkdir -p build
