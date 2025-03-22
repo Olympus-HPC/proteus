@@ -1,5 +1,5 @@
 // RUN: rm -rf .proteus
-// RUN: ./daxpy | FileCheck %s --check-prefixes=CHECK
+// RUN: ./daxpy | %FILECHECK %s --check-prefixes=CHECK
 // RUN: rm -rf .proteus
 
 #include <cstddef>

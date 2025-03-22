@@ -1,5 +1,5 @@
 // RUN: rm -rf .proteus
-// RUN: ./types | FileCheck %s --check-prefixes=CHECK
+// RUN: ./types | %FILECHECK %s --check-prefixes=CHECK
 // RUN: rm -rf .proteus
 
 #include <cstdlib>
