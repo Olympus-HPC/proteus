@@ -11,13 +11,13 @@ int main(int argc, char **argv) {
   proteus::init();
 
   auto J = proteus::JitModule();
-  auto &F = J.addFunction<double, double>("MyFunc");
+  auto &F = J.addFunction<double, double *>("MyFunc");
   auto &A = F.declVar<double>("a");
   auto &B = F.declVar<double>("b");
   auto &Arg = F.arg(0);
   A = 1;
   B = 2;
-  A = A + B + Arg;
+  A = A + B + Arg[0];
   // A = 4
   F.beginIf(A > 1.0);
   {
@@ -25,16 +25,17 @@ int main(int argc, char **argv) {
     {
       // A = 5
       A = A + 1.0;
-      F.endIf();
     }
+    F.endIf();
     // A = 5 or 6
     A = A + 1.0;
-    F.endIf();
   }
+  F.endIf();
   F.ret(A);
   J.print();
-  double (*Func)(double) = (double (*)(double))J.compile();
-  double Ret = Func(1.0);
+  double (*Func)(double *) = (double (*)(double *))J.compile();
+  double X[10] = {2.0};
+  double Ret = Func(&X[0]);
   std::cout << "Ret " << Ret << "\n";
 
   proteus::finalize();

@@ -5,6 +5,7 @@ namespace proteus {
 Func::Func(FunctionCallee FC) : FC(FC), IRB{FC.getCallee()->getContext()} {
   Function *F = cast<Function>(FC.getCallee());
   IP = IRBuilderBase::InsertPoint(&F->back(), F->back().end());
+  IRB.restoreIP(IP);
 }
 
 Function *Func::getFunction() {
@@ -14,18 +15,18 @@ Function *Func::getFunction() {
   return F;
 }
 
-Var &Func::arg(unsigned int ArgNo) {
+Var &Func::arg(unsigned int ArgNo) { return Arguments.at(ArgNo); }
+
+AllocaInst *Func::emitAlloca(Type *Ty, StringRef Name) {
+  auto SaveIP = IRB.saveIP();
   Function *F = getFunction();
-  auto *Arg = F->getArg(ArgNo);
   auto AllocaIP = IRBuilderBase::InsertPoint(&F->getEntryBlock(),
                                              F->getEntryBlock().begin());
   IRB.restoreIP(AllocaIP);
-  auto *Alloca =
-      IRB.CreateAlloca(Arg->getType(), nullptr, "arg." + std::to_string(ArgNo));
-  IRB.CreateStore(Arg, Alloca);
+  auto *Alloca = IRB.CreateAlloca(Ty, nullptr, Name);
 
-  Variables.emplace_back(Alloca, *this);
-  return Variables.back();
+  IRB.restoreIP(IP);
+  return Alloca;
 }
 
 void Func::ret(std::optional<std::reference_wrapper<Var>> OptRet) {
@@ -75,6 +76,8 @@ void Func::beginIf(Var &CondVar) {
 
 void Func::endIf() {
   IP = BlockIPs.back();
+  dbgs() << "Set IP to BB " << IP.getBlock()->getName() << "\n";
+  getchar();
   BlockIPs.pop_back();
 }
 

@@ -18,15 +18,28 @@ template <typename T> struct TypeMap;
 
 template <> struct TypeMap<double> {
   static Type *get(llvm::LLVMContext &Ctx) { return Type::getDoubleTy(Ctx); }
+
+  static Type *getPointerElemType(llvm::LLVMContext &Ctx) { return nullptr; }
+};
+
+template <> struct TypeMap<double *> {
+  static Type *get(llvm::LLVMContext &Ctx) {
+    return PointerType::getUnqual(Ctx);
+  }
+
+  static Type *getPointerElemType(llvm::LLVMContext &Ctx) {
+    return Type::getDoubleTy(Ctx);
+  }
 };
 
 struct Func;
 
 struct Var {
   AllocaInst *Alloca;
+  Type *PointerElemType;
   Func &Fn;
 
-  Var(AllocaInst *Alloca, Func &Fn);
+  Var(AllocaInst *Alloca, Func &Fn, Type *PointerElemType = nullptr);
 
   Var &operator+(Var &Other);
   Var &operator+(const double &ConstValue);
@@ -36,11 +49,13 @@ struct Var {
   Var &operator=(const Var &Other);
 
   Var &operator=(const double &ConstValue);
+  Var &operator[](size_t I);
 };
 struct Func {
   FunctionCallee FC;
   IRBuilder<> IRB;
   IRBuilderBase::InsertPoint IP;
+  std::deque<Var> Arguments;
   std::deque<Var> Variables;
   std::vector<IRBuilderBase::InsertPoint> BlockIPs;
 
@@ -48,15 +63,26 @@ struct Func {
 
   Function *getFunction();
 
+  AllocaInst *emitAlloca(Type *Ty, StringRef Name);
+
   template <typename T> Var &declVar(StringRef Name) {
     Function *F = getFunction();
-    auto AllocaIP = IRBuilderBase::InsertPoint(&F->getEntryBlock(),
-                                               F->getEntryBlock().begin());
-    IRB.restoreIP(AllocaIP);
-    auto *Alloca =
-        IRB.CreateAlloca(TypeMap<T>::get(F->getContext()), nullptr, Name);
-    Variables.emplace_back(Alloca, *this);
-    return Variables.back();
+    auto *Alloca = emitAlloca(TypeMap<T>::get(F->getContext()), Name);
+
+    auto &Var = Variables.emplace_back(
+        Alloca, *this, TypeMap<T>::getPointerElemType(F->getContext()));
+    return Var;
+  }
+
+  template <typename T> Var &declArg(StringRef Name) {
+    Function *F = getFunction();
+    auto *Alloca = emitAlloca(TypeMap<T>::get(F->getContext()), Name);
+
+    auto *Arg = F->getArg(Arguments.size());
+    IRB.CreateStore(Arg, Alloca);
+    auto &ArgVar = Arguments.emplace_back(
+        Alloca, *this, TypeMap<T>::getPointerElemType(F->getContext()));
+    return ArgVar;
   }
 
   Var &arg(unsigned int ArgNo);
@@ -91,8 +117,9 @@ public:
     if (!F)
       PROTEUS_FATAL_ERROR("Unexpected");
     BasicBlock *EntryBB = BasicBlock::Create(*Ctx, "entry", F);
-    Functions.emplace_back(FC);
-    return Functions.back();
+    auto &Fn = Functions.emplace_back(FC);
+    (Fn.declArg<ArgT>("arg"), ...);
+    return Fn;
   }
 
   void *compile() {
