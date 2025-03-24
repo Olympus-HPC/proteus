@@ -25,12 +25,11 @@ AllocaInst *Func::emitAlloca(Type *Ty, StringRef Name) {
   IRB.restoreIP(AllocaIP);
   auto *Alloca = IRB.CreateAlloca(Ty, nullptr, Name);
 
-  IRB.restoreIP(IP);
+  IRB.restoreIP(SaveIP);
   return Alloca;
 }
 
 void Func::ret(std::optional<std::reference_wrapper<Var>> OptRet) {
-  IRB.restoreIP(IP);
   if (OptRet == std::nullopt) {
     IRB.CreateRetVoid();
     return;
@@ -51,9 +50,8 @@ void Func::beginIf(Var &CondVar) {
   BasicBlock *CurBlock = IP.getBlock();
   if (auto *TermI = CurBlock->getTerminator()) {
     TermI->eraseFromParent();
-    IP = IRBuilderBase::InsertPoint(CurBlock, CurBlock->end());
   }
-  IRB.restoreIP(IP);
+  IRB.SetInsertPoint(CurBlock);
   Value *Cond =
       IRB.CreateLoad(CondVar.Alloca->getAllocatedType(), CondVar.Alloca);
   IRB.CreateCondBr(Cond, ThenBlock, ContBlock);
@@ -69,6 +67,7 @@ void Func::beginIf(Var &CondVar) {
   BlockIPs.push_back(ContIP);
 
   IP = IRBuilderBase::InsertPoint(ThenBlock, ThenBlock->begin());
+  IRB.restoreIP(IP);
 
   dbgs() << "Function " << *F << "\n";
   getchar();
@@ -76,9 +75,8 @@ void Func::beginIf(Var &CondVar) {
 
 void Func::endIf() {
   IP = BlockIPs.back();
-  dbgs() << "Set IP to BB " << IP.getBlock()->getName() << "\n";
-  getchar();
   BlockIPs.pop_back();
+  IRB.restoreIP(IP);
 }
 
 } // namespace proteus
