@@ -6,6 +6,7 @@
 #include <llvm/CodeGen/MachineModuleInfo.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
+#include <llvm/Support/CodeGen.h>
 #include <llvm/Support/MemoryBufferRef.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Target/TargetMachine.h>

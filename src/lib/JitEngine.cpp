@@ -30,6 +30,8 @@ JitEngine::JitEngine() {
       getEnvOrDefaultBool("PROTEUS_USE_STORED_CACHE", true);
   Config.PROTEUS_SPECIALIZE_LAUNCH_BOUNDS =
       getEnvOrDefaultBool("PROTEUS_SPECIALIZE_LAUNCH_BOUNDS", true);
+  Config.PROTEUS_USE_POLLY =
+      getEnvOrDefaultBool("PROTEUS_USE_POLLY", true);
   Config.PROTEUS_SPECIALIZE_ARGS =
       getEnvOrDefaultBool("PROTEUS_SPECIALIZE_ARGS", true);
   Config.PROTEUS_SPECIALIZE_DIMS =
@@ -70,7 +72,7 @@ std::string JitEngine::mangleSuffix(HashT &HashValue) {
 void JitEngine::optimizeIR(Module &M, StringRef Arch, char OptLevel,
                            unsigned CodegenOptLevel) {
   TIMESCOPE("Optimize IR");
-  proteus::optimizeIR(M, Arch, OptLevel, CodegenOptLevel);
+  proteus::optimizeIR(M, Arch, OptLevel, CodegenOptLevel, Config.PROTEUS_USE_POLLY);
 }
 
 void JitEngine::runCleanupPassPipeline(Module &M) {

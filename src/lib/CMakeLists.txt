@@ -179,6 +179,10 @@ endif()
 
 target_link_libraries(proteus PRIVATE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 target_link_libraries(proteusCore INTERFACE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+target_link_options(proteus PRIVATE "-Wl --version-script=${PROJECT_SOURCE_DIR}/version_script")
+target_include_directories(proteus PUBLIC "/usr/tce/packages/clang/clang-ibm-18.1.8-cuda-11.8.0-gcc-11.2.1/include/polly")
+target_include_directories(proteusCore INTERFACE  "/usr/tce/packages/clang/clang-ibm-18.1.8-cuda-11.8.0-gcc-11.2.1/include/polly")
+#target_link_options(proteusCore INTERFACE "-Wl --version-script=$<SOURCE_DIR>/version_script")
 
 set_target_properties(proteus PROPERTIES
   INSTALL_RPATH_USE_LINK_PATH TRUE
