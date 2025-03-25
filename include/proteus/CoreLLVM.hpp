@@ -36,6 +36,9 @@ static_assert(__cplusplus >= 201703L,
 #include <llvm/Transforms/IPO/StripDeadPrototypes.h>
 #include <llvm/Transforms/IPO/StripSymbols.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
+#include "polly/RegisterPasses.h"
+#include "polly/ScopInfo.h"
+#include "polly/LinkAllPasses.h"
 
 #include "proteus/Error.h"
 
@@ -79,9 +82,28 @@ createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3) {
   return TM;
 }
 
+struct ScopPrinterPass : public llvm::PassInfoMixin<ScopPrinterPass> {
+  llvm::PreservedAnalyses run(llvm::Function &F, llvm::FunctionAnalysisManager &FAM) {
+      // Get ScopInfo for the function
+      auto &SD = FAM.getResult<polly::ScopAnalysis>(F);
+
+      // Print detected SCoPs
+      if (SD.ValidRegions.size()) {
+          llvm::outs() << "Detected SCoPs in function: " << F.getName() << "\n";
+          for (auto* Region : SD.ValidRegions) {
+            Region->print(llvm::outs());
+          }
+      } else {
+          llvm::outs() << "No SCoPs found in function: " << F.getName() << "\n";
+      }
+
+      return llvm::PreservedAnalyses::all();
+  }
+};
+
 inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
                                         char OptLevel = '3',
-                                        unsigned CodegenOptLevel = 3) {
+                                        unsigned CodegenOptLevel = 3, bool UsePolly=true) {
   PipelineTuningOptions PTO;
 
   std::optional<PGOOptions> PGOOpt;
@@ -95,6 +117,15 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
   FunctionAnalysisManager FAM;
   CGSCCAnalysisManager CGAM;
   ModuleAnalysisManager MAM;
+  llvm::FunctionPassManager FPM;
+  if (UsePolly) {
+    //polly::initializePolly(PB);
+    polly::registerPollyPasses(PB);
+  }
+  //FPM.addPass(polly::createScopInfoRegionPassPass());
+
+  // Add Custom Scop Printer Pass
+  FPM.addPass(ScopPrinterPass());
 
   FAM.registerPass([&] { return TargetLibraryAnalysis(TLII); });
 
@@ -129,6 +160,14 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
   };
 
   ModulePassManager Passes = PB.buildPerModuleDefaultPipeline(OptSetting);
+  PB.populateModulePassManager
+  llvm::DebugFlag = true;
+  llvm::outs() << "test\n";
+  if (UsePolly) {
+    llvm::outs() << "polly\n";
+  }
+  Passes.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
+  Passes.printPipeline(llvm::outs(), [&](llvm::StringRef) {return llvm::StringRef{}; });
   Passes.run(M, MAM);
 }
 
@@ -145,8 +184,9 @@ struct InitLLVMTargets {
 };
 
 inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
-                       unsigned CodegenOptLevel) {
-  detail::runOptimizationPassPipeline(M, Arch, OptLevel, CodegenOptLevel);
+                       unsigned CodegenOptLevel,
+                       bool use_polly=true) {
+  detail::runOptimizationPassPipeline(M, Arch, OptLevel, CodegenOptLevel, use_polly);
 }
 
 inline std::unique_ptr<Module>

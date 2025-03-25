@@ -13,6 +13,7 @@ option(PROTEUS_ENABLE_DEBUG "Enable debugging output" OFF)
 option(PROTEUS_ENABLE_TIME_TRACING "Enable time tracing for the JIT engine" OFF)
 option(BUILD_SHARED "Builds the JIT library as shared" OFF)
 option(ENABLE_TESTS "Enable tests" ON)
+include_directories("/g/g11/bowen36/proteus/miniconda3-tioga/envs/proteus/proteus-lassen/include/")
 
 if(PROTEUS_ENABLE_HIP)
   add_definitions("-DPROTEUS_ENABLE_HIP")
@@ -36,6 +37,8 @@ endif()
 include(cmake/SetupLLVM.cmake)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
+
+find_package(Polly)
 
 add_subdirectory(src)
 

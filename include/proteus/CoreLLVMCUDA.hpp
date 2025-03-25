@@ -6,6 +6,7 @@
 #include <llvm/CodeGen/MachineModuleInfo.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
+#include <llvm/Support/CodeGen.h>
 #include <llvm/Support/MemoryBufferRef.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Target/TargetMachine.h>
@@ -133,7 +134,7 @@ inline void codegenPTX(Module &M, StringRef DeviceArch,
       reinterpret_cast<LLVMTargetMachine *>(TM.get()));
 
   raw_svector_ostream PTXOS(PTXStr);
-  TM->addPassesToEmitFile(PM, PTXOS, nullptr, CGFT_AssemblyFile,
+  TM->addPassesToEmitFile(PM, PTXOS, nullptr, CodeGenFileType::AssemblyFile,
                           /* DisableVerify */ false, MMIWP);
 
   PM.run(M);

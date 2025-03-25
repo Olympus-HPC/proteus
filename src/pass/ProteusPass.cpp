@@ -245,6 +245,13 @@ private:
       // Check the annotated functions is a kernel function or a device lambda.
       if (isDeviceCompilation(M)) {
         ModuleDeviceKernels = getDeviceKernels(M);
+        //std::string error;
+        //for (auto fn : ModuleDeviceKernels) {
+        //  error += fn->getName();
+        //}
+        //PROTEUS_FATAL_ERROR(
+        //  error
+        //);
         if (!isDeviceKernel(Fn) && !isLambdaFunction(*Fn))
           PROTEUS_FATAL_ERROR(
               std::string{} + __FILE__ + ":" + std::to_string(__LINE__) +

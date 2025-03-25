@@ -63,6 +63,7 @@ protected:
 
   struct {
     bool PROTEUS_USE_STORED_CACHE;
+    bool PROTEUS_USE_POLLY;
     bool PROTEUS_SET_LAUNCH_BOUNDS;
     bool PROTEUS_SPECIALIZE_ARGS;
     bool PROTEUS_SPECIALIZE_DIMS;
