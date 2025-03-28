@@ -316,10 +316,26 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
       ArrayRef{RCTypes, static_cast<size_t>(NumRuntimeConstants)}, RCVec);
   getLambdaJitValues(*M, FnName, LambdaJitValuesVec);
 
-  // You can optionally try using the new Builder here:
-  // return compileAndLinkWithBuilder(FnName, std::move(M), RCVec, LambdaJitValuesVec);
-
+  // For now, use the existing approach
   HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesVec);
+  
+  // EXAMPLE: How to use the CacheAdapter for gradually migrating to the new architecture
+  #ifdef USE_NEW_CACHE
+  // Create a cache adapter that wraps the new cache system
+  static JitCacheAdapter<void*> NewCache;
+  
+  // Check the cache first
+  void* JitFnPtr = NewCache.lookup(HashValue);
+  if (JitFnPtr)
+    return JitFnPtr;
+  #endif
+
+  // Use the Engine architecture for compilation when enabled
+  #ifdef USE_NEW_ENGINE
+  return compileAndLinkWithBuilder(FnName, std::move(M), RCVec, LambdaJitValuesVec);
+  #endif
+  
+  // Otherwise, use the legacy approach
 #if PROTEUS_ENABLE_DEBUG
   Logger::logs("proteus") << "Hashing: " << " FnName " << FnName << " RCVec [ ";
   for (auto &RC : RCVec)
@@ -413,7 +429,10 @@ JitEngineHost::JitEngineHost(int Argc, char *Argv[]) {
   LLJITPtr->getIRTransformLayer().setTransform(OptimizationTransform(*this));
 }
 
+#include "proteus/CacheAdapter.hpp"
 #include "proteus/SyncBuilder.hpp"
+#include "proteus/Engine.hpp"
+#include "proteus/Code.hpp"
 
 void* JitEngineHost::compileAndLinkWithBuilder(StringRef FnName, std::unique_ptr<Module> M, 
                                               const SmallVector<RuntimeConstant>& RCVec,
@@ -426,61 +445,37 @@ void* JitEngineHost::compileAndLinkWithBuilder(StringRef FnName, std::unique_ptr
   if (JitFnPtr)
     return JitFnPtr;
   
-  // Create a suffix for mangling
-  std::string Suffix = mangleSuffix(HashValue);
+  // Create and configure a CPU engine
+  static std::unique_ptr<Engine> CPUEng = Engine::create(BackendType::CPU);
+  EngineConfig EngCfg;
+  EngCfg.SpecializeArgs = true;
+  EngCfg.SpecializeDims = false;
+  EngCfg.SetLaunchBounds = false;
+  EngCfg.AsyncCompilation = false;
+  CPUEng->setConfig(EngCfg);
   
-  // Create a CompilationTask with default dimensions for CPU
-  dim3 BlockDim(1, 1, 1); // CPU functions don't need block/grid dimensions
+  // Default dimensions for CPU functions
+  dim3 BlockDim(1, 1, 1);
   dim3 GridDim(1, 1, 1);
   
-  // Create empty maps for device pointers (not needed for CPU)
-  std::unordered_map<std::string, const void*> VarNameToDevPtr;
-  SmallPtrSet<void*, 8> GlobalLinkedBinaries;
-  
-  // Extract metadata for lambda calls
-  SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo;
-  Function* F = M->getFunction(FnName);
-  if (F && !LambdaRegistry::instance().empty()) {
-    auto OptionalMapIt = LambdaRegistry::instance().matchJitVariableMap(F->getName());
-    if (OptionalMapIt) {
-      LambdaCalleeInfo.emplace_back(F->getName(), OptionalMapIt.value()->first);
-    }
-  }
-  
-  // Extract runtime constant indices from metadata
-  SmallVector<int32_t> RCIndices;
-  if (F) {
-    MDNode* Node = F->getMetadata("jit_arg_nos");
-    if (Node) {
-      for (int I = 0; I < Node->getNumOperands(); ++I) {
-        ConstantAsMetadata* CAM = cast<ConstantAsMetadata>(Node->getOperand(I));
-        ConstantInt* ConstInt = cast<ConstantInt>(CAM->getValue());
-        int ArgNo = ConstInt->getZExtValue();
-        RCIndices.push_back(ArgNo);
-      }
-    }
-  }
-  
-  // Create the compilation task
+  // Create a Code object from the module
   std::string FnNameStr = FnName.str();
-  CompilationTask Task(
-      *M, HashValue, FnNameStr, Suffix, BlockDim, GridDim,
-      RCIndices, RCVec, LambdaCalleeInfo, VarNameToDevPtr,
-      GlobalLinkedBinaries, sys::getHostCPUName().str(), 
-      /* UseRTC */ false, 
-      /* DumpIR */ false,
-      /* RelinkGlobalsByCopy */ false,
-      /* SpecializeArgs */ true,
-      /* SpecializeDims */ false,
-      /* SpecializeLaunchBounds */ false);
+  auto CodeObj = std::make_unique<Code>(std::move(M), FnNameStr);
   
-  // Use the SyncBuilder to compile the task
-  auto Result = SyncBuilder::instance().build(Task);
+  // Combine all runtime constants (including lambda values)
+  SmallVector<RuntimeConstant> AllRCs = RCVec;
+  AllRCs.append(LambdaJitValuesVec.begin(), LambdaJitValuesVec.end());
+  
+  // Create a compilation task using the Engine
+  auto Task = CPUEng->createCompilationTask(*CodeObj, FnNameStr, GridDim, BlockDim, AllRCs);
+  
+  // Compile the task
+  auto Result = CPUEng->compile(*Task);
   
   // Get the function pointer from the result
   JitFnPtr = Result->getFunctionPtr();
   
-  // Add to cache
+  // Add to cache (old cache for backward compatibility)
   CodeCache.insert(HashValue, JitFnPtr, FnName, RCVec);
   
   return JitFnPtr;

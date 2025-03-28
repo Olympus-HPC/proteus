@@ -34,16 +34,39 @@ public:
   void enable();
   void disable();
 
-  virtual std::unique_ptr<CompilationTask> createCompilationTask(...) = 0;
+  virtual std::unique_ptr<CompilationTask> createCompilationTask(
+      const Code& Code,
+      const std::string& FunctionName,
+      const dim3& GridDim,
+      const dim3& BlockDim,
+      const SmallVector<RuntimeConstant>& RuntimeConstants = {}) = 0;
+      
   virtual std::unique_ptr<CompilationResult> compile(const CompilationTask& Task) = 0;
   virtual std::unique_ptr<CompilationResult> lookupCache(const HashT& HashValue) = 0;
+  virtual void registerGlobalVariable(const char* VarName, const void* Addr) = 0;
+  
+protected:
+  void getRuntimeConstantValues(void** KernelArgs,
+                               const ArrayRef<int32_t> RCIndices,
+                               const ArrayRef<int32_t> RCTypes,
+                               SmallVector<RuntimeConstant>& RCVec);
+                               
+  void optimizeIR(Module& M, StringRef Arch, char OptLevel, unsigned CodegenOptLevel);
+  void runCleanupPassPipeline(Module& M);
+  std::string mangleSuffix(HashT& HashValue);
 };
 ```
 
 Engine implementations:
-- CPUEngine
-- CUDAEngine
-- HIPEngine
+- **CPUEngine**: Implementation for CPU targets using LLVM JIT compiler
+- **CUDAEngine**: Implementation for NVIDIA GPUs using NVPTX backend
+- **HIPEngine**: Implementation for AMD GPUs using ROCm/HIP backend
+
+Each backend implementation handles:
+- Target-specific compilation strategies
+- Hardware-specific optimizations and code generation
+- Device-specific resource management
+- Global variable handling in device memory
 
 ### CompilationTask
 
@@ -69,17 +92,43 @@ The Builder component handles the transformation of a CompilationTask into a Com
 ```cpp
 class Builder {
 public:
-  Builder(BackendType Backend, std::string Architecture = "",
-          bool DumpIR = false, bool RelinkGlobalsByCopy = false, bool UseRTC = false);
-
-  std::unique_ptr<CompilationResult> build(const CompilationTask& Task);
-
-private:
-  std::unique_ptr<CompilationResult> buildForCPU(const CompilationTask& Task);
-  std::unique_ptr<CompilationResult> buildForCUDA(const CompilationTask& Task);
-  std::unique_ptr<CompilationResult> buildForHIP(const CompilationTask& Task);
+  virtual ~Builder() = default;
+  virtual std::unique_ptr<CompilationResult> build(const CompilationTask& Task) = 0;
 };
 ```
+
+Builder implementations:
+- **SyncBuilder**: Synchronous compilation in the current thread
+  ```cpp
+  class SyncBuilder : public Builder {
+  public:
+    static SyncBuilder& instance();
+    std::unique_ptr<CompilationResult> build(const CompilationTask& Task) override;
+  private:
+    SyncBuilder() = default;
+  };
+  ```
+
+- **AsyncBuilder**: Asynchronous compilation using a thread pool
+  ```cpp
+  class AsyncBuilder : public Builder {
+  public:
+    static AsyncBuilder& instance(int NumThreads = 4);
+    std::unique_ptr<CompilationResult> build(const CompilationTask& Task) override;
+    bool isCompilationPending(const HashT& HashValue);
+    std::unique_ptr<CompilationResult> getResult(const HashT& HashValue, bool BlockingWait = false);
+    void joinAllThreads();
+  private:
+    // Thread pool and task queue management
+  };
+  ```
+
+Each Builder implementation is responsible for:
+- Cloning and preparing the IR module
+- Applying transformations (specialization, inlining, etc.)
+- Optimizing the code for the target architecture
+- Generating machine code
+- Creating a CompilationResult with the function pointer
 
 ### CompilationResult
 
@@ -186,14 +235,37 @@ The relationships between components form a clear chain of responsibility:
 6. **Code** represents the source code that will be specialized
 7. **CodeContext** keeps track of function and lambda metadata
 
+[Component Diagram](docs/assets/component-diagram.md)
+
 ## Use Flow
 
-1. The Engine creates a CompilationTask for a specific function and specialization
-2. The Engine checks the Cache for an existing result matching the Task's hash
-3. If not found, the Engine passes the Task to a Builder
-4. The Builder compiles the Task and returns a CompilationResult
-5. The Engine stores the CompilationResult in the Cache
-6. The Engine returns the CompilationResult to the caller
+1. User code calls into Proteus requesting JIT compilation of a function
+2. The system obtains or creates an appropriate Engine instance for the target backend
+3. The Engine creates a Code object that encapsulates the function's IR
+4. The Engine creates a CompilationTask with the Code, function name, runtime constants, etc.
+5. The Engine computes a hash value for the CompilationTask and checks the Cache
+6. If a cached CompilationResult is found, it is returned immediately
+7. Otherwise, the Engine delegates to a Builder (synchronous or asynchronous)
+8. The Builder:
+   - Clones and prepares the module from the CompilationTask
+   - Specializes the IR using runtime constants and launch dimensions
+   - Optimizes the IR for the target architecture
+   - Generates object code (machine code, PTX, or HSACO)
+   - Loads the object code and extracts the function pointer
+   - Returns a CompilationResult containing the function pointer and metadata
+9. The Engine stores the CompilationResult in the Cache for future reuse
+10. The Engine returns the CompilationResult to the caller
+11. The caller extracts the function pointer and executes the compiled code
+
+## Migration Strategy
+
+To facilitate the transition from the old architecture to the new one, we've implemented:
+
+1. **Feature flags**: `USE_NEW_CACHE` and `USE_NEW_ENGINE` control whether to use the new components
+2. **Adapters**: `JitCacheAdapter` provides a bridge between old and new cache implementations
+3. **Dual implementation**: Methods like `compileAndLink` support both old and new approaches
+4. **Gradual refactoring**: Starting with the CPU backend and progressively moving to CUDA and HIP
+5. **Backward compatibility**: Ensuring existing code continues to work during the transition
 
 ## Benefits of this Architecture
 

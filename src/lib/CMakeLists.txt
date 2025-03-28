@@ -3,6 +3,7 @@
 # globals in the target application.
 set(SOURCES
   CompilerInterfaceHost.cpp
+  Engine.cpp
   JitEngine.cpp
   JitEngineHost.cpp
 )
@@ -13,6 +14,7 @@ set(HEADERS
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/AsyncBuilder.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Builder.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Cache.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CacheAdapter.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Code.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CodeContext.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilationResult.hpp

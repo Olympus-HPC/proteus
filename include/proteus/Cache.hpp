@@ -319,10 +319,10 @@ public:
   explicit HierarchicalCache(const CacheConfig& Config)
       : Cache(Config.EnableStats) {
     if (Config.UseMemoryCache) {
-      MemCache = std::make_unique<MemoryCache>(Config.EnableStats);
+      MemCache = std::unique_ptr<MemoryCache>(new MemoryCache(Config.EnableStats));
     }
     if (Config.UseDiskCache) {
-      DiskCache = std::make_unique<DiskCache>(Config.DiskCachePath, Config.EnableStats);
+      DiskCache = std::unique_ptr<class DiskCache>(new class DiskCache(Config.DiskCachePath, Config.EnableStats));
     }
   }
 
@@ -427,14 +427,14 @@ private:
 
 inline std::unique_ptr<Cache> Cache::create(const CacheConfig& Config) {
   if (Config.UseMemoryCache && Config.UseDiskCache) {
-    return std::make_unique<HierarchicalCache>(Config);
+    return std::unique_ptr<Cache>(new HierarchicalCache(Config));
   } else if (Config.UseMemoryCache) {
-    return std::make_unique<MemoryCache>(Config.EnableStats);
+    return std::unique_ptr<Cache>(new MemoryCache(Config.EnableStats));
   } else if (Config.UseDiskCache) {
-    return std::make_unique<DiskCache>(Config.DiskCachePath, Config.EnableStats);
+    return std::unique_ptr<Cache>(new DiskCache(Config.DiskCachePath, Config.EnableStats));
   } else {
     // Default to memory cache if none specified
-    return std::make_unique<MemoryCache>(Config.EnableStats);
+    return std::unique_ptr<Cache>(new MemoryCache(Config.EnableStats));
   }
 }
 
