@@ -1,10 +1,21 @@
+//===-- CompilerAsync.hpp -- Asynchronous Compiler header --===//
+//
+// Part of the Proteus Project, under the Apache License v2.0 with LLVM
+// Exceptions. See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+// Asynchronous Compiler that internally uses the AsyncBuilder
+//
+//===----------------------------------------------------------------------===//
+
 #ifndef PROTEUS_ASYNC_COMPILER_HPP
 #define PROTEUS_ASYNC_COMPILER_HPP
 
-#include <condition_variable>
-#include <deque>
-#include <thread>
+#include <llvm/Support/MemoryBuffer.h>
 
+#include "proteus/AsyncBuilder.hpp"
 #include "proteus/CompilationTask.hpp"
 #include "proteus/Debug.h"
 #include "proteus/Hashing.hpp"
@@ -13,141 +24,77 @@ namespace proteus {
 
 using namespace llvm;
 
-class CompilationResult {
-public:
-  explicit CompilationResult() : IsReadyFlag{false} {}
-
-  CompilationResult(const CompilationResult &) = delete;
-  CompilationResult &operator=(const CompilationResult &) = delete;
-
-  CompilationResult(CompilationResult &&) noexcept = delete;
-  CompilationResult &operator=(CompilationResult &&) noexcept = delete;
-
-  bool isReady() { return IsReadyFlag; }
-
-  void set(std::unique_ptr<MemoryBuffer> ObjBuf) {
-    ResultObjBuf = std::move(ObjBuf);
-    IsReadyFlag = true;
-  }
-
-  void wait() {
-    // Busy wait until it's ready.
-    while (!IsReadyFlag) {
-      std::this_thread::yield();
-    }
-  }
-
-  std::unique_ptr<MemoryBuffer> take() { return std::move(ResultObjBuf); }
-
-private:
-  std::atomic<bool> IsReadyFlag;
-  std::unique_ptr<MemoryBuffer> ResultObjBuf;
-};
-
+/**
+ * @brief Asynchronous compiler that internally uses AsyncBuilder
+ * 
+ * This class provides backward compatibility with the existing codebase.
+ * It's a bridge between the old asynchronous API and the new Builder architecture.
+ */
 class CompilerAsync {
 public:
-  static CompilerAsync &instance(int NumThreads) {
+  /**
+   * @brief Get the singleton instance of CompilerAsync
+   * 
+   * @param NumThreads Number of worker threads to use
+   */
+  static CompilerAsync& instance(int NumThreads) {
     static CompilerAsync Singleton{NumThreads};
     return Singleton;
   }
 
-  void compile(CompilationTask &&CT) {
-    std::unique_lock Lock{Mutex};
-    Worklist.emplace_back(std::move(CT));
-    CompilationResultMap.emplace(CT.getHashValue(),
-                                 std::make_unique<CompilationResult>());
-    CondVar.notify_one();
+  /**
+   * @brief Queue a task for asynchronous compilation
+   * 
+   * @param CT The task to compile
+   */
+  void compile(CompilationTask&& CT) {
+    HashT HashValue = CT.getHashValue();
+    
+    // Use the AsyncBuilder to queue the task
+    AsyncBuilder::instance(NumThreads).build(CT);
   }
 
-  void run() {
-    int Count = 0;
-    while (Active) {
-      std::unique_lock Lock(Mutex);
-      CondVar.wait(Lock, [this] { return !Worklist.empty() || !Active; });
-      if (!Active)
-        break;
-      if (Worklist.empty())
-        PROTEUS_FATAL_ERROR("Expected non-empty Worklist");
-      CompilationTask CT = std::move(Worklist.front());
-      Worklist.pop_front();
-      Lock.unlock();
-
-      Count++;
-      std::unique_ptr<MemoryBuffer> ObjBuf = CT.compile();
-      Lock.lock();
-      CompilationResultMap.at(CT.getHashValue())->set(std::move(ObjBuf));
-      Lock.unlock();
-    }
-
-    PROTEUS_DBG(Logger::logs("proteus")
-                << "Thread exiting! Compiled " + std::to_string(Count) + "\n");
-  }
-
+  /**
+   * @brief Join all worker threads
+   */
   void joinAllThreads() {
-    Active = false;
-    CondVar.notify_all();
-
-    for (auto &Thread : Threads)
-      Thread.join();
-
-    Threads.clear();
+    AsyncBuilder::instance(NumThreads).joinAllThreads();
   }
 
-  bool isCompilationPending(HashT HashValue) {
-    std::unique_lock Lock{Mutex};
-    return !(CompilationResultMap.find(HashValue) ==
-             CompilationResultMap.end());
+  /**
+   * @brief Check if a compilation is pending
+   * 
+   * @param HashValue Hash of the compilation task
+   * @return True if the compilation is pending
+   */
+  bool isCompilationPending(const HashT& HashValue) {
+    return AsyncBuilder::instance(NumThreads).isCompilationPending(HashValue);
   }
 
-  std::unique_ptr<MemoryBuffer> takeCompilationResult(HashT HashValue,
-                                                      bool BlockingWait) {
-    std::unique_lock Lock{Mutex};
-    auto It = CompilationResultMap.find(HashValue);
-    if (It == CompilationResultMap.end())
-      return nullptr;
-
-    std::unique_ptr<CompilationResult> &CRes = It->second;
-    Lock.unlock();
-
-    if (BlockingWait)
-      CRes->wait();
-    else {
-      if (!CRes->isReady())
-        return nullptr;
-    }
-
-    // If compilation result is ready, take ownership of the buffer, erase it
-    // from the compilation results map and move the buffer to the caller.
-    std::unique_ptr<MemoryBuffer> ObjBuf = std::move(CRes->take());
-    Lock.lock();
-    // Use the HashValue key as the iterator may have been invalidated by
-    // insert/emplace from another thread.
-    CompilationResultMap.erase(HashValue);
-    Lock.unlock();
-    return std::move(ObjBuf);
+  /**
+   * @brief Get a compilation result, optionally waiting for it to complete
+   * 
+   * @param HashValue Hash of the compilation task
+   * @param BlockingWait Whether to wait for the result to be ready
+   * @return The memory buffer with the compiled object, or nullptr if not ready and not waiting
+   */
+  std::unique_ptr<MemoryBuffer> takeCompilationResult(const HashT& HashValue, bool BlockingWait) {
+    // Get the result from the AsyncBuilder
+    std::unique_ptr<CompilationResult> Result = 
+        AsyncBuilder::instance(NumThreads).getResult(HashValue, BlockingWait);
+    
+    // Return only the memory buffer for backward compatibility
+    return Result ? Result->takeObjectBuffer() : nullptr;
   }
 
 private:
-  std::atomic<bool> Active;
-  std::mutex Mutex;
-  std::condition_variable CondVar;
-  std::unordered_map<HashT, std::unique_ptr<CompilationResult>>
-      CompilationResultMap;
-  std::deque<CompilationTask> Worklist;
-  std::vector<std::thread> Threads;
+  int NumThreads;
 
-  CompilerAsync(int NumThreads) {
-    Active = true;
-    for (int I = 0; I < NumThreads; ++I)
-      Threads.emplace_back(&CompilerAsync::run, this);
-  }
-
-  ~CompilerAsync() {
-    if (Threads.size() > 0)
-      joinAllThreads();
-  }
+  // Private constructor for singleton
+  explicit CompilerAsync(int NumThreads) : NumThreads(NumThreads) {}
+  ~CompilerAsync() = default;
 };
 
 } // namespace proteus
 
-#endif
+#endif // PROTEUS_ASYNC_COMPILER_HPP
