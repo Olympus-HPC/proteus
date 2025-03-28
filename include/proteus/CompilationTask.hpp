@@ -32,6 +32,19 @@
 #include "proteus/Hashing.hpp"
 #include "proteus/Utils.h"
 
+// Include dim3 definition
+#if PROTEUS_ENABLE_CUDA
+#include <cuda_runtime.h>
+#elif PROTEUS_ENABLE_HIP
+#include <hip/hip_runtime.h>
+#else
+// Define a simple dim3 struct for CPU-only builds
+struct dim3 {
+  unsigned int x, y, z;
+  dim3(unsigned int x = 1, unsigned int y = 1, unsigned int z = 1) : x(x), y(y), z(z) {}
+};
+#endif
+
 namespace proteus {
 
 using namespace llvm;

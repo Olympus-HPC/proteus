@@ -108,6 +108,9 @@ JitEngineHost &JitEngineHost::instance() {
   return Jit;
 }
 
+#include "proteus/Builder.hpp"
+#include "proteus/CompilationResult.hpp"
+
 void JitEngineHost::addStaticLibrarySymbols() {
   // Create a SymbolMap for static symbols.
   SymbolMap SymbolMap;
@@ -313,6 +316,9 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
       ArrayRef{RCTypes, static_cast<size_t>(NumRuntimeConstants)}, RCVec);
   getLambdaJitValues(*M, FnName, LambdaJitValuesVec);
 
+  // You can optionally try using the new Builder here:
+  // return compileAndLinkWithBuilder(FnName, std::move(M), RCVec, LambdaJitValuesVec);
+
   HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesVec);
 #if PROTEUS_ENABLE_DEBUG
   Logger::logs("proteus") << "Hashing: " << " FnName " << FnName << " RCVec [ ";
@@ -405,4 +411,77 @@ JitEngineHost::JitEngineHost(int Argc, char *Argv[]) {
 
   // (3) Install transform to optimize modules when they're materialized.
   LLJITPtr->getIRTransformLayer().setTransform(OptimizationTransform(*this));
+}
+
+#include "proteus/SyncBuilder.hpp"
+
+void* JitEngineHost::compileAndLinkWithBuilder(StringRef FnName, std::unique_ptr<Module> M, 
+                                              const SmallVector<RuntimeConstant>& RCVec,
+                                              const SmallVector<RuntimeConstant>& LambdaJitValuesVec) {
+  // Create a hash of the function and runtime constants
+  HashT HashValue = hash(FnName, RCVec, LambdaJitValuesVec);
+  
+  // Check cache first
+  void* JitFnPtr = CodeCache.lookup(HashValue);
+  if (JitFnPtr)
+    return JitFnPtr;
+  
+  // Create a suffix for mangling
+  std::string Suffix = mangleSuffix(HashValue);
+  
+  // Create a CompilationTask with default dimensions for CPU
+  dim3 BlockDim(1, 1, 1); // CPU functions don't need block/grid dimensions
+  dim3 GridDim(1, 1, 1);
+  
+  // Create empty maps for device pointers (not needed for CPU)
+  std::unordered_map<std::string, const void*> VarNameToDevPtr;
+  SmallPtrSet<void*, 8> GlobalLinkedBinaries;
+  
+  // Extract metadata for lambda calls
+  SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo;
+  Function* F = M->getFunction(FnName);
+  if (F && !LambdaRegistry::instance().empty()) {
+    auto OptionalMapIt = LambdaRegistry::instance().matchJitVariableMap(F->getName());
+    if (OptionalMapIt) {
+      LambdaCalleeInfo.emplace_back(F->getName(), OptionalMapIt.value()->first);
+    }
+  }
+  
+  // Extract runtime constant indices from metadata
+  SmallVector<int32_t> RCIndices;
+  if (F) {
+    MDNode* Node = F->getMetadata("jit_arg_nos");
+    if (Node) {
+      for (int I = 0; I < Node->getNumOperands(); ++I) {
+        ConstantAsMetadata* CAM = cast<ConstantAsMetadata>(Node->getOperand(I));
+        ConstantInt* ConstInt = cast<ConstantInt>(CAM->getValue());
+        int ArgNo = ConstInt->getZExtValue();
+        RCIndices.push_back(ArgNo);
+      }
+    }
+  }
+  
+  // Create the compilation task
+  std::string FnNameStr = FnName.str();
+  CompilationTask Task(
+      *M, HashValue, FnNameStr, Suffix, BlockDim, GridDim,
+      RCIndices, RCVec, LambdaCalleeInfo, VarNameToDevPtr,
+      GlobalLinkedBinaries, sys::getHostCPUName().str(), 
+      /* UseRTC */ false, 
+      /* DumpIR */ false,
+      /* RelinkGlobalsByCopy */ false,
+      /* SpecializeArgs */ true,
+      /* SpecializeDims */ false,
+      /* SpecializeLaunchBounds */ false);
+  
+  // Use the SyncBuilder to compile the task
+  auto Result = SyncBuilder::instance().build(Task);
+  
+  // Get the function pointer from the result
+  JitFnPtr = Result->getFunctionPtr();
+  
+  // Add to cache
+  CodeCache.insert(HashValue, JitFnPtr, FnName, RCVec);
+  
+  return JitFnPtr;
 }
