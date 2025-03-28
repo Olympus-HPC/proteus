@@ -39,6 +39,7 @@ jobs:
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DLLVM_INSTALL_DIR=$(llvm-config --prefix) \
+            -DPROTEUS_LINK_SHARED_LLVM=on \
             -DPROTEUS_ENABLE_DEBUG=${{ matrix.enable_debug }} \
             -DPROTEUS_ENABLE_TIME_TRACING=${{ matrix.enable_time_tracing }} \
             -DBUILD_SHARED=${{ matrix.build_shared }} |& tee cmake_output.log

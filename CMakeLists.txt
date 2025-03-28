@@ -11,6 +11,7 @@ option(PROTEUS_ENABLE_HIP "Enable HIP" OFF)
 option(PROTEUS_ENABLE_CUDA "Enable CUDA" OFF)
 option(PROTEUS_ENABLE_DEBUG "Enable debugging output" OFF)
 option(PROTEUS_ENABLE_TIME_TRACING "Enable time tracing for the JIT engine" OFF)
+option(PROTEUS_LINK_SHARED_LLVM "Link with the LLVM shared library" OFF)
 option(BUILD_SHARED "Builds the JIT library as shared" OFF)
 option(ENABLE_TESTS "Enable tests" ON)
 
