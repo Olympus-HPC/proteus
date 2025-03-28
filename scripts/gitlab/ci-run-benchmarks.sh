@@ -31,8 +31,11 @@ if [[ "${COMMENTS_BODY}" == *"/run-benchmarks-hecbench"* ]]; then
 elif [[ "${COMMENTS_BODY}" == *"/run-benchmarks-rajaperf"* ]]; then
   echo "=> Run rajaperf benchmarks triggered <=";
   BENCHMARKS_TOML="rajaperf.toml"
+elif [[ "${COMMENTS_BODY}" == *"/run-benchmarks-lbann"* ]]; then
+  echo "=> Run lbann benchmarks triggered <=";
+  BENCHMARKS_TOML="lbann.toml"
 else
-  echo "=> Benchmarks will not run, trigger with /run-benchmarks-{hecbench|rajaperf} <="
+  echo "=> Benchmarks will not run, trigger with /run-benchmarks-{hecbench|rajaperf|lbann} <="
   exit 0
 fi
 
@@ -43,6 +46,10 @@ conda activate proteus
 if [ "${CI_MACHINE}" == "lassen" ]; then
   if [ "${BENCHMARKS_TOML}" == "rajaperf.toml" ]; then
     echo "RAJAPerf benchmarks can only run on tioga.  Exiting."
+    exit 0
+  fi
+  if [ "${BENCHMARKS_TOML}" == "lbann.toml" ]; then
+    echo "LBANN benchmarks can only run on tioga.  Exiting."
     exit 0
   fi
   ml load cuda/12.2.2
@@ -59,12 +66,20 @@ if [ "${CI_MACHINE}" == "lassen" ]; then
   MACHINE=nvidia
 elif [ "${CI_MACHINE}" == "tioga" ]; then
   ml load rocm/6.2.1
+  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CRAY_LD_LIBRARY_PATH
 
   LLVM_INSTALL_DIR=${ROCM_PATH}/llvm
 
-  CMAKE_MACHINE_OPTIONS="\
-    -DPROTEUS_ENABLE_HIP=on \
-  "
+  if [ "${BENCHMARKS_TOML}" == "lbann.toml" ]; then
+    CMAKE_MACHINE_OPTIONS="\
+      -DPROTEUS_ENABLE_HIP=on \
+      -DCMAKE_POSITION_INDEPENDENT_CODE=on \
+    "
+  else
+    CMAKE_MACHINE_OPTIONS="\
+      -DPROTEUS_ENABLE_HIP=on \
+    "
+  fi
 
   PROTEUS_CC=hipcc
   MACHINE=amd
