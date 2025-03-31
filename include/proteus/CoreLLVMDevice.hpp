@@ -333,8 +333,10 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
   }
 
   for (GlobalVariable *GV : ReachableGlobals) {
-    GlobalVariable *NewGV = cast<GlobalVariable>(VMap[GV]);
-    NewGV->setInitializer(MapValue(GV->getInitializer(), VMap));
+    if (GV->hasInitializer()) {
+      GlobalVariable *NewGV = cast<GlobalVariable>(VMap[GV]);
+      NewGV->setInitializer(MapValue(GV->getInitializer(), VMap));
+    }
   }
 
   for (auto *F : ReachableFunctions) {
