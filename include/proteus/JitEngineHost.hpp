@@ -47,11 +47,29 @@ public:
   void *compileAndLink(StringRef FnName, char *IR, int IRSize, void **Args,
                        int32_t *RCIndices, int32_t *RCTypes,
                        int NumRuntimeConstants);
+  
+  /**
+   * @brief Use the new Builder to compile and link a function
+   * 
+   * This is a refactored version of compileAndLink that uses the new Builder
+   * architecture instead of direct compilation.
+   * 
+   * @param FnName Name of the function to compile
+   * @param M Module containing the function
+   * @param RCVec Runtime constants
+   * @param LambdaJitValuesVec Lambda capture values
+   * @return Function pointer
+   */
 
 private:
   JitEngineHost(int argc, char *argv[]);
   void addStaticLibrarySymbols();
   JitCache<void *> CodeCache;
+  
+  // Helper method that uses the new Builder architecture
+  void* compileAndLinkWithBuilder(StringRef FnName, std::unique_ptr<Module> M, 
+                                 const SmallVector<RuntimeConstant>& RCVec,
+                                 const SmallVector<RuntimeConstant>& LambdaJitValuesVec);
 };
 
 } // namespace proteus

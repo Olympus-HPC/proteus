@@ -3,6 +3,7 @@
 # globals in the target application.
 set(SOURCES
   CompilerInterfaceHost.cpp
+  Engine.cpp
   JitEngine.cpp
   JitEngineHost.cpp
 )
@@ -10,7 +11,13 @@ set(SOURCES
 set(PROTEUS_PROJECT_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
 
 set(HEADERS
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Logger.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/AsyncBuilder.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Builder.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Cache.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CacheAdapter.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Code.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CodeContext.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilationResult.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilationTask.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilerAsync.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilerInterfaceTypes.h
@@ -19,6 +26,7 @@ set(HEADERS
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreLLVM.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreLLVMDevice.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Debug.h
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Engine.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Error.h
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Hashing.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitCache.hpp
@@ -27,6 +35,7 @@ set(HEADERS
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitInterface.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitStorageCache.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/LambdaRegistry.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/SyncBuilder.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/TimeTracing.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/TransformArgumentSpecialization.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/TransformLambdaSpecialization.hpp

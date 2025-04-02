@@ -108,6 +108,9 @@ JitEngineHost &JitEngineHost::instance() {
   return Jit;
 }
 
+#include "proteus/Builder.hpp"
+#include "proteus/CompilationResult.hpp"
+
 void JitEngineHost::addStaticLibrarySymbols() {
   // Create a SymbolMap for static symbols.
   SymbolMap SymbolMap;
@@ -313,7 +316,26 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
       ArrayRef{RCTypes, static_cast<size_t>(NumRuntimeConstants)}, RCVec);
   getLambdaJitValues(*M, FnName, LambdaJitValuesVec);
 
+  // For now, use the existing approach
   HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesVec);
+  
+  // EXAMPLE: How to use the CacheAdapter for gradually migrating to the new architecture
+  #ifdef USE_NEW_CACHE
+  // Create a cache adapter that wraps the new cache system
+  static JitCacheAdapter<void*> NewCache;
+  
+  // Check the cache first
+  void* JitFnPtr = NewCache.lookup(HashValue);
+  if (JitFnPtr)
+    return JitFnPtr;
+  #endif
+
+  // Use the Engine architecture for compilation when enabled
+  #ifdef USE_NEW_ENGINE
+  return compileAndLinkWithBuilder(FnName, std::move(M), RCVec, LambdaJitValuesVec);
+  #endif
+  
+  // Otherwise, use the legacy approach
 #if PROTEUS_ENABLE_DEBUG
   Logger::logs("proteus") << "Hashing: " << " FnName " << FnName << " RCVec [ ";
   for (auto &RC : RCVec)
@@ -405,4 +427,56 @@ JitEngineHost::JitEngineHost(int Argc, char *Argv[]) {
 
   // (3) Install transform to optimize modules when they're materialized.
   LLJITPtr->getIRTransformLayer().setTransform(OptimizationTransform(*this));
+}
+
+#include "proteus/CacheAdapter.hpp"
+#include "proteus/SyncBuilder.hpp"
+#include "proteus/Engine.hpp"
+#include "proteus/Code.hpp"
+
+void* JitEngineHost::compileAndLinkWithBuilder(StringRef FnName, std::unique_ptr<Module> M, 
+                                              const SmallVector<RuntimeConstant>& RCVec,
+                                              const SmallVector<RuntimeConstant>& LambdaJitValuesVec) {
+  // Create a hash of the function and runtime constants
+  HashT HashValue = hash(FnName, RCVec, LambdaJitValuesVec);
+  
+  // Check cache first
+  void* JitFnPtr = CodeCache.lookup(HashValue);
+  if (JitFnPtr)
+    return JitFnPtr;
+  
+  // Create and configure a CPU engine
+  static std::unique_ptr<Engine> CPUEng = Engine::create(BackendType::CPU);
+  EngineConfig EngCfg;
+  EngCfg.SpecializeArgs = true;
+  EngCfg.SpecializeDims = false;
+  EngCfg.SetLaunchBounds = false;
+  EngCfg.AsyncCompilation = false;
+  CPUEng->setConfig(EngCfg);
+  
+  // Default dimensions for CPU functions
+  dim3 BlockDim(1, 1, 1);
+  dim3 GridDim(1, 1, 1);
+  
+  // Create a Code object from the module
+  std::string FnNameStr = FnName.str();
+  auto CodeObj = std::make_unique<Code>(std::move(M), FnNameStr);
+  
+  // Combine all runtime constants (including lambda values)
+  SmallVector<RuntimeConstant> AllRCs = RCVec;
+  AllRCs.append(LambdaJitValuesVec.begin(), LambdaJitValuesVec.end());
+  
+  // Create a compilation task using the Engine
+  auto Task = CPUEng->createCompilationTask(*CodeObj, FnNameStr, GridDim, BlockDim, AllRCs);
+  
+  // Compile the task
+  auto Result = CPUEng->compile(*Task);
+  
+  // Get the function pointer from the result
+  JitFnPtr = Result->getFunctionPtr();
+  
+  // Add to cache (old cache for backward compatibility)
+  CodeCache.insert(HashValue, JitFnPtr, FnName, RCVec);
+  
+  return JitFnPtr;
 }

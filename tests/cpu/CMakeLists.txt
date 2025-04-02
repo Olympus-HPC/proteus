@@ -45,3 +45,8 @@ CREATE_CPU_TEST(types types.cpp)
 CREATE_CPU_TEST(lambda lambda.cpp)
 CREATE_CPU_TEST(lambda_def lambda_def.cpp)
 CREATE_CPU_TEST(lambda_multiple lambda_multiple.cpp)
+
+# Test the new Engine component architecture
+add_executable(test_engine test_engine.cpp)
+target_link_libraries(test_engine PRIVATE proteus)
+add_test(NAME test_engine COMMAND test_engine)
