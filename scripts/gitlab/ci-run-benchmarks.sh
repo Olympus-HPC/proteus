@@ -70,6 +70,7 @@ elif [ "${CI_MACHINE}" == "tioga" ]; then
   LLVM_INSTALL_DIR=${ROCM_PATH}/llvm
 
   if [ "${BENCHMARKS_TOML}" == "lbann.toml" ]; then
+    ml load cpe
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CRAY_LD_LIBRARY_PATH
     CMAKE_MACHINE_OPTIONS="\
       -DPROTEUS_ENABLE_HIP=on \
