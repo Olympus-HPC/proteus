@@ -1,7 +1,6 @@
 @PACKAGE_INIT@
 
 include(CMakeFindDependencyMacro)
-include(ProteusFunctions.cmake)
 set(PROTEUS_LLVM_DIR "@LLVM_DIR@")
 find_dependency(LLVM REQUIRED CONFIG)
 
@@ -12,5 +11,6 @@ if (NOT "${LLVM_DIR}" STREQUAL "${PROTEUS_LLVM_DIR}")
 endif()
 message(STATUS "LLVM DIR = ${LLVM_DIR}")
 
+include("${CMAKE_CURRENT_LIST_DIR}/ProteusFunctions.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/proteusTargets.cmake")
 check_required_components("@PROJECT_NAME@")
