@@ -28,12 +28,15 @@ COMMENTS_BODY=$(echo ${COMMENTS_INFO} | jq -r '.[].body')
 if [[ "${COMMENTS_BODY}" == *"/run-benchmarks-hecbench"* ]]; then
   echo "=> Run hecbench benchmarks triggered <=";
   BENCHMARKS_TOML="hecbench.toml"
+  REPS="1"
 elif [[ "${COMMENTS_BODY}" == *"/run-benchmarks-rajaperf"* ]]; then
   echo "=> Run rajaperf benchmarks triggered <=";
   BENCHMARKS_TOML="rajaperf.toml"
+  REPS="1"
 elif [[ "${COMMENTS_BODY}" == *"/run-benchmarks-lbann"* ]]; then
   echo "=> Run lbann benchmarks triggered <=";
   BENCHMARKS_TOML="lbann.toml"
+  REPS="10"
 else
   echo "=> Benchmarks will not run, trigger with /run-benchmarks-{hecbench|rajaperf|lbann} <="
   exit 0
@@ -117,11 +120,11 @@ cd proteus-benchmarks
 
 echo "Running AOT"
 python driver.py -t ${BENCHMARKS_TOML} \
-  -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x aot -m ${MACHINE} -r 1 --runconfig presets/aot.toml --results-dir results
+  -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x aot -m ${MACHINE} -r ${REPS} --runconfig presets/aot.toml --results-dir results
 echo "Running proteus"
 python driver.py -t ${BENCHMARKS_TOML} \
   -c ${PROTEUS_CC} -j ${PROTEUS_INSTALL_PATH} -x proteus \
-  -m ${MACHINE} -r 1 --runconfig presets/proteus.toml --results-dir results
+  -m ${MACHINE} -r ${REPS} --runconfig presets/proteus.toml --results-dir results
 
 echo "End run benchmarks..."
 
