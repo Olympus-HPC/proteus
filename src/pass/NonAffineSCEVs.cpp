@@ -1,16 +1,21 @@
 #include "proteus/NonAffineSCEVs.hpp"
-#include "proteus/log.h"
+//#include "proteus/log.h"
 #include "llvm/Analysis/RegionInfo.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 
 using namespace llvm;
-using namespace proteus;
+//using namespace proteus;
 
-#define DEBUG_TYPE "proteus-scev-validator"
+#define DEBUG_TYPE "jitpass"
+#ifdef PROTEUS_ENABLE_DEBUG
+#define DEBUG(x) x
+#else
+#define DEBUG(x)
+#endif
 
 namespace {
-REGISTER_LOG(console, DEBUG_TYPE);
+//REGISTER_LOG(console, DEBUG_TYPE);
 } // namespace
 
 namespace proteus {

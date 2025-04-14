@@ -1,5 +1,5 @@
 #include "proteus/NonAffineSCEVs.hpp"
-#include "proteus/DetectScops.h"
+#include "proteus/DetectScops.hpp"
 #include "polly/CodeGen/CodeGeneration.h"
 #include "polly/LinkAllPasses.h"
 #include "polly/Options.h"
@@ -8,6 +8,7 @@
 #include "polly/Support/SCEVValidator.h"
 #include "polly/Support/ScopLocation.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Analysis/Delinearization.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/PostDominators.h"
 #include "llvm/Analysis/RegionIterator.h"
@@ -18,16 +19,22 @@
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/IntrinsicInst.h"
 
-#include "proteus/log.h"
+//#include "proteus/log.h"
+#include <llvm/Analysis/AliasAnalysis.h>
 #include <stack>
 
 using namespace llvm;
 using namespace proteus;
 
-#define DEBUG_TYPE "polyjit"
+#define DEBUG_TYPE "jitpass"
+#ifdef PROTEUS_ENABLE_DEBUG
+#define DEBUG(x) x
+#else
+#define DEBUG(x)
+#endif
 
 namespace {
-REGISTER_LOG(console, DEBUG_TYPE);
+//REGISTER_LOG(console, DEBUG_TYPE);
 } // namespace
 
 namespace proteus {
@@ -35,6 +42,10 @@ bool PollyTrackFailures = false;
 bool PollyProcessUnprofitable;
 StringRef PollySkipFnAttr = "polly.skip.fn";
 } // namespace proteus
+
+extern llvm::cl::OptionCategory ProteusCategory;
+extern llvm::cl::OptionCategory PolyJitRuntime;
+extern llvm::cl::OptionCategory PolyJitCompiletime;
 
 // This option is set to a very high value, as analyzing such loops increases
 // compile time on several cases. For experiments that enable this option,
@@ -44,7 +55,7 @@ static cl::opt<int> ProfitabilityMinPerLoopInstructions(
     "proteus-detect-profitability-min-per-loop-insts",
     cl::desc("The minimal number of per-loop instructions before a single loop "
              "region is considered profitable"),
-    cl::Hidden, cl::ValueRequired, cl::init(100000000), cl::cat(proteusCategory));
+    cl::Hidden, cl::ValueRequired, cl::init(100000000), cl::cat(ProteusCategory));
 
 bool PollyProcessUnprofitable;
 static cl::opt<bool, true> XPollyProcessUnprofitable(
@@ -52,53 +63,53 @@ static cl::opt<bool, true> XPollyProcessUnprofitable(
     cl::desc(
         "Process scops that are unlikely to benefit from Polly optimizations."),
     cl::location(proteus::PollyProcessUnprofitable), cl::init(false),
-    cl::ZeroOrMore, cl::cat(proteusCategory));
+    cl::ZeroOrMore, cl::cat(ProteusCategory));
 
 static cl::opt<std::string> OnlyFunction(
     "proteus-only-func",
     cl::desc("Only run on functions that contain a certain string"),
     cl::value_desc("string"), cl::ValueRequired, cl::init(""),
-    cl::cat(proteusCategory));
+    cl::cat(ProteusCategory));
 
 static cl::opt<std::string> OnlyRegion(
     "proteus-only-region",
     cl::desc("Only run on certain regions (The provided identifier must "
              "appear in the name of the region's entry block"),
     cl::value_desc("identifier"), cl::ValueRequired, cl::init(""),
-    cl::cat(proteusCategory));
+    cl::cat(ProteusCategory));
 
 static cl::opt<bool>
     ReportLevel("proteus-report",
                 cl::desc("Print information about the activities of Polly"),
-                cl::init(false), cl::ZeroOrMore, cl::cat(proteusCategory));
+                cl::init(false), cl::ZeroOrMore, cl::cat(ProteusCategory));
 
 static cl::opt<bool> AllowDifferentTypes(
     "proteus-allow-differing-element-types",
     cl::desc("Allow different element types for array accesses"), cl::Hidden,
-    cl::init(true), cl::ZeroOrMore, cl::cat(proteusCategory));
+    cl::init(true), cl::ZeroOrMore, cl::cat(ProteusCategory));
 
 static cl::opt<bool>
     AllowModrefCall("proteus-allow-modref-calls",
                     cl::desc("Allow functions with known modref behavior"),
                     cl::Hidden, cl::init(false), cl::ZeroOrMore,
-                    cl::cat(proteusCategory));
+                    cl::cat(ProteusCategory));
 
 static cl::opt<bool, true>
     TrackFailures("proteus-detect-track-failures",
                   cl::desc("Track failure strings in detecting scop regions"),
                   cl::location(proteus::PollyTrackFailures), cl::Hidden,
-                  cl::ZeroOrMore, cl::init(true), cl::cat(proteusCategory));
+                  cl::ZeroOrMore, cl::init(true), cl::cat(ProteusCategory));
 
 static cl::opt<bool> KeepGoing("proteus-detect-keep-going",
                                cl::desc("Do not fail on the first error."),
                                cl::Hidden, cl::ZeroOrMore, cl::init(false),
-                               cl::cat(proteusCategory));
+                               cl::cat(ProteusCategory));
 
 static cl::opt<bool>
     VerifyScops("proteus-detect-verify",
                 cl::desc("Verify the detected SCoPs after each transformation"),
                 cl::Hidden, cl::init(false), cl::ZeroOrMore,
-                cl::cat(proteusCategory));
+                cl::cat(ProteusCategory));
 
 /// @brief The minimal trip count under which loops are considered unprofitable.
 static const unsigned MinLoopTripCount = 8;
@@ -188,7 +199,7 @@ bool JITScopDetection::isMaxRegionInScop(const Region &R, bool Verify) const {
     DetectionContextMap.erase(polly::getBBPairForRegion(&R));
     const auto &It = DetectionContextMap.insert(std::make_pair(
         polly::getBBPairForRegion(&R),
-        DetectionContext(const_cast<Region &>(R), *AA, false /*verifying*/)));
+        DetectionContext(const_cast<Region &>(R), *BAA, false /*verifying*/)));
     DetectionContext &Context = It.first->second;
     return isValidRegion(Context);
   }
@@ -236,7 +247,7 @@ bool JITScopDetection::onlyValidRequiredInvariantLoads(
     return false;
 
   for (LoadInst *Load : RequiredILS)
-    if (!polly::isHoistableLoad(Load, CurRegion, *LI, *SE, *DT))
+    if (!polly::isHoistableLoad(Load, CurRegion, *LI, *SE, *DT, RequiredILS))
       return false;
 
   Context.RequiredILS.insert(RequiredILS.begin(), RequiredILS.end());
@@ -346,7 +357,7 @@ bool JITScopDetection::isValidCFG(BasicBlock &BB, bool IsLoopBranch,
                                   DetectionContext &Context) const {
   Region &CurRegion = Context.CurRegion;
 
-  TerminatorInst *TI = BB.getTerminator();
+  Instruction *TI = BB.getTerminator();
 
   if (AllowUnreachable && isa<UnreachableInst>(TI))
     return true;
@@ -397,19 +408,10 @@ bool JITScopDetection::isValidCallInst(CallInst &CI,
     return false;
 
   if (AllowModrefCall) {
-    switch (AA->getModRefBehavior(CalledFunction)) {
-    case llvm::FMRB_UnknownModRefBehavior:
-      return false;
-    case llvm::FMRB_DoesNotAccessMemory:
-    case llvm::FMRB_OnlyReadsMemory:
-      // Implicitly disable delinearization since we have an unknown
-      // accesses with an unknown access function.
-      Context.HasUnknownAccess = true;
-      Context.AST.add(&CI);
-      return true;
-    case llvm::FMRB_OnlyReadsArgumentPointees:
-    case llvm::FMRB_OnlyAccessesArgumentPointees:
-      for (const auto &Arg : CI.arg_operands()) {
+    const auto& MemEffects = AA->getMemoryEffects(CalledFunction);
+    if (MemEffects.onlyAccessesArgPointees()) {
+      //for (auto* Arg = CI.arg_begin(); Arg != CI.arg_end(); ++Arg) {
+      for (const auto &Arg : CI.args()) {
         if (!Arg->getType()->isPointerTy())
           continue;
 
@@ -430,10 +432,16 @@ bool JITScopDetection::isValidCallInst(CallInst &CI,
 
       Context.AST.add(&CI);
       return true;
-    case FMRB_OnlyAccessesInaccessibleMem:
-    case FMRB_OnlyAccessesInaccessibleOrArgMem:
-    case llvm::FMRB_DoesNotReadMemory:
+    } else if (MemEffects.onlyAccessesInaccessibleMem() || 
+              MemEffects.onlyAccessesInaccessibleOrArgMem() ||
+              MemEffects.doesNotAccessMemory()) {
       return false;
+    } else if (MemEffects.doesNotAccessMemory() || MemEffects.onlyReadsMemory()) {
+      // Implicitly disable delinearization since we have an unknown
+      // accesses with an unknown access function.
+      Context.HasUnknownAccess = true;
+      Context.AST.add(&CI);
+      return true;
     }
   }
 
@@ -622,7 +630,7 @@ SmallVector<const SCEV *, 4> JITScopDetection::getDelinearizationTerms(
     if (auto *AF = dyn_cast<SCEVAddExpr>(Pair.second)) {
       for (auto Op : AF->operands()) {
         if (auto *AF2 = dyn_cast<SCEVAddRecExpr>(Op))
-          SE->collectParametricTerms(AF2, Terms);
+          collectParametricTerms(*SE, AF2, Terms);
         if (auto *AF2 = dyn_cast<SCEVMulExpr>(Op)) {
           SmallVector<const SCEV *, 0> Operands;
 
@@ -645,7 +653,7 @@ SmallVector<const SCEV *, 4> JITScopDetection::getDelinearizationTerms(
       }
     }
     if (Terms.empty())
-      SE->collectParametricTerms(Pair.second, Terms);
+      collectParametricTerms(*SE, Pair.second, Terms);
   }
   return Terms;
 }
@@ -712,10 +720,9 @@ bool JITScopDetection::isValidAccess(Instruction *Inst, const SCEV *AF,
 
   // Check if the base pointer of the memory access does alias with
   // any other pointer. This cannot be handled at the moment.
-  AAMDNodes AATags;
-  Inst->getAAMetadata(AATags);
-  AliasSet &AS = Context.AST.getAliasSetForPointer(
-      BP->getValue(), MemoryLocation::UnknownSize, AATags);
+  AAMDNodes AATags = Inst->getAAMetadata();
+  AliasSet &AS = Context.AST.getAliasSetFor(
+      MemoryLocation(BP->getValue(), MemoryLocation::UnknownSize, AATags));
 
   if (!AS.isMustAlias()) {
     bool CanBuildRunTimeCheck = true;
@@ -732,8 +739,8 @@ bool JITScopDetection::isValidAccess(Instruction *Inst, const SCEV *AF,
       Instruction *Inst = dyn_cast<Instruction>(Ptr.getValue());
       if (Inst && Context.CurRegion.contains(Inst)) {
         auto *Load = dyn_cast<LoadInst>(Inst);
-        if (Load && polly::isHoistableLoad(Load, Context.CurRegion, *LI, *SE, *DT)) {
-          Context.RequiredILS.insert(Load);
+        Context.RequiredILS.insert(Load);
+        if (Load && polly::isHoistableLoad(Load, Context.CurRegion, *LI, *SE, *DT, getRequiredInvariantLoads(&Context.CurRegion))) {
           continue;
         }
 
@@ -895,7 +902,7 @@ Region *JITScopDetection::expandRegion(Region &R) {
   while (ExpandedRegion) {
     const auto &It = DetectionContextMap.insert(std::make_pair(
         polly::getBBPairForRegion(ExpandedRegion.get()),
-        DetectionContext(*ExpandedRegion, *AA, false /*verifying*/)));
+        DetectionContext(*ExpandedRegion, BAA, false /*verifying*/)));
     DetectionContext &Context = It.first->second;
     DEBUG(dbgs() << "\t\tTrying " << ExpandedRegion->getNameStr() << "\n");
     // Only expand when we did not collect errors.
@@ -968,7 +975,7 @@ void JITScopDetection::removeCachedResults(const Region &R, RegionSet &Cache) {
 void JITScopDetection::findScops(Region &R) {
   const auto &It = DetectionContextMap.insert(
       std::make_pair(polly::getBBPairForRegion(&R),
-                     DetectionContext(R, *AA, false /*verifying*/)));
+                     DetectionContext(R, BAA, false /*verifying*/)));
   DetectionContext &Context = It.first->second;
 
   bool RegionIsValid = false;
@@ -1221,7 +1228,7 @@ bool JITScopDetection::isReducibleRegion(Region &R, DebugLoc &DbgLoc) const {
     DFSStack.pop();
 
     // Loop to iterate over the successors of current BB.
-    const TerminatorInst *TInst = CurrBB->getTerminator();
+    const Instruction *TInst = CurrBB->getTerminator();
     unsigned NSucc = TInst->getNumSuccessors();
     for (unsigned I = AdjacentBlockIndex; I < NSucc;
          ++I, ++AdjacentBlockIndex) {
@@ -1271,6 +1278,7 @@ bool JITScopDetection::runOnFunction(llvm::Function &F) {
     return false;
 
   AA = &getAnalysis<AAResultsWrapperPass>().getAAResults();
+  BAA = &BatchAAResults(AA);
   SE = &getAnalysis<ScalarEvolutionWrapperPass>().getSE();
   DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
   Region *TopRegion = RI->getTopLevelRegion();
@@ -1382,6 +1390,11 @@ void JITScopDetection::releaseMemory() {
   RequiredParams.clear();
 
   // Do not clear the invalid function set.
+}
+
+extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
+llvmGetPassPluginInfo() {
+  return getProteusJitPassPluginInfo();
 }
 
 namespace proteus {

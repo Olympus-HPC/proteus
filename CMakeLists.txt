@@ -45,6 +45,7 @@ include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
 add_subdirectory(src)
+find_package(Polly)
 
 if(ENABLE_TESTS)
   enable_testing()

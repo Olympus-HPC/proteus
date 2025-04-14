@@ -158,8 +158,8 @@ public:
     ParamVec RequiredParams;
 
     /// @brief Initialize a DetectionContext from scratch.
-    DetectionContext(Region &R, AliasAnalysis &AA, bool Verify)
-        : CurRegion(R), AST(AA), Verifying(Verify), Log(&R), hasLoads(false),
+    DetectionContext(Region &R, BatchAAResults &BAA, bool Verify)
+        : CurRegion(R), AST(BAA), Verifying(Verify), Log(&R), hasLoads(false),
           hasStores(false), HasUnknownAccess(false), requiresJIT(false) {}
 
     /// @brief Initialize a DetectionContext with the data from @p DC.
@@ -190,6 +190,7 @@ private:
   LoopInfo *LI;
   RegionInfo *RI;
   AliasAnalysis *AA;
+  BatchAAResults *BAA;
   //@}
 
   /// @brief Map to remember detection contexts for all regions.

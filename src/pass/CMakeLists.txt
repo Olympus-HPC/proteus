@@ -1,12 +1,17 @@
-add_library(ProteusPass SHARED ProteusPass.cpp)
+add_library(ProteusPass SHARED ProteusPass.cpp )#DetectScops.cpp NonAffineSCEVs.cpp)
 
 target_include_directories(ProteusPass
   PRIVATE ${PROJECT_SOURCE_DIR}/include
   ${CMAKE_CURRENT_BINARY_DIR}
 )
 
+message(STATUS "${LLVM_INCLUDE_DIRS}/Polly")
+
 target_include_directories(ProteusPass
-  SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
+  SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS}/polly)
+
+
+
 
 if(NOT LLVM_ENABLE_RTTI)
   target_compile_options(ProteusPass PRIVATE -fno-rtti)

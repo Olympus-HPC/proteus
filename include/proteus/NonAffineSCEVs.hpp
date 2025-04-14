@@ -37,7 +37,7 @@ class Loop;
 class LoadInst;
 } // namespace llvm
 
-namespace polli {
+namespace proteus {
 bool isNonAffineExpr(const llvm::Region *R, llvm::Loop *Scope,
                      const llvm::SCEV *Expr, llvm::ScalarEvolution &SE,
                      polly::InvariantLoadsSetTy *ILS);
