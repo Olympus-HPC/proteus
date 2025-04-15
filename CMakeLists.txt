@@ -35,6 +35,7 @@ if(PROTEUS_ENABLE_DEBUG)
 endif()
 
 include(cmake/SetupLLVM.cmake)
+include(cmake/ProteusFunctions.cmake)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
@@ -62,5 +63,6 @@ install(EXPORT proteusTargets
 install(FILES
   "${PROJECT_BINARY_DIR}/proteusConfigVersion.cmake"
   "${PROJECT_BINARY_DIR}/proteusConfig.cmake"
+  "${PROJECT_SOURCE_DIR}/cmake/ProteusFunctions.cmake"
   DESTINATION
   ${CMAKE_INSTALL_LIBDIR}/cmake/proteus)
