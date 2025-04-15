@@ -60,7 +60,7 @@ public:
   }
 
   void run() {
-    int Count = 0;
+    [[maybe_unused]] int Count = 0;
     while (Active) {
       std::unique_lock Lock(Mutex);
       CondVar.wait(Lock, [this] { return !Worklist.empty() || !Active; });
@@ -118,13 +118,13 @@ public:
 
     // If compilation result is ready, take ownership of the buffer, erase it
     // from the compilation results map and move the buffer to the caller.
-    std::unique_ptr<MemoryBuffer> ObjBuf = std::move(CRes->take());
+    std::unique_ptr<MemoryBuffer> ObjBuf = CRes->take();
     Lock.lock();
     // Use the HashValue key as the iterator may have been invalidated by
     // insert/emplace from another thread.
     CompilationResultMap.erase(HashValue);
     Lock.unlock();
-    return std::move(ObjBuf);
+    return ObjBuf;
   }
 
 private:

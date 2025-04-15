@@ -126,7 +126,7 @@ inline void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
               "1," + std::to_string(std::min(1024, BlockSize)));
   // TODO: find warp size (hardcoded 64) from device info.
   // int WavesPerEU = (GridSize * BlockSize) / 64 / 110 / 4 / 2;
-  int WavesPerEU = 0;
+  // int WavesPerEU = 0;
   // F->addFnAttr("amdgpu-waves-per-eu", std::to_string(WavesPerEU));
   PROTEUS_DBG(Logger::logs("proteus")
               << "BlockSize " << BlockSize << " GridSize " << GridSize

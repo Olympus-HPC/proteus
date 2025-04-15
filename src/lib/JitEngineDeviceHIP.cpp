@@ -102,8 +102,6 @@ HashT JitEngineDeviceHIP::getModuleHash(BinaryInfo &BinInfo) {
   if (Sections.takeError())
     PROTEUS_FATAL_ERROR("Error reading sections");
 
-  ArrayRef<uint8_t> DeviceBitcode;
-
   // NOTE: This code hashes the bitcode of the section. Leaving it here in case
   // there is a reason to revert to computing the hash at runtime instead of
   // compilation time.
@@ -157,7 +155,6 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
   if (Sections.takeError())
     PROTEUS_FATAL_ERROR("Error reading sections");
 
-  ArrayRef<uint8_t> DeviceBitcode;
   SmallVector<std::unique_ptr<Module>> LinkedModules;
   auto &Ctx = getLLVMContext();
 

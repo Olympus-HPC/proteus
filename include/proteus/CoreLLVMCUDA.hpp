@@ -147,7 +147,7 @@ inline void codegenPTX(Module &M, StringRef DeviceArch,
 inline std::unique_ptr<MemoryBuffer>
 codegenObject(Module &M, StringRef DeviceArch,
               SmallPtrSetImpl<void *> &GlobalLinkedBinaries,
-              bool UseRTC = true) {
+              [[maybe_unused]] bool UseRTC = true) {
   assert(UseRTC && "Expected RTC compilation true for CUDA");
   SmallVector<char, 4096> PTXStr;
   size_t BinSize;
@@ -225,13 +225,13 @@ codegenObject(Module &M, StringRef DeviceArch,
     void *BinOut;
     size_t BinSize;
     proteusCuErrCheck(cuLinkComplete(CULinkState, &BinOut, &BinSize));
-    FinalObjBuf = std::move(MemoryBuffer::getMemBufferCopy(
-        StringRef{static_cast<char *>(BinOut), BinSize}));
+    FinalObjBuf = MemoryBuffer::getMemBufferCopy(
+        StringRef{static_cast<char *>(BinOut), BinSize});
   } else {
     FinalObjBuf = std::move(ObjBuf);
   }
 
-  return std::move(FinalObjBuf);
+  return FinalObjBuf;
 }
 
 } // namespace proteus

@@ -82,7 +82,7 @@ void JitEngine::getRuntimeConstantValues(void **Args,
                                          const ArrayRef<int32_t> RCTypes,
                                          SmallVector<RuntimeConstant> &RCVec) {
   TIMESCOPE(__FUNCTION__);
-  for (int I = 0; I < RCIndices.size(); ++I) {
+  for (size_t I = 0; I < RCIndices.size(); ++I) {
     PROTEUS_DBG(Logger::logs("proteus") << "RC Index " << RCIndices[I]
                                         << " Type " << RCTypes[I] << " ");
     RuntimeConstant RC;

@@ -98,8 +98,7 @@ private:
 };
 
 JitEngineHost &JitEngineHost::instance() {
-  static char *args[] = {nullptr};
-  static JitEngineHost Jit(0, args);
+  static JitEngineHost Jit;
   return Jit;
 }
 
@@ -242,7 +241,7 @@ JitEngineHost::specializeIR(std::unique_ptr<Module> M,
 
   // Replace argument uses with runtime constants.
   SmallVector<int32_t> ArgPos;
-  for (int I = 0; I < Node->getNumOperands(); ++I) {
+  for (unsigned int I = 0; I < Node->getNumOperands(); ++I) {
     ConstantAsMetadata *CAM = cast<ConstantAsMetadata>(Node->getOperand(I));
     ConstantInt *ConstInt = cast<ConstantInt>(CAM->getValue());
     int ArgNo = ConstInt->getZExtValue();
@@ -356,7 +355,7 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   return JitFnPtr;
 }
 
-JitEngineHost::JitEngineHost(int Argc, char *Argv[]) {
+JitEngineHost::JitEngineHost() {
   ExitOnErr.setBanner("JIT: ");
   // Create the LLJIT instance.
   // TODO: Fix support for debugging jitted code. This appears to be

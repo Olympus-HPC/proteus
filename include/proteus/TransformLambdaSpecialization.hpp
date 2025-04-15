@@ -65,10 +65,12 @@ public:
     PROTEUS_DBG(Logger::logs("proteus")
                 << "TransformLambdaSpecialization::transform" << "\n");
     PROTEUS_DBG(Logger::logs("proteus") << "\t args" << "\n");
+#if PROTEUS_ENABLE_DEBUG
     for (auto &Arg : RCVec) {
-      PROTEUS_DBG(Logger::logs("proteus")
-                  << "{" << Arg.Value.Int64Val << ", " << Arg.Slot << " }\n");
+      Logger::logs("proteus")
+          << "{" << Arg.Value.Int64Val << ", " << Arg.Slot << " }\n";
     }
+#endif
 
     PROTEUS_DBG(Logger::logs("proteus") << "\t users" << "\n");
     for (User *User : LambdaClass->users()) {

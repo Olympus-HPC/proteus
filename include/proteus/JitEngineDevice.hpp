@@ -126,10 +126,11 @@ class JITKernelInfo {
 public:
   JITKernelInfo(void *Kernel, BinaryInfo &BinInfo, char const *Name,
                 int32_t *RCIndices, int32_t *RCTypes, int32_t NumRCs)
-      : Kernel(Kernel), BinInfo(BinInfo), Name(Name),
-        RCIndices{ArrayRef{RCIndices, static_cast<size_t>(NumRCs)}},
+      : Kernel(Kernel), Name(Name),
         RCTypes{ArrayRef{RCTypes, static_cast<size_t>(NumRCs)}},
-        ExtractedModule(std::nullopt), LambdaCalleeInfo(std::nullopt) {}
+        RCIndices{ArrayRef{RCIndices, static_cast<size_t>(NumRCs)}},
+        ExtractedModule(std::nullopt), BinInfo(BinInfo),
+        LambdaCalleeInfo(std::nullopt) {}
 
   JITKernelInfo() = default;
   void *getKernel() const {
@@ -139,20 +140,20 @@ public:
   const std::string &getName() const { return Name; }
   const auto &getRCIndices() const { return RCIndices; }
   const auto &getRCTypes() const { return RCTypes; }
-  const bool hasModule() const { return ExtractedModule.has_value(); }
+  bool hasModule() const { return ExtractedModule.has_value(); }
   Module &getModule() const { return *ExtractedModule->get(); }
   BinaryInfo &getBinaryInfo() const { return BinInfo.value(); }
   void setModule(std::unique_ptr<llvm::Module> Mod) {
     ExtractedModule = std::move(Mod);
   }
-  const bool hasStaticHash() const { return StaticHash.has_value(); }
+  bool hasStaticHash() const { return StaticHash.has_value(); }
   const HashT getStaticHash() const { return StaticHash.value(); }
   void createStaticHash(HashT ModuleHash) {
     StaticHash = hash(Name);
     StaticHash = hashCombine(StaticHash.value(), ModuleHash);
   }
 
-  const bool hasLambdaCalleeInfo() { return LambdaCalleeInfo.has_value(); }
+  bool hasLambdaCalleeInfo() { return LambdaCalleeInfo.has_value(); }
   const auto &getLambdaCalleeInfo() { return LambdaCalleeInfo.value(); }
   void setLambdaCalleeInfo(
       SmallVector<std::pair<std::string, StringRef>> &&LambdaInfo) {
@@ -204,7 +205,7 @@ public:
       KernelModule = std::move(proteus::cloneKernelFromModule(
           BinModule, getLLVMContext(), KernelInfo.getName()));
     } else {
-      KernelModule = std::move(llvm::CloneModule(BinModule));
+      KernelModule = llvm::CloneModule(BinModule);
     }
 
     internalize(*KernelModule, KernelInfo.getName());
