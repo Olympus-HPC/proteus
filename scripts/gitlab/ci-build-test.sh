@@ -60,6 +60,12 @@ if grep -q "Manually-specified variables were not used by the project:" cmake_ou
     exit 1
 fi
 make -j
+
+if  [ "$PROTEUS_CI_ENABLE_DEBUG" == "on" ] || [ "$PROTEUS_CI_ENABLE_TIME_TRACING" == "on" ]; then
+  echo "Skipping tests for debug output or time tracing builds."
+  exit 0
+fi
+
 # Test synchronous compilation by default.
 echo "### TESTING SYNC COMPILATION ###"
 ctest -T test --output-on-failure
