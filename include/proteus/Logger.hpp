@@ -20,15 +20,27 @@ public:
     return SingletonLogger.OutStream;
   }
 
+  template <typename T>
+  static void logfile(const std::string &Filename, T &&Data) {
+    std::error_code EC;
+    llvm::raw_fd_ostream Out(std::string(LogDir) + "/" +
+                                 std::to_string(getpid()) + "." + Filename,
+                             EC);
+    if (EC)
+      throw std::runtime_error("Error opening file: " + EC.message());
+    Out << Data;
+    Out.close();
+  }
+
 private:
-  const std::string LogDir = ".proteus-logs";
+  static constexpr char LogDir[] = ".proteus-logs";
   bool DirExists;
   std::error_code EC;
   llvm::raw_fd_ostream OutStream;
 
-  Logger(std::string Name)
+  Logger(const std::string &Name)
       : DirExists(std::filesystem::create_directory(LogDir)),
-        OutStream(llvm::raw_fd_ostream{LogDir + "/" + Name + "." +
+        OutStream(llvm::raw_fd_ostream{std::string(LogDir) + "/" + Name + "." +
                                            std::to_string(getpid()) + ".log",
                                        EC, llvm::sys::fs::OF_None}) {
     if (EC)

@@ -60,13 +60,8 @@ public:
   Expected<ThreadSafeModule> operator()(ThreadSafeModule TSM,
                                         MaterializationResponsibility &R) {
     TSM.withModuleDo([this](Module &M) {
-      PROTEUS_DBG(Logger::logs("proteus") << "=== Begin Before Optimization\n"
-                                          << M << "=== End Before\n");
       TIMESCOPE("Run Optimization Transform");
       JitEngineImpl.optimizeIR(M, sys::getHostCPUName());
-      PROTEUS_DBG(Logger::logs("proteus")
-                  << "=== Begin After Optimization\n"
-                  << M << "=== End After Optimization\n");
 #if PROTEUS_ENABLE_DEBUG
       if (verifyModule(M, &errs()))
         PROTEUS_FATAL_ERROR(
@@ -193,6 +188,9 @@ JitEngineHost::specializeIR(std::unique_ptr<Module> M,
   Function *F = M->getFunction(FnName);
   assert(F && "Expected non-null function!");
 
+#if PROTEUS_ENABLE_DEBUG
+  PROTEUS_DBG(Logger::logfile(FnName.str() + ".input.ll", *M));
+#endif
   // Find GlobalValue declarations that are externally defined. Resolve them
   // statically as absolute symbols in the ORC linker. Required for resolving
   // __jit_launch_kernel for a host JIT function when libproteus is compiled
@@ -264,8 +262,7 @@ JitEngineHost::specializeIR(std::unique_ptr<Module> M,
   F->setName(FnName + Suffix);
 
 #if PROTEUS_ENABLE_DEBUG
-  Logger::logs("proteus") << "=== Final Module\n"
-                          << *M << "=== End Final Module\n";
+  Logger::logfile(FnName.str() + ".final.ll", *M);
   if (verifyModule(*M, &errs()))
     PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
   else

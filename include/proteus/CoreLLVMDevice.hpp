@@ -220,9 +220,6 @@ inline void specializeIR(
   if (SpecializeDims)
     setKernelDims(M, GridDim, BlockDim);
 
-  PROTEUS_DBG(Logger::logs("proteus") << "=== JIT Module\n"
-                                      << M << "=== End of JIT Module\n");
-
   F->setName(FnName + Suffix);
 
   if (SpecializeLaunchBounds)
@@ -230,6 +227,8 @@ inline void specializeIR(
                              BlockDim.x * BlockDim.y * BlockDim.z);
 
   runCleanupPassPipeline(M);
+
+  PROTEUS_DBG(Logger::logfile(FnName.str() + ".specialized.ll", M));
 }
 
 inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
@@ -390,7 +389,7 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
   }
 
 #if PROTEUS_ENABLE_DEBUG
-  Logger::logs("proteus") << "Mini-module \n" << *KernelModule << "\n";
+  Logger::logfile(Name + ".mini.ll", *KernelModule);
   if (verifyModule(*KernelModule, &errs()))
     PROTEUS_FATAL_ERROR("Broken mini-module found, JIT compilation aborted!");
 #endif
