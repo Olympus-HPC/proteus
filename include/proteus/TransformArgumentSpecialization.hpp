@@ -29,7 +29,7 @@ public:
     auto &Ctx = M.getContext();
 
     // Replace argument uses with runtime constants.
-    for (int I = 0; I < ArgPos.size(); ++I) {
+    for (size_t I = 0; I < ArgPos.size(); ++I) {
       int ArgNo = ArgPos[I];
       Value *Arg = F.getArg(ArgNo);
       Type *ArgType = Arg->getType();

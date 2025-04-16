@@ -45,14 +45,15 @@ public:
     return It->second.FunctionPtr;
   }
 
-  void insert(HashT &HashValue, Function_t FunctionPtr, StringRef FnName,
-              ArrayRef<RuntimeConstant> RCArr) {
+  void insert(HashT &HashValue, Function_t FunctionPtr,
+              [[maybe_unused]] StringRef FnName,
+              [[maybe_unused]] ArrayRef<RuntimeConstant> RCArr) {
 #if PROTEUS_ENABLE_DEBUG
     if (CacheMap.count(HashValue))
       PROTEUS_FATAL_ERROR("JitCache collision detected");
 #endif
 
-    CacheMap[HashValue] = {FunctionPtr, /* num_execs */ 1};
+    CacheMap[HashValue] = {FunctionPtr, /* num_execs */ 1, /* num_hits */ 0};
 
 #if PROTEUS_ENABLE_DEBUG
     CacheMap[HashValue].FnName = FnName.str();

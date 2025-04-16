@@ -49,7 +49,7 @@ public:
                        int NumRuntimeConstants);
 
 private:
-  JitEngineHost(int argc, char *argv[]);
+  JitEngineHost();
   void addStaticLibrarySymbols();
   JitCache<void *> CodeCache;
 };

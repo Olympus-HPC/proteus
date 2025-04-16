@@ -156,7 +156,7 @@ public:
       DEBUG(Logger::logs("proteus-pass")
             << "Processing JIT Function " << JITFn->getName() << "\n");
       // Skip host device stubs coming from kernel annotations.
-      if (isDeviceKernelHostStub(M, *JITFn))
+      if (isDeviceKernelHostStub(*JITFn))
         continue;
 
       emitJitModuleHost(M, JFI);
@@ -227,18 +227,18 @@ private:
   }
 
   void parseAnnotations(Module &M) {
-    auto GlobalAnnotations = M.getNamedGlobal("llvm.global.annotations");
+    auto *GlobalAnnotations = M.getNamedGlobal("llvm.global.annotations");
     if (!GlobalAnnotations)
       return;
 
-    auto Array = cast<ConstantArray>(GlobalAnnotations->getOperand(0));
+    auto *Array = cast<ConstantArray>(GlobalAnnotations->getOperand(0));
     DEBUG(Logger::logs("proteus-pass")
           << "Annotation Array " << *Array << "\n");
-    for (int i = 0; i < Array->getNumOperands(); i++) {
-      auto Entry = cast<ConstantStruct>(Array->getOperand(i));
+    for (unsigned int I = 0; I < Array->getNumOperands(); I++) {
+      auto *Entry = cast<ConstantStruct>(Array->getOperand(I));
       DEBUG(Logger::logs("proteus-pass") << "Entry " << *Entry << "\n");
 
-      auto Fn = dyn_cast<Function>(Entry->getOperand(0)->stripPointerCasts());
+      auto *Fn = dyn_cast<Function>(Entry->getOperand(0)->stripPointerCasts());
 
       assert(Fn && "Expected function in entry operands");
 
@@ -265,7 +265,7 @@ private:
       DEBUG(Logger::logs("proteus-pass")
             << "JIT Function " << Fn->getName() << "\n");
 
-      auto Annotation =
+      auto *Annotation =
           cast<ConstantDataArray>(Entry->getOperand(1)->getOperand(0));
 
       DEBUG(Logger::logs("proteus-pass")
@@ -285,11 +285,11 @@ private:
         DEBUG(Logger::logs("proteus-pass")
               << "Type AnnotArgs "
               << *Entry->getOperand(4)->getOperand(0)->getType() << "\n");
-        auto AnnotArgs =
+        auto *AnnotArgs =
             cast<ConstantStruct>(Entry->getOperand(4)->getOperand(0));
 
-        for (int I = 0; I < AnnotArgs->getNumOperands(); ++I) {
-          auto *Index = cast<ConstantInt>(AnnotArgs->getOperand(I));
+        for (unsigned int J = 0; J < AnnotArgs->getNumOperands(); ++J) {
+          auto *Index = cast<ConstantInt>(AnnotArgs->getOperand(J));
           uint64_t ArgNo = Index->getValue().getZExtValue();
           if (ArgNo > Fn->arg_size())
             PROTEUS_FATAL_ERROR(
@@ -414,7 +414,7 @@ private:
     // globals included in the JIT module required for external
     // linking.
     for (auto &GVar : M.globals()) {
-      auto printGVarInfo = [](auto &GVar) {
+      [[maybe_unused]] auto PrintGVarInfo = [](auto &GVar) {
         Logger::logs("proteus-pass") << "=== GVar\n";
         Logger::logs("proteus-pass") << GVar.getName() << "\n";
         Logger::logs("proteus-pass") << "Linkage " << GVar.getLinkage() << "\n";
@@ -424,7 +424,7 @@ private:
       };
 
       if (VMap[&GVar]) {
-        DEBUG(printGVarInfo(GVar));
+        DEBUG(PrintGVarInfo(GVar));
 
         if (GVar.isConstant())
           continue;
@@ -555,7 +555,7 @@ private:
 
     SmallVector<Constant *> RCIndices;
     SmallVector<Constant *> RCTypes;
-    for (int ArgI = 0; ArgI < NumRuntimeConstants; ++ArgI) {
+    for (size_t ArgI = 0; ArgI < NumRuntimeConstants; ++ArgI) {
       int ArgNo = JFI.ConstantArgs[ArgI];
       Constant *ArgNoConstant = ConstantInt::get(Int32Ty, ArgNo);
       RCIndices.push_back(ArgNoConstant);
@@ -590,15 +590,14 @@ private:
       ArgPtrs = Builder.CreateAlloca(ArgPtrsTy);
       // Create an alloca for each argument.
       SmallVector<AllocaInst *> ArgPtrAllocas;
-      for (int ArgI = 0; ArgI < StubFn->arg_size(); ++ArgI) {
+      for (size_t ArgI = 0; ArgI < StubFn->arg_size(); ++ArgI) {
         auto *Alloca = Builder.CreateAlloca(StubFn->getArg(ArgI)->getType());
         ArgPtrAllocas.push_back(Alloca);
       }
       // Store each a pointer to the argument value to each alloca.
-      for (int ArgI = 0; ArgI < StubFn->arg_size(); ++ArgI) {
+      for (size_t ArgI = 0; ArgI < StubFn->arg_size(); ++ArgI) {
         auto *GEP = Builder.CreateInBoundsGEP(
             ArgPtrsTy, ArgPtrs, {Builder.getInt32(0), Builder.getInt32(ArgI)});
-        Value *V;
         Builder.CreateStore(StubFn->getArg(ArgI), ArgPtrAllocas[ArgI]);
         Builder.CreateStore(ArgPtrAllocas[ArgI], GEP);
       }
@@ -699,7 +698,7 @@ private:
     return Kernels;
   }
 
-  bool isDeviceKernelHostStub(Module &M, Function &Fn) {
+  bool isDeviceKernelHostStub(Function &Fn) {
     if (StubToKernelMap.contains(&Fn))
       return true;
 
@@ -1033,7 +1032,7 @@ private:
       Builder.CreateStore(Constant::getNullValue(RuntimeConstantArrayTy),
                           RuntimeConstantsTypesAlloca);
 
-      for (int ArgI = 0; ArgI < NumRuntimeConstants; ++ArgI) {
+      for (size_t ArgI = 0; ArgI < NumRuntimeConstants; ++ArgI) {
         auto *GEPIdx = Builder.CreateInBoundsGEP(
             RuntimeConstantArrayTy, RuntimeConstantsIndicesAlloca,
             {Builder.getInt32(0), Builder.getInt32(ArgI)});
@@ -1054,7 +1053,6 @@ private:
 
       FunctionCallee JitRegisterFunction = getJitRegisterFunctionFn(M);
 
-      constexpr int StubOperand = 1;
       Builder.CreateCall(
           JitRegisterFunction,
           {RegisterCB->getArgOperand(0), RegisterCB->getArgOperand(1),
@@ -1199,7 +1197,7 @@ struct ProteusJitPass : PassInfoMixin<ProteusJitPass> {
   ProteusJitPass(bool IsLTO) : IsLTO(IsLTO) {}
   bool IsLTO;
 
-  PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
+  PreservedAnalyses run(Module &M, [[maybe_unused]] ModuleAnalysisManager &AM) {
     ProteusJitPassImpl PJP{M};
 
     bool Changed = PJP.run(M, IsLTO);

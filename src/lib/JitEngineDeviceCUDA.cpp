@@ -97,8 +97,6 @@ HashT JitEngineDeviceCUDA::getModuleHash(BinaryInfo &BinInfo) {
 std::unique_ptr<Module>
 JitEngineDeviceCUDA::extractModule(BinaryInfo &BinInfo) {
   CUmodule CUMod;
-  CUdeviceptr DevPtr;
-  size_t Bytes;
 
   FatbinWrapperT *FatbinWrapper = BinInfo.getFatbinWrapper();
   if (!FatbinWrapper)

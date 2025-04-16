@@ -22,9 +22,8 @@ private:
 
 public:
   inline HashT(const stable_hash HashValue) { Value = HashValue; }
-  inline HashT(const HashT &H) { Value = H.Value; }
   inline HashT(StringRef S) { S.getAsInteger(0, Value); }
-  inline const stable_hash getValue() const { return Value; }
+  inline stable_hash getValue() const { return Value; }
   inline std::string toString() const { return std::to_string(Value); }
   inline bool operator==(const HashT &Other) const {
     return Value == Other.Value;
