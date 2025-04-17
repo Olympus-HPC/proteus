@@ -232,7 +232,8 @@ inline void specializeIR(
 }
 
 inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
-                                                     const std::string &Name) {
+                                                     const std::string &Name,
+                                                     CallGraph &CG) {
   auto KernelModule = std::make_unique<Module>("JitModule", C);
   KernelModule->setSourceFileName(M.getSourceFileName());
   KernelModule->setDataLayout(M.getDataLayout());
@@ -252,8 +253,6 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
   SmallVector<Function *, 8> ToVisit;
   ReachableFunctions.insert(KernelFunction);
   ToVisit.push_back(KernelFunction);
-  CallGraphWrapperPass CG;
-  CG.runOnModule(M);
   while (!ToVisit.empty()) {
     Function *VisitF = ToVisit.pop_back_val();
     CallGraphNode *CGNode = CG[VisitF];
