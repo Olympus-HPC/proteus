@@ -6,7 +6,7 @@ through environment variables.
 | Environment Variable             | Possible Values     | Description                                                               |
 | -------------------------------- | ------------------- | ------------------------------------------------------------------------- |
 | `PROTEUS_USE_STORED_CACHE`       | 0 or 1 (default: 1) | Enable the persistent storage cache                                       |
-| `PROTEUS_SET_LAUNCH_BOUNDS`      | 0 or 1 (default: 1) | Set or not launch bouds on JIT kernels                                    |
+| `PROTEUS_SPECIALIZE_LAUNCH_BOUNDS`      | 0 or 1 (default: 1) | Set or not launch bouds on JIT kernels                                    |
 | `PROTEUS_SPECIALIZE_ARGS`        | 0 or 1 (default: 1) | Specialize JIT functions for input arguments                              |
 | `PROTEUS_SPECIALIZE_DIMS`        | 0 or 1 (default: 1) | Specialize JIT kernels for launch dimensions                              |
 | `PROTEUS_USE_HIP_RTC_CODEGEN`    | 0 or 1 (default: 1) | Use HIP RTC for machine code generation (instead of our own) 
