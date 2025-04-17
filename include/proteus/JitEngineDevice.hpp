@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <functional>
 #include <llvm/ADT/SmallPtrSet.h>
+#include <llvm/Analysis/CallGraph.h>
 #include <memory>
 #include <optional>
 #include <string>
@@ -80,12 +81,14 @@ private:
   SmallVector<std::string> LinkedModuleIds;
   std::unique_ptr<Module> ExtractedModule;
   std::optional<HashT> ExtractedModuleHash;
+  std::optional<CallGraph> ModuleCallGraph;
 
 public:
   BinaryInfo() = default;
   BinaryInfo(FatbinWrapperT *FatbinWrapper,
              SmallVector<std::string> &&LinkedModuleIds)
-      : FatbinWrapper(FatbinWrapper), LinkedModuleIds(LinkedModuleIds) {}
+      : FatbinWrapper(FatbinWrapper), LinkedModuleIds(LinkedModuleIds),
+        ModuleCallGraph(std::nullopt) {}
 
   FatbinWrapperT *getFatbinWrapper() const { return FatbinWrapper; }
 
@@ -103,6 +106,13 @@ public:
       ExtractedModuleHash = hashCombine(ExtractedModuleHash.value(), HashValue);
     else
       ExtractedModuleHash = HashValue;
+  }
+
+  CallGraph &getCallGraph() {
+    if (!ModuleCallGraph.has_value()) {
+      ModuleCallGraph.emplace(CallGraph(*ExtractedModule));
+    }
+    return ModuleCallGraph.value();
   }
 
   void addModuleId(const char *ModuleId) {
@@ -203,7 +213,8 @@ public:
 
     if (Config.PROTEUS_USE_LIGHTWEIGHT_KERNEL_CLONE) {
       KernelModule = std::move(proteus::cloneKernelFromModule(
-          BinModule, getLLVMContext(), KernelInfo.getName()));
+          BinModule, getLLVMContext(), KernelInfo.getName(),
+          BinInfo.getCallGraph()));
     } else {
       KernelModule = llvm::CloneModule(BinModule);
     }
@@ -570,7 +581,7 @@ void JitEngineDevice<ImplT>::registerFatBinary(void *Handle,
   if (FatbinWrapper->PrelinkedFatbins) {
     // This is RDC compilation, just insert the FatbinWrapper and ignore the
     // ModuleId coming from the link.stub.
-    HandleToBinaryInfo[Handle] = {FatbinWrapper, {}};
+    HandleToBinaryInfo.emplace(Handle, BinaryInfo{FatbinWrapper, {}});
 
     // Initialize GlobalLinkedBinaries with prelinked fatbins.
     void *Ptr = FatbinWrapper->PrelinkedFatbins[0];
@@ -584,7 +595,7 @@ void JitEngineDevice<ImplT>::registerFatBinary(void *Handle,
     // This is non-RDC compilation, associate the ModuleId of the JIT bitcode in
     // the module with the FatbinWrapper.
     ModuleIdToFatBinary[ModuleId] = FatbinWrapper;
-    HandleToBinaryInfo[Handle] = {FatbinWrapper, {ModuleId}};
+    HandleToBinaryInfo.emplace(Handle, BinaryInfo{FatbinWrapper, {ModuleId}});
   }
 }
 
