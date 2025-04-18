@@ -128,7 +128,7 @@ void JitEngine::getRuntimeConstantValues(void **Args,
                   << "\n");
       break;
     case RuntimeConstantTypes::PTR:
-      RC.Value.PtrVal = (void *)Args[RCIndices[I]];
+      RC.Value.PtrVal = (void *)*(intptr_t *)Args[RCIndices[I]];
       PROTEUS_DBG(Logger::logs("proteus")
                   << "Value " << RC.Value.PtrVal << "\n");
       break;

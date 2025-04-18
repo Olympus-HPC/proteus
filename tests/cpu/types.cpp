@@ -29,6 +29,8 @@ int main(int argc, char **argv) {
   test(true);
   test('a');
   test((unsigned char)'a');
+  int *Ptr = (int *)0x123;
+  test(Ptr);
 
   proteus::finalize();
   return 0;
@@ -46,7 +48,8 @@ int main(int argc, char **argv) {
 // CHECK: Arg 1
 // CHECK: Arg a
 // CHECK: Arg a
-// CHECK: JitCache hits 0 total 12
+// CHECK: Arg 0x123
+// CHECK: JitCache hits 0 total 13
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
