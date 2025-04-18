@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
 // CHECK: Arg a
 // CHECK: Arg a
 // CHECK: Arg 0x123
-// CHECK: JitCache hits 0 total 12
+// CHECK: JitCache hits 0 total 13
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
