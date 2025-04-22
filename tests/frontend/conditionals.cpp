@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
   F.endFunction();
   J.print();
 
-  double (*Func)() = (double (*)())J.compile();
+  auto *Func = (double (*)())J.compile();
   double Ret = Func();
   std::cout << "Ret " << Ret << "\n";
 
