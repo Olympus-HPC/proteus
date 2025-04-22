@@ -1,10 +1,5 @@
-function(CREATE_CPU_TEST exe check_source)
+function(CREATE_FRONTEND_TEST exe check_source)
     add_executable(${exe} ${check_source} ${ARGN})
-
-    set_source_files_properties(${check_source} PROPERTIES
-        OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/src/pass/ProteusPass.cpp
-    )
-    add_dependencies(${exe} ProteusPass)
 
     target_link_libraries(${exe} PUBLIC proteus)
 
@@ -17,11 +12,11 @@ function(CREATE_CPU_TEST exe check_source)
     target_compile_options(
         ${exe}
         PUBLIC
-        -fpass-plugin=$<TARGET_FILE:ProteusPass>
         ${NATIVE_OPT_FLAGS}
     )
 
     add_test(NAME ${exe} COMMAND ${LIT} -vv ${check_source})
+    set_property(TEST ${exe} PROPERTY LABELS "frontend")
 endfunction()
 
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/lit.cfg.py "
@@ -38,6 +33,6 @@ config.test_exec_root = '${CMAKE_CURRENT_BINARY_DIR}'
 "
 )
 
-CREATE_CPU_TEST(daxpy daxpy.cpp)
-CREATE_CPU_TEST(types types.cpp)
-CREATE_CPU_TEST(lambda lambda.cpp)
+CREATE_FRONTEND_TEST(assignments assignments.cpp)
+CREATE_FRONTEND_TEST(conditionals conditionals.cpp)
+CREATE_FRONTEND_TEST(loops loops.cpp)

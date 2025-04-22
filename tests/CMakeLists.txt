@@ -33,3 +33,5 @@ add_subdirectory(cpu)
 if(PROTEUS_ENABLE_HIP OR PROTEUS_ENABLE_CUDA)
     add_subdirectory(gpu)
 endif()
+
+add_subdirectory(frontend)

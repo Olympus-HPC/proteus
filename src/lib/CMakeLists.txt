@@ -11,43 +11,13 @@ set(SOURCES
 
 set(PROTEUS_PROJECT_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
 
-set(HEADERS
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Logger.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilationTask.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilerAsync.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilerInterfaceTypes.h
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilerSync.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreDevice.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreLLVM.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreLLVMDevice.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Debug.h
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Error.h
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Hashing.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitCache.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngine.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngineHost.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitFrontend.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitInterface.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitStorageCache.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/LambdaRegistry.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/TimeTracing.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/TransformArgumentSpecialization.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/TransformLambdaSpecialization.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Utils.h)
+
 
 if(PROTEUS_ENABLE_CUDA)
 list(APPEND SOURCES
   CompilerInterfaceDevice.cpp
   JitEngineDeviceCUDA.cpp
 )
-
-list(APPEND HEADERS
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilerInterfaceDevice.h
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreDeviceCUDA.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreLLVMCUDA.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngineDevice.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngineDeviceCUDA.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/UtilsCUDA.h)
 endif()
 
 if(PROTEUS_ENABLE_HIP)
@@ -55,14 +25,6 @@ list(APPEND SOURCES
   CompilerInterfaceDevice.cpp
   JitEngineDeviceHIP.cpp
 )
-
-list(APPEND HEADERS
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilerInterfaceDevice.h
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreDeviceHIP.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreLLVMHIP.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngineDevice.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/JitEngineDeviceHIP.hpp
-  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/UtilsHIP.h)
 endif()
 
 if(BUILD_SHARED)
@@ -153,7 +115,7 @@ if(PROTEUS_ENABLE_CUDA)
     ${CUDAToolkit_LIBRARY_DIR}/libnvptxcompiler_static.a)
 endif()
 
-target_link_libraries(proteus PRIVATE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+#target_link_libraries(proteus PRIVATE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 target_link_libraries(proteusCore INTERFACE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 
 set_target_properties(proteus PROPERTIES
@@ -168,6 +130,8 @@ install(
   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 
-install(FILES
-  ${HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/proteus"
+# Install headers preserving directory structure
+install(DIRECTORY ${PROTEUS_PROJECT_INCLUDE_DIR}/
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+  FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
 )
