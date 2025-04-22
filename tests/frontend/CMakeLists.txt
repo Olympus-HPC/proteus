@@ -36,3 +36,4 @@ config.test_exec_root = '${CMAKE_CURRENT_BINARY_DIR}'
 CREATE_FRONTEND_TEST(assignments assignments.cpp)
 CREATE_FRONTEND_TEST(conditionals conditionals.cpp)
 CREATE_FRONTEND_TEST(loops loops.cpp)
+CREATE_FRONTEND_TEST(external_call external_call.cpp)

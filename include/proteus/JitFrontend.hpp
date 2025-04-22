@@ -54,6 +54,15 @@ public:
   void print() { Mod->print(outs(), nullptr); }
 };
 
+template <typename RetT, typename... ArgT> void Func::call(StringRef Name) {
+  auto *F = getFunction();
+  Module &M = *F->getParent();
+  LLVMContext &Ctx = F->getContext();
+  FunctionCallee Callee = M.getOrInsertFunction(Name, TypeMap<RetT>::get(Ctx),
+                                                TypeMap<ArgT>::get(Ctx)...);
+  auto *Call = IRB.CreateCall(Callee);
+}
+
 } // namespace proteus
 
 #endif

@@ -77,6 +77,8 @@ public:
   void beginLoop(Var &IterVar, Var &InitVar, Var &UpperBound, Var &IncVar);
   void endLoop();
 
+  template <typename RetT, typename... ArgT> void call(StringRef Name);
+
   void ret(std::optional<std::reference_wrapper<Var>> OptRet = std::nullopt);
 };
 
