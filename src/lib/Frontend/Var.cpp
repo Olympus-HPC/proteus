@@ -2,9 +2,6 @@
 
 namespace proteus {
 
-template <typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
-struct IntegerType {};
-
 Var::Var(AllocaInst *Alloca, Func &Fn, Type *PointerElemType)
     : Alloca(Alloca), Fn(Fn), PointerElemType(PointerElemType) {}
 
