@@ -297,13 +297,10 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 
   StringRef StrIR(IR, IRSize);
   auto Ctx = std::make_unique<LLVMContext>();
-
-  auto ExpectedM =
-      getLazyBitcodeModule(MemoryBufferRef(StrIR, "JitModule"), *Ctx, true);
-  if (ExpectedM.takeError()) {
-    PROTEUS_FATAL_ERROR("Parse IR failed");
-  }
-  auto M = std::move(*ExpectedM);
+  SMDiagnostic Diag;
+  auto M = parseIR(MemoryBufferRef(StrIR, "JitModule"), Diag, *Ctx);
+  if (!M)
+    PROTEUS_FATAL_ERROR("Error parsing IR: " + Diag.getMessage());
 
   SmallVector<RuntimeConstant> RCVec;
   SmallVector<RuntimeConstant> LambdaJitValuesVec;
