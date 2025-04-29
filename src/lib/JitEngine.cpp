@@ -28,8 +28,8 @@ using namespace llvm;
 JitEngine::JitEngine() {
   Config.PROTEUS_USE_STORED_CACHE =
       getEnvOrDefaultBool("PROTEUS_USE_STORED_CACHE", true);
-  Config.PROTEUS_SET_LAUNCH_BOUNDS =
-      getEnvOrDefaultBool("PROTEUS_SET_LAUNCH_BOUNDS", true);
+  Config.PROTEUS_SPECIALIZE_LAUNCH_BOUNDS =
+      getEnvOrDefaultBool("PROTEUS_SPECIALIZE_LAUNCH_BOUNDS", true);
   Config.PROTEUS_SPECIALIZE_ARGS =
       getEnvOrDefaultBool("PROTEUS_SPECIALIZE_ARGS", true);
   Config.PROTEUS_SPECIALIZE_DIMS =
@@ -52,8 +52,8 @@ JitEngine::JitEngine() {
 #if PROTEUS_ENABLE_DEBUG
   Logger::logs("proteus") << "PROTEUS_USE_STORED_CACHE "
                           << Config.PROTEUS_USE_STORED_CACHE << "\n";
-  Logger::logs("proteus") << "PROTEUS_SET_LAUNCH_BOUNDS "
-                          << Config.PROTEUS_SET_LAUNCH_BOUNDS << "\n";
+  Logger::logs("proteus") << "PROTEUS_SPECIALIZE_LAUNCH_BOUNDS "
+                          << Config.PROTEUS_SPECIALIZE_LAUNCH_BOUNDS << "\n";
   Logger::logs("proteus") << "PROTEUS_SPECIALIZE_ARGS "
                           << Config.PROTEUS_SPECIALIZE_ARGS << "\n";
   Logger::logs("proteus") << "PROTEUS_SPECIALIZE_DIMS "
