@@ -15,6 +15,8 @@
 
 #include <chrono>
 
+#include "proteus/Config.hpp"
+
 namespace proteus {
 
 using namespace llvm;
@@ -35,7 +37,10 @@ class Timer {
   using Clock = std::chrono::steady_clock;
 
 public:
-  Timer() { Start = Clock::now(); }
+  Timer() {
+    if (Config::get().ProteusEnableTimers)
+      Start = Clock::now();
+  }
 
   uint64_t elapsed() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() -
@@ -48,6 +53,10 @@ public:
 private:
   Clock::time_point Start;
 };
+
+#define PROTEUS_TIMER_OUTPUT(x)                                                \
+  if (Config::get().ProteusEnableTimers)                                       \
+    x;
 
 #if PROTEUS_ENABLE_TIME_TRACING
 #define TIMESCOPE(x) TimeTraceScope TTS(x);

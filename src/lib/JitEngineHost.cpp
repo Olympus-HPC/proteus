@@ -304,8 +304,8 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   if (!M)
     PROTEUS_FATAL_ERROR("Error parsing IR: " + Diag.getMessage());
 
-  PROTEUS_DBG(Logger::outs("proteus")
-              << "Parse IR " << FnName << " " << T.elapsed() << " ms\n");
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus") << "Parse IR " << FnName << " "
+                                               << T.elapsed() << " ms\n");
 
   SmallVector<RuntimeConstant> RCVec;
   SmallVector<RuntimeConstant> LambdaJitValuesVec;

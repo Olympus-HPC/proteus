@@ -211,7 +211,7 @@ public:
     auto &BinModule = BinInfo.getModule();
     std::unique_ptr<Module> KernelModule{nullptr};
 
-    if (Config.PROTEUS_USE_LIGHTWEIGHT_KERNEL_CLONE) {
+    if (Config::get().ProteusUseLightweightKernelClone) {
       KernelModule = std::move(proteus::cloneKernelFromModule(
           BinModule, getLLVMContext(), KernelInfo.getName(),
           BinInfo.getCallGraph()));
@@ -310,8 +310,9 @@ public:
   }
 
   void finalize() {
-    if (Config.PROTEUS_ASYNC_COMPILATION)
-      CompilerAsync::instance(Config.PROTEUS_ASYNC_THREADS).joinAllThreads();
+    if (Config::get().ProteusAsyncCompilation)
+      CompilerAsync::instance(Config::get().ProteusAsyncThreads)
+          .joinAllThreads();
   }
 
 private:
@@ -365,11 +366,6 @@ private:
 
   void internalize(Module &M, StringRef KernelName);
 
-  void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
-                    dim3 &BlockDim, dim3 &GridDim,
-                    const SmallVector<int32_t> &RCIndices,
-                    const SmallVector<RuntimeConstant> &RCVec);
-
   void replaceGlobalVariablesWithPointers(Module &M);
 
 protected:
@@ -392,28 +388,6 @@ protected:
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
 };
-
-template <typename ImplT>
-void JitEngineDevice<ImplT>::specializeIR(
-    Module &M, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
-    dim3 &GridDim, const SmallVector<int32_t> &RCIndices,
-    const SmallVector<RuntimeConstant> &RCVec) {
-  TIMESCOPE("specializeIR");
-
-  proteus::specializeIR(M, FnName, Suffix, BlockDim, GridDim, RCIndices, RCVec,
-                        Config.PROTEUS_SPECIALIZE_ARGS,
-                        Config.PROTEUS_SPECIALIZE_DIMS,
-                        Config.PROTEUS_SPECIALIZE_LAUNCH_BOUNDS);
-
-#if PROTEUS_ENABLE_DEBUG
-  Logger::logs("proteus") << "=== Final Module\n"
-                          << M << "=== End Final Module\n";
-  if (verifyModule(M, &errs()))
-    PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
-  else
-    Logger::logs("proteus") << "Module verified!\n";
-#endif
-}
 
 template <typename ImplT> void JitEngineDevice<ImplT>::pruneIR(Module &M) {
   TIMESCOPE("pruneIR");
@@ -483,7 +457,7 @@ JitEngineDevice<ImplT>::compileAndRun(
   std::string Suffix = mangleSuffix(HashValue);
   std::string KernelMangled = (KernelInfo.getName() + Suffix);
 
-  if (Config.PROTEUS_USE_STORED_CACHE) {
+  if (Config::get().ProteusUseStoredCache) {
     // If there device global variables, lookup the IR and codegen object
     // before launching. Else, if there aren't device global variables, lookup
     // the object and launch.
@@ -495,7 +469,7 @@ JitEngineDevice<ImplT>::compileAndRun(
     // TODO: Can we use RTC interfaces for fast linking on object files?
     auto CacheBuf = StorageCache.lookup(HashValue);
     if (CacheBuf) {
-      if (!Config.PROTEUS_RELINK_GLOBALS_BY_COPY)
+      if (!Config::get().ProteusRelinkGlobalsByCopy)
         relinkGlobalsObject(CacheBuf->getMemBufferRef());
 
       auto KernelFunc =
@@ -511,8 +485,8 @@ JitEngineDevice<ImplT>::compileAndRun(
   Module &KernelModule = getModule(KernelInfo);
   std::unique_ptr<MemoryBuffer> ObjBuf = nullptr;
 
-  if (Config.PROTEUS_ASYNC_COMPILATION) {
-    auto &Compiler = CompilerAsync::instance(Config.PROTEUS_ASYNC_THREADS);
+  if (Config::get().ProteusAsyncCompilation) {
+    auto &Compiler = CompilerAsync::instance(Config::get().ProteusAsyncThreads);
     // If there is no compilation pending for the specialization, post the
     // compilation task to the compiler.
     if (!Compiler.isCompilationPending(HashValue)) {
@@ -524,19 +498,20 @@ JitEngineDevice<ImplT>::compileAndRun(
           GridDim, KernelInfo.getRCIndices(), RCVec,
           KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr,
           GlobalLinkedBinaries, DeviceArch,
-          /* UseRTC */ Config.PROTEUS_USE_HIP_RTC_CODEGEN,
-          /* DumpIR */ Config.PROTEUS_DUMP_LLVM_IR,
-          /* RelinkGlobalsByCopy */ Config.PROTEUS_RELINK_GLOBALS_BY_COPY,
-          /*SpecializeArgs=*/Config.PROTEUS_SPECIALIZE_ARGS,
-          /*SpecializeDims=*/Config.PROTEUS_SPECIALIZE_DIMS,
-          /*SpecializeLaunchBounds=*/Config.PROTEUS_SPECIALIZE_LAUNCH_BOUNDS});
+          /* UseRTC */ Config::get().ProteusUseHIPRTCCodegen,
+          /* DumpIR */ Config::get().ProteusDumpLLVMIR,
+          /* RelinkGlobalsByCopy */ Config::get().ProteusRelinkGlobalsByCopy,
+          /*SpecializeArgs=*/Config::get().ProteusSpecializeArgs,
+          /*SpecializeDims=*/Config::get().ProteusSpecializeDims,
+          /*SpecializeLaunchBounds=*/
+          Config::get().ProteusSpecializeLaunchBounds});
     }
 
     // Compilation is pending, try to get the compilation result buffer. If
     // buffer is null, compilation is not done, so execute the AOT version
     // directly.
-    ObjBuf = Compiler.takeCompilationResult(HashValue,
-                                            Config.PROTEUS_ASYNC_TEST_BLOCKING);
+    ObjBuf = Compiler.takeCompilationResult(
+        HashValue, Config::get().ProteusAsyncTestBlocking);
     if (!ObjBuf) {
       return launchKernelDirect(KernelInfo.getKernel(), GridDim, BlockDim,
                                 KernelArgs, ShmemSize, Stream);
@@ -548,20 +523,21 @@ JitEngineDevice<ImplT>::compileAndRun(
         GridDim, KernelInfo.getRCIndices(), RCVec,
         KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr, GlobalLinkedBinaries,
         DeviceArch,
-        /* UseRTC */ Config.PROTEUS_USE_HIP_RTC_CODEGEN,
-        /* DumpIR */ Config.PROTEUS_DUMP_LLVM_IR,
-        /* RelinkGlobalsByCopy */ Config.PROTEUS_RELINK_GLOBALS_BY_COPY,
-        /*SpecializeArgs=*/Config.PROTEUS_SPECIALIZE_ARGS,
-        /*SpecializeDims=*/Config.PROTEUS_SPECIALIZE_DIMS,
-        /*SpecializeLaunchBounds=*/Config.PROTEUS_SPECIALIZE_LAUNCH_BOUNDS});
+        /* UseRTC */ Config::get().ProteusUseHIPRTCCodegen,
+        /* DumpIR */ Config::get().ProteusDumpLLVMIR,
+        /* RelinkGlobalsByCopy */ Config::get().ProteusRelinkGlobalsByCopy,
+        /*SpecializeArgs=*/Config::get().ProteusSpecializeArgs,
+        /*SpecializeDims=*/Config::get().ProteusSpecializeDims,
+        /*SpecializeLaunchBounds=*/
+        Config::get().ProteusSpecializeLaunchBounds});
   }
 
   KernelFunc = proteus::getKernelFunctionFromImage(
       KernelMangled, ObjBuf->getBufferStart(),
-      Config.PROTEUS_RELINK_GLOBALS_BY_COPY, VarNameToDevPtr);
+      Config::get().ProteusRelinkGlobalsByCopy, VarNameToDevPtr);
 
   CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName(), RCVec);
-  if (Config.PROTEUS_USE_STORED_CACHE) {
+  if (Config::get().ProteusUseStoredCache) {
     StorageCache.store(HashValue, ObjBuf->getMemBufferRef());
   }
 
@@ -683,8 +659,8 @@ std::unique_ptr<Module> JitEngineDevice<ImplT>::linkJitModule(
       PROTEUS_FATAL_ERROR("Linking failed");
   }
 
-  PROTEUS_DBG(Logger::outs("proteus")
-              << "linkJitModule " << T.elapsed() << " ms\n");
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                       << "linkJitModule " << T.elapsed() << " ms\n");
 
   return LinkedModule;
 }

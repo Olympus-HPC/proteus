@@ -151,9 +151,9 @@ inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
                        unsigned CodegenOptLevel) {
   Timer T;
   detail::runOptimizationPassPipeline(M, Arch, OptLevel, CodegenOptLevel);
-  PROTEUS_DBG(Logger::outs("proteus")
-              << "optimizeIR optlevel " << OptLevel << " codegenopt "
-              << CodegenOptLevel << " " << T.elapsed() << " ms\n");
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                       << "optimizeIR optlevel " << OptLevel << " codegenopt "
+                       << CodegenOptLevel << " " << T.elapsed() << " ms\n");
 }
 
 inline std::unique_ptr<Module>

@@ -20,6 +20,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/Target/TargetMachine.h>
 
+#include "proteus/Config.hpp"
 #include "proteus/CoreLLVM.hpp"
 #include "proteus/Debug.h"
 #include "proteus/Hashing.hpp"
@@ -29,29 +30,17 @@ namespace proteus {
 
 using namespace llvm;
 
-inline bool getEnvOrDefaultBool(const char *VarName, bool Default) {
-
-  const char *EnvValue = std::getenv(VarName);
-  return EnvValue ? static_cast<bool>(std::stoi(EnvValue)) : Default;
-}
-
-inline int getEnvOrDefaultInt(const char *VarName, int Default) {
-
-  const char *EnvValue = std::getenv(VarName);
-  return EnvValue ? std::stoi(EnvValue) : Default;
-}
-
 class JitEngine {
 public:
   InitLLVMTargets Init;
   void optimizeIR(Module &M, StringRef Arch, char OptLevel = '3',
                   unsigned CodegenOptLevel = 3);
 
-  bool isProteusDisabled() { return Config.PROTEUS_DISABLE; }
+  bool isProteusDisabled() { return Config::get().ProteusDisable; }
 
-  void enable() { Config.PROTEUS_DISABLE = false; }
+  void enable() { Config::get().ProteusDisable = false; }
 
-  void disable() { Config.PROTEUS_DISABLE = true; }
+  void disable() { Config::get().ProteusDisable = true; }
 
 protected:
   void getRuntimeConstantValues(void **KernelArgs,

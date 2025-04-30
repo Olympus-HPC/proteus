@@ -177,8 +177,8 @@ codegenObject(Module &M, StringRef DeviceArch,
     proteusHiprtcErrCheck(
         hiprtcLinkComplete(HipLinkStatePtr, (void **)&BinOut, &BinSize));
 
-    PROTEUS_DBG(Logger::outs("proteus")
-                    << "HIP RTC codegen " << T.elapsed() << " ms\n";)
+    PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                         << "HIP RTC codegen " << T.elapsed() << " ms\n");
 
     return MemoryBuffer::getMemBuffer(StringRef{BinOut, BinSize});
   }
@@ -203,8 +203,8 @@ codegenObject(Module &M, StringRef DeviceArch,
 
   PM.run(M);
 
-  PROTEUS_DBG(Logger::outs("proteus")
-              << "codegen object " << T.elapsed() << " ms\n");
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                       << "Codegen object " << T.elapsed() << " ms\n");
 
   T.reset();
   SmallString<64> TempDir;
@@ -248,8 +248,8 @@ codegenObject(Module &M, StringRef DeviceArch,
   sys::fs::remove(ObjectPath);
   sys::fs::remove(SharedObjectPath);
 
-  PROTEUS_DBG(Logger::outs("proteus")
-              << "codegen linking " << T.elapsed() << " ms\n");
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                       << "Codegen linking " << T.elapsed() << " ms\n");
 
   return std::move(*Buffer);
 #else

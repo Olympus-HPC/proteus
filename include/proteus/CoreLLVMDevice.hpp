@@ -229,8 +229,8 @@ inline void specializeIR(
 
   runCleanupPassPipeline(M);
 
-  PROTEUS_DBG(Logger::outs("proteus")
-              << "specializeIR " << T.elapsed() << " ms\n");
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                       << "specializeIR " << T.elapsed() << " ms\n");
   PROTEUS_DBG(Logger::logfile(FnName.str() + ".specialized.ll", M));
 }
 

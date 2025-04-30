@@ -147,8 +147,8 @@ inline void codegenPTX(Module &M, StringRef DeviceArch,
 
   PM.run(M);
 
-  PROTEUS_DBG(Logger::outs("proteus")
-              << "codegen ptx " << T.elapsed() << " ms\n");
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                       << "Codegen ptx " << T.elapsed() << " ms\n");
 }
 
 inline std::unique_ptr<MemoryBuffer>
@@ -239,8 +239,8 @@ codegenObject(Module &M, StringRef DeviceArch,
     FinalObjBuf = std::move(ObjBuf);
   }
 
-  PROTEUS_DBG(Logger::outs("proteus")
-              << "codegen CUDA RTC " << T.elapsed() << " ms\n");
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                       << "Codegen CUDA RTC " << T.elapsed() << " ms\n");
   return FinalObjBuf;
 }
 
