@@ -5,8 +5,6 @@ target_include_directories(ProteusPass
   ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-message(STATUS "${LLVM_INCLUDE_DIRS}/Polly")
-
 target_include_directories(ProteusPass
   SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS}/polly)
 

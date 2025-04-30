@@ -529,7 +529,8 @@ JitEngineDevice<ImplT>::compileAndRun(
           /* RelinkGlobalsByCopy */ Config.PROTEUS_RELINK_GLOBALS_BY_COPY,
           /*SpecializeArgs=*/Config.PROTEUS_SPECIALIZE_ARGS,
           /*SpecializeDims=*/Config.PROTEUS_SPECIALIZE_DIMS,
-          /*SpecializeLaunchBounds=*/Config.PROTEUS_SPECIALIZE_LAUNCH_BOUNDS});
+          /*SpecializeLaunchBounds=*/Config.PROTEUS_SPECIALIZE_LAUNCH_BOUNDS,
+          Config.PROTEUS_USE_POLLY});
     }
 
     // Compilation is pending, try to get the compilation result buffer. If
@@ -553,7 +554,8 @@ JitEngineDevice<ImplT>::compileAndRun(
         /* RelinkGlobalsByCopy */ Config.PROTEUS_RELINK_GLOBALS_BY_COPY,
         /*SpecializeArgs=*/Config.PROTEUS_SPECIALIZE_ARGS,
         /*SpecializeDims=*/Config.PROTEUS_SPECIALIZE_DIMS,
-        /*SpecializeLaunchBounds=*/Config.PROTEUS_SPECIALIZE_LAUNCH_BOUNDS});
+        /*SpecializeLaunchBounds=*/Config.PROTEUS_SPECIALIZE_LAUNCH_BOUNDS,
+        Config.PROTEUS_USE_POLLY});
   }
 
   KernelFunc = proteus::getKernelFunctionFromImage(

@@ -44,8 +44,6 @@ include(cmake/ProteusFunctions.cmake)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
-find_package(Polly)
-
 add_subdirectory(src)
 find_package(Polly)
 

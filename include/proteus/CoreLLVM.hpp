@@ -36,9 +36,32 @@ static_assert(__cplusplus >= 201703L,
 #include <llvm/Transforms/IPO/StripDeadPrototypes.h>
 #include <llvm/Transforms/IPO/StripSymbols.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
-#include "polly/RegisterPasses.h"
+//#include "polly/RegisterPasses.h"
 #include "polly/ScopInfo.h"
+#include "polly/ScopPass.h"
+#include "polly/DependenceInfo.h"
 #include "polly/LinkAllPasses.h"
+#include "polly/RegisterPasses.h"
+#include "polly/Canonicalization.h"
+#include "polly/CodeGen/CodeGeneration.h"
+#include "polly/CodeGen/IslAst.h"
+#include "polly/CodePreparation.h"
+#include "polly/DeLICM.h"
+#include "polly/DeadCodeElimination.h"
+#include "polly/DependenceInfo.h"
+#include "polly/ForwardOpTree.h"
+#include "polly/JSONExporter.h"
+#include "polly/LinkAllPasses.h"
+#include "polly/MaximalStaticExpansion.h"
+#include "polly/PolyhedralInfo.h"
+#include "polly/PruneUnprofitable.h"
+#include "polly/ScheduleOptimizer.h"
+#include "polly/ScopDetection.h"
+#include "polly/ScopGraphPrinter.h"
+#include "polly/ScopInfo.h"
+#include "polly/Simplify.h"
+#include "polly/Support/DumpFunctionPass.h"
+#include "polly/Support/DumpModulePass.h"
 
 #include "proteus/Error.h"
 
@@ -111,21 +134,41 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
   if (auto Err = TM.takeError())
     report_fatal_error(std::move(Err));
   TargetLibraryInfoImpl TLII(Triple(M.getTargetTriple()));
-
+using namespace polly;
   PassBuilder PB(TM->get(), PTO, PGOOpt, nullptr);
+  ScopPassManager SPM;
   LoopAnalysisManager LAM;
   FunctionAnalysisManager FAM;
   CGSCCAnalysisManager CGAM;
+  FunctionPassManager PM;
   ModuleAnalysisManager MAM;
-  llvm::FunctionPassManager FPM;
+
   if (UsePolly) {
     //polly::initializePolly(PB);
     polly::registerPollyPasses(PB);
+    PM.addPass(CodePreparationPass());
+
+    PM.addPass(ScopViewer());
+    PM.addPass(ScopOnlyViewer());
+    PM.addPass(ScopPrinter());
+    PM.addPass(ScopOnlyPrinter());
+    SPM.addPass(SimplifyPass(0));
+    SPM.addPass(ForwardOpTreePass());
+    SPM.addPass(DeLICMPass());
+    SPM.addPass(SimplifyPass(1));
+    SPM.addPass(DeadCodeElimPass());
+    SPM.addPass(MaximalStaticExpansionPass());
+    SPM.addPass(IslScheduleOptimizerPass());
+    SPM.addPass(CodeGenerationPass());
+    
+    PM.addPass(createFunctionToScopPassAdaptor(std::move(SPM)));
+    PM.addPass(PB.buildFunctionSimplificationPipeline(
+      OptimizationLevel::O3, llvm::ThinOrFullLTOPhase::None)); // Cleanup
   }
   //FPM.addPass(polly::createScopInfoRegionPassPass());
 
   // Add Custom Scop Printer Pass
-  FPM.addPass(ScopPrinterPass());
+  //FPM.addPass(ScopPrinterPass());
 
   FAM.registerPass([&] { return TargetLibraryAnalysis(TLII); });
 
@@ -160,13 +203,13 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
   };
 
   ModulePassManager Passes = PB.buildPerModuleDefaultPipeline(OptSetting);
-  PB.populateModulePassManager
+
   llvm::DebugFlag = true;
   llvm::outs() << "test\n";
   if (UsePolly) {
     llvm::outs() << "polly\n";
   }
-  Passes.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
+  Passes.addPass(createModuleToFunctionPassAdaptor(std::move(PM)));
   Passes.printPipeline(llvm::outs(), [&](llvm::StringRef) {return llvm::StringRef{}; });
   Passes.run(M, MAM);
 }

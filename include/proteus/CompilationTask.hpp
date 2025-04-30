@@ -34,6 +34,7 @@ private:
   bool SpecializeArgs;
   bool SpecializeDims;
   bool SpecializeLaunchBounds;
+  bool UsePolly;
 
   std::unique_ptr<Module> cloneKernelModule(LLVMContext &Ctx) {
     SmallVector<char, 4096> ModuleStr;
@@ -60,7 +61,8 @@ public:
       const SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
       const std::string &DeviceArch, bool UseRTC, bool DumpIR,
       bool RelinkGlobalsByCopy, bool SpecializeArgs, bool SpecializeDims,
-      bool SpecializeLaunchBounds)
+      bool SpecializeLaunchBounds,
+      bool UsePolly)
       : KernelModule(Mod), HashValue(HashValue), KernelName(KernelName),
         Suffix(Suffix), BlockDim(BlockDim), GridDim(GridDim),
         RCIndices(RCIndices), RCVec(RCVec), LambdaCalleeInfo(LambdaCalleeInfo),
@@ -69,7 +71,8 @@ public:
         UseRTC(UseRTC), DumpIR(DumpIR),
         RelinkGlobalsByCopy(RelinkGlobalsByCopy),
         SpecializeArgs(SpecializeArgs), SpecializeDims(SpecializeDims),
-        SpecializeLaunchBounds(SpecializeLaunchBounds) {}
+        SpecializeLaunchBounds(SpecializeLaunchBounds),
+        UsePolly(UsePolly) {}
 
   // Delete copy operations.
   CompilationTask(const CompilationTask &) = delete;
@@ -103,10 +106,10 @@ public:
     // optimization pipeline to optimize the LLVM IR before handing over
     // to codegen.
 #if PROTEUS_ENABLE_CUDA
-    optimizeIR(*M, DeviceArch, '3', 3);
+    optimizeIR(*M, DeviceArch, '3', 3, UsePolly);
 #elif PROTEUS_ENABLE_HIP
     if (!UseRTC)
-      optimizeIR(*M, DeviceArch, '3', 3);
+      optimizeIR(*M, DeviceArch, '3', 3, UsePolly);
 #else
 #error "JitEngineDevice requires PROTEUS_ENABLE_CUDA or PROTEUS_ENABLE_HIP"
 #endif
