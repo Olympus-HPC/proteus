@@ -297,10 +297,15 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 
   StringRef StrIR(IR, IRSize);
   auto Ctx = std::make_unique<LLVMContext>();
+
+  Timer T;
   SMDiagnostic Diag;
   auto M = parseIR(MemoryBufferRef(StrIR, "JitModule"), Diag, *Ctx);
   if (!M)
     PROTEUS_FATAL_ERROR("Error parsing IR: " + Diag.getMessage());
+
+  PROTEUS_DBG(Logger::outs("proteus")
+              << "Parse IR " << FnName << " " << T.elapsed() << " ms\n");
 
   SmallVector<RuntimeConstant> RCVec;
   SmallVector<RuntimeConstant> LambdaJitValuesVec;

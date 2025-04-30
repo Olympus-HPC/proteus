@@ -659,6 +659,7 @@ template <typename ImplT>
 std::unique_ptr<Module> JitEngineDevice<ImplT>::linkJitModule(
     SmallVector<std::unique_ptr<Module>> &LinkedModules,
     std::unique_ptr<Module> LTOModule) {
+  Timer T;
   if (LinkedModules.empty())
     PROTEUS_FATAL_ERROR("Expected jit module");
 
@@ -681,6 +682,9 @@ std::unique_ptr<Module> JitEngineDevice<ImplT>::linkJitModule(
                               Linker::Flags::LinkOnlyNeeded))
       PROTEUS_FATAL_ERROR("Linking failed");
   }
+
+  PROTEUS_DBG(Logger::outs("proteus")
+              << "linkJitModule " << T.elapsed() << " ms\n");
 
   return LinkedModule;
 }

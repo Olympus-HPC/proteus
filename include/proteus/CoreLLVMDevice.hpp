@@ -196,6 +196,7 @@ inline void specializeIR(
     const SmallVector<RuntimeConstant> &RCVec,
     const SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo,
     bool SpecializeArgs, bool SpecializeDims, bool SpecializeLaunchBounds) {
+  Timer T;
   Function *F = M.getFunction(FnName);
 
   assert(F && "Expected non-null function!");
@@ -228,12 +229,15 @@ inline void specializeIR(
 
   runCleanupPassPipeline(M);
 
+  PROTEUS_DBG(Logger::outs("proteus")
+              << "specializeIR " << T.elapsed() << " ms\n");
   PROTEUS_DBG(Logger::logfile(FnName.str() + ".specialized.ll", M));
 }
 
 inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
                                                      const std::string &Name,
                                                      CallGraph &CG) {
+  Timer T;
   auto KernelModule = std::make_unique<Module>("JitModule", C);
   KernelModule->setSourceFileName(M.getSourceFileName());
   KernelModule->setDataLayout(M.getDataLayout());
@@ -393,6 +397,8 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
     PROTEUS_FATAL_ERROR("Broken mini-module found, JIT compilation aborted!");
 #endif
 
+  PROTEUS_DBG(Logger::outs("proteus")
+              << __FUNCTION__ << " " << T.elapsed() << " ms\n");
   return KernelModule;
 }
 

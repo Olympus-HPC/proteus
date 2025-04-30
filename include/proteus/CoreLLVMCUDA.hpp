@@ -11,7 +11,9 @@
 #include <llvm/Target/TargetMachine.h>
 
 #include "proteus/CoreDeviceCUDA.hpp"
+#include "proteus/Debug.h"
 #include "proteus/Logger.hpp"
+#include "proteus/TimeTracing.hpp"
 #include "proteus/UtilsCUDA.h"
 
 namespace proteus {
@@ -120,6 +122,8 @@ inline void codegenPTX(Module &M, StringRef DeviceArch,
   // https://developer.nvidia.com/blog/cuda-pro-tip-understand-fat-binaries-jit-caching/
   // Interesting env vars: CUDA_CACHE_DISABLE, CUDA_CACHE_MAXSIZE,
   // CUDA_CACHE_PATH, CUDA_FORCE_PTX_JIT.
+
+  Timer T;
   auto TMExpected = proteus::detail::createTargetMachine(M, DeviceArch);
   if (!TMExpected)
     PROTEUS_FATAL_ERROR(toString(TMExpected.takeError()));
@@ -142,6 +146,9 @@ inline void codegenPTX(Module &M, StringRef DeviceArch,
 #endif
 
   PM.run(M);
+
+  PROTEUS_DBG(Logger::outs("proteus")
+              << "codegen ptx " << T.elapsed() << " ms\n");
 }
 
 inline std::unique_ptr<MemoryBuffer>
@@ -155,6 +162,7 @@ codegenObject(Module &M, StringRef DeviceArch,
   codegenPTX(M, DeviceArch, PTXStr);
   PTXStr.push_back('\0');
 
+  Timer T;
   nvPTXCompilerHandle PTXCompiler;
   proteusNvPTXCompilerErrCheck(
       nvPTXCompilerCreate(&PTXCompiler, PTXStr.size(), PTXStr.data()));
@@ -231,6 +239,8 @@ codegenObject(Module &M, StringRef DeviceArch,
     FinalObjBuf = std::move(ObjBuf);
   }
 
+  PROTEUS_DBG(Logger::outs("proteus")
+              << "codegen CUDA RTC " << T.elapsed() << " ms\n");
   return FinalObjBuf;
 }
 
