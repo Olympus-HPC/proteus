@@ -53,21 +53,6 @@ protected:
   JitEngine();
 
   std::string mangleSuffix(HashT &HashValue);
-
-  struct {
-    bool PROTEUS_USE_STORED_CACHE;
-    bool PROTEUS_SPECIALIZE_LAUNCH_BOUNDS;
-    bool PROTEUS_SPECIALIZE_ARGS;
-    bool PROTEUS_SPECIALIZE_DIMS;
-    bool PROTEUS_USE_HIP_RTC_CODEGEN;
-    bool PROTEUS_DISABLE;
-    bool PROTEUS_DUMP_LLVM_IR;
-    bool PROTEUS_RELINK_GLOBALS_BY_COPY;
-    bool PROTEUS_ASYNC_COMPILATION;
-    int PROTEUS_ASYNC_THREADS;
-    bool PROTEUS_ASYNC_TEST_BLOCKING;
-    bool PROTEUS_USE_LIGHTWEIGHT_KERNEL_CLONE;
-  } Config;
 };
 
 } // namespace proteus
