@@ -168,12 +168,11 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
     auto Bitcode = StringRef{reinterpret_cast<const char *>(BitcodeData.data()),
                              BitcodeData.size()};
 
-    auto ExpectedM =
-        getLazyBitcodeModule(MemoryBufferRef{Bitcode, SectionName}, Ctx, true);
-    if (ExpectedM.takeError()) {
-      PROTEUS_FATAL_ERROR("Parse IR failed");
-    }
-    auto M = std::move(*ExpectedM);
+    SMDiagnostic Diag;
+    auto M = getLazyIRModule(
+        MemoryBuffer::getMemBufferCopy(Bitcode, SectionName), Diag, Ctx, true);
+    if (!M)
+      PROTEUS_FATAL_ERROR("Error parsing IR: " + Diag.getMessage());
 
     return M;
   };
