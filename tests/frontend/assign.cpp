@@ -11,7 +11,7 @@ int main(int argc, char **argv) {
   proteus::init();
 
   auto J = proteus::JitModule();
-  auto &F = J.addFunction<double, double *>("Assignments");
+  auto &F = J.addFunction<double, double *>("Assign");
   auto &A = F.declVar<double>("a");
   auto &Arg = F.getArg(0);
   F.beginFunction();

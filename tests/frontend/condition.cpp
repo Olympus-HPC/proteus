@@ -11,7 +11,7 @@ int main(int argc, char **argv) {
   proteus::init();
 
   auto J = proteus::JitModule();
-  auto &F = J.addFunction<double>("Conditionals");
+  auto &F = J.addFunction<double>("Condition");
   auto &A = F.declVar<double>("a");
   auto &B = F.declVar<double>("b");
 

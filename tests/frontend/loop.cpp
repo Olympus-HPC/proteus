@@ -11,7 +11,7 @@ int main(int argc, char **argv) {
   proteus::init();
 
   auto J = proteus::JitModule();
-  auto &F = J.addFunction<void, double &>("Loops");
+  auto &F = J.addFunction<void, double &>("Loop");
 
   auto &I = F.declVar<int>("i");
   auto &Inc = F.declVar<int>("inc");
