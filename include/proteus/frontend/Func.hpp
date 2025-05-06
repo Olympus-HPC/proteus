@@ -79,6 +79,8 @@ public:
 
   template <typename RetT, typename... ArgT> void call(StringRef Name);
 
+  Var &callBuiltin(function_ref<Var &(Func &)> Lower) { return Lower(*this); }
+
   void ret(std::optional<std::reference_wrapper<Var>> OptRet = std::nullopt);
 };
 

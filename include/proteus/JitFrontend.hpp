@@ -7,6 +7,7 @@
 #include <llvm/IR/Verifier.h>
 #include <llvm/Support/Debug.h>
 #include <llvm/TargetParser/Host.h>
+#include <llvm/TargetParser/Triple.h>
 
 #include "proteus/Error.h"
 #include "proteus/JitEngineHost.hpp"
@@ -22,14 +23,29 @@ private:
   std::unique_ptr<Module> Mod;
 
   std::deque<Func> Functions;
+  std::string TargetTriple;
+
+  static std::string getTriple(StringRef Target) {
+    if (Target == "host" || Target == "native")
+      return sys::getProcessTriple();
+
+    if (Target == "cuda")
+      return "nvptx64-nvidia-cuda";
+
+    if (Target == "hip")
+      return "amdgcn-amd-amdhsa";
+
+    return Triple::normalize(Target);
+  }
 
 public:
-  JitModule()
+  JitModule(StringRef Target = "host")
       : Ctx{std::make_unique<LLVMContext>()}, Mod{std::make_unique<Module>(
-                                                  "JitModule", *Ctx)} {}
+                                                  "JitModule", *Ctx)},
+        TargetTriple(getTriple(Target)) {}
 
   template <typename RetT, typename... ArgT> Func &addFunction(StringRef Name) {
-    Mod->setTargetTriple(sys::getProcessTriple());
+    Mod->setTargetTriple(TargetTriple);
     FunctionCallee FC;
     FC = Mod->getOrInsertFunction(Name, TypeMap<RetT>::get(*Ctx),
                                   TypeMap<ArgT>::get(*Ctx)...);
