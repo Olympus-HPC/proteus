@@ -15,6 +15,7 @@ set(HEADERS
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilerAsync.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilerInterfaceTypes.h
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CompilerSync.hpp
+  ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/Config.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreDevice.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreLLVM.hpp
   ${PROTEUS_PROJECT_INCLUDE_DIR}/proteus/CoreLLVMDevice.hpp

@@ -168,11 +168,15 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
     auto Bitcode = StringRef{reinterpret_cast<const char *>(BitcodeData.data()),
                              BitcodeData.size()};
 
+    Timer T;
     SMDiagnostic Diag;
     auto M = getLazyIRModule(
         MemoryBuffer::getMemBufferCopy(Bitcode, SectionName), Diag, Ctx, true);
     if (!M)
       PROTEUS_FATAL_ERROR("Error parsing IR: " + Diag.getMessage());
+    PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                         << "Parse IR " << SectionName << " " << T.elapsed()
+                         << " ms\n");
 
     return M;
   };
@@ -216,14 +220,14 @@ std::unique_ptr<MemoryBuffer>
 JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
   TIMESCOPE("Codegen object");
   return proteus::codegenObject(M, DeviceArch, GlobalLinkedBinaries,
-                                Config.PROTEUS_USE_HIP_RTC_CODEGEN);
+                                Config::get().ProteusUseHIPRTCCodegen);
 }
 
 hipFunction_t
 JitEngineDeviceHIP::getKernelFunctionFromImage(StringRef KernelName,
                                                const void *Image) {
   return proteus::getKernelFunctionFromImage(
-      KernelName, Image, Config.PROTEUS_RELINK_GLOBALS_BY_COPY,
+      KernelName, Image, Config::get().ProteusRelinkGlobalsByCopy,
       VarNameToDevPtr);
 }
 

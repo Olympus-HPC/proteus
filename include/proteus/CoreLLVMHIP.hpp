@@ -21,6 +21,7 @@ LLD_HAS_DRIVER(elf)
 #include "proteus/Debug.h"
 #include "proteus/Error.h"
 #include "proteus/Logger.hpp"
+#include "proteus/TimeTracing.hpp"
 #include "proteus/UtilsHIP.h"
 
 namespace proteus {
@@ -140,6 +141,7 @@ codegenObject(Module &M, StringRef DeviceArch,
               bool UseRTC = true) {
   assert(GlobalLinkedBinaries.empty() &&
          "Expected empty linked binaries for HIP");
+  Timer T;
   if (UseRTC) {
     char *BinOut;
     size_t BinSize;
@@ -175,6 +177,9 @@ codegenObject(Module &M, StringRef DeviceArch,
     proteusHiprtcErrCheck(
         hiprtcLinkComplete(HipLinkStatePtr, (void **)&BinOut, &BinSize));
 
+    PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                         << "HIP RTC codegen " << T.elapsed() << " ms\n");
+
     return MemoryBuffer::getMemBuffer(StringRef{BinOut, BinSize});
   }
 
@@ -198,6 +203,10 @@ codegenObject(Module &M, StringRef DeviceArch,
 
   PM.run(M);
 
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                       << "Codegen object " << T.elapsed() << " ms\n");
+
+  T.reset();
   SmallString<64> TempDir;
   SmallString<64> ObjectPath;
   SmallString<64> SharedObjectPath;
@@ -238,6 +247,9 @@ codegenObject(Module &M, StringRef DeviceArch,
 
   sys::fs::remove(ObjectPath);
   sys::fs::remove(SharedObjectPath);
+
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                       << "Codegen linking " << T.elapsed() << " ms\n");
 
   return std::move(*Buffer);
 #else

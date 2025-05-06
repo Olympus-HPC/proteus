@@ -17,7 +17,13 @@ class Logger {
 public:
   static llvm::raw_ostream &logs(const std::string &Name) {
     static Logger SingletonLogger{Name};
+    SingletonLogger.OutStream << "[" << Name << "] ";
     return SingletonLogger.OutStream;
+  }
+
+  static llvm::raw_ostream &outs(const std::string &Name) {
+    llvm::outs() << "[" << Name << "] ";
+    return llvm::outs();
   }
 
   template <typename T>

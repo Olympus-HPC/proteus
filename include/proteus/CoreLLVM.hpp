@@ -37,7 +37,10 @@ static_assert(__cplusplus >= 201703L,
 #include <llvm/Transforms/IPO/StripSymbols.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
+#include "proteus/Debug.h"
 #include "proteus/Error.h"
+#include "proteus/Logger.hpp"
+#include "proteus/TimeTracing.hpp"
 
 namespace proteus {
 using namespace llvm;
@@ -146,7 +149,11 @@ struct InitLLVMTargets {
 
 inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
                        unsigned CodegenOptLevel) {
+  Timer T;
   detail::runOptimizationPassPipeline(M, Arch, OptLevel, CodegenOptLevel);
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                       << "optimizeIR optlevel " << OptLevel << " codegenopt "
+                       << CodegenOptLevel << " " << T.elapsed() << " ms\n");
 }
 
 inline std::unique_ptr<Module>

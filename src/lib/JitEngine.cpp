@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <string>
 
+#include "proteus/Config.hpp"
 #include "proteus/CoreLLVM.hpp"
 #include "proteus/Hashing.hpp"
 #include "proteus/JitEngine.hpp"
@@ -26,40 +27,18 @@ TimeTracerRAII TimeTracer;
 using namespace llvm;
 
 JitEngine::JitEngine() {
-  Config.PROTEUS_USE_STORED_CACHE =
-      getEnvOrDefaultBool("PROTEUS_USE_STORED_CACHE", true);
-  Config.PROTEUS_SPECIALIZE_LAUNCH_BOUNDS =
-      getEnvOrDefaultBool("PROTEUS_SPECIALIZE_LAUNCH_BOUNDS", true);
-  Config.PROTEUS_SPECIALIZE_ARGS =
-      getEnvOrDefaultBool("PROTEUS_SPECIALIZE_ARGS", true);
-  Config.PROTEUS_SPECIALIZE_DIMS =
-      getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS", true);
-  Config.PROTEUS_USE_HIP_RTC_CODEGEN =
-      getEnvOrDefaultBool("PROTEUS_USE_HIP_RTC_CODEGEN", true);
-  Config.PROTEUS_DISABLE = getEnvOrDefaultBool("PROTEUS_DISABLE", false);
-  Config.PROTEUS_DUMP_LLVM_IR =
-      getEnvOrDefaultBool("PROTEUS_DUMP_LLVM_IR", false);
-  Config.PROTEUS_RELINK_GLOBALS_BY_COPY =
-      getEnvOrDefaultBool("PROTEUS_RELINK_GLOBALS_BY_COPY", false);
-  Config.PROTEUS_ASYNC_COMPILATION =
-      getEnvOrDefaultBool("PROTEUS_ASYNC_COMPILATION", false);
-  Config.PROTEUS_ASYNC_TEST_BLOCKING =
-      getEnvOrDefaultBool("PROTEUS_ASYNC_TEST_BLOCKING", false);
-  Config.PROTEUS_ASYNC_THREADS = getEnvOrDefaultInt("PROTEUS_ASYNC_THREADS", 1);
-  Config.PROTEUS_USE_LIGHTWEIGHT_KERNEL_CLONE =
-      getEnvOrDefaultBool("PROTEUS_USE_LIGHTWEIGHT_KERNEL_CLONE", true);
-
 #if PROTEUS_ENABLE_DEBUG
   Logger::logs("proteus") << "PROTEUS_USE_STORED_CACHE "
-                          << Config.PROTEUS_USE_STORED_CACHE << "\n";
-  Logger::logs("proteus") << "PROTEUS_SPECIALIZE_LAUNCH_BOUNDS "
-                          << Config.PROTEUS_SPECIALIZE_LAUNCH_BOUNDS << "\n";
+                          << Config::get().ProteusUseStoredCache << "\n";
+  Logger::logs("proteus") << "PROTEUS_SET_LAUNCH_BOUNDS "
+                          << Config::get().ProteusSpecializeLaunchBounds
+                          << "\n";
   Logger::logs("proteus") << "PROTEUS_SPECIALIZE_ARGS "
-                          << Config.PROTEUS_SPECIALIZE_ARGS << "\n";
+                          << Config::get().ProteusSpecializeArgs << "\n";
   Logger::logs("proteus") << "PROTEUS_SPECIALIZE_DIMS "
-                          << Config.PROTEUS_SPECIALIZE_DIMS << "\n";
+                          << Config::get().ProteusSpecializeDims << "\n";
   Logger::logs("proteus") << "PROTEUS_USE_HIP_RTC_CODEGEN "
-                          << Config.PROTEUS_USE_HIP_RTC_CODEGEN << "\n";
+                          << Config::get().ProteusUseHIPRTCCodegen << "\n";
 #endif
 }
 
