@@ -48,12 +48,15 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
   DeviceBitcode.reserve(Bytes);
   proteusCuErrCheck(cuMemcpyDtoH(DeviceBitcode.data(), DevPtr, Bytes));
 
-  SMDiagnostic Err;
-  auto M =
-      parseIR(MemoryBufferRef(StringRef(DeviceBitcode.data(), Bytes), ModuleId),
-              Err, Ctx);
+  StringRef Bitcode{DeviceBitcode.data(), Bytes};
+  SMDiagnostic Diag;
+  // We copy the Bitcode data for lazy parsing.
+  // TODO: It could be zero-copy if we use our own backing storage for
+  // DeviceBitcode.
+  auto M = getLazyIRModule(MemoryBuffer::getMemBufferCopy(Bitcode, ModuleId),
+                           Diag, Ctx, true);
   if (!M)
-    PROTEUS_FATAL_ERROR("unexpected");
+    PROTEUS_FATAL_ERROR("Error parsing IR: " + Diag.getMessage());
 
   LinkedModules.push_back(std::move(M));
 }
