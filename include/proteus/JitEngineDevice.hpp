@@ -640,6 +640,9 @@ std::unique_ptr<Module> JitEngineDevice<ImplT>::linkJitModule(
     PROTEUS_FATAL_ERROR("Expected jit module");
 
   auto LinkedModule = proteus::linkModules(getLLVMContext(), LinkedModules);
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                       << "linkModules " << T.elapsed() << " ms\n");
+  T.reset();
 
   // Last, link in the LTO module, if there is one. The LTO module includes code
   // post-optimization, which reduces specialization opportunities for proteus
@@ -660,7 +663,7 @@ std::unique_ptr<Module> JitEngineDevice<ImplT>::linkJitModule(
   }
 
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
-                       << "linkJitModule " << T.elapsed() << " ms\n");
+                       << "link with LTO module " << T.elapsed() << " ms\n");
 
   return LinkedModule;
 }

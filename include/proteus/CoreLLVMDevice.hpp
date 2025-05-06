@@ -397,8 +397,8 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
     PROTEUS_FATAL_ERROR("Broken mini-module found, JIT compilation aborted!");
 #endif
 
-  PROTEUS_DBG(Logger::outs("proteus")
-              << __FUNCTION__ << " " << T.elapsed() << " ms\n");
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                       << __FUNCTION__ << " " << T.elapsed() << " ms\n");
   return KernelModule;
 }
 
