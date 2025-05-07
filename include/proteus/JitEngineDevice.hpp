@@ -78,6 +78,7 @@ struct FatbinWrapperT {
 class BinaryInfo {
 private:
   FatbinWrapperT *FatbinWrapper;
+  std::unique_ptr<LLVMContext> Ctx;
   SmallVector<std::string> LinkedModuleIds;
   std::unique_ptr<Module> ExtractedModule;
   std::optional<HashT> ExtractedModuleHash;
@@ -87,10 +88,12 @@ public:
   BinaryInfo() = default;
   BinaryInfo(FatbinWrapperT *FatbinWrapper,
              SmallVector<std::string> &&LinkedModuleIds)
-      : FatbinWrapper(FatbinWrapper), LinkedModuleIds(LinkedModuleIds),
-        ModuleCallGraph(std::nullopt) {}
+      : FatbinWrapper(FatbinWrapper), Ctx(std::make_unique<LLVMContext>()),
+        LinkedModuleIds(LinkedModuleIds), ModuleCallGraph(std::nullopt) {}
 
   FatbinWrapperT *getFatbinWrapper() const { return FatbinWrapper; }
+
+  std::unique_ptr<LLVMContext> &getLLVMContext() { return Ctx; }
 
   bool hasModule() const { return (ExtractedModule != nullptr); }
   Module &getModule() const { return *ExtractedModule; }
@@ -124,6 +127,7 @@ public:
 
 class JITKernelInfo {
   std::optional<void *> Kernel;
+  std::unique_ptr<LLVMContext> Ctx;
   std::string Name;
   SmallVector<int32_t> RCTypes;
   SmallVector<int32_t> RCIndices;
@@ -136,7 +140,7 @@ class JITKernelInfo {
 public:
   JITKernelInfo(void *Kernel, BinaryInfo &BinInfo, char const *Name,
                 int32_t *RCIndices, int32_t *RCTypes, int32_t NumRCs)
-      : Kernel(Kernel), Name(Name),
+      : Kernel(Kernel), Ctx(std::make_unique<LLVMContext>()), Name(Name),
         RCTypes{ArrayRef{RCTypes, static_cast<size_t>(NumRCs)}},
         RCIndices{ArrayRef{RCIndices, static_cast<size_t>(NumRCs)}},
         ExtractedModule(std::nullopt), BinInfo(BinInfo),
@@ -147,6 +151,7 @@ public:
     assert(Kernel.has_value() && "Expected Kernel is inited");
     return Kernel.value();
   }
+  std::unique_ptr<LLVMContext> &getLLVMContext() { return Ctx; }
   const std::string &getName() const { return Name; }
   const auto &getRCIndices() const { return RCIndices; }
   const auto &getRCTypes() const { return RCTypes; }
@@ -174,11 +179,6 @@ public:
 template <typename ImplT> struct DeviceTraits;
 
 template <typename ImplT> class JitEngineDevice : public JitEngine {
-
-private:
-  // LLVMContext needs to destroy after all associated Module objects have been
-  // destroyed. Declared first to destroy last.
-  LLVMContext Ctx;
 
 public:
   using DeviceError_t = typename DeviceTraits<ImplT>::DeviceError_t;
@@ -212,9 +212,9 @@ public:
     std::unique_ptr<Module> KernelModule{nullptr};
 
     if (Config::get().ProteusUseLightweightKernelClone) {
-      KernelModule = std::move(proteus::cloneKernelFromModule(
-          BinModule, getLLVMContext(), KernelInfo.getName(),
-          BinInfo.getCallGraph()));
+      KernelModule = proteus::cloneKernelFromModule(
+          BinModule, *KernelInfo.getLLVMContext(), KernelInfo.getName(),
+          BinInfo.getCallGraph());
     } else {
       KernelModule = llvm::CloneModule(BinModule);
     }
@@ -381,10 +381,9 @@ protected:
   std::string DeviceArch;
   std::unordered_map<std::string, const void *> VarNameToDevPtr;
   std::unique_ptr<Module>
-  linkJitModule(SmallVector<std::unique_ptr<Module>> &LinkedModules,
+  linkJitModule(LLVMContext &Ctx,
+                SmallVector<std::unique_ptr<Module>> &LinkedModules,
                 std::unique_ptr<Module> LTOModule = nullptr);
-
-  LLVMContext &getLLVMContext() { return Ctx; }
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
 };
@@ -633,13 +632,13 @@ void JitEngineDevice<ImplT>::registerLinkedBinary(FatbinWrapperT *FatbinWrapper,
 
 template <typename ImplT>
 std::unique_ptr<Module> JitEngineDevice<ImplT>::linkJitModule(
-    SmallVector<std::unique_ptr<Module>> &LinkedModules,
+    LLVMContext &Ctx, SmallVector<std::unique_ptr<Module>> &LinkedModules,
     std::unique_ptr<Module> LTOModule) {
   Timer T;
   if (LinkedModules.empty())
     PROTEUS_FATAL_ERROR("Expected jit module");
 
-  auto LinkedModule = proteus::linkModules(getLLVMContext(), LinkedModules);
+  auto LinkedModule = proteus::linkModules(Ctx, LinkedModules);
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                        << "linkModules " << T.elapsed() << " ms\n");
   T.reset();

@@ -156,10 +156,9 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
     PROTEUS_FATAL_ERROR("Error reading sections");
 
   SmallVector<std::unique_ptr<Module>> LinkedModules;
-  auto &Ctx = getLLVMContext();
 
-  auto ExtractModuleFromSection = [&DeviceElf, &Ctx](auto &Section,
-                                                     StringRef SectionName) {
+  auto ExtractModuleFromSection = [&DeviceElf, &BinInfo](
+                                      auto &Section, StringRef SectionName) {
     ArrayRef<uint8_t> BitcodeData;
     auto SectionContents = DeviceElf->getSectionContents(Section);
     if (SectionContents.takeError())
@@ -170,8 +169,9 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
 
     Timer T;
     SMDiagnostic Diag;
-    auto M = getLazyIRModule(
-        MemoryBuffer::getMemBufferCopy(Bitcode, SectionName), Diag, Ctx, true);
+    auto M =
+        getLazyIRModule(MemoryBuffer::getMemBufferCopy(Bitcode, SectionName),
+                        Diag, *BinInfo.getLLVMContext(), true);
     if (!M)
       PROTEUS_FATAL_ERROR("Error parsing IR: " + Diag.getMessage());
     PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
@@ -207,7 +207,8 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
     LinkedModules.push_back(std::move(M));
   }
 
-  return linkJitModule(LinkedModules, std::move(LTOModule));
+  return linkJitModule(*BinInfo.getLLVMContext(), LinkedModules,
+                       std::move(LTOModule));
 }
 
 void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
