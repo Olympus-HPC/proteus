@@ -394,8 +394,8 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
   }
 
 #if PROTEUS_ENABLE_DEBUG
-  Logger::logfile(Name + ".mini.ll", *KernelModule);
-  if (verifyModule(*KernelModule, &errs()))
+  Logger::logfile(Name + ".mini.ll", *KernelModuleTmp);
+  if (verifyModule(*KernelModuleTmp, &errs()))
     PROTEUS_FATAL_ERROR("Broken mini-module found, JIT compilation aborted!");
 #endif
 
