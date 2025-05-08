@@ -111,7 +111,7 @@ JitEngineDeviceCUDA::extractModule(BinaryInfo &BinInfo) {
     PROTEUS_FATAL_ERROR("Expected FatbinWrapper in map");
 
   SmallVector<std::unique_ptr<Module>> LinkedModules;
-  auto &Ctx = getLLVMContext();
+  auto &Ctx = *BinInfo.getLLVMContext();
 
   auto &LinkedModuleIds = BinInfo.getModuleIds();
 
@@ -125,7 +125,7 @@ JitEngineDeviceCUDA::extractModule(BinaryInfo &BinInfo) {
 
   proteusCuErrCheck(cuModuleUnload(CUMod));
 
-  return linkJitModule(LinkedModules);
+  return linkJitModule(Ctx, LinkedModules);
 }
 
 void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module &M, Function &F,

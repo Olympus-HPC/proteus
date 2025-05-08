@@ -12,6 +12,8 @@
 #if defined(PROTEUS_ENABLE_HIP) || defined(PROTEUS_ENABLE_CUDA)
 
 #include <llvm/Analysis/CallGraph.h>
+#include <llvm/Bitcode/BitcodeReader.h>
+#include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/IR/ReplaceConstant.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Object/ELFObjectFile.h>
@@ -234,17 +236,17 @@ inline void specializeIR(
   PROTEUS_DBG(Logger::logfile(FnName.str() + ".specialized.ll", M));
 }
 
-inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
-                                                     const std::string &Name,
-                                                     CallGraph &CG) {
+inline std::pair<std::unique_ptr<Module>, std::unique_ptr<MemoryBuffer>>
+cloneKernelFromModule(Module &M, LLVMContext &C, const std::string &Name,
+                      CallGraph &CG) {
   Timer T;
-  auto KernelModule = std::make_unique<Module>("JitModule", C);
-  KernelModule->setSourceFileName(M.getSourceFileName());
-  KernelModule->setDataLayout(M.getDataLayout());
-  KernelModule->setTargetTriple(M.getTargetTriple());
-  KernelModule->setModuleInlineAsm(M.getModuleInlineAsm());
+  auto KernelModuleTmp = std::make_unique<Module>("JitModule", M.getContext());
+  KernelModuleTmp->setSourceFileName(M.getSourceFileName());
+  KernelModuleTmp->setDataLayout(M.getDataLayout());
+  KernelModuleTmp->setTargetTriple(M.getTargetTriple());
+  KernelModuleTmp->setModuleInlineAsm(M.getModuleInlineAsm());
 #if LLVM_VERSION_MAJOR >= 18
-  KernelModule->IsNewDbgInfoFormat = M.IsNewDbgInfoFormat;
+  KernelModuleTmp->IsNewDbgInfoFormat = M.IsNewDbgInfoFormat;
 #endif
 
   auto *KernelFunction = M.getFunction(Name);
@@ -309,10 +311,10 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
 
   for (auto *GV : ReachableGlobals) {
     // We will set the initializer later, after VMap has been populated.
-    GlobalVariable *NewGV =
-        new GlobalVariable(*KernelModule, GV->getValueType(), GV->isConstant(),
-                           GV->getLinkage(), nullptr, GV->getName(), nullptr,
-                           GV->getThreadLocalMode(), GV->getAddressSpace());
+    GlobalVariable *NewGV = new GlobalVariable(
+        *KernelModuleTmp, GV->getValueType(), GV->isConstant(),
+        GV->getLinkage(), nullptr, GV->getName(), nullptr,
+        GV->getThreadLocalMode(), GV->getAddressSpace());
     NewGV->copyAttributesFrom(GV);
     VMap[GV] = NewGV;
   }
@@ -320,7 +322,7 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
   for (auto *F : ReachableFunctions) {
     auto *NewFunction = Function::Create(F->getFunctionType(), F->getLinkage(),
                                          F->getAddressSpace(), F->getName(),
-                                         KernelModule.get());
+                                         KernelModuleTmp.get());
     NewFunction->copyAttributesFrom(F);
     VMap[F] = NewFunction;
   }
@@ -328,7 +330,7 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
   for (auto *F : ReachableDeclarations) {
     auto *NewFunction = Function::Create(F->getFunctionType(), F->getLinkage(),
                                          F->getAddressSpace(), F->getName(),
-                                         KernelModule.get());
+                                         KernelModuleTmp.get());
     NewFunction->copyAttributesFrom(F);
     NewFunction->setLinkage(GlobalValue::ExternalLinkage);
     VMap[F] = NewFunction;
@@ -362,7 +364,7 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
     if (!NamedMD)
       continue;
 
-    auto *NewNamedMD = KernelModule->getOrInsertNamedMetadata(MetadataName);
+    auto *NewNamedMD = KernelModuleTmp->getOrInsertNamedMetadata(MetadataName);
     for (unsigned I = 0, E = NamedMD->getNumOperands(); I < E; ++I) {
       MDNode *MDEntry = NamedMD->getOperand(I);
       bool ShouldClone = true;
@@ -392,14 +394,30 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
   }
 
 #if PROTEUS_ENABLE_DEBUG
-  Logger::logfile(Name + ".mini.ll", *KernelModule);
-  if (verifyModule(*KernelModule, &errs()))
+  Logger::logfile(Name + ".mini.ll", *KernelModuleTmp);
+  if (verifyModule(*KernelModuleTmp, &errs()))
     PROTEUS_FATAL_ERROR("Broken mini-module found, JIT compilation aborted!");
 #endif
 
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                        << __FUNCTION__ << " " << T.elapsed() << " ms\n");
-  return KernelModule;
+
+  SmallVector<char, 1> ClonedModuleBuffer;
+  BitcodeWriter BCWriter(ClonedModuleBuffer);
+
+  BCWriter.writeModule(*KernelModuleTmp);
+  BCWriter.writeSymtab();
+  BCWriter.writeStrtab();
+  MemoryBufferRef ClonedModuleBufferRef(
+      StringRef(ClonedModuleBuffer.data(), ClonedModuleBuffer.size()),
+      "KernelModuleClone");
+  auto ExpectedKernelModule = parseBitcodeFile(ClonedModuleBufferRef, C);
+  if (auto E = ExpectedKernelModule.takeError())
+    PROTEUS_FATAL_ERROR("Error parsing bitcode: " + toString(std::move(E)));
+
+  return {std::move(*ExpectedKernelModule),
+          MemoryBuffer::getMemBufferCopy(
+              StringRef(ClonedModuleBuffer.data(), ClonedModuleBuffer.size()))};
 }
 
 } // namespace proteus

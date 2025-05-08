@@ -78,6 +78,7 @@ struct FatbinWrapperT {
 class BinaryInfo {
 private:
   FatbinWrapperT *FatbinWrapper;
+  std::unique_ptr<LLVMContext> Ctx;
   SmallVector<std::string> LinkedModuleIds;
   std::unique_ptr<Module> ExtractedModule;
   std::optional<HashT> ExtractedModuleHash;
@@ -87,10 +88,12 @@ public:
   BinaryInfo() = default;
   BinaryInfo(FatbinWrapperT *FatbinWrapper,
              SmallVector<std::string> &&LinkedModuleIds)
-      : FatbinWrapper(FatbinWrapper), LinkedModuleIds(LinkedModuleIds),
-        ModuleCallGraph(std::nullopt) {}
+      : FatbinWrapper(FatbinWrapper), Ctx(std::make_unique<LLVMContext>()),
+        LinkedModuleIds(LinkedModuleIds), ModuleCallGraph(std::nullopt) {}
 
   FatbinWrapperT *getFatbinWrapper() const { return FatbinWrapper; }
+
+  std::unique_ptr<LLVMContext> &getLLVMContext() { return Ctx; }
 
   bool hasModule() const { return (ExtractedModule != nullptr); }
   Module &getModule() const { return *ExtractedModule; }
@@ -124,10 +127,12 @@ public:
 
 class JITKernelInfo {
   std::optional<void *> Kernel;
+  std::unique_ptr<LLVMContext> Ctx;
   std::string Name;
   SmallVector<int32_t> RCTypes;
   SmallVector<int32_t> RCIndices;
   std::optional<std::unique_ptr<Module>> ExtractedModule;
+  std::optional<std::unique_ptr<MemoryBuffer>> Bitcode;
   std::optional<std::reference_wrapper<BinaryInfo>> BinInfo;
   std::optional<HashT> StaticHash;
   std::optional<SmallVector<std::pair<std::string, StringRef>>>
@@ -136,10 +141,10 @@ class JITKernelInfo {
 public:
   JITKernelInfo(void *Kernel, BinaryInfo &BinInfo, char const *Name,
                 int32_t *RCIndices, int32_t *RCTypes, int32_t NumRCs)
-      : Kernel(Kernel), Name(Name),
+      : Kernel(Kernel), Ctx(std::make_unique<LLVMContext>()), Name(Name),
         RCTypes{ArrayRef{RCTypes, static_cast<size_t>(NumRCs)}},
         RCIndices{ArrayRef{RCIndices, static_cast<size_t>(NumRCs)}},
-        ExtractedModule(std::nullopt), BinInfo(BinInfo),
+        ExtractedModule(std::nullopt), Bitcode{std::nullopt}, BinInfo(BinInfo),
         LambdaCalleeInfo(std::nullopt) {}
 
   JITKernelInfo() = default;
@@ -147,6 +152,7 @@ public:
     assert(Kernel.has_value() && "Expected Kernel is inited");
     return Kernel.value();
   }
+  std::unique_ptr<LLVMContext> &getLLVMContext() { return Ctx; }
   const std::string &getName() const { return Name; }
   const auto &getRCIndices() const { return RCIndices; }
   const auto &getRCTypes() const { return RCTypes; }
@@ -156,6 +162,13 @@ public:
   void setModule(std::unique_ptr<llvm::Module> Mod) {
     ExtractedModule = std::move(Mod);
   }
+
+  bool hasBitcode() { return Bitcode.has_value(); }
+  void setBitcode(std::unique_ptr<MemoryBuffer> ExtractedBitcode) {
+    Bitcode = std::move(ExtractedBitcode);
+  }
+  MemoryBufferRef getBitcode() { return Bitcode.value()->getMemBufferRef(); }
+
   bool hasStaticHash() const { return StaticHash.has_value(); }
   const HashT getStaticHash() const { return StaticHash.value(); }
   void createStaticHash(HashT ModuleHash) {
@@ -175,11 +188,6 @@ template <typename ImplT> struct DeviceTraits;
 
 template <typename ImplT> class JitEngineDevice : public JitEngine {
 
-private:
-  // LLVMContext needs to destroy after all associated Module objects have been
-  // destroyed. Declared first to destroy last.
-  LLVMContext Ctx;
-
 public:
   using DeviceError_t = typename DeviceTraits<ImplT>::DeviceError_t;
   using DeviceStream_t = typename DeviceTraits<ImplT>::DeviceStream_t;
@@ -190,11 +198,17 @@ public:
                 void **KernelArgs, uint64_t ShmemSize,
                 typename DeviceTraits<ImplT>::DeviceStream_t Stream);
 
-  Module &getModule(JITKernelInfo &KernelInfo) {
+  void extractModuleAndBitcode(JITKernelInfo &KernelInfo) {
     TIMESCOPE(__FUNCTION__)
 
+    if (KernelInfo.hasModule() && KernelInfo.hasBitcode())
+      return;
+
     if (KernelInfo.hasModule())
-      return KernelInfo.getModule();
+      PROTEUS_FATAL_ERROR("Unexpected KernelInfo has module but not bitcode");
+
+    if (KernelInfo.hasBitcode())
+      PROTEUS_FATAL_ERROR("Unexpected KernelInfo has bitcode but not module");
 
     BinaryInfo &BinInfo = KernelInfo.getBinaryInfo();
 
@@ -210,11 +224,12 @@ public:
 
     auto &BinModule = BinInfo.getModule();
     std::unique_ptr<Module> KernelModule{nullptr};
+    std::unique_ptr<MemoryBuffer> KernelBitcode{nullptr};
 
     if (Config::get().ProteusUseLightweightKernelClone) {
-      KernelModule = std::move(proteus::cloneKernelFromModule(
-          BinModule, getLLVMContext(), KernelInfo.getName(),
-          BinInfo.getCallGraph()));
+      std::tie(KernelModule, KernelBitcode) = proteus::cloneKernelFromModule(
+          BinModule, *KernelInfo.getLLVMContext(), KernelInfo.getName(),
+          BinInfo.getCallGraph());
     } else {
       KernelModule = llvm::CloneModule(BinModule);
     }
@@ -223,7 +238,27 @@ public:
     runCleanupPassPipeline(*KernelModule);
 
     KernelInfo.setModule(std::move(KernelModule));
+    KernelInfo.setBitcode(std::move(KernelBitcode));
+  }
+
+  Module &getModule(JITKernelInfo &KernelInfo) {
+    if (!KernelInfo.hasModule())
+      extractModuleAndBitcode(KernelInfo);
+
+    if (!KernelInfo.hasModule())
+      PROTEUS_FATAL_ERROR("Expected module in KernelInfo");
+
     return KernelInfo.getModule();
+  }
+
+  MemoryBufferRef getBitcode(JITKernelInfo &KernelInfo) {
+    if (!KernelInfo.hasBitcode())
+      extractModuleAndBitcode(KernelInfo);
+
+    if (!KernelInfo.hasBitcode())
+      PROTEUS_FATAL_ERROR("Expected bitcode in KernelInfo");
+
+    return KernelInfo.getBitcode();
   }
 
   void getLambdaJitValues(JITKernelInfo &KernelInfo,
@@ -381,10 +416,9 @@ protected:
   std::string DeviceArch;
   std::unordered_map<std::string, const void *> VarNameToDevPtr;
   std::unique_ptr<Module>
-  linkJitModule(SmallVector<std::unique_ptr<Module>> &LinkedModules,
+  linkJitModule(LLVMContext &Ctx,
+                SmallVector<std::unique_ptr<Module>> &LinkedModules,
                 std::unique_ptr<Module> LTOModule = nullptr);
-
-  LLVMContext &getLLVMContext() { return Ctx; }
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
 };
@@ -482,7 +516,7 @@ JitEngineDevice<ImplT>::compileAndRun(
     }
   }
 
-  Module &KernelModule = getModule(KernelInfo);
+  MemoryBufferRef KernelBitcode = getBitcode(KernelInfo);
   std::unique_ptr<MemoryBuffer> ObjBuf = nullptr;
 
   if (Config::get().ProteusAsyncCompilation) {
@@ -494,7 +528,7 @@ JitEngineDevice<ImplT>::compileAndRun(
                                           << HashValue.toString() << "\n");
 
       Compiler.compile(CompilationTask{
-          KernelModule, HashValue, KernelInfo.getName(), Suffix, BlockDim,
+          KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
           GridDim, KernelInfo.getRCIndices(), RCVec,
           KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr,
           GlobalLinkedBinaries, DeviceArch,
@@ -519,7 +553,7 @@ JitEngineDevice<ImplT>::compileAndRun(
   } else {
     // Process through synchronous compilation.
     ObjBuf = CompilerSync::instance().compile(CompilationTask{
-        KernelModule, HashValue, KernelInfo.getName(), Suffix, BlockDim,
+        KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
         GridDim, KernelInfo.getRCIndices(), RCVec,
         KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr, GlobalLinkedBinaries,
         DeviceArch,
@@ -633,13 +667,13 @@ void JitEngineDevice<ImplT>::registerLinkedBinary(FatbinWrapperT *FatbinWrapper,
 
 template <typename ImplT>
 std::unique_ptr<Module> JitEngineDevice<ImplT>::linkJitModule(
-    SmallVector<std::unique_ptr<Module>> &LinkedModules,
+    LLVMContext &Ctx, SmallVector<std::unique_ptr<Module>> &LinkedModules,
     std::unique_ptr<Module> LTOModule) {
   Timer T;
   if (LinkedModules.empty())
     PROTEUS_FATAL_ERROR("Expected jit module");
 
-  auto LinkedModule = proteus::linkModules(getLLVMContext(), LinkedModules);
+  auto LinkedModule = proteus::linkModules(Ctx, LinkedModules);
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                        << "linkModules " << T.elapsed() << " ms\n");
   T.reset();

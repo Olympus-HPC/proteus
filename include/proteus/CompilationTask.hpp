@@ -16,7 +16,7 @@ using namespace llvm;
 
 class CompilationTask {
 private:
-  std::reference_wrapper<const Module> KernelModule;
+  MemoryBufferRef Bitcode;
   HashT HashValue;
   std::string KernelName;
   std::string Suffix;
@@ -36,12 +36,7 @@ private:
   bool SpecializeLaunchBounds;
 
   std::unique_ptr<Module> cloneKernelModule(LLVMContext &Ctx) {
-    SmallVector<char, 4096> ModuleStr;
-    raw_svector_ostream OS(ModuleStr);
-    WriteBitcodeToFile(KernelModule, OS);
-    StringRef ModuleStrRef = StringRef{ModuleStr.data(), ModuleStr.size()};
-    auto BufferRef = MemoryBufferRef{ModuleStrRef, ""};
-    auto ClonedModule = parseBitcodeFile(BufferRef, Ctx);
+    auto ClonedModule = parseBitcodeFile(Bitcode, Ctx);
     if (auto E = ClonedModule.takeError()) {
       PROTEUS_FATAL_ERROR("Failed to parse bitcode" + toString(std::move(E)));
     }
@@ -51,7 +46,7 @@ private:
 
 public:
   CompilationTask(
-      const Module &Mod, HashT HashValue, const std::string &KernelName,
+      MemoryBufferRef Bitcode, HashT HashValue, const std::string &KernelName,
       std::string &Suffix, dim3 BlockDim, dim3 GridDim,
       const SmallVector<int32_t> &RCIndices,
       const SmallVector<RuntimeConstant> &RCVec,
@@ -61,7 +56,7 @@ public:
       const std::string &DeviceArch, bool UseRTC, bool DumpIR,
       bool RelinkGlobalsByCopy, bool SpecializeArgs, bool SpecializeDims,
       bool SpecializeLaunchBounds)
-      : KernelModule(Mod), HashValue(HashValue), KernelName(KernelName),
+      : Bitcode(Bitcode), HashValue(HashValue), KernelName(KernelName),
         Suffix(Suffix), BlockDim(BlockDim), GridDim(GridDim),
         RCIndices(RCIndices), RCVec(RCVec), LambdaCalleeInfo(LambdaCalleeInfo),
         VarNameToDevPtr(VarNameToDevPtr),
