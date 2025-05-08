@@ -3,7 +3,31 @@
 
 #include <string>
 
+#include "proteus/Logger.hpp"
+
 namespace proteus {
+
+enum class CodegenOption {
+  RTC,
+  Serial,
+  Parallel,
+  ParallelThinLTO,
+};
+
+inline std::string toString(CodegenOption Option) {
+  switch (Option) {
+  case CodegenOption::RTC:
+    return "RTC";
+  case CodegenOption::Serial:
+    return "Serial";
+  case CodegenOption::Parallel:
+    return "Parallel";
+  case CodegenOption::ParallelThinLTO:
+    return "ParallelThinLTO";
+  default:
+    return "Unknown";
+  }
+}
 
 inline bool getEnvOrDefaultBool(const char *VarName, bool Default) {
 
@@ -17,6 +41,31 @@ inline int getEnvOrDefaultInt(const char *VarName, int Default) {
   return EnvValue ? std::stoi(EnvValue) : Default;
 }
 
+inline CodegenOption getEnvOrDefaultCG(const char *VarName,
+                                       CodegenOption Default) {
+
+  const char *EnvValue = std::getenv(VarName);
+  if (!EnvValue)
+    return Default;
+
+  std::string EnvValueStr{EnvValue};
+  std::transform(EnvValueStr.begin(), EnvValueStr.end(), EnvValueStr.begin(),
+                 ::tolower);
+  if (EnvValueStr == "rtc")
+    return CodegenOption::RTC;
+  if (EnvValueStr == "serial")
+    return CodegenOption::Serial;
+  if (EnvValueStr == "parallel")
+    return CodegenOption::Parallel;
+  if (EnvValueStr == "thinlto")
+    return CodegenOption::ParallelThinLTO;
+
+  Logger::outs("proteus") << "Unknown codegen option " << EnvValueStr
+                          << ", using default codegen option: "
+                          << toString(Default) << "\n";
+  return Default;
+}
+
 class Config {
 public:
   static Config &get() {
@@ -28,7 +77,6 @@ public:
   bool ProteusSpecializeLaunchBounds;
   bool ProteusSpecializeArgs;
   bool ProteusSpecializeDims;
-  bool ProteusUseHIPRTCCodegen;
   bool ProteusDisable;
   bool ProteusDumpLLVMIR;
   bool ProteusRelinkGlobalsByCopy;
@@ -37,6 +85,7 @@ public:
   bool ProteusAsyncTestBlocking;
   bool ProteusUseLightweightKernelClone;
   bool ProteusEnableTimers;
+  CodegenOption ProteusCodegen;
 
 private:
   Config() {
@@ -48,8 +97,25 @@ private:
         getEnvOrDefaultBool("PROTEUS_SPECIALIZE_ARGS", true);
     ProteusSpecializeDims =
         getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS", true);
-    ProteusUseHIPRTCCodegen =
-        getEnvOrDefaultBool("PROTEUS_USE_HIP_RTC_CODEGEN", true);
+    ProteusCodegen = getEnvOrDefaultCG("PROTEUS_CODEGEN", CodegenOption::RTC);
+#if PROTEUS_ENABLE_CUDA
+    if (ProteusCodegen != CodegenOption::RTC) {
+      Logger::outs("proteus")
+          << "Warning: Proteus supports only RTC compilation for CUDA, "
+             "setting Codegen to RTC\n";
+      ProteusCodegen = CodegenOption::RTC;
+    }
+#endif
+#if PROTEUS_ENABLE_HIP
+#if LLVM_VERSION_MAJOR < 18
+    if (ProteusCodegen != CodegenOption::RTC) {
+      Logger::outs("proteus")
+          << "Warning: Proteus with LLVM < 18 supports only RTC compilation, "
+             "setting Codegen to RTC\n";
+      ProteusCodegen = CodegenOCodegenOption::RTC;
+    }
+#endif
+#endif
     ProteusDisable = getEnvOrDefaultBool("PROTEUS_DISABLE", false);
     ProteusDumpLLVMIR = getEnvOrDefaultBool("PROTEUS_DUMP_LLVM_IR", false);
     ProteusRelinkGlobalsByCopy =

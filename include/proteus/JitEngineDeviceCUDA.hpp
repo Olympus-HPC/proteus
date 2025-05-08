@@ -42,8 +42,6 @@ public:
   void codegenPTX(Module &M, StringRef DeviceArch,
                   SmallVectorImpl<char> &PTXStr);
 
-  std::unique_ptr<MemoryBuffer> codegenObject(Module &M, StringRef DeviceArch);
-
   CUfunction getKernelFunctionFromImage(StringRef KernelName,
                                         const void *Image);
 

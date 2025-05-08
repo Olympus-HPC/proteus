@@ -37,8 +37,8 @@ JitEngine::JitEngine() {
                           << Config::get().ProteusSpecializeArgs << "\n";
   Logger::logs("proteus") << "PROTEUS_SPECIALIZE_DIMS "
                           << Config::get().ProteusSpecializeDims << "\n";
-  Logger::logs("proteus") << "PROTEUS_USE_HIP_RTC_CODEGEN "
-                          << Config::get().ProteusUseHIPRTCCodegen << "\n";
+  Logger::logs("proteus") << "PROTEUS_CODEGEN"
+                          << toString(Config::get().ProteusCodegen) << "\n";
 #endif
 }
 
