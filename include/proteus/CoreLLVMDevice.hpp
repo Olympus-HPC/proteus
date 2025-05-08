@@ -236,9 +236,9 @@ inline void specializeIR(
   PROTEUS_DBG(Logger::logfile(FnName.str() + ".specialized.ll", M));
 }
 
-inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
-                                                     const std::string &Name,
-                                                     CallGraph &CG) {
+inline std::pair<std::unique_ptr<Module>, std::unique_ptr<MemoryBuffer>>
+cloneKernelFromModule(Module &M, LLVMContext &C, const std::string &Name,
+                      CallGraph &CG) {
   Timer T;
   auto KernelModuleTmp = std::make_unique<Module>("JitModule", M.getContext());
   KernelModuleTmp->setSourceFileName(M.getSourceFileName());
@@ -415,7 +415,9 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, LLVMContext &C,
   if (auto E = ExpectedKernelModule.takeError())
     PROTEUS_FATAL_ERROR("Error parsing bitcode: " + toString(std::move(E)));
 
-  return std::move(*ExpectedKernelModule);
+  return {std::move(*ExpectedKernelModule),
+          MemoryBuffer::getMemBufferCopy(
+              StringRef(ClonedModuleBuffer.data(), ClonedModuleBuffer.size()))};
 }
 
 } // namespace proteus

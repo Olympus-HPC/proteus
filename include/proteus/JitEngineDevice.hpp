@@ -132,6 +132,7 @@ class JITKernelInfo {
   SmallVector<int32_t> RCTypes;
   SmallVector<int32_t> RCIndices;
   std::optional<std::unique_ptr<Module>> ExtractedModule;
+  std::optional<std::unique_ptr<MemoryBuffer>> Bitcode;
   std::optional<std::reference_wrapper<BinaryInfo>> BinInfo;
   std::optional<HashT> StaticHash;
   std::optional<SmallVector<std::pair<std::string, StringRef>>>
@@ -143,7 +144,7 @@ public:
       : Kernel(Kernel), Ctx(std::make_unique<LLVMContext>()), Name(Name),
         RCTypes{ArrayRef{RCTypes, static_cast<size_t>(NumRCs)}},
         RCIndices{ArrayRef{RCIndices, static_cast<size_t>(NumRCs)}},
-        ExtractedModule(std::nullopt), BinInfo(BinInfo),
+        ExtractedModule(std::nullopt), Bitcode{std::nullopt}, BinInfo(BinInfo),
         LambdaCalleeInfo(std::nullopt) {}
 
   JITKernelInfo() = default;
@@ -161,6 +162,13 @@ public:
   void setModule(std::unique_ptr<llvm::Module> Mod) {
     ExtractedModule = std::move(Mod);
   }
+
+  bool hasBitcode() { return Bitcode.has_value(); }
+  void setBitcode(std::unique_ptr<MemoryBuffer> ExtractedBitcode) {
+    Bitcode = std::move(ExtractedBitcode);
+  }
+  MemoryBufferRef getBitcode() { return Bitcode.value()->getMemBufferRef(); }
+
   bool hasStaticHash() const { return StaticHash.has_value(); }
   const HashT getStaticHash() const { return StaticHash.value(); }
   void createStaticHash(HashT ModuleHash) {
@@ -190,11 +198,17 @@ public:
                 void **KernelArgs, uint64_t ShmemSize,
                 typename DeviceTraits<ImplT>::DeviceStream_t Stream);
 
-  Module &getModule(JITKernelInfo &KernelInfo) {
+  void extractModuleAndBitcode(JITKernelInfo &KernelInfo) {
     TIMESCOPE(__FUNCTION__)
 
+    if (KernelInfo.hasModule() && KernelInfo.hasBitcode())
+      return;
+
     if (KernelInfo.hasModule())
-      return KernelInfo.getModule();
+      PROTEUS_FATAL_ERROR("Unexpected KernelInfo has module but not bitcode");
+
+    if (KernelInfo.hasBitcode())
+      PROTEUS_FATAL_ERROR("Unexpected KernelInfo has bitcode but not module");
 
     BinaryInfo &BinInfo = KernelInfo.getBinaryInfo();
 
@@ -210,9 +224,10 @@ public:
 
     auto &BinModule = BinInfo.getModule();
     std::unique_ptr<Module> KernelModule{nullptr};
+    std::unique_ptr<MemoryBuffer> KernelBitcode{nullptr};
 
     if (Config::get().ProteusUseLightweightKernelClone) {
-      KernelModule = proteus::cloneKernelFromModule(
+      std::tie(KernelModule, KernelBitcode) = proteus::cloneKernelFromModule(
           BinModule, *KernelInfo.getLLVMContext(), KernelInfo.getName(),
           BinInfo.getCallGraph());
     } else {
@@ -223,7 +238,27 @@ public:
     runCleanupPassPipeline(*KernelModule);
 
     KernelInfo.setModule(std::move(KernelModule));
+    KernelInfo.setBitcode(std::move(KernelBitcode));
+  }
+
+  Module &getModule(JITKernelInfo &KernelInfo) {
+    if (!KernelInfo.hasModule())
+      extractModuleAndBitcode(KernelInfo);
+
+    if (!KernelInfo.hasModule())
+      PROTEUS_FATAL_ERROR("Expected module in KernelInfo");
+
     return KernelInfo.getModule();
+  }
+
+  MemoryBufferRef getBitcode(JITKernelInfo &KernelInfo) {
+    if (!KernelInfo.hasBitcode())
+      extractModuleAndBitcode(KernelInfo);
+
+    if (!KernelInfo.hasBitcode())
+      PROTEUS_FATAL_ERROR("Expected bitcode in KernelInfo");
+
+    return KernelInfo.getBitcode();
   }
 
   void getLambdaJitValues(JITKernelInfo &KernelInfo,
@@ -481,7 +516,7 @@ JitEngineDevice<ImplT>::compileAndRun(
     }
   }
 
-  Module &KernelModule = getModule(KernelInfo);
+  MemoryBufferRef KernelBitcode = getBitcode(KernelInfo);
   std::unique_ptr<MemoryBuffer> ObjBuf = nullptr;
 
   if (Config::get().ProteusAsyncCompilation) {
@@ -493,7 +528,7 @@ JitEngineDevice<ImplT>::compileAndRun(
                                           << HashValue.toString() << "\n");
 
       Compiler.compile(CompilationTask{
-          KernelModule, HashValue, KernelInfo.getName(), Suffix, BlockDim,
+          KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
           GridDim, KernelInfo.getRCIndices(), RCVec,
           KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr,
           GlobalLinkedBinaries, DeviceArch,
@@ -518,7 +553,7 @@ JitEngineDevice<ImplT>::compileAndRun(
   } else {
     // Process through synchronous compilation.
     ObjBuf = CompilerSync::instance().compile(CompilationTask{
-        KernelModule, HashValue, KernelInfo.getName(), Suffix, BlockDim,
+        KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
         GridDim, KernelInfo.getRCIndices(), RCVec,
         KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr, GlobalLinkedBinaries,
         DeviceArch,
