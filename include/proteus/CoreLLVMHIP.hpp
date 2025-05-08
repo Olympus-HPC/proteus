@@ -33,42 +33,42 @@ namespace detail {
 inline const SmallVector<StringRef> &gridDimXFnName() {
   static SmallVector<StringRef> Names = {
       "_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__XcvjEv",
-      "llvm.amdgcn.num.workgroups.x"};
+      "llvm.amdgcn.num.workgroups.x", "_ZL20__hip_get_grid_dim_xv"};
   return Names;
 }
 
 inline const SmallVector<StringRef> &gridDimYFnName() {
   static SmallVector<StringRef> Names = {
       "_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__YcvjEv",
-      "llvm.amdgcn.num.workgroups.y"};
+      "llvm.amdgcn.num.workgroups.y", "_ZL20__hip_get_grid_dim_yv"};
   return Names;
 }
 
 inline const SmallVector<StringRef> &gridDimZFnName() {
   static SmallVector<StringRef> Names = {
       "_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__ZcvjEv",
-      "llvm.amdgcn.num.workgroups.z"};
+      "llvm.amdgcn.num.workgroups.z", "_ZL20__hip_get_grid_dim_zv"};
   return Names;
 }
 
 inline const SmallVector<StringRef> &blockDimXFnName() {
   static SmallVector<StringRef> Names = {
       "_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__XcvjEv",
-      "llvm.amdgcn.workgroup.size.x"};
+      "llvm.amdgcn.workgroup.size.x", "_ZL21__hip_get_block_dim_xv"};
   return Names;
 }
 
 inline const SmallVector<StringRef> &blockDimYFnName() {
   static SmallVector<StringRef> Names = {
       "_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__YcvjEv",
-      "llvm.amdgcn.workgroup.size.y"};
+      "llvm.amdgcn.workgroup.size.y", "_ZL21__hip_get_block_dim_yv"};
   return Names;
 }
 
 inline const SmallVector<StringRef> &blockDimZFnName() {
   static SmallVector<StringRef> Names = {
       "_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__ZcvjEv",
-      "llvm.amdgcn.workgroup.size.z"};
+      "llvm.amdgcn.workgroup.size.z", "_ZL21__hip_get_block_dim_zv"};
   return Names;
 }
 
