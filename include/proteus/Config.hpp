@@ -112,7 +112,7 @@ private:
       Logger::outs("proteus")
           << "Warning: Proteus with LLVM < 18 supports only RTC compilation, "
              "setting Codegen to RTC\n";
-      ProteusCodegen = CodegenOCodegenOption::RTC;
+      ProteusCodegen = CodegenOption::RTC;
     }
 #endif
 #endif

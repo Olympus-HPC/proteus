@@ -20,7 +20,7 @@
 #include <llvm/Transforms/IPO/ThinLTOBitcodeWriter.h>
 #include <llvm/Transforms/Utils/SplitModule.h>
 
-#if LLVM_VERSION_MAJOR == 18
+#if LLVM_VERSION_MAJOR >= 18
 #include <lld/Common/Driver.h>
 LLD_HAS_DRIVER(elf)
 #endif
@@ -122,6 +122,7 @@ inline const SmallVector<StringRef> &threadIdxZFnName() {
   return Names;
 };
 
+#if LLVM_VERSION_MAJOR >= 18
 inline SmallVector<std::unique_ptr<sys::fs::TempFile>>
 codegenSerial(Module &M, StringRef DeviceArch, char OptLevel = '3',
               int CodegenOptLevel = 3) {
@@ -458,6 +459,7 @@ codegenParallelThinLTO(Module &M, StringRef DeviceArch,
 
   return ObjectFiles;
 }
+#endif
 
 inline std::unique_ptr<MemoryBuffer> codegenRTC(Module &M,
                                                 StringRef DeviceArch) {
@@ -534,6 +536,7 @@ codegenObject(Module &M, StringRef DeviceArch,
                          << "Codegen RTC " << T.elapsed() << " ms\n");
     return Ret;
   }
+#if LLVM_VERSION_MAJOR >= 18
   case CodegenOption::Serial:
     ObjectFiles = detail::codegenSerial(M, DeviceArch);
     break;
@@ -543,6 +546,7 @@ codegenObject(Module &M, StringRef DeviceArch,
   case CodegenOption::ParallelThinLTO:
     ObjectFiles = detail::codegenParallelThinLTO(M, DeviceArch);
     break;
+#endif
   default:
     PROTEUS_FATAL_ERROR("Unknown Codegen Option");
   }
@@ -551,7 +555,7 @@ codegenObject(Module &M, StringRef DeviceArch,
     PROTEUS_FATAL_ERROR("Expected non-empty vector of object files");
 
     // TODO: make it work for LLVM < 18 or drop claimed support.
-#if LLVM_VERSION_MAJOR == 18
+#if LLVM_VERSION_MAJOR >= 18
   auto ExpectedF = sys::fs::TempFile::create("proteus-jit-%%%%%%%.o");
   if (auto E = ExpectedF.takeError())
     PROTEUS_FATAL_ERROR("Error creating shared object file " +
