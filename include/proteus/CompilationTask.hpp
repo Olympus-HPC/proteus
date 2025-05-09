@@ -28,7 +28,7 @@ private:
   std::unordered_map<std::string, const void *> VarNameToDevPtr;
   SmallPtrSet<void *, 8> GlobalLinkedBinaries;
   std::string DeviceArch;
-  bool UseRTC;
+  CodegenOption CGOption;
   bool DumpIR;
   bool RelinkGlobalsByCopy;
   bool SpecializeArgs;
@@ -53,7 +53,7 @@ public:
       const SmallVector<std::pair<std::string, StringRef>> &LambdaCalleeInfo,
       const std::unordered_map<std::string, const void *> &VarNameToDevPtr,
       const SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
-      const std::string &DeviceArch, bool UseRTC, bool DumpIR,
+      const std::string &DeviceArch, CodegenOption CGOption, bool DumpIR,
       bool RelinkGlobalsByCopy, bool SpecializeArgs, bool SpecializeDims,
       bool SpecializeLaunchBounds)
       : Bitcode(Bitcode), HashValue(HashValue), KernelName(KernelName),
@@ -61,7 +61,7 @@ public:
         RCIndices(RCIndices), RCVec(RCVec), LambdaCalleeInfo(LambdaCalleeInfo),
         VarNameToDevPtr(VarNameToDevPtr),
         GlobalLinkedBinaries(GlobalLinkedBinaries), DeviceArch(DeviceArch),
-        UseRTC(UseRTC), DumpIR(DumpIR),
+        CGOption(CGOption), DumpIR(DumpIR),
         RelinkGlobalsByCopy(RelinkGlobalsByCopy),
         SpecializeArgs(SpecializeArgs), SpecializeDims(SpecializeDims),
         SpecializeLaunchBounds(SpecializeLaunchBounds) {}
@@ -92,15 +92,16 @@ public:
 
     replaceGlobalVariablesWithPointers(*M, VarNameToDevPtr);
 
-    // For HIP RTC codegen do not run the optimization pipeline since HIP
-    // RTC internally runs it. For the rest of cases, that is CUDA or HIP
-    // with our own codegen instead of RTC, run the target-specific
-    // optimization pipeline to optimize the LLVM IR before handing over
-    // to codegen.
 #if PROTEUS_ENABLE_CUDA
+    // For CUDA we always run the optimization pipeline.
     optimizeIR(*M, DeviceArch, '3', 3);
 #elif PROTEUS_ENABLE_HIP
-    if (!UseRTC)
+    // For HIP RTC codegen we run the optimization pipeline only for Serial and
+    // Parallel codegen since those do not run it internally. HIP RTC and
+    // Parallel ThinLTO invoke optimization internally.
+    // TODO: Move optimizeIR inside the codegen routines?
+    if (CGOption == CodegenOption::Serial ||
+        CGOption == CodegenOption::Parallel)
       optimizeIR(*M, DeviceArch, '3', 3);
 #else
 #error "JitEngineDevice requires PROTEUS_ENABLE_CUDA or PROTEUS_ENABLE_HIP"
@@ -120,7 +121,7 @@ public:
     }
 
     auto ObjBuf =
-        proteus::codegenObject(*M, DeviceArch, GlobalLinkedBinaries, UseRTC);
+        proteus::codegenObject(*M, DeviceArch, GlobalLinkedBinaries, CGOption);
 
     if (!RelinkGlobalsByCopy)
       proteus::relinkGlobalsObject(ObjBuf->getMemBufferRef(), VarNameToDevPtr);

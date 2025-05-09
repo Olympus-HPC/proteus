@@ -217,13 +217,6 @@ void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
   proteus::setLaunchBoundsForKernel(M, F, GridSize, BlockSize);
 }
 
-std::unique_ptr<MemoryBuffer>
-JitEngineDeviceHIP::codegenObject(Module &M, StringRef DeviceArch) {
-  TIMESCOPE("Codegen object");
-  return proteus::codegenObject(M, DeviceArch, GlobalLinkedBinaries,
-                                Config::get().ProteusUseHIPRTCCodegen);
-}
-
 hipFunction_t
 JitEngineDeviceHIP::getKernelFunctionFromImage(StringRef KernelName,
                                                const void *Image) {

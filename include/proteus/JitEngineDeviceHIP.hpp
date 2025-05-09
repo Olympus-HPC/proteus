@@ -98,8 +98,6 @@ public:
 
   std::unique_ptr<Module> extractModule(BinaryInfo &BinInfo);
 
-  std::unique_ptr<MemoryBuffer> codegenObject(Module &M, StringRef DeviceArch);
-
   hipFunction_t getKernelFunctionFromImage(StringRef KernelName,
                                            const void *Image);
 
