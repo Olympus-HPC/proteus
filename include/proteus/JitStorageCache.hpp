@@ -44,12 +44,12 @@ public:
     std::string Filebase =
         StorageDirectory + "/cache-jit-" + HashValue.toString();
 
-    auto CacheBuf = MemoryBuffer::getFile(Filebase + ".o");
+    auto CacheBuf = MemoryBuffer::getFileAsStream(Filebase + ".o");
     if (!CacheBuf)
       return nullptr;
 
     Hits++;
-    return std::move(CacheBuf.get());
+    return std::move(*CacheBuf);
   }
 
   void store(HashT &HashValue, MemoryBufferRef ObjBufRef) {

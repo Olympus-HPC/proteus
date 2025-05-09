@@ -146,8 +146,9 @@ inline void relinkGlobalsObject(
     const std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
   Expected<object::ELF64LEObjectFile> DeviceElfOrErr =
       object::ELF64LEObjectFile::create(Object);
-  if (DeviceElfOrErr.takeError())
-    PROTEUS_FATAL_ERROR("Cannot create the device elf");
+  if (auto E = DeviceElfOrErr.takeError())
+    PROTEUS_FATAL_ERROR("Cannot create the device elf: " +
+                        toString(std::move(E)));
   auto &DeviceElf = *DeviceElfOrErr;
 
   for (auto &[GlobalName, DevPtr] : VarNameToDevPtr) {
