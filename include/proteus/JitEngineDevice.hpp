@@ -223,22 +223,33 @@ public:
     }
 
     auto &BinModule = BinInfo.getModule();
-    std::unique_ptr<Module> KernelModule{nullptr};
-    std::unique_ptr<MemoryBuffer> KernelBitcode{nullptr};
+    std::unique_ptr<Module> KernelModuleTmp{nullptr};
 
     if (Config::get().ProteusUseLightweightKernelClone) {
-      std::tie(KernelModule, KernelBitcode) = proteus::cloneKernelFromModule(
-          BinModule, *KernelInfo.getLLVMContext(), KernelInfo.getName(),
-          BinInfo.getCallGraph());
+      KernelModuleTmp = proteus::cloneKernelFromModule(
+          BinModule, KernelInfo.getName(), BinInfo.getCallGraph());
     } else {
-      KernelModule = llvm::CloneModule(BinModule);
+      KernelModuleTmp = llvm::CloneModule(BinModule);
     }
 
-    internalize(*KernelModule, KernelInfo.getName());
-    runCleanupPassPipeline(*KernelModule);
+    internalize(*KernelModuleTmp, KernelInfo.getName());
+    runCleanupPassPipeline(*KernelModuleTmp);
 
-    KernelInfo.setModule(std::move(KernelModule));
-    KernelInfo.setBitcode(std::move(KernelBitcode));
+    SmallVector<char, 1> ClonedModuleBuffer;
+    raw_svector_ostream ClonedModuleOS(ClonedModuleBuffer);
+    WriteBitcodeToFile(*KernelModuleTmp, ClonedModuleOS);
+    StringRef ClonedModuleRef =
+        StringRef(ClonedModuleBuffer.data(), ClonedModuleBuffer.size());
+    MemoryBufferRef ClonedModuleBufferRef(ClonedModuleRef,
+                                          KernelInfo.getName());
+    auto ExpectedKernelModule =
+        parseBitcodeFile(ClonedModuleBufferRef, *KernelInfo.getLLVMContext());
+    if (auto E = ExpectedKernelModule.takeError())
+      PROTEUS_FATAL_ERROR("Error parsing bitcode: " + toString(std::move(E)));
+
+    KernelInfo.setModule(std::move(*ExpectedKernelModule));
+    KernelInfo.setBitcode(
+        std::move(MemoryBuffer::getMemBufferCopy(ClonedModuleRef)));
   }
 
   Module &getModule(JITKernelInfo &KernelInfo) {

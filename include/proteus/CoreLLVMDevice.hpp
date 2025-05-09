@@ -236,9 +236,8 @@ inline void specializeIR(
   PROTEUS_DBG(Logger::logfile(FnName.str() + ".specialized.ll", M));
 }
 
-inline std::pair<std::unique_ptr<Module>, std::unique_ptr<MemoryBuffer>>
-cloneKernelFromModule(Module &M, LLVMContext &C, const std::string &Name,
-                      CallGraph &CG) {
+inline std::unique_ptr<Module>
+cloneKernelFromModule(Module &M, const std::string &Name, CallGraph &CG) {
   Timer T;
   auto KernelModuleTmp = std::make_unique<Module>("JitModule", M.getContext());
   KernelModuleTmp->setSourceFileName(M.getSourceFileName());
@@ -356,7 +355,8 @@ cloneKernelFromModule(Module &M, LLVMContext &C, const std::string &Name,
                             CloneFunctionChangeType::DifferentModule, Returns);
   }
 
-  // Copy annotations from M into KernelModule now that VMap has been populated.
+  // Copy annotations from M into KernelModuleTmp now that VMap has been
+  // populated.
   const std::string MetadataToCopy[] = {"llvm.annotations", "nvvm.annotations",
                                         "nvvmir.version", "llvm.module.flags"};
   for (auto &MetadataName : MetadataToCopy) {
@@ -402,22 +402,7 @@ cloneKernelFromModule(Module &M, LLVMContext &C, const std::string &Name,
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                        << __FUNCTION__ << " " << T.elapsed() << " ms\n");
 
-  SmallVector<char, 1> ClonedModuleBuffer;
-  BitcodeWriter BCWriter(ClonedModuleBuffer);
-
-  BCWriter.writeModule(*KernelModuleTmp);
-  BCWriter.writeSymtab();
-  BCWriter.writeStrtab();
-  MemoryBufferRef ClonedModuleBufferRef(
-      StringRef(ClonedModuleBuffer.data(), ClonedModuleBuffer.size()),
-      "KernelModuleClone");
-  auto ExpectedKernelModule = parseBitcodeFile(ClonedModuleBufferRef, C);
-  if (auto E = ExpectedKernelModule.takeError())
-    PROTEUS_FATAL_ERROR("Error parsing bitcode: " + toString(std::move(E)));
-
-  return {std::move(*ExpectedKernelModule),
-          MemoryBuffer::getMemBufferCopy(
-              StringRef(ClonedModuleBuffer.data(), ClonedModuleBuffer.size()))};
+  return std::move(KernelModuleTmp);
 }
 
 } // namespace proteus
