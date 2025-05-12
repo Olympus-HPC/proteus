@@ -154,8 +154,9 @@ inline void codegenPTX(Module &M, StringRef DeviceArch,
 inline std::unique_ptr<MemoryBuffer>
 codegenObject(Module &M, StringRef DeviceArch,
               SmallPtrSetImpl<void *> &GlobalLinkedBinaries,
-              [[maybe_unused]] bool UseRTC = true) {
-  assert(UseRTC && "Expected RTC compilation true for CUDA");
+              [[maybe_unused]] CodegenOption CGOption = CodegenOption::RTC) {
+  assert(CGOption == CodegenOption::RTC &&
+         "Only RTC compilation is supported for CUDA");
   SmallVector<char, 4096> PTXStr;
   size_t BinSize;
 

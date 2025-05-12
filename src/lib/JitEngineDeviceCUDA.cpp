@@ -149,12 +149,6 @@ JitEngineDeviceCUDA::launchKernelFunction(CUfunction KernelFunc, dim3 GridDim,
                                        KernelArgs, ShmemSize, Stream);
 }
 
-std::unique_ptr<MemoryBuffer>
-JitEngineDeviceCUDA::codegenObject(Module &M, StringRef DeviceArch) {
-  TIMESCOPE("Codegen object");
-  return proteus::codegenObject(M, DeviceArch, GlobalLinkedBinaries);
-}
-
 JitEngineDeviceCUDA::JitEngineDeviceCUDA() {
   // Initialize CUDA and retrieve the compute capability, needed for later
   // operations.

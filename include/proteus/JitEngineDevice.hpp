@@ -232,7 +232,11 @@ public:
       KernelModuleTmp = llvm::CloneModule(BinModule);
     }
 
-    internalize(*KernelModuleTmp, KernelInfo.getName());
+    // Do not internalize it the codegen backend is thinlto since that performs
+    // its own internalization. Otherwise we do double the work and limit
+    // parallelism at the thinlto backend.
+    if (Config::get().ProteusCodegen != CodegenOption::ParallelThinLTO)
+      internalize(*KernelModuleTmp, KernelInfo.getName());
     runCleanupPassPipeline(*KernelModuleTmp);
 
     SmallVector<char, 1> ClonedModuleBuffer;
@@ -393,10 +397,6 @@ private:
     proteus::relinkGlobalsObject(Object, VarNameToDevPtr);
   }
 
-  std::unique_ptr<MemoryBuffer> codegenObject(Module &M, StringRef DeviceArch) {
-    return static_cast<ImplT &>(*this).codegenObject(M, DeviceArch);
-  }
-
   KernelFunction_t getKernelFunctionFromImage(StringRef KernelName,
                                               const void *Image) {
     TIMESCOPE(__FUNCTION__);
@@ -543,7 +543,7 @@ JitEngineDevice<ImplT>::compileAndRun(
           GridDim, KernelInfo.getRCIndices(), RCVec,
           KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr,
           GlobalLinkedBinaries, DeviceArch,
-          /* UseRTC */ Config::get().ProteusUseHIPRTCCodegen,
+          /* CGOption */ Config::get().ProteusCodegen,
           /* DumpIR */ Config::get().ProteusDumpLLVMIR,
           /* RelinkGlobalsByCopy */ Config::get().ProteusRelinkGlobalsByCopy,
           /*SpecializeArgs=*/Config::get().ProteusSpecializeArgs,
@@ -568,7 +568,7 @@ JitEngineDevice<ImplT>::compileAndRun(
         GridDim, KernelInfo.getRCIndices(), RCVec,
         KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr, GlobalLinkedBinaries,
         DeviceArch,
-        /* UseRTC */ Config::get().ProteusUseHIPRTCCodegen,
+        /* CGOption */ Config::get().ProteusCodegen,
         /* DumpIR */ Config::get().ProteusDumpLLVMIR,
         /* RelinkGlobalsByCopy */ Config::get().ProteusRelinkGlobalsByCopy,
         /*SpecializeArgs=*/Config::get().ProteusSpecializeArgs,
@@ -576,6 +576,9 @@ JitEngineDevice<ImplT>::compileAndRun(
         /*SpecializeLaunchBounds=*/
         Config::get().ProteusSpecializeLaunchBounds});
   }
+
+  if (!ObjBuf)
+    PROTEUS_FATAL_ERROR("Expected non-null object");
 
   KernelFunc = proteus::getKernelFunctionFromImage(
       KernelMangled, ObjBuf->getBufferStart(),
