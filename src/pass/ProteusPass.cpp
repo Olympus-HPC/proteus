@@ -27,6 +27,7 @@
 
 #include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/ADT/StringRef.h>
+#include <llvm/ADT/StringSet.h>
 #include <llvm/Analysis/CallGraph.h>
 #include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/Demangle/Demangle.h>
@@ -45,6 +46,7 @@
 #include <llvm/IR/Mangler.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/IRReader/IRReader.h>
 #include <llvm/Object/ELF.h>
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Passes/PassPlugin.h>
@@ -467,7 +469,69 @@ private:
   void emitJitModuleDevice(Module &M, bool IsLTO) {
     SmallVector<char, 4096> Bitcode;
     raw_svector_ostream OS(Bitcode);
-    WriteBitcodeToFile(M, OS);
+
+    // For LTO, prune the Module to include only possibly used definitions that
+    // are not in the individual, per-TU extracted bitcode.
+    if (IsLTO) {
+      // Gather all definitions in per-TU extracted bitcodes.
+      StringSet DefSet;
+      for (auto &GVar : M.globals()) {
+        if (!GVar.hasName())
+          continue;
+
+        if (!GVar.getName().starts_with("_jit_bitcode"))
+          continue;
+
+        // Found an extracted bitcode global variable, lazy parse the IR and
+        // store definitions.
+        ConstantDataArray *JitModule =
+            dyn_cast<ConstantDataArray>(GVar.getInitializer());
+        assert(JitModule && "Expected non-null bitcode for JIT module");
+        StringRef Bitcode = JitModule->getAsString();
+
+        LLVMContext Ctx;
+        MemoryBufferRef Buffer{Bitcode, GVar.getName()};
+        auto ExpectedParsedModule = getLazyBitcodeModule(Buffer, Ctx);
+        if (auto E = ExpectedParsedModule.takeError())
+          PROTEUS_FATAL_ERROR("Error: " + toString(std::move(E)));
+        auto ParsedModule = std::move(*ExpectedParsedModule);
+        for (auto &F : ParsedModule->getFunctionList()) {
+          if (!F.isDeclaration())
+            DefSet.insert(F.getName());
+        }
+      }
+
+      // Callback returns true only for global values not in the definition set
+      // and also avoids unneeded global variables.
+      auto ShouldClone = [&DefSet](const GlobalValue *GV) {
+        if (GV->hasName()) {
+          if (DefSet.contains(GV->getName()))
+            return false;
+
+          if (GV->getName().starts_with("__clang_gpu_used_external") ||
+              GV->getName().starts_with("_jit_bitcode") ||
+              GV->getName().starts_with("__hip_cuid") ||
+              GV->getName().starts_with("llvm.global.annotations") ||
+              GV->getName().starts_with("llvm.used") ||
+              GV->getName().starts_with("llvm.compiler.used"))
+            return false;
+        }
+
+        return true;
+      };
+
+      ValueToValueMapTy VMap;
+      auto PrunedM = CloneModule(M, VMap, ShouldClone);
+
+      StripDebugInfo(*PrunedM);
+
+      WriteBitcodeToFile(*PrunedM, OS);
+      if (verifyModule(*PrunedM, &errs()))
+        PROTEUS_FATAL_ERROR(
+            "Broken pruned lto module found, compilation aborted!");
+    } else {
+      WriteBitcodeToFile(M, OS);
+    }
 
     HashT HashValue = hash(StringRef{Bitcode.data(), Bitcode.size()});
 
