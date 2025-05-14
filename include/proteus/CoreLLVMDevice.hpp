@@ -580,7 +580,6 @@ struct LinkingCloner {
             GV->getLinkage(), nullptr, GV->getName(), nullptr,
             GV->getThreadLocalMode(), GV->getAddressSpace());
         NG->copyAttributesFrom(GVar);
-        NG->setAlignment(Align{GVar->getAlignment()});
         VMap[GVar] = NG;
 
         for (auto *DeclGV : ResolvedMap[GVar])
