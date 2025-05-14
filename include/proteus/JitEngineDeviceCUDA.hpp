@@ -37,7 +37,7 @@ public:
   void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
                                 int BlockSize);
 
-  std::unique_ptr<Module> extractModule(BinaryInfo &BinInfo);
+  void extractModules(BinaryInfo &BinInfo);
 
   void codegenPTX(Module &M, StringRef DeviceArch,
                   SmallVectorImpl<char> &PTXStr);

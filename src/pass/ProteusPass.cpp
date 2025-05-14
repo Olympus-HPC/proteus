@@ -68,6 +68,7 @@
 
 #include <iostream>
 #include <string>
+#include <variant>
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Error.h"
@@ -466,77 +467,388 @@ private:
           << *JitMod << "=== End of Final Host JIT Module\n");
   }
 
-  void emitJitModuleDevice(Module &M, bool IsLTO) {
-    SmallVector<char, 4096> Bitcode;
-    raw_svector_ostream OS(Bitcode);
+  // Returns true for globals that are not needed when cloning to extract a
+  // module.
+  static bool skipGlobal(const GlobalValue &G) {
+    if (G.getName().starts_with("_jit_bitcode") ||
+        G.getName().starts_with("__clang_gpu_used_external") ||
+        G.getName().starts_with("__hip_cuid") ||
+        G.getName().starts_with("llvm.used") ||
+        G.getName().starts_with("llvm.compiler.used") ||
+        G.getName().starts_with("llvm.global.annotations"))
+      return true;
 
-    // For LTO, prune the Module to include only possibly used definitions that
-    // are not in the individual, per-TU extracted bitcode.
-    if (IsLTO) {
-      // Gather all definitions in per-TU extracted bitcodes.
+    return false;
+  }
+
+  void writeLinkedBitcodeToFile(Module &LTOModule, raw_ostream &OS) {
+    // Top-level context used for parsed and create modules so that all global
+    // values and metadata are under the same context for cloning.
+    LLVMContext Ctx;
+    auto LinkedModule = std::make_unique<Module>("linked.module", Ctx);
+    LinkedModule->setSourceFileName("linked.module");
+    LinkedModule->setDataLayout(LTOModule.getDataLayout());
+    LinkedModule->setTargetTriple(LTOModule.getTargetTriple());
+    LinkedModule->setModuleInlineAsm(LTOModule.getModuleInlineAsm());
+#if LLVM_VERSION_MAJOR >= 18
+    LinkedModule->IsNewDbgInfoFormat = LTOModule.IsNewDbgInfoFormat;
+#endif
+
+    // Gather all extracted modules and the pruned LTO module.
+    SmallVector<std::unique_ptr<Module>> LinkedModules;
+    auto ExtractLinkedModules = [&Ctx, &LTOModule, &LinkedModules]() {
       StringSet DefSet;
-      for (auto &GVar : M.globals()) {
+      for (auto &GVar : LTOModule.globals()) {
         if (!GVar.hasName())
           continue;
 
         if (!GVar.getName().starts_with("_jit_bitcode"))
           continue;
 
-        // Found an extracted bitcode global variable, lazy parse the IR and
-        // store definitions.
+        // Found an extracted bitcode global variable, parse the IR and
+        // store the names of definitions to prune the LTO module.
         ConstantDataArray *JitModule =
             dyn_cast<ConstantDataArray>(GVar.getInitializer());
         assert(JitModule && "Expected non-null bitcode for JIT module");
-        StringRef Bitcode = JitModule->getAsString();
+        StringRef BitcodeData = JitModule->getAsString();
 
-        LLVMContext Ctx;
-        MemoryBufferRef Buffer{Bitcode, GVar.getName()};
-        auto ExpectedParsedModule = getLazyBitcodeModule(Buffer, Ctx);
+        // It is imported to preserve the unique global variable name as the
+        // module name for the parsed module. It will be used later to create
+        // unique symbols for linking modules together.
+        MemoryBufferRef MBRef{BitcodeData, GVar.getName()};
+        auto ExpectedParsedModule = parseBitcodeFile(MBRef, Ctx);
         if (auto E = ExpectedParsedModule.takeError())
           PROTEUS_FATAL_ERROR("Error: " + toString(std::move(E)));
         auto ParsedModule = std::move(*ExpectedParsedModule);
-        for (auto &F : ParsedModule->getFunctionList()) {
-          if (!F.isDeclaration())
-            DefSet.insert(F.getName());
+        for (auto &G : ParsedModule->global_values()) {
+          if (!G.isDeclaration())
+            DefSet.insert(G.getName());
         }
+
+        LinkedModules.push_back(std::move(ParsedModule));
       }
 
-      // Callback returns true only for global values not in the definition set
-      // and also avoids unneeded global variables.
       auto ShouldClone = [&DefSet](const GlobalValue *GV) {
         if (GV->hasName()) {
           if (DefSet.contains(GV->getName()))
             return false;
 
-          if (GV->getName().starts_with("__clang_gpu_used_external") ||
-              GV->getName().starts_with("_jit_bitcode") ||
-              GV->getName().starts_with("__hip_cuid") ||
-              GV->getName().starts_with("llvm.global.annotations") ||
-              GV->getName().starts_with("llvm.used") ||
-              GV->getName().starts_with("llvm.compiler.used"))
+          if (skipGlobal(*GV))
             return false;
         }
 
         return true;
       };
-
+      // Create pruned LTO module avoiding unneeded globals and globals in
+      // the DefSet. Roundtrip it through bitcode parsing to the top-level
+      // context.
       ValueToValueMapTy VMap;
-      auto PrunedM = CloneModule(M, VMap, ShouldClone);
+      auto PrunedLTOModule = CloneModule(LTOModule, VMap, ShouldClone);
+      for (auto &G : PrunedLTOModule->global_values())
+        if (G.hasInternalLinkage())
+          G.setLinkage(GlobalValue::ExternalLinkage);
 
-      StripDebugInfo(*PrunedM);
+      StripDebugInfo(*PrunedLTOModule);
 
-      WriteBitcodeToFile(*PrunedM, OS);
-      if (verifyModule(*PrunedM, &errs()))
+      if (verifyModule(*PrunedLTOModule, &errs()))
         PROTEUS_FATAL_ERROR(
             "Broken pruned lto module found, compilation aborted!");
+
+      SmallVector<char> Bitcode;
+      raw_svector_ostream BOS{Bitcode};
+      WriteBitcodeToFile(*PrunedLTOModule, BOS);
+      MemoryBufferRef MBRef{StringRef{Bitcode.data(), Bitcode.size()},
+                            "pruned.lto.module"};
+      auto ExpectedPrunedLTOModuleInCtx = parseBitcodeFile(MBRef, Ctx);
+      if (auto E = ExpectedPrunedLTOModuleInCtx.takeError())
+        PROTEUS_FATAL_ERROR("Error parsing pruned lto module " +
+                            toString(std::move(E)));
+      LinkedModules.push_back(std::move(*ExpectedPrunedLTOModuleInCtx));
+    };
+
+    ExtractLinkedModules();
+
+    // Find all definitions, assumed unique and prevailing, and all preserved
+    // declarations which are intrinsics or others lowered in backends.
+    struct FuncDeclInfo {
+      FunctionType *FuncTy;
+      AttributeList Attributes;
+    };
+
+    struct GlobDeclInfo {
+      Type *ValueType;
+      bool IsConstant;
+      GlobalValue::ThreadLocalMode TLM;
+      AttributeSet Attributes;
+    };
+
+    struct DeclInfo {
+      GlobalValue::LinkageTypes Linkage;
+      unsigned int AddrSpace;
+      SmallPtrSet<GlobalValue *, 32> GVs;
+      std::variant<FuncDeclInfo, GlobDeclInfo> Specific;
+
+      const FuncDeclInfo *asFunc() const {
+        return std::get_if<FuncDeclInfo>(&Specific);
+      }
+      const GlobDeclInfo *asGlobal() const {
+        return std::get_if<GlobDeclInfo>(&Specific);
+      }
+    };
+
+    struct DefInfo {
+      GlobalValue *PrevailingGV;
+      SmallPtrSet<GlobalValue *, 32> ResolvedGVs;
+    };
+
+    StringMap<DefInfo> Defs;
+    StringMap<DeclInfo> Decls;
+    BumpPtrAllocator Alloc;
+    StringSaver StringStorage{Alloc};
+    auto ResolveDefsAndDecls = [&Defs, &Decls, &LinkedModules,
+                                &StringStorage]() {
+      // Find all definitions across modules.
+      for (auto &Mod : LinkedModules) {
+        for (auto &G : Mod->global_values()) {
+          // Skip unneeded globals.
+          if (skipGlobal(G))
+            continue;
+
+          // Skip if declaration.
+          if (G.isDeclaration())
+            continue;
+
+          // We insert the definition. If there exists one already, we assume
+          // the definition resolves to this existing one since the modules
+          // are linkable.
+          DefInfo DI{&G, {}};
+          // Make a unique Symbol using the unique module name for global values
+          // with private linkage for mapping.
+          // NOTE: The AMDGPU device runtime library defines functions with
+          // internal linkage. We merge them here to resolve to the same symbol.
+          StringRef Symbol = G.hasPrivateLinkage()
+                                 ? StringStorage.save(G.getName() + "." +
+                                                      G.getParent()->getName())
+                                 : G.getName();
+          auto [It, IsInserted] = Defs.insert({Symbol, DI});
+          if (!IsInserted) {
+            It->getValue().ResolvedGVs.insert(&G);
+          }
+        }
+      }
+
+      // Find all declarations, resolve them to definitions if available.
+      for (auto &Mod : LinkedModules) {
+        for (auto &G : Mod->global_values()) {
+          // Skip unneeded globals.
+          if (skipGlobal(G))
+            continue;
+
+          // Skip if not a declaration.
+          if (!G.isDeclaration())
+            continue;
+
+          // If there is a definition, add the global value to the resolved
+          // vector in the definition info.
+          if (Defs.contains(G.getName())) {
+            Defs[G.getName()].ResolvedGVs.insert(&G);
+            continue;
+          }
+
+          // If there is a declaration, add the global value to the common set
+          // of declaration GVs.
+          if (Decls.contains(G.getName())) {
+            Decls[G.getName()].GVs.insert(&G);
+            continue;
+          }
+
+          // Create a declaration with specific info.
+          DeclInfo DI = {G.getLinkage(), G.getAddressSpace(), {&G}, {}};
+          if (auto *F = dyn_cast<Function>(&G)) {
+            DI.Specific =
+                FuncDeclInfo{F->getFunctionType(), F->getAttributes()};
+          } else if (auto *GV = dyn_cast<GlobalVariable>(&G)) {
+            DI.Specific =
+                GlobDeclInfo{GV->getValueType(), GV->isConstant(),
+                             GV->getThreadLocalMode(), GV->getAttributes()};
+          } else {
+            PROTEUS_FATAL_ERROR("Unsupported global value " + G.getName());
+          }
+
+          Decls.insert({G.getName(), DI});
+        }
+      }
+    };
+
+    ResolveDefsAndDecls();
+
+    // Create single, fully-linked module.
+    auto CreateLinkedModule = [&LinkedModule, &Decls, &Defs, &LinkedModules]() {
+      ValueToValueMapTy VMap;
+      // Create skeleton declarations for both Decls and Defs and populate the
+      // VMap.
+      for (auto &[Symbol, DI] : Decls) {
+        if (auto *FI = DI.asFunc()) {
+          Function *NF = Function::Create(FI->FuncTy, DI.Linkage, DI.AddrSpace,
+                                          Symbol, LinkedModule.get());
+          NF->setAttributes(FI->Attributes);
+          for (auto *GV : DI.GVs)
+            VMap[GV] = NF;
+        } else if (auto *GI = DI.asGlobal()) {
+          auto *NG = new GlobalVariable(*LinkedModule, GI->ValueType,
+                                        GI->IsConstant, DI.Linkage, nullptr,
+                                        Symbol, nullptr, GI->TLM, DI.AddrSpace);
+          NG->setAttributes(GI->Attributes);
+          for (auto *GV : DI.GVs)
+            VMap[GV] = NG;
+        } else {
+          PROTEUS_FATAL_ERROR("Unsupported global value " + Symbol);
+        }
+      }
+
+      for (auto &[Symbol, DI] : Defs) {
+        if (auto *F = dyn_cast<Function>(DI.PrevailingGV)) {
+          Function *NF = Function::Create(F->getFunctionType(), F->getLinkage(),
+                                          F->getAddressSpace(), F->getName(),
+                                          LinkedModule.get());
+          NF->setAttributes(F->getAttributes());
+          VMap[F] = NF;
+          for (auto *G : DI.ResolvedGVs)
+            VMap[G] = NF;
+        } else if (auto *GV = dyn_cast<GlobalVariable>(DI.PrevailingGV)) {
+          auto *NG = new GlobalVariable(
+              *LinkedModule, GV->getValueType(), GV->isConstant(),
+              GV->getLinkage(), nullptr, GV->getName(), nullptr,
+              GV->getThreadLocalMode(), GV->getAddressSpace());
+          NG->copyAttributesFrom(GV);
+          VMap[GV] = NG;
+          for (auto *G : DI.ResolvedGVs)
+            VMap[G] = NG;
+        } else {
+          PROTEUS_FATAL_ERROR("Unsupported global value " + Symbol);
+        }
+      }
+
+      for (auto &[Symbol, DI] : Defs) {
+        if (auto *F = dyn_cast<Function>(DI.PrevailingGV)) {
+          Function *NF = cast<Function>(VMap[F]);
+          SmallVector<ReturnInst *, 8> Returns;
+          Function::arg_iterator DestI = NF->arg_begin();
+          for (const Argument &I : F->args())
+            if (VMap.count(&I) == 0) {
+              DestI->setName(I.getName());
+              VMap[&I] = &*DestI++;
+            }
+
+          CloneFunctionInto(
+              NF, F, VMap,
+              /*Changes=*/CloneFunctionChangeType::DifferentModule, Returns);
+        } else if (auto *GVar = dyn_cast<GlobalVariable>(DI.PrevailingGV)) {
+          auto *NG = cast<GlobalVariable>(VMap[GVar]);
+          if (GVar->hasInitializer())
+            NG->setInitializer(MapValue(GVar->getInitializer(), VMap));
+        } else
+          PROTEUS_FATAL_ERROR("Unsupported global value " + Symbol);
+      }
+
+      // Copy annotations from M into KernelModuleTmp now that VMap has been
+      // populated.
+      const std::string MetadataToCopy[] = {
+          "llvm.annotations",  "nvvm.annotations",   "nvvmir.version",
+          "llvm.module.flags", "opencl.ocl.version", "llvm.ident"};
+      auto &PrunedLTOModule = LinkedModules.back();
+      for (auto &MetadataName : MetadataToCopy) {
+        NamedMDNode *NamedMD = PrunedLTOModule->getNamedMetadata(MetadataName);
+        if (!NamedMD)
+          continue;
+
+        auto *NewNamedMD = LinkedModule->getOrInsertNamedMetadata(MetadataName);
+        for (unsigned I = 0, E = NamedMD->getNumOperands(); I < E; ++I) {
+          MDNode *MDEntry = NamedMD->getOperand(I);
+          bool ShouldClone = true;
+          // Skip if the operands of an MDNode refer to non-existing,
+          // unreachable global values.
+          for (auto &Operand : MDEntry->operands()) {
+            Metadata *MD = Operand.get();
+            auto *CMD = dyn_cast<ConstantAsMetadata>(MD);
+            if (!CMD)
+              continue;
+
+            auto *GV = dyn_cast<GlobalValue>(CMD->getValue());
+            if (!GV)
+              continue;
+
+            if (!VMap.count(GV)) {
+              ShouldClone = false;
+              break;
+            }
+          }
+
+          if (!ShouldClone)
+            continue;
+
+          NewNamedMD->addOperand(MapMetadata(MDEntry, VMap));
+        }
+      }
+
+      if (verifyModule(*LinkedModule, &errs()))
+        PROTEUS_FATAL_ERROR("Broken linked module found, compilation aborted!");
+    };
+
+    CreateLinkedModule();
+
+    StripDebugInfo(*LinkedModule);
+    runCleanupPassPipeline(*LinkedModule);
+    WriteBitcodeToFile(*LinkedModule, OS);
+  }
+
+  void emitJitModuleDevice(Module &M, bool IsLTO) {
+    SmallVector<char> Bitcode;
+    raw_svector_ostream OS(Bitcode);
+
+    // For LTO, supported only in HIP RDC, create the linked module AOT by
+    // linking all the modules and a pruned LTO module.
+    if (IsLTO) {
+      writeLinkedBitcodeToFile(M, OS);
+
+      SmallPtrSet<GlobalVariable *, 32> RemoveBitcodesGVs;
+      for (auto &G : M.globals()) {
+        if (!G.getName().starts_with("_jit_bitcode"))
+          continue;
+
+        if (G.getName() == "_jit_bitcode_lto")
+          continue;
+
+        removeFromUsedLists(M, [&G](Constant *C) {
+          if (&G == C)
+            return true;
+
+          return false;
+        });
+        RemoveBitcodesGVs.insert(&G);
+      }
+
+      for (auto *G : RemoveBitcodesGVs)
+        M.eraseGlobalVariable(G);
+
     } else {
-      WriteBitcodeToFile(M, OS);
+      ValueToValueMapTy VMap;
+      auto ShouldClone = [](const GlobalValue *G) {
+        if (skipGlobal(*G))
+          return false;
+
+        return true;
+      };
+      auto EmitM = CloneModule(M, VMap, ShouldClone);
+      runCleanupPassPipeline(*EmitM);
+
+      WriteBitcodeToFile(*EmitM, OS);
     }
 
     HashT HashValue = hash(StringRef{Bitcode.data(), Bitcode.size()});
 
     std::string GVName =
-        (IsLTO ? "__jit_bitcode_lto" : getJitBitcodeUniqueName(M));
+        (IsLTO ? "_jit_bitcode_lto" : getJitBitcodeUniqueName(M));
     //  NOTE: HIP compilation supports custom section in the binary to store the
     //  IR. CUDA does not, hence we parse the IR by reading the global from the
     //  device memory.

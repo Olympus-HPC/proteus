@@ -11,6 +11,7 @@
 
 #if defined(PROTEUS_ENABLE_HIP) || defined(PROTEUS_ENABLE_CUDA)
 
+#include <llvm/ADT/StringSet.h>
 #include <llvm/Analysis/CallGraph.h>
 #include <llvm/Bitcode/BitcodeReader.h>
 #include <llvm/Bitcode/BitcodeWriter.h>
@@ -239,7 +240,6 @@ inline void specializeIR(
 
 inline std::unique_ptr<Module>
 cloneKernelFromModule(Module &M, const std::string &Name, CallGraph &CG) {
-  Timer T;
   auto KernelModuleTmp = std::make_unique<Module>("JitModule", M.getContext());
   KernelModuleTmp->setSourceFileName(M.getSourceFileName());
   KernelModuleTmp->setDataLayout(M.getDataLayout());
@@ -400,10 +400,344 @@ cloneKernelFromModule(Module &M, const std::string &Name, CallGraph &CG) {
     PROTEUS_FATAL_ERROR("Broken mini-module found, JIT compilation aborted!");
 #endif
 
-  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
-                       << __FUNCTION__ << " " << T.elapsed() << " ms\n");
+  return KernelModuleTmp;
+}
 
-  return std::move(KernelModuleTmp);
+struct LinkingCloner {
+  // Definitions maps that map symbol name to GlobalValue.
+  struct DefMaps {
+    StringMap<Function *> FuncDefs;
+    StringMap<GlobalVariable *> GlobDefs;
+  };
+
+  // Stores declaration prototype and GVs that map to it.
+  struct FuncDeclInfo {
+    FunctionType *FuncTy;
+    GlobalValue::LinkageTypes Linkage;
+    unsigned int AddrSpace;
+    AttributeList Attributes;
+    SmallPtrSet<GlobalValue *, 32> GVs;
+  };
+
+  struct GlobDeclInfo {
+    Type *ValueType;
+    bool IsConstant;
+    GlobalValue::LinkageTypes Linkage;
+    Constant *Initializer;
+    GlobalValue::ThreadLocalMode TLM;
+    unsigned int AddrSpace;
+    AttributeSet Attributes;
+    SmallPtrSet<GlobalValue *, 32> GVs;
+  };
+
+  // Maps a resolved GV to cross-module GV references.
+  DenseMap<GlobalValue *, SmallVector<GlobalValue *>> ResolvedMap;
+  // Stores declaration info by symbol name to clone and update references.
+  StringMap<FuncDeclInfo> FuncDecls;
+  StringMap<GlobDeclInfo> GlobDecls;
+
+  DefMaps buildDefMaps(ArrayRef<std::unique_ptr<Module>> Mods) {
+    DefMaps SymbolMaps;
+    for (auto &M : Mods) {
+      for (Function &F : M->functions())
+        if (!F.isDeclaration())
+          SymbolMaps.FuncDefs[F.getName()] = &F;
+      for (GlobalVariable &G : M->globals())
+        if (G.hasInitializer())
+          SymbolMaps.GlobDefs[G.getName()] = &G;
+    }
+    return SymbolMaps;
+  }
+
+  // Resolve GlobalValue to its definition across modules or fallback to the
+  // declartion if not found (e.g., intrinsics). Add to WorkList if unseen.
+  void resolveGV(const DefMaps &Defs, GlobalValue *G,
+                 SmallVector<GlobalValue *> &WorkList,
+                 SmallPtrSetImpl<GlobalValue *> &Found) {
+    GlobalValue *ResolvedGV = nullptr;
+    if (auto *F = dyn_cast<Function>(G)) {
+      if (!F->isDeclaration())
+        ResolvedGV = F;
+      else if (auto *D = Defs.FuncDefs.lookup(F->getName()))
+        ResolvedGV = D;
+      else {
+        if (FuncDecls.contains(F->getName()))
+          FuncDecls[F->getName()].GVs.insert(G);
+        else
+          FuncDecls[F->getName()] = {F->getFunctionType(),
+                                     F->getLinkage(),
+                                     F->getAddressSpace(),
+                                     F->getAttributes(),
+                                     {G}};
+      }
+    } else if (auto *GV = dyn_cast<GlobalVariable>(G)) {
+      if (GV->hasInitializer())
+        ResolvedGV = GV;
+      else if (auto *D = Defs.GlobDefs.lookup(GV->getName()))
+        ResolvedGV = D;
+      else {
+        if (GlobDecls.contains(GV->getName()))
+          GlobDecls[GV->getName()].GVs.insert(G);
+        else
+          GlobDecls[GV->getName()] = {
+              GV->getValueType(),       GV->isConstant(),
+              GV->getLinkage(),         nullptr,
+              GV->getThreadLocalMode(), GV->getAddressSpace(),
+              GV->getAttributes(),      {G}};
+      }
+    } else
+      PROTEUS_FATAL_ERROR("Unsupported global value");
+
+    if (ResolvedGV && Found.insert(ResolvedGV).second) {
+      WorkList.push_back(ResolvedGV);
+      ResolvedMap[ResolvedGV].push_back(G);
+    }
+  }
+
+  void scanConstant(Constant *C, const DefMaps &Defs,
+                    SmallVector<GlobalValue *> &WorkList,
+                    SmallPtrSetImpl<GlobalValue *> &Found) {
+    // If this is a constant expression (e.g.,  bitcast), unwrap and scan its
+    // operand.
+    if (auto *CE = dyn_cast<ConstantExpr>(C)) {
+      if (CE->isCast())
+        scanConstant(CE->getOperand(0), Defs, WorkList, Found);
+    }
+
+    // If C itself is a global value resolve its definition.
+    if (auto *G = dyn_cast<GlobalValue>(C))
+      resolveGV(Defs, G, WorkList, Found);
+
+    // Recurse into any operand constants.
+    for (unsigned I = 0, E = C->getNumOperands(); I != E; ++I)
+      if (auto *OpC = dyn_cast<Constant>(C->getOperand(I)))
+        scanConstant(OpC, Defs, WorkList, Found);
+  }
+
+  SmallPtrSet<GlobalValue *, 32> findTransitiveClosure(Function *Entry,
+                                                       const DefMaps &Defs) {
+    SmallPtrSet<GlobalValue *, 32> Found;
+    SmallVector<GlobalValue *> WorkList;
+
+    // Seed with the entry function.
+    resolveGV(Defs, Entry, WorkList, Found);
+
+    // Process DFS work-list.
+    while (!WorkList.empty()) {
+      auto *GV = WorkList.pop_back_val();
+
+      if (auto *F = dyn_cast<Function>(GV)) {
+        for (auto &BB : *F) {
+          for (auto &I : BB) {
+            // Add direct calls to other functions.
+            if (auto *CB = dyn_cast<CallBase>(&I))
+              if (Function *Callee = CB->getCalledFunction())
+                resolveGV(Defs, Callee, WorkList, Found);
+
+            // Scan GlobalValue operands or Constants.
+            for (Use &U : I.operands()) {
+              Value *Op = U.get()->stripPointerCasts();
+              if (auto *GVOp = dyn_cast<GlobalValue>(Op)) {
+                resolveGV(Defs, GVOp, WorkList, Found);
+              } else if (auto *C = dyn_cast<Constant>(Op)) {
+                scanConstant(C, Defs, WorkList, Found);
+              }
+            }
+          }
+        }
+      } else if (auto *GVar = dyn_cast<GlobalVariable>(GV)) {
+        if (auto *Init = GVar->getInitializer())
+          scanConstant(Init, Defs, WorkList, Found);
+      } else {
+        PROTEUS_FATAL_ERROR("Unsupported global value");
+      }
+    }
+
+    return Found;
+  }
+
+  std::unique_ptr<Module>
+  cloneClosure(Module &M, LLVMContext &Ctx,
+               SmallPtrSetImpl<GlobalValue *> const &Reachable) {
+    auto ModuleOut =
+        std::make_unique<Module>(M.getName().str() + ".closure.clone", Ctx);
+    ModuleOut->setSourceFileName(M.getSourceFileName());
+    ModuleOut->setDataLayout(M.getDataLayout());
+    ModuleOut->setTargetTriple(M.getTargetTriple());
+    ModuleOut->setModuleInlineAsm(M.getModuleInlineAsm());
+#if LLVM_VERSION_MAJOR >= 18
+    ModuleOut->IsNewDbgInfoFormat = M.IsNewDbgInfoFormat;
+#endif
+
+    ValueToValueMapTy VMap;
+
+    // Emit the function declarations.
+    for (auto &D : FuncDecls) {
+      StringRef FuncName = D.getKey();
+      FuncDeclInfo &FuncInfo = D.getValue();
+      Function *NF =
+          Function::Create(FuncInfo.FuncTy, FuncInfo.Linkage,
+                           FuncInfo.AddrSpace, FuncName, ModuleOut.get());
+      NF->setAttributes(FuncInfo.Attributes);
+      for (auto *GV : FuncInfo.GVs)
+        VMap[GV] = NF;
+    }
+
+    // Emit the global variable declarations.
+    for (auto &D : GlobDecls) {
+      StringRef GVName = D.getKey();
+      GlobDeclInfo &GlobInfo = D.getValue();
+      auto *NG = new GlobalVariable(
+          *ModuleOut, GlobInfo.ValueType, GlobInfo.IsConstant, GlobInfo.Linkage,
+          nullptr, GVName, nullptr, GlobInfo.TLM, GlobInfo.AddrSpace);
+      NG->setAttributes(GlobInfo.Attributes);
+      for (auto *GV : GlobInfo.GVs)
+        VMap[GV] = NG;
+    }
+
+    // Create unpopulated declarations.
+    for (GlobalValue *GV : Reachable) {
+      if (auto *F = dyn_cast<Function>(GV)) {
+        Function *NF = Function::Create(F->getFunctionType(), F->getLinkage(),
+                                        F->getAddressSpace(), F->getName(),
+                                        ModuleOut.get());
+        NF->copyAttributesFrom(F);
+        VMap[F] = NF;
+
+        for (auto *DeclGV : ResolvedMap[F])
+          VMap[DeclGV] = NF;
+      } else if (auto *GVar = dyn_cast<GlobalVariable>(GV)) {
+        auto *NG = new GlobalVariable(
+            *ModuleOut, GV->getValueType(), GVar->isConstant(),
+            GV->getLinkage(), nullptr, GV->getName(), nullptr,
+            GV->getThreadLocalMode(), GV->getAddressSpace());
+        NG->copyAttributesFrom(GVar);
+        VMap[GVar] = NG;
+
+        for (auto *DeclGV : ResolvedMap[GVar])
+          VMap[DeclGV] = NG;
+      } else
+        PROTEUS_FATAL_ERROR("Unsupported global value");
+    }
+
+    // Clone function bodies and global variable initializers.
+    for (GlobalValue *GV : Reachable) {
+      if (auto *F = dyn_cast<Function>(GV)) {
+        Function *NF = cast<Function>(VMap[F]);
+        SmallVector<ReturnInst *, 8> Returns;
+        Function::arg_iterator DestI = NF->arg_begin();
+        for (const Argument &I : F->args())
+          if (VMap.count(&I) == 0) {
+            DestI->setName(I.getName());
+            VMap[&I] = &*DestI++;
+          }
+
+        CloneFunctionInto(NF, F, VMap,
+                          /*Changes=*/CloneFunctionChangeType::DifferentModule,
+                          Returns);
+      } else if (auto *GVar = dyn_cast<GlobalVariable>(GV)) {
+
+        auto *NG = cast<GlobalVariable>(VMap[GVar]);
+        if (GVar->hasInitializer())
+          NG->setInitializer(MapValue(GVar->getInitializer(), VMap));
+      } else
+        PROTEUS_FATAL_ERROR("Unsupported global value");
+    }
+
+    // Copy annotations from the entry module M into KernelModuleTmp now that
+    // VMap has been populated.
+    const std::string MetadataToCopy[] = {"llvm.annotations",
+                                          "nvvm.annotations", "nvvmir.version",
+                                          "llvm.module.flags"};
+    for (auto &MetadataName : MetadataToCopy) {
+      NamedMDNode *NamedMD = M.getNamedMetadata(MetadataName);
+      if (!NamedMD)
+        continue;
+
+      auto *NewNamedMD = ModuleOut->getOrInsertNamedMetadata(MetadataName);
+      for (unsigned I = 0, E = NamedMD->getNumOperands(); I < E; ++I) {
+        MDNode *MDEntry = NamedMD->getOperand(I);
+        bool ShouldClone = true;
+        // Skip if the operands of an MDNode refer to non-existing,
+        // unreachable global values.
+        for (auto &Operand : MDEntry->operands()) {
+          Metadata *MD = Operand.get();
+          auto *CMD = dyn_cast<ConstantAsMetadata>(MD);
+          if (!CMD)
+            continue;
+
+          auto *GV = dyn_cast<GlobalValue>(CMD->getValue());
+          if (!GV)
+            continue;
+
+          if (!VMap.count(GV)) {
+            ShouldClone = false;
+            break;
+          }
+        }
+
+        if (!ShouldClone)
+          continue;
+
+        NewNamedMD->addOperand(MapMetadata(MDEntry, VMap));
+      }
+    }
+
+#if PROTEUS_ENABLE_DEBUG
+    if (verifyModule(*ModuleOut, &errs()))
+      PROTEUS_FATAL_ERROR(
+          "Broken cross-module clone found, JIT compilation aborted!");
+#endif
+    return ModuleOut;
+  }
+};
+
+inline std::unique_ptr<Module>
+cloneKernelFromModules(ArrayRef<std::unique_ptr<Module>> Mods,
+                       StringRef EntryName) {
+  auto Cloner = LinkingCloner();
+  LinkingCloner::DefMaps Defs = Cloner.buildDefMaps(Mods);
+
+  // Find the entry function and its module.
+  Function *EntryF = nullptr;
+  Module *EntryM = nullptr;
+  for (auto &M : Mods) {
+    if ((EntryF = M->getFunction(EntryName)) && !EntryF->isDeclaration()) {
+      EntryM = M.get();
+      break;
+    }
+  }
+  if (!EntryF)
+    PROTEUS_FATAL_ERROR("Expected non-null entry function");
+
+  // Compute the transitive closure starting from the entry function.
+  SmallVector<Function *> ToVisit{EntryF};
+  SmallPtrSet<Function *, 32> VisitSet{EntryF};
+  SmallPtrSet<GlobalValue *, 32> Reachable;
+  while (!ToVisit.empty()) {
+    auto *F = ToVisit.pop_back_val();
+    // Due to lazy parsing, make sure the function is materialized before
+    // traversing it.
+    if (auto E = F->materialize())
+      PROTEUS_FATAL_ERROR("Failed to materialize: " + toString(std::move(E)));
+
+    auto ThisReachable = Cloner.findTransitiveClosure(F, Defs);
+    for (auto *GV : ThisReachable) {
+      Reachable.insert(GV);
+      if (auto *ThisF = dyn_cast<Function>(GV)) {
+        if (!VisitSet.contains(ThisF)) {
+          VisitSet.insert(ThisF);
+          ToVisit.push_back(ThisF);
+        }
+      }
+    }
+  }
+
+  // Clone closure in new module.
+  auto KernelModule =
+      Cloner.cloneClosure(*EntryM, EntryF->getContext(), Reachable);
+
+  return KernelModule;
 }
 
 } // namespace proteus
