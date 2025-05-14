@@ -66,10 +66,19 @@ if  [ "$PROTEUS_CI_ENABLE_DEBUG" == "on" ] || [ "$PROTEUS_CI_ENABLE_TIME_TRACING
   exit 0
 fi
 
-# Test synchronous compilation by default.
-echo "### TESTING SYNC COMPILATION ###"
-ctest -T test --output-on-failure
-echo "### END TESTING SYNC COMPILATION ###"
+# Test synchronous compilation (default) and kernel clone options.
+echo "### TESTING SYNC COMPILATION KERNEL_CLONE cross-clone ###"
+PROTEUS_KERNEL_CLONE=cross-clone ctest -T test --output-on-failure
+echo "### END TESTING SYNC COMPILATION KERNEL_CLONE cross-clone ###"
+
+echo "### TESTING SYNC COMPILATION KERNEL_CLONE link-clone-light ###"
+PROTEUS_KERNEL_CLONE=link-clone-light ctest -T test --output-on-failure
+echo "### END TESTING SYNC COMPILATION KERNEL_CLONE link-clone-light ###"
+
+echo "### TESTING SYNC COMPILATION KERNEL_CLONE link-clone-prune ###"
+PROTEUS_KERNEL_CLONE=link-clone-prune ctest -T test --output-on-failure
+echo "### END TESTING SYNC COMPILATION KERNEL_CLONE link-clone-prune ###"
+
 # Test asynchronous compilation.
 echo "### TESTING (BLOCKING) ASYNC COMPILATION ###"
 PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 ctest -T test --output-on-failure
