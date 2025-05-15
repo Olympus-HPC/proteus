@@ -104,6 +104,7 @@ static std::unique_ptr<MemoryBuffer> getDeviceBinary(BinaryInfo &BinInfo,
                                                      StringRef DeviceArch) {
   FatbinWrapperT *FatbinWrapper = BinInfo.getFatbinWrapper();
 
+#if LLVM_VERSION_MAJOR >= 18
   std::unique_ptr<MemoryBuffer> FatbinBuffer = nullptr;
   auto FileMagic = identify_magic(FatbinWrapper->Binary);
   switch (FileMagic) {
@@ -121,6 +122,10 @@ static std::unique_ptr<MemoryBuffer> getDeviceBinary(BinaryInfo &BinInfo,
   default:
     PROTEUS_FATAL_ERROR("Failed to read device binary bundle");
   }
+#else
+  std::unique_ptr<MemoryBuffer> FatbinBuffer =
+      MemoryBuffer::getMemBuffer(FatbinWrapper->Binary, "", false);
+#endif
 
   constexpr char OffloadBundlerMagicStr[] = "__CLANG_OFFLOAD_BUNDLE__";
   size_t Pos = 0;
