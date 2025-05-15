@@ -13,10 +13,10 @@
 #include <proteus/JitInterface.hpp>
 
 __global__ __attribute__((annotate("jit"))) void kernel() {
-  dim3 idx = threadIdx;
-  (void)idx;
-  dim3 blockidx = blockIdx;
-  (void)blockidx;
+  dim3 Idx = threadIdx;
+  (void)Idx;
+  dim3 Blockidx = blockIdx;
+  (void)Blockidx;
   printf("Kernel\n");
 }
 
