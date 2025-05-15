@@ -23,8 +23,7 @@ using namespace llvm;
 
 class TransformArgumentSpecialization {
 public:
-  static void transform(Module &M, Function &F,
-                        const SmallVectorImpl<int32_t> &ArgPos,
+  static void transform(Module &M, Function &F, const ArrayRef<int32_t> &ArgPos,
                         ArrayRef<RuntimeConstant> RC) {
     auto &Ctx = M.getContext();
 

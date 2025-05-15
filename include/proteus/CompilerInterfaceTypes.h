@@ -14,6 +14,11 @@
 #include <cstring>
 #include <stdint.h>
 
+#include <llvm/IR/DerivedTypes.h>
+#include <llvm/Support/raw_ostream.h>
+
+#include "proteus/Error.h"
+
 namespace proteus {
 
 enum RuntimeConstantTypes : int32_t {
@@ -43,6 +48,30 @@ struct RuntimeConstant {
   RuntimeConstantType Value;
   int32_t Slot{-1};
 };
+
+inline RuntimeConstantTypes convertTypeToRuntimeConstantType(llvm::Type *Ty) {
+  if (Ty->isIntegerTy(1))
+    return RuntimeConstantTypes::BOOL;
+  if (Ty->isIntegerTy(8))
+    return RuntimeConstantTypes::INT8;
+  if (Ty->isIntegerTy(32))
+    return RuntimeConstantTypes::INT32;
+  if (Ty->isIntegerTy(64))
+    return RuntimeConstantTypes::INT64;
+  if (Ty->isFloatTy())
+    return RuntimeConstantTypes::FLOAT;
+  if (Ty->isDoubleTy())
+    return RuntimeConstantTypes::DOUBLE;
+  if (Ty->isFP128Ty() || Ty->isPPC_FP128Ty() || Ty->isX86_FP80Ty())
+    return RuntimeConstantTypes::LONG_DOUBLE;
+  if (Ty->isPointerTy())
+    return RuntimeConstantTypes::PTR;
+
+  std::string TypeString;
+  llvm::raw_string_ostream TypeOstream(TypeString);
+  Ty->print(TypeOstream);
+  PROTEUS_FATAL_ERROR("Unknown Type " + TypeOstream.str());
+}
 
 } // namespace proteus
 

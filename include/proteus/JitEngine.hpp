@@ -54,11 +54,6 @@ public:
   void disable() { Config.PROTEUS_DISABLE = true; }
 
 protected:
-  void getRuntimeConstantValues(void **KernelArgs,
-                                const ArrayRef<int32_t> RCIndices,
-                                const ArrayRef<int32_t> RCTypes,
-                                SmallVector<RuntimeConstant> &RCVec);
-
   void runCleanupPassPipeline(Module &M);
 
   JitEngine();
