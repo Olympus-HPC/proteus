@@ -305,5 +305,22 @@ endif()
 CREATE_GPU_LIBRARY(device_func_lib device_func.cpp)
 CREATE_GPU_TEST_RDC_LIBS(kernel_calls_func_lib device_func_lib kernel_calls_func_lib.cpp)
 
+if(PROTEUS_ENABLE_HIP)
+    function(CREATE_GPU_TEST_COMPRESS exe check_source)
+        CREATE_GPU_TEST(${exe}.compress ${check_source} ${ARGN})
+        target_compile_options(${exe}.compress.HIP PRIVATE --offload-compress)
+        target_link_options(${exe}.compress.HIP PRIVATE --offload-compress)
+    endfunction()
+
+    function(CREATE_GPU_TEST_RDC_COMPRESS exe check_source)
+        CREATE_GPU_TEST_RDC(${exe}.compress ${check_source} ${ARGN})
+        target_compile_options(${exe}.compress.HIP.rdc PRIVATE --offload-compress)
+        target_link_options(${exe}.compress.HIP.rdc PRIVATE --offload-compress)
+    endfunction()
+
+    CREATE_GPU_TEST_COMPRESS(kernel kernel.cpp)
+    CREATE_GPU_TEST_RDC_COMPRESS(kernel kernel.cpp)
+endif()
+
 add_subdirectory(scale100)
 add_subdirectory(scale100-gvar)
