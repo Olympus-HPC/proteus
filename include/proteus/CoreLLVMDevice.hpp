@@ -411,7 +411,7 @@ struct LinkingCloner {
   };
 
   // Stores declaration prototype and GVs that map to it.
-  struct DeclInfo {
+  struct FuncDeclInfo {
     FunctionType *FuncTy;
     GlobalValue::LinkageTypes Linkage;
     unsigned int AddrSpace;
@@ -419,10 +419,22 @@ struct LinkingCloner {
     SmallPtrSet<GlobalValue *, 32> GVs;
   };
 
+  struct GlobDeclInfo {
+    Type *ValyeType;
+    bool IsConstant;
+    GlobalValue::LinkageTypes Linkage;
+    Constant *Initializer;
+    GlobalValue::ThreadLocalMode TLM;
+    unsigned int AddrSpace;
+    AttributeSet Attributes;
+    SmallPtrSet<GlobalValue *, 32> GVs;
+  };
+
   // Maps a resolved GV to cross-module GV references.
   DenseMap<GlobalValue *, SmallVector<GlobalValue *>> ResolvedMap;
   // Stores declaration info by symbol name to clone and update references.
-  StringMap<DeclInfo> Decls;
+  StringMap<FuncDeclInfo> FuncDecls;
+  StringMap<GlobDeclInfo> GlobDecls;
 
   DefMaps buildDefMaps(ArrayRef<std::unique_ptr<Module>> Mods) {
     DefMaps SymbolMaps;
@@ -449,23 +461,30 @@ struct LinkingCloner {
       else if (auto *D = Defs.FuncDefs.lookup(F->getName()))
         ResolvedGV = D;
       else {
-        if (Decls.contains(F->getName()))
-          Decls[F->getName()].GVs.insert(G);
+        if (FuncDecls.contains(F->getName()))
+          FuncDecls[F->getName()].GVs.insert(G);
         else
-          Decls[F->getName()] = {F->getFunctionType(),
-                                 F->getLinkage(),
-                                 F->getAddressSpace(),
-                                 F->getAttributes(),
-                                 {G}};
+          FuncDecls[F->getName()] = {F->getFunctionType(),
+                                     F->getLinkage(),
+                                     F->getAddressSpace(),
+                                     F->getAttributes(),
+                                     {G}};
       }
     } else if (auto *GV = dyn_cast<GlobalVariable>(G)) {
       if (GV->hasInitializer())
         ResolvedGV = GV;
       else if (auto *D = Defs.GlobDefs.lookup(GV->getName()))
         ResolvedGV = D;
-      else
-        PROTEUS_FATAL_ERROR("Unresolved global variable " + GV->getName() +
-                            " should not exist");
+      else {
+        if (GlobDecls.contains(GV->getName()))
+          GlobDecls[GV->getName()].GVs.insert(G);
+        else
+          GlobDecls[GV->getName()] = {
+              GV->getValueType(),       GV->isConstant(),
+              GV->getLinkage(),         nullptr,
+              GV->getThreadLocalMode(), GV->getAddressSpace(),
+              GV->getAttributes(),      {G}};
+      }
     } else
       PROTEUS_FATAL_ERROR("Unsupported global value");
 
@@ -552,15 +571,28 @@ struct LinkingCloner {
 
     ValueToValueMapTy VMap;
 
-    for (auto &D : Decls) {
+    // Emit the function declarations.
+    for (auto &D : FuncDecls) {
       StringRef FuncName = D.getKey();
-      DeclInfo &FuncInfo = D.getValue();
+      FuncDeclInfo &FuncInfo = D.getValue();
       Function *NF =
           Function::Create(FuncInfo.FuncTy, FuncInfo.Linkage,
                            FuncInfo.AddrSpace, FuncName, ModuleOut.get());
       NF->setAttributes(FuncInfo.Attributes);
       for (auto *GV : FuncInfo.GVs)
         VMap[GV] = NF;
+    }
+
+    // Emit the global variable declarations.
+    for (auto &D : GlobDecls) {
+      StringRef GVName = D.getKey();
+      GlobDeclInfo &GlobInfo = D.getValue();
+      auto *NG = new GlobalVariable(
+          *ModuleOut, GlobInfo.ValyeType, GlobInfo.IsConstant, GlobInfo.Linkage,
+          nullptr, GVName, nullptr, GlobInfo.TLM, GlobInfo.AddrSpace);
+      NG->setAttributes(GlobInfo.Attributes);
+      for (auto *GV : GlobInfo.GVs)
+        VMap[GV] = NG;
     }
 
     // Create unpopulated declarations.
