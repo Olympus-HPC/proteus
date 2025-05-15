@@ -208,7 +208,7 @@ std::unique_ptr<Module> JitEngineDeviceHIP::extractModule(BinaryInfo &BinInfo) {
 void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
                                                   size_t GridSize,
                                                   int BlockSize) {
-  proteus::setLaunchBoundsForKernel(M, F, GridSize, BlockSize);
+  proteus::setLaunchBoundsForKernel(F, BlockSize);
 }
 
 std::unique_ptr<MemoryBuffer>

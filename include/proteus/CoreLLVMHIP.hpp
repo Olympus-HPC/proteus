@@ -115,23 +115,29 @@ inline const SmallVector<StringRef> &threadIdxZFnName() {
 
 } // namespace detail
 
-inline void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
-                                     int BlockSize) {
+inline void setLaunchBoundsForKernel(Function &F, int MaxThreadsPerBlock,
+                                     int MinBlocksPerSM = -1) {
   // TODO: fix calculation of launch bounds.
   // TODO: find maximum (hardcoded 1024) from device info.
   // TODO: Setting as 1, BlockSize to replicate launch bounds settings
   // Does setting it as BlockSize, BlockSize help?
   // Setting the attribute override any previous setting.
   F.addFnAttr("amdgpu-flat-work-group-size",
-              "1," + std::to_string(std::min(1024, BlockSize)));
+              "1," + std::to_string(std::min(1024, MaxThreadsPerBlock)));
   // TODO: find warp size (hardcoded 64) from device info.
-  // int WavesPerEU = (GridSize * BlockSize) / 64 / 110 / 4 / 2;
-  [[maybe_unused]] int WavesPerEU = 0;
-  // F->addFnAttr("amdgpu-waves-per-eu", std::to_string(WavesPerEU));
+  [[maybe_unused]] int MinWavesPerEU = 0;
+  if (MinBlocksPerSM != -1) {
+    // int WavesPerEU = (GridSize * BlockSize) / 64 / 110 / 4 / 2;
+    constexpr int ExecUnitsPerComputeUnit = 4;
+    constexpr int WaveFrontSize = 64;
+    int WavesPerCU = (MaxThreadsPerBlock * MinBlocksPerSM) / WaveFrontSize;
+    MinWavesPerEU = WavesPerCU / ExecUnitsPerComputeUnit;
+    F.addFnAttr("amdgpu-waves-per-eu", std::to_string(MinWavesPerEU));
+  }
   PROTEUS_DBG(Logger::logs("proteus")
               << "BlockSize " << BlockSize << " GridSize " << GridSize
               << " => Set Wokgroup size " << BlockSize
-              << " WavesPerEU (unused) " << WavesPerEU << "\n");
+              << " WavesPerEU (maybe-unused) " << MinWavesPerEU << "\n");
 }
 
 inline std::unique_ptr<MemoryBuffer>

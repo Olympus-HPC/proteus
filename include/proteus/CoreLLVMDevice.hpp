@@ -223,8 +223,7 @@ inline void specializeIR(
   F->setName(FnName + Suffix);
 
   if (SpecializeLaunchBounds)
-    setLaunchBoundsForKernel(M, *F, GridDim.x * GridDim.y * GridDim.z,
-                             BlockDim.x * BlockDim.y * BlockDim.z);
+    setLaunchBoundsForKernel(*F, BlockDim.x * BlockDim.y * BlockDim.z);
 
   runCleanupPassPipeline(M);
 
