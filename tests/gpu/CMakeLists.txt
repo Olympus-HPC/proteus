@@ -41,6 +41,7 @@ function(CREATE_GPU_TEST_RDC exe check_source)
         LANGUAGE ${lang}
         OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/src/pass/ProteusPass.cpp
     )
+    add_dependencies(${exe}.${lang}.rdc ProteusPass)
 
     target_link_libraries(${exe}.${lang}.rdc PUBLIC proteus)
 
@@ -156,6 +157,7 @@ function(CREATE_PROTEUS_GPU_LIBRARY lib source)
         LANGUAGE ${lang}
         OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/src/pass/ProteusPass.cpp
     )
+    add_dependencies(${lib} ProteusPass)
     target_link_libraries(${lib} PUBLIC proteus)
 
     if(PROTEUS_ENABLE_HIP)

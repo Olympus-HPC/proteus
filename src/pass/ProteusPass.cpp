@@ -495,9 +495,9 @@ private:
         if (auto E = ExpectedParsedModule.takeError())
           PROTEUS_FATAL_ERROR("Error: " + toString(std::move(E)));
         auto ParsedModule = std::move(*ExpectedParsedModule);
-        for (auto &F : ParsedModule->getFunctionList()) {
-          if (!F.isDeclaration())
-            DefSet.insert(F.getName());
+        for (auto &G : ParsedModule->global_values()) {
+          if (!G.isDeclaration())
+            DefSet.insert(G.getName());
         }
       }
 
