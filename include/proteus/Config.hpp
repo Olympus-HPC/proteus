@@ -14,6 +14,12 @@ enum class CodegenOption {
   ParallelThinLTO,
 };
 
+enum class KernelCloneOption {
+  LinkClonePrune,
+  LinkCloneLight,
+  CrossClone,
+};
+
 inline std::string toString(CodegenOption Option) {
   switch (Option) {
   case CodegenOption::RTC:
@@ -24,6 +30,19 @@ inline std::string toString(CodegenOption Option) {
     return "Parallel";
   case CodegenOption::ParallelThinLTO:
     return "ParallelThinLTO";
+  default:
+    return "Unknown";
+  }
+}
+
+inline std::string toString(KernelCloneOption Option) {
+  switch (Option) {
+  case KernelCloneOption::LinkClonePrune:
+    return "link-clone-prune";
+  case proteus::KernelCloneOption::LinkCloneLight:
+    return "link-clone-light";
+  case proteus::KernelCloneOption::CrossClone:
+    return "cross-clone";
   default:
     return "Unknown";
   }
@@ -66,6 +85,28 @@ inline CodegenOption getEnvOrDefaultCG(const char *VarName,
   return Default;
 }
 
+inline KernelCloneOption getEnvOrDefaultKC(const char *VarName,
+                                           KernelCloneOption Default) {
+
+  const char *EnvValue = std::getenv(VarName);
+  if (!EnvValue)
+    return Default;
+
+  std::string EnvValueStr{EnvValue};
+  std::transform(EnvValueStr.begin(), EnvValueStr.end(), EnvValueStr.begin(),
+                 ::tolower);
+  if (EnvValueStr == "link-clone-prune")
+    return KernelCloneOption::LinkClonePrune;
+  if (EnvValueStr == "link-clone-light")
+    return KernelCloneOption::LinkCloneLight;
+  if (EnvValueStr == "cross-clone")
+    return KernelCloneOption::CrossClone;
+
+  Logger::outs("proteus") << "Unknown kernel clone option " << EnvValueStr
+                          << ", using default: " << toString(Default) << "\n";
+  return Default;
+}
+
 class Config {
 public:
   static Config &get() {
@@ -83,7 +124,7 @@ public:
   bool ProteusAsyncCompilation;
   int ProteusAsyncThreads;
   bool ProteusAsyncTestBlocking;
-  bool ProteusUseLightweightKernelClone;
+  KernelCloneOption ProteusKernelClone;
   bool ProteusEnableTimers;
   CodegenOption ProteusCodegen;
 
@@ -125,8 +166,8 @@ private:
     ProteusAsyncTestBlocking =
         getEnvOrDefaultBool("PROTEUS_ASYNC_TEST_BLOCKING", false);
     ProteusAsyncThreads = getEnvOrDefaultInt("PROTEUS_ASYNC_THREADS", 1);
-    ProteusUseLightweightKernelClone =
-        getEnvOrDefaultBool("PROTEUS_USE_LIGHTWEIGHT_KERNEL_CLONE", true);
+    ProteusKernelClone = getEnvOrDefaultKC("PROTEUS_KERNEL_CLONE",
+                                           KernelCloneOption::CrossClone);
     ProteusEnableTimers = getEnvOrDefaultBool("PROTEUS_ENABLE_TIMERS", false);
   }
 };
