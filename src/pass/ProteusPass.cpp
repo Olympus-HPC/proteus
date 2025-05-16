@@ -522,6 +522,9 @@ private:
 
       ValueToValueMapTy VMap;
       auto PrunedM = CloneModule(M, VMap, ShouldClone);
+      for (auto &G : PrunedM->global_values())
+        if (G.hasInternalLinkage())
+          G.setLinkage(GlobalValue::ExternalLinkage);
 
       StripDebugInfo(*PrunedM);
 
