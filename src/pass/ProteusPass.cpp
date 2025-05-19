@@ -725,7 +725,11 @@ private:
           for (auto *G : DI.ResolvedGVs)
             VMap[G] = NG;
         } else {
-          PROTEUS_FATAL_ERROR("Unsupported global value " + Symbol);
+          SmallVector<char> GStr;
+          raw_svector_ostream OS{GStr};
+          OS << *DI.PrevailingGV;
+          PROTEUS_FATAL_ERROR("Unsupported global value " + Symbol +
+                              " LLVM Value: " + GStr + "\n");
         }
       }
 
