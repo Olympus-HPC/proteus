@@ -724,6 +724,13 @@ private:
           VMap[GV] = NG;
           for (auto *G : DI.ResolvedGVs)
             VMap[G] = NG;
+        } else if (auto *GA = dyn_cast<GlobalAlias>(DI.PrevailingGV)) {
+          auto *NA = GlobalAlias::create(
+              GA->getValueType(), GA->getType()->getAddressSpace(),
+              GA->getLinkage(), GA->getName(),
+              /*Aliasee=*/nullptr, LinkedModule.get());
+          NA->setVisibility(GA->getVisibility());
+          VMap[GA] = NA;
         } else {
           SmallVector<char> GStr;
           raw_svector_ostream OS{GStr};
@@ -751,6 +758,9 @@ private:
           auto *NG = cast<GlobalVariable>(VMap[GVar]);
           if (GVar->hasInitializer())
             NG->setInitializer(MapValue(GVar->getInitializer(), VMap));
+        } else if (auto *GA = dyn_cast<GlobalAlias>(DI.PrevailingGV)) {
+          auto *NA = cast<GlobalAlias>(VMap[GA]);
+          NA->setAliasee(cast<Constant>(MapValue(GA->getAliasee(), VMap)));
         } else
           PROTEUS_FATAL_ERROR("Unsupported global value " + Symbol);
       }
