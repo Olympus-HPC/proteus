@@ -1,7 +1,16 @@
+add_library(IRLinker SHARED IRLinker.cpp)
+target_include_directories(IRLinker
+  PRIVATE ${PROJECT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_BINARY_DIR}
+  SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS}
+)
+target_link_libraries(IRLinker
+  PRIVATE LLVMLinker
+  -Wl,-Bsymbolic
+)
+
 add_library(ProteusPass SHARED
   ProteusPass.cpp
-  Linker/IRMover.cpp
-  Linker/LinkModules.cpp
 )
 
 target_include_directories(ProteusPass
@@ -19,7 +28,7 @@ endif()
 # Allow undefined symbols in shared objects on Darwin (this is the default
 # behaviour on Linux)
 target_link_libraries(ProteusPass
-  #PRIVATE LLVMLinker
+  PRIVATE IRLinker
   "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 
 target_compile_options(
@@ -35,7 +44,7 @@ target_link_options(
 )
 
 install(
-  TARGETS ProteusPass
+  TARGETS ProteusPass IRLinker
   EXPORT proteusTargets
   RUNTIME DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
