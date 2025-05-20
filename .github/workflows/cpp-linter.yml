@@ -26,12 +26,13 @@ jobs:
             clangxx=18.1.3 \
             llvmdev=18.1.3 \
             lit=18.1.3 \
-            zlib
+            zlib zstd
       - name: Run cmake to export compilation database
         run: |
           mkdir -p build
           pushd build
           cmake .. \
+            -DCMAKE_PREFIX_PATH="$CONDA_PREFIX;$CONDA_PREFIX/lib/cmake" \
             -DLLVM_INSTALL_DIR=$(llvm-config --prefix) \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
