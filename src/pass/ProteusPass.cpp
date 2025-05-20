@@ -66,6 +66,9 @@
 #include <llvm/Transforms/Utils/Cloning.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
+#include <llvm/Linker/Linker.h>
+#include <llvm/Transforms/IPO/MergeFunctions.h>
+
 #include <iostream>
 #include <string>
 #include <variant>
@@ -325,6 +328,8 @@ private:
     PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
     ModulePassManager Passes;
+    Passes.addPass(AlwaysInlinerPass());
+    Passes.addPass(MergeFunctionsPass());
     Passes.addPass(GlobalDCEPass());
     Passes.addPass(StripDeadDebugInfoPass());
     Passes.addPass(StripDeadPrototypesPass());
@@ -568,248 +573,14 @@ private:
 
     ExtractLinkedModules();
 
-    // Find all definitions, assumed unique and prevailing, and all preserved
-    // declarations which are intrinsics or others lowered in backends.
-    struct FuncDeclInfo {
-      FunctionType *FuncTy;
-      AttributeList Attributes;
-    };
+    for (auto &Mod : LinkedModules)
+      runCleanupPassPipeline(*Mod);
 
-    struct GlobDeclInfo {
-      Type *ValueType;
-      bool IsConstant;
-      GlobalValue::ThreadLocalMode TLM;
-      AttributeSet Attributes;
-    };
-
-    struct DeclInfo {
-      GlobalValue::LinkageTypes Linkage;
-      unsigned int AddrSpace;
-      SmallPtrSet<GlobalValue *, 32> GVs;
-      std::variant<FuncDeclInfo, GlobDeclInfo> Specific;
-
-      const FuncDeclInfo *asFunc() const {
-        return std::get_if<FuncDeclInfo>(&Specific);
-      }
-      const GlobDeclInfo *asGlobal() const {
-        return std::get_if<GlobDeclInfo>(&Specific);
-      }
-    };
-
-    struct DefInfo {
-      GlobalValue *PrevailingGV;
-      SmallPtrSet<GlobalValue *, 32> ResolvedGVs;
-    };
-
-    StringMap<DefInfo> Defs;
-    StringMap<DeclInfo> Decls;
-    BumpPtrAllocator Alloc;
-    StringSaver StringStorage{Alloc};
-    auto ResolveDefsAndDecls = [&Defs, &Decls, &LinkedModules,
-                                &StringStorage]() {
-      // Find all definitions across modules.
-      for (auto &Mod : LinkedModules) {
-        for (auto &G : Mod->global_values()) {
-          // Skip unneeded globals.
-          if (skipGlobal(G))
-            continue;
-
-          // Skip if declaration.
-          if (G.isDeclaration())
-            continue;
-
-          // We insert the definition. If there exists one already, we assume
-          // the definition resolves to this existing one since the modules
-          // are linkable.
-          DefInfo DI{&G, {}};
-          // Make a unique Symbol using the unique module name for global values
-          // with private linkage for mapping.
-          // NOTE: The AMDGPU device runtime library defines functions with
-          // internal linkage. We merge them here to resolve to the same symbol.
-          StringRef Symbol = G.hasPrivateLinkage()
-                                 ? StringStorage.save(G.getName() + "." +
-                                                      G.getParent()->getName())
-                                 : G.getName();
-          auto [It, IsInserted] = Defs.insert({Symbol, DI});
-          if (!IsInserted) {
-            It->getValue().ResolvedGVs.insert(&G);
-          }
-        }
-      }
-
-      // Find all declarations, resolve them to definitions if available.
-      for (auto &Mod : LinkedModules) {
-        for (auto &G : Mod->global_values()) {
-          // Skip unneeded globals.
-          if (skipGlobal(G))
-            continue;
-
-          // Skip if not a declaration.
-          if (!G.isDeclaration())
-            continue;
-
-          // If there is a definition, add the global value to the resolved
-          // vector in the definition info.
-          if (Defs.contains(G.getName())) {
-            Defs[G.getName()].ResolvedGVs.insert(&G);
-            continue;
-          }
-
-          // If there is a declaration, add the global value to the common set
-          // of declaration GVs.
-          if (Decls.contains(G.getName())) {
-            Decls[G.getName()].GVs.insert(&G);
-            continue;
-          }
-
-          // Create a declaration with specific info.
-          DeclInfo DI = {G.getLinkage(), G.getAddressSpace(), {&G}, {}};
-          if (auto *F = dyn_cast<Function>(&G)) {
-            DI.Specific =
-                FuncDeclInfo{F->getFunctionType(), F->getAttributes()};
-          } else if (auto *GV = dyn_cast<GlobalVariable>(&G)) {
-            DI.Specific =
-                GlobDeclInfo{GV->getValueType(), GV->isConstant(),
-                             GV->getThreadLocalMode(), GV->getAttributes()};
-          } else {
-            PROTEUS_FATAL_ERROR("Unsupported global value " + G.getName());
-          }
-
-          Decls.insert({G.getName(), DI});
-        }
-      }
-    };
-
-    ResolveDefsAndDecls();
-
-    // Create single, fully-linked module.
-    auto CreateLinkedModule = [&LinkedModule, &Decls, &Defs, &LinkedModules]() {
-      ValueToValueMapTy VMap;
-      // Create skeleton declarations for both Decls and Defs and populate the
-      // VMap.
-      for (auto &[Symbol, DI] : Decls) {
-        if (auto *FI = DI.asFunc()) {
-          Function *NF = Function::Create(FI->FuncTy, DI.Linkage, DI.AddrSpace,
-                                          Symbol, LinkedModule.get());
-          NF->setAttributes(FI->Attributes);
-          for (auto *GV : DI.GVs)
-            VMap[GV] = NF;
-        } else if (auto *GI = DI.asGlobal()) {
-          auto *NG = new GlobalVariable(*LinkedModule, GI->ValueType,
-                                        GI->IsConstant, DI.Linkage, nullptr,
-                                        Symbol, nullptr, GI->TLM, DI.AddrSpace);
-          NG->setAttributes(GI->Attributes);
-          for (auto *GV : DI.GVs)
-            VMap[GV] = NG;
-        } else {
-          PROTEUS_FATAL_ERROR("Unsupported global value " + Symbol);
-        }
-      }
-
-      for (auto &[Symbol, DI] : Defs) {
-        if (auto *F = dyn_cast<Function>(DI.PrevailingGV)) {
-          Function *NF = Function::Create(F->getFunctionType(), F->getLinkage(),
-                                          F->getAddressSpace(), F->getName(),
-                                          LinkedModule.get());
-          NF->setAttributes(F->getAttributes());
-          VMap[F] = NF;
-          for (auto *G : DI.ResolvedGVs)
-            VMap[G] = NF;
-        } else if (auto *GV = dyn_cast<GlobalVariable>(DI.PrevailingGV)) {
-          auto *NG = new GlobalVariable(
-              *LinkedModule, GV->getValueType(), GV->isConstant(),
-              GV->getLinkage(), nullptr, GV->getName(), nullptr,
-              GV->getThreadLocalMode(), GV->getAddressSpace());
-          NG->copyAttributesFrom(GV);
-          VMap[GV] = NG;
-          for (auto *G : DI.ResolvedGVs)
-            VMap[G] = NG;
-        } else if (auto *GA = dyn_cast<GlobalAlias>(DI.PrevailingGV)) {
-          auto *NA = GlobalAlias::create(
-              GA->getValueType(), GA->getType()->getAddressSpace(),
-              GA->getLinkage(), GA->getName(),
-              /*Aliasee=*/nullptr, LinkedModule.get());
-          NA->setVisibility(GA->getVisibility());
-          VMap[GA] = NA;
-        } else {
-          SmallVector<char> GStr;
-          raw_svector_ostream OS{GStr};
-          OS << *DI.PrevailingGV;
-          PROTEUS_FATAL_ERROR("Unsupported global value " + Symbol +
-                              " LLVM Value: " + GStr + "\n");
-        }
-      }
-
-      for (auto &[Symbol, DI] : Defs) {
-        if (auto *F = dyn_cast<Function>(DI.PrevailingGV)) {
-          Function *NF = cast<Function>(VMap[F]);
-          SmallVector<ReturnInst *, 8> Returns;
-          Function::arg_iterator DestI = NF->arg_begin();
-          for (const Argument &I : F->args())
-            if (VMap.count(&I) == 0) {
-              DestI->setName(I.getName());
-              VMap[&I] = &*DestI++;
-            }
-
-          CloneFunctionInto(
-              NF, F, VMap,
-              /*Changes=*/CloneFunctionChangeType::DifferentModule, Returns);
-        } else if (auto *GVar = dyn_cast<GlobalVariable>(DI.PrevailingGV)) {
-          auto *NG = cast<GlobalVariable>(VMap[GVar]);
-          if (GVar->hasInitializer())
-            NG->setInitializer(MapValue(GVar->getInitializer(), VMap));
-        } else if (auto *GA = dyn_cast<GlobalAlias>(DI.PrevailingGV)) {
-          auto *NA = cast<GlobalAlias>(VMap[GA]);
-          NA->setAliasee(cast<Constant>(MapValue(GA->getAliasee(), VMap)));
-        } else
-          PROTEUS_FATAL_ERROR("Unsupported global value " + Symbol);
-      }
-
-      // Copy annotations from M into KernelModuleTmp now that VMap has been
-      // populated.
-      const std::string MetadataToCopy[] = {
-          "llvm.annotations",  "nvvm.annotations",   "nvvmir.version",
-          "llvm.module.flags", "opencl.ocl.version", "llvm.ident"};
-      auto &PrunedLTOModule = LinkedModules.back();
-      for (auto &MetadataName : MetadataToCopy) {
-        NamedMDNode *NamedMD = PrunedLTOModule->getNamedMetadata(MetadataName);
-        if (!NamedMD)
-          continue;
-
-        auto *NewNamedMD = LinkedModule->getOrInsertNamedMetadata(MetadataName);
-        for (unsigned I = 0, E = NamedMD->getNumOperands(); I < E; ++I) {
-          MDNode *MDEntry = NamedMD->getOperand(I);
-          bool ShouldClone = true;
-          // Skip if the operands of an MDNode refer to non-existing,
-          // unreachable global values.
-          for (auto &Operand : MDEntry->operands()) {
-            Metadata *MD = Operand.get();
-            auto *CMD = dyn_cast<ConstantAsMetadata>(MD);
-            if (!CMD)
-              continue;
-
-            auto *GV = dyn_cast<GlobalValue>(CMD->getValue());
-            if (!GV)
-              continue;
-
-            if (!VMap.count(GV)) {
-              ShouldClone = false;
-              break;
-            }
-          }
-
-          if (!ShouldClone)
-            continue;
-
-          NewNamedMD->addOperand(MapMetadata(MDEntry, VMap));
-        }
-      }
-
-      if (verifyModule(*LinkedModule, &errs()))
-        PROTEUS_FATAL_ERROR("Broken linked module found, compilation aborted!");
-    };
-
-    CreateLinkedModule();
+    Linker IRLinker(*LinkedModule);
+    for (auto &Mod : LinkedModules) {
+      if (IRLinker.linkInModule(std::move(Mod)))
+        PROTEUS_FATAL_ERROR("Linking failed");
+    }
 
     StripDebugInfo(*LinkedModule);
     runCleanupPassPipeline(*LinkedModule);
