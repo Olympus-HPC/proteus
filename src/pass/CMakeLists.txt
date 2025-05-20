@@ -1,4 +1,8 @@
-add_library(ProteusPass SHARED ProteusPass.cpp)
+add_library(ProteusPass SHARED
+  ProteusPass.cpp
+  Linker/IRMover.cpp
+  Linker/LinkModules.cpp
+)
 
 target_include_directories(ProteusPass
   PRIVATE ${PROJECT_SOURCE_DIR}/include
