@@ -651,25 +651,33 @@ private:
         PROTEUS_FATAL_ERROR("Linking failed");
     }
 
-    StripDebugInfo(*LinkedModule);
     runCleanupPassPipeline(*LinkedModule);
 
-    // Create per kernel linked modules.
-    CallGraph CG{*LinkedModule};
-    for (auto &Sym : KernelSymbols) {
-      auto KernelName = Sym.getKey();
+    const char *EnvValue = std::getenv("PROTEUS_PASS_CREATE_KERNEL_MODULES");
+    bool CreateKernelModules =
+        (EnvValue ? static_cast<bool>(std::stoi(EnvValue)) : false);
 
-      if (!LinkedModule->getFunction(KernelName))
-        PROTEUS_FATAL_ERROR("Expected kernel function in linked module");
+    if (CreateKernelModules) {
+      // Create per kernel linked modules.
+      CallGraph CG{*LinkedModule};
+      for (auto &Sym : KernelSymbols) {
+        auto KernelName = Sym.getKey();
 
-      auto KernelModule = cloneKernelFromModule(*LinkedModule, KernelName, CG);
-      runCleanupPassPipeline(*KernelModule);
+        if (!LinkedModule->getFunction(KernelName))
+          PROTEUS_FATAL_ERROR("Expected kernel function in linked module");
 
-      if (verifyModule(*KernelModule, &errs()))
-        PROTEUS_FATAL_ERROR(
-            "Broken original module found, compilation aborted!");
+        auto KernelModule =
+            cloneKernelFromModule(*LinkedModule, KernelName, CG);
+        runCleanupPassPipeline(*KernelModule);
 
-      emitModuleDevice(LTOModule, *KernelModule, KernelName, false);
+        if (verifyModule(*KernelModule, &errs()))
+          PROTEUS_FATAL_ERROR(
+              "Broken original module found, compilation aborted!");
+
+        emitModuleDevice(LTOModule, *KernelModule, KernelName, false);
+      }
+    } else {
+      emitModuleDevice(LTOModule, *LinkedModule, "lto", false);
     }
   }
 
