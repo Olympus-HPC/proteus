@@ -5,6 +5,7 @@
 #include <llvm/Transforms/Utils/Cloning.h>
 
 #include "proteus/Error.h"
+#include "proteus/Logger.hpp"
 
 namespace proteus {
 
@@ -167,7 +168,7 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, StringRef Name,
   }
 
 #if PROTEUS_ENABLE_DEBUG
-  Logger::logfile(Name + ".mini.ll", *KernelModuleTmp);
+  Logger::logfile(Name.str() + ".mini.ll", *KernelModuleTmp);
   if (verifyModule(*KernelModuleTmp, &errs()))
     PROTEUS_FATAL_ERROR("Broken mini-module found, JIT compilation aborted!");
 #endif
