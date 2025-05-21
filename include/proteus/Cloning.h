@@ -2,6 +2,7 @@
 #define PROTEUS_CLONING_H
 
 #include <llvm/Analysis/CallGraph.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/Transforms/Utils/Cloning.h>
 
 #include "proteus/Error.h"
