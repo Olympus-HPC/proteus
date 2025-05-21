@@ -98,6 +98,10 @@ public:
 
   void extractModules(BinaryInfo &BinInfo);
 
+  std::unique_ptr<Module> extractKernelModule(BinaryInfo &BinInfo,
+                                              StringRef KernelName,
+                                              LLVMContext &Ctx);
+
   hipFunction_t getKernelFunctionFromImage(StringRef KernelName,
                                            const void *Image);
 

@@ -145,6 +145,63 @@ HashT JitEngineDeviceHIP::getModuleHash(BinaryInfo &BinInfo) {
   return BinInfo.getModuleHash();
 }
 
+std::unique_ptr<Module> JitEngineDeviceHIP::extractKernelModule(
+    BinaryInfo &BinInfo, StringRef KernelName, LLVMContext &Ctx) {
+  Expected<object::ELF64LEFile> DeviceElf =
+      object::ELF64LEFile::create(getDeviceBinary(BinInfo, DeviceArch));
+  if (DeviceElf.takeError())
+    PROTEUS_FATAL_ERROR("Cannot create the device elf");
+
+  auto Sections = DeviceElf->sections();
+  if (Sections.takeError())
+    PROTEUS_FATAL_ERROR("Error reading sections");
+
+  auto ExtractModuleFromSection = [&Ctx, &DeviceElf, &BinInfo, &KernelName](
+                                      auto &Section, StringRef SectionName) {
+    ArrayRef<uint8_t> BitcodeData;
+    auto SectionContents = DeviceElf->getSectionContents(Section);
+    if (SectionContents.takeError())
+      PROTEUS_FATAL_ERROR("Error reading section contents");
+    BitcodeData = *SectionContents;
+    auto Bitcode = StringRef{reinterpret_cast<const char *>(BitcodeData.data()),
+                             BitcodeData.size()};
+
+    Timer T;
+    SMDiagnostic Diag;
+    // Parse the IR module eagerly as it will be immediately used for codegen.
+    auto M = parseIR(MemoryBufferRef(Bitcode, SectionName), Diag, Ctx);
+    if (!M)
+      PROTEUS_FATAL_ERROR("Error parsing IR: " + Diag.getMessage());
+    PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                         << "Parse IR " << SectionName << " " << T.elapsed()
+                         << " ms\n");
+
+    return M;
+  };
+
+  // We extract the bitcode from the ELF sections uniquely identified by the
+  // kernel symbol.
+  std::unique_ptr<Module> KernelModule = nullptr;
+  for (auto Section : *Sections) {
+    auto SectionName = DeviceElf->getSectionName(Section);
+    if (SectionName.takeError())
+      PROTEUS_FATAL_ERROR("Error reading section name");
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "SectionName " << *SectionName << "\n");
+
+    if (!SectionName->starts_with(".jit.bitcode." + KernelName.str()))
+      continue;
+
+    KernelModule = ExtractModuleFromSection(Section, *SectionName);
+    break;
+  }
+
+  // If the kernel module is not found, this returns null and it is the caller's
+  // responsibility to construct the kernel module by extracting per-TU modules
+  // and cloning.
+  return KernelModule;
+}
+
 void JitEngineDeviceHIP::extractModules(BinaryInfo &BinInfo) {
   Expected<object::ELF64LEFile> DeviceElf =
       object::ELF64LEFile::create(getDeviceBinary(BinInfo, DeviceArch));

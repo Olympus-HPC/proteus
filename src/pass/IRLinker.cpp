@@ -44,10 +44,8 @@ using namespace llvm;
 
 void linkModules(Module &Dest,
                  SmallVector<std::unique_ptr<Module>> &LinkedModules) {
-  dbgs() << "IMBA LINKER!\n";
   Linker IRLinker(Dest);
   for (auto &Mod : LinkedModules) {
-    // if (LLVMLinkModules2(wrap(&Dest), wrap(Mod.get())))
     if (IRLinker.linkInModule(std::move(Mod)))
       PROTEUS_FATAL_ERROR("Linking failed");
   }
