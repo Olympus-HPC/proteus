@@ -43,6 +43,15 @@ target_link_options(
   "SHELL:$<$<LINK_LANGUAGE:HIP>:-Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPass>>"
 )
 
+set_target_properties(ProteusPass PROPERTIES
+  # on macOS enable passing RPATH flags to the linker; no-ops on Linux
+  MACOSX_RPATH          ON
+  # let CMake use INSTALL_RPATH even in the build tree
+  BUILD_WITH_INSTALL_RPATH  TRUE
+  # pick @loader_path on Darwin, $ORIGIN elsewhere
+  INSTALL_RPATH        "$<IF:$<PLATFORM_ID:Darwin>,@loader_path,\$ORIGIN>"
+)
+
 install(
   TARGETS ProteusPass IRLinker
   EXPORT proteusTargets
