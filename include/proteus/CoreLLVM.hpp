@@ -13,6 +13,7 @@ static_assert(__cplusplus >= 201703L,
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Target/TargetMachine.h>
+#include <llvm/Transforms/IPO/MergeFunctions.h>
 
 #if LLVM_VERSION_MAJOR == 18
 #include <llvm/TargetParser/SubtargetFeature.h>
@@ -188,6 +189,7 @@ inline void runCleanupPassPipeline(Module &M) {
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
   ModulePassManager Passes;
+  Passes.addPass(MergeFunctionsPass());
   Passes.addPass(GlobalDCEPass());
   // Passes.addPass(StripDeadDebugInfoPass());
   Passes.addPass(StripDeadPrototypesPass());

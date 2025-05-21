@@ -229,6 +229,79 @@ public:
                 void **KernelArgs, uint64_t ShmemSize,
                 typename DeviceTraits<ImplT>::DeviceStream_t Stream);
 
+  std::pair<std::unique_ptr<Module>, std::unique_ptr<MemoryBuffer>>
+  extractKernelModule(BinaryInfo &BinInfo, StringRef KernelName,
+                      LLVMContext &Ctx) {
+    std::unique_ptr<Module> KernelModule =
+        static_cast<ImplT &>(*this).extractKernelModule(BinInfo, KernelName,
+                                                        Ctx);
+    if (KernelModule) {
+      // Do not internalize it the codegen backend is thinlto since that
+      // performs its own internalization. Otherwise we do double the work and
+      // limit parallelism at the thinlto backend.
+      if (Config::get().ProteusCodegen != CodegenOption::ParallelThinLTO)
+        internalize(*KernelModule, KernelName);
+      runCleanupPassPipeline(*KernelModule);
+
+      SmallVector<char> Bitcode;
+      raw_svector_ostream OS(Bitcode);
+      WriteBitcodeToFile(*KernelModule, OS);
+      auto BitcodeStr = StringRef{Bitcode.data(), Bitcode.size()};
+      auto BitcodeBuffer = MemoryBuffer::getMemBufferCopy(BitcodeStr);
+      return std::make_pair(std::move(KernelModule), std::move(BitcodeBuffer));
+    }
+
+    Timer T;
+    if (!BinInfo.hasExtractedModules())
+      static_cast<ImplT &>(*this).extractModules(BinInfo);
+
+    std::unique_ptr<Module> KernelModuleTmp = nullptr;
+    switch (Config::get().ProteusKernelClone) {
+    case proteus::KernelCloneOption::LinkClonePrune: {
+      auto &BinModule = BinInfo.getLinkedModule();
+      KernelModuleTmp = llvm::CloneModule(BinModule);
+      break;
+    }
+    case proteus::KernelCloneOption::LinkCloneLight: {
+      auto &BinModule = BinInfo.getLinkedModule();
+      KernelModuleTmp = proteus::cloneKernelFromModule(BinModule, KernelName,
+                                                       BinInfo.getCallGraph());
+      break;
+    }
+    case proteus::KernelCloneOption::CrossClone: {
+      KernelModuleTmp = proteus::cloneKernelFromModules(
+          BinInfo.getExtractedModules(), KernelName);
+      break;
+    }
+    default:
+      PROTEUS_FATAL_ERROR("Unsupported kernel cloning option");
+    }
+
+    if (Config::get().ProteusCodegen != CodegenOption::ParallelThinLTO)
+      internalize(*KernelModuleTmp, KernelName);
+    runCleanupPassPipeline(*KernelModuleTmp);
+
+    // Roundtrip the tmp module to the input context.
+    SmallVector<char> CloneBuffer;
+    raw_svector_ostream OS(CloneBuffer);
+    WriteBitcodeToFile(*KernelModuleTmp, OS);
+    StringRef CloneStr = StringRef(CloneBuffer.data(), CloneBuffer.size());
+    auto ExpectedKernelModule =
+        parseBitcodeFile(MemoryBufferRef{CloneStr, KernelName}, Ctx);
+    if (auto E = ExpectedKernelModule.takeError())
+      PROTEUS_FATAL_ERROR("Error parsing bitcode: " + toString(std::move(E)));
+
+    PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                         << "Extract with cloning "
+                         << toString(Config::get().ProteusKernelClone) << " "
+                         << T.elapsed() << " ms\n");
+
+    KernelModule = std::move(*ExpectedKernelModule);
+    auto BitcodeBuffer = MemoryBuffer::getMemBufferCopy(CloneStr);
+
+    return std::make_pair(std::move(KernelModule), std::move(BitcodeBuffer));
+  }
+
   void extractModuleAndBitcode(JITKernelInfo &KernelInfo) {
     TIMESCOPE(__FUNCTION__)
 
@@ -243,58 +316,19 @@ public:
 
     BinaryInfo &BinInfo = KernelInfo.getBinaryInfo();
 
-    if (!BinInfo.hasExtractedModules())
-      static_cast<ImplT &>(*this).extractModules(BinInfo);
-
     Timer T;
-    std::unique_ptr<Module> KernelModuleTmp = nullptr;
-    switch (Config::get().ProteusKernelClone) {
-    case proteus::KernelCloneOption::LinkClonePrune: {
-      auto &BinModule = BinInfo.getLinkedModule();
-      KernelModuleTmp = llvm::CloneModule(BinModule);
-      break;
-    }
-    case proteus::KernelCloneOption::LinkCloneLight: {
-      auto &BinModule = BinInfo.getLinkedModule();
-      KernelModuleTmp = proteus::cloneKernelFromModule(
-          BinModule, KernelInfo.getName(), BinInfo.getCallGraph());
-      break;
-    }
-    case proteus::KernelCloneOption::CrossClone: {
-      KernelModuleTmp = proteus::cloneKernelFromModules(
-          BinInfo.getExtractedModules(), KernelInfo.getName());
-      break;
-    }
-    default:
-      PROTEUS_FATAL_ERROR("Unsupported kernel cloning option");
-    }
+    auto [KernelModule, BitcodeBuffer] = extractKernelModule(
+        BinInfo, KernelInfo.getName(), *KernelInfo.getLLVMContext());
 
-    // Do not internalize it the codegen backend is thinlto since that performs
-    // its own internalization. Otherwise we do double the work and limit
-    // parallelism at the thinlto backend.
-    if (Config::get().ProteusCodegen != CodegenOption::ParallelThinLTO)
-      internalize(*KernelModuleTmp, KernelInfo.getName());
-    runCleanupPassPipeline(*KernelModuleTmp);
+    if (!KernelModule)
+      PROTEUS_FATAL_ERROR("Expected non-null kernel module");
+    if (!BitcodeBuffer)
+      PROTEUS_FATAL_ERROR("Expected non-null kernel bitcode");
 
-    SmallVector<char, 1> ClonedModuleBuffer;
-    raw_svector_ostream ClonedModuleOS(ClonedModuleBuffer);
-    WriteBitcodeToFile(*KernelModuleTmp, ClonedModuleOS);
-    StringRef ClonedModuleRef =
-        StringRef(ClonedModuleBuffer.data(), ClonedModuleBuffer.size());
-    MemoryBufferRef ClonedModuleBufferRef(ClonedModuleRef,
-                                          KernelInfo.getName());
-    auto ExpectedKernelModule =
-        parseBitcodeFile(ClonedModuleBufferRef, *KernelInfo.getLLVMContext());
-    if (auto E = ExpectedKernelModule.takeError())
-      PROTEUS_FATAL_ERROR("Error parsing bitcode: " + toString(std::move(E)));
-
-    KernelInfo.setModule(std::move(*ExpectedKernelModule));
-    KernelInfo.setBitcode(MemoryBuffer::getMemBufferCopy(ClonedModuleRef));
-
+    KernelInfo.setModule(std::move(KernelModule));
+    KernelInfo.setBitcode(std::move(BitcodeBuffer));
     PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
-                         << "Extract clone "
-                         << toString(Config::get().ProteusKernelClone) << " "
-                         << T.elapsed() << " ms\n");
+                         << "Extract kernel module " << T.elapsed() << " ms\n");
   }
 
   Module &getModule(JITKernelInfo &KernelInfo) {
