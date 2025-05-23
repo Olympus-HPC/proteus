@@ -655,19 +655,19 @@ private:
 
     const char *EnvValue = std::getenv("PROTEUS_PASS_CREATE_KERNEL_MODULES");
     bool CreateKernelModules =
-        (EnvValue ? static_cast<bool>(std::stoi(EnvValue)) : false);
+        (EnvValue ? static_cast<bool>(std::stoi(EnvValue)) : true);
 
     if (CreateKernelModules) {
-      // Create per kernel linked modules.
-      CallGraph CG{*LinkedModule};
+      SmallVector<std::unique_ptr<Module>> Mods;
+      Mods.push_back(std::move(LinkedModule));
       for (auto &Sym : KernelSymbols) {
         auto KernelName = Sym.getKey();
 
+        auto &LinkedModule = Mods.back();
         if (!LinkedModule->getFunction(KernelName))
           PROTEUS_FATAL_ERROR("Expected kernel function in linked module");
 
-        auto KernelModule =
-            cloneKernelFromModule(*LinkedModule, KernelName, CG);
+        auto KernelModule = cloneKernelFromModules(Mods, KernelName);
         runCleanupPassPipeline(*KernelModule);
 
         if (verifyModule(*KernelModule, &errs()))

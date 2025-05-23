@@ -167,7 +167,7 @@ private:
         getEnvOrDefaultBool("PROTEUS_ASYNC_TEST_BLOCKING", false);
     ProteusAsyncThreads = getEnvOrDefaultInt("PROTEUS_ASYNC_THREADS", 1);
     ProteusKernelClone = getEnvOrDefaultKC("PROTEUS_KERNEL_CLONE",
-                                           KernelCloneOption::LinkCloneLight);
+                                           KernelCloneOption::CrossClone);
     ProteusEnableTimers = getEnvOrDefaultBool("PROTEUS_ENABLE_TIMERS", false);
   }
 };
