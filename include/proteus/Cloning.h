@@ -204,6 +204,13 @@ struct LinkingCloner {
     SmallPtrSet<GlobalValue *, 32> GVs;
   };
 
+  void reportUnsupportedGlobalValue(GlobalValue *G) {
+    SmallVector<char> ErrMsg;
+    raw_svector_ostream OS{ErrMsg};
+    G->print(OS);
+    PROTEUS_FATAL_ERROR("Unsupported global value: " + ErrMsg);
+  }
+
   // Maps a resolved GV to cross-module GV references.
   DenseMap<GlobalValue *, SmallVector<GlobalValue *>> ResolvedMap;
   // Stores declaration info by symbol name to clone and update references.
@@ -259,8 +266,9 @@ struct LinkingCloner {
               GV->getThreadLocalMode(), GV->getAddressSpace(),
               GV->getAttributes(),      {G}};
       }
-    } else
-      PROTEUS_FATAL_ERROR("Unsupported global value");
+    } else {
+      reportUnsupportedGlobalValue(G);
+    }
 
     if (ResolvedGV && Found.insert(ResolvedGV).second) {
       WorkList.push_back(ResolvedGV);
@@ -323,7 +331,7 @@ struct LinkingCloner {
         if (auto *Init = GVar->getInitializer())
           scanConstant(Init, Defs, WorkList, Found);
       } else {
-        PROTEUS_FATAL_ERROR("Unsupported global value");
+        reportUnsupportedGlobalValue(GV);
       }
     }
 
@@ -390,8 +398,9 @@ struct LinkingCloner {
 
         for (auto *DeclGV : ResolvedMap[GVar])
           VMap[DeclGV] = NG;
-      } else
-        PROTEUS_FATAL_ERROR("Unsupported global value");
+      } else {
+        reportUnsupportedGlobalValue(GV);
+      }
     }
 
     // Clone function bodies and global variable initializers.
@@ -414,8 +423,9 @@ struct LinkingCloner {
         auto *NG = cast<GlobalVariable>(VMap[GVar]);
         if (GVar->hasInitializer())
           NG->setInitializer(MapValue(GVar->getInitializer(), VMap));
-      } else
-        PROTEUS_FATAL_ERROR("Unsupported global value");
+      } else {
+        reportUnsupportedGlobalValue(GV);
+      }
     }
 
     // Copy annotations from the entry module M into KernelModuleTmp now that
