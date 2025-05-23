@@ -259,6 +259,15 @@ struct LinkingCloner {
               GV->getThreadLocalMode(), GV->getAddressSpace(),
               GV->getAttributes(),      {G}};
       }
+    } else if (auto *GA = dyn_cast<GlobalAlias>(G)) {
+      auto *GVA = dyn_cast<GlobalValue>(GA->getAliasee()->stripPointerCasts());
+      if (!GVA) {
+        SmallVector<char> ErrMsg;
+        raw_svector_ostream OS{ErrMsg};
+        G->print(OS);
+        PROTEUS_FATAL_ERROR("Expected aliasee to be a global value: " + ErrMsg);
+      }
+      ResolvedGV = GA;
     } else {
       SmallVector<char> ErrMsg;
       raw_svector_ostream OS{ErrMsg};
@@ -326,6 +335,8 @@ struct LinkingCloner {
       } else if (auto *GVar = dyn_cast<GlobalVariable>(GV)) {
         if (auto *Init = GVar->getInitializer())
           scanConstant(Init, Defs, WorkList, Found);
+      } else if (auto *GA = dyn_cast<GlobalAlias>(GV)) {
+        scanConstant(GA->getAliasee(), Defs, WorkList, Found);
       } else {
         SmallVector<char> ErrMsg;
         raw_svector_ostream OS{ErrMsg};
@@ -397,6 +408,21 @@ struct LinkingCloner {
 
         for (auto *DeclGV : ResolvedMap[GVar])
           VMap[DeclGV] = NG;
+      } else if (auto *GA = dyn_cast<GlobalAlias>(GV)) {
+        auto *GVA = dyn_cast<GlobalValue>(GA->getAliasee());
+        if (!GVA) {
+          SmallVector<char> ErrMsg;
+          raw_svector_ostream OS{ErrMsg};
+          GV->print(OS);
+          PROTEUS_FATAL_ERROR("Expected aliasee to be a global value: " +
+                              ErrMsg);
+        }
+
+        auto *NGA = GlobalAlias::create(
+            GVA->getValueType(), GVA->getAddressSpace(), GVA->getLinkage(),
+            GA->getName(), ModuleOut.get());
+        NGA->copyAttributesFrom(GA);
+        VMap[GA] = NGA;
       } else {
         SmallVector<char> ErrMsg;
         raw_svector_ostream OS{ErrMsg};
@@ -421,10 +447,21 @@ struct LinkingCloner {
                           /*Changes=*/CloneFunctionChangeType::DifferentModule,
                           Returns);
       } else if (auto *GVar = dyn_cast<GlobalVariable>(GV)) {
-
         auto *NG = cast<GlobalVariable>(VMap[GVar]);
         if (GVar->hasInitializer())
           NG->setInitializer(MapValue(GVar->getInitializer(), VMap));
+      } else if (auto *GA = dyn_cast<GlobalAlias>(GV)) {
+        auto *GVA = dyn_cast<GlobalValue>(GA->getAliasee());
+        if (!GVA) {
+          SmallVector<char> ErrMsg;
+          raw_svector_ostream OS{ErrMsg};
+          GV->print(OS);
+          PROTEUS_FATAL_ERROR("Expected aliasee to be a global value: " +
+                              ErrMsg);
+        }
+
+        auto *NGA = cast<GlobalAlias>(VMap[GA]);
+        NGA->setAliasee(MapValue(GVA, VMap));
       } else {
         SmallVector<char> ErrMsg;
         raw_svector_ostream OS{ErrMsg};
