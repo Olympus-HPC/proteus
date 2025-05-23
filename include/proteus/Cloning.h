@@ -204,13 +204,6 @@ struct LinkingCloner {
     SmallPtrSet<GlobalValue *, 32> GVs;
   };
 
-  void reportUnsupportedGlobalValue(GlobalValue *G) {
-    SmallVector<char> ErrMsg;
-    raw_svector_ostream OS{ErrMsg};
-    G->print(OS);
-    PROTEUS_FATAL_ERROR("Unsupported global value: " + ErrMsg);
-  }
-
   // Maps a resolved GV to cross-module GV references.
   DenseMap<GlobalValue *, SmallVector<GlobalValue *>> ResolvedMap;
   // Stores declaration info by symbol name to clone and update references.
@@ -267,7 +260,10 @@ struct LinkingCloner {
               GV->getAttributes(),      {G}};
       }
     } else {
-      reportUnsupportedGlobalValue(G);
+      SmallVector<char> ErrMsg;
+      raw_svector_ostream OS{ErrMsg};
+      G->print(OS);
+      PROTEUS_FATAL_ERROR("Unsupported global value: " + ErrMsg);
     }
 
     if (ResolvedGV && Found.insert(ResolvedGV).second) {
@@ -331,7 +327,10 @@ struct LinkingCloner {
         if (auto *Init = GVar->getInitializer())
           scanConstant(Init, Defs, WorkList, Found);
       } else {
-        reportUnsupportedGlobalValue(GV);
+        SmallVector<char> ErrMsg;
+        raw_svector_ostream OS{ErrMsg};
+        GV->print(OS);
+        PROTEUS_FATAL_ERROR("Unsupported global value: " + ErrMsg);
       }
     }
 
@@ -399,7 +398,10 @@ struct LinkingCloner {
         for (auto *DeclGV : ResolvedMap[GVar])
           VMap[DeclGV] = NG;
       } else {
-        reportUnsupportedGlobalValue(GV);
+        SmallVector<char> ErrMsg;
+        raw_svector_ostream OS{ErrMsg};
+        GV->print(OS);
+        PROTEUS_FATAL_ERROR("Unsupported global value: " + ErrMsg);
       }
     }
 
@@ -424,7 +426,10 @@ struct LinkingCloner {
         if (GVar->hasInitializer())
           NG->setInitializer(MapValue(GVar->getInitializer(), VMap));
       } else {
-        reportUnsupportedGlobalValue(GV);
+        SmallVector<char> ErrMsg;
+        raw_svector_ostream OS{ErrMsg};
+        GV->print(OS);
+        PROTEUS_FATAL_ERROR("Unsupported global value: " + ErrMsg);
       }
     }
 
