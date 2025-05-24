@@ -251,7 +251,13 @@ CREATE_GPU_TEST(lambda_def lambda_def.cpp)
 CREATE_GPU_TEST(lambda_host_device lambda_host_device.cpp)
 CREATE_GPU_TEST(builtin_globals builtin_globals.cpp)
 CREATE_GPU_TEST(kernel_calls_indirect kernel_calls_indirect.cpp)
-CREATE_GPU_TEST(alias alias.cpp)
+CREATE_GPU_TEST(alias_func alias_func.cpp)
+if (PROTEUS_ENABLE_HIP)
+    # CUDA does not support alias on global variables.
+    # HIP toolchain supports alias on global variables only for non-RDC
+    # compilation.
+    CREATE_GPU_TEST(alias_gvar alias_gvar.cpp)
+endif()
 
 CREATE_GPU_TEST_RDC(kernel kernel.cpp)
 CREATE_GPU_TEST_RDC(kernel_cache kernel_cache.cpp)
@@ -286,7 +292,10 @@ CREATE_GPU_TEST_RDC(lambda_def lambda_def.cpp)
 CREATE_GPU_TEST_RDC(lambda_host_device lambda_host_device.cpp)
 CREATE_GPU_TEST_RDC(builtin_globals builtin_globals.cpp)
 CREATE_GPU_TEST_RDC(kernel_calls_indirect kernel_calls_indirect.cpp)
-CREATE_GPU_TEST_RDC(alias alias.cpp)
+if (PROTEUS_ENABLE_HIP)
+    # CUDA does not support alias for functions in RDC mode.
+    CREATE_GPU_TEST_RDC(alias_func alias_func.cpp)
+endif()
 
 CREATE_GPU_LIBRARY(device_func_lib device_func.cpp)
 CREATE_GPU_TEST_RDC_LIBS(kernel_calls_func_lib device_func_lib kernel_calls_func_lib.cpp)
