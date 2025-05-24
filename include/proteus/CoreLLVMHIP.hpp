@@ -287,8 +287,8 @@ codegenParallelThinLTO(Module &M, StringRef DeviceArch,
 #if PROTEUS_ENABLE_DEBUG
         if (verifyModule(*MPart, &errs()))
           PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
-        PassBuilder PB;
 #endif
+        PassBuilder PB;
 
         LoopAnalysisManager LAM;
         FunctionAnalysisManager FAM;
