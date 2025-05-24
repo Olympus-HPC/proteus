@@ -212,13 +212,13 @@ struct LinkingCloner {
   StringMap<FuncDeclInfo> FuncDecls;
   StringMap<GlobDeclInfo> GlobDecls;
 
-  DefMaps buildDefMaps(ArrayRef<std::unique_ptr<Module>> Mods) {
+  DefMaps buildDefMaps(ArrayRef<std::reference_wrapper<Module>> Mods) {
     DefMaps SymbolMaps;
-    for (auto &M : Mods) {
-      for (Function &F : M->functions())
+    for (Module &M : Mods) {
+      for (Function &F : M.functions())
         if (!F.isDeclaration())
           SymbolMaps.FuncDefs[F.getName()] = &F;
-      for (GlobalVariable &G : M->globals())
+      for (GlobalVariable &G : M.globals())
         if (G.hasInitializer())
           SymbolMaps.GlobDefs[G.getName()] = &G;
     }
@@ -493,7 +493,7 @@ struct LinkingCloner {
 };
 
 inline std::unique_ptr<Module>
-cloneKernelFromModules(ArrayRef<std::unique_ptr<Module>> Mods,
+cloneKernelFromModules(ArrayRef<std::reference_wrapper<Module>> Mods,
                        StringRef EntryName) {
   auto Cloner = LinkingCloner();
   LinkingCloner::DefMaps Defs = Cloner.buildDefMaps(Mods);
@@ -501,9 +501,9 @@ cloneKernelFromModules(ArrayRef<std::unique_ptr<Module>> Mods,
   // Find the entry function and its module.
   Function *EntryF = nullptr;
   Module *EntryM = nullptr;
-  for (auto &M : Mods) {
-    if ((EntryF = M->getFunction(EntryName)) && !EntryF->isDeclaration()) {
-      EntryM = M.get();
+  for (Module &M : Mods) {
+    if ((EntryF = M.getFunction(EntryName)) && !EntryF->isDeclaration()) {
+      EntryM = &M;
       break;
     }
   }
