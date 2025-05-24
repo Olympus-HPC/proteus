@@ -159,7 +159,7 @@ inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
 
 inline std::unique_ptr<Module>
 linkModules(LLVMContext &Ctx,
-            SmallVector<std::unique_ptr<Module>> &LinkedModules) {
+            SmallVector<std::unique_ptr<Module>> LinkedModules) {
   if (LinkedModules.empty())
     PROTEUS_FATAL_ERROR("Expected jit module");
 

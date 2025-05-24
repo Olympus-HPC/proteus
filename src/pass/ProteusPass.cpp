@@ -658,16 +658,13 @@ private:
         (EnvValue ? static_cast<bool>(std::stoi(EnvValue)) : true);
 
     if (CreateKernelModules) {
-      SmallVector<std::unique_ptr<Module>> Mods;
-      Mods.push_back(std::move(LinkedModule));
       for (auto &Sym : KernelSymbols) {
         auto KernelName = Sym.getKey();
 
-        auto &LinkedModule = Mods.back();
         if (!LinkedModule->getFunction(KernelName))
           PROTEUS_FATAL_ERROR("Expected kernel function in linked module");
 
-        auto KernelModule = cloneKernelFromModules(Mods, KernelName);
+        auto KernelModule = cloneKernelFromModules({*LinkedModule}, KernelName);
         runCleanupPassPipeline(*KernelModule);
 
         if (verifyModule(*KernelModule, &errs()))
@@ -1046,7 +1043,7 @@ private:
       IRBuilder<> Builder(CB->getNextNode());
       Value *FatbinWrapper = CB->getArgOperand(0);
 
-      std::string GVName = getUniqueFileID(M);
+      std::string GVName = "_jit_bitcode_tu_" + getUniqueFileID(M);
       DEBUG(Logger::logs("proteus-pass")
                 << "Instrument register fatbinary bitcode GV " << GVName
                 << "\n";);
@@ -1126,7 +1123,7 @@ private:
           continue;
 
         IRBuilder<> Builder(CB);
-        std::string GVName = getUniqueFileID(M);
+        std::string GVName = "_jit_bitcode_tu_" + getUniqueFileID(M);
         DEBUG(Logger::logs("proteus-pass")
               << "Instrument register linked binary to extract bitcode GV "
               << GVName << "\n");

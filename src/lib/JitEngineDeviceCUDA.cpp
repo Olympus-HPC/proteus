@@ -41,8 +41,8 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
 
   CUdeviceptr DevPtr;
   size_t Bytes;
-  proteusCuErrCheck(cuModuleGetGlobal(&DevPtr, &Bytes, CUMod,
-                                      ("_jit_bitcode_tu_" + ModuleId).c_str()));
+  proteusCuErrCheck(
+      cuModuleGetGlobal(&DevPtr, &Bytes, CUMod, ModuleId.c_str()));
 
   SmallString<4096> DeviceBitcode;
   DeviceBitcode.reserve(Bytes);
@@ -82,8 +82,8 @@ HashT JitEngineDeviceCUDA::getModuleHash(BinaryInfo &BinInfo) {
   auto ExtractLinkedBitcodeHash = [&CUMod](std::string &ModuleId) {
     CUdeviceptr DevPtr;
     size_t Bytes;
-    proteusCuErrCheck(cuModuleGetGlobal(
-        &DevPtr, &Bytes, CUMod, ("_jit_bitcode_tu_" + ModuleId).c_str()));
+    proteusCuErrCheck(
+        cuModuleGetGlobal(&DevPtr, &Bytes, CUMod, ModuleId.c_str()));
 
     SmallVector<char, 4096> DeviceBitcode;
     DeviceBitcode.reserve(Bytes);

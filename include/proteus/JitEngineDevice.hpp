@@ -81,7 +81,7 @@ private:
   FatbinWrapperT *FatbinWrapper;
   std::unique_ptr<LLVMContext> Ctx;
   SmallVector<std::string> LinkedModuleIds;
-  std::unique_ptr<Module> LinkedModule;
+  Module *LinkedModule;
   std::optional<SmallVector<std::unique_ptr<Module>>> ExtractedModules;
   std::optional<HashT> ExtractedModuleHash;
   std::optional<CallGraph> ModuleCallGraph;
@@ -108,11 +108,21 @@ public:
       // Avoid linking when there's a single module by moving it instead and
       // making sure it's materialized for call graph analysis.
       if (ExtractedModules->size() == 1) {
-        LinkedModule = ExtractedModules->pop_back_val();
+        LinkedModule = ExtractedModules->front().get();
         if (auto E = LinkedModule->materializeAll())
           PROTEUS_FATAL_ERROR("Error materializing " + toString(std::move(E)));
       } else {
-        LinkedModule = proteus::linkModules(*Ctx, ExtractedModules.value());
+        // By the LLVM API, linkModules takes ownership of module pointers in
+        // ExtractedModules and returns a new unique ptr to the linked module.
+        // We update ExtractedModules to contain and own only the generated
+        // LinkedModule.
+        auto GeneratedLinkedModule =
+            proteus::linkModules(*Ctx, std::move(ExtractedModules.value()));
+        SmallVector<std::unique_ptr<Module>> NewExtractedModules;
+        NewExtractedModules.emplace_back(std::move(GeneratedLinkedModule));
+        setExtractedModules(NewExtractedModules);
+
+        LinkedModule = ExtractedModules->front().get();
       }
 
       PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
@@ -123,8 +133,14 @@ public:
   }
 
   bool hasExtractedModules() const { return ExtractedModules.has_value(); }
-  const SmallVector<std::unique_ptr<Module>> &getExtractedModules() const {
-    return ExtractedModules.value();
+  const SmallVector<std::reference_wrapper<Module>>
+  getExtractedModules() const {
+    // This should be called only once when cloning the kernel module to cache.
+    SmallVector<std::reference_wrapper<Module>> ModulesRef;
+    for (auto &M : ExtractedModules.value())
+      ModulesRef.emplace_back(*M);
+
+    return ModulesRef;
   }
   void setExtractedModules(SmallVector<std::unique_ptr<Module>> &Modules) {
     ExtractedModules = std::move(Modules);
@@ -247,14 +263,14 @@ public:
       std::unique_ptr<Module> KernelModuleTmp = nullptr;
       switch (Config::get().ProteusKernelClone) {
       case proteus::KernelCloneOption::LinkClonePrune: {
-        auto &BinModule = BinInfo.getLinkedModule();
-        KernelModule = llvm::CloneModule(BinModule);
+        auto &LinkedModule = BinInfo.getLinkedModule();
+        KernelModule = llvm::CloneModule(LinkedModule);
         break;
       }
       case proteus::KernelCloneOption::LinkCloneLight: {
-        auto &BinModule = BinInfo.getLinkedModule();
-        KernelModule = proteus::cloneKernelFromModule(BinModule, KernelName,
-                                                      BinInfo.getCallGraph());
+        auto &LinkedModule = BinInfo.getLinkedModule();
+        KernelModule =
+            proteus::cloneKernelFromModules({LinkedModule}, KernelName);
         break;
       }
       case proteus::KernelCloneOption::CrossClone: {

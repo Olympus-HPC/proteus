@@ -126,16 +126,16 @@ inline void replaceGlobalVariablesWithPointers(
         GV->getAddressSpace(), true);
 
     // Find all Constant users that refer to the global variable.
-    SmallPtrSet<Value *, 16> Others;
+    SmallPtrSet<Value *, 16> ValuesToReplace;
     SmallVector<Value *> Worklist;
     // Seed with the global variable.
     Worklist.push_back(GV);
-    Others.insert(GV);
+    ValuesToReplace.insert(GV);
     while (!Worklist.empty()) {
       Value *V = Worklist.pop_back_val();
       for (auto *User : V->users()) {
         if (auto *C = dyn_cast<Constant>(User)) {
-          if (Others.insert(C).second)
+          if (ValuesToReplace.insert(C).second)
             Worklist.push_back(C);
 
           continue;
@@ -151,7 +151,7 @@ inline void replaceGlobalVariablesWithPointers(
       }
     }
 
-    for (Value *V : Others) {
+    for (Value *V : ValuesToReplace) {
       SmallPtrSet<Instruction *, 16> Insts;
       // Find instruction users to replace value.
       for (User *U : V->users()) {
