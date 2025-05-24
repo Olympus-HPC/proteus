@@ -125,21 +125,60 @@ inline void replaceGlobalVariablesWithPointers(
         CE, GV->getName() + "$ptr", nullptr, GV->getThreadLocalMode(),
         GV->getAddressSpace(), true);
 
-    SmallVector<Instruction *> ToReplace;
-    for (auto *User : GV->users()) {
-      auto *Inst = dyn_cast<Instruction>(User);
-      if (!Inst)
-        PROTEUS_FATAL_ERROR("Expected Instruction User for GV");
+    // Find all Constant users that refer to the global variable.
+    SmallPtrSet<Value *, 16> Others;
+    SmallVector<Value *> Worklist;
+    // Seed with the global variable.
+    Worklist.push_back(GV);
+    Others.insert(GV);
+    while (!Worklist.empty()) {
+      Value *V = Worklist.pop_back_val();
+      for (auto *User : V->users()) {
+        if (auto *C = dyn_cast<Constant>(User)) {
+          if (Others.insert(C).second)
+            Worklist.push_back(C);
 
-      ToReplace.push_back(Inst);
+          continue;
+        }
+
+        // Skip instructions to be handled when replacing.
+        if (isa<Instruction>(User))
+          continue;
+
+        PROTEUS_FATAL_ERROR(
+            "Expected Instruction or Constant user for Value: " + toString(*V) +
+            " , User: " + toString(*User));
+      }
     }
 
-    for (auto *Inst : ToReplace) {
-      IRBuilder Builder{Inst};
-      auto *Load = Builder.CreateLoad(GV->getType(), GVarPtr);
-      Inst->replaceUsesOfWith(GV, Load);
+    for (Value *V : Others) {
+      SmallPtrSet<Instruction *, 16> Insts;
+      // Find instruction users to replace value.
+      for (User *U : V->users()) {
+        if (auto *I = dyn_cast<Instruction>(U)) {
+          Insts.insert(I);
+        }
+      }
+
+      // Replace value in instructions.
+      for (auto *I : Insts) {
+        IRBuilder Builder{I};
+        auto *Load = Builder.CreateLoad(GV->getType(), GVarPtr);
+        Value *Replacement = Load;
+        Type *ExpectedTy = V->getType();
+        if (Load->getType() != ExpectedTy)
+          Replacement =
+              Builder.CreatePointerBitCastOrAddrSpaceCast(Load, ExpectedTy);
+
+        I->replaceUsesOfWith(V, Replacement);
+      }
     }
   }
+
+#if PROTEUS_ENABLE_DEBUG
+  if (verifyModule(M, &errs()))
+    PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
+#endif
 }
 
 inline void relinkGlobalsObject(

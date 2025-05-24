@@ -1,14 +1,17 @@
 // clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./alias.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: ./alias_func.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./alias.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: ./alias_func.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
 // clang-format on
 
+#include <cstdio>
+
 #include "gpu_common.h"
 
-#ifdef __HIP_DEVICE_COMPILE__
+#if defined(__HIP_DEVICE_COMPILE__) ||                                         \
+    (defined(__CUDA__) && defined(__CUDA_ARCH__))
 // 1) Forward‐declare the real device function
 extern "C" __device__ __attribute__((used)) void foo(void *ptr, int v);
 
@@ -24,7 +27,8 @@ extern "C" __device__ __attribute__((used)) void foo(void *ptr, int v) {
 
 // A trivial kernel that forces emission of both symbols
 __global__ __attribute__((annotate("jit"))) void kernel() {
-#ifdef __HIP_DEVICE_COMPILE__
+#if defined(__HIP_DEVICE_COMPILE__) ||                                         \
+    (defined(__CUDA__) && defined(__CUDA_ARCH__))
   printf("Kernel\n");
   foo_alias(nullptr, 42);
 #endif

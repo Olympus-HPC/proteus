@@ -3,8 +3,10 @@
 
 #include <llvm/Analysis/CallGraph.h>
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/Verifier.h>
 #include <llvm/Transforms/Utils/Cloning.h>
 
+#include "proteus/Debug.h"
 #include "proteus/Error.h"
 #include "proteus/Logger.hpp"
 
@@ -269,10 +271,7 @@ struct LinkingCloner {
       }
       ResolvedGV = GA;
     } else {
-      SmallVector<char> ErrMsg;
-      raw_svector_ostream OS{ErrMsg};
-      G->print(OS);
-      PROTEUS_FATAL_ERROR("Unsupported global value: " + ErrMsg);
+      PROTEUS_FATAL_ERROR("Unsupported global value: " + toString(*G));
     }
 
     if (ResolvedGV && Found.insert(ResolvedGV).second) {
@@ -338,10 +337,7 @@ struct LinkingCloner {
       } else if (auto *GA = dyn_cast<GlobalAlias>(GV)) {
         scanConstant(GA->getAliasee(), Defs, WorkList, Found);
       } else {
-        SmallVector<char> ErrMsg;
-        raw_svector_ostream OS{ErrMsg};
-        GV->print(OS);
-        PROTEUS_FATAL_ERROR("Unsupported global value: " + ErrMsg);
+        PROTEUS_FATAL_ERROR("Unsupported global value: " + toString(*GV));
       }
     }
 
@@ -409,25 +405,14 @@ struct LinkingCloner {
         for (auto *DeclGV : ResolvedMap[GVar])
           VMap[DeclGV] = NG;
       } else if (auto *GA = dyn_cast<GlobalAlias>(GV)) {
-        auto *GVA = dyn_cast<GlobalValue>(GA->getAliasee());
-        if (!GVA) {
-          SmallVector<char> ErrMsg;
-          raw_svector_ostream OS{ErrMsg};
-          GV->print(OS);
-          PROTEUS_FATAL_ERROR("Expected aliasee to be a global value: " +
-                              ErrMsg);
-        }
-
-        auto *NGA = GlobalAlias::create(
-            GVA->getValueType(), GVA->getAddressSpace(), GVA->getLinkage(),
-            GA->getName(), ModuleOut.get());
+        auto *NGA = GlobalAlias::create(GA->getValueType(),
+                                        GA->getAddressSpace(), GA->getLinkage(),
+                                        GA->getName(), ModuleOut.get());
         NGA->copyAttributesFrom(GA);
+        NGA->setVisibility(GA->getVisibility());
         VMap[GA] = NGA;
       } else {
-        SmallVector<char> ErrMsg;
-        raw_svector_ostream OS{ErrMsg};
-        GV->print(OS);
-        PROTEUS_FATAL_ERROR("Unsupported global value: " + ErrMsg);
+        PROTEUS_FATAL_ERROR("Unsupported global value: " + toString(*GV));
       }
     }
 
@@ -451,22 +436,11 @@ struct LinkingCloner {
         if (GVar->hasInitializer())
           NG->setInitializer(MapValue(GVar->getInitializer(), VMap));
       } else if (auto *GA = dyn_cast<GlobalAlias>(GV)) {
-        auto *GVA = dyn_cast<GlobalValue>(GA->getAliasee());
-        if (!GVA) {
-          SmallVector<char> ErrMsg;
-          raw_svector_ostream OS{ErrMsg};
-          GV->print(OS);
-          PROTEUS_FATAL_ERROR("Expected aliasee to be a global value: " +
-                              ErrMsg);
-        }
-
+        auto *Aliasee = GA->getAliasee();
         auto *NGA = cast<GlobalAlias>(VMap[GA]);
-        NGA->setAliasee(MapValue(GVA, VMap));
+        NGA->setAliasee(MapValue(Aliasee, VMap));
       } else {
-        SmallVector<char> ErrMsg;
-        raw_svector_ostream OS{ErrMsg};
-        GV->print(OS);
-        PROTEUS_FATAL_ERROR("Unsupported global value: " + ErrMsg);
+        PROTEUS_FATAL_ERROR("Unsupported global value: " + toString(*GV));
       }
     }
 
