@@ -1,5 +1,7 @@
 #!/bin/sh
 
+HOSTN=${HOSTNAME//[0-9]/}
+
 ROCM_VERSION=$1
 if [ $# -lt 1 ]; then
     echo "Usage: source setup-rocm.sh <ROCm version>"
@@ -10,8 +12,8 @@ ml load rocm/${ROCM_VERSION}
 
 LLVM_INSTALL_DIR=${ROCM_PATH}/llvm
 
-mkdir build-rocm-${ROCM_VERSION}
-pushd build-rocm-${ROCM_VERSION}
+mkdir build-${HOSTN}-rocm-${ROCM_VERSION}
+pushd build-${HOSTN}-rocm-${ROCM_VERSION}
 
 cmake .. \
 -DLLVM_INSTALL_DIR=${LLVM_INSTALL_DIR} \
