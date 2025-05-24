@@ -62,6 +62,7 @@
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/AlwaysInliner.h>
 #include <llvm/Transforms/IPO/GlobalDCE.h>
+#include <llvm/Transforms/IPO/GlobalOpt.h>
 #include <llvm/Transforms/IPO/MergeFunctions.h>
 #include <llvm/Transforms/IPO/StripDeadPrototypes.h>
 #include <llvm/Transforms/IPO/StripSymbols.h>
@@ -333,6 +334,7 @@ private:
 
     ModulePassManager Passes;
     Passes.addPass(MergeFunctionsPass());
+    Passes.addPass(GlobalOptPass());
     Passes.addPass(GlobalDCEPass());
     Passes.addPass(StripDeadDebugInfoPass());
     Passes.addPass(StripDeadPrototypesPass());

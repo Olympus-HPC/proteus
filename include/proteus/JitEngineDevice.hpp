@@ -288,12 +288,10 @@ public:
                            << T.elapsed() << " ms\n");
     }
 
-    // Do not internalize if the codegen backend is thinlto since that
-    // performs its own internalization. Otherwise we do double the work and
-    // limit parallelism at the thinlto backend.
-    if (Config::get().ProteusCodegen != CodegenOption::ParallelThinLTO)
-      internalize(*KernelModule, KernelName);
-    runCleanupPassPipeline(*KernelModule);
+    // Internalize and cleanup to simplify the module and prepare it for
+    // optimization.
+    internalize(*KernelModule, KernelName);
+    proteus::runCleanupPassPipeline(*KernelModule);
 
     // If the module is not in the provided context due to cloning, roundtrip it
     // using bitcode. Re-use the roundtrip bitcode to return it.

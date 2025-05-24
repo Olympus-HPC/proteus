@@ -8,6 +8,7 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/Verifier.h>
 #include <llvm/LTO/LTO.h>
 #include <llvm/Support/CodeGen.h>
 #include <llvm/Support/FileSystem.h>
@@ -283,7 +284,11 @@ codegenParallelThinLTO(Module &M, StringRef DeviceArch,
   SplitModule(
       M, BitcodesOS.size(),
       [&PartIdx, &BitcodesOS](std::unique_ptr<Module> MPart) {
+#if PROTEUS_ENABLE_DEBUG
+        if (verifyModule(*MPart, &errs()))
+          PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
         PassBuilder PB;
+#endif
 
         LoopAnalysisManager LAM;
         FunctionAnalysisManager FAM;

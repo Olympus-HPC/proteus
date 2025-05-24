@@ -48,8 +48,6 @@ protected:
                                 const ArrayRef<int32_t> RCTypes,
                                 SmallVector<RuntimeConstant> &RCVec);
 
-  void runCleanupPassPipeline(Module &M);
-
   JitEngine();
 
   std::string mangleSuffix(HashT &HashValue);
