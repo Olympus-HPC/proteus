@@ -249,8 +249,8 @@ public:
   extractKernelModule(BinaryInfo &BinInfo, StringRef KernelName,
                       LLVMContext &Ctx) {
     std::unique_ptr<Module> KernelModule =
-        static_cast<ImplT &>(*this).extractKernelModule(BinInfo, KernelName,
-                                                        Ctx);
+        static_cast<ImplT &>(*this).tryExtractKernelModule(BinInfo, KernelName,
+                                                           Ctx);
     std::unique_ptr<MemoryBuffer> Bitcode = nullptr;
 
     // If there is no ready-made kernel module from AOT, extract per-TU or the

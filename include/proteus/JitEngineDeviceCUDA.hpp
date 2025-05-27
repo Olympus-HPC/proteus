@@ -39,9 +39,9 @@ public:
 
   void extractModules(BinaryInfo &BinInfo);
 
-  std::unique_ptr<Module> extractKernelModule(BinaryInfo &BinInfo,
-                                              StringRef KernelName,
-                                              LLVMContext &Ctx);
+  std::unique_ptr<Module> tryExtractKernelModule(BinaryInfo &BinInfo,
+                                                 StringRef KernelName,
+                                                 LLVMContext &Ctx);
 
   void codegenPTX(Module &M, StringRef DeviceArch,
                   SmallVectorImpl<char> &PTXStr);

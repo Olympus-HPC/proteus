@@ -145,7 +145,7 @@ HashT JitEngineDeviceHIP::getModuleHash(BinaryInfo &BinInfo) {
   return BinInfo.getModuleHash();
 }
 
-std::unique_ptr<Module> JitEngineDeviceHIP::extractKernelModule(
+std::unique_ptr<Module> JitEngineDeviceHIP::tryExtractKernelModule(
     BinaryInfo &BinInfo, StringRef KernelName, LLVMContext &Ctx) {
   Expected<object::ELF64LEFile> DeviceElf =
       object::ELF64LEFile::create(getDeviceBinary(BinInfo, DeviceArch));
