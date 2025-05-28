@@ -577,7 +577,7 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   HashT HashValue =
       hash(getStaticHash(KernelInfo), RCVec, LambdaJitValuesVec, GridDim.x,
-           GridDim.x, GridDim.y, GridDim.z, BlockDim.x, BlockDim.y, BlockDim.z);
+           GridDim.y, GridDim.z, BlockDim.x, BlockDim.y, BlockDim.z);
 
   typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc =
       CodeCache.lookup(HashValue);
