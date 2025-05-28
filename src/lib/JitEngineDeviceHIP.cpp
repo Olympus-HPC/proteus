@@ -99,7 +99,6 @@ static Expected<std::unique_ptr<MemoryBuffer>> decompress(StringRef Blob) {
       llvm::toStringRef(DecompressedData));
 }
 
-// TODO: We could cache the device binary in a HIP-specific BinaryInfo.
 static std::unique_ptr<MemoryBuffer> getDeviceBinary(BinaryInfo &BinInfo,
                                                      StringRef DeviceArch) {
   FatbinWrapperT *FatbinWrapper = BinInfo.getFatbinWrapper();
@@ -182,15 +181,22 @@ static std::unique_ptr<MemoryBuffer> getDeviceBinary(BinaryInfo &BinInfo,
   return MemoryBuffer::getMemBufferCopy(DeviceBinary->getBuffer());
 }
 
+static Expected<object::ELF64LEFile> getDeviceElf(BinaryInfo &BinInfo,
+                                                  StringRef DeviceArch) {
+  if (!BinInfo.hasDeviceBinary())
+    BinInfo.setDeviceBinary(getDeviceBinary(BinInfo, DeviceArch));
+
+  Expected<object::ELF64LEFile> DeviceElf =
+      object::ELF64LEFile::create(BinInfo.getDeviceBinary().getBuffer());
+
+  return DeviceElf;
+}
+
 HashT JitEngineDeviceHIP::getModuleHash(BinaryInfo &BinInfo) {
   if (BinInfo.hasModuleHash())
     return BinInfo.getModuleHash();
 
-  std::unique_ptr<MemoryBuffer> DeviceBinary =
-      std::move(getDeviceBinary(BinInfo, DeviceArch));
-  Expected<object::ELF64LEFile> DeviceElf =
-      object::ELF64LEFile::create(DeviceBinary->getBuffer());
-
+  Expected<object::ELF64LEFile> DeviceElf = getDeviceElf(BinInfo, DeviceArch);
   if (DeviceElf.takeError())
     PROTEUS_FATAL_ERROR("Cannot create the device elf");
 
@@ -243,10 +249,7 @@ HashT JitEngineDeviceHIP::getModuleHash(BinaryInfo &BinInfo) {
 
 std::unique_ptr<Module> JitEngineDeviceHIP::tryExtractKernelModule(
     BinaryInfo &BinInfo, StringRef KernelName, LLVMContext &Ctx) {
-  std::unique_ptr<MemoryBuffer> DeviceBinary =
-      std::move(getDeviceBinary(BinInfo, DeviceArch));
-  Expected<object::ELF64LEFile> DeviceElf =
-      object::ELF64LEFile::create(DeviceBinary->getBuffer());
+  Expected<object::ELF64LEFile> DeviceElf = getDeviceElf(BinInfo, DeviceArch);
   if (DeviceElf.takeError())
     PROTEUS_FATAL_ERROR("Cannot create the device elf");
 
@@ -301,10 +304,7 @@ std::unique_ptr<Module> JitEngineDeviceHIP::tryExtractKernelModule(
 }
 
 void JitEngineDeviceHIP::extractModules(BinaryInfo &BinInfo) {
-  std::unique_ptr<MemoryBuffer> DeviceBinary =
-      std::move(getDeviceBinary(BinInfo, DeviceArch));
-  Expected<object::ELF64LEFile> DeviceElf =
-      object::ELF64LEFile::create(DeviceBinary->getBuffer());
+  Expected<object::ELF64LEFile> DeviceElf = getDeviceElf(BinInfo, DeviceArch);
   if (DeviceElf.takeError())
     PROTEUS_FATAL_ERROR("Cannot create the device elf");
 
