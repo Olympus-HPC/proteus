@@ -85,6 +85,7 @@ private:
   std::optional<SmallVector<std::unique_ptr<Module>>> ExtractedModules;
   std::optional<HashT> ExtractedModuleHash;
   std::optional<CallGraph> ModuleCallGraph;
+  std::unique_ptr<MemoryBuffer> DeviceBinary;
 
 public:
   BinaryInfo() = default;
@@ -92,7 +93,8 @@ public:
              SmallVector<std::string> &&LinkedModuleIds)
       : FatbinWrapper(FatbinWrapper), Ctx(std::make_unique<LLVMContext>()),
         LinkedModuleIds(LinkedModuleIds), LinkedModule(nullptr),
-        ExtractedModules(std::nullopt), ModuleCallGraph(std::nullopt) {}
+        ExtractedModules(std::nullopt), ModuleCallGraph(std::nullopt),
+        DeviceBinary(nullptr) {}
 
   FatbinWrapperT *getFatbinWrapper() const { return FatbinWrapper; }
 
@@ -163,6 +165,16 @@ public:
       ModuleCallGraph.emplace(CallGraph(*LinkedModule));
     }
     return ModuleCallGraph.value();
+  }
+
+  bool hasDeviceBinary() { return (DeviceBinary != nullptr); }
+  MemoryBufferRef getDeviceBinary() {
+    if (!hasDeviceBinary())
+      PROTEUS_FATAL_ERROR("Expeced non-null device binary");
+    return DeviceBinary->getMemBufferRef();
+  }
+  void setDeviceBinary(std::unique_ptr<MemoryBuffer> DeviceBinaryBuffer) {
+    DeviceBinary = std::move(DeviceBinaryBuffer);
   }
 
   void addModuleId(const char *ModuleId) {
