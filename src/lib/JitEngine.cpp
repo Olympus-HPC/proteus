@@ -52,10 +52,6 @@ void JitEngine::optimizeIR(Module &M, StringRef Arch, char OptLevel,
   proteus::optimizeIR(M, Arch, OptLevel, CodegenOptLevel);
 }
 
-void JitEngine::runCleanupPassPipeline(Module &M) {
-  proteus::runCleanupPassPipeline(M);
-}
-
 void JitEngine::getRuntimeConstantValues(void **Args,
                                          const ArrayRef<int32_t> RCIndices,
                                          const ArrayRef<int32_t> RCTypes,

@@ -96,7 +96,11 @@ public:
 
   void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim);
 
-  std::unique_ptr<Module> extractModule(BinaryInfo &BinInfo);
+  void extractModules(BinaryInfo &BinInfo);
+
+  std::unique_ptr<Module> tryExtractKernelModule(BinaryInfo &BinInfo,
+                                                 StringRef KernelName,
+                                                 LLVMContext &Ctx);
 
   hipFunction_t getKernelFunctionFromImage(StringRef KernelName,
                                            const void *Image);

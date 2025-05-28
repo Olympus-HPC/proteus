@@ -51,6 +51,7 @@
 #include <llvm/Transforms/Utils/Cloning.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
+#include "proteus/Cloning.h"
 #include "proteus/CompilerAsync.hpp"
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/CompilerSync.hpp"
@@ -80,7 +81,8 @@ private:
   FatbinWrapperT *FatbinWrapper;
   std::unique_ptr<LLVMContext> Ctx;
   SmallVector<std::string> LinkedModuleIds;
-  std::unique_ptr<Module> ExtractedModule;
+  Module *LinkedModule;
+  std::optional<SmallVector<std::unique_ptr<Module>>> ExtractedModules;
   std::optional<HashT> ExtractedModuleHash;
   std::optional<CallGraph> ModuleCallGraph;
 
@@ -89,16 +91,59 @@ public:
   BinaryInfo(FatbinWrapperT *FatbinWrapper,
              SmallVector<std::string> &&LinkedModuleIds)
       : FatbinWrapper(FatbinWrapper), Ctx(std::make_unique<LLVMContext>()),
-        LinkedModuleIds(LinkedModuleIds), ModuleCallGraph(std::nullopt) {}
+        LinkedModuleIds(LinkedModuleIds), LinkedModule(nullptr),
+        ExtractedModules(std::nullopt), ModuleCallGraph(std::nullopt) {}
 
   FatbinWrapperT *getFatbinWrapper() const { return FatbinWrapper; }
 
   std::unique_ptr<LLVMContext> &getLLVMContext() { return Ctx; }
 
-  bool hasModule() const { return (ExtractedModule != nullptr); }
-  Module &getModule() const { return *ExtractedModule; }
-  void setModule(std::unique_ptr<Module> Module) {
-    ExtractedModule = std::move(Module);
+  bool hasLinkedModule() const { return (LinkedModule != nullptr); }
+  Module &getLinkedModule() {
+    if (!LinkedModule) {
+      if (!hasExtractedModules())
+        PROTEUS_FATAL_ERROR("Expected extracted modules");
+
+      Timer T;
+      // Avoid linking when there's a single module by moving it instead and
+      // making sure it's materialized for call graph analysis.
+      if (ExtractedModules->size() == 1) {
+        LinkedModule = ExtractedModules->front().get();
+        if (auto E = LinkedModule->materializeAll())
+          PROTEUS_FATAL_ERROR("Error materializing " + toString(std::move(E)));
+      } else {
+        // By the LLVM API, linkModules takes ownership of module pointers in
+        // ExtractedModules and returns a new unique ptr to the linked module.
+        // We update ExtractedModules to contain and own only the generated
+        // LinkedModule.
+        auto GeneratedLinkedModule =
+            proteus::linkModules(*Ctx, std::move(ExtractedModules.value()));
+        SmallVector<std::unique_ptr<Module>> NewExtractedModules;
+        NewExtractedModules.emplace_back(std::move(GeneratedLinkedModule));
+        setExtractedModules(NewExtractedModules);
+
+        LinkedModule = ExtractedModules->front().get();
+      }
+
+      PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                           << "getLinkedModule " << T.elapsed() << " ms\n");
+    }
+
+    return *LinkedModule;
+  }
+
+  bool hasExtractedModules() const { return ExtractedModules.has_value(); }
+  const SmallVector<std::reference_wrapper<Module>>
+  getExtractedModules() const {
+    // This should be called only once when cloning the kernel module to cache.
+    SmallVector<std::reference_wrapper<Module>> ModulesRef;
+    for (auto &M : ExtractedModules.value())
+      ModulesRef.emplace_back(*M);
+
+    return ModulesRef;
+  }
+  void setExtractedModules(SmallVector<std::unique_ptr<Module>> &Modules) {
+    ExtractedModules = std::move(Modules);
   }
 
   bool hasModuleHash() const { return ExtractedModuleHash.has_value(); }
@@ -113,7 +158,9 @@ public:
 
   CallGraph &getCallGraph() {
     if (!ModuleCallGraph.has_value()) {
-      ModuleCallGraph.emplace(CallGraph(*ExtractedModule));
+      if (!LinkedModule)
+        PROTEUS_FATAL_ERROR("Expected non-null linked module");
+      ModuleCallGraph.emplace(CallGraph(*LinkedModule));
     }
     return ModuleCallGraph.value();
   }
@@ -198,6 +245,81 @@ public:
                 void **KernelArgs, uint64_t ShmemSize,
                 typename DeviceTraits<ImplT>::DeviceStream_t Stream);
 
+  std::pair<std::unique_ptr<Module>, std::unique_ptr<MemoryBuffer>>
+  extractKernelModule(BinaryInfo &BinInfo, StringRef KernelName,
+                      LLVMContext &Ctx) {
+    std::unique_ptr<Module> KernelModule =
+        static_cast<ImplT &>(*this).tryExtractKernelModule(BinInfo, KernelName,
+                                                           Ctx);
+    std::unique_ptr<MemoryBuffer> Bitcode = nullptr;
+
+    // If there is no ready-made kernel module from AOT, extract per-TU or the
+    // single linked module and clone the kernel module.
+    if (!KernelModule) {
+      Timer T;
+      if (!BinInfo.hasExtractedModules())
+        static_cast<ImplT &>(*this).extractModules(BinInfo);
+
+      std::unique_ptr<Module> KernelModuleTmp = nullptr;
+      switch (Config::get().ProteusKernelClone) {
+      case proteus::KernelCloneOption::LinkClonePrune: {
+        auto &LinkedModule = BinInfo.getLinkedModule();
+        KernelModule = llvm::CloneModule(LinkedModule);
+        break;
+      }
+      case proteus::KernelCloneOption::LinkCloneLight: {
+        auto &LinkedModule = BinInfo.getLinkedModule();
+        KernelModule =
+            proteus::cloneKernelFromModules({LinkedModule}, KernelName);
+        break;
+      }
+      case proteus::KernelCloneOption::CrossClone: {
+        KernelModule = proteus::cloneKernelFromModules(
+            BinInfo.getExtractedModules(), KernelName);
+        break;
+      }
+      default:
+        PROTEUS_FATAL_ERROR("Unsupported kernel cloning option");
+      }
+
+      PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                           << "Cloning "
+                           << toString(Config::get().ProteusKernelClone) << " "
+                           << T.elapsed() << " ms\n");
+    }
+
+    // Internalize and cleanup to simplify the module and prepare it for
+    // optimization.
+    internalize(*KernelModule, KernelName);
+    proteus::runCleanupPassPipeline(*KernelModule);
+
+    // If the module is not in the provided context due to cloning, roundtrip it
+    // using bitcode. Re-use the roundtrip bitcode to return it.
+    if (&KernelModule->getContext() != &Ctx) {
+      SmallVector<char> CloneBuffer;
+      raw_svector_ostream OS(CloneBuffer);
+      WriteBitcodeToFile(*KernelModule, OS);
+      StringRef CloneStr = StringRef(CloneBuffer.data(), CloneBuffer.size());
+      auto ExpectedKernelModule =
+          parseBitcodeFile(MemoryBufferRef{CloneStr, KernelName}, Ctx);
+      if (auto E = ExpectedKernelModule.takeError())
+        PROTEUS_FATAL_ERROR("Error parsing bitcode: " + toString(std::move(E)));
+
+      KernelModule = std::move(*ExpectedKernelModule);
+      Bitcode = MemoryBuffer::getMemBufferCopy(CloneStr);
+    } else {
+      // Parse the kernel module to create the bitcode since it has not been
+      // created by roundtripping.
+      SmallVector<char> BitcodeBuffer;
+      raw_svector_ostream OS(BitcodeBuffer);
+      WriteBitcodeToFile(*KernelModule, OS);
+      auto BitcodeStr = StringRef{BitcodeBuffer.data(), BitcodeBuffer.size()};
+      Bitcode = MemoryBuffer::getMemBufferCopy(BitcodeStr);
+    }
+
+    return std::make_pair(std::move(KernelModule), std::move(Bitcode));
+  }
+
   void extractModuleAndBitcode(JITKernelInfo &KernelInfo) {
     TIMESCOPE(__FUNCTION__)
 
@@ -212,48 +334,19 @@ public:
 
     BinaryInfo &BinInfo = KernelInfo.getBinaryInfo();
 
-    if (!BinInfo.hasModule()) {
-      std::unique_ptr<Module> ExtractedModule =
-          static_cast<ImplT &>(*this).extractModule(BinInfo);
+    Timer T;
+    auto [KernelModule, BitcodeBuffer] = extractKernelModule(
+        BinInfo, KernelInfo.getName(), *KernelInfo.getLLVMContext());
 
-      pruneIR(*ExtractedModule);
-      runCleanupPassPipeline(*ExtractedModule);
+    if (!KernelModule)
+      PROTEUS_FATAL_ERROR("Expected non-null kernel module");
+    if (!BitcodeBuffer)
+      PROTEUS_FATAL_ERROR("Expected non-null kernel bitcode");
 
-      BinInfo.setModule(std::move(ExtractedModule));
-    }
-
-    auto &BinModule = BinInfo.getModule();
-    std::unique_ptr<Module> KernelModuleTmp{nullptr};
-
-    if (Config::get().ProteusUseLightweightKernelClone) {
-      KernelModuleTmp = proteus::cloneKernelFromModule(
-          BinModule, KernelInfo.getName(), BinInfo.getCallGraph());
-    } else {
-      KernelModuleTmp = llvm::CloneModule(BinModule);
-    }
-
-    // Do not internalize it the codegen backend is thinlto since that performs
-    // its own internalization. Otherwise we do double the work and limit
-    // parallelism at the thinlto backend.
-    if (Config::get().ProteusCodegen != CodegenOption::ParallelThinLTO)
-      internalize(*KernelModuleTmp, KernelInfo.getName());
-    runCleanupPassPipeline(*KernelModuleTmp);
-
-    SmallVector<char, 1> ClonedModuleBuffer;
-    raw_svector_ostream ClonedModuleOS(ClonedModuleBuffer);
-    WriteBitcodeToFile(*KernelModuleTmp, ClonedModuleOS);
-    StringRef ClonedModuleRef =
-        StringRef(ClonedModuleBuffer.data(), ClonedModuleBuffer.size());
-    MemoryBufferRef ClonedModuleBufferRef(ClonedModuleRef,
-                                          KernelInfo.getName());
-    auto ExpectedKernelModule =
-        parseBitcodeFile(ClonedModuleBufferRef, *KernelInfo.getLLVMContext());
-    if (auto E = ExpectedKernelModule.takeError())
-      PROTEUS_FATAL_ERROR("Error parsing bitcode: " + toString(std::move(E)));
-
-    KernelInfo.setModule(std::move(*ExpectedKernelModule));
-    KernelInfo.setBitcode(
-        std::move(MemoryBuffer::getMemBufferCopy(ClonedModuleRef)));
+    KernelInfo.setModule(std::move(KernelModule));
+    KernelInfo.setBitcode(std::move(BitcodeBuffer));
+    PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                         << "Extract kernel module " << T.elapsed() << " ms\n");
   }
 
   Module &getModule(JITKernelInfo &KernelInfo) {
@@ -426,10 +519,6 @@ protected:
   JitStorageCache<KernelFunction_t> StorageCache;
   std::string DeviceArch;
   std::unordered_map<std::string, const void *> VarNameToDevPtr;
-  std::unique_ptr<Module>
-  linkJitModule(LLVMContext &Ctx,
-                SmallVector<std::unique_ptr<Module>> &LinkedModules,
-                std::unique_ptr<Module> LTOModule = nullptr);
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
 };
@@ -677,43 +766,6 @@ void JitEngineDevice<ImplT>::registerLinkedBinary(FatbinWrapperT *FatbinWrapper,
     GlobalLinkedModuleIds.push_back(ModuleId);
 
   ModuleIdToFatBinary[ModuleId] = FatbinWrapper;
-}
-
-template <typename ImplT>
-std::unique_ptr<Module> JitEngineDevice<ImplT>::linkJitModule(
-    LLVMContext &Ctx, SmallVector<std::unique_ptr<Module>> &LinkedModules,
-    std::unique_ptr<Module> LTOModule) {
-  Timer T;
-  if (LinkedModules.empty())
-    PROTEUS_FATAL_ERROR("Expected jit module");
-
-  auto LinkedModule = proteus::linkModules(Ctx, LinkedModules);
-  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
-                       << "linkModules " << T.elapsed() << " ms\n");
-  T.reset();
-
-  // Last, link in the LTO module, if there is one. The LTO module includes code
-  // post-optimization, which reduces specialization opportunities for proteus
-  // (e.g., due to inlining). Due to that, we selectively link as needed from
-  // it, to import definitions outside the proteus-compiled bitcode.
-  if (LTOModule) {
-    Linker IRLinker(*LinkedModule);
-    // Remove internal linkage from functions in the LTO module to make them
-    // linkable.
-    for (auto &F : *LTOModule) {
-      if (F.hasInternalLinkage())
-        F.setLinkage(GlobalValue::ExternalLinkage);
-    }
-
-    if (IRLinker.linkInModule(std::move(LTOModule),
-                              Linker::Flags::LinkOnlyNeeded))
-      PROTEUS_FATAL_ERROR("Linking failed");
-  }
-
-  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
-                       << "link with LTO module " << T.elapsed() << " ms\n");
-
-  return LinkedModule;
 }
 
 } // namespace proteus

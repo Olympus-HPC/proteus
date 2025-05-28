@@ -102,8 +102,15 @@ HashT JitEngineDeviceCUDA::getModuleHash(BinaryInfo &BinInfo) {
   return BinInfo.getModuleHash();
 }
 
-std::unique_ptr<Module>
-JitEngineDeviceCUDA::extractModule(BinaryInfo &BinInfo) {
+std::unique_ptr<Module> JitEngineDeviceCUDA::tryExtractKernelModule(
+    BinaryInfo &BinInfo, StringRef KernelName, LLVMContext &Ctx) {
+  // We do not support emitting per-kernel modules during CUDA compilation,
+  // hence this returns null to trigger the fallback to extraction of per-TU
+  // modules and cloning.
+  return nullptr;
+}
+
+void JitEngineDeviceCUDA::extractModules(BinaryInfo &BinInfo) {
   CUmodule CUMod;
 
   FatbinWrapperT *FatbinWrapper = BinInfo.getFatbinWrapper();
@@ -125,7 +132,7 @@ JitEngineDeviceCUDA::extractModule(BinaryInfo &BinInfo) {
 
   proteusCuErrCheck(cuModuleUnload(CUMod));
 
-  return linkJitModule(Ctx, LinkedModules);
+  BinInfo.setExtractedModules(LinkedModules);
 }
 
 void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module &M, Function &F,

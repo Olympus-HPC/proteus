@@ -1,4 +1,17 @@
-add_library(ProteusPass SHARED ProteusPass.cpp)
+add_library(IRLinker SHARED IRLinker.cpp)
+target_include_directories(IRLinker
+  PRIVATE ${PROJECT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_BINARY_DIR}
+  SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS}
+)
+target_link_libraries(IRLinker
+  PRIVATE LLVMLinker
+  -Wl,-Bsymbolic
+)
+
+add_library(ProteusPass SHARED
+  ProteusPass.cpp
+)
 
 target_include_directories(ProteusPass
   PRIVATE ${PROJECT_SOURCE_DIR}/include
@@ -15,6 +28,7 @@ endif()
 # Allow undefined symbols in shared objects on Darwin (this is the default
 # behaviour on Linux)
 target_link_libraries(ProteusPass
+  PRIVATE IRLinker
   "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 
 target_compile_options(
@@ -29,8 +43,17 @@ target_link_options(
   "SHELL:$<$<LINK_LANGUAGE:HIP>:-Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPass>>"
 )
 
+set_target_properties(ProteusPass PROPERTIES
+  # on macOS enable passing RPATH flags to the linker; no-ops on Linux
+  MACOSX_RPATH          ON
+  # let CMake use INSTALL_RPATH even in the build tree
+  BUILD_WITH_INSTALL_RPATH  TRUE
+  # pick @loader_path on Darwin, $ORIGIN elsewhere
+  INSTALL_RPATH        "$<IF:$<PLATFORM_ID:Darwin>,@loader_path,\$ORIGIN>"
+)
+
 install(
-  TARGETS ProteusPass
+  TARGETS ProteusPass IRLinker
   EXPORT proteusTargets
   RUNTIME DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"

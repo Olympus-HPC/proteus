@@ -47,6 +47,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/IRReader/IRReader.h>
+#include <llvm/Linker/Linker.h>
 #include <llvm/Object/ELF.h>
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Passes/PassPlugin.h>
@@ -61,6 +62,8 @@
 #include <llvm/Transforms/IPO.h>
 #include <llvm/Transforms/IPO/AlwaysInliner.h>
 #include <llvm/Transforms/IPO/GlobalDCE.h>
+#include <llvm/Transforms/IPO/GlobalOpt.h>
+#include <llvm/Transforms/IPO/MergeFunctions.h>
 #include <llvm/Transforms/IPO/StripDeadPrototypes.h>
 #include <llvm/Transforms/IPO/StripSymbols.h>
 #include <llvm/Transforms/Utils/Cloning.h>
@@ -68,7 +71,9 @@
 
 #include <iostream>
 #include <string>
+#include <variant>
 
+#include "proteus/Cloning.h"
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Error.h"
 #include "proteus/Hashing.hpp"
@@ -215,15 +220,15 @@ private:
            StringRef{DemangledName}.contains(")::operator()");
   }
 
-  std::string getJitBitcodeUniqueName(Module &M) {
+  std::string getUniqueFileID(Module &M) {
     llvm::sys::fs::UniqueID ID;
     if (auto EC = llvm::sys::fs::getUniqueID(M.getSourceFileName(), ID))
-      PROTEUS_FATAL_ERROR("Cound not get unique id");
+      PROTEUS_FATAL_ERROR("Could not get unique id for source file " +
+                          EC.message());
 
     SmallString<64> Out;
     llvm::raw_svector_ostream OutStr(Out);
-    OutStr << "_jit_bitcode" << llvm::format("_%x", ID.getDevice())
-           << llvm::format("_%x", ID.getFile());
+    OutStr << llvm::format("%x_%x", ID.getDevice(), ID.getFile());
 
     return std::string(Out);
   }
@@ -253,6 +258,10 @@ private:
               " => Expected the annotated Fn " + Fn->getName() + " (" +
               demangle(Fn->getName().str()) +
               ") to be a kernel function or device lambda function!");
+
+        if (isDeviceKernel(Fn)) {
+          JitFunctionInfoMap.insert({Fn, JitFunctionInfo{}});
+        }
 
         continue;
       }
@@ -324,11 +333,15 @@ private:
     PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
     ModulePassManager Passes;
+    Passes.addPass(MergeFunctionsPass());
+    Passes.addPass(GlobalOptPass());
     Passes.addPass(GlobalDCEPass());
     Passes.addPass(StripDeadDebugInfoPass());
     Passes.addPass(StripDeadPrototypesPass());
 
     Passes.run(M, MAM);
+
+    StripDebugInfo(M);
   }
 
   void runOptimizationPassPipeline(Module &M) {
@@ -466,94 +479,229 @@ private:
           << *JitMod << "=== End of Final Host JIT Module\n");
   }
 
-  void emitJitModuleDevice(Module &M, bool IsLTO) {
-    SmallVector<char, 4096> Bitcode;
+  // Returns true for globals that are not needed when cloning to extract a
+  // module.
+  static bool skipGlobal(const GlobalValue &G) {
+    if (G.getName().starts_with("_jit_bitcode") ||
+        G.getName().starts_with("__clang_gpu_used_external") ||
+        G.getName().starts_with("__hip_cuid") ||
+        G.getName().starts_with("llvm.used") ||
+        G.getName().starts_with("llvm.compiler.used") ||
+        G.getName().starts_with("llvm.global.annotations"))
+      return true;
+
+    return false;
+  }
+
+  // Emit a uniquely named global variable in a corresponding section that
+  // contains the embedded bitcode module.
+  void emitModuleDevice(Module &M, Module &EmbedM, StringRef Id,
+                        bool HasSourceFileID) {
+    SmallVector<char> Bitcode;
     raw_svector_ostream OS(Bitcode);
-
-    // For LTO, prune the Module to include only possibly used definitions that
-    // are not in the individual, per-TU extracted bitcode.
-    if (IsLTO) {
-      // Gather all definitions in per-TU extracted bitcodes.
-      StringSet DefSet;
-      for (auto &GVar : M.globals()) {
-        if (!GVar.hasName())
-          continue;
-
-        if (!GVar.getName().starts_with("_jit_bitcode"))
-          continue;
-
-        // Found an extracted bitcode global variable, lazy parse the IR and
-        // store definitions.
-        ConstantDataArray *JitModule =
-            dyn_cast<ConstantDataArray>(GVar.getInitializer());
-        assert(JitModule && "Expected non-null bitcode for JIT module");
-        StringRef Bitcode = JitModule->getAsString();
-
-        LLVMContext Ctx;
-        MemoryBufferRef Buffer{Bitcode, GVar.getName()};
-        auto ExpectedParsedModule = getLazyBitcodeModule(Buffer, Ctx);
-        if (auto E = ExpectedParsedModule.takeError())
-          PROTEUS_FATAL_ERROR("Error: " + toString(std::move(E)));
-        auto ParsedModule = std::move(*ExpectedParsedModule);
-        for (auto &F : ParsedModule->getFunctionList()) {
-          if (!F.isDeclaration())
-            DefSet.insert(F.getName());
-        }
-      }
-
-      // Callback returns true only for global values not in the definition set
-      // and also avoids unneeded global variables.
-      auto ShouldClone = [&DefSet](const GlobalValue *GV) {
-        if (GV->hasName()) {
-          if (DefSet.contains(GV->getName()))
-            return false;
-
-          if (GV->getName().starts_with("__clang_gpu_used_external") ||
-              GV->getName().starts_with("_jit_bitcode") ||
-              GV->getName().starts_with("__hip_cuid") ||
-              GV->getName().starts_with("llvm.global.annotations") ||
-              GV->getName().starts_with("llvm.used") ||
-              GV->getName().starts_with("llvm.compiler.used"))
-            return false;
-        }
-
-        return true;
-      };
-
-      ValueToValueMapTy VMap;
-      auto PrunedM = CloneModule(M, VMap, ShouldClone);
-
-      StripDebugInfo(*PrunedM);
-
-      WriteBitcodeToFile(*PrunedM, OS);
-      if (verifyModule(*PrunedM, &errs()))
-        PROTEUS_FATAL_ERROR(
-            "Broken pruned lto module found, compilation aborted!");
-    } else {
-      WriteBitcodeToFile(M, OS);
-    }
+    WriteBitcodeToFile(EmbedM, OS);
 
     HashT HashValue = hash(StringRef{Bitcode.data(), Bitcode.size()});
 
-    std::string GVName =
-        (IsLTO ? "__jit_bitcode_lto" : getJitBitcodeUniqueName(M));
-    //  NOTE: HIP compilation supports custom section in the binary to store the
-    //  IR. CUDA does not, hence we parse the IR by reading the global from the
-    //  device memory.
+    std::string GVName = "_jit_bitcode_" + Id.str() +
+                         (HasSourceFileID ? ("_" + getUniqueFileID(M)) : "");
+    //  NOTE: HIP compilation supports custom section in the binary to store
+    //  the IR. CUDA does not, hence we parse the IR by reading the global
+    //  from the device memory.
     Constant *JitModule = ConstantDataArray::get(
         M.getContext(),
         ArrayRef<uint8_t>((const uint8_t *)Bitcode.data(), Bitcode.size()));
+    if (M.getNamedGlobal(GVName))
+      PROTEUS_FATAL_ERROR(
+          "Expected unique name for jit module global variable " + GVName);
     auto *GV =
         new GlobalVariable(M, JitModule->getType(), /* isConstant */ true,
                            GlobalValue::ExternalLinkage, JitModule, GVName);
     appendToUsed(M, {GV});
     // We append the hash value to the section name and retrieve it in HIP JIT
     // compilation to avoid hashing at runtime.
-    GV->setSection(".jit.bitcode" +
-                   (IsLTO ? ".lto." : (getUniqueModuleId(&M) + ".")) +
+    GV->setSection(".jit.bitcode." + Id.str() + getUniqueModuleId(&M) + "." +
                    HashValue.toString());
     DEBUG(Logger::logs("proteus-pass")
           << "Emit jit bitcode GV " << GVName << "\n");
+  }
+
+  void emitLinkedKernelModules(Module &LTOModule) {
+    LLVMContext Ctx;
+    auto LinkedModule = std::make_unique<Module>("linked.module", Ctx);
+    LinkedModule->setSourceFileName("linked.module");
+    LinkedModule->setDataLayout(LTOModule.getDataLayout());
+    LinkedModule->setTargetTriple(LTOModule.getTargetTriple());
+    LinkedModule->setModuleInlineAsm(LTOModule.getModuleInlineAsm());
+#if LLVM_VERSION_MAJOR >= 18
+    LinkedModule->IsNewDbgInfoFormat = LTOModule.IsNewDbgInfoFormat;
+#endif
+
+    // Gather all extracted modules and the pruned LTO module.
+    SmallVector<std::unique_ptr<Module>> LinkedModules;
+    StringSet KernelSymbols;
+
+    auto ExtractKernelSymbols = [&LTOModule, &KernelSymbols]() {
+      auto *GlobalAnnotations =
+          LTOModule.getNamedGlobal("llvm.global.annotations");
+      if (!GlobalAnnotations)
+        return;
+
+      auto *AnnotArray = cast<ConstantArray>(GlobalAnnotations->getOperand(0));
+
+      for (unsigned int I = 0; I < AnnotArray->getNumOperands(); I++) {
+        auto *Entry = cast<ConstantStruct>(AnnotArray->getOperand(I));
+        auto *Fn =
+            dyn_cast<Function>(Entry->getOperand(0)->stripPointerCasts());
+        assert(Fn && "Expected function in entry operands");
+        KernelSymbols.insert(Fn->getName());
+      }
+    };
+
+    ExtractKernelSymbols();
+
+    SmallPtrSet<GlobalVariable *, 32> RemoveModuleGVs;
+    auto ExtractLinkedModules = [&Ctx, &LTOModule, &LinkedModules,
+                                 &RemoveModuleGVs]() {
+      StringSet DefSet;
+      for (auto &GVar : LTOModule.globals()) {
+        if (!GVar.hasName())
+          continue;
+
+        if (!GVar.getName().starts_with("_jit_bitcode"))
+          continue;
+
+        // Found an extracted bitcode global variable, parse the IR and
+        // store the names of definitions to prune the LTO module.
+        ConstantDataArray *JitModule =
+            dyn_cast<ConstantDataArray>(GVar.getInitializer());
+        assert(JitModule && "Expected non-null bitcode for JIT module");
+        StringRef BitcodeData = JitModule->getAsString();
+
+        // It is important to preserve the unique global variable name as
+        // the module name for the parsed module. It will be used later to
+        // create unique symbols for linking modules together.
+        MemoryBufferRef MBRef{BitcodeData, GVar.getName()};
+        auto ExpectedParsedModule = parseBitcodeFile(MBRef, Ctx);
+        if (auto E = ExpectedParsedModule.takeError())
+          PROTEUS_FATAL_ERROR("Error: " + toString(std::move(E)));
+        auto ParsedModule = std::move(*ExpectedParsedModule);
+        for (auto &G : ParsedModule->global_values()) {
+          if (!G.isDeclaration())
+            DefSet.insert(G.getName());
+        }
+
+        LinkedModules.push_back(std::move(ParsedModule));
+
+        RemoveModuleGVs.insert(&GVar);
+      }
+
+      auto ShouldClone = [&DefSet](const GlobalValue *GV) {
+        if (GV->hasName()) {
+          if (DefSet.contains(GV->getName()))
+            return false;
+
+          if (skipGlobal(*GV))
+            return false;
+        }
+
+        return true;
+      };
+      // Create pruned LTO module avoiding unneeded globals and globals in
+      // the DefSet. Roundtrip it through bitcode parsing to the top-level
+      // context.
+      ValueToValueMapTy VMap;
+      auto PrunedLTOModule = CloneModule(LTOModule, VMap, ShouldClone);
+      for (auto &G : PrunedLTOModule->global_values())
+        if (G.hasInternalLinkage())
+          G.setLinkage(GlobalValue::ExternalLinkage);
+
+      StripDebugInfo(*PrunedLTOModule);
+
+      if (verifyModule(*PrunedLTOModule, &errs()))
+        PROTEUS_FATAL_ERROR(
+            "Broken pruned lto module found, compilation aborted!");
+
+      SmallVector<char> Bitcode;
+      raw_svector_ostream BOS{Bitcode};
+      WriteBitcodeToFile(*PrunedLTOModule, BOS);
+      MemoryBufferRef MBRef{StringRef{Bitcode.data(), Bitcode.size()},
+                            "pruned.lto.module"};
+      auto ExpectedPrunedLTOModuleInCtx = parseBitcodeFile(MBRef, Ctx);
+      if (auto E = ExpectedPrunedLTOModuleInCtx.takeError())
+        PROTEUS_FATAL_ERROR("Error parsing pruned lto module " +
+                            toString(std::move(E)));
+      LinkedModules.push_back(std::move(*ExpectedPrunedLTOModuleInCtx));
+    };
+
+    ExtractLinkedModules();
+    // Remove global vars with per-TU modules as they are not needed anymore.
+    // The final step in this method will create per-kernel modules.
+    for (auto *GV : RemoveModuleGVs) {
+      removeFromUsedLists(LTOModule, [GV](Constant *C) {
+        if (GV == C)
+          return true;
+
+        return false;
+      });
+      LTOModule.eraseGlobalVariable(GV);
+    }
+
+    Linker IRLinker(*LinkedModule);
+    for (auto &Mod : LinkedModules) {
+      if (IRLinker.linkInModule(std::move(Mod)))
+        PROTEUS_FATAL_ERROR("Linking failed");
+    }
+
+    runCleanupPassPipeline(*LinkedModule);
+
+    const char *EnvValue = std::getenv("PROTEUS_PASS_CREATE_KERNEL_MODULES");
+    bool CreateKernelModules =
+        (EnvValue ? static_cast<bool>(std::stoi(EnvValue)) : true);
+
+    if (CreateKernelModules) {
+      for (auto &Sym : KernelSymbols) {
+        auto KernelName = Sym.getKey();
+
+        if (!LinkedModule->getFunction(KernelName))
+          PROTEUS_FATAL_ERROR("Expected kernel function in linked module");
+
+        auto KernelModule = cloneKernelFromModules({*LinkedModule}, KernelName);
+        runCleanupPassPipeline(*KernelModule);
+
+        if (verifyModule(*KernelModule, &errs()))
+          PROTEUS_FATAL_ERROR(
+              "Broken original module found, compilation aborted!");
+
+        emitModuleDevice(LTOModule, *KernelModule, KernelName, false);
+      }
+    } else {
+      emitModuleDevice(LTOModule, *LinkedModule, "lto", false);
+    }
+  }
+
+  void emitJitModuleDevice(Module &M, bool IsLTO) {
+    SmallVector<char> Bitcode;
+    raw_svector_ostream OS(Bitcode);
+
+    // For LTO, supported only in HIP RDC, create the per-kernel linked module
+    // AOT.
+    if (IsLTO) {
+      emitLinkedKernelModules(M);
+    } else {
+      // Emit the TU-wide extracted module.
+      ValueToValueMapTy VMap;
+      auto ShouldClone = [](const GlobalValue *G) {
+        if (skipGlobal(*G))
+          return false;
+
+        return true;
+      };
+      auto EmitM = CloneModule(M, VMap, ShouldClone);
+      runCleanupPassPipeline(*EmitM);
+
+      emitModuleDevice(M, *EmitM, "tu", true);
+    }
   }
 
   void emitJitFunctionArgMetadata(Module &JitMod, JitFunctionInfo &JFI,
@@ -897,7 +1045,7 @@ private:
       IRBuilder<> Builder(CB->getNextNode());
       Value *FatbinWrapper = CB->getArgOperand(0);
 
-      std::string GVName = getJitBitcodeUniqueName(M);
+      std::string GVName = "_jit_bitcode_tu_" + getUniqueFileID(M);
       DEBUG(Logger::logs("proteus-pass")
                 << "Instrument register fatbinary bitcode GV " << GVName
                 << "\n";);
@@ -977,7 +1125,7 @@ private:
           continue;
 
         IRBuilder<> Builder(CB);
-        std::string GVName = getJitBitcodeUniqueName(M);
+        std::string GVName = "_jit_bitcode_tu_" + getUniqueFileID(M);
         DEBUG(Logger::logs("proteus-pass")
               << "Instrument register linked binary to extract bitcode GV "
               << GVName << "\n");
@@ -1245,8 +1393,8 @@ private:
       for (auto *User : Function->users()) {
         CallBase *CB = dyn_cast<CallBase>(User);
         if (!CB)
-          PROTEUS_FATAL_ERROR(
-              "Expected CallBase as user of proteus::register_lambda function");
+          PROTEUS_FATAL_ERROR("Expected CallBase as user of "
+                              "proteus::register_lambda function");
 
         IRBuilder<> Builder(CB);
         auto *LambdaNameGlobal = Builder.CreateGlobalString(LambdaType);

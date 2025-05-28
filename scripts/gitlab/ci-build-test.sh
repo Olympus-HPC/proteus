@@ -21,7 +21,8 @@ if [ "${CI_MACHINE}" == "lassen" ]; then
   conda activate proteus
 
   LLVM_INSTALL_DIR=$(llvm-config --prefix)
-  CMAKE_OPTIONS_MACHINE=" -DPROTEUS_LINK_SHARED_LLVM=on"
+  CMAKE_OPTIONS_MACHINE=" -DCMAKE_PREFIX_PATH=$CONDA_PREFIX;$CONDA_PREFIX/lib/cmake"
+  CMAKE_OPTIONS_MACHINE+=" -DPROTEUS_LINK_SHARED_LLVM=on"
   CMAKE_OPTIONS_MACHINE+=" -DPROTEUS_ENABLE_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=70"
   CMAKE_OPTIONS_MACHINE+=" -DCMAKE_CUDA_COMPILER=$LLVM_INSTALL_DIR/bin/clang++"
 elif [ "${CI_MACHINE}" == "tioga" ]; then
@@ -66,10 +67,19 @@ if  [ "$PROTEUS_CI_ENABLE_DEBUG" == "on" ] || [ "$PROTEUS_CI_ENABLE_TIME_TRACING
   exit 0
 fi
 
-# Test synchronous compilation by default.
-echo "### TESTING SYNC COMPILATION ###"
-ctest -T test --output-on-failure
-echo "### END TESTING SYNC COMPILATION ###"
+# Test synchronous compilation (default) and kernel clone options.
+echo "### TESTING SYNC COMPILATION KERNEL_CLONE cross-clone ###"
+PROTEUS_KERNEL_CLONE=cross-clone ctest -T test --output-on-failure
+echo "### END TESTING SYNC COMPILATION KERNEL_CLONE cross-clone ###"
+
+echo "### TESTING SYNC COMPILATION KERNEL_CLONE link-clone-light ###"
+PROTEUS_KERNEL_CLONE=link-clone-light ctest -T test --output-on-failure
+echo "### END TESTING SYNC COMPILATION KERNEL_CLONE link-clone-light ###"
+
+echo "### TESTING SYNC COMPILATION KERNEL_CLONE link-clone-prune ###"
+PROTEUS_KERNEL_CLONE=link-clone-prune ctest -T test --output-on-failure
+echo "### END TESTING SYNC COMPILATION KERNEL_CLONE link-clone-prune ###"
+
 # Test asynchronous compilation.
 echo "### TESTING (BLOCKING) ASYNC COMPILATION ###"
 PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 ctest -T test --output-on-failure

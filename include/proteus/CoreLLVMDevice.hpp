@@ -124,21 +124,60 @@ inline void replaceGlobalVariablesWithPointers(
         CE, GV->getName() + "$ptr", nullptr, GV->getThreadLocalMode(),
         GV->getAddressSpace(), true);
 
-    SmallVector<Instruction *> ToReplace;
-    for (auto *User : GV->users()) {
-      auto *Inst = dyn_cast<Instruction>(User);
-      if (!Inst)
-        PROTEUS_FATAL_ERROR("Expected Instruction User for GV");
+    // Find all Constant users that refer to the global variable.
+    SmallPtrSet<Value *, 16> ValuesToReplace;
+    SmallVector<Value *> Worklist;
+    // Seed with the global variable.
+    Worklist.push_back(GV);
+    ValuesToReplace.insert(GV);
+    while (!Worklist.empty()) {
+      Value *V = Worklist.pop_back_val();
+      for (auto *User : V->users()) {
+        if (auto *C = dyn_cast<Constant>(User)) {
+          if (ValuesToReplace.insert(C).second)
+            Worklist.push_back(C);
 
-      ToReplace.push_back(Inst);
+          continue;
+        }
+
+        // Skip instructions to be handled when replacing.
+        if (isa<Instruction>(User))
+          continue;
+
+        PROTEUS_FATAL_ERROR(
+            "Expected Instruction or Constant user for Value: " + toString(*V) +
+            " , User: " + toString(*User));
+      }
     }
 
-    for (auto *Inst : ToReplace) {
-      IRBuilder Builder{Inst};
-      auto *Load = Builder.CreateLoad(GV->getType(), GVarPtr);
-      Inst->replaceUsesOfWith(GV, Load);
+    for (Value *V : ValuesToReplace) {
+      SmallPtrSet<Instruction *, 16> Insts;
+      // Find instruction users to replace value.
+      for (User *U : V->users()) {
+        if (auto *I = dyn_cast<Instruction>(U)) {
+          Insts.insert(I);
+        }
+      }
+
+      // Replace value in instructions.
+      for (auto *I : Insts) {
+        IRBuilder Builder{I};
+        auto *Load = Builder.CreateLoad(GV->getType(), GVarPtr);
+        Value *Replacement = Load;
+        Type *ExpectedTy = V->getType();
+        if (Load->getType() != ExpectedTy)
+          Replacement =
+              Builder.CreatePointerBitCastOrAddrSpaceCast(Load, ExpectedTy);
+
+        I->replaceUsesOfWith(V, Replacement);
+      }
     }
   }
+
+#if PROTEUS_ENABLE_DEBUG
+  if (verifyModule(M, &errs()))
+    PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
+#endif
 }
 
 inline void relinkGlobalsObject(
@@ -235,175 +274,6 @@ inline void specializeIR(
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                        << "specializeIR " << T.elapsed() << " ms\n");
   PROTEUS_DBG(Logger::logfile(FnName.str() + ".specialized.ll", M));
-}
-
-inline std::unique_ptr<Module>
-cloneKernelFromModule(Module &M, const std::string &Name, CallGraph &CG) {
-  Timer T;
-  auto KernelModuleTmp = std::make_unique<Module>("JitModule", M.getContext());
-  KernelModuleTmp->setSourceFileName(M.getSourceFileName());
-  KernelModuleTmp->setDataLayout(M.getDataLayout());
-  KernelModuleTmp->setTargetTriple(M.getTargetTriple());
-  KernelModuleTmp->setModuleInlineAsm(M.getModuleInlineAsm());
-#if LLVM_VERSION_MAJOR >= 18
-  KernelModuleTmp->IsNewDbgInfoFormat = M.IsNewDbgInfoFormat;
-#endif
-
-  auto *KernelFunction = M.getFunction(Name);
-  if (!KernelFunction)
-    PROTEUS_FATAL_ERROR("Expected function " + Name);
-
-  SmallPtrSet<Function *, 8> ReachableFunctions;
-  SmallPtrSet<GlobalVariable *, 16> ReachableGlobals;
-  SmallPtrSet<Function *, 8> ReachableDeclarations;
-  SmallVector<Function *, 8> ToVisit;
-  ReachableFunctions.insert(KernelFunction);
-  ToVisit.push_back(KernelFunction);
-  while (!ToVisit.empty()) {
-    Function *VisitF = ToVisit.pop_back_val();
-    CallGraphNode *CGNode = CG[VisitF];
-
-    for (const auto &Callee : *CGNode) {
-      Function *CalleeF = Callee.second->getFunction();
-      if (!CalleeF)
-        continue;
-      if (CalleeF->isDeclaration()) {
-        ReachableDeclarations.insert(CalleeF);
-        continue;
-      }
-      if (ReachableFunctions.contains(CalleeF))
-        continue;
-      ReachableFunctions.insert(CalleeF);
-      ToVisit.push_back(CalleeF);
-    }
-  }
-
-  auto ProcessInstruction = [&](GlobalVariable &GV, const Instruction *I) {
-    const Function *ParentF = I->getFunction();
-    if (ReachableFunctions.contains(ParentF))
-      ReachableGlobals.insert(&GV);
-  };
-
-  for (auto &GV : M.globals()) {
-    for (const User *Usr : GV.users()) {
-      const Instruction *I = dyn_cast<Instruction>(Usr);
-
-      if (I) {
-        ProcessInstruction(GV, I);
-        continue;
-      }
-
-      // We follow non-instructions users to process them if those are
-      // instructions.
-      // TODO: We may need to follow deeper than just users of user and also
-      // expand to non-instruction users.
-      for (const User *NextUser : Usr->users()) {
-        I = dyn_cast<Instruction>(NextUser);
-        if (!I)
-          continue;
-
-        ProcessInstruction(GV, I);
-      }
-    }
-  }
-
-  ValueToValueMapTy VMap;
-
-  for (auto *GV : ReachableGlobals) {
-    // We will set the initializer later, after VMap has been populated.
-    GlobalVariable *NewGV = new GlobalVariable(
-        *KernelModuleTmp, GV->getValueType(), GV->isConstant(),
-        GV->getLinkage(), nullptr, GV->getName(), nullptr,
-        GV->getThreadLocalMode(), GV->getAddressSpace());
-    NewGV->copyAttributesFrom(GV);
-    VMap[GV] = NewGV;
-  }
-
-  for (auto *F : ReachableFunctions) {
-    auto *NewFunction = Function::Create(F->getFunctionType(), F->getLinkage(),
-                                         F->getAddressSpace(), F->getName(),
-                                         KernelModuleTmp.get());
-    NewFunction->copyAttributesFrom(F);
-    VMap[F] = NewFunction;
-  }
-
-  for (auto *F : ReachableDeclarations) {
-    auto *NewFunction = Function::Create(F->getFunctionType(), F->getLinkage(),
-                                         F->getAddressSpace(), F->getName(),
-                                         KernelModuleTmp.get());
-    NewFunction->copyAttributesFrom(F);
-    NewFunction->setLinkage(GlobalValue::ExternalLinkage);
-    VMap[F] = NewFunction;
-  }
-
-  for (GlobalVariable *GV : ReachableGlobals) {
-    if (GV->hasInitializer()) {
-      GlobalVariable *NewGV = cast<GlobalVariable>(VMap[GV]);
-      NewGV->setInitializer(MapValue(GV->getInitializer(), VMap));
-    }
-  }
-
-  for (auto *F : ReachableFunctions) {
-    SmallVector<ReturnInst *, 8> Returns;
-    auto *NewFunction = dyn_cast<Function>(VMap[F]);
-    Function::arg_iterator DestI = NewFunction->arg_begin();
-    for (const Argument &I : F->args())
-      if (VMap.count(&I) == 0) {
-        DestI->setName(I.getName());
-        VMap[&I] = &*DestI++;
-      }
-    llvm::CloneFunctionInto(NewFunction, F, VMap,
-                            CloneFunctionChangeType::DifferentModule, Returns);
-  }
-
-  // Copy annotations from M into KernelModuleTmp now that VMap has been
-  // populated.
-  const std::string MetadataToCopy[] = {"llvm.annotations", "nvvm.annotations",
-                                        "nvvmir.version", "llvm.module.flags"};
-  for (auto &MetadataName : MetadataToCopy) {
-    NamedMDNode *NamedMD = M.getNamedMetadata(MetadataName);
-    if (!NamedMD)
-      continue;
-
-    auto *NewNamedMD = KernelModuleTmp->getOrInsertNamedMetadata(MetadataName);
-    for (unsigned I = 0, E = NamedMD->getNumOperands(); I < E; ++I) {
-      MDNode *MDEntry = NamedMD->getOperand(I);
-      bool ShouldClone = true;
-      // Skip if the operands of an MDNode refer to non-existing,
-      // unreachable global values.
-      for (auto &Operand : MDEntry->operands()) {
-        Metadata *MD = Operand.get();
-        auto *CMD = dyn_cast<ConstantAsMetadata>(MD);
-        if (!CMD)
-          continue;
-
-        auto *GV = dyn_cast<GlobalValue>(CMD->getValue());
-        if (!GV)
-          continue;
-
-        if (!VMap.count(GV)) {
-          ShouldClone = false;
-          break;
-        }
-      }
-
-      if (!ShouldClone)
-        continue;
-
-      NewNamedMD->addOperand(MapMetadata(MDEntry, VMap));
-    }
-  }
-
-#if PROTEUS_ENABLE_DEBUG
-  Logger::logfile(Name + ".mini.ll", *KernelModuleTmp);
-  if (verifyModule(*KernelModuleTmp, &errs()))
-    PROTEUS_FATAL_ERROR("Broken mini-module found, JIT compilation aborted!");
-#endif
-
-  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
-                       << __FUNCTION__ << " " << T.elapsed() << " ms\n");
-
-  return std::move(KernelModuleTmp);
 }
 
 } // namespace proteus
