@@ -6,7 +6,7 @@
 
 #include <llvm/ADT/ArrayRef.h>
 #include <string>
-#if LLVM_VERSION_MAJOR == 18
+#if LLVM_VERSION_MAJOR >= 18
 #include <llvm/ADT/StableHashing.h>
 #else
 #include <llvm/CodeGen/StableHashing.h>

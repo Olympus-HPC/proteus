@@ -15,7 +15,7 @@ static_assert(__cplusplus >= 201703L,
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/Transforms/IPO/MergeFunctions.h>
 
-#if LLVM_VERSION_MAJOR == 18
+#if LLVM_VERSION_MAJOR >= 18
 #include <llvm/TargetParser/SubtargetFeature.h>
 // This convoluted logic below is because AMD ROCm 5.7.1 identifies as LLVM 17
 // but includes the header SubtargetFeature.h to a different directory than
