@@ -29,7 +29,6 @@ template <typename T> gpuError_t launcher(T KernelIn, int A) {
 int main() {
   proteus::init();
 
-  const auto *Indirect = reinterpret_cast<const void *>(&kernel);
   gpuErrCheck(launcher(kernel, 42));
   gpuErrCheck(launcher(kernelTwo, 24));
   gpuErrCheck(gpuDeviceSynchronize());

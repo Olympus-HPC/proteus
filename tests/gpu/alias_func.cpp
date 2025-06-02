@@ -20,9 +20,7 @@ extern "C" __device__ __attribute__((used)) void foo_alias(void *ptr, int v)
     __attribute__((alias("foo")));
 
 // 3) Define the aliasee
-extern "C" __device__ __attribute__((used)) void foo(void *ptr, int v) {
-  printf("foo\n");
-}
+extern "C" __device__ __attribute__((used)) void foo() { printf("foo\n"); }
 #endif
 
 // A trivial kernel that forces emission of both symbols

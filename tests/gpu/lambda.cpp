@@ -19,7 +19,7 @@ __global__ __attribute__((annotate("jit"))) void kernel(T LB) {
 }
 
 template <typename T>
-__global__ __attribute__((annotate("jit"))) void kernel(int N, T LB) {
+__global__ __attribute__((annotate("jit"))) void kernel(size_t N, T LB) {
   std::size_t I = blockDim.x * blockIdx.x + threadIdx.x;
   if (I < N)
     LB(I);
@@ -50,7 +50,7 @@ inline void launch(double C, double *X) {
   std::cout << "x[0] = " << X[0] << "\n";
 }
 
-int main(int argc, char **argv) {
+int main() {
   proteus::init();
 
   double A{3.14};

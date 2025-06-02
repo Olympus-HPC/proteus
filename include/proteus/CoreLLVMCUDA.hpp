@@ -84,8 +84,8 @@ inline const SmallVector<StringRef> &threadIdxZFnName() {
 
 } // namespace detail
 
-inline void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
-                                     int BlockSize) {
+inline void setLaunchBoundsForKernel(Module &M, Function &F,
+                                     size_t /*GridSize*/, int BlockSize) {
   NamedMDNode *NvvmAnnotations = M.getNamedMetadata("nvvm.annotations");
   assert(NvvmAnnotations && "Expected non-null nvvm.annotations metadata");
   // TODO: fix hardcoded 1024 as the maximum, by reading device
@@ -154,9 +154,9 @@ inline void codegenPTX(Module &M, StringRef DeviceArch,
 inline std::unique_ptr<MemoryBuffer>
 codegenObject(Module &M, StringRef DeviceArch,
               SmallPtrSetImpl<void *> &GlobalLinkedBinaries,
-              [[maybe_unused]] CodegenOption CGOption = CodegenOption::RTC) {
-  assert(CGOption == CodegenOption::RTC &&
-         "Only RTC compilation is supported for CUDA");
+              CodegenOption CGOption = CodegenOption::RTC) {
+  if (CGOption != CodegenOption::RTC)
+    PROTEUS_FATAL_ERROR("Only RTC compilation is supported for CUDA");
   SmallVector<char, 4096> PTXStr;
   size_t BinSize;
 

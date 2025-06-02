@@ -12,10 +12,10 @@
 #include <proteus/JitInterface.hpp>
 
 __global__ __attribute__((annotate("jit", 4), noinline)) void
-daxpyImpl(double A, double *X, double *Y, int N) {
+daxpyImpl(double A, double *X, double *Y, size_t N) {
   std::size_t I = blockIdx.x * 256 + threadIdx.x;
   if (I < N) {
-    for (int J = 0; J < N; ++J)
+    for (size_t J = 0; J < N; ++J)
       Y[I] += X[I] * A;
   }
 }
@@ -33,10 +33,10 @@ void daxpy(double A, double *X, double *Y, int N) {
 #endif
 }
 
-int main(int argc, char **argv) {
+int main() {
   proteus::init();
 
-  int N = 1024;
+  size_t N = 1024;
   double *X;
   double *Y;
 

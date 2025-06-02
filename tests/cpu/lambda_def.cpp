@@ -11,7 +11,7 @@ template <typename F> void run(F &&Func) {
   Func();
 }
 
-int main(int argc, char **argv) {
+int main() {
   proteus::init();
 
   int A = 42;

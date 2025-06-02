@@ -58,7 +58,7 @@ public:
       : JitEngineImpl(JitEngineImpl) {}
 
   Expected<ThreadSafeModule> operator()(ThreadSafeModule TSM,
-                                        MaterializationResponsibility &R) {
+                                        MaterializationResponsibility & /*R*/) {
     TSM.withModuleDo([this](Module &M) {
       TIMESCOPE("Run Optimization Transform");
       JitEngineImpl.optimizeIR(M, sys::getHostCPUName());
@@ -170,7 +170,7 @@ void JitEngineHost::dumpSymbolInfo(
   ofd.close();
 }
 
-void JitEngineHost::notifyLoaded(MaterializationResponsibility &R,
+void JitEngineHost::notifyLoaded(MaterializationResponsibility & /*R*/,
                                  const object::ObjectFile &Obj,
                                  const RuntimeDyld::LoadedObjectInfo &LOI) {
   dumpSymbolInfo(Obj, LOI);
@@ -270,7 +270,7 @@ JitEngineHost::specializeIR(std::unique_ptr<Module> M,
   return ThreadSafeModule(std::move(M), std::move(Ctx));
 }
 
-void getLambdaJitValues(Module &M, StringRef FnName,
+void getLambdaJitValues(StringRef FnName,
                         SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
   LambdaRegistry LR = LambdaRegistry::instance();
   if (LR.empty())
@@ -312,7 +312,7 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   getRuntimeConstantValues(
       Args, ArrayRef{RCIndices, static_cast<size_t>(NumRuntimeConstants)},
       ArrayRef{RCTypes, static_cast<size_t>(NumRuntimeConstants)}, RCVec);
-  getLambdaJitValues(*M, FnName, LambdaJitValuesVec);
+  getLambdaJitValues(FnName, LambdaJitValuesVec);
 
   HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesVec);
 #if PROTEUS_ENABLE_DEBUG
@@ -369,7 +369,7 @@ JitEngineHost::JitEngineHost() {
   LLJITPtr =
       ExitOnErr(LLJITBuilder()
                     .setObjectLinkingLayerCreator([&](ExecutionSession &ES,
-                                                      const Triple &TT) {
+                                                      const Triple & /*TT*/) {
                       auto GetMemMgr = []() {
                         return std::make_unique<SectionMemoryManager>();
                       };

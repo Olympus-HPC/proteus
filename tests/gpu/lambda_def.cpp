@@ -22,7 +22,7 @@ template <typename T> void run(T &&LB) {
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
-int main(int argc, char **argv) {
+int main() {
   proteus::init();
 
   int A = 42;

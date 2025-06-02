@@ -1409,7 +1409,7 @@ struct ProteusJitPass : PassInfoMixin<ProteusJitPass> {
   ProteusJitPass(bool IsLTO) : IsLTO(IsLTO) {}
   bool IsLTO;
 
-  PreservedAnalyses run(Module &M, [[maybe_unused]] ModuleAnalysisManager &AM) {
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager & /*AM*/) {
     ProteusJitPassImpl PJP{M};
 
     bool Changed = PJP.run(M, IsLTO);

@@ -1,8 +1,13 @@
 add_library(IRLinker SHARED IRLinker.cpp)
 target_include_directories(IRLinker
-  PRIVATE ${PROJECT_SOURCE_DIR}/include
+  PRIVATE
+  ${PROJECT_SOURCE_DIR}/include
   ${CMAKE_CURRENT_BINARY_DIR}
-  SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS}
+)
+
+target_include_directories(IRLinker
+  SYSTEM PRIVATE
+  ${LLVM_INCLUDE_DIRS}
 )
 target_link_libraries(IRLinker
   PRIVATE LLVMLinker

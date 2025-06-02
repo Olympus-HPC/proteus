@@ -14,7 +14,7 @@ template <typename T> __attribute__((annotate("jit", 1))) void test(T Arg) {
   std::cout << "Arg " << Arg << "\n";
 }
 
-int main(int argc, char **argv) {
+int main() {
   proteus::init();
 
   test(1);

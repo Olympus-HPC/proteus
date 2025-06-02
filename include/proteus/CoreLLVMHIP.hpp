@@ -125,8 +125,8 @@ inline const SmallVector<StringRef> &threadIdxZFnName() {
 
 #if LLVM_VERSION_MAJOR >= 18
 inline SmallVector<std::unique_ptr<sys::fs::TempFile>>
-codegenSerial(Module &M, StringRef DeviceArch, char OptLevel = '3',
-              int CodegenOptLevel = 3) {
+codegenSerial(Module &M, StringRef DeviceArch,
+              [[maybe_unused]] char OptLevel = '3', int CodegenOptLevel = 3) {
   SmallVector<std::unique_ptr<sys::fs::TempFile>> ObjectFiles;
 
   auto ExpectedTM =
@@ -213,8 +213,8 @@ inline void runPreLinkPipeline(Module &M, StringRef DeviceArch,
 }
 
 inline SmallVector<std::unique_ptr<sys::fs::TempFile>>
-codegenParallel(Module &M, StringRef DeviceArch, char OptLevel = '3',
-                int CodegenOptLevel = 3) {
+codegenParallel(Module &M, StringRef DeviceArch,
+                [[maybe_unused]] char OptLevel = '3', int CodegenOptLevel = 3) {
   auto TMFactory = [&]() {
     auto TMExpected =
         proteus::detail::createTargetMachine(M, DeviceArch, CodegenOptLevel);
@@ -438,8 +438,9 @@ codegenParallelThinLTO(Module &M, StringRef DeviceArch,
   // Run the LTO job to compile the bitcode.
   size_t MaxTasks = LTOBackend.getMaxTasks();
   SmallVector<std::unique_ptr<sys::fs::TempFile>> ObjectFiles{MaxTasks};
-  auto AddStream = [&](size_t Task, [[maybe_unused]] const Twine &ModuleName)
-      -> std::unique_ptr<CachedFileStream> {
+  auto AddStream =
+      [&](size_t Task,
+          const Twine & /*ModuleName*/) -> std::unique_ptr<CachedFileStream> {
     std::string TaskStr = Task ? "." + std::to_string(Task) : "";
     auto ExpectedF =
         sys::fs::TempFile::create("lto.shard" + TaskStr + "-%%%%%%%.o");
@@ -507,8 +508,8 @@ inline std::unique_ptr<MemoryBuffer> codegenRTC(Module &M,
 
 } // namespace detail
 
-inline void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
-                                     int BlockSize) {
+inline void setLaunchBoundsForKernel(Module & /*M*/, Function &F,
+                                     size_t /*GridSize*/, int BlockSize) {
   // TODO: fix calculation of launch bounds.
   // TODO: find maximum (hardcoded 1024) from device info.
   // TODO: Setting as 1, BlockSize to replicate launch bounds settings
@@ -528,7 +529,7 @@ inline void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
 
 inline std::unique_ptr<MemoryBuffer>
 codegenObject(Module &M, StringRef DeviceArch,
-              [[maybe_unused]] SmallPtrSetImpl<void *> &GlobalLinkedBinaries,
+              SmallPtrSetImpl<void *> & /*GlobalLinkedBinaries*/,
               CodegenOption CGOption = CodegenOption::RTC) {
   assert(GlobalLinkedBinaries.empty() &&
          "Expected empty linked binaries for HIP");
