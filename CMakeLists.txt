@@ -17,7 +17,7 @@ option(ENABLE_TESTS "Enable tests" ON)
 option(ENABLE_DEVELOPER_COMPILER_FLAGS "Enable developer compiler flags: -Wall -Wextra" OFF)
 
 if (ENABLE_DEVELOPER_COMPILER_FLAGS)
-  add_compile_options(-Wall -Wextra)
+  add_compile_options(-Wall -Wextra -Werror)
 endif()
 
 if(PROTEUS_ENABLE_HIP)
