@@ -509,7 +509,8 @@ inline std::unique_ptr<MemoryBuffer> codegenRTC(Module &M,
 } // namespace detail
 
 inline void setLaunchBoundsForKernel(Module & /*M*/, Function &F,
-                                     size_t /*GridSize*/, int BlockSize) {
+                                     [[maybe_unused]] size_t GridSize,
+                                     int BlockSize) {
   // TODO: fix calculation of launch bounds.
   // TODO: find maximum (hardcoded 1024) from device info.
   // TODO: Setting as 1, BlockSize to replicate launch bounds settings
