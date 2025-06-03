@@ -35,6 +35,7 @@ JitEngineDeviceHIP &JitEngineDeviceHIP::instance() {
   return Jit;
 }
 
+#if LLVM_VERSION_MAJOR >= 18
 static Expected<std::unique_ptr<MemoryBuffer>> decompress(StringRef Blob) {
   static constexpr size_t MagicSize = 4;
   static constexpr size_t VersionFieldSize = sizeof(uint16_t);
@@ -98,6 +99,7 @@ static Expected<std::unique_ptr<MemoryBuffer>> decompress(StringRef Blob) {
   return llvm::MemoryBuffer::getMemBufferCopy(
       llvm::toStringRef(DecompressedData));
 }
+#endif
 
 static std::unique_ptr<MemoryBuffer> getDeviceBinary(BinaryInfo &BinInfo,
                                                      StringRef DeviceArch) {
