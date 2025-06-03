@@ -15,12 +15,7 @@
 
 #include <string>
 
-// GCC diagnostic pragmas are valid for GCC and clang.
-// Suppress ciso646 #warning.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-W#warnings"
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
-#pragma GCC diagnostic pop
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/JitCache.hpp"
