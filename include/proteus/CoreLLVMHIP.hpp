@@ -529,7 +529,7 @@ inline void setLaunchBoundsForKernel(Module & /*M*/, Function &F,
 
 inline std::unique_ptr<MemoryBuffer>
 codegenObject(Module &M, StringRef DeviceArch,
-              SmallPtrSetImpl<void *> & /*GlobalLinkedBinaries*/,
+              [[maybe_unused]] SmallPtrSetImpl<void *> &GlobalLinkedBinaries,
               CodegenOption CGOption = CodegenOption::RTC) {
   assert(GlobalLinkedBinaries.empty() &&
          "Expected empty linked binaries for HIP");
