@@ -20,7 +20,7 @@ daxpyImpl(double A, double *X, double *Y, size_t N) {
   }
 }
 
-void daxpy(double A, double *X, double *Y, int N) {
+void daxpy(double A, double *X, double *Y, size_t N) {
   const std::size_t GridSize = (((N) + (256) - 1) / (256));
 #if PROTEUS_ENABLE_HIP
   hipLaunchKernelGGL((daxpyImpl), dim3(GridSize), dim3(256), 0, 0, A, X, Y, N);
@@ -58,6 +58,8 @@ int main() {
 
   gpuErrCheck(gpuFree(X));
   gpuErrCheck(gpuFree(Y));
+
+  proteus::finalize();
 }
 
 // CHECK: 0
