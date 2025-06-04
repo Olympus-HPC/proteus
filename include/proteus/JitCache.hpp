@@ -53,11 +53,14 @@ public:
       PROTEUS_FATAL_ERROR("JitCache collision detected");
 #endif
 
-    CacheMap[HashValue] = {FunctionPtr, /* num_execs */ 1, /* num_hits */ 0};
+    auto &CacheEntry = CacheMap[HashValue];
+    CacheEntry.FunctionPtr = FunctionPtr;
+    CacheEntry.NumExecs = 1;
+    CacheEntry.NumHits = 0;
 
 #if PROTEUS_ENABLE_DEBUG
-    CacheMap[HashValue].FnName = FnName.str();
-    CacheMap[HashValue].RCVector = SmallVector<RuntimeConstant>{RCArr};
+    CacheEntry.FnName = FnName.str();
+    CacheEntry.RCVector = SmallVector<RuntimeConstant>{RCArr};
 #endif
   }
 

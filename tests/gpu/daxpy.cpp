@@ -12,15 +12,15 @@
 #include <proteus/JitInterface.hpp>
 
 __global__ __attribute__((annotate("jit", 4), noinline)) void
-daxpyImpl(double A, double *X, double *Y, int N) {
+daxpyImpl(double A, double *X, double *Y, size_t N) {
   std::size_t I = blockIdx.x * 256 + threadIdx.x;
   if (I < N) {
-    for (int J = 0; J < N; ++J)
+    for (size_t J = 0; J < N; ++J)
       Y[I] += X[I] * A;
   }
 }
 
-void daxpy(double A, double *X, double *Y, int N) {
+void daxpy(double A, double *X, double *Y, size_t N) {
   const std::size_t GridSize = (((N) + (256) - 1) / (256));
 #if PROTEUS_ENABLE_HIP
   hipLaunchKernelGGL((daxpyImpl), dim3(GridSize), dim3(256), 0, 0, A, X, Y, N);
@@ -33,10 +33,10 @@ void daxpy(double A, double *X, double *Y, int N) {
 #endif
 }
 
-int main(int argc, char **argv) {
+int main() {
   proteus::init();
 
-  int N = 1024;
+  size_t N = 1024;
   double *X;
   double *Y;
 
@@ -58,6 +58,8 @@ int main(int argc, char **argv) {
 
   gpuErrCheck(gpuFree(X));
   gpuErrCheck(gpuFree(Y));
+
+  proteus::finalize();
 }
 
 // CHECK: 0

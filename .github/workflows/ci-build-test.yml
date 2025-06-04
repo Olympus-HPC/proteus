@@ -40,6 +40,7 @@ jobs:
             -DCMAKE_PREFIX_PATH="$CONDA_PREFIX;$CONDA_PREFIX/lib/cmake" \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
+            -DENABLE_DEVELOPER_COMPILER_FLAGS=on \
             -DLLVM_INSTALL_DIR=$(llvm-config --prefix) \
             -DPROTEUS_LINK_SHARED_LLVM=on \
             -DPROTEUS_ENABLE_DEBUG=${{ matrix.enable_debug }} \

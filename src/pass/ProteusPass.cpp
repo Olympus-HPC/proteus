@@ -832,7 +832,7 @@ private:
       Builder.CreateRet(RetVal);
   }
 
-  Value *getStubGV(Value *Operand) {
+  Value *getStubGV([[maybe_unused]] Value *Operand) {
     // NOTE: when called by isDeviceKernelHostStub, Operand may not be a global
     // variable point to the stub, so we check and return null in that case.
     Value *V = nullptr;
@@ -879,7 +879,7 @@ private:
       }
   }
 
-  SmallPtrSet<Function *, 16> getDeviceKernels(Module &M) {
+  SmallPtrSet<Function *, 16> getDeviceKernels([[maybe_unused]] Module &M) {
     SmallPtrSet<Function *, 16> Kernels;
 #if PROTEUS_ENABLE_CUDA
     NamedMDNode *MD = M.getOrInsertNamedMetadata("nvvm.annotations");
@@ -1409,7 +1409,7 @@ struct ProteusJitPass : PassInfoMixin<ProteusJitPass> {
   ProteusJitPass(bool IsLTO) : IsLTO(IsLTO) {}
   bool IsLTO;
 
-  PreservedAnalyses run(Module &M, [[maybe_unused]] ModuleAnalysisManager &AM) {
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager & /*AM*/) {
     ProteusJitPassImpl PJP{M};
 
     bool Changed = PJP.run(M, IsLTO);

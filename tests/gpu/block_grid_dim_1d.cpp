@@ -13,8 +13,8 @@
 #include <proteus/JitInterface.hpp>
 
 __global__ __attribute__((annotate("jit"))) void kernel() {
-  int Idx = threadIdx.x + blockIdx.x * blockDim.x;
-  if (Idx == gridDim.x * blockDim.x - 1) {
+  unsigned int Idx = threadIdx.x + blockIdx.x * blockDim.x;
+  if (Idx == (gridDim.x * blockDim.x - 1)) {
     printf("ThreadId: (%d %d %d) BlockID: (%d %d %d) BlockDim: (%d %d %d) "
            "GridDim: (%d %d %d)\n",
            (int)threadIdx.x, (int)threadIdx.y, (int)threadIdx.z,

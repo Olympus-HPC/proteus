@@ -14,10 +14,10 @@ option(PROTEUS_ENABLE_TIME_TRACING "Enable time tracing for the JIT engine" OFF)
 option(PROTEUS_LINK_SHARED_LLVM "Link with the LLVM shared library" OFF)
 option(BUILD_SHARED "Builds the JIT library as shared" OFF)
 option(ENABLE_TESTS "Enable tests" ON)
-option(ENABLE_DEVELOPER_COMPILER_FLAGS "Enable developer compiler flags: -Wall -Wextra" OFF)
+option(ENABLE_DEVELOPER_COMPILER_FLAGS "Enable developer compiler flags: -Wall -Wextra -Werror" OFF)
 
 if (ENABLE_DEVELOPER_COMPILER_FLAGS)
-  add_compile_options(-Wall -Wextra)
+  add_compile_options(-Wall -Wextra -Werror "-Wno-error=\#warnings" -Wno-error=unknown-cuda-version)
 endif()
 
 if(PROTEUS_ENABLE_HIP)

@@ -35,6 +35,7 @@ JitEngineDeviceHIP &JitEngineDeviceHIP::instance() {
   return Jit;
 }
 
+#if LLVM_VERSION_MAJOR >= 18
 static Expected<std::unique_ptr<MemoryBuffer>> decompress(StringRef Blob) {
   static constexpr size_t MagicSize = 4;
   static constexpr size_t VersionFieldSize = sizeof(uint16_t);
@@ -45,8 +46,8 @@ static Expected<std::unique_ptr<MemoryBuffer>> decompress(StringRef Blob) {
   static constexpr size_t V2HeaderSize =
       MagicSize + VersionFieldSize + FileSizeFieldSize + MethodFieldSize +
       UncompressedSizeFieldSize + HashFieldSize;
-  static constexpr llvm::StringRef MagicNumber = "CCOB";
-  static constexpr uint16_t Version = 2;
+  [[maybe_unused]] static constexpr llvm::StringRef MagicNumber = "CCOB";
+  [[maybe_unused]] static constexpr uint16_t Version = 2;
 
   size_t CurrentOffset = MagicSize;
 
@@ -98,6 +99,7 @@ static Expected<std::unique_ptr<MemoryBuffer>> decompress(StringRef Blob) {
   return llvm::MemoryBuffer::getMemBufferCopy(
       llvm::toStringRef(DecompressedData));
 }
+#endif
 
 static std::unique_ptr<MemoryBuffer> getDeviceBinary(BinaryInfo &BinInfo,
                                                      StringRef DeviceArch) {
@@ -257,8 +259,8 @@ std::unique_ptr<Module> JitEngineDeviceHIP::tryExtractKernelModule(
   if (Sections.takeError())
     PROTEUS_FATAL_ERROR("Error reading sections");
 
-  auto ExtractModuleFromSection = [&Ctx, &DeviceElf, &BinInfo, &KernelName](
-                                      auto &Section, StringRef SectionName) {
+  auto ExtractModuleFromSection = [&Ctx, &DeviceElf](auto &Section,
+                                                     StringRef SectionName) {
     ArrayRef<uint8_t> BitcodeData;
     auto SectionContents = DeviceElf->getSectionContents(Section);
     if (SectionContents.takeError())

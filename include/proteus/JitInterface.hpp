@@ -51,7 +51,8 @@ static __attribute__((noinline)) T &&register_lambda(T &&t,
 #if defined(__CUDACC__) || defined(__HIP__)
 template <typename T>
 __device__ __attribute__((noinline)) T *
-shared_array(size_t N, size_t ElemSize = sizeof(T)) {
+shared_array([[maybe_unused]] size_t N,
+             [[maybe_unused]] size_t ElemSize = sizeof(T)) {
   __builtin_trap();
 }
 #endif

@@ -9,16 +9,16 @@
 #include <proteus/JitInterface.hpp>
 
 __attribute__((annotate("jit", 1, 4))) void myDaxpy(double A, double *X,
-                                                    double *Y, int N) {
+                                                    double *Y, size_t N) {
   for (std::size_t I{0}; I < N; I++) {
     Y[I] += X[I] * A;
   }
 }
 
-int main(int argc, char **argv) {
+int main() {
   proteus::init();
 
-  int N = 1024;
+  size_t N = 1024;
   double *X = static_cast<double *>(malloc(sizeof(double) * N));
   double *Y = static_cast<double *>(malloc(sizeof(double) * N));
 

@@ -30,7 +30,7 @@ void lambdaCaller(int V) {
       [=, V = proteus::jit_variable(V)] __device__() { printf("V %d\n", V); }));
 }
 
-int main(int argc, char **argv) {
+int main() {
   proteus::init();
   // We expect that lambdas will specialize and NOT hit the cache since its
   // kernel invocation is templated on the unique lambda type.  The

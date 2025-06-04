@@ -14,7 +14,7 @@ __global__ __attribute__((annotate("jit", 1))) void kernel(T Arg) {
   Local = Arg;
 }
 
-int main(int argc, char **argv) {
+int main() {
   proteus::init();
 
   kernel<<<1, 1>>>(1);

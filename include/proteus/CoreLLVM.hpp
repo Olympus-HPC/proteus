@@ -30,7 +30,7 @@ static_assert(__cplusplus >= 201703L,
 #else
 #define STRINGIFY_HELPER(x) #x
 #define STRINGIFY(x) STRINGIFY_HELPER(x)
-#error "Unsupported LLVM version " STRINGIFY(LLVM_VERSION)
+#error "Unsupported LLVM version " STRINGIFY(LLVM_VERSION_MAJOR)
 #endif
 #include <llvm/Transforms/IPO/GlobalDCE.h>
 #include <llvm/Transforms/IPO/Internalize.h>

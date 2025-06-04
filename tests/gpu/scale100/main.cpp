@@ -234,17 +234,10 @@ int main() {
       break;
     }
 
-  bool GvarSuccess = true;
-  int HostGvar;
-  int NGvar = 0;
-
-  if (VecaddSuccess && GvarSuccess)
+  if (VecaddSuccess)
     fprintf(stdout, "Verification successful\n");
   else {
-    if (!VecaddSuccess)
-      fprintf(stdout, "Vecadd failed\n");
-    if (!GvarSuccess)
-      fprintf(stdout, "Gvar failed gvar%d = %d != 102\n", NGvar, HostGvar);
+    fprintf(stdout, "Vecadd failed\n");
     fprintf(stdout, "Verification failed\n");
   }
 

@@ -102,8 +102,9 @@ HashT JitEngineDeviceCUDA::getModuleHash(BinaryInfo &BinInfo) {
   return BinInfo.getModuleHash();
 }
 
-std::unique_ptr<Module> JitEngineDeviceCUDA::tryExtractKernelModule(
-    BinaryInfo &BinInfo, StringRef KernelName, LLVMContext &Ctx) {
+std::unique_ptr<Module>
+JitEngineDeviceCUDA::tryExtractKernelModule(BinaryInfo &, StringRef,
+                                            LLVMContext &) {
   // We do not support emitting per-kernel modules during CUDA compilation,
   // hence this returns null to trigger the fallback to extraction of per-TU
   // modules and cloning.
