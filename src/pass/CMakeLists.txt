@@ -9,10 +9,16 @@ target_include_directories(IRLinker
   SYSTEM PRIVATE
   ${LLVM_INCLUDE_DIRS}
 )
-target_link_libraries(IRLinker
+
+if(APPLE)
+  # On macOS we avoid the use of the -Bsymbolic linker flag.
+  target_link_libraries(IRLinker
+  PRIVATE LLVMLinker)
+else()
+  target_link_libraries(IRLinker
   PRIVATE LLVMLinker
-  -Wl,-Bsymbolic
-)
+  -Wl,-Bsymbolic)
+endif()
 
 add_library(ProteusPass SHARED
   ProteusPass.cpp
