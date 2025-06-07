@@ -53,7 +53,7 @@ int main() {
 // CHECK: Arg 7
 // CHECK: [ArgSpec] Replaced Function _Z4testIdEvT_ ArgNo 0 with value double 8.000000e+00
 // CHECK: Arg 8
-// CHECK: [ArgSpec] Replaced Function _Z4testIeEvT_ ArgNo 0 with value {{x86_fp80 0xK40029000000000000000|ppc_fp128 0xM40220000000000000000000000000000}}
+// CHECK: [ArgSpec] Replaced Function _Z4testI{{e|g}}EvT_ ArgNo 0 with value {{x86_fp80 0xK40029000000000000000|ppc_fp128 0xM40220000000000000000000000000000}}
 // CHECK: Arg 9
 // CHECK: [ArgSpec] Replaced Function _Z4testIbEvT_ ArgNo 0 with value i1 true
 // CHECK: Arg 1
