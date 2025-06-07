@@ -1,6 +1,8 @@
+// clang-format off
 // RUN: rm -rf .proteus
 // RUN: PROTEUS_TRACE_OUTPUT=1 ./lambda_def | %FILECHECK %s --check-prefixes=CHECK
 // RUN: rm -rf .proteus
+// clang-format on
 
 #include <cstdio>
 
