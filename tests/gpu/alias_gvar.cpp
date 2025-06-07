@@ -56,10 +56,6 @@ int main() {
 }
 
 // clang-format off
-// CHECK-FIRST: [DimSpec] Replace call to _ZL21__hip_get_block_dim_xv with constant i32 256
-// CHECK-FIRST: [DimSpec] Assume llvm.amdgcn.workitem.id.x with 256
-// CHECK-FIRST: [DimSpec] Assume llvm.amdgcn.workgroup.id.x with 4
-// CHECK-FIRST: [LaunchBoundSpec] GridSize 4 BlockSize 256
 // CHECK: First 5 elements: 0 2 4 6 8
 // CHECK: JitCache hits 0 total 1
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0

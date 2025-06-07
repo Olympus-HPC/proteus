@@ -59,18 +59,18 @@ public:
           // TODO: Create or find an API to query the proper ABI alignment.
           SharedMemGV->setAlignment(Align{16});
 
-          auto TraceOut = [](CallBase *CB, GlobalVariable *SharedMemGV) {
+          auto TraceOut = [](StringRef DemangledName, GlobalVariable *SharedMemGV) {
             SmallString<128> S;
             raw_svector_ostream OS(S);
-            OS << "[SharedArray] " << "Replace CB " << *CB << " with "
+            OS << "[SharedArray] " << "Replace CB " << DemangledName << " with "
                << *SharedMemGV << "\n";
 
             return S;
           };
 
-          PROTEUS_DBG(Logger::logs("proteus") << TraceOut(CB, SharedMemGV));
+          PROTEUS_DBG(Logger::logs("proteus") << TraceOut(DemangledName, SharedMemGV));
           if (Config::get().ProteusTraceOutput)
-            Logger::trace(TraceOut(CB, SharedMemGV));
+            Logger::trace(TraceOut(DemangledName, SharedMemGV));
 
           CB->replaceAllUsesWith(ConstantExpr::getAddrSpaceCast(
               SharedMemGV, CB->getFunctionType()->getReturnType()));
