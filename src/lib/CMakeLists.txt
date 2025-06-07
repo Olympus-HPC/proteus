@@ -5,6 +5,9 @@ set(SOURCES
   CompilerInterfaceHost.cpp
   JitEngine.cpp
   JitEngineHost.cpp
+  Frontend/Func.cpp
+  Frontend/Var.cpp
+  Frontend/Dispatcher.cpp
 )
 
 set(PROTEUS_PROJECT_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
@@ -13,6 +16,7 @@ if(PROTEUS_ENABLE_CUDA)
 list(APPEND SOURCES
   CompilerInterfaceDevice.cpp
   JitEngineDeviceCUDA.cpp
+  Frontend/DispatcherCUDA.cpp
 )
 endif()
 
@@ -20,6 +24,7 @@ if(PROTEUS_ENABLE_HIP)
 list(APPEND SOURCES
   CompilerInterfaceDevice.cpp
   JitEngineDeviceHIP.cpp
+  Frontend/DispatcherHIP.cpp
 )
 endif()
 
