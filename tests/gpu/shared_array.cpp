@@ -1,8 +1,10 @@
+// clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./shared_array.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_TRACE_OUTPUT=1 ./shared_array.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
 // RUN: ./shared_array.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
+// clang-format on
 #include <climits>
 #include <cstdio>
 
@@ -38,6 +40,10 @@ int main() {
   return 0;
 }
 
+// clang-format off
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 3
+// CHECK-FIRST: [SharedArray] Replace CB double* proteus::shared_array<double>(unsigned long, unsigned long) with @.proteus.shared = internal addrspace(3) global [24 x i8] undef, align 16
+// CHECK-FIRST: [LaunchBoundSpec] GridSize 1 BlockSize 1
 // CHECK: Kernel
 // CHECK: Lambda Array[0] 1.000000 Array[1] 2.000000 Array[2] 3.000000
 // CHECK: JitCache hits 0 total 1

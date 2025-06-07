@@ -22,6 +22,7 @@ function(CREATE_CPU_TEST exe check_source)
     )
 
     add_test(NAME ${exe} COMMAND ${LIT} -vv -D FILECHECK=${FILECHECK} ${check_source})
+    set_tests_properties(${exe} PROPERTIES LABELS "cpu")
 endfunction()
 
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/lit.cfg.py "

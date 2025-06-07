@@ -72,6 +72,14 @@ public:
     }
 #endif
 
+    auto TraceOut = [](int Slot, Constant *C) {
+      SmallString<128> S;
+      raw_svector_ostream OS(S);
+      OS << "[LambdaSpec] Replacing slot " << Slot << " with " << *C << "\n";
+
+      return S;
+    };
+
     PROTEUS_DBG(Logger::logs("proteus") << "\t users" << "\n");
     for (User *User : LambdaClass->users()) {
       PROTEUS_DBG(Logger::logs("proteus") << *User << "\n");
@@ -80,9 +88,9 @@ public:
           if (Arg.Slot == 0) {
             Constant *C = getConstant(M.getContext(), User->getType(), Arg);
             User->replaceAllUsesWith(C);
-            PROTEUS_DBG(Logger::logs("proteus")
-                        << "[LambdaSpec] Replacing " << *User << " with " << *C
-                        << "\n");
+            PROTEUS_DBG(Logger::logs("proteus") << TraceOut(Arg.Slot, C));
+            if (Config::get().ProteusTraceOutput)
+              Logger::trace(TraceOut(Arg.Slot, C));
           }
         }
       } else if (auto *GEP = dyn_cast<GetElementPtrInst>(User)) {
@@ -98,9 +106,9 @@ public:
               Type *LoadType = LI->getType();
               Constant *C = getConstant(M.getContext(), LoadType, Arg);
               LI->replaceAllUsesWith(C);
-              PROTEUS_DBG(Logger::logs("proteus")
-                          << "[LambdaSpec] Replacing " << *User << " with "
-                          << *C << "\n");
+              PROTEUS_DBG(Logger::logs("proteus") << TraceOut(Arg.Slot, C));
+              if (Config::get().ProteusTraceOutput)
+                Logger::trace(TraceOut(Arg.Slot, C));
             }
           }
         }

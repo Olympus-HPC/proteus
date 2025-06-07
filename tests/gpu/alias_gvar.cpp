@@ -1,6 +1,6 @@
 // clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./alias_gvar.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_TRACE_OUTPUT=1 ./alias_gvar.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
 // RUN: ./alias_gvar.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
@@ -55,6 +55,7 @@ int main() {
   return 0;
 }
 
+// clang-format off
 // CHECK: First 5 elements: 0 2 4 6 8
 // CHECK: JitCache hits 0 total 1
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0

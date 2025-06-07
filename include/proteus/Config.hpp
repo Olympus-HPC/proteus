@@ -127,6 +127,7 @@ public:
   KernelCloneOption ProteusKernelClone;
   bool ProteusEnableTimers;
   CodegenOption ProteusCodegen;
+  bool ProteusTraceOutput;
 
 private:
   Config() {
@@ -169,6 +170,7 @@ private:
     ProteusKernelClone = getEnvOrDefaultKC("PROTEUS_KERNEL_CLONE",
                                            KernelCloneOption::CrossClone);
     ProteusEnableTimers = getEnvOrDefaultBool("PROTEUS_ENABLE_TIMERS", false);
+    ProteusTraceOutput = getEnvOrDefaultBool("PROTEUS_TRACE_OUTPUT", false);
   }
 };
 } // namespace proteus

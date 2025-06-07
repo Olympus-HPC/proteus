@@ -2,6 +2,7 @@
 #define PROTEUS_LOGGER_HPP
 
 #include <filesystem>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <system_error>
@@ -25,6 +26,8 @@ public:
     llvm::outs() << "[" << Name << "] ";
     return llvm::outs();
   }
+
+  static void trace(llvm::StringRef Msg) { std::cout << Msg.str(); }
 
   template <typename T>
   static void logfile(const std::string &Filename, T &&Data) {
@@ -51,6 +54,10 @@ private:
                                        EC, llvm::sys::fs::OF_None}) {
     if (EC)
       throw std::runtime_error("Error opening file: " + EC.message());
+
+    // Synchronize C++ streams with stdio for tracing (e.g., printf from GPU
+    // kernels).
+    std::ios::sync_with_stdio(true);
   }
 };
 

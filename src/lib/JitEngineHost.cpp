@@ -181,7 +181,7 @@ JitEngineHost::~JitEngineHost() { CodeCache.printStats(); }
 Expected<orc::ThreadSafeModule>
 JitEngineHost::specializeIR(std::unique_ptr<Module> M,
                             std::unique_ptr<LLVMContext> Ctx, StringRef FnName,
-                            StringRef Suffix,
+                            StringRef Suffix, ArrayRef<int32_t> RCTypes,
                             const SmallVector<RuntimeConstant> &RCVec) {
   TIMESCOPE("specializeIR");
   Function *F = M->getFunction(FnName);
@@ -248,7 +248,7 @@ JitEngineHost::specializeIR(std::unique_ptr<Module> M,
     ArgPos.push_back(ArgNo);
   }
 
-  TransformArgumentSpecialization::transform(*M, *F, ArgPos, RCVec);
+  TransformArgumentSpecialization::transform(*M, *F, ArgPos, RCTypes, RCVec);
 
   if (!LambdaRegistry::instance().empty()) {
     if (auto OptionalMapIt =
@@ -309,9 +309,11 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 
   SmallVector<RuntimeConstant> RCVec;
   SmallVector<RuntimeConstant> LambdaJitValuesVec;
+  ArrayRef<int32_t> RCTypesArr =
+      ArrayRef{RCTypes, static_cast<size_t>(NumRuntimeConstants)};
   getRuntimeConstantValues(
       Args, ArrayRef{RCIndices, static_cast<size_t>(NumRuntimeConstants)},
-      ArrayRef{RCTypes, static_cast<size_t>(NumRuntimeConstants)}, RCVec);
+      RCTypesArr, RCVec);
   getLambdaJitValues(FnName, LambdaJitValuesVec);
 
   HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesVec);
@@ -332,8 +334,8 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   std::string MangledFnName = FnName.str() + Suffix;
 
   // (3) Add modules.
-  ExitOnErr(LLJITPtr->addIRModule(ExitOnErr(
-      specializeIR(std::move(M), std::move(Ctx), FnName, Suffix, RCVec))));
+  ExitOnErr(LLJITPtr->addIRModule(ExitOnErr(specializeIR(
+      std::move(M), std::move(Ctx), FnName, Suffix, RCTypesArr, RCVec))));
 
   PROTEUS_DBG(Logger::logs("proteus")
               << "===\n"

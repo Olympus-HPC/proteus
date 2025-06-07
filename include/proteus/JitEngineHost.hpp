@@ -41,7 +41,7 @@ public:
 
   Expected<orc::ThreadSafeModule>
   specializeIR(std::unique_ptr<Module> M, std::unique_ptr<LLVMContext> Ctx,
-               StringRef FnName, StringRef Suffix,
+               StringRef FnName, StringRef Suffix, ArrayRef<int32_t> RCTypes,
                const SmallVector<RuntimeConstant> &RCVec);
 
   void *compileAndLink(StringRef FnName, char *IR, int IRSize, void **Args,

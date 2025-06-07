@@ -641,7 +641,7 @@ JitEngineDevice<ImplT>::compileAndRun(
 
       Compiler.compile(CompilationTask{
           KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
-          GridDim, KernelInfo.getRCIndices(), RCVec,
+          GridDim, KernelInfo.getRCIndices(), KernelInfo.getRCTypes(), RCVec,
           KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr,
           GlobalLinkedBinaries, DeviceArch,
           /* CGOption */ Config::get().ProteusCodegen,
@@ -666,7 +666,7 @@ JitEngineDevice<ImplT>::compileAndRun(
     // Process through synchronous compilation.
     ObjBuf = CompilerSync::instance().compile(CompilationTask{
         KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
-        GridDim, KernelInfo.getRCIndices(), RCVec,
+        GridDim, KernelInfo.getRCIndices(), KernelInfo.getRCTypes(), RCVec,
         KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr, GlobalLinkedBinaries,
         DeviceArch,
         /* CGOption */ Config::get().ProteusCodegen,

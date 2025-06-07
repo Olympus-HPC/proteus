@@ -48,10 +48,21 @@ inline void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
       if (!IntrinsicFunction)
         continue;
 
+      auto TraceOut = [](Function *F, Value *C) {
+        SmallString<128> S;
+        raw_svector_ostream OS(S);
+        OS << "[DimSpec] Replace call to " << F->getName() << " with constant "
+           << *C << "\n";
+
+        return S;
+      };
+
       for (auto *Call : CollectCallUsers(*IntrinsicFunction)) {
         Value *ConstantValue =
             ConstantInt::get(Type::getInt32Ty(M.getContext()), DimValue);
         Call->replaceAllUsesWith(ConstantValue);
+        if (Config::get().ProteusTraceOutput)
+          Logger::trace(TraceOut(IntrinsicFunction, ConstantValue));
         Call->eraseFromParent();
       }
     }
@@ -71,6 +82,15 @@ inline void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
       if (!IntrinsicFunction || IntrinsicFunction->use_empty())
         continue;
 
+      auto TraceOut = [](Function *IntrinsicF, int DimValue) {
+        SmallString<128> S;
+        raw_svector_ostream OS(S);
+        OS << "[DimSpec] Assume " << IntrinsicF->getName() << " with "
+           << DimValue << "\n";
+
+        return S;
+      };
+
       // Iterate over all uses of the intrinsic.
       for (auto *U : IntrinsicFunction->users()) {
         auto *Call = dyn_cast<CallInst>(U);
@@ -85,6 +105,8 @@ inline void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
         Function *AssumeIntrinsic =
             Intrinsic::getDeclaration(&M, Intrinsic::assume);
         Builder.CreateCall(AssumeIntrinsic, Cmp);
+        if (Config::get().ProteusTraceOutput)
+          Logger::trace(TraceOut(IntrinsicFunction, DimValue));
       }
     }
   };
@@ -235,7 +257,7 @@ inline void relinkGlobalsObject(
 inline void specializeIR(
     Module &M, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
     dim3 &GridDim, const SmallVector<int32_t> &RCIndices,
-    const SmallVector<RuntimeConstant> &RCVec,
+    ArrayRef<int32_t> RCTypes, const SmallVector<RuntimeConstant> &RCVec,
     const SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo,
     bool SpecializeArgs, bool SpecializeDims, bool SpecializeLaunchBounds) {
   Timer T;
@@ -244,7 +266,8 @@ inline void specializeIR(
   assert(F && "Expected non-null function!");
   // Replace argument uses with runtime constants.
   if (SpecializeArgs)
-    TransformArgumentSpecialization::transform(M, *F, RCIndices, RCVec);
+    TransformArgumentSpecialization::transform(M, *F, RCIndices, RCTypes,
+                                               RCVec);
 
   auto &LR = LambdaRegistry::instance();
   for (auto &[FnName, LambdaType] : LambdaCalleeInfo) {
@@ -265,9 +288,21 @@ inline void specializeIR(
 
   F->setName(FnName + Suffix);
 
-  if (SpecializeLaunchBounds)
-    setLaunchBoundsForKernel(M, *F, GridDim.x * GridDim.y * GridDim.z,
-                             BlockDim.x * BlockDim.y * BlockDim.z);
+  if (SpecializeLaunchBounds) {
+    size_t GridSize = GridDim.x * GridDim.y * GridDim.z;
+    int BlockSize = BlockDim.x * BlockDim.y * BlockDim.z;
+    auto TraceOut = [](size_t GridSize, int BlockSize) {
+      SmallString<128> S;
+      raw_svector_ostream OS(S);
+      OS << "[LaunchBoundSpec] GridSize " << GridSize << " BlockSize "
+         << BlockSize << "\n";
+
+      return S;
+    };
+    if (Config::get().ProteusTraceOutput)
+      Logger::trace(TraceOut(GridSize, BlockSize));
+    setLaunchBoundsForKernel(M, *F, GridSize, BlockSize);
+  }
 
   runCleanupPassPipeline(M);
 

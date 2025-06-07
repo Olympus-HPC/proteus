@@ -1,6 +1,6 @@
 // clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./kernel_calls_func_lib.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_TRACE_OUTPUT=1 ./kernel_calls_func_lib.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
 // RUN: ./kernel_calls_func_lib.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
@@ -28,6 +28,9 @@ int main() {
   return 0;
 }
 
+// clang-format off
+// CHECK-FIRST: [ArgSpec] Replaced Function _Z14kernelFunctioni ArgNo 0 with value i32 1
+// CHECK-FIRST: [LaunchBoundSpec] GridSize 1 BlockSize 1
 // CHECK: device_func 1
 // CHECK: Kernel with lib 1
 // CHECK: JitCache hits 0 total 1
