@@ -1,8 +1,9 @@
+// clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./daxpy.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
-// Second run uses the object cache.
-// RUN: ./daxpy.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: PROTEUS_TRACE_OUTPUT=1 ./daxpy.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// ./daxpy.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
+// clang-format on
 
 #include <cstddef>
 #include <cstdlib>
@@ -62,7 +63,11 @@ int main() {
   proteus::finalize();
 }
 
+// clang-format off
 // CHECK: 0
+// CHECK-FIRST: [ArgSpec] Replaced Function _Z9daxpyImpldPdS_m ArgNo 3 with value i64 1024
+// CHECK-FIRST: [DimSpec]
+// CHECK-FIRST: [DimSpec]
 // CHECK: 19944.1
 // CHECK: 39888.2
 // CHECK: JitCache hits 1 total 2

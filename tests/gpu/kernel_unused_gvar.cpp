@@ -29,6 +29,7 @@ int main() {
   return 0;
 }
 
+// clang-format off
 // CHECK: Kernel
 // CHECK: Kernel gvar
 // CHECK: JitCache hits 0 total 2

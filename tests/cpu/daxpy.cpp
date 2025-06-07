@@ -1,5 +1,5 @@
 // RUN: rm -rf .proteus
-// RUN: ./daxpy | %FILECHECK %s --check-prefixes=CHECK
+// RUN: PROTEUS_TRACE_OUTPUT=1 ./daxpy | %FILECHECK %s --check-prefixes=CHECK
 // RUN: rm -rf .proteus
 
 #include <cstddef>
@@ -40,8 +40,13 @@ int main() {
   return 0;
 }
 
+// clang-format off
 // CHECK: 0
+// CHECK: [ArgSpec] Replaced Function _Z7myDaxpydPdS_m ArgNo 0 with value double 6.200000e+00
+// CHECK: [ArgSpec] Replaced Function _Z7myDaxpydPdS_m ArgNo 3 with value i64 1024
 // CHECK: 19.4767
+// CHECK: [ArgSpec] Replaced Function _Z7myDaxpydPdS_m ArgNo 0 with value double 1.000000e+00
+// CHECK: [ArgSpec] Replaced Function _Z7myDaxpydPdS_m ArgNo 3 with value i64 1024
 // CHECK: 22.6181
 // CHECK: JitCache hits 0 total 2
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0

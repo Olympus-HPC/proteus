@@ -1,5 +1,5 @@
 // RUN: rm -rf .proteus
-// RUN: ./lambda_def | %FILECHECK %s --check-prefixes=CHECK
+// RUN: PROTEUS_TRACE_OUTPUT=1 ./lambda_def | %FILECHECK %s --check-prefixes=CHECK
 // RUN: rm -rf .proteus
 
 #include <cstdio>
@@ -16,9 +16,8 @@ int main() {
 
   int A = 42;
   auto Lambda =
-      [ =, A = proteus::jit_variable(A) ]() __attribute__((annotate("jit"))) {
-    printf("Lambda A %d\n", A);
-  };
+      [=, A = proteus::jit_variable(A)]()
+          __attribute__((annotate("jit"))) { printf("Lambda A %d\n", A); };
   run(Lambda);
   run(Lambda);
   run(Lambda);
@@ -27,6 +26,8 @@ int main() {
   return 0;
 }
 
-// CHECK-3: Lambda 42
+// clang-format off
+// CHECK: [LambdaSpec] Replacing slot 0 with i32 42
+// CHECK-COUNT-3: Lambda A 42
 // CHECK: JitCache hits 2 total 3
 // CHECK: HashValue {{[0-9]+}} NumExecs 3 NumHits 2

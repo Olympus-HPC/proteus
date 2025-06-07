@@ -1,5 +1,5 @@
 // RUN: rm -rf .proteus
-// RUN: ./types | %FILECHECK %s --check-prefixes=CHECK
+// RUN: PROTEUS_TRACE_OUTPUT=1 ./types | %FILECHECK %s --check-prefixes=CHECK
 // RUN: rm -rf .proteus
 
 #include <cstdlib>
@@ -36,18 +36,32 @@ int main() {
   return 0;
 }
 
+// clang-format off
+// CHECK: [ArgSpec] Replaced Function _Z4testIiEvT_ ArgNo 0 with value i32 1
 // CHECK: Arg 1
+// CHECK: [ArgSpec] Replaced Function _Z4testIlEvT_ ArgNo 0 with value i64 2
 // CHECK: Arg 2
+// CHECK: [ArgSpec] Replaced Function _Z4testIjEvT_ ArgNo 0 with value i32 3
 // CHECK: Arg 3
+// CHECK: [ArgSpec] Replaced Function _Z4testImEvT_ ArgNo 0 with value i64 4
 // CHECK: Arg 4
+// CHECK: [ArgSpec] Replaced Function _Z4testIxEvT_ ArgNo 0 with value i64 5
 // CHECK: Arg 5
+// CHECK: [ArgSpec] Replaced Function _Z4testIyEvT_ ArgNo 0 with value i64 6
 // CHECK: Arg 6
+// CHECK: [ArgSpec] Replaced Function _Z4testIfEvT_ ArgNo 0 with value float 7.000000e+00
 // CHECK: Arg 7
+// CHECK: [ArgSpec] Replaced Function _Z4testIdEvT_ ArgNo 0 with value double 8.000000e+00
 // CHECK: Arg 8
+// CHECK: [ArgSpec] Replaced Function _Z4testIeEvT_ ArgNo 0 with value {{x86_fp80 0xK40029000000000000000|ppc_fp128 0xM40220000000000000000000000000000}}
 // CHECK: Arg 9
+// CHECK: [ArgSpec] Replaced Function _Z4testIbEvT_ ArgNo 0 with value i1 true
 // CHECK: Arg 1
+// CHECK: [ArgSpec] Replaced Function _Z4testIcEvT_ ArgNo 0 with value i8 97
 // CHECK: Arg a
+// CHECK: [ArgSpec] Replaced Function _Z4testIhEvT_ ArgNo 0 with value i8 97
 // CHECK: Arg a
+// CHECK: [ArgSpec] Replaced Function _Z4testIPiEvT_ ArgNo 0 with value ptr inttoptr (i64 291 to ptr)
 // CHECK: Arg 0x123
 // CHECK: JitCache hits 0 total 13
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0

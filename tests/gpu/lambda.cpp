@@ -1,8 +1,10 @@
+// clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./lambda.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_TRACE_OUTPUT=1 ./lambda.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
 // RUN: ./lambda.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
+// clang-format on
 
 #include <iostream>
 
@@ -45,7 +47,7 @@ template <typename T> void run(T &&LB) {
 }
 
 inline void launch(double C, double *X) {
-  registerRun([ =, C = proteus::jit_variable(C) ] __device__
+  registerRun([=, C = proteus::jit_variable(C)] __device__
               __attribute__((annotate("jit"))) () { X[0] = C + 2; });
   std::cout << "x[0] = " << X[0] << "\n";
 }
@@ -59,29 +61,34 @@ int main() {
   double *X;
   gpuErrCheck(gpuMallocManaged(&X, sizeof(double) * 2));
 
-  registerRun([ =, A = proteus::jit_variable(A) ] __device__
+  registerRun([=, A = proteus::jit_variable(A)] __device__
               __attribute__((annotate("jit"))) () { X[0] = A; });
 
   std::cout << "x[0] = " << X[0] << "\n";
 
-  registerRun(
-      2, [ =, C = proteus::jit_variable(C) ] __device__
-      __attribute__((annotate("jit"))) (int I) { X[I] = C; });
+  registerRun(2, [=, C = proteus::jit_variable(C)] __device__
+              __attribute__((annotate("jit"))) (int I) { X[I] = C; });
 
   std::cout << "x[0:1] = " << X[0] << "," << X[1] << "\n";
 
-  run(proteus::register_lambda([
-    =, A = proteus::jit_variable(A), B = proteus::jit_variable(B)
-  ] __device__ __attribute__((annotate("jit"))) () { X[0] = A + B; }));
+  run(proteus::register_lambda(
+      [=, A = proteus::jit_variable(A), B = proteus::jit_variable(B)] __device__
+      __attribute__((annotate("jit"))) () { X[0] = A + B; }));
   std::cout << "x[0] = " << X[0] << "\n";
 
   launch(C, X);
   gpuErrCheck(gpuFree(X));
 }
 
+// clang-format off
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with double 3.140000e+00
 // CHECK: x[0] = 3.14
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with double 4.560000e+00
 // CHECK: x[0:1] = 4.56,4.56
+// CHECK-FIRST: [LambdaSpec] Replacing slot 1 with double 1.230000e+00
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with double 3.140000e+00
 // CHECK: x[0] = 4.37
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with double 4.560000e+00
 // CHECK: x[0] = 6.56
 // CHECK: JitCache hits 0 total 4
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0

@@ -1,6 +1,6 @@
 // clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./builtin_globals.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_TRACE_OUTPUT=1 ./builtin_globals.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
 // RUN: ./builtin_globals.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
@@ -30,6 +30,14 @@ int main() {
   return 0;
 }
 
+// clang-format off
+// CHECK-FIRST: [DimSpec]
+// CHECK-FIRST: [DimSpec]
+// CHECK-FIRST: [DimSpec]
+// CHECK-FIRST: [DimSpec]
+// CHECK-FIRST: [DimSpec]
+// CHECK-FIRST: [DimSpec]
+// CHECK-FIRST: [LaunchBoundSpec] GridSize 1 BlockSize 1
 // CHECK: Kernel
 // CHECK: JitCache hits 0 total 1
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0

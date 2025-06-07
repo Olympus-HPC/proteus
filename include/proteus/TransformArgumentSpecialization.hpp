@@ -15,6 +15,7 @@
 #include <llvm/Support/Debug.h>
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Debug.h"
 #include "proteus/Utils.h"
 
 namespace proteus {
@@ -25,6 +26,7 @@ class TransformArgumentSpecialization {
 public:
   static void transform(Module &M, Function &F,
                         const SmallVectorImpl<int32_t> &ArgPos,
+                        ArrayRef<int32_t> RCTypes,
                         ArrayRef<RuntimeConstant> RC) {
     auto &Ctx = M.getContext();
 
@@ -47,13 +49,14 @@ public:
       } else if (ArgType->isFloatTy()) {
         // Logger::logs("proteus") << "RC is Float\n";
         C = ConstantFP::get(ArgType, RC[I].Value.FloatVal);
-      }
-      // NOTE: long double on device should correspond to plain double.
-      // XXX: CUDA with a long double SILENTLY fails to create a working
-      // kernel in AOT compilation, with or without JIT.
-      else if (ArgType->isDoubleTy()) {
-        // Logger::logs("proteus") << "RC is Double\n";
-        C = ConstantFP::get(ArgType, RC[I].Value.DoubleVal);
+      } else if (ArgType->isDoubleTy()) {
+        // NOTE: long double on device should correspond to plain double.
+        // XXX: CUDA with a long double SILENTLY fails to create a working
+        // kernel in AOT compilation, with or without JIT.
+        if (RCTypes[I] == LONG_DOUBLE)
+          C = ConstantFP::get(ArgType, RC[I].Value.LongDoubleVal);
+        else
+          C = ConstantFP::get(ArgType, RC[I].Value.DoubleVal);
       } else if (ArgType->isX86_FP80Ty() || ArgType->isPPC_FP128Ty() ||
                  ArgType->isFP128Ty()) {
         C = ConstantFP::get(ArgType, RC[I].Value.LongDoubleVal);
@@ -69,9 +72,18 @@ public:
                             TypeOstream.str());
       }
 
-      PROTEUS_DBG(Logger::logs("proteus") << "[ArgSpecial] Replaced Function "
-                                          << F.getName() + " ArgNo " << ArgNo
-                                          << " with value " << *C << "\n");
+      auto TraceOut = [](Function &F, int ArgNo, Constant *C) {
+        SmallString<128> S;
+        raw_svector_ostream OS(S);
+        OS << "[ArgSpec] Replaced Function " << F.getName() << " ArgNo "
+           << ArgNo << " with value " << *C << "\n";
+
+        return S;
+      };
+
+      PROTEUS_DBG(Logger::logs("proteus") << TraceOut(F, ArgNo, C));
+      if (Config::get().ProteusTraceOutput)
+        Logger::trace(TraceOut(F, ArgNo, C));
       Arg->replaceAllUsesWith(C);
     }
   }

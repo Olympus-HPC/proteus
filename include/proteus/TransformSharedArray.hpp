@@ -32,7 +32,6 @@ public:
       std::string DemangledName = llvm::demangle(Func.getName().str());
       StringRef StrRef{DemangledName};
       if (StrRef.contains("proteus::shared_array")) {
-
         // Use a while loop to delete while iterating.
         while (!Func.user_empty()) {
           User *Usr = *Func.user_begin();
@@ -60,9 +59,18 @@ public:
           // TODO: Create or find an API to query the proper ABI alignment.
           SharedMemGV->setAlignment(Align{16});
 
-          PROTEUS_DBG(Logger::logs("proteus")
-                      << "[SharedArray] " << "Replace CB " << *CB << " with "
-                      << *SharedMemGV << "\n");
+          auto TraceOut = [](CallBase *CB, GlobalVariable *SharedMemGV) {
+            SmallString<128> S;
+            raw_svector_ostream OS(S);
+            OS << "[SharedArray] " << "Replace CB " << *CB << " with "
+               << *SharedMemGV << "\n";
+
+            return S;
+          };
+
+          PROTEUS_DBG(Logger::logs("proteus") << TraceOut(CB, SharedMemGV));
+          if (Config::get().ProteusTraceOutput)
+            Logger::trace(TraceOut(CB, SharedMemGV));
 
           CB->replaceAllUsesWith(ConstantExpr::getAddrSpaceCast(
               SharedMemGV, CB->getFunctionType()->getReturnType()));

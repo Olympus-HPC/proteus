@@ -1,8 +1,10 @@
+// clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./kernel_repeat.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_TRACE_OUTPUT=1 ./kernel_repeat.%ext |  %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
 // RUN: ./kernel_repeat.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
+// clang-format on
 #include <climits>
 #include <cstdio>
 
@@ -24,6 +26,9 @@ int main() {
   return 0;
 }
 
+// clang-format off
+// CHECK-FIRST: [ArgSpec] Replaced Function _Z6kerneli ArgNo 0 with value i32 42
+// CHECK-FIRST: [LaunchBoundSpec] GridSize 1 BlockSize 1
 // CHECK-COUNT-1000: Kernel i 42
 // CHECK: JitCache hits 999 total 1000
 // CHECK: HashValue {{[0-9]+}} NumExecs 1000 NumHits 999
