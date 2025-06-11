@@ -55,6 +55,8 @@ public:
 
   HashT getModuleHash(BinaryInfo &BinInfo);
 
+  std::unique_ptr<MemoryBuffer> compileOnly(Module &M);
+
 private:
   JitEngineDeviceCUDA();
   JitEngineDeviceCUDA(JitEngineDeviceCUDA &) = delete;

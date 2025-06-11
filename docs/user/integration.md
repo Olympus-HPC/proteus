@@ -45,3 +45,11 @@ Where `target` is the name of your library or executable target.
     You may need to build `libproteus` with the Position Independent Code (PIC)
     flag (`-fPIC` or `CMAKE_POSITION_INDEPENDENT_CODE=on` in CMake), if you want
     to integrate Proteus as a static library to a dynamic library target.
+
+## Link with `-rdynamic`
+
+When using Proteus for JIT generation of CPU code, and your JIT-compiled code
+needs to call functions defined in your main program, you must link your main
+application with the `-rdynamic` flag. This flag ensures that all symbols from
+your main program are visible to the Proteus JIT, allowing external function
+calls from JIT code to resolve correctly at runtime.

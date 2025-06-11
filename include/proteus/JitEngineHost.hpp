@@ -48,6 +48,10 @@ public:
                        int32_t *RCIndices, int32_t *RCTypes,
                        int NumRuntimeConstants);
 
+  void compileOnly(std::unique_ptr<Module> M);
+
+  void *getFunctionAddress(StringRef FnName);
+
 private:
   JitEngineHost();
   void addStaticLibrarySymbols();

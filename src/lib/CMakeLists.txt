@@ -5,6 +5,9 @@ set(SOURCES
   CompilerInterfaceHost.cpp
   JitEngine.cpp
   JitEngineHost.cpp
+  Frontend/Func.cpp
+  Frontend/Var.cpp
+  Frontend/Dispatcher.cpp
 )
 
 set(PROTEUS_PROJECT_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
@@ -34,6 +37,7 @@ else()
 endif()
 
 add_library(proteusCore INTERFACE)
+add_library(proteusFrontend INTERFACE)
 
 target_compile_definitions(proteus PUBLIC ${LLVM_DEFINITIONS})
 target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
@@ -44,6 +48,7 @@ if(PROTEUS_ENABLE_HIP)
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_HIP)
 elseif(PROTEUS_ENABLE_CUDA)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_CUDA)
+  target_compile_definitions(proteus PRIVATE LIBDEVICE_BC_PATH="${LIBDEVICE_BC_FILE}")
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_CUDA)
 endif()
 
@@ -77,6 +82,7 @@ target_include_directories(proteusCore
 if(PROTEUS_LINK_SHARED_LLVM)
   if(LLVM_LINK_LLVM_DYLIB)
     llvm_config(proteus USE_SHARED)
+    set(libs LLVM)
   else()
     find_library(LLVM_SHARED_LIB
       NAMES LLVM
@@ -138,6 +144,7 @@ if(PROTEUS_ENABLE_CUDA)
 endif()
 
 target_link_libraries(proteus PRIVATE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+target_link_libraries(proteusFrontend INTERFACE proteus ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 target_link_libraries(proteusCore INTERFACE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 
 set_target_properties(proteus PROPERTIES

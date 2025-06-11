@@ -33,6 +33,16 @@ if(PROTEUS_ENABLE_CUDA)
   add_definitions("-DPROTEUS_ENABLE_CUDA")
 
   find_package(CUDAToolkit 12 REQUIRED)
+  find_file(LIBDEVICE_BC_FILE
+    NAMES libdevice.10.bc
+    PATHS "${CUDAToolkit_TARGET_DIR}/nvvm/libdevice"
+    NO_DEFAULT_PATH
+  )
+  if(NOT LIBDEVICE_BC_FILE)
+    message(FATAL_ERROR
+      "Could not locate libdevice bitcode under ${CUDAToolkit_TARGET_DIR}/nvvm/libdevice")
+  endif()
+  message(STATUS "Found libdevice bitcode: ${LIBDEVICE_BC_FILE}")
 endif()
 
 if(PROTEUS_ENABLE_DEBUG)

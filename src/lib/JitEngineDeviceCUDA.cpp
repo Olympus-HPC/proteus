@@ -184,3 +184,10 @@ JitEngineDeviceCUDA::JitEngineDeviceCUDA() {
 
   PROTEUS_DBG(Logger::logs("proteus") << "CUDA Arch " << DeviceArch << "\n");
 }
+
+std::unique_ptr<MemoryBuffer> JitEngineDeviceCUDA::compileOnly(Module &M) {
+  proteus::optimizeIR(M, DeviceArch, '3', 3);
+  auto DeviceObject =
+      proteus::codegenObject(M, DeviceArch, GlobalLinkedBinaries);
+  return DeviceObject;
+}

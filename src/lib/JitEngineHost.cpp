@@ -362,6 +362,22 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   return JitFnPtr;
 }
 
+void JitEngineHost::compileOnly(std::unique_ptr<Module> M) {
+  auto TSM = ThreadSafeModule{std::move(M), std::make_unique<LLVMContext>()};
+  // (3) Add modules.
+  ExitOnErr(LLJITPtr->addIRModule(std::move(TSM)));
+}
+
+void *JitEngineHost::getFunctionAddress(StringRef FnName) {
+
+  auto EntryAddr = ExitOnErr(LLJITPtr->lookup(FnName));
+
+  void *JitFnPtr = (void *)EntryAddr.getValue();
+  assert(JitFnPtr && "Expected non-null JIT function pointer");
+
+  return JitFnPtr;
+}
+
 JitEngineHost::JitEngineHost() {
   ExitOnErr.setBanner("JIT: ");
   // Create the LLJIT instance.

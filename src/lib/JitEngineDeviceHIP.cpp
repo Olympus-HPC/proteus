@@ -391,3 +391,10 @@ JitEngineDeviceHIP::JitEngineDeviceHIP() {
   DeviceArch = DevProp.gcnArchName;
   DeviceArch = DeviceArch.substr(0, DeviceArch.find_first_of(":"));
 }
+
+std::unique_ptr<MemoryBuffer> JitEngineDeviceHIP::compileOnly(Module &M) {
+  proteus::optimizeIR(M, DeviceArch, '3', 3);
+  auto DeviceObject =
+      proteus::codegenObject(M, DeviceArch, GlobalLinkedBinaries);
+  return DeviceObject;
+}
