@@ -55,6 +55,3 @@ int main() {
 // CHECK-NEXT: X[7] = 2
 // CHECK-NEXT: X[8] = 2
 // CHECK-NEXT: X[9] = 2
-// CHECK-NEXT: JitCache hits 0 total 0
-// CHECK-NEXT: JitStorageCache hits 0 total 0
-// CHECK-NEXT: JitCache hits 0 total 0

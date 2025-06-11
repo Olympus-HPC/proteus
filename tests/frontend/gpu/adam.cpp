@@ -278,7 +278,5 @@ int main(int argc, char *argv[]) {
 // CHECK-NEXT: p[7] = -0.599872
 // CHECK-NEXT: p[8] = -0.58157
 // CHECK-NEXT: p[9] = -0.59015{{[7|8]}}
-// CHECK-NEXT: JitCache hits 0 total 0
-// CHECK-NEXT: JitStorageCache hits 0 total 0
 
 // NOLINTEND

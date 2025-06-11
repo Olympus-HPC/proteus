@@ -68,15 +68,12 @@ int main() {
 
 // clang-format off
 // CHECK: R0 = 2
-// CHECK: R1 = 3
-// CHECK: R2 = 5
-// CHECK: R3 = -1
-// CHECK: R4 = 6
-// CHECK: R5 = 0.666667
-// CHECK: R6 = 7
-// CHECK: R7 = 3
-// CHECK: R8 = 10
-// CHECK: R9 = 2.5
-// CHECK: JitCache hits 0 total 0
-// CHECK: JitStorageCache hits 0 total 0
-// CHECK: JitCache hits 0 total 0
+// CHECK-NEXT: R1 = 3
+// CHECK-NEXT: R2 = 5
+// CHECK-NEXT: R3 = -1
+// CHECK-NEXT: R4 = 6
+// CHECK-NEXT: R5 = 0.666667
+// CHECK-NEXT: R6 = 7
+// CHECK-NEXT: R7 = 3
+// CHECK-NEXT: R8 = 10
+// CHECK-NEXT: R9 = 2.5

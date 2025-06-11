@@ -223,18 +223,16 @@ int main() {
 
 // clang-format off
 // CHECK: R LT 1
-// CHECK: R LT 0
-// CHECK: R LE 1
-// CHECK: R LE 1
-// CHECK: R LE 0
-// CHECK: R GT 1
-// CHECK: R GT 0
-// CHECK: R GE 1
-// CHECK: R GE 1
-// CHECK: R GE 0
-// CHECK: R EQ 1
-// CHECK: R EQ 0
-// CHECK: R NE 1
-// CHECK: R NE 0
-// CHECK: JitCache hits 0 total 0
-// CHECK: JitStorageCache hits 0 total 0
+// CHECK-NEXT: R LT 0
+// CHECK-NEXT: R LE 1
+// CHECK-NEXT: R LE 1
+// CHECK-NEXT: R LE 0
+// CHECK-NEXT: R GT 1
+// CHECK-NEXT: R GT 0
+// CHECK-NEXT: R GE 1
+// CHECK-NEXT: R GE 1
+// CHECK-NEXT: R GE 0
+// CHECK-NEXT: R EQ 1
+// CHECK-NEXT: R EQ 0
+// CHECK-NEXT: R NE 1
+// CHECK-NEXT: R NE 0

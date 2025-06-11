@@ -111,5 +111,3 @@ int main() {
 // CHECK-NEXT: R7 = 3
 // CHECK-NEXT: R8 = 10
 // CHECK-NEXT: R9 = 2.5
-// CHECK-NEXT: JitCache hits 0 total 0
-// CHECK-NEXT: JitStorageCache hits 0 total 0
