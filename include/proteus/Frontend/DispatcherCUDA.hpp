@@ -53,7 +53,7 @@ public:
   }
 
 protected:
-  void *getFunctionAddress(StringRef FnName) override {
+  void *getFunctionAddress(StringRef) override {
     PROTEUS_FATAL_ERROR("CUDA does not support getFunctionAddress");
   }
 

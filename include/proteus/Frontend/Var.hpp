@@ -103,9 +103,8 @@ struct Var {
 
   Var &operator=(const Var &Other);
 
-  template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var &>
-  operator=(const T &ConstValue);
+  template <typename T, typename = std::enable_if<std::is_arithmetic_v<T>>>
+  Var &operator=(const T &ConstValue);
 
   Var &operator[](size_t I);
   Var &operator[](const Var &I);

@@ -1,7 +1,6 @@
 #ifndef PROTEUS_JIT_DEV_HPP
 #define PROTEUS_JIT_DEV_HPP
 
-#include <deque>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
@@ -10,6 +9,8 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/TargetParser/Host.h>
 #include <llvm/TargetParser/Triple.h>
+
+#include <deque>
 
 #include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.hpp"

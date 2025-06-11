@@ -1,10 +1,11 @@
 #ifndef PROTEUS_FRONTEND_TYPEMAP_HPP
 #define PROTEUS_FRONTEND_TYPEMAP_HPP
 
-#include <cstddef>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Type.h>
+
+#include <cstddef>
 
 namespace proteus {
 using namespace llvm;

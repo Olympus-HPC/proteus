@@ -271,9 +271,7 @@ Var &Var::operator=(const Var &Other) {
   return *this;
 }
 
-template <typename T>
-std::enable_if_t<std::is_arithmetic_v<T>, Var &>
-Var::operator=(const T &ConstValue) {
+template <typename T, typename> Var &Var::operator=(const T &ConstValue) {
   Type *LHSType = getValueType();
 
   if (LHSType->isIntegerTy()) {
@@ -558,12 +556,10 @@ Var &powf(const Var &L, const Var &R) {
   auto *ResultType = IRB.getFloatTy();
   Var &ResultVar = Fn.declVarInternal("res.", ResultType);
 
-#if PROTEUS_ENABLE_HIP
-  std::string IntrinsicName = "llvm.pow.f32";
-#elif PROTEUS_ENABLE_CUDA
+#if PROTEUS_ENABLE_CUDA
   std::string IntrinsicName = "__nv_powf";
 #else
-  PROTEUS_FATAL_ERROR("Unsupported target for powf");
+  std::string IntrinsicName = "llvm.pow.f32";
 #endif
 
   FunctionCallee Callee =
@@ -583,12 +579,10 @@ Var &sqrtf(const Var &R) {
   auto *ResultType = IRB.getFloatTy();
   Var &ResultVar = Fn.declVarInternal("res.", ResultType);
 
-#if PROTEUS_ENABLE_HIP
-  std::string IntrinsicName = "llvm.sqrt.f32";
-#elif PROTEUS_ENABLE_CUDA
+#if PROTEUS_ENABLE_CUDA
   std::string IntrinsicName = "__nv_sqrtf";
 #else
-  PROTEUS_FATAL_ERROR("Unsupported target for sqrtf");
+  std::string IntrinsicName = "llvm.sqrt.f32";
 #endif
 
   FunctionCallee Callee =
