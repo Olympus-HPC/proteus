@@ -45,7 +45,7 @@ private:
       return "IF";
     case ScopeKind::LOOP:
       return "LOOP";
-    defaut:
+    default:
       PROTEUS_FATAL_ERROR("Unsupported Kind " +
                           std::to_string(static_cast<int>(Kind)));
     }
@@ -102,10 +102,10 @@ public:
                int Line = __builtin_LINE());
   void endIf();
 
-  void beginLoop(Var &IterVar, Var &InitVar, Var &UpperBound, Var &IncVar,
-                 const char *File = __builtin_FILE(),
-                 int Line = __builtin_LINE());
-  void endLoop();
+  void beginFor(Var &IterVar, Var &InitVar, Var &UpperBound, Var &IncVar,
+                const char *File = __builtin_FILE(),
+                int Line = __builtin_LINE());
+  void endFor();
 
   template <typename RetT, typename... ArgT> void call(StringRef Name);
 

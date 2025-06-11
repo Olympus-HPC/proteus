@@ -363,8 +363,7 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 }
 
 void JitEngineHost::compileOnly(std::unique_ptr<Module> M) {
-  auto TSM = ThreadSafeModule{std::move(M),
-                              std::move(std::make_unique<LLVMContext>())};
+  auto TSM = ThreadSafeModule{std::move(M), std::make_unique<LLVMContext>()};
   // (3) Add modules.
   ExitOnErr(LLJITPtr->addIRModule(std::move(TSM)));
 }

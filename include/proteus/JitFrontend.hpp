@@ -224,7 +224,7 @@ template <typename RetT, typename... ArgT> void Func::call(StringRef Name) {
   LLVMContext &Ctx = F->getContext();
   FunctionCallee Callee = M.getOrInsertFunction(Name, TypeMap<RetT>::get(Ctx),
                                                 TypeMap<ArgT>::get(Ctx)...);
-  auto *Call = IRB.CreateCall(Callee);
+  IRB.CreateCall(Callee);
 }
 
 } // namespace proteus

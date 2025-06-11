@@ -10,7 +10,6 @@ static Var &binOp(const Var &L, const Var &R, IntOp IOp, FPOp FOp) {
   Function *F = Fn.getFunction();
 
   auto &DL = F->getParent()->getDataLayout();
-  auto &Ctx = F->getContext();
   auto &IRB = Fn.getIRB();
   Type *LHSType = L.getValueType();
   Type *RHSType = R.getValueType();
@@ -42,7 +41,6 @@ static Var &cmpOp(const Var &L, const Var &R, IntOp IOp, FPOp FOp) {
   Function *F = Fn.getFunction();
 
   auto &DL = F->getParent()->getDataLayout();
-  auto &Ctx = F->getContext();
   auto &IRB = Fn.getIRB();
   Type *LHSType = L.getValueType();
   Type *RHSType = R.getValueType();
@@ -89,10 +87,13 @@ Type *Var::getValueType() const {
   return AllocaType;
 }
 
+StringRef Var::getName() { return Alloca->getName(); }
+
 bool Var::isPointer() const {
   Type *AllocaType = Alloca->getAllocatedType();
   if (AllocaType->isPointerTy()) {
-    assert(PointerElemType && "Expected pointer type");
+    if (!PointerElemType)
+      PROTEUS_FATAL_ERROR("Expected pointer type");
     return true;
   }
   return false;
@@ -111,7 +112,8 @@ void Var::storeValue(Value *Val) {
 
 void Var::storePointer(Value *Ptr) {
   auto &IRB = Fn.getIRB();
-  assert(isPointer() && "Expected pointer type");
+  if (!isPointer())
+    PROTEUS_FATAL_ERROR("Expected pointer type");
   IRB.CreateStore(Ptr, Alloca);
 }
 
@@ -262,7 +264,6 @@ Var::operator/(const T &ConstValue) const {
 Var &Var::operator=(const Var &Other) {
   auto &IRB = Fn.getIRB();
   Type *LHSType = getValueType();
-  Type *RHSType = Other.getValueType();
 
   Value *RHS = convert(IRB, Other.getValue(), LHSType);
   storeValue(RHS);
@@ -273,8 +274,6 @@ Var &Var::operator=(const Var &Other) {
 template <typename T>
 std::enable_if_t<std::is_arithmetic_v<T>, Var &>
 Var::operator=(const T &ConstValue) {
-  auto &IRB = Fn.getIRB();
-
   Type *LHSType = getValueType();
 
   if (LHSType->isIntegerTy()) {
@@ -427,7 +426,8 @@ Var::operator!=(const T &ConstValue) const {
 Var &Var::operator[](size_t I) {
   auto &IRB = Fn.getIRB();
 
-  assert(isPointer() && "Expected pointer type");
+  if (!isPointer())
+    PROTEUS_FATAL_ERROR("Expected pointer type: Var " + getName());
 
   auto &ResultVar = Fn.declVarInternal("res.", PointerElemType->getPointerTo(),
                                        PointerElemType);
@@ -442,7 +442,8 @@ Var &Var::operator[](size_t I) {
 Var &Var::operator[](const Var &IdxVar) {
   auto &IRB = Fn.getIRB();
 
-  assert(isPointer() && "Expected pointer type");
+  if (!isPointer())
+    PROTEUS_FATAL_ERROR("Expected pointer type");
 
   auto &ResultVar = Fn.declVarInternal("res.", PointerElemType->getPointerTo(),
                                        PointerElemType);
@@ -529,8 +530,6 @@ Value *convert(IRBuilderBase IRB, Value *V, Type *TargetType) {
 
 /// Get the common type following C++ usual arithmetic conversions.
 Type *getCommonType(const DataLayout &DL, Type *T1, Type *T2) {
-  LLVMContext &Ctx = T1->getContext();
-
   // Give priority to floating point types.
   if (T1->isFloatingPointTy() && T2->isIntegerTy()) {
     return T1;
@@ -554,19 +553,18 @@ Type *getCommonType(const DataLayout &DL, Type *T1, Type *T2) {
 Var &powf(const Var &L, const Var &R) {
   auto &Fn = L.Fn;
   auto &M = *Fn.getFunction()->getParent();
-  auto &Ctx = M.getContext();
   auto &IRB = Fn.getIRB();
 
   auto *ResultType = IRB.getFloatTy();
   Var &ResultVar = Fn.declVarInternal("res.", ResultType);
 
-  std::string IntrinsicName;
-  if (ResultType->isFloatTy())
-    IntrinsicName = "llvm.pow.f32";
-  else if (ResultType->isDoubleTy())
-    IntrinsicName = "llvm.pow.f64";
-  else
-    PROTEUS_FATAL_ERROR("Unsupported type");
+#if PROTEUS_ENABLE_HIP
+  std::string IntrinsicName = "llvm.pow.f32";
+#elif PROTEUS_ENABLE_CUDA
+  std::string IntrinsicName = "__nv_powf";
+#else
+  PROTEUS_FATAL_ERROR("Unsupported target for powf");
+#endif
 
   FunctionCallee Callee =
       M.getOrInsertFunction(IntrinsicName, ResultType, ResultType, ResultType);
@@ -580,19 +578,18 @@ Var &powf(const Var &L, const Var &R) {
 Var &sqrtf(const Var &R) {
   auto &Fn = R.Fn;
   auto &M = *Fn.getFunction()->getParent();
-  auto &Ctx = M.getContext();
   auto &IRB = Fn.getIRB();
 
   auto *ResultType = IRB.getFloatTy();
   Var &ResultVar = Fn.declVarInternal("res.", ResultType);
 
-  std::string IntrinsicName;
-  if (ResultType->isFloatTy())
-    IntrinsicName = "llvm.sqrt.f32";
-  else if (ResultType->isDoubleTy())
-    IntrinsicName = "llvm.sqrt.f64";
-  else
-    PROTEUS_FATAL_ERROR("Unsupported type");
+#if PROTEUS_ENABLE_HIP
+  std::string IntrinsicName = "llvm.sqrt.f32";
+#elif PROTEUS_ENABLE_CUDA
+  std::string IntrinsicName = "__nv_sqrtf";
+#else
+  PROTEUS_FATAL_ERROR("Unsupported target for sqrtf");
+#endif
 
   FunctionCallee Callee =
       M.getOrInsertFunction(IntrinsicName, ResultType, ResultType);

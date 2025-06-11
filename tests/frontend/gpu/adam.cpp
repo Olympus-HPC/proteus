@@ -1,29 +1,53 @@
-#include "adam.h"
-#include "proteus/Frontend/Builtins.hpp"
+// NOLINTBEGIN
+
+// RUN: rm -rf .proteus
+// RUN: ./adam.%ext 10000 200 100 | %FILECHECK %s --check-prefixes=CHECK
+// RUN: rm -rf .proteus
+
+#include <proteus/Frontend/Builtins.hpp>
+#include <proteus/JitFrontend.hpp>
+
+#include "../../gpu/gpu_common.h"
+
 #include <chrono>
 #include <iostream>
 #include <math.h>
-#include <proteus/JitFrontend.hpp>
-#include <proteus/Utils.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <hip/hip_runtime.h>
+using namespace proteus;
 
-// NOLINTBEGIN
-template <typename T, typename G>
-#ifdef ENABLE_PROTEUS
-__global__
-    __attribute__((annotate("jit", 5, 6, 7, 8, 9, 10, 11, 13)))
+#if PROTEUS_ENABLE_HIP
+
+#define TARGET "hip"
+#define getThreadIdX builtins::hip::getThreadIdX
+#define getBlockIdX builtins::hip::getBlockIdX
+#define getBlockDimX builtins::hip::getBlockDimX
+#define getGridDimX builtins::hip::getGridDimX
+
+#elif PROTEUS_ENABLE_CUDA
+
+#define TARGET "cuda"
+#define getThreadIdX builtins::cuda::getThreadIdX
+#define getBlockIdX builtins::cuda::getBlockIdX
+#define getBlockDimX builtins::cuda::getBlockDimX
+#define getGridDimX builtins::cuda::getGridDimX
+
 #else
-__global__
+#error "Expected PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA defined"
 #endif
-    void
-    adam(T *__restrict__ p, T *__restrict__ m, T *__restrict__ v,
-         const G *__restrict__ g, const float b1, const float b2,
-         const float eps, const float grad_scale, const float step_size,
-         const int time_step, const size_t vector_size, adamMode_t mode,
-         const float decay) {
+
+typedef enum {
+  ADAM_MODE_0 = 0, // eps under square root
+  ADAM_MODE_1 = 1  // eps outside square root
+} adamMode_t;
+
+template <typename T, typename G>
+__global__ void
+adam(T *__restrict__ p, T *__restrict__ m, T *__restrict__ v,
+     const G *__restrict__ g, const float b1, const float b2, const float eps,
+     const float grad_scale, const float step_size, const int time_step,
+     const size_t vector_size, adamMode_t mode, const float decay) {
   const size_t i = blockIdx.x * blockDim.x + threadIdx.x;
   const size_t totThreads = gridDim.x * blockDim.x;
 
@@ -45,9 +69,8 @@ __global__
   }
 }
 
-using namespace proteus;
 std::unique_ptr<JitModule> createJitModule() {
-  auto J = std::make_unique<JitModule>("hip");
+  auto J = std::make_unique<JitModule>(TARGET);
   auto KernelHandle =
       J->addKernel<float *, float *, float *, float *, float, float, float,
                    float, float, int, size_t, int, float>("adam");
@@ -73,19 +96,17 @@ std::unique_ptr<JitModule> createJitModule() {
   auto &inc1 = F.declVar<int>("inc1");
   F.beginFunction();
   {
-    i = F.callBuiltin(builtins::hip::getBlockIdX) *
-            F.callBuiltin(builtins::hip::getBlockDimX) +
-        F.callBuiltin(builtins::hip::getThreadIdX);
-    totThreads = F.callBuiltin(builtins::hip::getGridDimX) *
-                 F.callBuiltin(builtins::hip::getBlockDimX);
+    i = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +
+        F.callBuiltin(getThreadIdX);
+    totThreads = F.callBuiltin(getGridDimX) * F.callBuiltin(getBlockDimX);
 
-    F.beginLoop(j, i, vector_size, totThreads);
+    F.beginFor(j, i, vector_size, totThreads);
     {
       auto &lim = F.declVar<int>("lim");
       t = 1;
       inc1 = 1;
       lim = time_step + 1;
-      F.beginLoop(t, t, lim, inc1);
+      F.beginFor(t, t, lim, inc1);
       {
         auto &scaled_grad = F.declVar<float>("scale_grad");
         scaled_grad = g[j] / grad_scale;
@@ -112,9 +133,9 @@ std::unique_ptr<JitModule> createJitModule() {
 
         p[j] -= (step_size * update);
       }
-      F.endLoop();
+      F.endFor();
     }
-    F.endLoop();
+    F.endFor();
     F.ret();
   }
   F.endFunction();
@@ -153,17 +174,17 @@ int main(int argc, char *argv[]) {
 
   float *d_m, *d_v, *d_g, *d_p;
 
-  proteusHipErrCheck(hipMalloc((void **)&d_m, size_bytes));
-  proteusHipErrCheck(hipMemcpy(d_m, m, size_bytes, hipMemcpyHostToDevice));
+  gpuErrCheck(gpuMalloc((void **)&d_m, size_bytes));
+  gpuErrCheck(gpuMemcpy(d_m, m, size_bytes, gpuMemcpyHostToDevice));
 
-  proteusHipErrCheck(hipMalloc((void **)&d_v, size_bytes));
-  proteusHipErrCheck(hipMemcpy(d_v, v, size_bytes, hipMemcpyHostToDevice));
+  gpuErrCheck(gpuMalloc((void **)&d_v, size_bytes));
+  gpuErrCheck(gpuMemcpy(d_v, v, size_bytes, gpuMemcpyHostToDevice));
 
-  proteusHipErrCheck(hipMalloc((void **)&d_g, size_bytes));
-  proteusHipErrCheck(hipMemcpy(d_g, g, size_bytes, hipMemcpyHostToDevice));
+  gpuErrCheck(gpuMalloc((void **)&d_g, size_bytes));
+  gpuErrCheck(gpuMemcpy(d_g, g, size_bytes, gpuMemcpyHostToDevice));
 
-  proteusHipErrCheck(hipMalloc((void **)&d_p, size_bytes));
-  proteusHipErrCheck(hipMemcpy(d_p, p, size_bytes, hipMemcpyHostToDevice));
+  gpuErrCheck(gpuMalloc((void **)&d_p, size_bytes));
+  gpuErrCheck(gpuMemcpy(d_p, p, size_bytes, gpuMemcpyHostToDevice));
 
   // Arbitrary constants
   const float step_size = 1e-3f;
@@ -179,13 +200,10 @@ int main(int argc, char *argv[]) {
 
   adamMode_t mode = ADAM_MODE_0;
 
-  proteusHipErrCheck(hipDeviceSynchronize());
+  gpuErrCheck(gpuDeviceSynchronize());
 
   std::cout << "Creating JIT module\n";
   auto J = createJitModule();
-
-  // std::cout << "Printing JIT module\n";
-  // J->print();
 
   std::cout << "Compiling JIT module\n";
   J->compile();
@@ -202,50 +220,29 @@ int main(int argc, char *argv[]) {
     //                                       grad_scale, step_size, time_step,
     //                                       vector_size, mode, decay);
 
-    KernelHandle.launch({grids.x, 1, 1}, {blocks.x, 1, 1}, 0, 0, d_p, d_m, d_v,
-                        d_g, beta1, beta2, eps, grad_scale, step_size,
-                        time_step, vector_size, mode, decay);
+    gpuErrCheck(KernelHandle.launch({grids.x, 1, 1}, {blocks.x, 1, 1}, 0, 0,
+                                    d_p, d_m, d_v, d_g, beta1, beta2, eps,
+                                    grad_scale, step_size, time_step,
+                                    vector_size, mode, decay));
   }
 
-  proteusHipErrCheck(hipDeviceSynchronize());
+  gpuErrCheck(gpuDeviceSynchronize());
   auto end = std::chrono::steady_clock::now();
   auto time =
       std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
   printf("Average kernel execution time %f (ms)\n", time * 1e-6f / repeat);
 
-  proteusHipErrCheck(hipMemcpy(p, d_p, size_bytes, hipMemcpyDeviceToHost));
+  gpuErrCheck(gpuMemcpy(p, d_p, size_bytes, gpuMemcpyDeviceToHost));
 
   for (int j = 0; j < 10; ++j) {
     std::cout << "p[" << j << "] = " << p[j] << "\n";
+    ;
   }
 
-  proteusHipErrCheck(hipFree(d_p));
-  proteusHipErrCheck(hipFree(d_m));
-  proteusHipErrCheck(hipFree(d_v));
-  proteusHipErrCheck(hipFree(d_g));
-
-  // Commenting, already verified
-  //  // verify
-  //  reference<float, float>(
-  //    repeat,
-  //    r, m, v, g,
-  //    beta1, beta2,
-  //    eps,
-  //    grad_scale,
-  //    step_size,
-  //    time_step,
-  //    vector_size,
-  //    mode,
-  //    decay);
-  //
-  //  bool ok = true;
-  //  for (int i = 0; i < vector_size; i++) {
-  //    if (r[i] - p[i] > 1e-3f) {
-  //      ok = false;
-  //      break;
-  //    }
-  //  }
-  //  printf("%s\n", ok ? "PASS" : "FAIL");
+  gpuErrCheck(gpuFree(d_p));
+  gpuErrCheck(gpuFree(d_m));
+  gpuErrCheck(gpuFree(d_v));
+  gpuErrCheck(gpuFree(d_g));
 
   free(p);
   free(m);
@@ -254,5 +251,34 @@ int main(int argc, char *argv[]) {
   free(r);
   return 0;
 }
+
+// clang-format off
+// We got slight differences in the output for the least significant digits.
+// Could be HW, numeric, or the way we handle signedness.
+// CHECK: init p[0] = 0.348563
+// CHECK-NEXT: init p[1] = 0.259322
+// CHECK-NEXT: init p[2] = 0.377145
+// CHECK-NEXT: init p[3] = 0.486632
+// CHECK-NEXT: init p[4] = 0.352038
+// CHECK-NEXT: init p[5] = 0.0784863
+// CHECK-NEXT: init p[6] = 0.968732
+// CHECK-NEXT: init p[7] = 0.852707
+// CHECK-NEXT: init p[8] = 0.153431
+// CHECK-NEXT: init p[9] = 0.559506
+// CHECK-NEXT: Creating JIT module
+// CHECK-NEXT: Compiling JIT module
+// CHECK-NEXT: Average kernel execution time {{.*}} (ms)
+// CHECK-NEXT: p[0] = -0.57293
+// CHECK-NEXT: p[1] = -0.59603
+// CHECK-NEXT: p[2] = -0.592634
+// CHECK-NEXT: p[3] = -0.588154
+// CHECK-NEXT: p[4] = -0.593454
+// CHECK-NEXT: p[5] = -0.59199
+// CHECK-NEXT: p[6] = -0.573486
+// CHECK-NEXT: p[7] = -0.599872
+// CHECK-NEXT: p[8] = -0.58157
+// CHECK-NEXT: p[9] = -0.59015{{[7|8]}}
+// CHECK-NEXT: JitCache hits 0 total 0
+// CHECK-NEXT: JitStorageCache hits 0 total 0
 
 // NOLINTEND

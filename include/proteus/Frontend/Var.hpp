@@ -12,10 +12,12 @@ using namespace llvm;
 
 struct Var {
   AllocaInst *Alloca;
-  Type *PointerElemType;
   Func &Fn;
+  Type *PointerElemType;
 
   Var(AllocaInst *Alloca, Func &Fn, Type *PointerElemType = nullptr);
+
+  StringRef getName();
 
   Value *getValue() const;
   Type *getValueType() const;

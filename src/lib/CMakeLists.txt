@@ -16,7 +16,6 @@ if(PROTEUS_ENABLE_CUDA)
 list(APPEND SOURCES
   CompilerInterfaceDevice.cpp
   JitEngineDeviceCUDA.cpp
-  Frontend/DispatcherCUDA.cpp
 )
 endif()
 
@@ -24,7 +23,6 @@ if(PROTEUS_ENABLE_HIP)
 list(APPEND SOURCES
   CompilerInterfaceDevice.cpp
   JitEngineDeviceHIP.cpp
-  Frontend/DispatcherHIP.cpp
 )
 endif()
 
@@ -49,6 +47,7 @@ if(PROTEUS_ENABLE_HIP)
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_HIP)
 elseif(PROTEUS_ENABLE_CUDA)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_CUDA)
+  target_compile_definitions(proteus PRIVATE LIBDEVICE_BC_PATH="${LIBDEVICE_BC_FILE}")
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_CUDA)
 endif()
 
@@ -144,6 +143,10 @@ endif()
 
 target_link_libraries(proteus PRIVATE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 target_link_libraries(proteusCore INTERFACE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+
+# Consumers need to add rdynamic when linking so that ORC JIT can link JIT
+# modules with exported symbols.
+target_link_options(proteus INTERFACE $<LINK_ONLY:-rdynamic>)
 
 set_target_properties(proteus PROPERTIES
   INSTALL_RPATH_USE_LINK_PATH TRUE

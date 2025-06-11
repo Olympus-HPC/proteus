@@ -32,6 +32,12 @@ struct DispatchResult {
 #if PROTEUS_ENABLE_HIP && __HIP__
   operator hipError_t() const noexcept { return static_cast<hipError_t>(Ret); }
 #endif
+
+#if PROTEUS_ENABLE_CUDA && defined(__CUDACC__)
+  operator cudaError_t() const noexcept {
+    return static_cast<cudaError_t>(Ret);
+  }
+#endif
 };
 
 struct DispatchResult;

@@ -17,9 +17,8 @@ public:
     Jit.compileOnly(std::move(M));
   }
 
-  DispatchResult launch(StringRef KernelName, LaunchDims GridDim,
-                        LaunchDims BlockDim, ArrayRef<void *> KernelArgs,
-                        uint64_t ShmemSize, void *Stream) override {
+  DispatchResult launch(StringRef, LaunchDims, LaunchDims, ArrayRef<void *>,
+                        uint64_t, void *) override {
     PROTEUS_FATAL_ERROR("Host does not support launch");
   }
 

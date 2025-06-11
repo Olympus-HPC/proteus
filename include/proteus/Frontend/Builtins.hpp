@@ -122,11 +122,56 @@ inline Var &getThreadIdX(Func &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  Var &Ret = Fn.declVarInternal("threadid.x", TypeMap<int>::get(Ctx));
+  Var &Ret = Fn.declVarInternal("threadIdx.x", TypeMap<int>::get(Ctx));
 
   auto &IRB = Fn.getIRB();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.nvvm.read.ptx.sreg.tid.x",
                                                 TypeMap<int>::get(Ctx));
+  auto *Call = IRB.CreateCall(Callee);
+  Ret.storeValue(Call);
+
+  return Ret;
+}
+
+inline Var &getBlockIdX(Func &Fn) {
+  auto &Ctx = Fn.getFunction()->getContext();
+  auto &M = *Fn.getFunction()->getParent();
+
+  Var &Ret = Fn.declVarInternal("blockIdx.x", TypeMap<int>::get(Ctx));
+
+  auto &IRB = Fn.getIRB();
+  FunctionCallee Callee = M.getOrInsertFunction(
+      "llvm.nvvm.read.ptx.sreg.ctaid.x", TypeMap<int>::get(Ctx));
+  auto *Call = IRB.CreateCall(Callee);
+  Ret.storeValue(Call);
+
+  return Ret;
+}
+
+inline Var &getBlockDimX(Func &Fn) {
+  auto &Ctx = Fn.getFunction()->getContext();
+  auto &M = *Fn.getFunction()->getParent();
+
+  Var &Ret = Fn.declVarInternal("blockDim.x", TypeMap<int>::get(Ctx));
+
+  auto &IRB = Fn.getIRB();
+  FunctionCallee Callee = M.getOrInsertFunction(
+      "llvm.nvvm.read.ptx.sreg.ntid.x", TypeMap<int>::get(Ctx));
+  auto *Call = IRB.CreateCall(Callee);
+  Ret.storeValue(Call);
+
+  return Ret;
+}
+
+inline Var &getGridDimX(Func &Fn) {
+  auto &Ctx = Fn.getFunction()->getContext();
+  auto &M = *Fn.getFunction()->getParent();
+
+  Var &Ret = Fn.declVarInternal("blockDim.x", TypeMap<int>::get(Ctx));
+
+  auto &IRB = Fn.getIRB();
+  FunctionCallee Callee = M.getOrInsertFunction(
+      "llvm.nvvm.read.ptx.sreg.nctaid.x", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
   Ret.storeValue(Call);
 

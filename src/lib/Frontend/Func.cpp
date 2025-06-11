@@ -4,7 +4,7 @@ namespace proteus {
 
 Func::Func(FunctionCallee FC) : FC(FC), IRB{FC.getCallee()->getContext()} {
   Function *F = cast<Function>(FC.getCallee());
-  BasicBlock *EntryBB = BasicBlock::Create(F->getContext(), "entry", F);
+  BasicBlock::Create(F->getContext(), "entry", F);
   Name = F->getName();
 }
 
@@ -141,8 +141,8 @@ void Func::endIf() {
   IRB.restoreIP(IP);
 }
 
-void Func::beginLoop(Var &IterVar, Var &Init, Var &UpperBound, Var &Inc,
-                     const char *File, int Line) {
+void Func::beginFor(Var &IterVar, Var &Init, Var &UpperBound, Var &Inc,
+                    const char *File, int Line) {
   Function *F = getFunction();
   // Update the terminator of the current basic block due to the split
   // control-flow.
@@ -201,7 +201,7 @@ void Func::beginLoop(Var &IterVar, Var &Init, Var &UpperBound, Var &Inc,
   Scopes.emplace_back(File, Line, ScopeKind::LOOP);
 }
 
-void Func::endLoop() {
+void Func::endFor() {
   Scope S = Scopes.back();
   if (S.Kind != ScopeKind::LOOP)
     PROTEUS_FATAL_ERROR("Syntax error, expected LOOP end scope but "
