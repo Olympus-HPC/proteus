@@ -1,7 +1,7 @@
 function(CREATE_FRONTEND_TEST exe check_source)
     add_executable(${exe} ${check_source} ${ARGN})
 
-    target_link_libraries(${exe} PUBLIC proteus)
+    target_link_libraries(${exe} PUBLIC proteusFrontend)
 
     if(${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "ppc64le")
         set(NATIVE_OPT_FLAGS "-mcpu=native" "-mtune=native")

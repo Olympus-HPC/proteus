@@ -37,6 +37,7 @@ else()
 endif()
 
 add_library(proteusCore INTERFACE)
+add_library(proteusFrontend INTERFACE)
 
 target_compile_definitions(proteus PUBLIC ${LLVM_DEFINITIONS})
 target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
@@ -81,6 +82,7 @@ target_include_directories(proteusCore
 if(PROTEUS_LINK_SHARED_LLVM)
   if(LLVM_LINK_LLVM_DYLIB)
     llvm_config(proteus USE_SHARED)
+    set(libs LLVM)
   else()
     find_library(LLVM_SHARED_LIB
       NAMES LLVM
@@ -142,6 +144,7 @@ if(PROTEUS_ENABLE_CUDA)
 endif()
 
 target_link_libraries(proteus PRIVATE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+target_link_libraries(proteusFrontend INTERFACE proteus ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 target_link_libraries(proteusCore INTERFACE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 
 # Consumers need to add rdynamic when linking so that ORC JIT can link JIT

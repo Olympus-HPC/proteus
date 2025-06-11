@@ -21,7 +21,7 @@ function(CREATE_FRONTEND_TEST_GPU exe check_source)
     endif()
 
     add_executable(${exe}.${lang} ${check_source} ${ARGN})
-    target_link_libraries(${exe}.${lang} PUBLIC proteus)
+    target_link_libraries(${exe}.${lang} PUBLIC proteusFrontend)
     set_source_files_properties(${check_source} ${ARGN} PROPERTIES
         LANGUAGE ${lang}
     )
