@@ -23,17 +23,18 @@ private:
   IRBuilderBase::InsertPoint IP;
   std::deque<Var> Arguments;
   std::deque<Var> Variables;
-  std::vector<IRBuilderBase::InsertPoint> ContIPs;
   std::string Name;
 
-  enum class ScopeKind { FUNCTION, IF, LOOP };
+  enum class ScopeKind { FUNCTION, IF, FOR };
   struct Scope {
     std::string File;
     int Line;
     ScopeKind Kind;
+    IRBuilderBase::InsertPoint ContIP;
 
-    explicit Scope(const char *File, int Line, ScopeKind Kind)
-        : File(File), Line(Line), Kind(Kind) {}
+    explicit Scope(const char *File, int Line, ScopeKind Kind,
+                   IRBuilderBase::InsertPoint ContIP)
+        : File(File), Line(Line), Kind(Kind), ContIP(ContIP) {}
   };
   std::vector<Scope> Scopes;
 
@@ -43,8 +44,8 @@ private:
       return "FUNCTION";
     case ScopeKind::IF:
       return "IF";
-    case ScopeKind::LOOP:
-      return "LOOP";
+    case ScopeKind::FOR:
+      return "FOR";
     default:
       PROTEUS_FATAL_ERROR("Unsupported Kind " +
                           std::to_string(static_cast<int>(Kind)));

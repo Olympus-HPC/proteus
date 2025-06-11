@@ -38,10 +38,14 @@ void Func::beginFunction(const char *File, int Line) {
   IP = IRBuilderBase::InsertPoint(BodyBB, BodyBB->begin());
   IRB.restoreIP(IP);
 
-  Scopes.emplace_back(File, Line, ScopeKind::FUNCTION);
+  Scopes.emplace_back(File, Line, ScopeKind::FUNCTION,
+                      IRBuilderBase::InsertPoint(ExitBB, ExitBB->begin()));
 }
 
 void Func::endFunction() {
+  if (Scopes.empty())
+    PROTEUS_FATAL_ERROR("Expected FUNCTION scope");
+
   Scope S = Scopes.back();
   if (S.Kind != ScopeKind::FUNCTION)
     PROTEUS_FATAL_ERROR("Syntax error, expected FUNCTION end scope but found "
@@ -49,8 +53,6 @@ void Func::endFunction() {
                         toString(S.Kind) + " @ " + S.File + ":" +
                         std::to_string(S.Line));
   Scopes.pop_back();
-
-  ContIPs.pop_back();
 }
 
 Function *Func::getFunction() {
@@ -99,6 +101,9 @@ void Func::beginIf(Var &CondVar, const char *File, int Line) {
   BasicBlock *NextBlock =
       CurBlock->splitBasicBlock(IP.getPoint(), CurBlock->getName() + ".split");
 
+  auto ContIP = IRBuilderBase::InsertPoint(NextBlock, NextBlock->begin());
+  Scopes.emplace_back(File, Line, ScopeKind::IF, ContIP);
+
   BasicBlock *ThenBlock =
       BasicBlock::Create(F->getContext(), "if.then", F, NextBlock);
   BasicBlock *ExitBlock =
@@ -120,14 +125,11 @@ void Func::beginIf(Var &CondVar, const char *File, int Line) {
 
   IP = IRBuilderBase::InsertPoint(ThenBlock, ThenBlock->begin());
   IRB.restoreIP(IP);
-
-  auto ContIP = IRBuilderBase::InsertPoint(NextBlock, NextBlock->begin());
-  ContIPs.push_back(ContIP);
-
-  Scopes.emplace_back(File, Line, ScopeKind::IF);
 }
 
 void Func::endIf() {
+  if (Scopes.empty())
+    PROTEUS_FATAL_ERROR("Expected IF scope");
   Scope S = Scopes.back();
   if (S.Kind != ScopeKind::IF)
     PROTEUS_FATAL_ERROR("Syntax error, expected IF end scope but "
@@ -135,9 +137,9 @@ void Func::endIf() {
                         toString(S.Kind) + " @ " + S.File + ":" +
                         std::to_string(S.Line));
 
+  IP = S.ContIP;
   Scopes.pop_back();
-  IP = ContIPs.back();
-  ContIPs.pop_back();
+
   IRB.restoreIP(IP);
 }
 
@@ -151,7 +153,7 @@ void Func::beginFor(Var &IterVar, Var &Init, Var &UpperBound, Var &Inc,
       CurBlock->splitBasicBlock(IP.getPoint(), CurBlock->getName() + ".split");
 
   auto ContIP = IRBuilderBase::InsertPoint(NextBlock, NextBlock->begin());
-  ContIPs.push_back(ContIP);
+  Scopes.emplace_back(File, Line, ScopeKind::FOR, ContIP);
 
   BasicBlock *Header =
       BasicBlock::Create(F->getContext(), "loop.header", F, NextBlock);
@@ -197,21 +199,22 @@ void Func::beginFor(Var &IterVar, Var &Init, Var &UpperBound, Var &Inc,
 
   IP = IRBuilderBase::InsertPoint(Body, Body->begin());
   IRB.restoreIP(IP);
-
-  Scopes.emplace_back(File, Line, ScopeKind::LOOP);
 }
 
 void Func::endFor() {
+  if (Scopes.empty())
+    PROTEUS_FATAL_ERROR("Expected FOR scope");
+
   Scope S = Scopes.back();
-  if (S.Kind != ScopeKind::LOOP)
-    PROTEUS_FATAL_ERROR("Syntax error, expected LOOP end scope but "
+  if (S.Kind != ScopeKind::FOR)
+    PROTEUS_FATAL_ERROR("Syntax error, expected FOR end scope but "
                         "found unterminated scope " +
                         toString(S.Kind) + " @ " + S.File + ":" +
                         std::to_string(S.Line));
 
+  IP = S.ContIP;
   Scopes.pop_back();
-  IP = ContIPs.back();
-  ContIPs.pop_back();
+
   IRB.restoreIP(IP);
 }
 
