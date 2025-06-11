@@ -17,7 +17,7 @@ function(CREATE_FRONTEND_TEST exe check_source)
 
     # Consumers need to add rdynamic when linking so that ORC JIT can link JIT
     # modules with exported symbols.
-    target_link_options(proteus INTERFACE $<LINK_ONLY:-rdynamic>)
+    target_link_options(${exe} PRIVATE $<LINK_ONLY:-rdynamic>)
 
     add_test(NAME ${exe} COMMAND ${LIT} -vv -D FILECHECK=${FILECHECK} ${check_source})
     set_property(TEST ${exe} PROPERTY LABELS "frontend-cpu")
