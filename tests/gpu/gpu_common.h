@@ -17,7 +17,9 @@
 #define gpuMemcpy cudaMemcpy
 #define gpuMemcpyHostToDevice cudaMemcpyHostToDevice
 #elif PROTEUS_ENABLE_HIP
+// NOLINTBEGIN
 #include <hip/hip_runtime.h>
+// NOLINTEND
 #define gpuError_t hipError_t
 #define gpuStream_t hipStream_t
 #define gpuSuccess hipSuccess
