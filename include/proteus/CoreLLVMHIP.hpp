@@ -142,8 +142,8 @@ inline void setLaunchBoundsForKernel(Function &F, int MaxThreadsPerBlock,
 
 inline std::unique_ptr<MemoryBuffer>
 codegenObject(Module &M, StringRef DeviceArch,
-              SmallPtrSetImpl<void *> &GlobalLinkedBinaries,
-              bool UseRTC = true) {
+              SmallPtrSetImpl<void *> &GlobalLinkedBinaries, bool UseRTC = true,
+              unsigned OptLevel = 3) {
   assert(GlobalLinkedBinaries.empty() &&
          "Expected empty linked binaries for HIP");
   if (UseRTC) {
@@ -185,7 +185,8 @@ codegenObject(Module &M, StringRef DeviceArch,
   }
 
 #if LLVM_VERSION_MAJOR == 18
-  auto TMExpected = proteus::detail::createTargetMachine(M, DeviceArch);
+  auto TMExpected =
+      proteus::detail::createTargetMachine(M, DeviceArch, OptLevel);
   if (!TMExpected)
     PROTEUS_FATAL_ERROR(toString(TMExpected.takeError()));
 

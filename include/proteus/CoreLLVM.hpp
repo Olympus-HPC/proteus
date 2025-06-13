@@ -83,7 +83,7 @@ createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3) {
 }
 
 inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
-                                        char OptLevel = '3',
+                                        StringRef OptLevel = "default<O3>",
                                         unsigned CodegenOptLevel = 3) {
   PipelineTuningOptions PTO;
 
@@ -108,30 +108,8 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
   OptimizationLevel OptSetting;
-  switch (OptLevel) {
-  case '0':
-    OptSetting = OptimizationLevel::O0;
-    break;
-  case '1':
-    OptSetting = OptimizationLevel::O1;
-    break;
-  case '2':
-    OptSetting = OptimizationLevel::O2;
-    break;
-  case '3':
-    OptSetting = OptimizationLevel::O3;
-    break;
-  case 's':
-    OptSetting = OptimizationLevel::Os;
-    break;
-  case 'z':
-    OptSetting = OptimizationLevel::Oz;
-    break;
-  default:
-    PROTEUS_FATAL_ERROR("Unsupported optimization level " + OptLevel);
-  };
-
-  ModulePassManager Passes = PB.buildPerModuleDefaultPipeline(OptSetting);
+  ModulePassManager Passes;
+  Error Err = PB.parsePassPipeline(Passes, OptLevel);
   Passes.run(M, MAM);
 }
 
@@ -211,7 +189,7 @@ inline void getRuntimeConstantValues(void **Args,
   }
 }
 
-inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
+inline void optimizeIR(Module &M, StringRef Arch, StringRef OptLevel,
                        unsigned CodegenOptLevel) {
   detail::runOptimizationPassPipeline(M, Arch, OptLevel, CodegenOptLevel);
 }

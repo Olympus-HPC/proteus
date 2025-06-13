@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
   auto Mod = std::move(ModuleOrErr.get());
   proteus::pruneIR(*Mod);
   proteus::internalize(*Mod, KernelSym);
-  proteus::optimizeIR(*Mod, DeviceArch, '1', 1);
+  proteus::optimizeIR(*Mod, DeviceArch, "default<O1>", 1);
   auto DeviceObject =
       proteus::codegenObject(*Mod, DeviceArch, GlobalLinkedBinaries);
   if (!DeviceObject)

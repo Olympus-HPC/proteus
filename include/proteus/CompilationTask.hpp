@@ -103,10 +103,10 @@ public:
     // optimization pipeline to optimize the LLVM IR before handing over
     // to codegen.
 #if PROTEUS_ENABLE_CUDA
-    optimizeIR(*M, DeviceArch, '3', 3);
+    optimizeIR(*M, DeviceArch, "default<O3>", 3);
 #elif PROTEUS_ENABLE_HIP
     if (!UseRTC)
-      optimizeIR(*M, DeviceArch, '3', 3);
+      optimizeIR(*M, DeviceArch, "default<O3>", 3);
 #else
 #error "JitEngineDevice requires PROTEUS_ENABLE_CUDA or PROTEUS_ENABLE_HIP"
 #endif

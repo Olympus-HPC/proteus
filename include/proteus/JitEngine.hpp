@@ -44,7 +44,7 @@ inline int getEnvOrDefaultInt(const char *VarName, int Default) {
 class JitEngine {
 public:
   InitLLVMTargets Init;
-  void optimizeIR(Module &M, StringRef Arch, char OptLevel = '3',
+  void optimizeIR(Module &M, StringRef Arch, StringRef OptLevel = "default<O3>",
                   unsigned CodegenOptLevel = 3);
 
   bool isProteusDisabled() { return Config.PROTEUS_DISABLE; }

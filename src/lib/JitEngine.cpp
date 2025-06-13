@@ -67,7 +67,7 @@ std::string JitEngine::mangleSuffix(HashT &HashValue) {
   return "$jit$" + HashValue.toString() + "$";
 }
 
-void JitEngine::optimizeIR(Module &M, StringRef Arch, char OptLevel,
+void JitEngine::optimizeIR(Module &M, StringRef Arch, StringRef OptLevel,
                            unsigned CodegenOptLevel) {
   TIMESCOPE("Optimize IR");
   proteus::optimizeIR(M, Arch, OptLevel, CodegenOptLevel);
