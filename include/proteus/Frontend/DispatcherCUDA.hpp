@@ -27,12 +27,6 @@ public:
     Library = Jit.compileOnly(*M);
     if (!Library)
       PROTEUS_FATAL_ERROR("Expected non-null object library");
-
-    {
-      std::error_code EC;
-      raw_fd_ostream OS{"object.o", EC};
-      OS << Library->getBuffer();
-    }
   }
 
   DispatchResult launch(StringRef KernelName, LaunchDims GridDim,
