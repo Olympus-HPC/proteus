@@ -181,10 +181,10 @@ public:
     IsCompiled = true;
   }
 
-  template <typename Ret, typename... ArgT> Ret run(Func &F, ArgT &&...Args) {
+  template <typename Ret, typename... ArgT> Ret run(Func &F, ArgT... Args) {
     if (!IsCompiled)
       PROTEUS_FATAL_ERROR("Expected compiled JIT module");
-    return Dispatch.run<Ret>(F.getName(), std::forward<ArgT>(Args)...);
+    return Dispatch.run<Ret>(F.getName(), Args...);
   }
 
   template <typename... ArgT>
