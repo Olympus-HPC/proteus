@@ -54,11 +54,11 @@ public:
                                 void *Stream) = 0;
 
   template <typename Ret, typename... ArgT>
-  Ret run(StringRef FuncName, ArgT &&...Args) {
+  Ret run(StringRef FuncName, ArgT... Args) {
     void *Addr = getFunctionAddress(FuncName);
     using FnPtr = Ret (*)(ArgT...);
     auto Fn = reinterpret_cast<FnPtr>(Addr);
-    return Fn(std::forward<ArgT>(Args)...);
+    return Fn(Args...);
   }
 
 protected:
