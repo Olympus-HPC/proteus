@@ -30,6 +30,16 @@ extern "C" void __jit_disable_device();
 
 namespace proteus {
 
+template <typename T> static __attribute__((noinline)) T jit_arg(T v) {
+  return v;
+}
+#if defined(__CUDACC__) || defined(__HIP__)
+template <typename T>
+static __attribute__((noinline)) __device__ T jit_arg(T v) {
+  return v;
+}
+#endif
+
 template <typename T>
 static __attribute__((noinline)) T jit_variable(T v, int pos = -1) {
   RuntimeConstant RC;
