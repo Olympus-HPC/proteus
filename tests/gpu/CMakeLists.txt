@@ -43,6 +43,16 @@ function(CREATE_GPU_TEST_RDC exe check_source)
         OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/src/pass/ProteusPass.cpp
     )
     add_dependencies(${exe}.${lang}.rdc ProteusPass)
+    # We introduce a build dependency between the same non-RDC and RDC tests to
+    # avoid collisions with parallel builds, in case the test uses the
+    # project::jit_arg API. Both tests will create the same manifest JSON file
+    # because its uniqueness depends on the source file, which is common for
+    # both instances of the test.  The ProteusPass deletes the manifest file
+    # after parsing it and if builds collide the compilation of one of the tests
+    # may miss its manifest and mis-compile.
+    if(TARGET ${exe}.${lang})
+        add_dependencies(${exe}.${lang}.rdc ${exe}.${lang})
+    endif()
 
     target_link_libraries(${exe}.${lang}.rdc PUBLIC proteus)
 
