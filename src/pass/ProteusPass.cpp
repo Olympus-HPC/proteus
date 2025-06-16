@@ -562,7 +562,7 @@ private:
     // annotations.
     SmallPtrSet<Function *, 32> JitArgAnnotations;
     for (auto &F : M.getFunctionList()) {
-      std::string DemangledName = demangle(F.getName());
+      std::string DemangledName = demangle(F.getName().str());
       if (StringRef{DemangledName}.contains("proteus::jit_arg"))
         JitArgAnnotations.insert(&F);
     }
