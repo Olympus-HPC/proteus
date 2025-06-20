@@ -22,8 +22,6 @@ private:
   std::string Suffix;
   dim3 BlockDim;
   dim3 GridDim;
-  SmallVector<int32_t> RCIndices;
-  ArrayRef<int32_t> RCTypes;
   SmallVector<RuntimeConstant> RCVec;
   SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo;
   std::unordered_map<std::string, const void *> VarNameToDevPtr;
@@ -49,7 +47,6 @@ public:
   CompilationTask(
       MemoryBufferRef Bitcode, HashT HashValue, const std::string &KernelName,
       std::string &Suffix, dim3 BlockDim, dim3 GridDim,
-      const SmallVector<int32_t> &RCIndices, ArrayRef<int32_t> RCTypes,
       const SmallVector<RuntimeConstant> &RCVec,
       const SmallVector<std::pair<std::string, StringRef>> &LambdaCalleeInfo,
       const std::unordered_map<std::string, const void *> &VarNameToDevPtr,
@@ -58,8 +55,7 @@ public:
       bool RelinkGlobalsByCopy, bool SpecializeArgs, bool SpecializeDims,
       bool SpecializeLaunchBounds)
       : Bitcode(Bitcode), HashValue(HashValue), KernelName(KernelName),
-        Suffix(Suffix), BlockDim(BlockDim), GridDim(GridDim),
-        RCIndices(RCIndices), RCTypes(RCTypes), RCVec(RCVec),
+        Suffix(Suffix), BlockDim(BlockDim), GridDim(GridDim), RCVec(RCVec),
         LambdaCalleeInfo(LambdaCalleeInfo), VarNameToDevPtr(VarNameToDevPtr),
         GlobalLinkedBinaries(GlobalLinkedBinaries), DeviceArch(DeviceArch),
         CGOption(CGOption), DumpIR(DumpIR),
@@ -87,9 +83,9 @@ public:
 
     std::string KernelMangled = (KernelName + Suffix);
 
-    proteus::specializeIR(*M, KernelName, Suffix, BlockDim, GridDim, RCIndices,
-                          RCTypes, RCVec, LambdaCalleeInfo, SpecializeArgs,
-                          SpecializeDims, SpecializeLaunchBounds);
+    proteus::specializeIR(*M, KernelName, Suffix, BlockDim, GridDim, RCVec,
+                          LambdaCalleeInfo, SpecializeArgs, SpecializeDims,
+                          SpecializeLaunchBounds);
 
     replaceGlobalVariablesWithPointers(*M, VarNameToDevPtr);
 

@@ -188,8 +188,7 @@ class JITKernelInfo {
   std::optional<void *> Kernel;
   std::unique_ptr<LLVMContext> Ctx;
   std::string Name;
-  SmallVector<int32_t> RCTypes;
-  SmallVector<int32_t> RCIndices;
+  ArrayRef<RuntimeConstantInfo *> RCInfoArray;
   std::optional<std::unique_ptr<Module>> ExtractedModule;
   std::optional<std::unique_ptr<MemoryBuffer>> Bitcode;
   std::optional<std::reference_wrapper<BinaryInfo>> BinInfo;
@@ -199,11 +198,10 @@ class JITKernelInfo {
 
 public:
   JITKernelInfo(void *Kernel, BinaryInfo &BinInfo, char const *Name,
-                int32_t *RCIndices, int32_t *RCTypes, int32_t NumRCs)
+                ArrayRef<RuntimeConstantInfo *> RCInfoArray)
       : Kernel(Kernel), Ctx(std::make_unique<LLVMContext>()), Name(Name),
-        RCTypes{ArrayRef{RCTypes, static_cast<size_t>(NumRCs)}},
-        RCIndices{ArrayRef{RCIndices, static_cast<size_t>(NumRCs)}},
-        ExtractedModule(std::nullopt), Bitcode{std::nullopt}, BinInfo(BinInfo),
+        RCInfoArray(RCInfoArray), ExtractedModule(std::nullopt),
+        Bitcode{std::nullopt}, BinInfo(BinInfo),
         LambdaCalleeInfo(std::nullopt) {}
 
   JITKernelInfo() = default;
@@ -213,8 +211,7 @@ public:
   }
   std::unique_ptr<LLVMContext> &getLLVMContext() { return Ctx; }
   const std::string &getName() const { return Name; }
-  const auto &getRCIndices() const { return RCIndices; }
-  const auto &getRCTypes() const { return RCTypes; }
+  ArrayRef<RuntimeConstantInfo *> getRCInfoArray() const { return RCInfoArray; }
   bool hasModule() const { return ExtractedModule.has_value(); }
   Module &getModule() const { return *ExtractedModule->get(); }
   BinaryInfo &getBinaryInfo() const { return BinInfo.value(); }
@@ -427,7 +424,7 @@ public:
                          const char *ModuleId);
   void registerFatBinaryEnd();
   void registerFunction(void *Handle, void *Kernel, char *KernelName,
-                        int32_t *RCIndices, int32_t *RCTypes, int32_t NumRCs);
+                        ArrayRef<RuntimeConstantInfo *> RCInfoArray);
 
   void *CurHandle = nullptr;
   std::unordered_map<std::string, FatbinWrapperT *> ModuleIdToFatBinary;
@@ -580,11 +577,10 @@ JitEngineDevice<ImplT>::compileAndRun(
     }
   });
 
-  SmallVector<RuntimeConstant> RCVec;
-  SmallVector<RuntimeConstant> LambdaJitValuesVec;
+  SmallVector<RuntimeConstant> RCVec =
+      getRuntimeConstantValues(KernelArgs, KernelInfo.getRCInfoArray());
 
-  getRuntimeConstantValues(KernelArgs, KernelInfo.getRCIndices(),
-                           KernelInfo.getRCTypes(), RCVec);
+  SmallVector<RuntimeConstant> LambdaJitValuesVec;
   getLambdaJitValues(KernelInfo, LambdaJitValuesVec);
 
   HashT HashValue =
@@ -641,8 +637,7 @@ JitEngineDevice<ImplT>::compileAndRun(
 
       Compiler.compile(CompilationTask{
           KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
-          GridDim, KernelInfo.getRCIndices(), KernelInfo.getRCTypes(), RCVec,
-          KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr,
+          GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr,
           GlobalLinkedBinaries, DeviceArch,
           /* CGOption */ Config::get().ProteusCodegen,
           /* DumpIR */ Config::get().ProteusDumpLLVMIR,
@@ -666,9 +661,8 @@ JitEngineDevice<ImplT>::compileAndRun(
     // Process through synchronous compilation.
     ObjBuf = CompilerSync::instance().compile(CompilationTask{
         KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
-        GridDim, KernelInfo.getRCIndices(), KernelInfo.getRCTypes(), RCVec,
-        KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr, GlobalLinkedBinaries,
-        DeviceArch,
+        GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr,
+        GlobalLinkedBinaries, DeviceArch,
         /* CGOption */ Config::get().ProteusCodegen,
         /* DumpIR */ Config::get().ProteusDumpLLVMIR,
         /* RelinkGlobalsByCopy */ Config::get().ProteusRelinkGlobalsByCopy,
@@ -735,11 +729,9 @@ template <typename ImplT> void JitEngineDevice<ImplT>::registerFatBinaryEnd() {
 }
 
 template <typename ImplT>
-void JitEngineDevice<ImplT>::registerFunction(void *Handle, void *Kernel,
-                                              char *KernelName,
-                                              int32_t *RCIndices,
-                                              int32_t *RCTypes,
-                                              int32_t NumRCs) {
+void JitEngineDevice<ImplT>::registerFunction(
+    void *Handle, void *Kernel, char *KernelName,
+    ArrayRef<RuntimeConstantInfo *> RCInfoArray) {
   PROTEUS_DBG(Logger::logs("proteus") << "Register function " << Kernel
                                       << " To Handle " << Handle << "\n");
   // NOTE: HIP RDC might call multiple times the registerFunction for the same
@@ -759,7 +751,7 @@ void JitEngineDevice<ImplT>::registerFunction(void *Handle, void *Kernel,
   BinaryInfo &BinInfo = HandleToBinaryInfo[Handle];
 
   JITKernelInfoMap[Kernel] =
-      JITKernelInfo{Kernel, BinInfo, KernelName, RCIndices, RCTypes, NumRCs};
+      JITKernelInfo{Kernel, BinInfo, KernelName, RCInfoArray};
 }
 
 template <typename ImplT>

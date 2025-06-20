@@ -25,44 +25,42 @@ using namespace llvm;
 class TransformArgumentSpecialization {
 public:
   static void transform(Module &M, Function &F,
-                        const SmallVectorImpl<int32_t> &ArgPos,
-                        ArrayRef<int32_t> RCTypes,
-                        ArrayRef<RuntimeConstant> RC) {
+                        ArrayRef<RuntimeConstant> RCArray) {
     auto &Ctx = M.getContext();
 
     // Replace argument uses with runtime constants.
-    for (size_t I = 0; I < ArgPos.size(); ++I) {
-      int ArgNo = ArgPos[I];
+    for (const auto &RC : RCArray) {
+      int ArgNo = RC.Pos;
       Value *Arg = F.getArg(ArgNo);
       Type *ArgType = Arg->getType();
       Constant *C = nullptr;
+
       if (ArgType->isIntegerTy(1)) {
-        C = ConstantInt::get(ArgType, RC[I].Value.BoolVal);
+        C = ConstantInt::get(ArgType, RC.Value.BoolVal);
       } else if (ArgType->isIntegerTy(8)) {
-        C = ConstantInt::get(ArgType, RC[I].Value.Int8Val);
+        C = ConstantInt::get(ArgType, RC.Value.Int8Val);
       } else if (ArgType->isIntegerTy(32)) {
         // Logger::logs("proteus") << "RC is Int32\n";
-        C = ConstantInt::get(ArgType, RC[I].Value.Int32Val);
+        C = ConstantInt::get(ArgType, RC.Value.Int32Val);
       } else if (ArgType->isIntegerTy(64)) {
         // Logger::logs("proteus") << "RC is Int64\n";
-        C = ConstantInt::get(ArgType, RC[I].Value.Int64Val);
+        C = ConstantInt::get(ArgType, RC.Value.Int64Val);
       } else if (ArgType->isFloatTy()) {
         // Logger::logs("proteus") << "RC is Float\n";
-        C = ConstantFP::get(ArgType, RC[I].Value.FloatVal);
+        C = ConstantFP::get(ArgType, RC.Value.FloatVal);
       } else if (ArgType->isDoubleTy()) {
         // NOTE: long double on device should correspond to plain double.
         // XXX: CUDA with a long double SILENTLY fails to create a working
         // kernel in AOT compilation, with or without JIT.
-        if (RCTypes[I] == LONG_DOUBLE)
-          C = ConstantFP::get(ArgType, RC[I].Value.LongDoubleVal);
+        if (RC.Type == RuntimeConstantType::LONG_DOUBLE)
+          C = ConstantFP::get(ArgType, RC.Value.LongDoubleVal);
         else
-          C = ConstantFP::get(ArgType, RC[I].Value.DoubleVal);
+          C = ConstantFP::get(ArgType, RC.Value.DoubleVal);
       } else if (ArgType->isX86_FP80Ty() || ArgType->isPPC_FP128Ty() ||
                  ArgType->isFP128Ty()) {
-        C = ConstantFP::get(ArgType, RC[I].Value.LongDoubleVal);
+        C = ConstantFP::get(ArgType, RC.Value.LongDoubleVal);
       } else if (ArgType->isPointerTy()) {
-        auto *IntC =
-            ConstantInt::get(Type::getInt64Ty(Ctx), RC[I].Value.Int64Val);
+        auto *IntC = ConstantInt::get(Type::getInt64Ty(Ctx), RC.Value.Int64Val);
         C = ConstantExpr::getIntToPtr(IntC, ArgType);
       } else {
         std::string TypeString;

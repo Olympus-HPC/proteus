@@ -256,8 +256,7 @@ inline void relinkGlobalsObject(
 
 inline void specializeIR(
     Module &M, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
-    dim3 &GridDim, const SmallVector<int32_t> &RCIndices,
-    ArrayRef<int32_t> RCTypes, const SmallVector<RuntimeConstant> &RCVec,
+    dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
     const SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo,
     bool SpecializeArgs, bool SpecializeDims, bool SpecializeLaunchBounds) {
   Timer T;
@@ -266,8 +265,7 @@ inline void specializeIR(
   assert(F && "Expected non-null function!");
   // Replace argument uses with runtime constants.
   if (SpecializeArgs)
-    TransformArgumentSpecialization::transform(M, *F, RCIndices, RCTypes,
-                                               RCVec);
+    TransformArgumentSpecialization::transform(M, *F, RCArray);
 
   auto &LR = LambdaRegistry::instance();
   for (auto &[FnName, LambdaType] : LambdaCalleeInfo) {
