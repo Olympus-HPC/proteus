@@ -53,7 +53,7 @@ inline HashT hashArrayRefElement(const RuntimeConstant &RC) {
       StringRef{reinterpret_cast<const char *>(&RC.Value), sizeof(RC.Value)});
 }
 
-inline HashT hashValue(const ArrayRef<RuntimeConstant> &Arr) {
+inline HashT hashValue(ArrayRef<RuntimeConstant> Arr) {
   if (Arr.empty())
     return 0;
 

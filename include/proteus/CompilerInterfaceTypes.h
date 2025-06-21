@@ -16,7 +16,7 @@
 
 namespace proteus {
 
-enum RuntimeConstantTypes : int32_t {
+enum RuntimeConstantType : int32_t {
   BOOL = 1,
   INT8,
   INT32,
@@ -27,9 +27,16 @@ enum RuntimeConstantTypes : int32_t {
   PTR
 };
 
+struct RuntimeConstantInfo {
+  RuntimeConstantType Type;
+  int32_t Pos;
+
+  explicit RuntimeConstantInfo(RuntimeConstantType Type, int32_t Pos)
+      : Type(Type), Pos(Pos) {}
+};
+
 struct RuntimeConstant {
-  RuntimeConstant() { std::memset(&Value, 0, sizeof(RuntimeConstantType)); }
-  using RuntimeConstantType = union {
+  using RuntimeConstantValue = union {
     bool BoolVal;
     int8_t Int8Val;
     int32_t Int32Val;
@@ -37,11 +44,27 @@ struct RuntimeConstant {
     float FloatVal;
     double DoubleVal;
     long double LongDoubleVal;
-    // TODO: This allows pointer as runtime constant values. How useful is that?
+    // TODO: This allows pointer as runtime constant values. How useful is
+    // that?
     void *PtrVal;
   };
-  RuntimeConstantType Value;
+  RuntimeConstantValue Value;
+  RuntimeConstantType Type;
+  int32_t Pos;
   int32_t Slot{-1};
+
+  explicit RuntimeConstant(RuntimeConstantType Type, int32_t Pos)
+      : Type(Type), Pos(Pos) {
+    std::memset(&Value, 0, sizeof(RuntimeConstantValue));
+  }
+  explicit RuntimeConstant() {
+    std::memset(&Value, 0, sizeof(RuntimeConstantValue));
+  }
+
+  RuntimeConstant(const RuntimeConstant &) = default;
+  RuntimeConstant(RuntimeConstant &&) = default;
+  RuntimeConstant &operator=(const RuntimeConstant &) = default;
+  RuntimeConstant &operator=(RuntimeConstant &&) = default;
 };
 
 } // namespace proteus

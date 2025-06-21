@@ -117,6 +117,7 @@ public:
   ProteusJitPassImpl(Module &M) {
     PtrTy = PointerType::getUnqual(M.getContext());
     VoidTy = Type::getVoidTy(M.getContext());
+    Int1Ty = Type::getInt1Ty(M.getContext());
     Int8Ty = Type::getInt8Ty(M.getContext());
     Int32Ty = Type::getInt32Ty(M.getContext());
     Int64Ty = Type::getInt64Ty(M.getContext());
@@ -202,6 +203,7 @@ public:
 private:
   Type *PtrTy = nullptr;
   Type *VoidTy = nullptr;
+  Type *Int1Ty = nullptr;
   Type *Int8Ty = nullptr;
   Type *Int32Ty = nullptr;
   Type *Int64Ty = nullptr;
@@ -733,23 +735,23 @@ private:
     Passes.run(M, MAM);
   }
 
-  RuntimeConstantTypes convertTypeToRuntimeConstantType(Type *Ty) {
+  RuntimeConstantType convertTypeToRuntimeConstantType(Type *Ty) {
     if (Ty->isIntegerTy(1))
-      return RuntimeConstantTypes::BOOL;
+      return RuntimeConstantType::BOOL;
     if (Ty->isIntegerTy(8))
-      return RuntimeConstantTypes::INT8;
+      return RuntimeConstantType::INT8;
     if (Ty->isIntegerTy(32))
-      return RuntimeConstantTypes::INT32;
+      return RuntimeConstantType::INT32;
     if (Ty->isIntegerTy(64))
-      return RuntimeConstantTypes::INT64;
+      return RuntimeConstantType::INT64;
     if (Ty->isFloatTy())
-      return RuntimeConstantTypes::FLOAT;
+      return RuntimeConstantType::FLOAT;
     if (Ty->isDoubleTy())
-      return RuntimeConstantTypes::DOUBLE;
+      return RuntimeConstantType::DOUBLE;
     if (Ty->isFP128Ty() || Ty->isPPC_FP128Ty() || Ty->isX86_FP80Ty())
-      return RuntimeConstantTypes::LONG_DOUBLE;
+      return RuntimeConstantType::LONG_DOUBLE;
     if (Ty->isPointerTy())
-      return RuntimeConstantTypes::PTR;
+      return RuntimeConstantType::PTR;
 
     std::string TypeString;
     raw_string_ostream TypeOstream(TypeString);
@@ -1094,17 +1096,24 @@ private:
     //             char *IR,
     //             int IRSize,
     //             void **Args,
-    //             int32_t *RCIndices,
-    //             int32_t *RCTypes,
+    //             RuntimeConstantInfo **RCInfoArrayPtr,
     //             int32_t NumRCs)
 
-    FunctionType *JitEntryFnTy = FunctionType::get(
-        PtrTy, {PtrTy, PtrTy, Int32Ty, PtrTy, PtrTy, PtrTy, Int32Ty},
-        /* isVarArg=*/false);
+    FunctionType *JitEntryFnTy =
+        FunctionType::get(PtrTy, {PtrTy, PtrTy, Int32Ty, PtrTy, PtrTy, Int32Ty},
+                          /* isVarArg=*/false);
     FunctionCallee JitEntryFn =
         M.getOrInsertFunction("__jit_entry", JitEntryFnTy);
 
     return JitEntryFn;
+  }
+
+  FunctionCallee getProteusCreateRuntimeConstantInfoFn(Module &M) {
+    // RuntimeConstantInfo *__proteus_create_runtime_constant_info(
+    //             RuntimeConstantType Type (int32_t),
+    //             int32_t Pos)
+    return M.getOrInsertFunction("__proteus_create_runtime_constant_info",
+                                 PtrTy, Int32Ty, Int32Ty);
   }
 
   void emitJitEntryCall(Module &M,
@@ -1128,43 +1137,56 @@ private:
 
     // Replace the body of the jit'ed function to call the jit entry, grab the
     // address of the specialized jit version and execute it.
-    IRBuilder<> Builder(BasicBlock::Create(M.getContext(), "entry", StubFn));
+    auto &Ctx = M.getContext();
+    IRBuilder<> Builder(BasicBlock::Create(Ctx, "entry", StubFn));
+    BasicBlock *InitBlock =
+        BasicBlock::Create(Ctx, "init_rtconst_info", StubFn);
+    BasicBlock *ContinueBlock = BasicBlock::Create(Ctx, "continue", StubFn);
 
-    // Create the runtime constant array type for the indices and types of
-    // runtime constant info passed to the jit entry function.
-    ArrayType *RuntimeConstantArrayInfoTy =
-        ArrayType::get(Int32Ty, NumRuntimeConstants);
+    // Create a static flag to track if we've initialized the constants
+    GlobalVariable *RCInfoInitialized = new GlobalVariable(
+        M, Int1Ty, false, GlobalValue::InternalLinkage,
+        ConstantInt::getFalse(Ctx), ".proteus.rtconst.info.inited." + FnName);
 
-    SmallVector<Constant *> RCIndices;
-    SmallVector<Constant *> RCTypes;
-    for (int ArgNo : JFI.ConstantArgs) {
-      Constant *ArgNoConstant = ConstantInt::get(Int32Ty, ArgNo);
-      RCIndices.push_back(ArgNoConstant);
+    // Create a static global array to store the runtime constant pointers.
+    ArrayType *RuntimeConstantInfoPtrArrayTy =
+        ArrayType::get(PtrTy, JFI.ConstantArgs.size());
+    GlobalVariable *RuntimeConstantInfoPtrArray = new GlobalVariable(
+        M, RuntimeConstantInfoPtrArrayTy, false, GlobalValue::InternalLinkage,
+        ConstantAggregateZero::get(RuntimeConstantInfoPtrArrayTy),
+        ".proteus.rtconst.array." + FnName);
 
+    Builder.CreateCondBr(Builder.CreateLoad(Int1Ty, RCInfoInitialized),
+                         ContinueBlock, InitBlock);
+
+    // Initialize rt constants block.
+    Builder.SetInsertPoint(InitBlock);
+
+    for (size_t I = 0; I < NumRuntimeConstants; ++I) {
+      int32_t ArgNo = JFI.ConstantArgs[I];
       int32_t TypeId =
           convertTypeToRuntimeConstantType(StubFn->getArg(ArgNo)->getType());
-      Constant *TypeIdConstant = ConstantInt::get(Int32Ty, TypeId);
-      RCTypes.push_back(TypeIdConstant);
-    }
-    Constant *RCIndicesConstant =
-        ConstantArray::get(RuntimeConstantArrayInfoTy, RCIndices);
-    Constant *RCTypesConstant =
-        ConstantArray::get(RuntimeConstantArrayInfoTy, RCTypes);
 
-    // Create globals for the function name, string, RC indices and types.
-    // entry.
+      FunctionCallee CreateFn = getProteusCreateRuntimeConstantInfoFn(M);
+      Constant *ArgNoC = ConstantInt::get(Int32Ty, ArgNo);
+      Constant *TypeIdC = ConstantInt::get(Int32Ty, TypeId);
+      Value *RCInfoPtr = Builder.CreateCall(CreateFn, {TypeIdC, ArgNoC});
+      Value *GEP = Builder.CreateGEP(
+          RuntimeConstantInfoPtrArrayTy, RuntimeConstantInfoPtrArray,
+          {ConstantInt::get(Int32Ty, 0), ConstantInt::get(Int32Ty, I)});
+      Builder.CreateStore(RCInfoPtr, GEP);
+    }
+    // Mark runtime constants info as initialized.
+    Builder.CreateStore(ConstantInt::getTrue(Ctx), RCInfoInitialized);
+    // Branch to continue block.
+    Builder.CreateBr(ContinueBlock);
+
+    Builder.SetInsertPoint(ContinueBlock);
+
+    // Create globals for the function name, the IR string.
     auto *FnNameGlobal = Builder.CreateGlobalString(StubFn->getName());
     auto *StrIRGlobal = Builder.CreateGlobalString(JFI.ModuleIR);
-    auto *RCIndicesGV = new GlobalVariable(
-        M, RuntimeConstantArrayInfoTy, /*isConstant=*/true,
-        GlobalVariable::PrivateLinkage,
-        /*Initializer=*/RCIndicesConstant, ".proteus.indices");
-    auto *RCTypesGV =
-        new GlobalVariable(M, RuntimeConstantArrayInfoTy, /*isConstant=*/true,
-                           GlobalVariable::PrivateLinkage,
-                           /*Initializer=*/RCTypesConstant, ".proteus.types");
 
-    // Create the runtime constants args pointer array.
     ArrayType *ArgPtrsTy = ArrayType::get(PtrTy, StubFn->arg_size());
     Value *ArgPtrs = nullptr;
     if (NumRuntimeConstants > 0) {
@@ -1188,7 +1210,7 @@ private:
     auto *JitFnPtr =
         Builder.CreateCall(JitEntryFn, {FnNameGlobal, StrIRGlobal,
                                         Builder.getInt32(JFI.ModuleIR.size()),
-                                        ArgPtrs, RCIndicesGV, RCTypesGV,
+                                        ArgPtrs, RuntimeConstantInfoPtrArray,
                                         Builder.getInt32(NumRuntimeConstants)});
     SmallVector<Value *, 8> Args;
     for (auto &Arg : StubFn->args())
@@ -1542,11 +1564,10 @@ private:
     // __jit_register_function(void *Handle,
     //                         void *Kernel,
     //                         char const *KernelName,
-    //                         int32_t *RCIndices,
-    //                         int32_t *RCTypes,
+    //                         RuntimeConstantInfo **RCInfoArrayPtr,
     //                         int32_t NumRCs)
     FunctionType *JitRegisterFunctionFnTy =
-        FunctionType::get(VoidTy, {PtrTy, PtrTy, PtrTy, PtrTy, PtrTy, Int32Ty},
+        FunctionType::get(VoidTy, {PtrTy, PtrTy, PtrTy, PtrTy, Int32Ty},
                           /* isVarArg=*/false);
     FunctionCallee JitRegisterKernelFn = M.getOrInsertFunction(
         "__jit_register_function", JitRegisterFunctionFnTy);
@@ -1587,60 +1608,42 @@ private:
             << "Instrumenting JIT function " << *FunctionToRegister << "\n");
       const auto &JFI = JitFunctionInfoMap[FunctionToRegister];
       size_t NumRuntimeConstants = JFI.ConstantArgs.size();
-      // Create jit entry runtime function.
 
       // Both RCIndices and RCIndices have the same array type.
-      ArrayType *RuntimeConstantArrayTy =
-          ArrayType::get(Int32Ty, NumRuntimeConstants);
+      ArrayType *RuntimeConstantInfoPtrArrayTy =
+          ArrayType::get(PtrTy, NumRuntimeConstants);
+
+      GlobalVariable *RuntimeConstantInfoPtrArray = new GlobalVariable(
+          M, RuntimeConstantInfoPtrArrayTy, false, GlobalValue::InternalLinkage,
+          ConstantAggregateZero::get(RuntimeConstantInfoPtrArrayTy),
+          ".proteus.rtconst.array." + FunctionToRegister->getName());
 
       IRBuilder<> Builder(RegisterCB->getNextNode());
-      // Create an array representing the indices of the args which are runtime
-      // constants.
-      Value *RuntimeConstantsIndicesAlloca =
-          Builder.CreateAlloca(RuntimeConstantArrayTy);
-      assert(RuntimeConstantsIndicesAlloca &&
-             "Expected non-null runtime constants alloca");
-      // Zero-initialize the alloca to avoid stack garbage for caching.
-      Builder.CreateStore(Constant::getNullValue(RuntimeConstantArrayTy),
-                          RuntimeConstantsIndicesAlloca);
-
-      // Create an array for the types of runtime constant arguments.
-      Value *RuntimeConstantsTypesAlloca =
-          Builder.CreateAlloca(RuntimeConstantArrayTy);
-      assert(RuntimeConstantsTypesAlloca &&
-             "Expected non-null runtime constants alloca");
-      // Zero-initialize the alloca.
-      Builder.CreateStore(Constant::getNullValue(RuntimeConstantArrayTy),
-                          RuntimeConstantsTypesAlloca);
-
-      int GEPIdx = 0;
-      for (int ArgNo : JFI.ConstantArgs) {
-        auto *GEP = Builder.CreateInBoundsGEP(
-            RuntimeConstantArrayTy, RuntimeConstantsIndicesAlloca,
-            {Builder.getInt32(0), Builder.getInt32(GEPIdx)});
-        Value *Idx = ConstantInt::get(Builder.getInt32Ty(), ArgNo);
-        Builder.CreateStore(Idx, GEP);
-
-        auto *GEPType = Builder.CreateInBoundsGEP(
-            RuntimeConstantArrayTy, RuntimeConstantsTypesAlloca,
-            {Builder.getInt32(0), Builder.getInt32(GEPIdx)});
+      for (size_t I = 0; I < NumRuntimeConstants; ++I) {
+        int32_t ArgNo = JFI.ConstantArgs[I];
         int32_t TypeId = convertTypeToRuntimeConstantType(
             FunctionToRegister->getArg(ArgNo)->getType());
-        Value *TypeVal = ConstantInt::get(Builder.getInt32Ty(), TypeId);
-        Builder.CreateStore(TypeVal, GEPType);
 
-        GEPIdx++;
+        FunctionCallee CreateFn = getProteusCreateRuntimeConstantInfoFn(M);
+        Constant *ArgNoC = ConstantInt::get(Int32Ty, ArgNo);
+        Constant *TypeIdC = ConstantInt::get(Int32Ty, TypeId);
+        Value *RCPtr = Builder.CreateCall(CreateFn, {TypeIdC, ArgNoC});
+        Value *GEP = Builder.CreateGEP(
+            RuntimeConstantInfoPtrArrayTy, RuntimeConstantInfoPtrArray,
+            {ConstantInt::get(Int32Ty, 0), ConstantInt::get(Int32Ty, I)});
+        Builder.CreateStore(RCPtr, GEP);
       }
+
       Value *NumRCsValue =
           ConstantInt::get(Builder.getInt32Ty(), NumRuntimeConstants);
 
       FunctionCallee JitRegisterFunction = getJitRegisterFunctionFn(M);
 
-      Builder.CreateCall(
-          JitRegisterFunction,
-          {RegisterCB->getArgOperand(0), RegisterCB->getArgOperand(1),
-           RegisterCB->getArgOperand(2), RuntimeConstantsIndicesAlloca,
-           RuntimeConstantsTypesAlloca, NumRCsValue});
+      Builder.CreateCall(JitRegisterFunction,
+                         {RegisterCB->getArgOperand(0),
+                          RegisterCB->getArgOperand(1),
+                          RegisterCB->getArgOperand(2),
+                          RuntimeConstantInfoPtrArray, NumRCsValue});
     }
   }
 

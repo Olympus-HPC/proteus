@@ -43,10 +43,9 @@ public:
   void disable() { Config::get().ProteusDisable = true; }
 
 protected:
-  void getRuntimeConstantValues(void **KernelArgs,
-                                const ArrayRef<int32_t> RCIndices,
-                                const ArrayRef<int32_t> RCTypes,
-                                SmallVector<RuntimeConstant> &RCVec);
+  SmallVector<RuntimeConstant>
+  getRuntimeConstantValues(void **KernelArgs,
+                           ArrayRef<RuntimeConstantInfo *> RCInfoArray);
 
   JitEngine();
 

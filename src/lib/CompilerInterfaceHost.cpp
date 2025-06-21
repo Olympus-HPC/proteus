@@ -17,12 +17,13 @@ using namespace proteus;
 using namespace llvm;
 
 extern "C" __attribute__((used)) void *
-__jit_entry(char *FnName, char *IR, int IRSize, void **Args, int32_t *RCIndices,
-            int32_t *RCTypes, int NumRuntimeConstants) {
+__jit_entry(char *FnName, char *IR, int IRSize, void **Args,
+            RuntimeConstantInfo **RCInfoArrayPtr, int NumRuntimeConstants) {
   TIMESCOPE("__jit_entry");
   JitEngineHost &Jit = JitEngineHost::instance();
-  void *JitFnPtr = Jit.compileAndLink(FnName, IR, IRSize, Args, RCIndices,
-                                      RCTypes, NumRuntimeConstants);
+  ArrayRef<RuntimeConstantInfo *> RCInfoArray{
+      RCInfoArrayPtr, static_cast<size_t>(NumRuntimeConstants)};
+  void *JitFnPtr = Jit.compileAndLink(FnName, IR, IRSize, Args, RCInfoArray);
 
   return JitFnPtr;
 }
