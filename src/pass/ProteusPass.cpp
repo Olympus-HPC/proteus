@@ -468,8 +468,8 @@ private:
     return NewAnnotation;
   }
 
-  /// If V ultimately came from a store of an argument into an alloca, return
-  /// that argument, otherwise return nullptr.
+  /// If V ultimately came from a store of an argument into an alloca or
+  /// addrspacecast, return that argument, otherwise return nullptr.
   Argument *getOriginatingArgument(Value *V) {
     // Strip intermittent casts.
     auto StripAllCasts = [](Value *V) {
@@ -492,19 +492,22 @@ private:
     if (!LI)
       return nullptr;
 
-    auto *AI = dyn_cast<AllocaInst>(LI->getPointerOperand());
-    if (!AI)
-      return nullptr;
-
-    for (auto *U : AI->users()) {
+    StoreInst *SingleStore = nullptr;
+    Value *LoadSource = LI->getPointerOperand();
+    for (auto *U : LoadSource->users()) {
       auto *SI = dyn_cast<StoreInst>(U);
-      if (!SI || SI->getPointerOperand() != AI)
+      if (!SI || SI->getPointerOperand() != LoadSource)
         continue;
 
-      Value *Val = StripAllCasts(SI->getValueOperand());
-      if (auto *Arg = dyn_cast<Argument>(Val))
-        return Arg;
+      if (SingleStore != nullptr)
+        PROTEUS_FATAL_ERROR("Expected single store");
+
+      SingleStore = SI;
     }
+
+    Value *Val = StripAllCasts(SingleStore->getValueOperand());
+    if (auto *Arg = dyn_cast<Argument>(Val))
+      return Arg;
 
     return nullptr;
   }
@@ -514,11 +517,17 @@ private:
     // Iterate over all proteus::jit_arg annotations and store the information
     // in the JitArgs map.
     DenseMap<Function *, SmallSetVector<int, 16>> JitArgs;
+    SmallVector<CallBase *> CallsToDelete;
     for (Function *AnnotationF : JitArgAnnotations) {
       for (User *Usr : AnnotationF->users()) {
         CallBase *CB = dyn_cast<CallBase>(Usr);
         if (!CB)
           continue;
+
+        if (CB->getNumUses() != 0)
+          PROTEUS_FATAL_ERROR("Expected zero uses of the annotation function");
+
+        CallsToDelete.push_back(CB);
 
         Function *JitFunction = CB->getFunction();
         assert(CB->arg_size() == 1 && "Expected single argument");
@@ -536,6 +545,20 @@ private:
                               std::to_string(Arg->getArgNo()));
       }
     }
+
+    // Remove JitArg annotations and their calls as they are not needed anymore.
+    // Also removing them avoids errors with LTO and O0 compilation: LTO will
+    // find those annotations and attempt to create a manifest which will cause
+    // an error since it is not backed by a source filename.
+    for (CallBase *CB : CallsToDelete)
+      CB->eraseFromParent();
+
+    for (Function *AnnotationF : JitArgAnnotations)
+      AnnotationF->eraseFromParent();
+
+    if (verifyModule(M, &errs()))
+      PROTEUS_FATAL_ERROR("Broken JIT module found, compilation aborted!");
+
     // Sort argument numbers for determinism.
     SmallVector<Constant *> NewJitAnnotations;
     for (auto &[F, ConstantArgs] : JitArgs) {
