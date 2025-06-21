@@ -8,6 +8,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+// NOLINTBEGIN(readability-identifier-naming)
+
 #ifndef PROTEUS_JIT_INTERFACE_HPP
 #define PROTEUS_JIT_INTERFACE_HPP
 
@@ -30,14 +32,10 @@ extern "C" void __jit_disable_device();
 
 namespace proteus {
 
-template <typename T> static __attribute__((noinline)) T jit_arg(T V) {
-  return V;
-}
+template <typename T> __attribute__((noinline)) void jit_arg(T V) noexcept;
 #if defined(__CUDACC__) || defined(__HIP__)
 template <typename T>
-static __attribute__((noinline)) __device__ T jit_arg(T V) {
-  return V;
-}
+__attribute__((noinline)) __device__ void jit_arg(T V) noexcept;
 #endif
 
 template <typename T>
@@ -94,3 +92,5 @@ inline void finalize() {
 } // namespace proteus
 
 #endif
+
+// NOLINTBEGIN(readability-identifier-naming)
