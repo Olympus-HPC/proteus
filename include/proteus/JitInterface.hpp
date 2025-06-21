@@ -93,4 +93,4 @@ inline void finalize() {
 
 #endif
 
-// NOLINTBEGIN(readability-identifier-naming)
+// NOLINTEND(readability-identifier-naming)
