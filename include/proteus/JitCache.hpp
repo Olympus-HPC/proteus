@@ -47,7 +47,7 @@ public:
 
   void insert(HashT &HashValue, Function_t FunctionPtr,
               [[maybe_unused]] StringRef FnName,
-              [[maybe_unused]] ArrayRef<RuntimeConstant> RCArr) {
+              [[maybe_unused]] ArrayRef<RuntimeConstant> RCArray) {
 #if PROTEUS_ENABLE_DEBUG
     if (CacheMap.count(HashValue))
       PROTEUS_FATAL_ERROR("JitCache collision detected");
@@ -60,7 +60,7 @@ public:
 
 #if PROTEUS_ENABLE_DEBUG
     CacheEntry.FnName = FnName.str();
-    CacheEntry.RCVector = SmallVector<RuntimeConstant>{RCArr};
+    CacheEntry.RCVector = SmallVector<RuntimeConstant>{RCArray};
 #endif
   }
 

@@ -3,6 +3,7 @@
 # globals in the target application.
 set(SOURCES
   CompilerInterfaceHost.cpp
+  CompilerInterfaceRuntimeConstantInfo.cpp
   JitEngine.cpp
   JitEngineHost.cpp
   Frontend/Func.cpp
