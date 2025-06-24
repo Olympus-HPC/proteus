@@ -1,8 +1,9 @@
 function(CREATE_CPU_TEST exe check_source)
     add_executable(${exe} ${check_source} ${ARGN})
 
+    get_target_property(PROTEUS_PASS_SOURCES ProteusPass SOURCES)
     set_source_files_properties(${check_source} PROPERTIES
-        OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/src/pass/ProteusPass.cpp
+        OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES}"
     )
     add_dependencies(${exe} ProteusPass)
 
@@ -43,6 +44,8 @@ config.substitutions.append(('%FILECHECK', FILECHECK))
 
 CREATE_CPU_TEST(daxpy daxpy.cpp)
 CREATE_CPU_TEST(daxpy_api daxpy_api.cpp)
+CREATE_CPU_TEST(daxpy_annot_long daxpy_annot_long.cpp)
+CREATE_CPU_TEST(daxpy_annot_mix daxpy_annot_mix.cpp)
 CREATE_CPU_TEST(types types.cpp)
 CREATE_CPU_TEST(types_api types_api.cpp)
 CREATE_CPU_TEST(lambda lambda.cpp)

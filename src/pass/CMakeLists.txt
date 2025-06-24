@@ -20,8 +20,15 @@ else()
   -Wl,-Bsymbolic)
 endif()
 
+# We use the full path because we query those source files to make them
+# dependencies for building tests.
+set(PROTEUS_PASS_SOURCES
+  ${PROJECT_SOURCE_DIR}/src/pass/AnnotationHandler.cpp
+  ${PROJECT_SOURCE_DIR}/src/pass/ProteusPass.cpp
+)
+
 add_library(ProteusPass SHARED
-  ProteusPass.cpp
+  ${PROTEUS_PASS_SOURCES}
 )
 
 target_include_directories(ProteusPass

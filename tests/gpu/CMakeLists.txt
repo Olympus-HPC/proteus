@@ -9,9 +9,10 @@ function(CREATE_GPU_TEST exe check_source)
     endif()
 
     add_executable(${exe}.${lang} ${check_source} ${ARGN})
+    get_target_property(PROTEUS_PASS_SOURCES ProteusPass SOURCES)
     set_source_files_properties(${check_source} ${ARGN} PROPERTIES
         LANGUAGE ${lang}
-        OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/src/pass/ProteusPass.cpp
+        OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES}"
     )
     add_dependencies(${exe}.${lang} ProteusPass)
 
@@ -38,9 +39,10 @@ function(CREATE_GPU_TEST_RDC exe check_source)
     endif()
 
     add_executable(${exe}.${lang}.rdc ${check_source} ${ARGN})
+    get_target_property(PROTEUS_PASS_SOURCES ProteusPass SOURCES)
     set_source_files_properties(${check_source} ${ARGN} PROPERTIES
         LANGUAGE ${lang}
-        OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/src/pass/ProteusPass.cpp
+        OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES}"
     )
     add_dependencies(${exe}.${lang}.rdc ProteusPass)
     # We introduce a build dependency between the same non-RDC and RDC tests to
@@ -165,9 +167,10 @@ function(CREATE_PROTEUS_GPU_LIBRARY lib source)
     add_library(${lib} ${source} ${ARGN})
 
     set_source_files_properties(${source} ${ARGN} PROPERTIES LANGUAGE ${lang})
+    get_target_property(PROTEUS_PASS_SOURCES ProteusPass SOURCES)
     set_source_files_properties(${source} ${ARGN} PROPERTIES
         LANGUAGE ${lang}
-        OBJECT_DEPENDS ${PROJECT_SOURCE_DIR}/src/pass/ProteusPass.cpp
+        OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES}"
     )
     add_dependencies(${lib} ProteusPass)
     target_link_libraries(${lib} PUBLIC proteus)
@@ -233,6 +236,8 @@ CREATE_GPU_TEST(kernel kernel.cpp)
 CREATE_GPU_TEST(kernel_cache kernel_cache.cpp)
 CREATE_GPU_TEST(kernel_args kernel_args.cpp)
 CREATE_GPU_TEST(kernel_args_api kernel_args_api.cpp)
+CREATE_GPU_TEST(kernel_args_annot_long kernel_args_annot_long.cpp)
+CREATE_GPU_TEST(kernel_args_annot_mix kernel_args_annot_mix.cpp)
 CREATE_GPU_TEST(kernels_gvar kernels_gvar.cpp)
 CREATE_GPU_TEST(kernel_launches kernel_launches.cpp)
 CREATE_GPU_TEST(kernel_launches_args kernel_launches_args.cpp)
@@ -285,6 +290,8 @@ CREATE_GPU_TEST_RDC(kernel kernel.cpp)
 CREATE_GPU_TEST_RDC(kernel_cache kernel_cache.cpp)
 CREATE_GPU_TEST_RDC(kernel_args kernel_args.cpp)
 CREATE_GPU_TEST_RDC(kernel_args_api kernel_args_api.cpp)
+CREATE_GPU_TEST_RDC(kernel_args_annot_long kernel_args_annot_long.cpp)
+CREATE_GPU_TEST_RDC(kernel_args_annot_mix kernel_args_annot_mix.cpp)
 CREATE_GPU_TEST_RDC(kernels_gvar kernels_gvar.cpp)
 CREATE_GPU_TEST_RDC(kernel_launches kernel_launches.cpp)
 CREATE_GPU_TEST_RDC(kernel_launches_args kernel_launches_args.cpp)
