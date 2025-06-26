@@ -77,6 +77,7 @@
 #include "proteus/Error.h"
 #include "proteus/Hashing.hpp"
 #include "proteus/Logger.hpp"
+#include "proteus/RuntimeConstantTypeHelpers.h"
 
 #include "AnnotationHandler.h"
 #include "Helpers.h"
@@ -202,30 +203,6 @@ private:
     ModulePassManager Passes =
         PB.buildPerModuleDefaultPipeline(OptimizationLevel::O3);
     Passes.run(M, MAM);
-  }
-
-  RuntimeConstantType convertTypeToRuntimeConstantType(Type *Ty) {
-    if (Ty->isIntegerTy(1))
-      return RuntimeConstantType::BOOL;
-    if (Ty->isIntegerTy(8))
-      return RuntimeConstantType::INT8;
-    if (Ty->isIntegerTy(32))
-      return RuntimeConstantType::INT32;
-    if (Ty->isIntegerTy(64))
-      return RuntimeConstantType::INT64;
-    if (Ty->isFloatTy())
-      return RuntimeConstantType::FLOAT;
-    if (Ty->isDoubleTy())
-      return RuntimeConstantType::DOUBLE;
-    if (Ty->isFP128Ty() || Ty->isPPC_FP128Ty() || Ty->isX86_FP80Ty())
-      return RuntimeConstantType::LONG_DOUBLE;
-    if (Ty->isPointerTy())
-      return RuntimeConstantType::PTR;
-
-    std::string TypeString;
-    raw_string_ostream TypeOstream(TypeString);
-    Ty->print(TypeOstream);
-    PROTEUS_FATAL_ERROR("Unknown Type " + TypeOstream.str());
   }
 
   void emitJitModuleHost(Module &M,
@@ -550,9 +527,9 @@ private:
                                   Function &JitF) {
     LLVMContext &Ctx = JitMod.getContext();
     SmallVector<Metadata *> ConstArgNos;
-    for (int ArgNo : JFI.ConstantArgs) {
-      Metadata *Meta =
-          ConstantAsMetadata::get(ConstantInt::get(Types.Int32Ty, ArgNo));
+    for (auto &RCI : JFI.ConstantArgs) {
+      Metadata *Meta = ConstantAsMetadata::get(
+          ConstantInt::get(Types.Int32Ty, RCI.ArgInfo.Pos));
       ConstArgNos.push_back(Meta);
     }
     MDNode *Node = MDNode::get(Ctx, ConstArgNos);
@@ -579,12 +556,122 @@ private:
     return JitEntryFn;
   }
 
-  FunctionCallee getProteusCreateRuntimeConstantInfoFn(Module &M) {
+  FunctionCallee getProteusCreateRuntimeConstantInfoScalarFn(Module &M) {
     // RuntimeConstantInfo *__proteus_create_runtime_constant_info(
     //             RuntimeConstantType Type (int32_t),
     //             int32_t Pos)
-    return M.getOrInsertFunction("__proteus_create_runtime_constant_info",
-                                 Types.PtrTy, Types.Int32Ty, Types.Int32Ty);
+    return M.getOrInsertFunction(
+        "__proteus_create_runtime_constant_info_scalar", Types.PtrTy,
+        Types.Int32Ty, Types.Int32Ty);
+  }
+
+  FunctionCallee
+  getProteusCreateRuntimeConstantInfoArrayConstSizeFn(Module &M) {
+    // RuntimeConstantInfo *__proteus_create_runtime_constant_info(
+    //             RuntimeConstantType Type (int32_t),
+    //             int32_t Pos,
+    //             int32_t NumElts,
+    //             RuntimeConstantType EltType (int32_t))
+    return M.getOrInsertFunction(
+        "__proteus_create_runtime_constant_info_array_const_size", Types.PtrTy,
+        Types.Int32Ty, Types.Int32Ty, Types.Int32Ty, Types.Int32Ty);
+  }
+
+  FunctionCallee
+  getProteusCreateRuntimeConstantInfoArrayRunConstSizeFn(Module &M) {
+    // RuntimeConstantInfo *__proteus_create_runtime_constant_info(
+    //             RuntimeConstantType Type (int32_t),
+    //             int32_t Pos,
+    //             RuntimeConstantType EltType (int32_t),
+    //             RuntimeConstantType NumEltsType (int32_t),
+    //             int32_t NumEltsPos)
+    return M.getOrInsertFunction(
+        "__proteus_create_runtime_constant_info_array_runconst_size",
+        Types.PtrTy, Types.Int32Ty, Types.Int32Ty, Types.Int32Ty, Types.Int32Ty,
+        Types.Int32Ty);
+  }
+
+  void emitRuntimeConstantInfoScalar(
+      Module &M, const RuntimeConstantInfo &RCInfo, IRBuilderBase &Builder,
+      ArrayType *RuntimeConstantInfoPtrArrayTy,
+      GlobalVariable *RuntimeConstantInfoPtrArray, size_t Idx) {
+    FunctionCallee CreateFn = getProteusCreateRuntimeConstantInfoScalarFn(M);
+    Constant *TypeIdC = ConstantInt::get(Types.Int32Ty, RCInfo.ArgInfo.Type);
+    Constant *ArgNoC = ConstantInt::get(Types.Int32Ty, RCInfo.ArgInfo.Pos);
+    Value *RCInfoPtr = Builder.CreateCall(CreateFn, {TypeIdC, ArgNoC});
+    Value *GEP = Builder.CreateGEP(RuntimeConstantInfoPtrArrayTy,
+                                   RuntimeConstantInfoPtrArray,
+                                   {ConstantInt::get(Types.Int32Ty, 0),
+                                    ConstantInt::get(Types.Int32Ty, Idx)});
+    Builder.CreateStore(RCInfoPtr, GEP);
+  }
+
+  void emitRuntimeConstantInfoArrayConstSize(
+      Module &M, const RuntimeConstantInfo &RCInfo, IRBuilderBase &Builder,
+      ArrayType *RuntimeConstantInfoPtrArrayTy,
+      GlobalVariable *RuntimeConstantInfoPtrArray, size_t Idx) {
+    FunctionCallee CreateFn =
+        getProteusCreateRuntimeConstantInfoArrayConstSizeFn(M);
+    Constant *TypeIdC = ConstantInt::get(Types.Int32Ty, RCInfo.ArgInfo.Type);
+    Constant *ArgNoC = ConstantInt::get(Types.Int32Ty, RCInfo.ArgInfo.Pos);
+    Constant *NumEltsC =
+        ConstantInt::get(Types.Int32Ty, RCInfo.OptArrInfo->NumElts);
+    Constant *EltTypeC =
+        ConstantInt::get(Types.Int32Ty, RCInfo.OptArrInfo->EltType);
+    Value *RCInfoPtr = Builder.CreateCall(CreateFn, {
+                                                        TypeIdC,
+                                                        ArgNoC,
+                                                        NumEltsC,
+                                                        EltTypeC,
+                                                    });
+    Value *GEP = Builder.CreateGEP(RuntimeConstantInfoPtrArrayTy,
+                                   RuntimeConstantInfoPtrArray,
+                                   {ConstantInt::get(Types.Int32Ty, 0),
+                                    ConstantInt::get(Types.Int32Ty, Idx)});
+    Builder.CreateStore(RCInfoPtr, GEP);
+  }
+
+  void emitRuntimeConstantInfoArrayRunConstSize(
+      Module &M, const RuntimeConstantInfo &RCInfo, IRBuilderBase &Builder,
+      ArrayType *RuntimeConstantInfoPtrArrayTy,
+      GlobalVariable *RuntimeConstantInfoPtrArray, size_t Idx) {
+    FunctionCallee CreateFn =
+        getProteusCreateRuntimeConstantInfoArrayRunConstSizeFn(M);
+    Constant *TypeIdC = ConstantInt::get(Types.Int32Ty, RCInfo.ArgInfo.Type);
+    Constant *ArgNoC = ConstantInt::get(Types.Int32Ty, RCInfo.ArgInfo.Pos);
+    Constant *EltTypeC =
+        ConstantInt::get(Types.Int32Ty, RCInfo.OptArrInfo->EltType);
+    Constant *NumEltsTypeC = ConstantInt::get(
+        Types.Int32Ty, RCInfo.OptArrInfo->OptNumEltsRCInfo->Type);
+    Constant *NumEltsPosC = ConstantInt::get(
+        Types.Int32Ty, RCInfo.OptArrInfo->OptNumEltsRCInfo->Pos);
+    Value *RCInfoPtr = Builder.CreateCall(
+        CreateFn, {TypeIdC, ArgNoC, EltTypeC, NumEltsTypeC, NumEltsPosC});
+    Value *GEP = Builder.CreateGEP(RuntimeConstantInfoPtrArrayTy,
+                                   RuntimeConstantInfoPtrArray,
+                                   {ConstantInt::get(Types.Int32Ty, 0),
+                                    ConstantInt::get(Types.Int32Ty, Idx)});
+    Builder.CreateStore(RCInfoPtr, GEP);
+  }
+
+  void emitRuntimeConstantInfoArray(Module &M,
+                                    const RuntimeConstantInfo &RCInfo,
+                                    IRBuilderBase &Builder,
+                                    ArrayType *RuntimeConstantInfoPtrArrayTy,
+                                    GlobalVariable *RuntimeConstantInfoPtrArray,
+                                    size_t Idx) {
+    if (!RCInfo.OptArrInfo)
+      PROTEUS_FATAL_ERROR("Expected array info");
+
+    if (RCInfo.OptArrInfo->OptNumEltsRCInfo) {
+      emitRuntimeConstantInfoArrayRunConstSize(
+          M, RCInfo, Builder, RuntimeConstantInfoPtrArrayTy,
+          RuntimeConstantInfoPtrArray, Idx);
+    } else {
+      emitRuntimeConstantInfoArrayConstSize(M, RCInfo, Builder,
+                                            RuntimeConstantInfoPtrArrayTy,
+                                            RuntimeConstantInfoPtrArray, Idx);
+    }
   }
 
   void emitJitEntryCall(Module &M,
@@ -634,19 +721,17 @@ private:
     Builder.SetInsertPoint(InitBlock);
 
     for (size_t I = 0; I < NumRuntimeConstants; ++I) {
-      int32_t ArgNo = JFI.ConstantArgs[I];
-      int32_t TypeId =
-          convertTypeToRuntimeConstantType(StubFn->getArg(ArgNo)->getType());
+      auto &RCInfo = JFI.ConstantArgs[I];
 
-      FunctionCallee CreateFn = getProteusCreateRuntimeConstantInfoFn(M);
-      Constant *ArgNoC = ConstantInt::get(Types.Int32Ty, ArgNo);
-      Constant *TypeIdC = ConstantInt::get(Types.Int32Ty, TypeId);
-      Value *RCInfoPtr = Builder.CreateCall(CreateFn, {TypeIdC, ArgNoC});
-      Value *GEP = Builder.CreateGEP(RuntimeConstantInfoPtrArrayTy,
-                                     RuntimeConstantInfoPtrArray,
-                                     {ConstantInt::get(Types.Int32Ty, 0),
-                                      ConstantInt::get(Types.Int32Ty, I)});
-      Builder.CreateStore(RCInfoPtr, GEP);
+      if (RCInfo.ArgInfo.Type == RuntimeConstantType::ARRAY) {
+        emitRuntimeConstantInfoArray(M, RCInfo, Builder,
+                                     RuntimeConstantInfoPtrArrayTy,
+                                     RuntimeConstantInfoPtrArray, I);
+      } else {
+        emitRuntimeConstantInfoScalar(M, RCInfo, Builder,
+                                      RuntimeConstantInfoPtrArrayTy,
+                                      RuntimeConstantInfoPtrArray, I);
+      }
     }
     // Mark runtime constants info as initialized.
     Builder.CreateStore(ConstantInt::getTrue(Ctx), RCInfoInitialized);
@@ -1052,7 +1137,6 @@ private:
       const auto &JFI = JitFunctionInfoMap[FunctionToRegister];
       size_t NumRuntimeConstants = JFI.ConstantArgs.size();
 
-      // Both RCIndices and RCIndices have the same array type.
       ArrayType *RuntimeConstantInfoPtrArrayTy =
           ArrayType::get(Types.PtrTy, NumRuntimeConstants);
 
@@ -1063,19 +1147,17 @@ private:
 
       IRBuilder<> Builder(RegisterCB->getNextNode());
       for (size_t I = 0; I < NumRuntimeConstants; ++I) {
-        int32_t ArgNo = JFI.ConstantArgs[I];
-        int32_t TypeId = convertTypeToRuntimeConstantType(
-            FunctionToRegister->getArg(ArgNo)->getType());
+        auto &RCInfo = JFI.ConstantArgs[I];
 
-        FunctionCallee CreateFn = getProteusCreateRuntimeConstantInfoFn(M);
-        Constant *ArgNoC = ConstantInt::get(Types.Int32Ty, ArgNo);
-        Constant *TypeIdC = ConstantInt::get(Types.Int32Ty, TypeId);
-        Value *RCPtr = Builder.CreateCall(CreateFn, {TypeIdC, ArgNoC});
-        Value *GEP = Builder.CreateGEP(RuntimeConstantInfoPtrArrayTy,
-                                       RuntimeConstantInfoPtrArray,
-                                       {ConstantInt::get(Types.Int32Ty, 0),
-                                        ConstantInt::get(Types.Int32Ty, I)});
-        Builder.CreateStore(RCPtr, GEP);
+        if (RCInfo.ArgInfo.Type == RuntimeConstantType::ARRAY) {
+          emitRuntimeConstantInfoArray(M, RCInfo, Builder,
+                                       RuntimeConstantInfoPtrArrayTy,
+                                       RuntimeConstantInfoPtrArray, I);
+        } else {
+          emitRuntimeConstantInfoScalar(M, RCInfo, Builder,
+                                        RuntimeConstantInfoPtrArrayTy,
+                                        RuntimeConstantInfoPtrArray, I);
+        }
       }
 
       Value *NumRCsValue =

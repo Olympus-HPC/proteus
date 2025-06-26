@@ -11,8 +11,9 @@
 #include "gpu_common.h"
 #include <proteus/JitInterface.hpp>
 
-__global__ __attribute__((annotate("jit", "arg=1", 2, "arg=3"))) void
-kernel(int Arg1, int Arg2, int Arg3) {
+__global__
+    __attribute__((annotate("jit", R"({"arg":1})", 2, R"({"arg":3})"))) void
+    kernel(int Arg1, int Arg2, int Arg3) {
   printf("Kernel arg %d\n", Arg1 + Arg2 + Arg3);
 }
 

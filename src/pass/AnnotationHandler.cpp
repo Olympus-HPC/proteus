@@ -10,6 +10,7 @@
 #include <llvm/Support/MemoryBuffer.h>
 
 #include "proteus/Error.h"
+#include "proteus/RuntimeConstantTypeHelpers.h"
 
 #include "AnnotationHandler.h"
 #include "Helpers.h"
@@ -113,20 +114,42 @@ AnnotationHandler::AnnotationHandler(Module &M) : M(M), Types(M) {}
 
 void AnnotationHandler::parseAnnotations(
     MapVector<Function *, JitFunctionInfo> &JitFunctionInfoMap) {
-  // First parse any proteus::jit_arg annotations and append them to global
-  // annotations.
+  // First parse any proteus::jit_arg or proteus::jit_array annotations and
+  // append them to global annotations.
   SmallPtrSet<Function *, 32> JitArgAnnotations;
+  SmallPtrSet<Function *, 32> JitArrayAnnotations;
   for (auto &F : M.getFunctionList()) {
     std::string DemangledName = demangle(F.getName().str());
     if (StringRef{DemangledName}.contains("proteus::jit_arg"))
       JitArgAnnotations.insert(&F);
+    if (StringRef{DemangledName}.contains("proteus::jit_array"))
+      JitArrayAnnotations.insert(&F);
   }
 
+  DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> RCInfoMap;
   if (!JitArgAnnotations.empty())
-    parseJitArgAnnotations(JitArgAnnotations);
+    parseJitArgAnnotations(JitArgAnnotations, RCInfoMap);
+
+  if (!JitArrayAnnotations.empty())
+    parseJitArrayAnnotations(JitArrayAnnotations, RCInfoMap);
+
+  SmallVector<Constant *> NewJitAnnotations;
+  for (auto &[F, RCInfos] : RCInfoMap)
+    NewJitAnnotations.push_back(createJitAnnotation(F, RCInfos));
+
+  // We append to global annotations the parsed information. This is to have and
+  // a common place to store information and also needed for HIP LTO because it
+  // uses global annotations to identify kernels.
+  appendToGlobalAnnotations(NewJitAnnotations);
+  // If this is device compilation the pass emits a JSON file that stores this
+  // information for the host compilation pass to parse for instrumentation.
+  // The JSON file is uniquely named using the TU unique file ID.
+  if (isDeviceCompilation(M))
+    if (!RCInfoMap.empty())
+      createDeviceManifestFile(RCInfoMap);
 
   // Last, parse global annotations, either created throught attributes or the
-  // parsed proteus::jit_arg interface.
+  // parsed proteus::jit_arg, proteus::jit_array interfaces.
   auto *GlobalAnnotations = M.getNamedGlobal("llvm.global.annotations");
   if (!JitArgAnnotations.empty() && !GlobalAnnotations)
     PROTEUS_FATAL_ERROR("Expected llvm.global.annotations global variable "
@@ -175,10 +198,6 @@ void AnnotationHandler::parseManifestFileAnnotations(
 
     StringRef KernelSym = *OptionalKernelSym;
 
-    json::Array *JitArgs = KernelObject->getArray("args");
-    if (!JitArgs)
-      PROTEUS_FATAL_ERROR("Failed parsing json: jit args");
-
     // Find the device stub function searching the StubToKernelMap.
     Function *F = nullptr;
     for (auto [Stub, KernelSymGV] : StubToKernelMap) {
@@ -205,20 +224,102 @@ void AnnotationHandler::parseManifestFileAnnotations(
       PROTEUS_FATAL_ERROR("Expected device stub Function for kernel sym " +
                           KernelSym);
 
+    json::Array *JsonRCInfoArray = KernelObject->getArray("rc");
+    if (!JsonRCInfoArray)
+      PROTEUS_FATAL_ERROR("Failed parsing json: jit args");
     // Update the JitFunctionInfoMap for the stub function proxying the
     // kernel.
     auto &JFI = JitFunctionInfoMap[F];
-    for (auto It : *JitArgs) {
-      auto OptionalArgNo = It.getAsInteger();
-      if (!OptionalArgNo)
-        PROTEUS_FATAL_ERROR("Error parsing json: jit arg no");
+    for (auto J : *JsonRCInfoArray) {
+      auto CreateRuntimeConstantInfo = [&F](json::Object *JsonRCDict) {
+        json::Value *ArgV = JsonRCDict->get("arg");
+        if (!ArgV)
+          PROTEUS_FATAL_ERROR("Expected arg in runtime constant info");
+        auto OptArgNo = ArgV->getAsInteger();
+        int32_t ArgNo = *OptArgNo;
 
-      int ArgNo = *OptionalArgNo;
-      if (!JFI.ConstantArgs.insert(ArgNo))
+        json::Value *TypeV = JsonRCDict->get("type");
+        if (!TypeV)
+          PROTEUS_FATAL_ERROR("Expected type in runtime constant info");
+        auto OptRCType = TypeV->getAsInteger();
+        RuntimeConstantType RCType =
+            static_cast<RuntimeConstantType>(*OptRCType);
+
+        Type *ArgType = F->getArg(ArgNo)->getType();
+        RuntimeConstantType ExpectedRCType =
+            convertTypeToRuntimeConstantType(ArgType);
+        if (ExpectedRCType != RCType) {
+          // For GPU code, long double decays to double but the host code still
+          // pushes a long double to kernel args. Update the RCType to avoid
+          // data marshaling errors.
+          if (ExpectedRCType == RuntimeConstantType::LONG_DOUBLE &&
+              RCType == RuntimeConstantType::DOUBLE)
+            RCType = RuntimeConstantType::LONG_DOUBLE;
+          else if (ExpectedRCType == RuntimeConstantType::PTR &&
+                   RCType == RuntimeConstantType::ARRAY) {
+            // This is a valid check since there is no way we can distinguish a
+            // PTR from an ARRAY just by looking at the function argument type.
+          } else
+            PROTEUS_FATAL_ERROR("Type mismatch, function " + F->getName() +
+                                " for argument (0-index) " +
+                                std::to_string(ArgNo) + " expected " +
+                                toString(ExpectedRCType) + " but found " +
+                                toString(RCType));
+        }
+
+        if (RCType == RuntimeConstantType::ARRAY) {
+          json::Value *EltTypeV = JsonRCDict->get("elt-type");
+          auto OptEltType = EltTypeV->getAsInteger();
+          if (!OptEltType)
+            PROTEUS_FATAL_ERROR("Expected elt-type in runtime constant info");
+          RuntimeConstantType EltType =
+              static_cast<RuntimeConstantType>(*OptEltType);
+
+          json::Value *NumEltsV = JsonRCDict->get("num-elts");
+          json::Value *NumEltsPosV = JsonRCDict->get("num-elts-pos");
+          json::Value *NumEltsTypeV = JsonRCDict->get("num-elts-type");
+
+          // Check for semantic errors.
+          if (NumEltsV && NumEltsPosV)
+            PROTEUS_FATAL_ERROR(
+                "Setting both NumElts and NumEltsPos is incorrect");
+
+          if (!NumEltsV && !NumEltsPosV)
+            PROTEUS_FATAL_ERROR("Either NumElts or NumEltsPos must be set");
+
+          if (NumEltsPosV && !NumEltsTypeV)
+            PROTEUS_FATAL_ERROR("NumEltsType must be set if NumEltsPos is set");
+
+          if (!NumEltsPosV && NumEltsTypeV)
+            PROTEUS_FATAL_ERROR("NumEltsPos must be set if NumEltsType is set");
+
+          if (NumEltsV) {
+            int32_t NumElts = NumEltsV->getAsInteger().value();
+            return RuntimeConstantInfo{RCType, ArgNo, NumElts, EltType};
+          }
+
+          int32_t NumEltsPos = NumEltsPosV->getAsInteger().value();
+          RuntimeConstantType NumEltsType = static_cast<RuntimeConstantType>(
+              NumEltsTypeV->getAsInteger().value());
+          return RuntimeConstantInfo{RCType, ArgNo, EltType, NumEltsType,
+                                     NumEltsPos};
+        }
+
+        return RuntimeConstantInfo{RCType, ArgNo};
+      };
+
+      RuntimeConstantInfo RCI = CreateRuntimeConstantInfo(J.getAsObject());
+      // RuntimeConstantInfo RCI{RuntimeConstantType::NONE, 0};
+      if (!JFI.ConstantArgs.insert(RCI))
         PROTEUS_FATAL_ERROR(
             "Duplicate JIT annotation for argument (0-index): " +
-            std::to_string(ArgNo));
+            std::to_string(RCI.ArgInfo.Pos));
     }
+
+    SmallVector<RuntimeConstantInfo> SortedRCInfos{JFI.ConstantArgs.begin(),
+                                                   JFI.ConstantArgs.end()};
+    std::sort(SortedRCInfos.begin(), SortedRCInfos.end());
+    JFI.ConstantArgs = {SortedRCInfos.begin(), SortedRCInfos.end()};
   }
 
   std::remove(UniqueFilename.c_str());
@@ -260,9 +361,8 @@ void AnnotationHandler::appendToGlobalAnnotations(
   AnnotationsGV->setSection("llvm.metadata");
 }
 
-Constant *
-AnnotationHandler::createJitAnnotation(Function *F,
-                                       SmallVector<int> &ConstantArgs) {
+Constant *AnnotationHandler::createJitAnnotation(
+    Function *F, SmallSetVector<RuntimeConstantInfo, 16> &RCInfos) {
   // llvm.global.annotations entry format:
   //  ptr: (addrspace 1) Function pointer
   //  ptr: (addrspace 4) Annotations string
@@ -291,30 +391,55 @@ AnnotationHandler::createJitAnnotation(Function *F,
   // We don't know the line number, hence we store 0.
   AnnotationVals[3] = IRB.getInt32(0);
 
-  // Create the struct to store the JIT argument numbers.
-  SmallVector<Type *> ArgInfo{ConstantArgs.size(), Types.Int32Ty};
-  StructType *ArgEltTy = StructType::get(M.getContext(), ArgInfo);
-  SmallVector<Constant *> ArgConsts;
-  for (int ArgNo : ConstantArgs)
-    // We add 1 to the ArgNo to create the 1-index argument number that global
-    // annotations expect.
-    // TODO: Maybe require 0-indexing to avoid this?
-    ArgConsts.push_back(ConstantInt::get(Types.Int32Ty, ArgNo + 1));
-  Constant *ArgInit = ConstantStruct::get(ArgEltTy, ArgConsts);
+  // Create the JIT argument information in long form to include the argument
+  // number and possible size. Each RCInfo will create a global variable string
+  // with key-value pairs to store the information.
+  SmallVector<Type *> RCInfoTypes{RCInfos.size(), Types.PtrTy};
+  StructType *RCInfoStructTy = StructType::get(M.getContext(), RCInfoTypes);
+  SmallVector<Constant *> RCInfoConsts;
+  for (const auto &RCInfo : RCInfos) {
+    json::Object JsonRCDict;
+    JsonRCDict["arg"] = RCInfo.ArgInfo.Pos + 1;
+    JsonRCDict["type"] = static_cast<int32_t>(RCInfo.ArgInfo.Type);
 
-  GlobalVariable *ArgsInfoGV = nullptr;
+    if (RCInfo.OptArrInfo) {
+      JsonRCDict["elt-type"] = static_cast<int32_t>(RCInfo.OptArrInfo->EltType);
+
+      if (RCInfo.OptArrInfo->OptNumEltsRCInfo) {
+        JsonRCDict["num-elts-type"] =
+            static_cast<int32_t>(RCInfo.OptArrInfo->OptNumEltsRCInfo->Type);
+        JsonRCDict["num-elts-pos"] = RCInfo.OptArrInfo->OptNumEltsRCInfo->Pos;
+      } else {
+        JsonRCDict["num-elts"] = RCInfo.OptArrInfo->NumElts;
+      }
+    }
+
+    std::string RCInfoStr;
+    raw_string_ostream OS{RCInfoStr};
+    OS << json::Value(std::move(JsonRCDict));
+
+    if (isDeviceCompilation(M)) {
+      constexpr unsigned ConstAddressSpace = 4;
+      RCInfoConsts.push_back(
+          IRB.CreateGlobalString(RCInfoStr, ".str", ConstAddressSpace, &M));
+    } else
+      RCInfoConsts.push_back(IRB.CreateGlobalString(RCInfoStr, ".str", 0, &M));
+  }
+  Constant *RCInfoInit = ConstantStruct::get(RCInfoStructTy, RCInfoConsts);
+
+  GlobalVariable *RCInfoGV = nullptr;
   if (isDeviceCompilation(M)) {
     constexpr unsigned GlobalAddressSpace = 1;
-    ArgsInfoGV = new GlobalVariable(
-        M, ArgInit->getType(), true, GlobalValue::PrivateLinkage, ArgInit,
+    RCInfoGV = new GlobalVariable(
+        M, RCInfoInit->getType(), true, GlobalValue::PrivateLinkage, RCInfoInit,
         ".args", nullptr, llvm::GlobalValue::NotThreadLocal,
         GlobalAddressSpace);
   } else {
-    ArgsInfoGV =
-        new GlobalVariable(M, ArgInit->getType(), true,
-                           GlobalValue::PrivateLinkage, ArgInit, ".args");
+    RCInfoGV =
+        new GlobalVariable(M, RCInfoInit->getType(), true,
+                           GlobalValue::PrivateLinkage, RCInfoInit, ".args");
   }
-  AnnotationVals[4] = ArgsInfoGV;
+  AnnotationVals[4] = RCInfoGV;
 
   Constant *NewAnnotation = ConstantStruct::get(
       Types.GlobalAnnotationEltTy, ArrayRef{AnnotationVals, NumElts});
@@ -323,7 +448,7 @@ AnnotationHandler::createJitAnnotation(Function *F,
 }
 
 void AnnotationHandler::createDeviceManifestFile(
-    DenseMap<Function *, SmallSetVector<int, 16>> &JitArgs) {
+    DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap) {
   // Emit JSON file manifest which contains the kernel symbol and
   // JIT-annotated arguments.
   SmallString<64> UniqueFilename = getUniqueManifestFilename();
@@ -335,15 +460,33 @@ void AnnotationHandler::createDeviceManifestFile(
   json::Object ManifestInfo;
   json::Array KernelArray;
 
-  for (auto [F, ConstantArgs] : JitArgs) {
+  for (auto &[F, RCInfos] : RCInfoMap) {
     json::Object KernelObject;
     KernelObject["symbol"] = F->getName();
 
-    json::Array JitArgNos;
-    for (auto ArgNo : ConstantArgs) {
-      JitArgNos.push_back(ArgNo);
+    json::Array JsonRCInfoArray;
+    for (auto &RCInfo : RCInfos) {
+      json::Object JsonRCDict;
+      JsonRCDict["arg"] = RCInfo.ArgInfo.Pos;
+      JsonRCDict["type"] = static_cast<int32_t>(RCInfo.ArgInfo.Type);
+
+      if (RCInfo.OptArrInfo) {
+        JsonRCDict["elt-type"] =
+            static_cast<int32_t>(RCInfo.OptArrInfo->EltType);
+
+        if (RCInfo.OptArrInfo->OptNumEltsRCInfo) {
+          JsonRCDict["num-elts-type"] =
+              static_cast<int32_t>(RCInfo.OptArrInfo->OptNumEltsRCInfo->Type);
+          JsonRCDict["num-elts-pos"] = RCInfo.OptArrInfo->OptNumEltsRCInfo->Pos;
+        } else {
+          JsonRCDict["num-elts"] = RCInfo.OptArrInfo->NumElts;
+        }
+      }
+
+      JsonRCInfoArray.push_back(std::move(JsonRCDict));
     }
-    KernelObject["args"] = std::move(JitArgNos);
+
+    KernelObject["rc"] = std::move(JsonRCInfoArray);
 
     KernelArray.push_back(std::move(KernelObject));
   }
@@ -355,10 +498,10 @@ void AnnotationHandler::createDeviceManifestFile(
 }
 
 void AnnotationHandler::parseJitArgAnnotations(
-    SmallPtrSetImpl<Function *> &JitArgAnnotations) {
+    SmallPtrSetImpl<Function *> &JitArgAnnotations,
+    DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap) {
   // Iterate over all proteus::jit_arg annotations and store the information
-  // in the JitArgs map.
-  DenseMap<Function *, SmallSetVector<int, 16>> JitArgs;
+  // in RCInfoMap.
   SmallVector<CallBase *> CallsToDelete;
   for (Function *AnnotationF : JitArgAnnotations) {
     for (User *Usr : AnnotationF->users()) {
@@ -381,8 +524,15 @@ void AnnotationHandler::parseJitArgAnnotations(
             "Expected non-null argument. Possible cause: proteus::jit_arg "
             "argument is not an argument of the enclosing function.");
 
-      auto &ConstantArgs = JitArgs[JitFunction];
-      if (!ConstantArgs.insert(Arg->getArgNo()))
+      auto &ConstantArgs = RCInfoMap[JitFunction];
+      RuntimeConstantType RCType =
+          convertTypeToRuntimeConstantType(Arg->getType());
+      int32_t ArgNo = Arg->getArgNo();
+      RuntimeConstantInfo RCI{
+          RCType,
+          ArgNo,
+      };
+      if (!ConstantArgs.insert(RCI))
         PROTEUS_FATAL_ERROR("Duplicate argument number found: " +
                             std::to_string(Arg->getArgNo()));
     }
@@ -400,26 +550,84 @@ void AnnotationHandler::parseJitArgAnnotations(
 
   if (verifyModule(M, &errs()))
     PROTEUS_FATAL_ERROR("Broken JIT module found, compilation aborted!");
+}
 
-  // Sort argument numbers for determinism.
-  SmallVector<Constant *> NewJitAnnotations;
-  for (auto &[F, ConstantArgs] : JitArgs) {
-    SmallVector<int> SortedArgs{ConstantArgs.begin(), ConstantArgs.end()};
-    std::sort(SortedArgs.begin(), SortedArgs.end());
-    ConstantArgs = {SortedArgs.begin(), SortedArgs.end()};
+void AnnotationHandler::parseJitArrayAnnotations(
+    SmallPtrSetImpl<Function *> &JitArrayAnnotations,
+    DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap) {
+  // Iterate over all proteus::jit_array annotations and store the information
+  // in RCInfoMap.
+  SmallVector<CallBase *> CallsToDelete;
+  for (Function *AnnotationF : JitArrayAnnotations) {
+    for (User *Usr : AnnotationF->users()) {
+      CallBase *CB = dyn_cast<CallBase>(Usr);
+      if (!CB)
+        continue;
 
-    NewJitAnnotations.push_back(createJitAnnotation(F, SortedArgs));
+      if (CB->getNumUses() != 0)
+        PROTEUS_FATAL_ERROR("Expected zero uses of the annotation function");
+
+      CallsToDelete.push_back(CB);
+
+      Function *JitFunction = CB->getFunction();
+      assert(CB->arg_size() == 3 &&
+             "Expected three arguments (value, size, element)");
+      auto *V = CB->getArgOperand(0);
+      auto *Size = CB->getArgOperand(1);
+      auto *Elt = CB->getArgOperand(2);
+
+      Argument *Arg = getOriginatingArgument(V);
+      if (!Arg)
+        PROTEUS_FATAL_ERROR(
+            "Expected non-null argument. Possible cause: proteus::jit_array "
+            "argument is not an argument of the enclosing function.");
+
+      auto &ConstantArgs = RCInfoMap[JitFunction];
+      RuntimeConstantType RCType = RuntimeConstantType::ARRAY;
+      int32_t ArgNo = Arg->getArgNo();
+
+      int32_t NumElts = 0;
+      RuntimeConstantType EltType =
+          convertTypeToRuntimeConstantType(Elt->getType());
+      auto *ConstInt = dyn_cast<ConstantInt>(Size);
+      if (ConstInt) {
+        NumElts = ConstInt->getZExtValue();
+
+        RuntimeConstantInfo RCI{RCType, ArgNo, NumElts, EltType};
+        if (!ConstantArgs.insert(RCI))
+          PROTEUS_FATAL_ERROR("Duplicate argument number found: " +
+                              std::to_string(Arg->getArgNo()));
+      } else {
+        // Find NumElts corresponding to a runtime constant argument.
+        Argument *NumEltsArg = getOriginatingArgument(Size);
+        if (!NumEltsArg)
+          PROTEUS_FATAL_ERROR("Expected non-null argument for size");
+
+        RuntimeConstantType NumEltsType =
+            convertTypeToRuntimeConstantType(NumEltsArg->getType());
+        int32_t NumEltsPos = NumEltsArg->getArgNo();
+
+        RuntimeConstantInfo RCI{RCType, ArgNo, EltType, NumEltsType,
+                                NumEltsPos};
+        if (!ConstantArgs.insert(RCI))
+          PROTEUS_FATAL_ERROR("Duplicate argument number found: " +
+                              std::to_string(Arg->getArgNo()));
+      }
+    }
   }
 
-  // We append to global annotations the parsed information from the manifest
-  // file. This is needed for HIP LTO because it uses global annotations to
-  // identify kernels.
-  appendToGlobalAnnotations(NewJitAnnotations);
-  // If this is device compilation the pass emits a JSON file that stores this
-  // information for the host compilation pass to parse for instrumentation.
-  // The JSON file is uniquely named using the TU unique file ID.
-  if (isDeviceCompilation(M))
-    createDeviceManifestFile(JitArgs);
+  // Remove JitArray annotations and their calls as they are not needed anymore.
+  // Also removing them avoids errors with LTO and O0 compilation: LTO will
+  // find those annotations and attempt to create a manifest which will cause
+  // an error since it is not backed by a source filename.
+  for (CallBase *CB : CallsToDelete)
+    CB->eraseFromParent();
+
+  for (Function *AnnotationF : JitArrayAnnotations)
+    AnnotationF->eraseFromParent();
+
+  if (verifyModule(M, &errs()))
+    PROTEUS_FATAL_ERROR("Broken JIT module found, compilation aborted!");
 }
 
 void AnnotationHandler::parseAttributeAnnotations(
@@ -446,13 +654,6 @@ void AnnotationHandler::parseAttributeAnnotations(
             ") to be a kernel function or device lambda function!");
     }
 
-    if (JitFunctionInfoMap.contains(Fn)) {
-      DEBUG(Logger::logs("proteus-pass")
-            << "Warning: Duplicate jit annotation for Fn " + Fn->getName() +
-                   "\n");
-      continue;
-    }
-
     DEBUG(Logger::logs("proteus-pass")
           << "JIT Function " << Fn->getName() << "\n");
 
@@ -466,7 +667,8 @@ void AnnotationHandler::parseAttributeAnnotations(
     if (Annotation->getAsCString().compare("jit"))
       continue;
 
-    JitFunctionInfo JFI;
+    // Get or create the JitFunctionInfo for Fn.
+    JitFunctionInfo &JFI = JitFunctionInfoMap[Fn];
 
     if (Entry->getOperand(4)->isNullValue()) {
       JFI.ConstantArgs = {};
@@ -481,48 +683,142 @@ void AnnotationHandler::parseAttributeAnnotations(
           << *Entry->getOperand(4)->getOperand(0)->getType() << "\n");
     auto *AnnotArgs = cast<ConstantStruct>(Entry->getOperand(4)->getOperand(0));
 
-    SmallSetVector<int, 16> JitArgs;
+    SmallSetVector<RuntimeConstantInfo, 16> ParsedRuntimeConstantInfo;
     for (unsigned int J = 0; J < AnnotArgs->getNumOperands(); ++J) {
-      uint64_t ArgNo;
+      std::optional<uint64_t> OptArgNo;
+      std::optional<RuntimeConstantType> OptRCType;
+      std::optional<int32_t> OptNumElts = std::nullopt;
+      std::optional<RuntimeConstantType> OptEltType = std::nullopt;
+      std::optional<int32_t> OptNumEltsPos = std::nullopt;
+      std::optional<RuntimeConstantType> OptNumEltsType = std::nullopt;
+
       Constant *C = AnnotArgs->getOperand(J)->stripPointerCasts();
       // We parse either numeric arguments in short form or the key-value pairs
       // in long form.
       if (isa<ConstantInt>(C)) {
         auto *Index = cast<ConstantInt>(AnnotArgs->getOperand(J));
-        ArgNo = Index->getValue().getZExtValue();
+        OptArgNo = Index->getValue().getZExtValue();
+        if (*OptArgNo > Fn->arg_size())
+          PROTEUS_FATAL_ERROR("Expected ArgNo (1-index) " +
+                              std::to_string(*OptArgNo) + " <= arg_size " +
+                              std::to_string(Fn->arg_size()) +
+                              " for function " + Fn->getName());
+        int32_t ArgNo = *OptArgNo - 1;
+        OptRCType =
+            convertTypeToRuntimeConstantType(Fn->getArg(ArgNo)->getType());
+        OptNumElts = 1;
+        OptEltType = RuntimeConstantType::NONE;
       } else {
         auto *CDA = dyn_cast<ConstantDataArray>(C->getOperand(0));
         if (!CDA)
           PROTEUS_FATAL_ERROR("Expected constant data array string");
 
-        StringRef KVStr = CDA->getAsCString();
-        auto [K, V] = KVStr.split("=");
-        if (V.empty())
-          PROTEUS_FATAL_ERROR("Wrong format: " + KVStr);
+        StringRef RCDictStr = CDA->getAsCString();
+        auto ExpectedRCDict = json::parse(RCDictStr);
+        if (auto E = ExpectedRCDict.takeError())
+          PROTEUS_FATAL_ERROR(
+              "Failed to parse runtime constant info json dict");
 
-        V.getAsInteger(10, ArgNo);
+        json::Value RCDictV = *ExpectedRCDict;
+        json::Object *RCDict = RCDictV.getAsObject();
+        for (auto &[K, V] : *RCDict) {
+          auto OptIntegerValue = V.getAsInteger();
+          if (!OptIntegerValue) {
+            std::string ErrMsg;
+            raw_string_ostream OS{ErrMsg};
+            OS << "Expected integer value for key " << K << " value: " << V;
+            PROTEUS_FATAL_ERROR(ErrMsg);
+          }
+
+          int64_t IntegerValue = *OptIntegerValue;
+
+          if (K == "arg") {
+            OptArgNo = IntegerValue;
+            if (*OptArgNo > Fn->arg_size())
+              PROTEUS_FATAL_ERROR("Expected ArgNo " +
+                                  std::to_string(*OptArgNo) + " <= arg_size " +
+                                  std::to_string(Fn->arg_size()) +
+                                  " for function " + Fn->getName());
+          } else if (K == "type") {
+            OptRCType = static_cast<RuntimeConstantType>(IntegerValue);
+          } else if (K == "num-elts") {
+            OptNumElts = IntegerValue;
+          } else if (K == "num-elts-pos") {
+            OptNumEltsPos = IntegerValue;
+          } else if (K == "num-elts-type") {
+            OptNumEltsType = static_cast<RuntimeConstantType>(IntegerValue);
+          } else if (K == "elt-type") {
+            OptEltType = static_cast<RuntimeConstantType>(IntegerValue);
+          } else
+            PROTEUS_FATAL_ERROR("Unsupported key: " + K.str());
+        }
       }
 
-      if (ArgNo > Fn->arg_size())
-        PROTEUS_FATAL_ERROR(
-            Twine("Error: JIT annotation runtime constant argument " +
-                  std::to_string(ArgNo) +
-                  " is greater than number of arguments " +
-                  std::to_string(Fn->arg_size()))
-                .str()
-                .c_str());
-      // TODO: think about types, -1 to convert to 0-start index.
-      if (!JitArgs.insert(ArgNo - 1))
+      // Check for semantic errors.
+      if (!OptArgNo)
+        PROTEUS_FATAL_ERROR("Missing required argument number");
+      // We subtract 1 to convert to 0-start index.
+      int32_t ArgNo = *OptArgNo - 1;
+
+      if (!OptRCType) {
+        // Auto-detect type for a scalar argument.
+        OptRCType =
+            convertTypeToRuntimeConstantType(Fn->getArg(ArgNo)->getType());
+        if (OptRCType == RuntimeConstantType::PTR)
+          PROTEUS_FATAL_ERROR("Auto-detecting argument type requires a scalar "
+                              "argument, got PTR instead");
+      }
+
+      if (RuntimeConstantType::ARRAY == *OptRCType) {
+        if (OptNumElts && OptNumEltsPos)
+          PROTEUS_FATAL_ERROR(
+              "Setting both NumElts and NumEltsPos is incorrect");
+
+        if (!OptNumElts && !OptNumEltsPos)
+          PROTEUS_FATAL_ERROR("Either NumElts or NumEltsPos must be set");
+
+        if (OptNumEltsPos && !OptNumEltsType)
+          PROTEUS_FATAL_ERROR("NumEltsType must be set if NumEltsPos is set");
+
+        if (!OptNumEltsPos && OptNumEltsType)
+          PROTEUS_FATAL_ERROR("NumEltsPos must be set if NumEltsType is set");
+      }
+
+      auto CreateRuntimeConstantInfo = [&]() -> RuntimeConstantInfo {
+        if (RuntimeConstantType::ARRAY == *OptRCType) {
+          if (OptNumElts)
+            return RuntimeConstantInfo{*OptRCType, ArgNo, *OptNumElts,
+                                       *OptEltType};
+
+          if (OptNumEltsPos && OptNumEltsType)
+            return RuntimeConstantInfo{*OptRCType, ArgNo, *OptEltType,
+                                       *OptNumEltsType, *OptNumEltsPos};
+
+          PROTEUS_FATAL_ERROR(
+              "Unreachable, error in ARRAY runtime constant info definition");
+        }
+
+        return RuntimeConstantInfo{*OptRCType, ArgNo};
+      };
+
+      RuntimeConstantInfo RCI = CreateRuntimeConstantInfo();
+      if (!ParsedRuntimeConstantInfo.insert(RCI))
         PROTEUS_FATAL_ERROR(
             "Duplicate JIT annotation for argument (0-index): " +
-            std::to_string(ArgNo - 1));
+            std::to_string(ArgNo));
     }
 
-    // Sort JFI.ConstantArgs for determinism.
-    SmallVector<int> SortedArgs{JitArgs.begin(), JitArgs.end()};
-    std::sort(SortedArgs.begin(), SortedArgs.end());
-    JFI.ConstantArgs = {SortedArgs.begin(), SortedArgs.end()};
-    JitFunctionInfoMap[Fn] = JFI;
+    // Insert RC infos and sort JFI.ConstantArgs for determinism.
+    for (auto &RCInfo : ParsedRuntimeConstantInfo) {
+      if (!JFI.ConstantArgs.insert(RCInfo)) {
+        PROTEUS_FATAL_ERROR("Duplicate entry found for arg no " +
+                            std::to_string(RCInfo.ArgInfo.Pos));
+      }
+    }
+    SmallVector<RuntimeConstantInfo> SortedRCInfos{JFI.ConstantArgs.begin(),
+                                                   JFI.ConstantArgs.end()};
+    std::sort(SortedRCInfos.begin(), SortedRCInfos.end());
+    JFI.ConstantArgs = {SortedRCInfos.begin(), SortedRCInfos.end()};
   }
 }
 

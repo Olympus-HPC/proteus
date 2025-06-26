@@ -16,13 +16,32 @@
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Debug.h"
-#include "proteus/Utils.h"
+#include "proteus/RuntimeConstantTypeHelpers.h"
 
 namespace proteus {
 
 using namespace llvm;
 
 class TransformArgumentSpecialization {
+private:
+  template <typename T>
+  static void processArray(const RuntimeConstant &RC,
+                           SmallVector<Constant *> &Constants, Type *EltType) {
+    T *TypedPtr = static_cast<T *>(RC.Value.PtrVal);
+    if (RC.OptArrInfo->NumElts <= 0)
+      PROTEUS_FATAL_ERROR("Invalid number of elements in array: " +
+                          std::to_string(RC.OptArrInfo->NumElts));
+    for (size_t I = 0; I < static_cast<size_t>(RC.OptArrInfo->NumElts); ++I) {
+      if constexpr (std::is_floating_point_v<T>) {
+        Constants.push_back(ConstantFP::get(EltType, TypedPtr[I]));
+      } else if constexpr (std::is_integral_v<T>) {
+        Constants.push_back(ConstantInt::get(EltType, TypedPtr[I]));
+      } else {
+        PROTEUS_FATAL_ERROR("Unsupported type: " + __PRETTY_FUNCTION__);
+      }
+    }
+  }
+
 public:
   static void transform(Module &M, Function &F,
                         ArrayRef<RuntimeConstant> RCArray) {
@@ -60,8 +79,54 @@ public:
                  ArgType->isFP128Ty()) {
         C = ConstantFP::get(ArgType, RC.Value.LongDoubleVal);
       } else if (ArgType->isPointerTy()) {
-        auto *IntC = ConstantInt::get(Type::getInt64Ty(Ctx), RC.Value.Int64Val);
-        C = ConstantExpr::getIntToPtr(IntC, ArgType);
+        if (RC.Type == RuntimeConstantType::PTR) {
+          auto *IntC =
+              ConstantInt::get(Type::getInt64Ty(Ctx), RC.Value.Int64Val);
+          C = ConstantExpr::getIntToPtr(IntC, ArgType);
+        } else if (RC.Type == RuntimeConstantType::ARRAY) {
+          Type *EltType = convertRuntimeConstantTypeToLLVMType(
+              RC.OptArrInfo->EltType, M.getContext());
+
+          SmallVector<Constant *> Constants;
+
+          // Dispatch based on element type.
+          switch (RC.OptArrInfo->EltType) {
+          case RuntimeConstantType::BOOL:
+            processArray<bool>(RC, Constants, EltType);
+            break;
+          case RuntimeConstantType::INT8:
+            processArray<int8_t>(RC, Constants, EltType);
+            break;
+          case RuntimeConstantType::INT32:
+            processArray<int32_t>(RC, Constants, EltType);
+            break;
+          case RuntimeConstantType::INT64:
+            processArray<int64_t>(RC, Constants, EltType);
+            break;
+          case RuntimeConstantType::FLOAT:
+            processArray<float>(RC, Constants, EltType);
+            break;
+          case RuntimeConstantType::DOUBLE:
+            processArray<double>(RC, Constants, EltType);
+            break;
+          case RuntimeConstantType::LONG_DOUBLE:
+            processArray<long double>(RC, Constants, EltType);
+            break;
+          default:
+            PROTEUS_FATAL_ERROR("Unsupported array element type: " +
+                                toString(RC.OptArrInfo->EltType));
+          }
+
+          Constant *CDA = ConstantArray::get(
+              ArrayType::get(EltType, RC.OptArrInfo->NumElts), Constants);
+
+          // Create a global variable to hold the array.
+          GlobalVariable *GV = new GlobalVariable(
+              M, CDA->getType(), true, GlobalValue::PrivateLinkage, CDA);
+
+          // Cast to the expected pointer type.
+          C = ConstantExpr::getBitCast(GV, ArgType);
+        }
       } else {
         std::string TypeString;
         raw_string_ostream TypeOstream(TypeString);
