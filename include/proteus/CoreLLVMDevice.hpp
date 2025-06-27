@@ -24,6 +24,7 @@
 #include "proteus/TransformArgumentSpecialization.hpp"
 #include "proteus/TransformLambdaSpecialization.hpp"
 #include "proteus/TransformSharedArray.hpp"
+#include "proteus/PropagateConstants.hpp"
 
 namespace proteus {
 
@@ -276,6 +277,10 @@ inline void specializeIR(
     TransformLambdaSpecialization::transform(M, *F, RCVec);
   }
 
+  proteus::PropagateConstants::runConstantPropagation(M);
+  llvm::outs()<< "MODULE POST CONST PROP \n";
+  M.print(llvm::outs(), nullptr);
+
   // Run the shared array transform after any value specialization (arguments,
   // captures) to propagate any constants.
   TransformSharedArray::transform(M);
@@ -306,7 +311,7 @@ inline void specializeIR(
 
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                        << "specializeIR " << T.elapsed() << " ms\n");
-  PROTEUS_DBG(Logger::logfile(FnName.str() + ".specialized.ll", M));
+  PROTEUS_DBG(Logger::logfile(FnName.str().substr(0,230) + ".specialized.ll", M));
 }
 
 } // namespace proteus

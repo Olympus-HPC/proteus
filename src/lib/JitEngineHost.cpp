@@ -186,7 +186,7 @@ Expected<orc::ThreadSafeModule> JitEngineHost::specializeIR(
   assert(F && "Expected non-null function!");
 
 #if PROTEUS_ENABLE_DEBUG
-  PROTEUS_DBG(Logger::logfile(FnName.str() + ".input.ll", *M));
+  PROTEUS_DBG(Logger::logfile(FnName.str().substr(0,230) + ".input.ll", *M));
 #endif
   // Find GlobalValue declarations that are externally defined. Resolve them
   // statically as absolute symbols in the ORC linker. Required for resolving
@@ -259,7 +259,7 @@ Expected<orc::ThreadSafeModule> JitEngineHost::specializeIR(
   F->setName(FnName + Suffix);
 
 #if PROTEUS_ENABLE_DEBUG
-  Logger::logfile(FnName.str() + ".final.ll", *M);
+  Logger::logfile(FnName.str().substr(0,230) + ".final.ll", *M);
   if (verifyModule(*M, &errs()))
     PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
   else

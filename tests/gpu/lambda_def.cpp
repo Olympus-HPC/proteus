@@ -13,7 +13,7 @@
 
 template <typename T>
 __global__ __attribute__((annotate("jit"))) void kernel(T LB) {
-  LB();
+  LB(1);
 }
 
 template <typename T> void run(T &&LB) {
@@ -25,10 +25,44 @@ template <typename T> void run(T &&LB) {
 int main() {
   proteus::init();
 
+  //auto Lambda = [ =, A = proteus::jit_variable(A)
+  //, B = proteus::jit_variable(B) ] __device__(int)
+  //    __attribute__((annotate("jit"))) {
+    //  auto lam = [&]() {
+      //    printf("Lambda A %d\n", A);
+      //    printf("Lambda B %d\n", B);
+      //  };
+      //  lam();
+      //};
   int A = 42;
-  auto Lambda =
-      [=, A = proteus::jit_variable(A)] __device__()
-          __attribute__((annotate("jit"))) { printf("Lambda A %d\n", A); };
+  int B = 28;
+  int C = 1;
+  int D = 12;
+  auto Lambda = [=,
+    A = proteus::jit_variable(A),
+    B = proteus::jit_variable(B),
+    C = proteus::jit_variable(C),
+    D = proteus::jit_variable(D)
+   ]
+   __device__(int)
+   __attribute__((annotate("jit"))) {
+    int tmp = C*A;
+    auto lam = [&]() {
+      auto res = proteus::shared_array<int>(C*B);
+      auto res2 = proteus::shared_array<int>(D*B);
+      return C*B + D*B;
+    };
+    return lam() + tmp;
+  };
+  // auto Lambda = [=, A = proteus::jit_variable(A)
+  // , B = proteus::jit_variable(B)] __device__(int) {
+    // double* arr = proteus::shared_array<double>(A*B);
+    // arr[0] = A;
+    // arr[1] = B;
+    //
+    // printf("Lambda A %f\n", arr[0]);
+    // printf("Lambda B %f\n", arr[1]);
+  // };
   run(Lambda);
   run(Lambda);
   run(Lambda);

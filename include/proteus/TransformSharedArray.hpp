@@ -42,8 +42,10 @@ public:
           assert(CB->arg_size() == 2 && "Expected 2 arguments: N and sizeof");
           int64_t N;
           int64_t Sizeof;
-          if (!getConstantValue(CB->getArgOperand(0), N, M.getDataLayout()))
+          if (!getConstantValue(CB->getArgOperand(0), N, M.getDataLayout())) {
+            M.print(llvm::outs(),nullptr);
             PROTEUS_FATAL_ERROR("Expected constant N argument");
+          }
           if (!getConstantValue(CB->getArgOperand(1), Sizeof,
                                 M.getDataLayout()))
             PROTEUS_FATAL_ERROR("Expected constant Sizeof argument");
