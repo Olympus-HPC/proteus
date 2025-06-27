@@ -82,14 +82,17 @@ inline const SmallVector<StringRef> &threadIdxZFnName() {
 
 } // namespace detail
 
-inline void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
-                                     int BlockSize) {
+inline void setLaunchBoundsForKernel(Function &F, int MaxThreadsPerBlock,
+                                     int MinBlocksPerSM = -1) {
+  auto &M = *F.getParent();
   NamedMDNode *NvvmAnnotations = M.getNamedMetadata("nvvm.annotations");
   assert(NvvmAnnotations && "Expected non-null nvvm.annotations metadata");
   // TODO: fix hardcoded 1024 as the maximum, by reading device
   // properties.
   // TODO: set min GridSize.
-  int MaxThreads = std::min(1024, BlockSize);
+  assert(MinBlocksPerSM == -1 &&
+         "We currently do not support setting min blocks per sm");
+  int MaxThreads = std::min(1024, MaxThreadsPerBlock);
   auto *FuncMetadata = ConstantAsMetadata::get(&F);
   auto *MaxntidxMetadata = MDString::get(M.getContext(), "maxntidx");
   auto *MaxThreadsMetadata = ConstantAsMetadata::get(

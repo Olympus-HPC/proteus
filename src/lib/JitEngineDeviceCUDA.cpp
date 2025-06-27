@@ -123,7 +123,7 @@ JitEngineDeviceCUDA::extractModule(BinaryInfo &BinInfo) {
 void JitEngineDeviceCUDA::setLaunchBoundsForKernel(Module &M, Function &F,
                                                    size_t GridSize,
                                                    int BlockSize) {
-  proteus::setLaunchBoundsForKernel(M, F, GridSize, BlockSize);
+  proteus::setLaunchBoundsForKernel(F, BlockSize);
 }
 
 CUfunction JitEngineDeviceCUDA::getKernelFunctionFromImage(StringRef KernelName,
