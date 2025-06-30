@@ -1,12 +1,12 @@
-#include "llvm/IR/Module.h"
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/Passes/PassBuilder.h"
-#include "llvm/IR/PassManager.h"
-#include "llvm/Transforms/Scalar/SCCP.h"
-#include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Scalar/SCCP.h"
 
 #ifndef PROTEUS_PROPAGATE_CONSTANTS_HPP
 #define PROTEUS_PROPAGATE_CONSTANTS_HPP
@@ -16,7 +16,7 @@
 namespace proteus {
 class PropagateConstants {
 public:
-static void runConstantPropagation(llvm::Module &M) {
+  static void runConstantPropagation(llvm::Module &M) {
     llvm::PassBuilder PB;
 
     llvm::LoopAnalysisManager LAM;
@@ -35,7 +35,7 @@ static void runConstantPropagation(llvm::Module &M) {
     llvm::FunctionPassManager FPM;
     FPM.addPass(llvm::SCCPPass());
     FPM.addPass(llvm::InstCombinePass());
-    FPM.addPass(llvm::ADCEPass());  // Optional but helps remove unused code
+    FPM.addPass(llvm::ADCEPass()); // Optional but helps remove unused code
 
     // Module-level pass to apply FPM
     llvm::ModulePassManager MPM;
@@ -43,7 +43,7 @@ static void runConstantPropagation(llvm::Module &M) {
 
     // Run the pipeline
     MPM.run(M, MAM);
-}
+  }
 };
 } // namespace proteus
 

@@ -47,6 +47,7 @@ int main() {
    __device__(int)
    __attribute__((annotate("jit"))) {
     int tmp = C*A;
+    proteus::shared_array<int>(tmp);
     auto lam = [&]() {
       auto res = proteus::shared_array<int>(C*B);
       auto res2 = proteus::shared_array<int>(D*B);

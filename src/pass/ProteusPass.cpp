@@ -1694,8 +1694,7 @@ private:
         DEBUG(Logger::logs("proteus-pass") << "call: " << *CB << "\n");
 
         Value *V = FindStorePtr(CB);
-        llvm::outs()<<"KWORD\n";
-        V->print(llvm::outs());
+
         GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(V);
         if (GEP) {
           DEBUG(Logger::logs("proteus-pass") << "gep: " << *GEP << "\n");

@@ -27,16 +27,30 @@ int main(int argc, char **argv) {
 
   int A = 42;
   int B = 28;
-
-  auto Lambda = [=, A = proteus::jit_variable(A)
-  , B = proteus::jit_variable(B)] __device__(int) {
-    double* arr = proteus::shared_array<double>(A*B);
-    arr[0] = A;
-    arr[1] = B;
-    
-    printf("shared elem 0 %f\n", arr[0]);
-    printf("shared elem 1 %f\n", arr[1]);
+  int C = 1;
+  int D = 12;
+  auto Lambda = [=,
+    A = proteus::jit_variable(A),
+    B = proteus::jit_variable(B),
+    C = proteus::jit_variable(C),
+    D = proteus::jit_variable(D)
+   ]
+   __device__(int)
+   __attribute__((annotate("jit"))) {
+    int tmp = C*A;
+    proteus::shared_array<int>(tmp);
+    auto lam = [&]() {
+      proteus::shared_array<int>(A);
+      auto lam = [&]() {
+        auto res = proteus::shared_array<int>(C*B);
+        auto res2 = proteus::shared_array<int>(D*B);
+        return C*B + D*B;
+      };
+      lam();
+    };
+    return lam();
   };
+
   run(Lambda);
   run(Lambda);
   run(Lambda);
