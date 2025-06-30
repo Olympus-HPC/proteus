@@ -101,62 +101,76 @@ public:
           << "{" << Arg.Value.Int64Val << ", " << Arg.Slot << " }\n";
     }
 #endif
-// The below implementation works for lambdas where the entire capture list is a runtime
-// constant, and does not have a complex struct type (which precludes all RAJA launch lambdas)
-#if 0
-    Type* LambdaClassType = nullptr;
-    for (User *User : LambdaClass->users()) {
-      if (auto *GEP = dyn_cast<GetElementPtrInst>(User)) {
-        LambdaClassType = GEP->getSourceElementType();
+    // Check for all allocated types
+    DenseSet<Type*> NestedLambdaTypes;
+    std::queue<std::pair<Value*, Type*>> Worklist;
+    for (BasicBlock &BB : F) {
+      for (Instruction &I : BB) {
+        if (auto* Alloc = dyn_cast<AllocaInst>(&I); Alloc) {
+          Type* AllocatedType = Alloc->getAllocatedType();
+          StringRef Name = AllocatedType->getStructName();
+          if (Name.contains(".anon")) {
+            NestedLambdaTypes.insert(AllocatedType);
+            Worklist.push(std::make_pair(Alloc, AllocatedType));
+          }
+        }
       }
     }
-    if (!LambdaClassType) {
-      PROTEUS_FATAL_ERROR("No GEP found for lambda class");
-    }
-    StructType* LambdaStructType = dyn_cast<StructType>(LambdaClassType);
-    if (!LambdaStructType) {
-      PROTEUS_FATAL_ERROR("GEP source element type not a struct");
-    }
-
-    llvm::outs() << *LambdaStructType << "\n";
-
-    ArrayRef<Type*> NonConstElements = LambdaStructType->elements();
-    DenseMap<int, RuntimeConstant> RCMap;
-    SmallVector<Constant*> Fields;
-    for (const auto& RC: RCVec) {
-      RCMap[RC.Slot] = RC;
-    }
-    for (int32_t Idx = 0; Idx < NonConstElements.size(); ++Idx) {
-      Type* ElemType = NonConstElements[Idx];
-      if (RCMap.contains(Idx)) {
-        Fields.push_back(getConstant(M.getContext(), NonConstElements[Idx], RCMap[Idx]));
-      } else {
-        PROTEUS_FATAL_ERROR("All fields must be fixed");
+    // Collect all GEP into nested types
+    DenseMap<Value*, int> GEPIntoNestedLambda;
+    DenseMap<Value*, int> GEPIntoBaseLambda;
+    DenseMap<int, int> NestedToBaseIndex;
+    for (BasicBlock &BB : F) {
+      for (Instruction &I : BB) {
+        if (auto* GEP = dyn_cast<GetElementPtrInst>(&I); GEP) {
+          auto *GEPSlot = GEP->getOperand(GEP->getNumOperands() - 1);
+          ConstantInt *CI = dyn_cast<ConstantInt>(GEPSlot);
+          int slot = CI->getZExtValue();
+          if (NestedLambdaTypes.contains(GEP->getSourceElementType())) {
+            GEPIntoNestedLambda[GEP] = slot;
+          } else if (GEP->getPointerOperand() == LambdaClass) {
+            // Can this be broken? Is it more reliable for this check to be by type?
+            GEPIntoBaseLambda[GEP] = slot;
+          }
+        }
       }
     }
-    Constant* ConstStruct = ConstantStruct::get(LambdaStructType, Fields);
-    GlobalVariable *GV = new GlobalVariable(M,
-                                            LambdaStructType,
-                                            /*isConstant=*/true,
-                                            GlobalValue::InternalLinkage,
-                                            ConstStruct,
-                                            "my_global_struct",
-                                            nullptr,
-                                            llvm::GlobalVariable::NotThreadLocal,
-                                            0
-                                          );
-    llvm::outs() << "GV ADDR SPACE " << GV->getAddressSpace() << "\n";
+
+    DenseSet<Value*> Launches;
+    for (BasicBlock &BB : F) {
+      for (Instruction &I : BB) {
+        if (auto* Store = dyn_cast<StoreInst>(&I); Store) {
+          if (GEPIntoNestedLambda.contains(Store->getPointerOperand()) &&
+              GEPIntoBaseLambda.contains(Store->getValueOperand())) {
+            NestedToBaseIndex[GEPIntoNestedLambda[Store->getPointerOperand()]] = GEPIntoBaseLambda[Store->getValueOperand()];
+          }
+      }
+    }
+    // Identify nested lambda launches
+    std::queue<std::pair<Value*, Type*>> FunctionsToReplace;
+    DenseSet<Value*> visited;
+    while (!Worklist.empty()) {
+      auto& [Val, Ty] = Worklist.front();
+      Worklist.pop();
+      if (visited.contains(Val)) {
+        continue;
+      }
+      visited.insert(Val);
+      if (auto* CB = dyn_cast<CallBase>(Val); CB) {
+        FunctionsToReplace.push(std::make_pair(CB->getCalledFunction()->getArgOperand(0), Ty));
+      }
+      for (auto* Usr : Val->users()) {
+        Worklist.push(std::make_pair(Usr,Ty));
+      }
+    }
 
 
-for (User *User : LambdaClass->users()) {
-   llvm::outs() << "LAMBDA USR " << *User << "\n";
-}
-#endif
     DenseSet<Value*> visited;
     DenseMap<Value*, int> ValToSlot;
     std::queue<std::pair<Value*, int>> to_visit;
-    for (User *User : LambdaClass->users()) {
-      to_visit.push(std::make_pair(User, -1));
+   // std::queue<std::pair<Value*, Type*>> ReplaceLoadsWorklist;
+    for (const auto& Pair : FunctionsToReplace) {
+      to_visit.push(std::make_pair(Pair.first, -1));
     }
     while (!to_visit.empty()) {
       auto* CurUser = to_visit.front().first;
@@ -205,17 +219,7 @@ for (User *User : LambdaClass->users()) {
           ValToSlot[PtrUser] = slot == -1 ? 0: slot;
           llvm::outs() << *PtrUser << "\n";
         }
-      } else if (auto* CB = dyn_cast<CallBase>(CurUser); CB) {
-        auto* Fn = CB->getCalledFunction();
-        for (unsigned i = 0; i < CB->arg_size(); ++i) {
-          llvm::Value *argVal = CB->getArgOperand(i);
-
-          if (ValToSlot.contains(argVal)) {
-            llvm::outs()<< "ADDING " << *Fn->getArg(i) << "TO LIST\n";
-            to_visit.push(std::make_pair(Fn->getArg(i), ValToSlot[argVal]));
-          }
-        }
-      } else {
+      }  else {
         for (auto* Usr : CurUser->users()) {
           to_visit.push(std::make_pair(Usr, slot));
         }
@@ -224,52 +228,6 @@ for (User *User : LambdaClass->users()) {
 
       PROTEUS_DBG(Logger::logs("proteus") << "\t users" << "\n");
 
-#if 0
-    std::queue<User*> q;
-    for (User *Usr : LambdaClass->users()) {
-      q.push(Usr);
-    }
-    while(!q.empty()) {
-      auto* User = q.front();
-      q.pop();
-      llvm::outs() << "LAMBDA USR " << *User << "\n";
-      //continue;
-      if (auto* LI = dyn_cast<LoadInst>(User); LI ) {
-        auto Ty = LI->getType();
-        int slot = -1;
-        if (Ty->isPointerTy()) {
-          slot = 0;
-          LI->setOperand(0, GV);
-        } else {
-          for (auto &Arg : RCVec) {
-            if (Arg.Slot == 0) {
-              Constant *C = getConstant(M.getContext(), User->getType(), Arg);
-              User->replaceAllUsesWith(C);
-              llvm::outs ()
-                          << "[LambdaSpec] Replacing " << *User << " with " << *C
-                          << "\n";
-            }
-          }
-        }
-      } else if (auto *GEP = dyn_cast<GetElementPtrInst>(User)) {
-        auto *GEPSlot = GEP->getOperand(User->getNumOperands() - 1);
-        Type* AnonClassType = GEP->getSourceElementType();
-        llvm::outs() << *AnonClassType << "\n";
-        ConstantInt *CI = dyn_cast<ConstantInt>(GEPSlot);
-        int Slot = CI->getZExtValue();
-        llvm::outs() << "KWORD " << *GEP << "\n";
-        llvm::outs() << "ADDR SPACE " << GEP->getAddressSpace() << "\n";
-        llvm::outs() << "OLD BASE PTR " << *GEP->getPointerOperand() << "\n";
-        GEP->setOperand(0, GV);
-        //GEP->setSourceElementType()
-      } else if (auto *Store = dyn_cast<StoreInst>(User)) {
-        llvm::IRBuilder<> Builder(M.getContext());
-        llvm::Value *Loaded = Builder.CreateStore(GV, Store->getPointerOperand());
-        Store->replaceAllUsesWith(Loaded);
-
-      }
-    }
-    #endif
   }
 };
 } // namespace proteus
