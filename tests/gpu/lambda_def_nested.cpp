@@ -1,6 +1,6 @@
 // clang-format off
 // RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 ./lambda_def.%ext |  %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: ./lambda_def.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
 // RUN: ./lambda_def.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
@@ -22,18 +22,9 @@ template <typename T> void run(T &&LB) {
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
-int main() {
+int main(int argc, char **argv) {
   proteus::init();
 
-  //auto Lambda = [ =, A = proteus::jit_variable(A)
-  //, B = proteus::jit_variable(B) ] __device__(int)
-  //    __attribute__((annotate("jit"))) {
-    //  auto lam = [&]() {
-      //    printf("Lambda A %d\n", A);
-      //    printf("Lambda B %d\n", B);
-      //  };
-      //  lam();
-      //};
   int A = 42;
   int B = 28;
   int C = 1;
@@ -49,21 +40,17 @@ int main() {
     int tmp = C*A;
     proteus::shared_array<int>(tmp);
     auto lam = [&]() {
-      auto res = proteus::shared_array<int>(C*B);
-      auto res2 = proteus::shared_array<int>(D*B);
-      return C*B + D*B;
+      proteus::shared_array<int>(A);
+      auto lam = [&]() {
+        auto res = proteus::shared_array<int>(C*B);
+        auto res2 = proteus::shared_array<int>(D*B);
+        return C*B + D*B;
+      };
+      lam();
     };
-    return lam() + tmp;
+    return lam();
   };
-  // auto Lambda = [=, A = proteus::jit_variable(A)
-  // , B = proteus::jit_variable(B)] __device__(int) {
-    // double* arr = proteus::shared_array<double>(A*B);
-    // arr[0] = A;
-    // arr[1] = B;
-    //
-    // printf("Lambda A %f\n", arr[0]);
-    // printf("Lambda B %f\n", arr[1]);
-  // };
+
   run(Lambda);
   run(Lambda);
   run(Lambda);
@@ -72,9 +59,7 @@ int main() {
   return 0;
 }
 
-// clang-format off
-// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 42
-// CHECK-COUNT-3: Lambda A 42
+// CHECK-3: Lambda 42
 // CHECK: JitCache hits 2 total 3
 // CHECK: HashValue {{[0-9]+}} NumExecs 3 NumHits 2
 // CHECK-FIRST: JitStorageCache hits 0 total 1

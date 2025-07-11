@@ -20,6 +20,7 @@
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Debug.h"
 #include "proteus/Utils.h"
+#include <queue>
 
 namespace proteus {
 
@@ -55,9 +56,197 @@ inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
 }
 
 class TransformLambdaSpecialization {
+  static bool isLambdaFunction(llvm::Function *F) {
+    llvm::StringRef name = F->getName();
+    return name.contains("_ZZ") && name.contains("clE");
+  }
+  static void getIndexMap(Module &M, Function &F, Value *LambdaClass,
+                          DenseMap<int, int> &NestedToBaseIndex,
+                          Type *NestedLambdaType) {
+    // Collect all GEP into nested types
+    DenseMap<Value *, int> GEPIntoNestedLambda;
+    DenseMap<Value *, int> GEPIntoBaseLambda;
+    for (BasicBlock &BB : F) {
+      for (Instruction &I : BB) {
+        if (auto *GEP = dyn_cast<GetElementPtrInst>(&I); GEP) {
+          auto *GEPSlot = GEP->getOperand(GEP->getNumOperands() - 1);
+          ConstantInt *CI = dyn_cast<ConstantInt>(GEPSlot);
+          int slot = CI->getZExtValue();
+          if (NestedLambdaType == GEP->getSourceElementType()) {
+            GEPIntoNestedLambda[GEP] = slot;
+          } else if (GEP->getPointerOperand() == LambdaClass) {
+            // Can this be broken? Is it more reliable for this check to be by
+            // type?
+            GEPIntoBaseLambda[GEP] = slot;
+          }
+        } else if (auto *Alloc = dyn_cast<AllocaInst>(&I); Alloc) {
+          Type *AllocatedType = Alloc->getAllocatedType();
+          if (AllocatedType == NestedLambdaType) {
+            // store the base pointer with the subclass's GEPs
+            GEPIntoNestedLambda[Alloc] = 0;
+            for (auto *Usr : Alloc->users()) {
+              GEPIntoNestedLambda[Usr] = 0;
+            }
+          }
+        }
+      }
+    }
+
+    DenseSet<Value *> Launches;
+    for (BasicBlock &BB : F) {
+      for (Instruction &I : BB) {
+        if (auto *Store = dyn_cast<StoreInst>(&I); Store) {
+          if (GEPIntoNestedLambda.contains(Store->getPointerOperand()) &&
+              GEPIntoBaseLambda.contains(Store->getValueOperand())) {
+            NestedToBaseIndex[GEPIntoNestedLambda[Store->getPointerOperand()]] =
+                GEPIntoBaseLambda[Store->getValueOperand()];
+          }
+        }
+      }
+    }
+  }
+
+  static void
+  getEnclosedLambdaTypes(Module &M, Function &F, Value *LambdaClass,
+                         DenseSet<Type *> &NestedLambdaTypes,
+                         DenseMap<Type *, Function *> &EnclosedLambdas,
+                         DenseMap<Type *, std::queue<std::pair<Value *, int>>>
+                             &FunctionsToReplace) {
+    std::queue<std::pair<Value *, Type *>> Worklist;
+    for (BasicBlock &BB : F) {
+      for (Instruction &I : BB) {
+        if (auto *Alloc = dyn_cast<AllocaInst>(&I); Alloc) {
+          Type *AllocatedType = Alloc->getAllocatedType();
+          StringRef Name = AllocatedType->getStructName();
+          if (Name.contains(".anon")) {
+            NestedLambdaTypes.insert(AllocatedType);
+            Worklist.push(std::make_pair(Alloc, AllocatedType));
+          }
+        }
+      }
+    }
+
+    DenseSet<Value *> visited;
+    while (!Worklist.empty()) {
+      auto &[Val, Ty] = Worklist.front();
+      llvm::outs() << "USE OF ALLOCATED CLASS " << *Val << "\n";
+      Worklist.pop();
+      if (visited.contains(Val)) {
+        continue;
+      }
+      visited.insert(Val);
+
+      if (auto *CB = dyn_cast<CallBase>(Val);
+          CB && isLambdaFunction(CB->getCalledFunction())) {
+        FunctionsToReplace[Ty].push(
+            std::make_pair(CB->getCalledFunction()->getArg(0), -1));
+        EnclosedLambdas[Ty] = CB->getCalledFunction();
+      }
+      for (auto *Usr : Val->users()) {
+        Worklist.push(std::make_pair(Usr, Ty));
+      }
+    }
+  }
+
+  static void
+  replaceLoadInstWithConst(Module &M, Function &F,
+                           std::queue<std::pair<Value *, int>> &to_visit,
+                           DenseMap<int, int> &NestedToBaseIndex,
+                           const SmallVector<RuntimeConstant> &RCVec) {
+    DenseMap<Value *, int> ValToSlot;
+    DenseSet<Value *> visited;
+
+    while (!to_visit.empty()) {
+      auto [CurUser, slot] = to_visit.front();
+      to_visit.pop();
+      if (visited.contains(CurUser))
+        continue;
+      llvm::outs() << "processing " << *CurUser << "SLOT = " << slot << "\n";
+      visited.insert(CurUser);
+      ValToSlot[CurUser] = slot;
+      if (auto *LI = dyn_cast<LoadInst>(CurUser); LI) {
+        auto Ty = LI->getType();
+        if (Ty->isPointerTy()) {
+          for (auto *Usr : CurUser->users())
+            to_visit.push(std::make_pair(Usr, slot));
+          continue;
+        }
+        if (slot == -1) {
+          slot = 0;
+        }
+
+        for (auto &Arg : RCVec) {
+          if (!NestedToBaseIndex.contains(slot)) {
+            llvm::outs() << "couldn't find slow " << slot << " from\n";
+            for (auto [k, v] : NestedToBaseIndex) {
+              llvm::outs() << k << " v " << v << "\n";
+            }
+            PROTEUS_FATAL_ERROR("ERROR");
+          }
+          if (Arg.Slot == NestedToBaseIndex[slot]) {
+            Constant *C = getConstant(M.getContext(), CurUser->getType(), Arg);
+            CurUser->replaceAllUsesWith(C);
+            llvm::outs() << "[LambdaSpec] Replacing " << *CurUser << " with "
+                         << *C << "\n";
+          }
+        }
+      } else if (auto *GEP = dyn_cast<GetElementPtrInst>(CurUser); GEP) {
+        auto *GEPSlot = GEP->getOperand(GEP->getNumOperands() - 1);
+        ConstantInt *CI = dyn_cast<ConstantInt>(GEPSlot);
+        int Slot = slot == -1 ? CI->getZExtValue() : slot;
+
+        for (auto *usr : GEP->users()) {
+          to_visit.push(std::make_pair(usr, Slot));
+          ValToSlot[CurUser] = Slot;
+        }
+
+      } else if (auto *Store = dyn_cast<StoreInst>(CurUser); Store) {
+        to_visit.push(
+            std::make_pair(Store->getPointerOperand(), slot == -1 ? 0 : slot));
+        ValToSlot[Store->getPointerOperand()] = slot == -1 ? 0 : slot;
+        for (auto *PtrUser : Store->getPointerOperand()->users()) {
+          // Stores are used to access the first data member in the struct
+          to_visit.push(std::make_pair(PtrUser, slot == -1 ? 0 : slot));
+          ValToSlot[PtrUser] = slot == -1 ? 0 : slot;
+          llvm::outs() << *PtrUser << "\n";
+        }
+      } else {
+        for (auto *Usr : CurUser->users()) {
+          to_visit.push(std::make_pair(Usr, slot));
+        }
+      }
+    }
+  }
+
+  static void transformFunction(Module &M, Function &F, Value *LambdaClass,
+                                DenseMap<int, int> &ParentIdxMap,
+                                const SmallVector<RuntimeConstant> &RCVec) {
+    DenseSet<Type *> NestedLambdaTypes;
+    DenseMap<Type *, std::queue<std::pair<Value *, int>>> FunctionsToReplace;
+    DenseMap<Type *, Function *> EnclosedLambdaFunctions;
+    getEnclosedLambdaTypes(M, F, LambdaClass, NestedLambdaTypes,
+                           EnclosedLambdaFunctions, FunctionsToReplace);
+
+    for (auto *NestedLambdaType : NestedLambdaTypes) {
+      DenseMap<int, int> NestedToBaseIndex;
+      getIndexMap(M, F, LambdaClass, NestedToBaseIndex, NestedLambdaType);
+      for (const auto &[k, v] : NestedToBaseIndex) {
+        NestedToBaseIndex[k] = ParentIdxMap[v];
+      }
+      transformFunction(M, *EnclosedLambdaFunctions[NestedLambdaType],
+                        EnclosedLambdaFunctions[NestedLambdaType]->getArg(0),
+                        NestedToBaseIndex, RCVec);
+      auto &FunctionsWorklist = FunctionsToReplace[NestedLambdaType];
+      llvm::outs() << "REPLACING " << F << "\n";
+      replaceLoadInstWithConst(M, F, FunctionsWorklist, NestedToBaseIndex,
+                               RCVec);
+    }
+  }
+
 public:
   static void transform(Module &M, Function &F,
                         const SmallVector<RuntimeConstant> &RCVec) {
+    M.print(llvm::outs(), nullptr);
     auto *LambdaClass = F.getArg(0);
     PROTEUS_DBG(Logger::logs("proteus")
                 << "[LambdaSpec] Function: " << F.getName() << " RCVec size "
@@ -71,52 +260,31 @@ public:
           << "{" << Arg.Value.Int64Val << ", " << Arg.Slot << " }\n";
     }
 #endif
-
-    auto TraceOut = [](int Slot, Constant *C) {
-      SmallString<128> S;
-      raw_svector_ostream OS(S);
-      OS << "[LambdaSpec] Replacing slot " << Slot << " with " << *C << "\n";
-
-      return S;
-    };
+    // We use a dense map to track the indirection between nested lambda types.
+    // IE for
+    //  int a;
+    //  int b;
+    //  [ =] () {
+    //   int c = a+ b;
+    //   [&] {
+    //     int d = c + b;
+    //   };
+    // }
+    // The zeroth field of the nested struct will point to the first field of
+    // the parent. This indirection must be tracked to accurately replace
+    // constants.
+    DenseMap<int, int> IdentityMap;
+    for (const auto &RC : RCVec) {
+      IdentityMap[RC.Slot] = RC.Slot;
+    }
+    std::queue<std::pair<Value *, int>> TopLevelQ;
+    TopLevelQ.push(std::make_pair(LambdaClass, -1));
+    replaceLoadInstWithConst(M, F, TopLevelQ, IdentityMap, RCVec);
+    transformFunction(M, F, LambdaClass, IdentityMap, RCVec);
 
     PROTEUS_DBG(Logger::logs("proteus") << "\t users" << "\n");
-    for (User *User : LambdaClass->users()) {
-      PROTEUS_DBG(Logger::logs("proteus") << *User << "\n");
-      if (isa<LoadInst>(User)) {
-        for (auto &Arg : RCVec) {
-          if (Arg.Slot == 0) {
-            Constant *C = getConstant(M.getContext(), User->getType(), Arg);
-            User->replaceAllUsesWith(C);
-            PROTEUS_DBG(Logger::logs("proteus") << TraceOut(Arg.Slot, C));
-            if (Config::get().ProteusTraceOutput)
-              Logger::trace(TraceOut(Arg.Slot, C));
-          }
-        }
-      } else if (auto *GEP = dyn_cast<GetElementPtrInst>(User)) {
-        auto *GEPSlot = GEP->getOperand(User->getNumOperands() - 1);
-        ConstantInt *CI = dyn_cast<ConstantInt>(GEPSlot);
-        int Slot = CI->getZExtValue();
-        for (auto &Arg : RCVec) {
-          if (Arg.Slot == Slot) {
-            for (auto *GEPUser : GEP->users()) {
-              auto *LI = dyn_cast<LoadInst>(GEPUser);
-              if (!LI)
-                PROTEUS_FATAL_ERROR("Expected load instruction");
-              Type *LoadType = LI->getType();
-              Constant *C = getConstant(M.getContext(), LoadType, Arg);
-              LI->replaceAllUsesWith(C);
-              PROTEUS_DBG(Logger::logs("proteus") << TraceOut(Arg.Slot, C));
-              if (Config::get().ProteusTraceOutput)
-                Logger::trace(TraceOut(Arg.Slot, C));
-            }
-          }
-        }
-      }
-    }
   }
 };
-
 } // namespace proteus
 
 #endif
