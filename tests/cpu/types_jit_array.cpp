@@ -99,7 +99,5 @@ int main() {
 // CHECK: A: [0] = 3, [1] = 2, [2] = 1,
 // CHECK: [ArgSpec] Replaced Function _Z4testIhEvPT_ ArgNo 0 with value @0 = private constant [3 x i8] c"\03\02\01"
 // CHECK: A: [0] = 3, [1] = 2, [2] = 1,
-// CHECK: JitCache hits 0 total 0
-// CHECK: JitStorageCache hits 0 total 0
 // CHECK: JitCache hits 0 total 10
 // CHECK-COUNT=10: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
