@@ -11,10 +11,11 @@
 #ifndef PROTEUS_COMPILERINTERFACETYPES_H
 #define PROTEUS_COMPILERINTERFACETYPES_H
 
-#include "proteus/Error.h"
+#include <cstdint>
 #include <cstring>
 #include <optional>
-#include <stdint.h>
+
+#include "proteus/Error.h"
 
 namespace proteus {
 
