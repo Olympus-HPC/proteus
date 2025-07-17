@@ -1,6 +1,8 @@
 #ifndef PROTEUS_COMPILER_INTERFACE_RUNTIME_CONSTANT_INFO_H
 #define PROTEUS_COMPILER_INTERFACE_RUNTIME_CONSTANT_INFO_H
 
+#include <optional>
+
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Error.h"
 
