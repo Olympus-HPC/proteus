@@ -52,7 +52,7 @@ inline std::enable_if_t<std::is_scalar<T>::value, HashT> hashValue(const T &V) {
 template <typename T>
 inline HashT hashRuntimeConstantArray(const RuntimeConstant &RC) {
   return stable_hash_combine_string(
-      StringRef{reinterpret_cast<const char *>(&RC.Value.PtrVal),
+      StringRef{reinterpret_cast<const char *>(RC.Value.PtrVal),
                 sizeof(T) * RC.OptArrInfo->NumElts});
 }
 
