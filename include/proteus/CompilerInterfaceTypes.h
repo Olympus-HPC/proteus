@@ -34,6 +34,8 @@ enum RuntimeConstantType : int32_t {
   END
 };
 
+// This struct holds the information passed from the compiler pass for a runtime
+// constant argument to a function.
 struct RuntimeConstantArgInfo {
   RuntimeConstantType Type;
   int32_t Pos;
@@ -42,6 +44,10 @@ struct RuntimeConstantArgInfo {
       : Type(Type), Pos(Pos) {}
 };
 
+// This struct holds the information from the compiler pass for a runtime
+// constant array, that is the number of elements, if a known compile time
+// constant, or a runtime constant argument as the number of elements, and the
+// element type.
 struct RuntimeConstantArrayInfo {
   int32_t NumElts = 0;
   RuntimeConstantType EltType;
@@ -58,6 +64,9 @@ struct RuntimeConstantArrayInfo {
         OptNumEltsRCInfo{RuntimeConstantArgInfo{NumEltsType, NumEltsPos}} {}
 };
 
+// This struct holds the information from the compiler pass for a runtime
+// constant, be it a scalar or an array. If the runtime constant is an array,
+// there is an optional variable to store the runtime constant array info.
 struct RuntimeConstantInfo {
   RuntimeConstantArgInfo ArgInfo;
   std::optional<RuntimeConstantArrayInfo> OptArrInfo = std::nullopt;
@@ -99,11 +108,17 @@ struct RuntimeConstantInfo {
   }
 };
 
+// This struct holds the concrete array information, the number of elements and
+// element type, for the runtime library, constructed using the runtime constant
+// info provided by the compiler pass.
 struct ArrayInfo {
   int32_t NumElts;
   RuntimeConstantType EltType;
 };
 
+// This union stores all possible runtime constant values.
+// TODO: Try std::variant as better type-checked interface, check performance
+// implications.
 union RuntimeConstantValue {
   bool BoolVal;
   int8_t Int8Val;
@@ -115,6 +130,8 @@ union RuntimeConstantValue {
   void *PtrVal;
 };
 
+// This struct holds all information used by the runtime library for a runtime
+// constant, be it a scalar or an array, for specialization.
 struct RuntimeConstant {
   RuntimeConstantValue Value;
   RuntimeConstantType Type;

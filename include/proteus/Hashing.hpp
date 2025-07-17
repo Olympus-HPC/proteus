@@ -51,13 +51,9 @@ inline std::enable_if_t<std::is_scalar<T>::value, HashT> hashValue(const T &V) {
 
 template <typename T>
 inline HashT hashRuntimeConstantArray(const RuntimeConstant &RC) {
-  T *TypedPtr = static_cast<T *>(RC.Value.PtrVal);
-  HashT HashValue = hashValue(TypedPtr[0]);
-  for (size_t I = 1; I < static_cast<size_t>(RC.OptArrInfo->NumElts); ++I)
-    stable_hash_combine(HashValue.getValue(),
-                        hashValue(TypedPtr[I]).getValue());
-
-  return HashValue;
+  return stable_hash_combine_string(
+      StringRef{reinterpret_cast<const char *>(&RC.Value.PtrVal),
+                sizeof(T) * RC.OptArrInfo->NumElts});
 }
 
 inline HashT hashArrayRefElement(const RuntimeConstant &RC) {

@@ -15,7 +15,9 @@
 #include <llvm/Support/Debug.h>
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Config.hpp"
 #include "proteus/Debug.h"
+#include "proteus/Logger.hpp"
 #include "proteus/RuntimeConstantTypeHelpers.h"
 
 namespace proteus {
@@ -25,21 +27,13 @@ using namespace llvm;
 class TransformArgumentSpecialization {
 private:
   template <typename T>
-  static void processArray(const RuntimeConstant &RC,
-                           SmallVector<Constant *> &Constants, Type *EltType) {
+  static ArrayRef<T> createArrayRef(const RuntimeConstant &RC) {
     T *TypedPtr = static_cast<T *>(RC.Value.PtrVal);
     if (RC.OptArrInfo->NumElts <= 0)
       PROTEUS_FATAL_ERROR("Invalid number of elements in array: " +
                           std::to_string(RC.OptArrInfo->NumElts));
-    for (size_t I = 0; I < static_cast<size_t>(RC.OptArrInfo->NumElts); ++I) {
-      if constexpr (std::is_floating_point_v<T>) {
-        Constants.push_back(ConstantFP::get(EltType, TypedPtr[I]));
-      } else if constexpr (std::is_integral_v<T>) {
-        Constants.push_back(ConstantInt::get(EltType, TypedPtr[I]));
-      } else {
-        PROTEUS_FATAL_ERROR("Unsupported type: " + __PRETTY_FUNCTION__);
-      }
-    }
+
+    return ArrayRef<T>(TypedPtr, RC.OptArrInfo->NumElts);
   }
 
 public:
@@ -84,42 +78,34 @@ public:
               ConstantInt::get(Type::getInt64Ty(Ctx), RC.Value.Int64Val);
           C = ConstantExpr::getIntToPtr(IntC, ArgType);
         } else if (RC.Type == RuntimeConstantType::ARRAY) {
-          Type *EltType = convertRuntimeConstantTypeToLLVMType(
-              RC.OptArrInfo->EltType, M.getContext());
+          auto CreateConstantDataArray = [&]() {
+            //  Dispatch based on element type.
+            switch (RC.OptArrInfo->EltType) {
+            case RuntimeConstantType::BOOL:
+              return ConstantDataArray::get(M.getContext(),
+                                            createArrayRef<bool>(RC));
+            case RuntimeConstantType::INT8:
+              return ConstantDataArray::get(M.getContext(),
+                                            createArrayRef<int8_t>(RC));
+            case RuntimeConstantType::INT32:
+              return ConstantDataArray::get(M.getContext(),
+                                            createArrayRef<int32_t>(RC));
+            case RuntimeConstantType::INT64:
+              return ConstantDataArray::get(M.getContext(),
+                                            createArrayRef<int64_t>(RC));
+            case RuntimeConstantType::FLOAT:
+              return ConstantDataArray::get(M.getContext(),
+                                            createArrayRef<float>(RC));
+            case RuntimeConstantType::DOUBLE:
+              return ConstantDataArray::get(M.getContext(),
+                                            createArrayRef<double>(RC));
+            default:
+              PROTEUS_FATAL_ERROR("Unsupported array element type: " +
+                                  toString(RC.OptArrInfo->EltType));
+            }
+          };
 
-          SmallVector<Constant *> Constants;
-
-          // Dispatch based on element type.
-          switch (RC.OptArrInfo->EltType) {
-          case RuntimeConstantType::BOOL:
-            processArray<bool>(RC, Constants, EltType);
-            break;
-          case RuntimeConstantType::INT8:
-            processArray<int8_t>(RC, Constants, EltType);
-            break;
-          case RuntimeConstantType::INT32:
-            processArray<int32_t>(RC, Constants, EltType);
-            break;
-          case RuntimeConstantType::INT64:
-            processArray<int64_t>(RC, Constants, EltType);
-            break;
-          case RuntimeConstantType::FLOAT:
-            processArray<float>(RC, Constants, EltType);
-            break;
-          case RuntimeConstantType::DOUBLE:
-            processArray<double>(RC, Constants, EltType);
-            break;
-          case RuntimeConstantType::LONG_DOUBLE:
-            processArray<long double>(RC, Constants, EltType);
-            break;
-          default:
-            PROTEUS_FATAL_ERROR("Unsupported array element type: " +
-                                toString(RC.OptArrInfo->EltType));
-          }
-
-          Constant *CDA = ConstantArray::get(
-              ArrayType::get(EltType, RC.OptArrInfo->NumElts), Constants);
-
+          Constant *CDA = CreateConstantDataArray();
           // Create a global variable to hold the array.
           GlobalVariable *GV = new GlobalVariable(
               M, CDA->getType(), true, GlobalValue::PrivateLinkage, CDA);
