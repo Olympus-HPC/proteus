@@ -51,14 +51,18 @@ inline std::enable_if_t<std::is_scalar<T>::value, HashT> hashValue(const T &V) {
 
 template <typename T>
 inline HashT hashRuntimeConstantArray(const RuntimeConstant &RC) {
+  if (RC.ArrInfo.NumElts <= 0)
+    PROTEUS_FATAL_ERROR("Invalid number of elements in array: " +
+                        std::to_string(RC.ArrInfo.NumElts));
+
   return stable_hash_combine_string(
       StringRef{reinterpret_cast<const char *>(RC.Value.PtrVal),
-                sizeof(T) * RC.OptArrInfo->NumElts});
+                sizeof(T) * RC.ArrInfo.NumElts});
 }
 
 inline HashT hashArrayRefElement(const RuntimeConstant &RC) {
   if (RC.Type == RuntimeConstantType::ARRAY) {
-    switch (RC.OptArrInfo->EltType) {
+    switch (RC.ArrInfo.EltType) {
     case RuntimeConstantType::BOOL:
       return hashRuntimeConstantArray<bool>(RC);
     case RuntimeConstantType::INT8:
@@ -73,7 +77,7 @@ inline HashT hashArrayRefElement(const RuntimeConstant &RC) {
       return hashRuntimeConstantArray<double>(RC);
     default:
       PROTEUS_FATAL_ERROR("Unsupported array element type: " +
-                          toString(RC.OptArrInfo->EltType));
+                          toString(RC.ArrInfo.EltType));
     }
   }
 

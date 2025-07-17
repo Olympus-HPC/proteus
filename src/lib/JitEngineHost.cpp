@@ -24,6 +24,7 @@
 #include <llvm/Object/SymbolSize.h>
 #include <llvm/TargetParser/Host.h>
 
+#include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/CoreLLVM.hpp"
 #include "proteus/JitEngine.hpp"

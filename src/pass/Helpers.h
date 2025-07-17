@@ -6,7 +6,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/TargetParser/Triple.h>
 
-#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/Error.h"
 #include "proteus/Logger.hpp"
 

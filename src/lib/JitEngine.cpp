@@ -148,11 +148,11 @@ SmallVector<RuntimeConstant> JitEngine::getRuntimeConstantValues(
         RuntimeConstantValue RV;
         dispatchGetRuntimeConstantValue(Args[NumEltsPos], NumEltsType, RV);
 
-        RC.OptArrInfo = ArrayInfo{static_cast<int32_t>(RV.Int64Val),
-                                  RCInfo->OptArrInfo->EltType};
+        RC.ArrInfo = ArrayInfo{static_cast<int32_t>(RV.Int64Val),
+                               RCInfo->OptArrInfo->EltType};
 
       } else {
-        RC.OptArrInfo =
+        RC.ArrInfo =
             ArrayInfo{RCInfo->OptArrInfo->NumElts, RCInfo->OptArrInfo->EltType};
       }
     }

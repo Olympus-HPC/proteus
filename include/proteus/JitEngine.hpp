@@ -20,6 +20,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/Target/TargetMachine.h>
 
+#include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/Config.hpp"
 #include "proteus/CoreLLVM.hpp"
 #include "proteus/Debug.h"

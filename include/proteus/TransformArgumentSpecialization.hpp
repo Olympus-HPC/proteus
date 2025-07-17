@@ -29,11 +29,11 @@ private:
   template <typename T>
   static ArrayRef<T> createArrayRef(const RuntimeConstant &RC) {
     T *TypedPtr = static_cast<T *>(RC.Value.PtrVal);
-    if (RC.OptArrInfo->NumElts <= 0)
+    if (RC.ArrInfo.NumElts <= 0)
       PROTEUS_FATAL_ERROR("Invalid number of elements in array: " +
-                          std::to_string(RC.OptArrInfo->NumElts));
+                          std::to_string(RC.ArrInfo.NumElts));
 
-    return ArrayRef<T>(TypedPtr, RC.OptArrInfo->NumElts);
+    return ArrayRef<T>(TypedPtr, RC.ArrInfo.NumElts);
   }
 
 public:
@@ -80,7 +80,7 @@ public:
         } else if (RC.Type == RuntimeConstantType::ARRAY) {
           auto CreateConstantDataArray = [&]() {
             //  Dispatch based on element type.
-            switch (RC.OptArrInfo->EltType) {
+            switch (RC.ArrInfo.EltType) {
             case RuntimeConstantType::BOOL:
               return ConstantDataArray::get(M.getContext(),
                                             createArrayRef<bool>(RC));
@@ -101,7 +101,7 @@ public:
                                             createArrayRef<double>(RC));
             default:
               PROTEUS_FATAL_ERROR("Unsupported array element type: " +
-                                  toString(RC.OptArrInfo->EltType));
+                                  toString(RC.ArrInfo.EltType));
             }
           };
 
