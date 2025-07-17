@@ -972,7 +972,7 @@ private:
     // The prototype is
     // __jit_register_var(const void *HostAddr, const char *VarName).
     FunctionType *JitRegisterVarFnTy =
-        FunctionType::get(Types.PtrTy, {Types.PtrTy, Types.PtrTy},
+        FunctionType::get(Types.VoidTy, {Types.PtrTy, Types.PtrTy},
                           /* isVarArg=*/false);
     FunctionCallee JitRegisterVarFn =
         M.getOrInsertFunction("__jit_register_var", JitRegisterVarFnTy);
