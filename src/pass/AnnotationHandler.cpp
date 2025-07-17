@@ -140,7 +140,8 @@ void AnnotationHandler::parseAnnotations(
   // We append to global annotations the parsed information. This is to have and
   // a common place to store information and also needed for HIP LTO because it
   // uses global annotations to identify kernels.
-  appendToGlobalAnnotations(NewJitAnnotations);
+  if (!NewJitAnnotations.empty())
+    appendToGlobalAnnotations(NewJitAnnotations);
   // If this is device compilation the pass emits a JSON file that stores this
   // information for the host compilation pass to parse for instrumentation.
   // The JSON file is uniquely named using the TU unique file ID.
