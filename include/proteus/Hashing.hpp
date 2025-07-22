@@ -2,6 +2,7 @@
 #define PROTEUS_HASHING_HPP
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/RuntimeConstantTypeHelpers.h"
 #include "proteus/TimeTracing.hpp"
 
 #include <llvm/ADT/ArrayRef.h>
@@ -48,7 +49,38 @@ inline std::enable_if_t<std::is_scalar<T>::value, HashT> hashValue(const T &V) {
       StringRef{reinterpret_cast<const char *>(&V), sizeof(T)});
 }
 
+template <typename T>
+inline HashT hashRuntimeConstantArray(const RuntimeConstant &RC) {
+  if (RC.ArrInfo.NumElts <= 0)
+    PROTEUS_FATAL_ERROR("Invalid number of elements in array: " +
+                        std::to_string(RC.ArrInfo.NumElts));
+
+  return stable_hash_combine_string(
+      StringRef{reinterpret_cast<const char *>(RC.Value.PtrVal),
+                sizeof(T) * RC.ArrInfo.NumElts});
+}
+
 inline HashT hashArrayRefElement(const RuntimeConstant &RC) {
+  if (RC.Type == RuntimeConstantType::ARRAY) {
+    switch (RC.ArrInfo.EltType) {
+    case RuntimeConstantType::BOOL:
+      return hashRuntimeConstantArray<bool>(RC);
+    case RuntimeConstantType::INT8:
+      return hashRuntimeConstantArray<int8_t>(RC);
+    case RuntimeConstantType::INT32:
+      return hashRuntimeConstantArray<int32_t>(RC);
+    case RuntimeConstantType::INT64:
+      return hashRuntimeConstantArray<int64_t>(RC);
+    case RuntimeConstantType::FLOAT:
+      return hashRuntimeConstantArray<float>(RC);
+    case RuntimeConstantType::DOUBLE:
+      return hashRuntimeConstantArray<double>(RC);
+    default:
+      PROTEUS_FATAL_ERROR("Unsupported array element type: " +
+                          toString(RC.ArrInfo.EltType));
+    }
+  }
+
   return stable_hash_combine_string(
       StringRef{reinterpret_cast<const char *>(&RC.Value), sizeof(RC.Value)});
 }

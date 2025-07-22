@@ -8,6 +8,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/JitEngineHost.hpp"
 #include "proteus/LambdaRegistry.hpp"

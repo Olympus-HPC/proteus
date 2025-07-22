@@ -39,6 +39,19 @@ __attribute__((noinline)) __device__ void jit_arg(T V) noexcept;
 #endif
 
 template <typename T>
+__attribute__((noinline)) void
+jit_array(T V, [[maybe_unused]] size_t NumElts,
+          [[maybe_unused]]
+          typename std::remove_pointer<T>::type Velem = 0) noexcept;
+#if defined(__CUDACC__) || defined(__HIP__)
+template <typename T>
+__attribute__((noinline)) __device__ void
+jit_array(T V, [[maybe_unused]] size_t NumElts,
+          [[maybe_unused]]
+          typename std::remove_pointer<T>::type Velem = 0) noexcept;
+#endif
+
+template <typename T>
 static __attribute__((noinline)) T jit_variable(T v, int pos = -1) {
   RuntimeConstant RC;
   std::memcpy(&RC, &v, sizeof(T));

@@ -8,7 +8,7 @@
 
 #include <proteus/JitInterface.hpp>
 
-__attribute__((annotate("jit", "arg=1", "arg=4"))) void
+__attribute__((annotate("jit", R"({"arg":1})", R"({"arg":4})"))) void
 myDaxpy(double A, double *X, double *Y, size_t N) {
   for (std::size_t I{0}; I < N; I++) {
     Y[I] += X[I] * A;

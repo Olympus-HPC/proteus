@@ -21,19 +21,17 @@
 //
 //        __attibute__((annotate("jit", [<argument list>])))
 //
-// Long form, which uses the annotate attribute to specify arguments to
-// specialize but also supports arrays. The long form uses key-value pairs:
-// arg=<1-index argument number>:
+// Long form, which uses the annotate attributes in a JSON dict format to
+// specify arguments to specialize for. Although it is technically possible for
+// users to directly provide the long form notation, the expected usage is that
+// they call proteus::jit_arg or proteus::jit_array instrumentation functions,
+// esp. since reconstructing the expected JSON form and providing explicit
+// runtime type enum values is not ideal.
 //
-//        __attribute__((annotate("jit", ["arg=<N>"]*)))
-//
-// Those annotations populate the llvm.global.annotations global variable in the
-// LLVM IR.
-//
-// Besides attribute-based annotations, the handler supports annotations through
-// the C++ API, namely proteus::jit_arg. The handler parses the IR and populates
-// llvm.global.annotations accordingly. For split device compilation, it emits a
-// JSON manifest file that the host compilation parses.
+// Both annotations forms populate the global variable llvm.global.annotations
+// in the LLVM IR. For split device compilation, the handler also emits a
+// JSON manifest file for the host compilation to parse, since there is no other
+// direct channel between the split device and host compilation.
 
 namespace proteus {
 
@@ -58,12 +56,20 @@ private:
 
   void appendToGlobalAnnotations(SmallVector<Constant *> &NewAnnotations);
 
-  Constant *createJitAnnotation(Function *F, SmallVector<int> &ConstantArgs);
+  Constant *
+  createJitAnnotation(Function *F,
+                      SmallSetVector<RuntimeConstantInfo, 16> &ConstantArgs);
 
   void createDeviceManifestFile(
-      DenseMap<Function *, SmallSetVector<int, 16>> &JitArgs);
+      DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap);
 
-  void parseJitArgAnnotations(SmallPtrSetImpl<Function *> &JitArgAnnotations);
+  void parseJitArgAnnotations(
+      SmallPtrSetImpl<Function *> &JitArgAnnotations,
+      DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap);
+
+  void parseJitArrayAnnotations(
+      SmallPtrSetImpl<Function *> &JitArrayAnnotations,
+      DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap);
 
   void parseAttributeAnnotations(
       GlobalVariable *GlobalAnnotations,

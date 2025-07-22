@@ -6,6 +6,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/TargetParser/Triple.h>
 
+#include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/Error.h"
 #include "proteus/Logger.hpp"
 
@@ -38,7 +39,7 @@ namespace proteus {
 using namespace llvm;
 
 struct JitFunctionInfo {
-  SmallSetVector<int, 16> ConstantArgs;
+  SmallSetVector<RuntimeConstantInfo, 16> ConstantArgs;
   std::string ModuleIR;
 };
 
@@ -71,5 +72,33 @@ inline std::string getUniqueFileID(Module &M) {
 }
 
 } // namespace proteus
+
+namespace llvm {
+
+using namespace proteus;
+
+template <> struct DenseMapInfo<RuntimeConstantInfo> {
+  static inline RuntimeConstantInfo getEmptyKey() {
+    RuntimeConstantInfo K{BEGIN, -1};
+    return K;
+  }
+
+  static inline RuntimeConstantInfo getTombstoneKey() {
+    RuntimeConstantInfo K{END, -1};
+    return K;
+  }
+
+  static unsigned getHashValue(const RuntimeConstantInfo &Val) {
+    return hash_combine(Val.ArgInfo.Type, Val.ArgInfo.Pos);
+  }
+
+  static bool isEqual(const RuntimeConstantInfo &LHS,
+                      const RuntimeConstantInfo &RHS) {
+    return ((LHS.ArgInfo.Type == RHS.ArgInfo.Type) &&
+            (LHS.ArgInfo.Pos == RHS.ArgInfo.Pos));
+  }
+};
+
+} // namespace llvm
 
 #endif
