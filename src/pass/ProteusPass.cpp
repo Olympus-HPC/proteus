@@ -903,7 +903,7 @@ private:
   FunctionCallee getJitRegisterVarFn(Module &M) {
     // The prototype is
     // __jit_register_var(const void *HostAddr, const char *VarName).
-    FunctionType *JitRegisterVarFnTy = FunctionType::get(PtrTy, {PtrTy, PtrTy},
+    FunctionType *JitRegisterVarFnTy = FunctionType::get(VoidTy, {PtrTy, PtrTy},
                                                          /* isVarArg=*/false);
     FunctionCallee JitRegisterVarFn =
         M.getOrInsertFunction("__jit_register_var", JitRegisterVarFnTy);
