@@ -43,5 +43,12 @@ RuntimeConstantInfo *__proteus_create_runtime_constant_info_array_runconst_size(
                                             NumEltsPos));
   return Ptr.get();
 }
+
+RuntimeConstantInfo *__proteus_create_runtime_constant_info_object(
+    RuntimeConstantType RCType, int32_t Pos, int32_t Size, bool PassByValue) {
+  auto &Ptr = getRuntimeConstantInfoStorage().emplace_back(
+      std::make_unique<RuntimeConstantInfo>(RCType, Pos, Size, PassByValue));
+  return Ptr.get();
+}
 }
 // NOLINTEND(readability-identifier-naming)

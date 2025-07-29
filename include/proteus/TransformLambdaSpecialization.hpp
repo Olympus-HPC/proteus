@@ -68,7 +68,7 @@ public:
 #if PROTEUS_ENABLE_DEBUG
     for (auto &Arg : RCVec) {
       Logger::logs("proteus")
-          << "{" << Arg.Value.Int64Val << ", " << Arg.Slot << " }\n";
+          << "{" << Arg.Value.Int64Val << ", " << Arg.Pos << " }\n";
     }
 #endif
 
@@ -85,12 +85,12 @@ public:
       PROTEUS_DBG(Logger::logs("proteus") << *User << "\n");
       if (isa<LoadInst>(User)) {
         for (auto &Arg : RCVec) {
-          if (Arg.Slot == 0) {
+          if (Arg.Pos == 0) {
             Constant *C = getConstant(M.getContext(), User->getType(), Arg);
             User->replaceAllUsesWith(C);
-            PROTEUS_DBG(Logger::logs("proteus") << TraceOut(Arg.Slot, C));
+            PROTEUS_DBG(Logger::logs("proteus") << TraceOut(Arg.Pos, C));
             if (Config::get().ProteusTraceOutput)
-              Logger::trace(TraceOut(Arg.Slot, C));
+              Logger::trace(TraceOut(Arg.Pos, C));
           }
         }
       } else if (auto *GEP = dyn_cast<GetElementPtrInst>(User)) {
@@ -98,7 +98,7 @@ public:
         ConstantInt *CI = dyn_cast<ConstantInt>(GEPSlot);
         int Slot = CI->getZExtValue();
         for (auto &Arg : RCVec) {
-          if (Arg.Slot == Slot) {
+          if (Arg.Pos == Slot) {
             for (auto *GEPUser : GEP->users()) {
               auto *LI = dyn_cast<LoadInst>(GEPUser);
               if (!LI)
@@ -106,9 +106,9 @@ public:
               Type *LoadType = LI->getType();
               Constant *C = getConstant(M.getContext(), LoadType, Arg);
               LI->replaceAllUsesWith(C);
-              PROTEUS_DBG(Logger::logs("proteus") << TraceOut(Arg.Slot, C));
+              PROTEUS_DBG(Logger::logs("proteus") << TraceOut(Arg.Pos, C));
               if (Config::get().ProteusTraceOutput)
-                Logger::trace(TraceOut(Arg.Slot, C));
+                Logger::trace(TraceOut(Arg.Pos, C));
             }
           }
         }

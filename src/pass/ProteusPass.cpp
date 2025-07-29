@@ -591,6 +591,17 @@ private:
         Types.Int32Ty);
   }
 
+  FunctionCallee getProteusCreateRuntimeConstantInfoObjectFn(Module &M) {
+    // RuntimeConstantInfo *__proteus_create_runtime_constant_info_object(
+    //             RuntimeConstantType Type (int32_t),
+    //             int32_t Pos,
+    //             int32_t Size,
+    //             bool PassByValue)
+    return M.getOrInsertFunction(
+        "__proteus_create_runtime_constant_info_object", Types.PtrTy,
+        Types.Int32Ty, Types.Int32Ty, Types.Int32Ty, Types.Int1Ty);
+  }
+
   void emitRuntimeConstantInfoScalar(
       Module &M, const RuntimeConstantInfo &RCInfo, IRBuilderBase &Builder,
       ArrayType *RuntimeConstantInfoPtrArrayTy,
@@ -610,6 +621,9 @@ private:
       Module &M, const RuntimeConstantInfo &RCInfo, IRBuilderBase &Builder,
       ArrayType *RuntimeConstantInfoPtrArrayTy,
       GlobalVariable *RuntimeConstantInfoPtrArray, size_t Idx) {
+    if (!RCInfo.OptArrInfo)
+      PROTEUS_FATAL_ERROR("Expected existing array info");
+
     FunctionCallee CreateFn =
         getProteusCreateRuntimeConstantInfoArrayConstSizeFn(M);
     Constant *TypeIdC = ConstantInt::get(Types.Int32Ty, RCInfo.ArgInfo.Type);
@@ -635,6 +649,9 @@ private:
       Module &M, const RuntimeConstantInfo &RCInfo, IRBuilderBase &Builder,
       ArrayType *RuntimeConstantInfoPtrArrayTy,
       GlobalVariable *RuntimeConstantInfoPtrArray, size_t Idx) {
+    if (!RCInfo.OptArrInfo)
+      PROTEUS_FATAL_ERROR("Expected array info");
+
     FunctionCallee CreateFn =
         getProteusCreateRuntimeConstantInfoArrayRunConstSizeFn(M);
     Constant *TypeIdC = ConstantInt::get(Types.Int32Ty, RCInfo.ArgInfo.Type);
@@ -674,6 +691,30 @@ private:
     }
   }
 
+  void emitRuntimeConstantInfoObject(
+      Module &M, const RuntimeConstantInfo &RCInfo, IRBuilderBase &Builder,
+      ArrayType *RuntimeConstantInfoPtrArrayTy,
+      GlobalVariable *RuntimeConstantInfoPtrArray, size_t Idx) {
+    if (!RCInfo.OptObjInfo)
+      PROTEUS_FATAL_ERROR("Expected object info");
+
+    FunctionCallee CreateFn = getProteusCreateRuntimeConstantInfoObjectFn(M);
+
+    Constant *TypeIdC = ConstantInt::get(Types.Int32Ty, RCInfo.ArgInfo.Type);
+    Constant *ArgNoC = ConstantInt::get(Types.Int32Ty, RCInfo.ArgInfo.Pos);
+    Constant *SizeC = ConstantInt::get(Types.Int32Ty, RCInfo.OptObjInfo->Size);
+    Constant *PassByValueC =
+        ConstantInt::get(Types.Int1Ty, RCInfo.OptObjInfo->PassByValue);
+
+    Value *RCInfoPtr =
+        Builder.CreateCall(CreateFn, {TypeIdC, ArgNoC, SizeC, PassByValueC});
+    Value *GEP = Builder.CreateGEP(RuntimeConstantInfoPtrArrayTy,
+                                   RuntimeConstantInfoPtrArray,
+                                   {ConstantInt::get(Types.Int32Ty, 0),
+                                    ConstantInt::get(Types.Int32Ty, Idx)});
+    Builder.CreateStore(RCInfoPtr, GEP);
+  }
+
   void emitJitEntryCall(Module &M,
                         std::pair<Function *, JitFunctionInfo> &JITInfo) {
 
@@ -690,6 +731,9 @@ private:
     JITFn->setName("");
     Function *StubFn = Function::Create(JITFn->getFunctionType(),
                                         JITFn->getLinkage(), FnName, M);
+    // We need copy attributes as the can affect affect the ABI, such as
+    // 'byval', 'byref' for parameters.
+    StubFn->setAttributes(JITFn->getAttributes());
     JITFn->replaceAllUsesWith(StubFn);
     JITFn->eraseFromParent();
 
@@ -727,10 +771,22 @@ private:
         emitRuntimeConstantInfoArray(M, RCInfo, Builder,
                                      RuntimeConstantInfoPtrArrayTy,
                                      RuntimeConstantInfoPtrArray, I);
-      } else {
+      } else if ((RCInfo.ArgInfo.Type == RuntimeConstantType::STATIC_ARRAY) ||
+                 (RCInfo.ArgInfo.Type == RuntimeConstantType::VECTOR)) {
+        emitRuntimeConstantInfoArrayConstSize(M, RCInfo, Builder,
+                                              RuntimeConstantInfoPtrArrayTy,
+                                              RuntimeConstantInfoPtrArray, I);
+      } else if (RCInfo.ArgInfo.Type == RuntimeConstantType::OBJECT) {
+        emitRuntimeConstantInfoObject(M, RCInfo, Builder,
+                                      RuntimeConstantInfoPtrArrayTy,
+                                      RuntimeConstantInfoPtrArray, I);
+      } else if (isScalarRuntimeConstantType(RCInfo.ArgInfo.Type)) {
         emitRuntimeConstantInfoScalar(M, RCInfo, Builder,
                                       RuntimeConstantInfoPtrArrayTy,
                                       RuntimeConstantInfoPtrArray, I);
+      } else {
+        PROTEUS_FATAL_ERROR("Unsupported runtime constant type " +
+                            toString(RCInfo.ArgInfo.Type));
       }
     }
     // Mark runtime constants info as initialized.
@@ -748,7 +804,10 @@ private:
     Value *ArgPtrs = nullptr;
     if (NumRuntimeConstants > 0) {
       ArgPtrs = Builder.CreateAlloca(ArgPtrsTy);
-      // Create an alloca for each argument.
+      // Create an alloca for each argument to store a pointer to the argument,
+      // mimicking how arguments are passed for GPU kernels. This is done so
+      // that we have a uniform way to read function/kernel arguments in the
+      // Proteus runtime for both host and device code.
       SmallVector<AllocaInst *> ArgPtrAllocas;
       for (size_t ArgI = 0; ArgI < StubFn->arg_size(); ++ArgI) {
         auto *Alloca = Builder.CreateAlloca(StubFn->getArg(ArgI)->getType());
@@ -758,8 +817,17 @@ private:
       for (size_t ArgI = 0; ArgI < StubFn->arg_size(); ++ArgI) {
         auto *GEP = Builder.CreateInBoundsGEP(
             ArgPtrsTy, ArgPtrs, {Builder.getInt32(0), Builder.getInt32(ArgI)});
-        Builder.CreateStore(StubFn->getArg(ArgI), ArgPtrAllocas[ArgI]);
-        Builder.CreateStore(ArgPtrAllocas[ArgI], GEP);
+        // If the argument has the 'byval' or 'byref' attribute, we store the
+        // pointer to the argument value directly in the alloca, otherwise we
+        // store the pointer-to-pointer. This is done to conform to the ABI and
+        // correctly reconstruct the runtime value.
+        if (StubFn->getArg(ArgI)->hasByValAttr() ||
+            StubFn->getArg(ArgI)->hasByRefAttr()) {
+          Builder.CreateStore(StubFn->getArg(ArgI), GEP);
+        } else {
+          Builder.CreateStore(StubFn->getArg(ArgI), ArgPtrAllocas[ArgI]);
+          Builder.CreateStore(ArgPtrAllocas[ArgI], GEP);
+        }
       }
     } else
       ArgPtrs = Constant::getNullValue(ArgPtrsTy->getPointerTo());
@@ -772,12 +840,20 @@ private:
     SmallVector<Value *, 8> Args;
     for (auto &Arg : StubFn->args())
       Args.push_back(&Arg);
-    auto *RetVal =
-        Builder.CreateCall(StubFn->getFunctionType(), JitFnPtr, Args);
+    auto *CI = Builder.CreateCall(StubFn->getFunctionType(), JitFnPtr, Args);
+
+    // We set param attributes for the call to the function pointer returned by
+    // the Proteus JIT runtime since they affect the ABI and codegen.
+    for (size_t I = 0; I < StubFn->arg_size(); ++I) {
+      auto ParamAttrs = StubFn->getAttributes().getParamAttrs(I);
+      for (auto A : ParamAttrs)
+        CI->addParamAttr(I, A);
+    }
+
     if (StubFn->getReturnType()->isVoidTy())
       Builder.CreateRetVoid();
     else
-      Builder.CreateRet(RetVal);
+      Builder.CreateRet(CI);
   }
 
   Value *getStubGV([[maybe_unused]] Value *Operand) {
@@ -1153,10 +1229,17 @@ private:
           emitRuntimeConstantInfoArray(M, RCInfo, Builder,
                                        RuntimeConstantInfoPtrArrayTy,
                                        RuntimeConstantInfoPtrArray, I);
-        } else {
+        } else if (RCInfo.ArgInfo.Type == RuntimeConstantType::OBJECT) {
+          emitRuntimeConstantInfoObject(M, RCInfo, Builder,
+                                        RuntimeConstantInfoPtrArrayTy,
+                                        RuntimeConstantInfoPtrArray, I);
+        } else if (isScalarRuntimeConstantType(RCInfo.ArgInfo.Type)) {
           emitRuntimeConstantInfoScalar(M, RCInfo, Builder,
                                         RuntimeConstantInfoPtrArrayTy,
                                         RuntimeConstantInfoPtrArray, I);
+        } else {
+          PROTEUS_FATAL_ERROR("Unsupported runtime constant type " +
+                              toString(RCInfo.ArgInfo.Type));
         }
       }
 

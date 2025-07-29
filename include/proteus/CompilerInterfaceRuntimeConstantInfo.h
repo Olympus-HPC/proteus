@@ -5,8 +5,12 @@
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Error.h"
+#include "proteus/RuntimeConstantTypeHelpers.h"
 
 namespace proteus {
+
+using namespace llvm;
+
 // This struct holds the information passed from the compiler pass for a runtime
 // constant argument to a function.
 struct RuntimeConstantArgInfo {
@@ -38,11 +42,23 @@ struct RuntimeConstantArrayInfo {
 };
 
 // This struct holds the information from the compiler pass for a runtime
+// constant object assumed trivially copyable, that is the size of the object
+// and whether it is passed by value.
+struct RuntimeConstantObjectInfo {
+  int32_t Size;
+  bool PassByValue;
+
+  explicit RuntimeConstantObjectInfo(int32_t Size, bool PassByValue)
+      : Size(Size), PassByValue(PassByValue) {}
+};
+
+// This struct holds the information from the compiler pass for a runtime
 // constant, be it a scalar or an array. If the runtime constant is an array,
 // there is an optional variable to store the runtime constant array info.
 struct RuntimeConstantInfo {
   RuntimeConstantArgInfo ArgInfo;
   std::optional<RuntimeConstantArrayInfo> OptArrInfo = std::nullopt;
+  std::optional<RuntimeConstantObjectInfo> OptObjInfo = std::nullopt;
 
   explicit RuntimeConstantInfo(RuntimeConstantType Type, int32_t Pos)
       : ArgInfo{Type, Pos} {
@@ -54,9 +70,11 @@ struct RuntimeConstantInfo {
                                int32_t NumElts, RuntimeConstantType EltType)
       : ArgInfo{Type, Pos},
         OptArrInfo{RuntimeConstantArrayInfo{NumElts, EltType}} {
-    if (Type != RuntimeConstantType::ARRAY)
+    if ((Type != RuntimeConstantType::ARRAY) &&
+        (Type != RuntimeConstantType::STATIC_ARRAY) &&
+        (Type != RuntimeConstantType::VECTOR))
       PROTEUS_FATAL_ERROR("Expected array runtime constant but type is " +
-                          std::to_string(Type));
+                          toString(Type));
   }
 
   explicit RuntimeConstantInfo(RuntimeConstantType Type, int32_t Pos,
@@ -67,6 +85,15 @@ struct RuntimeConstantInfo {
         OptArrInfo{RuntimeConstantArrayInfo{EltType, NumEltsType, NumEltsPos}} {
     if (Type != RuntimeConstantType::ARRAY)
       PROTEUS_FATAL_ERROR("Expected array runtime constant but type is " +
+                          std::to_string(Type));
+  }
+
+  explicit RuntimeConstantInfo(RuntimeConstantType Type, int32_t Pos,
+                               int32_t Size, bool PassByValue)
+      : ArgInfo{Type, Pos},
+        OptObjInfo{RuntimeConstantObjectInfo{Size, PassByValue}} {
+    if (Type != RuntimeConstantType::OBJECT)
+      PROTEUS_FATAL_ERROR("Expected object runtime constant but type is " +
                           std::to_string(Type));
   }
 

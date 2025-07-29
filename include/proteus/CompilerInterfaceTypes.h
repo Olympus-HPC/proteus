@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <memory>
 
 namespace proteus {
 
@@ -27,7 +28,10 @@ enum RuntimeConstantType : int32_t {
   DOUBLE,
   LONG_DOUBLE,
   PTR,
+  STATIC_ARRAY,
+  VECTOR,
   ARRAY,
+  OBJECT,
   END
 };
 
@@ -37,6 +41,16 @@ enum RuntimeConstantType : int32_t {
 struct ArrayInfo {
   int32_t NumElts;
   RuntimeConstantType EltType;
+  std::shared_ptr<unsigned char[]> Blob;
+};
+
+// This struct holds the information (the byte size) for an assumed trivially
+// copyable object constructed using the runtime constant info provided by the
+// compiler pass.
+struct ObjectInfo {
+  int32_t Size;
+  bool PassByValue;
+  std::shared_ptr<unsigned char[]> Blob;
 };
 
 // This union stores all possible runtime constant values.
@@ -59,9 +73,9 @@ struct RuntimeConstant {
   RuntimeConstantValue Value;
   RuntimeConstantType Type;
   int32_t Pos;
-  int32_t Slot{-1};
 
-  ArrayInfo ArrInfo{0, RuntimeConstantType::NONE};
+  ArrayInfo ArrInfo{0, RuntimeConstantType::NONE, nullptr};
+  ObjectInfo ObjInfo{0, false, nullptr};
 
   explicit RuntimeConstant(RuntimeConstantType Type, int32_t Pos)
       : Type(Type), Pos(Pos) {
@@ -70,11 +84,13 @@ struct RuntimeConstant {
 
   explicit RuntimeConstant(RuntimeConstantType Type, int32_t Pos,
                            int32_t NumElts, RuntimeConstantType EltType)
-      : Type(Type), Pos(Pos), ArrInfo{ArrayInfo{NumElts, EltType}} {
+      : Type(Type), Pos(Pos), ArrInfo{ArrayInfo{NumElts, EltType, nullptr}} {
     std::memset(&Value, 0, sizeof(RuntimeConstantValue));
   }
 
-  explicit RuntimeConstant() {
+  explicit RuntimeConstant(RuntimeConstantType Type, int32_t Pos, int32_t Size,
+                           bool PassByValue)
+      : Type(Type), Pos(Pos), ObjInfo{ObjectInfo{Size, PassByValue, nullptr}} {
     std::memset(&Value, 0, sizeof(RuntimeConstantValue));
   }
 

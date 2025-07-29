@@ -260,7 +260,7 @@ Expected<orc::ThreadSafeModule> JitEngineHost::specializeIR(
   F->setName(FnName + Suffix);
 
 #if PROTEUS_ENABLE_DEBUG
-  Logger::logfile(FnName.str() + ".final.ll", *M);
+  Logger::logfile(FnName.str() + ".specialized.ll", *M);
   if (verifyModule(*M, &errs()))
     PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
   else
@@ -349,7 +349,7 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
               << "FnName " << FnName << " Mangled " << MangledFnName
               << " address " << JitFnPtr << "\n");
   assert(JitFnPtr && "Expected non-null JIT function pointer");
-  CodeCache.insert(HashValue, JitFnPtr, FnName, RCVec);
+  CodeCache.insert(HashValue, JitFnPtr, FnName);
 
   Logger::logs("proteus") << "=== JIT compile: " << FnName << " Mangled "
                           << MangledFnName << " RC HashValue "

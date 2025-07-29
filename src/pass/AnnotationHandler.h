@@ -71,6 +71,10 @@ private:
       SmallPtrSetImpl<Function *> &JitArrayAnnotations,
       DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap);
 
+  void parseJitObjectAnnotations(
+      SmallPtrSetImpl<Function *> &JitObjectAnnotations,
+      DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap);
+
   void parseAttributeAnnotations(
       GlobalVariable *GlobalAnnotations,
       MapVector<Function *, JitFunctionInfo> &JitFunctionInfoMap);

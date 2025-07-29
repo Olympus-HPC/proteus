@@ -35,6 +35,10 @@ inline RuntimeConstantType convertTypeToRuntimeConstantType(Type *Ty) {
     return RuntimeConstantType::LONG_DOUBLE;
   if (Ty->isPointerTy())
     return RuntimeConstantType::PTR;
+  if (Ty->isArrayTy())
+    return RuntimeConstantType::STATIC_ARRAY;
+  if (Ty->isVectorTy())
+    return RuntimeConstantType::VECTOR;
 
   std::string TypeString;
   raw_string_ostream TypeOstream(TypeString);
@@ -66,6 +70,50 @@ inline Type *convertRuntimeConstantTypeToLLVMType(RuntimeConstantType RCType,
   }
 }
 
+inline size_t getSizeInBytes(RuntimeConstantType RCType) {
+  switch (RCType) {
+  case RuntimeConstantType::BOOL:
+    return sizeof(bool);
+  case RuntimeConstantType::INT8:
+    return sizeof(int8_t);
+  case RuntimeConstantType::INT32:
+    return sizeof(int32_t);
+  case RuntimeConstantType::INT64:
+    return sizeof(int64_t);
+  case RuntimeConstantType::FLOAT:
+    return sizeof(float);
+  case RuntimeConstantType::DOUBLE:
+    return sizeof(double);
+  case RuntimeConstantType::LONG_DOUBLE:
+    return sizeof(long double);
+  default:
+    PROTEUS_FATAL_ERROR("Unknown size for RuntimeConstantType " +
+                        toString(RCType));
+  }
+}
+
+template <typename T> T getValue(const RuntimeConstant &RC) {
+  switch (RC.Type) {
+  case RuntimeConstantType::BOOL:
+    return RC.Value.BoolVal;
+  case RuntimeConstantType::INT8:
+    return RC.Value.Int8Val;
+  case RuntimeConstantType::INT32:
+    return RC.Value.Int32Val;
+  case RuntimeConstantType::INT64:
+    return RC.Value.Int64Val;
+  case RuntimeConstantType::FLOAT:
+    return RC.Value.FloatVal;
+  case RuntimeConstantType::DOUBLE:
+    return RC.Value.DoubleVal;
+  case RuntimeConstantType::LONG_DOUBLE:
+    return RC.Value.LongDoubleVal;
+  default:
+    PROTEUS_FATAL_ERROR("Cannot get value for RuntimeConstantType " +
+                        toString(RC.Type));
+  }
+}
+
 inline std::string toString(const RuntimeConstantType RCType) {
   switch (RCType) {
   case RuntimeConstantType::BOOL:
@@ -84,11 +132,22 @@ inline std::string toString(const RuntimeConstantType RCType) {
     return "LONG_DOUBLE";
   case RuntimeConstantType::PTR:
     return "PTR";
+  case RuntimeConstantType::STATIC_ARRAY:
+    return "STATIC_ARRAY";
+  case RuntimeConstantType::VECTOR:
+    return "VECTOR";
   case RuntimeConstantType::ARRAY:
     return "ARRAY";
+  case RuntimeConstantType::OBJECT:
+    return "OBJECT";
   default:
     PROTEUS_FATAL_ERROR("Unknown RCType " + std::to_string(RCType));
   }
+}
+
+inline bool isScalarRuntimeConstantType(RuntimeConstantType RCType) {
+  return (RCType >= RuntimeConstantType::BOOL &&
+          RCType <= RuntimeConstantType::PTR);
 }
 
 } // namespace proteus

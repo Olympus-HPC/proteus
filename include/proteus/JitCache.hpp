@@ -46,8 +46,7 @@ public:
   }
 
   void insert(HashT &HashValue, Function_t FunctionPtr,
-              [[maybe_unused]] StringRef FnName,
-              [[maybe_unused]] ArrayRef<RuntimeConstant> RCArray) {
+              [[maybe_unused]] StringRef FnName) {
 #if PROTEUS_ENABLE_DEBUG
     if (CacheMap.count(HashValue))
       PROTEUS_FATAL_ERROR("JitCache collision detected");
@@ -60,7 +59,6 @@ public:
 
 #if PROTEUS_ENABLE_DEBUG
     CacheEntry.FnName = FnName.str();
-    CacheEntry.RCVector = SmallVector<RuntimeConstant>{RCArray};
 #endif
   }
 
@@ -72,15 +70,8 @@ public:
       std::cout << "HashValue " << HashValue.toString() << " NumExecs "
                 << JCE.NumExecs << " NumHits " << JCE.NumHits;
 #if PROTEUS_ENABLE_DEBUG
-      // outs() << " FnName " << JCE.FnName << " RCs [";
-      printf(" FnName %s RCs [", JCE.FnName.c_str());
-      for (auto &RC : JCE.RCVector)
-        // outs() << RC.Int64Val << ", ";
-        printf("%ld, ", RC.Value.Int64Val);
-      // outs() << "]";
-      printf("]");
+      printf(" FnName %s", JCE.FnName.c_str());
 #endif
-      // outs() << "\n";
       printf("\n");
     }
   }
@@ -94,7 +85,6 @@ private:
     uint64_t NumHits;
 #if PROTEUS_ENABLE_DEBUG
     std::string FnName;
-    SmallVector<RuntimeConstant> RCVector;
 #endif
   };
 

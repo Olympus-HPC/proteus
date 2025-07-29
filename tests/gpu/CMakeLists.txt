@@ -287,6 +287,7 @@ endif()
 CREATE_GPU_TEST(mix_attr_api mix_attr_api.cpp)
 CREATE_GPU_TEST(types_jit_array types_jit_array.cpp)
 CREATE_GPU_TEST(dynamic_jit_array dynamic_jit_array.cpp)
+CREATE_GPU_TEST(jit_struct jit_struct.cpp)
 
 CREATE_GPU_TEST_RDC(kernel kernel.cpp)
 CREATE_GPU_TEST_RDC(kernel_cache kernel_cache.cpp)
@@ -345,6 +346,7 @@ CREATE_GPU_TEST_RDC_LIBS(kernel_calls_func_lib_api device_func_lib kernel_calls_
 CREATE_GPU_TEST_RDC(mix_attr_api mix_attr_api.cpp)
 CREATE_GPU_TEST_RDC(types_jit_array types_jit_array.cpp)
 CREATE_GPU_TEST_RDC(dynamic_jit_array dynamic_jit_array.cpp)
+CREATE_GPU_TEST_RDC(jit_struct jit_struct.cpp)
 
 if(PROTEUS_ENABLE_HIP)
     if(LLVM_VERSION_MAJOR GREATER_EQUAL 18)
