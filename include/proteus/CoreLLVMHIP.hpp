@@ -128,11 +128,11 @@ inline void setLaunchBoundsForKernel(Function &F, int MaxThreadsPerBlock,
   [[maybe_unused]] int MinWavesPerEU = 0;
   if (MinBlocksPerSM != -1) {
     // int WavesPerEU = (GridSize * BlockSize) / 64 / 110 / 4 / 2;
-    constexpr int ExecUnitsPerComputeUnit = 4;
-    constexpr int WaveFrontSize = 64;
-    int WavesPerCU = (MaxThreadsPerBlock * MinBlocksPerSM) / WaveFrontSize;
-    MinWavesPerEU = WavesPerCU / ExecUnitsPerComputeUnit;
-    F.addFnAttr("amdgpu-waves-per-eu", "1," + std::to_string(MinWavesPerEU));
+    // constexpr int ExecUnitsPerComputeUnit = 4;
+    // constexpr int WaveFrontSize = 64;
+    // int WavesPerCU = (MaxThreadsPerBlock * MinBlocksPerSM) / WaveFrontSize;
+    // MinWavesPerEU = WavesPerCU / ExecUnitsPerComputeUnit;
+    F.addFnAttr("amdgpu-waves-per-eu", std::to_string(MinWavesPerEU));
   }
   PROTEUS_DBG(Logger::logs("proteus")
               << "BlockSize " << BlockSize << " GridSize " << GridSize
