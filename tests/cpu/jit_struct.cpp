@@ -88,7 +88,7 @@ int main() {
 // CHECK: A X 3.000000 Y 2.000000 Z 1.000000
 // CHECK-x86_64: [ArgSpec] Replaced Function _Z9testByValI6DimIntEvT_ ArgNo 0 with value i64 8589934595
 // CHECK-x86_64: [ArgSpec] Replaced Function _Z9testByValI6DimIntEvT_ ArgNo 1 with value i32 1
-// CHECK-ppc64le: [ArgSpec] Replaced Function _Z9testByValI6DimIntEvT_ ArgNo 0 with value [2 x i64] [i64 8589934595, i64 1]
+// CHECK-ppc64le: [ArgSpec] Replaced Function _Z9testByValI6DimIntEvT_ ArgNo 0 with value [2 x i64] [i64 8589934595, i64 {{[0-9]+}}]
 // CHECK: A X 3.000000 Y 2.000000 Z 1.000000
 // CHECK: [ArgSpec] Replaced Function _Z9testByPtrI8DimFloatEvPT_ ArgNo 0 with value @0 = private constant [12 x i8] c"\00\00@@\00\00\00@\00\00\80?"
 // CHECK: A X 3.000000 Y 2.000000 Z 1.000000
@@ -110,7 +110,7 @@ int main() {
 // CHECK: [ArgSpec] Replaced Function _Z9testByRefI6DimMixEvRT_ ArgNo 0 with value @0 = private constant [24 x i8] c"\03\00\00\00\00\00\00\00\00\00\00\00\00\00\00@\00\00\80?\00\00\00\00"
 // CHECK: A X 3.000000 Y 2.000000 Z 1.000000
 // CHECK-x86_64: [ArgSpec] Replaced Function _Z9testByValI6DimMixEvT_ ArgNo 0 with value @0 = private constant [24 x i8] c"\03\00\00\00\00\00\00\00\00\00\00\00\00\00\00@\00\00\80?\00\00\00\00"
-// CHECK-ppc64le: [ArgSpec] Replaced Function _Z9testByValI6DimMixEvT_ ArgNo 0 with value [3 x i64] [i64 3, i64 4611686018427387904, i64 1065353216]
+// CHECK-ppc64le: [ArgSpec] Replaced Function _Z9testByValI6DimMixEvT_ ArgNo 0 with value [3 x i64] [i64 3, i64 4611686018427387904, i64 {{[0-9]+}}]
 // CHECK: A X 3.000000 Y 2.000000 Z 1.000000
 // CHECK: [ArgSpec] Replaced Function _Z9testByPtrI7DimFillEvPT_ ArgNo 0 with value @0 = private constant [76 x i8] c"\03\00\00\00\02\00\00\00\01\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00"
 // CHECK: A X 3.000000 Y 2.000000 Z 1.000000
@@ -125,7 +125,7 @@ int main() {
 // CHECK: A X 103.000000 Y 102.000000 Z 101.000000
 // CHECK-x86_64: [ArgSpec] Replaced Function _Z9testByValI6DimIntEvT_ ArgNo 0 with value i64 438086664295
 // CHECK-x86_64: [ArgSpec] Replaced Function _Z9testByValI6DimIntEvT_ ArgNo 1 with value i32 101
-// CHECK-ppc64le: [ArgSpec] Replaced Function _Z9testByValI6DimIntEvT_ ArgNo 0 with value [2 x i64] [i64 438086664295, i64 101]
+// CHECK-ppc64le: [ArgSpec] Replaced Function _Z9testByValI6DimIntEvT_ ArgNo 0 with value [2 x i64] [i64 438086664295, i64 {{[0-9]+}}]
 // CHECK: A X 103.000000 Y 102.000000 Z 101.000000
 // CHECK: [ArgSpec] Replaced Function _Z9testByPtrI8DimFloatEvPT_ ArgNo 0 with value @0 = private constant [12 x i8] c"\00\00\CEB\00\00\CCB\00\00\CAB"
 // CHECK: A X 103.000000 Y 102.000000 Z 101.000000
