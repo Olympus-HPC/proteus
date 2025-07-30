@@ -148,7 +148,8 @@ dispatchGetRuntimeConstantValue(void **Args,
 
     RC.ArrInfo = ArrayInfo{NumElts, RCInfo.OptArrInfo->EltType, Blob};
 
-    PROTEUS_DBG(Logger::logs("proteus") << "Value Blob " << Blob << "\n");
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "Value Blob ptr " << Blob.get() << "\n");
     break;
   }
   case RuntimeConstantType::STATIC_ARRAY: {
@@ -162,7 +163,8 @@ dispatchGetRuntimeConstantValue(void **Args,
     RC.ArrInfo =
         ArrayInfo{RCInfo.OptArrInfo->NumElts, RCInfo.OptArrInfo->EltType, Blob};
 
-    PROTEUS_DBG(Logger::logs("proteus") << "Value " << RC.Value.PtrVal << "\n");
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "Value Blob ptr " << Blob.get() << "\n");
     break;
   }
   case RuntimeConstantType::VECTOR: {
@@ -175,7 +177,8 @@ dispatchGetRuntimeConstantValue(void **Args,
     RC.ArrInfo =
         ArrayInfo{RCInfo.OptArrInfo->NumElts, RCInfo.OptArrInfo->EltType, Blob};
 
-    PROTEUS_DBG(Logger::logs("proteus") << "Value " << RC.Value.PtrVal << "\n");
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "Value Blob ptr " << Blob.get() << "\n");
     break;
   }
   case RuntimeConstantType::OBJECT: {
