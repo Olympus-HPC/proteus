@@ -89,7 +89,7 @@ PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 ctest -T test --output
 echo "### END TESTING (BLOCKING) ASYNC COMPILATION ###"
 
 # Test also our faster, alternative to HIP RTC codegen.
-if [ "${CI_MACHINE}" == "tioga" ] && [ "${PROTEUS_CI_ROCM_VERSION}" == "6.2.1" ]; then
+if [ "${CI_MACHINE}" == "tioga" ]; then
   echo "### TESTING SYNC COMPILATION WITH PROTEUS CODEGEN SERIAL ###"
   PROTEUS_CODEGEN=serial ctest -T test --output-on-failure
   echo "### END TESTING SYNC COMPILATION WITH PROTEUS HIP CODEGEN SERIAL ###"
