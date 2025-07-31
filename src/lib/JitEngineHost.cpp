@@ -159,9 +159,10 @@ void JitEngineHost::dumpSymbolInfo(
       // address.
       loadedSymAddress += objInfo.getSectionLoadAddress(*symbolSection.get());
     }
-    outs() << format("Address range: [%12p, %12p]", loadedSymAddress,
-                     loadedSymAddress + size)
-           << "\tSymbol: " << *symName << "\n";
+    PROTEUS_DBG(Logger::logs("proteus")
+                << format("Address range: [%12p, %12p]", loadedSymAddress,
+                          loadedSymAddress + size)
+                << "\tSymbol: " << *symName << "\n");
 
     if (size > 0)
       ofd << format("%lx %x)", loadedSymAddress, size) << " " << *symName
