@@ -52,18 +52,67 @@ jit_array(T V, [[maybe_unused]] size_t NumElts,
 #endif
 
 template <typename T>
-static __attribute__((noinline)) T jit_variable(T v, int pos = -1) {
-  RuntimeConstant RC;
-  std::memcpy(&RC, &v, sizeof(T));
-  RC.Slot = pos;
-  __jit_push_variable(RC);
+__attribute__((noinline))
+std::enable_if_t<std::is_trivially_copyable_v<std::remove_pointer_t<T>>, void>
+jit_object(T *V, size_t Size = sizeof(std::remove_pointer_t<T>)) noexcept;
 
-  return v;
+#if defined(__CUDACC__) || defined(__HIP__)
+template <typename T>
+__attribute__((noinline)) __device__ std::enable_if_t<
+    std::is_trivially_copyable_v<std::remove_pointer_t<T>>, void>
+jit_object(T *V, size_t Size = sizeof(T)) noexcept;
+#endif
+
+template <typename T>
+__attribute__((noinline))
+std::enable_if_t<!std::is_pointer_v<T> &&
+                     std::is_trivially_copyable_v<std::remove_reference_t<T>>,
+                 void>
+jit_object(T &V, size_t Size = sizeof(std::remove_reference_t<T>)) noexcept;
+
+#if defined(__CUDACC__) || defined(__HIP__)
+template <typename T>
+__attribute__((noinline)) __device__ std::enable_if_t<
+    !std::is_pointer_v<T> &&
+        std::is_trivially_copyable_v<std::remove_reference_t<T>>,
+    void>
+jit_object(T &V, size_t Size = sizeof(T)) noexcept;
+#endif
+
+template <typename T> inline static RuntimeConstantType convertCTypeToRCType() {
+  if constexpr (std::is_same_v<T, bool>) {
+    return RuntimeConstantType::BOOL;
+  } else if constexpr (std::is_integral_v<T> && sizeof(T) == sizeof(int8_t)) {
+    return RuntimeConstantType::INT8;
+  } else if constexpr (std::is_integral_v<T> && sizeof(T) == sizeof(int32_t)) {
+    return RuntimeConstantType::INT32;
+  } else if constexpr (std::is_integral_v<T> && sizeof(T) == sizeof(int64_t)) {
+    return RuntimeConstantType::INT64;
+  } else if constexpr (std::is_same_v<T, float>) {
+    return RuntimeConstantType::FLOAT;
+  } else if constexpr (std::is_same_v<T, double>) {
+    return RuntimeConstantType::DOUBLE;
+  } else if constexpr (std::is_same_v<T, long double>) {
+    return RuntimeConstantType::LONG_DOUBLE;
+  } else if constexpr (std::is_pointer_v<T>) {
+    return RuntimeConstantType::PTR;
+  } else {
+    return RuntimeConstantType::NONE;
+  }
 }
 
 template <typename T>
-static __attribute__((noinline)) T &&register_lambda(T &&t,
-                                                     const char *Symbol = "") {
+static __attribute__((noinline)) T jit_variable(T V, int Pos = -1) noexcept {
+  RuntimeConstant RC{convertCTypeToRCType<T>(), Pos};
+  std::memcpy(&RC, &V, sizeof(T));
+  __jit_push_variable(RC);
+
+  return V;
+}
+
+template <typename T>
+static __attribute__((noinline)) T &&
+register_lambda(T &&t, const char *Symbol = "") noexcept {
   assert(Symbol && "Expected non-null Symbol");
   __jit_register_lambda(Symbol);
   return std::forward<T>(t);

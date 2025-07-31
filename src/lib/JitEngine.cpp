@@ -74,53 +74,135 @@ template <typename T> inline static T getRuntimeConstantValue(void *Arg) {
   }
 }
 
-inline static void dispatchGetRuntimeConstantValue(void *Arg,
-                                                   RuntimeConstantType RCType,
-                                                   RuntimeConstantValue &RV) {
-  switch (RCType) {
+inline static RuntimeConstant
+dispatchGetRuntimeConstantValue(void **Args,
+                                const RuntimeConstantInfo &RCInfo) {
+  RuntimeConstant RC{RCInfo.ArgInfo.Type, RCInfo.ArgInfo.Pos};
+
+  void *Arg = Args[RC.Pos];
+  switch (RC.Type) {
   case RuntimeConstantType::BOOL:
-    RV.BoolVal = getRuntimeConstantValue<bool>(Arg);
-    PROTEUS_DBG(Logger::logs("proteus") << "Value " << RV.BoolVal << "\n");
+    RC.Value.BoolVal = getRuntimeConstantValue<bool>(Arg);
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "Value " << RC.Value.BoolVal << "\n");
     break;
   case RuntimeConstantType::INT8:
-    RV.Int8Val = getRuntimeConstantValue<int8_t>(Arg);
-    PROTEUS_DBG(Logger::logs("proteus") << "Value " << RV.Int8Val << "\n");
+    RC.Value.Int8Val = getRuntimeConstantValue<int8_t>(Arg);
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "Value " << RC.Value.Int8Val << "\n");
     break;
   case RuntimeConstantType::INT32:
-    RV.Int32Val = getRuntimeConstantValue<int32_t>(Arg);
-    PROTEUS_DBG(Logger::logs("proteus") << "Value " << RV.Int32Val << "\n");
+    RC.Value.Int32Val = getRuntimeConstantValue<int32_t>(Arg);
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "Value " << RC.Value.Int32Val << "\n");
     break;
   case RuntimeConstantType::INT64:
-    RV.Int64Val = getRuntimeConstantValue<int64_t>(Arg);
-    PROTEUS_DBG(Logger::logs("proteus") << "Value " << RV.Int64Val << "\n");
+    RC.Value.Int64Val = getRuntimeConstantValue<int64_t>(Arg);
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "Value " << RC.Value.Int64Val << "\n");
     break;
   case RuntimeConstantType::FLOAT:
-    RV.FloatVal = getRuntimeConstantValue<float>(Arg);
-    PROTEUS_DBG(Logger::logs("proteus") << "Value " << RV.FloatVal << "\n");
+    RC.Value.FloatVal = getRuntimeConstantValue<float>(Arg);
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "Value " << RC.Value.FloatVal << "\n");
     break;
   case RuntimeConstantType::DOUBLE:
-    RV.DoubleVal = getRuntimeConstantValue<double>(Arg);
-    PROTEUS_DBG(Logger::logs("proteus") << "Value " << RV.DoubleVal << "\n");
+    RC.Value.DoubleVal = getRuntimeConstantValue<double>(Arg);
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "Value " << RC.Value.DoubleVal << "\n");
     break;
   case RuntimeConstantType::LONG_DOUBLE:
     // NOTE: long double on device should correspond to plain double.
     // XXX: CUDA with a long double SILENTLY fails to create a working
     // kernel in AOT compilation, with or without JIT.
-    RV.LongDoubleVal = getRuntimeConstantValue<long double>(Arg);
+    RC.Value.LongDoubleVal = getRuntimeConstantValue<long double>(Arg);
     PROTEUS_DBG(Logger::logs("proteus")
-                << "Value " << std::to_string(RV.LongDoubleVal) << "\n");
+                << "Value " << std::to_string(RC.Value.LongDoubleVal) << "\n");
     break;
   case RuntimeConstantType::PTR:
-    RV.PtrVal = (void *)getRuntimeConstantValue<intptr_t>(Arg);
-    PROTEUS_DBG(Logger::logs("proteus") << "Value " << RV.PtrVal << "\n");
+    RC.Value.PtrVal = (void *)getRuntimeConstantValue<intptr_t>(Arg);
+    PROTEUS_DBG(Logger::logs("proteus") << "Value " << RC.Value.PtrVal << "\n");
     break;
-  case RuntimeConstantType::ARRAY:
-    RV.PtrVal = (void *)getRuntimeConstantValue<intptr_t>(Arg);
+  case RuntimeConstantType::ARRAY: {
+    int32_t NumElts;
+    if (RCInfo.OptArrInfo->OptNumEltsRCInfo) {
+      int32_t NumEltsPos = RCInfo.OptArrInfo->OptNumEltsRCInfo->Pos;
+      RuntimeConstantType NumEltsType =
+          RCInfo.OptArrInfo->OptNumEltsRCInfo->Type;
+
+      RuntimeConstantInfo NumEltsRCInfo{NumEltsType, NumEltsPos};
+      RuntimeConstant NumEltsRC =
+          dispatchGetRuntimeConstantValue(Args, NumEltsRCInfo);
+
+      NumElts = getValue<int32_t>(NumEltsRC);
+    } else {
+      NumElts = RCInfo.OptArrInfo->NumElts;
+    }
+
+    size_t SizeInBytes = NumElts * getSizeInBytes(RCInfo.OptArrInfo->EltType);
+    std::shared_ptr<unsigned char[]> Blob{new unsigned char[SizeInBytes]};
+    // The interface is a pointer-to-pointer so we need to deref it to copy the
+    // data.
+    void *Src = (void *)getRuntimeConstantValue<intptr_t>(Arg);
+    std::memcpy(Blob.get(), Src, SizeInBytes);
+
+    RC.ArrInfo = ArrayInfo{NumElts, RCInfo.OptArrInfo->EltType, Blob};
+
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "Value Blob ptr " << Blob.get() << "\n");
     break;
+  }
+  case RuntimeConstantType::STATIC_ARRAY: {
+    size_t SizeInBytes =
+        RCInfo.OptArrInfo->NumElts * getSizeInBytes(RCInfo.OptArrInfo->EltType);
+    std::shared_ptr<unsigned char[]> Blob{new unsigned char[SizeInBytes]};
+    // Static arrays are passed by value, so it is a pointer directly to the
+    // stack.
+    std::memcpy(Blob.get(), Arg, SizeInBytes);
+
+    RC.ArrInfo =
+        ArrayInfo{RCInfo.OptArrInfo->NumElts, RCInfo.OptArrInfo->EltType, Blob};
+
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "Value Blob ptr " << Blob.get() << "\n");
+    break;
+  }
+  case RuntimeConstantType::VECTOR: {
+    size_t SizeInBytes =
+        RCInfo.OptArrInfo->NumElts * getSizeInBytes(RCInfo.OptArrInfo->EltType);
+    std::shared_ptr<unsigned char[]> Blob{new unsigned char[SizeInBytes]};
+    // Vectors are passed by value, so it is a pointer directly to the stack.
+    std::memcpy(Blob.get(), Arg, SizeInBytes);
+
+    RC.ArrInfo =
+        ArrayInfo{RCInfo.OptArrInfo->NumElts, RCInfo.OptArrInfo->EltType, Blob};
+
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "Value Blob ptr " << Blob.get() << "\n");
+    break;
+  }
+  case RuntimeConstantType::OBJECT: {
+    std::shared_ptr<unsigned char[]> Blob{
+        new unsigned char[RCInfo.OptObjInfo->Size]};
+
+    void *Src = (RCInfo.OptObjInfo->PassByValue
+                     ? Args[RCInfo.ArgInfo.Pos]
+                     : (void *)getRuntimeConstantValue<intptr_t>(
+                           Args[RCInfo.ArgInfo.Pos]));
+    std::memcpy(Blob.get(), Src, RCInfo.OptObjInfo->Size);
+
+    RC.ObjInfo = ObjectInfo{RCInfo.OptObjInfo->Size,
+                            RCInfo.OptObjInfo->PassByValue, Blob};
+
+    PROTEUS_DBG(Logger::logs("proteus") << "Value " << RC.Value.PtrVal << "\n");
+    break;
+  }
   default:
     PROTEUS_FATAL_ERROR("Unsupported runtime constant type: " +
-                        std::to_string(RCType));
+                        toString(RC.Type));
   }
+
+  return RC;
 }
 
 SmallVector<RuntimeConstant> JitEngine::getRuntimeConstantValues(
@@ -130,32 +212,11 @@ SmallVector<RuntimeConstant> JitEngine::getRuntimeConstantValues(
   SmallVector<RuntimeConstant> RCVec;
   RCVec.reserve(RCInfoArray.size());
   for (const auto *RCInfo : RCInfoArray) {
-    auto &RC = RCVec.emplace_back(RCInfo->ArgInfo.Type, RCInfo->ArgInfo.Pos);
-
     PROTEUS_DBG(Logger::logs("proteus")
-                << "RC Index " << RC.Pos << " Type " << RC.Type << " ");
+                << "RC Index " << RCInfo->ArgInfo.Pos << " Type "
+                << toString(RCInfo->ArgInfo.Type) << " ");
 
-    void *Arg = Args[RC.Pos];
-
-    dispatchGetRuntimeConstantValue(Arg, RC.Type, RC.Value);
-    // Resolve NumElts for runtime constant arrays.
-    if (RCInfo->ArgInfo.Type == RuntimeConstantType::ARRAY) {
-      if (RCInfo->OptArrInfo->OptNumEltsRCInfo) {
-        int32_t NumEltsPos = RCInfo->OptArrInfo->OptNumEltsRCInfo->Pos;
-        RuntimeConstantType NumEltsType =
-            RCInfo->OptArrInfo->OptNumEltsRCInfo->Type;
-
-        RuntimeConstantValue RV;
-        dispatchGetRuntimeConstantValue(Args[NumEltsPos], NumEltsType, RV);
-
-        RC.ArrInfo = ArrayInfo{static_cast<int32_t>(RV.Int64Val),
-                               RCInfo->OptArrInfo->EltType};
-
-      } else {
-        RC.ArrInfo =
-            ArrayInfo{RCInfo->OptArrInfo->NumElts, RCInfo->OptArrInfo->EltType};
-      }
-    }
+    RCVec.emplace_back(dispatchGetRuntimeConstantValue(Args, *RCInfo));
   }
 
   return RCVec;

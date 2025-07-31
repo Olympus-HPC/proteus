@@ -617,7 +617,7 @@ JitEngineDevice<ImplT>::compileAndRun(
       auto KernelFunc =
           getKernelFunctionFromImage(KernelMangled, CacheBuf->getBufferStart());
 
-      CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName(), RCVec);
+      CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
 
       return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                                   ShmemSize, Stream);
@@ -679,7 +679,7 @@ JitEngineDevice<ImplT>::compileAndRun(
       KernelMangled, ObjBuf->getBufferStart(),
       Config::get().ProteusRelinkGlobalsByCopy, VarNameToDevPtr);
 
-  CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName(), RCVec);
+  CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
   if (Config::get().ProteusUseStoredCache) {
     StorageCache.store(HashValue, ObjBuf->getMemBufferRef());
   }

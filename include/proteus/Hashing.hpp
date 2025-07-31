@@ -55,13 +55,30 @@ inline HashT hashRuntimeConstantArray(const RuntimeConstant &RC) {
     PROTEUS_FATAL_ERROR("Invalid number of elements in array: " +
                         std::to_string(RC.ArrInfo.NumElts));
 
+  if (!RC.ArrInfo.Blob)
+    PROTEUS_FATAL_ERROR("Expected non-null Blob");
+
   return stable_hash_combine_string(
-      StringRef{reinterpret_cast<const char *>(RC.Value.PtrVal),
+      StringRef{reinterpret_cast<const char *>(RC.ArrInfo.Blob.get()),
                 sizeof(T) * RC.ArrInfo.NumElts});
 }
 
+inline HashT hashRuntimeConstantObject(const RuntimeConstant &RC) {
+  if (RC.ObjInfo.Size <= 0)
+    PROTEUS_FATAL_ERROR("Invalid object size <= 0");
+
+  if (!RC.ObjInfo.Blob)
+    PROTEUS_FATAL_ERROR("Expected non-null Blob");
+
+  return stable_hash_combine_string(
+      StringRef{reinterpret_cast<const char *>(RC.ObjInfo.Blob.get()),
+                static_cast<size_t>(RC.ObjInfo.Size)});
+}
+
 inline HashT hashArrayRefElement(const RuntimeConstant &RC) {
-  if (RC.Type == RuntimeConstantType::ARRAY) {
+  if (RC.Type == RuntimeConstantType::ARRAY ||
+      RC.Type == RuntimeConstantType::STATIC_ARRAY ||
+      RC.Type == RuntimeConstantType::VECTOR) {
     switch (RC.ArrInfo.EltType) {
     case RuntimeConstantType::BOOL:
       return hashRuntimeConstantArray<bool>(RC);
@@ -79,10 +96,14 @@ inline HashT hashArrayRefElement(const RuntimeConstant &RC) {
       PROTEUS_FATAL_ERROR("Unsupported array element type: " +
                           toString(RC.ArrInfo.EltType));
     }
+  } else if (RC.Type == RuntimeConstantType::OBJECT) {
+    return hashRuntimeConstantObject(RC);
+  } else if (isScalarRuntimeConstantType(RC.Type)) {
+    return stable_hash_combine_string(
+        StringRef{reinterpret_cast<const char *>(&RC.Value), sizeof(RC.Value)});
   }
 
-  return stable_hash_combine_string(
-      StringRef{reinterpret_cast<const char *>(&RC.Value), sizeof(RC.Value)});
+  PROTEUS_FATAL_ERROR("Unsupported type " + toString(RC.Type));
 }
 
 inline HashT hashValue(ArrayRef<RuntimeConstant> Arr) {

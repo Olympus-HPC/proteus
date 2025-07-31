@@ -29,6 +29,7 @@ endfunction()
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/lit.cfg.py "
 import lit.formats
 import os
+import platform
 
 config.name = 'LIT tests'
 config.test_format = lit.formats.ShTest(True)
@@ -39,6 +40,7 @@ config.test_source_root = '${CMAKE_CURRENT_SOURCE_DIR}'
 config.test_exec_root = '${CMAKE_CURRENT_BINARY_DIR}'
 FILECHECK = lit_config.params['FILECHECK']
 config.substitutions.append(('%FILECHECK', FILECHECK))
+config.substitutions.append(('%target_arch', platform.machine()))
 "
 )
 
@@ -54,3 +56,4 @@ CREATE_CPU_TEST(lambda_multiple lambda_multiple.cpp)
 CREATE_CPU_TEST(lambda_multiple_api lambda_multiple_api.cpp)
 CREATE_CPU_TEST(types_jit_array types_jit_array.cpp)
 CREATE_CPU_TEST(dynamic_jit_array dynamic_jit_array.cpp)
+CREATE_CPU_TEST(jit_struct jit_struct.cpp)
