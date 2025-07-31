@@ -52,22 +52,30 @@ jit_array(T V, [[maybe_unused]] size_t NumElts,
 #endif
 
 template <typename T>
-__attribute__((noinline)) void
+__attribute__((noinline))
+std::enable_if_t<std::is_trivially_copyable_v<std::remove_pointer_t<T>>, void>
 jit_object(T *V, size_t Size = sizeof(std::remove_pointer_t<T>)) noexcept;
 
 #if defined(__CUDACC__) || defined(__HIP__)
 template <typename T>
-__attribute__((noinline)) __device__ void
+__attribute__((noinline)) __device__ std::enable_if_t<
+    std::is_trivially_copyable_v<std::remove_pointer_t<T>>, void>
 jit_object(T *V, size_t Size = sizeof(T)) noexcept;
 #endif
 
 template <typename T>
-__attribute__((noinline)) void
+__attribute__((noinline))
+std::enable_if_t<!std::is_pointer_v<T> &&
+                     std::is_trivially_copyable_v<std::remove_reference_t<T>>,
+                 void>
 jit_object(T &V, size_t Size = sizeof(std::remove_reference_t<T>)) noexcept;
 
 #if defined(__CUDACC__) || defined(__HIP__)
 template <typename T>
-__attribute__((noinline)) __device__ void
+__attribute__((noinline)) __device__ std::enable_if_t<
+    !std::is_pointer_v<T> &&
+        std::is_trivially_copyable_v<std::remove_reference_t<T>>,
+    void>
 jit_object(T &V, size_t Size = sizeof(T)) noexcept;
 #endif
 
