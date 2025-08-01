@@ -102,8 +102,9 @@ template <typename T> inline static RuntimeConstantType convertCTypeToRCType() {
 }
 
 template <typename T>
-static __attribute__((noinline)) T jit_variable(T V, int Pos = -1) noexcept {
-  RuntimeConstant RC{convertCTypeToRCType<T>(), Pos};
+static __attribute__((noinline)) T jit_variable(T V, int Pos = -1,
+                                                int Offset = -1) noexcept {
+  RuntimeConstant RC{convertCTypeToRCType<T>(), Pos, Offset};
   std::memcpy(&RC, &V, sizeof(T));
   __jit_push_variable(RC);
 

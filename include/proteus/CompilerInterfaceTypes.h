@@ -73,12 +73,19 @@ struct RuntimeConstant {
   RuntimeConstantValue Value;
   RuntimeConstantType Type;
   int32_t Pos;
+  int32_t Offset;
 
   ArrayInfo ArrInfo{0, RuntimeConstantType::NONE, nullptr};
   ObjectInfo ObjInfo{0, false, nullptr};
 
   explicit RuntimeConstant(RuntimeConstantType Type, int32_t Pos)
       : Type(Type), Pos(Pos) {
+    std::memset(&Value, 0, sizeof(RuntimeConstantValue));
+  }
+
+  explicit RuntimeConstant(RuntimeConstantType Type, int32_t Pos,
+                           int32_t Offset)
+      : Type(Type), Pos(Pos), Offset(Offset) {
     std::memset(&Value, 0, sizeof(RuntimeConstantValue));
   }
 

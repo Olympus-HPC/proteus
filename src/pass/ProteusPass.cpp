@@ -957,7 +957,7 @@ private:
     SmallVector<Value *> Args = {LaunchKernelCB->arg_begin(),
                                  LaunchKernelCB->arg_end()};
 
-    if (auto *CallI = dyn_cast<CallInst>(LaunchKernelCB)) {
+    if (isa<CallInst>(LaunchKernelCB)) {
       CallOrInvoke = Builder.CreateCall(JitLaunchKernelFn, Args);
     } else if (auto *InvokeI = dyn_cast<InvokeInst>(LaunchKernelCB)) {
       CallOrInvoke =
@@ -1310,11 +1310,23 @@ private:
           auto *Slot = GEP->getOperand(GEP->getNumOperands() - 1);
           DEBUG(Logger::logs("proteus-pass") << "slot: " << *Slot << "\n");
           CB->setArgOperand(1, Slot);
+          auto *GEPTy = GEP->getSourceElementType();
+          StructType *STy = dyn_cast<StructType>(GEPTy);
+          if (!STy)
+            PROTEUS_FATAL_ERROR("Expected struct type for lambda");
+          const StructLayout *SL = M.getDataLayout().getStructLayout(STy);
+          ConstantInt *SlotC = dyn_cast<ConstantInt>(Slot);
+          if (!SlotC)
+            PROTEUS_FATAL_ERROR("Expected constant slot");
+          auto Offset = SL->getElementOffset(SlotC->getZExtValue());
+          Constant *OffsetCI = ConstantInt::get(Types.Int32Ty, Offset);
+          CB->setArgOperand(2, OffsetCI);
         } else {
           DEBUG(Logger::logs("proteus-pass")
                 << "no gep, assuming slot 0" << "\n");
           Constant *C = ConstantInt::get(Types.Int32Ty, 0);
           CB->setArgOperand(1, C);
+          CB->setArgOperand(2, C);
         }
       }
     }
