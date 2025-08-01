@@ -8,6 +8,8 @@ cd /tmp/proteus-ci-${CI_JOB_ID}
 if [ "${CI_MACHINE}" == "lassen" ]; then
   ml load cmake/3.23.1
   ml load cuda/12.2.2
+  PYTHON_VERSION=3.12
+  LLVM_VERSION=18.1.8
 
   # Install Clang/LLVM through conda.
   MINICONDA_DIR=miniconda3
@@ -17,7 +19,7 @@ if [ "${CI_MACHINE}" == "lassen" ]; then
   rm ./${MINICONDA_DIR}/miniconda.sh
   source ./${MINICONDA_DIR}/bin/activate
   conda create -y -n proteus -c conda-forge \
-      python=3.10 clang=17.0.5 clangxx=17.0.5 llvmdev=17.0.5 lit=17.0.5
+      python=${PYTHON_VERSION} clang=${LLVM_VERSION} clangxx=${LLVM_VERSION} llvmdev=${LLVM_VERSION} lit=${LLVM_VERSION}
   conda activate proteus
 
   LLVM_INSTALL_DIR=$(llvm-config --prefix)
@@ -87,7 +89,7 @@ PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 ctest -T test --output
 echo "### END TESTING (BLOCKING) ASYNC COMPILATION ###"
 
 # Test also our faster, alternative to HIP RTC codegen.
-if [ "${CI_MACHINE}" == "tioga" ] && [ "${PROTEUS_CI_ROCM_VERSION}" == "6.2.1" ]; then
+if [ "${CI_MACHINE}" == "tioga" ]; then
   echo "### TESTING SYNC COMPILATION WITH PROTEUS CODEGEN SERIAL ###"
   PROTEUS_CODEGEN=serial ctest -T test --output-on-failure
   echo "### END TESTING SYNC COMPILATION WITH PROTEUS HIP CODEGEN SERIAL ###"

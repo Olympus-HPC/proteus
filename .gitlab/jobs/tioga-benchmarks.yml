@@ -6,8 +6,13 @@
     #- rm -rf ${CI_BUILDS_DIR}
     - echo "=== End CI Benchmarking ==="
 
+.build-variants:
+  parallel:
+    matrix:
+      - PROTEUS_CI_ROCM_VERSION: ["6.2.1"]
+
 proteus-benchmarks-tioga:
-  extends: [.base-job]
+  extends: [.base-job, .build-variants]
   artifacts:
     paths:
       - proteus-benchmarks/results/*.csv

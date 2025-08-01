@@ -13,7 +13,7 @@ We provide information on how to integrate Proteus with your application in the
 ## Building
 
 The project uses `cmake` for building and depends on an LLVM installation (CI
-tests cover LLVM 17, 18 and AMD ROCm versions 5.7.1, 6.2.1).  The top-level
+tests cover LLVM 18 and AMD ROCm versions 6.2.1, 6.3.1).  The top-level
 `CMakeLists.txt` has the following (binary) build options:
 
 * `BUILD_SHARED`: builds Proteus as a shared library (default is static).
@@ -25,7 +25,7 @@ tests cover LLVM 17, 18 and AMD ROCm versions 5.7.1, 6.2.1).  The top-level
 
 !!! info "Host, CUDA and HIP support"
     Proteus supports host JIT compilation in all cases.
-    On top of that, it supports either CUDA or HIP JIT compilation, setting 
+    On top of that, it supports either CUDA or HIP JIT compilation, setting
     `PROTEUS_ENABLE_CUDA` or `PROTEUS_ENABLE_HIP` respectively.
 
 A typical build process is:

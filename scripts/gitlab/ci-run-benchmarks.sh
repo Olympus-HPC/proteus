@@ -68,7 +68,7 @@ if [ "${CI_MACHINE}" == "lassen" ]; then
   PROTEUS_CC=${CONDA_PREFIX}/bin/clang++
   MACHINE=nvidia
 elif [ "${CI_MACHINE}" == "tioga" ]; then
-  ml load rocm/6.2.1
+  ml load rocm/${PROTEUS_CI_ROCM_VERSION}
 
   LLVM_INSTALL_DIR=${ROCM_PATH}/llvm
 

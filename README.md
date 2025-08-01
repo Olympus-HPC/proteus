@@ -58,7 +58,7 @@ runtime library for JIT compilation and runtime optimization.
 
 ## Building
 The project uses `cmake` for building and depends on an LLVM installation
-(CI tests cover LLVM 17, 18 and AMD ROCm versions 5.7.1, 6.2.1).
+(CI tests cover LLVM 18 and AMD ROCm versions 6.2.1, 6.3.1).
 Check the top-level `CMakeLists.txt` for the available build options.
 The typical building process is:
 ```
