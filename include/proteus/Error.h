@@ -1,6 +1,7 @@
 #ifndef PROTEUS_ERROR_H
 #define PROTEUS_ERROR_H
 
+#include <cstdint>
 #include <llvm/ADT/Twine.h>
 
 #define PROTEUS_FATAL_ERROR(x)                                                 \

@@ -13,8 +13,8 @@ We provide information on how to integrate Proteus with your application in the
 ## Building
 
 The project uses `cmake` for building and depends on an LLVM installation (CI
-tests cover LLVM 18 and AMD ROCm versions 6.2.1, 6.3.1).  The top-level
-`CMakeLists.txt` has the following (binary) build options:
+tests cover LLVM 18, 19 and AMD ROCm versions 6.2.1, 6.3.1, 6.4.1).
+The top-level `CMakeLists.txt` has the following (binary) build options:
 
 * `BUILD_SHARED`: builds Proteus as a shared library (default is static).
 * `ENABLE_TESTS`: builds Proteus tests.

@@ -9,7 +9,6 @@ if [ "${CI_MACHINE}" == "lassen" ]; then
   ml load cmake/3.23.1
   ml load cuda/12.2.2
   PYTHON_VERSION=3.12
-  LLVM_VERSION=18.1.8
 
   # Install Clang/LLVM through conda.
   MINICONDA_DIR=miniconda3
@@ -19,7 +18,8 @@ if [ "${CI_MACHINE}" == "lassen" ]; then
   rm ./${MINICONDA_DIR}/miniconda.sh
   source ./${MINICONDA_DIR}/bin/activate
   conda create -y -n proteus -c conda-forge \
-      python=${PYTHON_VERSION} clang=${LLVM_VERSION} clangxx=${LLVM_VERSION} llvmdev=${LLVM_VERSION} lit=${LLVM_VERSION}
+      python=${PYTHON_VERSION} clang=${PROTEUS_CI_LLVM_VERSION} clangxx=${PROTEUS_CI_LLVM_VERSION} \
+      llvmdev=${PROTEUS_CI_LLVM_VERSION} lit=${PROTEUS_CI_LLVM_VERSION}
   conda activate proteus
 
   LLVM_INSTALL_DIR=$(llvm-config --prefix)

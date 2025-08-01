@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        llvm: [18.1.8]
+        llvm: [18.1.8, 19.1.7]
         enable_debug: [on, off]
         enable_time_tracing: [on, off]
         build_shared: [on, off]

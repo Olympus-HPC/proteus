@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include "proteus/Error.h"
 #include "proteus/Logger.hpp"
 
 namespace proteus {
@@ -155,6 +156,11 @@ private:
           << "Warning: Proteus with LLVM < 18 supports only RTC compilation, "
              "setting Codegen to RTC\n";
       ProteusCodegen = CodegenOption::RTC;
+    }
+#elif LLVM_VERSION_MAJOR > 18
+    if (ProteusCodegen == CodegenOption::Parallel) {
+      PROTEUS_FATAL_ERROR(
+          "Proteus with LLVM > 18 does not support parallel split codegen");
     }
 #endif
 #endif

@@ -219,7 +219,7 @@ inline void relinkGlobalsObject(
         continue;
       auto SymbolName = *SymbolNameOrErr;
 
-      if (!SymbolName.equals(GlobalName + "$ptr"))
+      if (!(SymbolName == (GlobalName + "$ptr")))
         continue;
 
       Expected<uint64_t> ValueOrErr = Symbol.getValue();

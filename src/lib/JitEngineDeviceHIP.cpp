@@ -133,7 +133,7 @@ static std::unique_ptr<MemoryBuffer> getDeviceBinary(BinaryInfo &BinInfo,
 
   StringRef Magic(FatbinBuffer->getBufferStart(),
                   sizeof(OffloadBundlerMagicStr) - 1);
-  if (!Magic.equals(OffloadBundlerMagicStr))
+  if (!(Magic == OffloadBundlerMagicStr))
     PROTEUS_FATAL_ERROR("Error missing magic string");
   Pos += sizeof(OffloadBundlerMagicStr) - 1;
 

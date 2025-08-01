@@ -27,25 +27,26 @@ using namespace llvm;
 
 inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
                              const RuntimeConstant &RC) {
-  if (ArgType->isIntegerTy(1)) {
+  switch (RC.Type) {
+  case RuntimeConstantType::BOOL:
     return ConstantInt::get(ArgType, RC.Value.BoolVal);
-  } else if (ArgType->isIntegerTy(8)) {
+  case RuntimeConstantType::INT8:
     return ConstantInt::get(ArgType, RC.Value.Int8Val);
-  } else if (ArgType->isIntegerTy(32)) {
+  case RuntimeConstantType::INT32:
     return ConstantInt::get(ArgType, RC.Value.Int32Val);
-  } else if (ArgType->isIntegerTy(64)) {
+  case RuntimeConstantType::INT64:
     return ConstantInt::get(ArgType, RC.Value.Int64Val);
-  } else if (ArgType->isFloatTy()) {
+  case RuntimeConstantType::FLOAT:
     return ConstantFP::get(ArgType, RC.Value.FloatVal);
-  } else if (ArgType->isDoubleTy()) {
+  case RuntimeConstantType::DOUBLE:
     return ConstantFP::get(ArgType, RC.Value.DoubleVal);
-  } else if (ArgType->isX86_FP80Ty() || ArgType->isPPC_FP128Ty() ||
-             ArgType->isFP128Ty()) {
+  case RuntimeConstantType::LONG_DOUBLE:
     return ConstantFP::get(ArgType, RC.Value.LongDoubleVal);
-  } else if (ArgType->isPointerTy()) {
+  case RuntimeConstantType::PTR: {
     auto *IntC = ConstantInt::get(Type::getInt64Ty(Ctx), RC.Value.Int64Val);
     return ConstantExpr::getIntToPtr(IntC, ArgType);
-  } else {
+  }
+  default:
     std::string TypeString;
     raw_string_ostream TypeOstream(TypeString);
     ArgType->print(TypeOstream);
@@ -55,6 +56,71 @@ inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
 }
 
 class TransformLambdaSpecialization {
+private:
+  static const RuntimeConstant *
+  findArgByOffset(const SmallVector<RuntimeConstant> &RCVec, int32_t Offset) {
+    for (auto &Arg : RCVec) {
+      if (Arg.Offset == Offset)
+        return &Arg;
+    }
+    return nullptr;
+  };
+
+  static const RuntimeConstant *
+  findArgByPos(const SmallVector<RuntimeConstant> &RCVec, int32_t Pos) {
+    for (auto &Arg : RCVec) {
+      if (Arg.Pos == Pos)
+        return &Arg;
+    }
+    return nullptr;
+  };
+
+  static auto traceOut(int Slot, Constant *C) {
+    SmallString<128> S;
+    raw_svector_ostream OS(S);
+    OS << "[LambdaSpec] Replacing slot " << Slot << " with " << *C << "\n";
+
+    return S;
+  };
+
+  static void handleLoad(Module &M, User *User,
+                         const SmallVector<RuntimeConstant> &RCVec) {
+    auto *Arg = findArgByPos(RCVec, 0);
+    if (!Arg)
+      return;
+
+    Constant *C = getConstant(M.getContext(), User->getType(), *Arg);
+    User->replaceAllUsesWith(C);
+    PROTEUS_DBG(Logger::logs("proteus") << traceOut(Arg->Pos, C));
+    if (Config::get().ProteusTraceOutput)
+      Logger::trace(traceOut(Arg->Pos, C));
+  }
+
+  static void handleGEP(Module &M, GetElementPtrInst *GEP, User *User,
+                        const SmallVector<RuntimeConstant> &RCVec) {
+    auto *GEPSlot = GEP->getOperand(User->getNumOperands() - 1);
+    ConstantInt *CI = dyn_cast<ConstantInt>(GEPSlot);
+    int Slot = CI->getZExtValue();
+    Type *SrcTy = GEP->getSourceElementType();
+
+    auto *Arg = SrcTy->isStructTy() ? findArgByPos(RCVec, Slot)
+                                    : findArgByOffset(RCVec, Slot);
+    if (!Arg)
+      return;
+
+    for (auto *GEPUser : GEP->users()) {
+      auto *LI = dyn_cast<LoadInst>(GEPUser);
+      if (!LI)
+        PROTEUS_FATAL_ERROR("Expected load instruction");
+      Type *LoadType = LI->getType();
+      Constant *C = getConstant(M.getContext(), LoadType, *Arg);
+      LI->replaceAllUsesWith(C);
+      PROTEUS_DBG(Logger::logs("proteus") << traceOut(Arg->Pos, C));
+      if (Config::get().ProteusTraceOutput)
+        Logger::trace(traceOut(Arg->Pos, C));
+    }
+  }
+
 public:
   static void transform(Module &M, Function &F,
                         const SmallVector<RuntimeConstant> &RCVec) {
@@ -72,47 +138,13 @@ public:
     }
 #endif
 
-    auto TraceOut = [](int Slot, Constant *C) {
-      SmallString<128> S;
-      raw_svector_ostream OS(S);
-      OS << "[LambdaSpec] Replacing slot " << Slot << " with " << *C << "\n";
-
-      return S;
-    };
-
     PROTEUS_DBG(Logger::logs("proteus") << "\t users" << "\n");
     for (User *User : LambdaClass->users()) {
       PROTEUS_DBG(Logger::logs("proteus") << *User << "\n");
-      if (isa<LoadInst>(User)) {
-        for (auto &Arg : RCVec) {
-          if (Arg.Pos == 0) {
-            Constant *C = getConstant(M.getContext(), User->getType(), Arg);
-            User->replaceAllUsesWith(C);
-            PROTEUS_DBG(Logger::logs("proteus") << TraceOut(Arg.Pos, C));
-            if (Config::get().ProteusTraceOutput)
-              Logger::trace(TraceOut(Arg.Pos, C));
-          }
-        }
-      } else if (auto *GEP = dyn_cast<GetElementPtrInst>(User)) {
-        auto *GEPSlot = GEP->getOperand(User->getNumOperands() - 1);
-        ConstantInt *CI = dyn_cast<ConstantInt>(GEPSlot);
-        int Slot = CI->getZExtValue();
-        for (auto &Arg : RCVec) {
-          if (Arg.Pos == Slot) {
-            for (auto *GEPUser : GEP->users()) {
-              auto *LI = dyn_cast<LoadInst>(GEPUser);
-              if (!LI)
-                PROTEUS_FATAL_ERROR("Expected load instruction");
-              Type *LoadType = LI->getType();
-              Constant *C = getConstant(M.getContext(), LoadType, Arg);
-              LI->replaceAllUsesWith(C);
-              PROTEUS_DBG(Logger::logs("proteus") << TraceOut(Arg.Pos, C));
-              if (Config::get().ProteusTraceOutput)
-                Logger::trace(TraceOut(Arg.Pos, C));
-            }
-          }
-        }
-      }
+      if (isa<LoadInst>(User))
+        handleLoad(M, User, RCVec);
+      else if (auto *GEP = dyn_cast<GetElementPtrInst>(User))
+        handleGEP(M, GEP, User, RCVec);
     }
   }
 };

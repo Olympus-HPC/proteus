@@ -3,7 +3,6 @@
 
 #include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/CodeGen/MachineModuleInfo.h>
-#include <llvm/CodeGen/ParallelCG.h>
 #include <llvm/IR/DiagnosticPrinter.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/LegacyPassManager.h>
@@ -20,6 +19,10 @@
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/Transforms/IPO/ThinLTOBitcodeWriter.h>
 #include <llvm/Transforms/Utils/SplitModule.h>
+
+#if LLVM_VERSION_MAJOR == 18
+#include <llvm/CodeGen/ParallelCG.h>
+#endif
 
 #if LLVM_VERSION_MAJOR >= 18
 #include <lld/Common/Driver.h>
@@ -212,6 +215,8 @@ inline void runPreLinkPipeline(Module &M, StringRef DeviceArch,
                        << __FUNCTION__ << " " << T.elapsed() << " ms\n");
 }
 
+#if LLVM_VERSION_MAJOR == 18
+// This interface is available only for LLVM 18.
 inline SmallVector<std::unique_ptr<sys::fs::TempFile>>
 codegenParallel(Module &M, StringRef DeviceArch,
                 [[maybe_unused]] char OptLevel = '3', int CodegenOptLevel = 3) {
@@ -257,6 +262,7 @@ codegenParallel(Module &M, StringRef DeviceArch,
 
   return ObjectFiles;
 }
+#endif
 
 inline SmallVector<std::unique_ptr<sys::fs::TempFile>>
 codegenParallelThinLTO(Module &M, StringRef DeviceArch,
@@ -338,7 +344,6 @@ codegenParallelThinLTO(Module &M, StringRef DeviceArch,
   Conf.CPU = DeviceArch;
   // Use default machine attributes.
   Conf.MAttrs = {};
-  Conf.UseDefaultPipeline = false;
   Conf.DisableVerify = true;
   Conf.TimeTraceEnabled = false;
   Conf.DebugPassManager = false;
@@ -548,7 +553,11 @@ codegenObject(Module &M, StringRef DeviceArch,
     ObjectFiles = detail::codegenSerial(M, DeviceArch);
     break;
   case CodegenOption::Parallel:
+#if LLVM_VERSION_MAJOR == 18
     ObjectFiles = detail::codegenParallel(M, DeviceArch);
+#else
+    PROTEUS_FATAL_ERROR("Parallel split codegen is supported only for LLVM 18");
+#endif
     break;
   case CodegenOption::ParallelThinLTO:
     ObjectFiles = detail::codegenParallelThinLTO(M, DeviceArch);
@@ -561,7 +570,6 @@ codegenObject(Module &M, StringRef DeviceArch,
   if (ObjectFiles.empty())
     PROTEUS_FATAL_ERROR("Expected non-empty vector of object files");
 
-    // TODO: make it work for LLVM < 18 or drop claimed support.
 #if LLVM_VERSION_MAJOR >= 18
   auto ExpectedF = sys::fs::TempFile::create("proteus-jit-%%%%%%%.o");
   if (auto E = ExpectedF.takeError())
