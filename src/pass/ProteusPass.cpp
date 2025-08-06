@@ -1263,9 +1263,8 @@ private:
     SmallVector<Function *, 16> JitFunctions;
 
     for (auto &F : M.getFunctionList()) {
-      // TODO: Demangle and search for the fully qualified proteus::jit_variable
-      // name.
-      if (F.getName().contains("jit_variable")) {
+      std::string DemangledName = demangle(F.getName().str());
+      if (StringRef{DemangledName}.contains("proteus::jit_variable")) {
         JitFunctions.push_back(&F);
       }
     }
