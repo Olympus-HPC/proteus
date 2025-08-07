@@ -7,22 +7,28 @@
 #include <llvm/IR/Module.h>
 
 #include "proteus/Error.h"
+#include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/Frontend/TypeMap.hpp"
 #include "proteus/Frontend/Var.hpp"
+#include "proteus/Hashing.hpp"
 
 namespace proteus {
 
 struct Var;
+class JitModule;
 
 using namespace llvm;
 
-class Func {
-private:
+class FuncBase {
+protected:
+  JitModule &J;
   FunctionCallee FC;
   IRBuilder<> IRB;
   IRBuilderBase::InsertPoint IP;
   std::deque<Var> Arguments;
   std::deque<Var> Variables;
+  std::deque<Var> RuntimeConstants;
+  HashT HashValue;
   std::string Name;
 
   enum class ScopeKind { FUNCTION, IF, FOR };
@@ -53,7 +59,7 @@ private:
   }
 
 public:
-  Func(FunctionCallee FC);
+  FuncBase(JitModule &J, FunctionCallee FC);
 
   Function *getFunction();
 
@@ -64,12 +70,43 @@ public:
   Var &declVarInternal(StringRef Name, Type *Ty,
                        Type *PointerElemType = nullptr);
 
-  template <typename T> Var &declVar(StringRef Name) {
+  template <typename T> Var &declVar(StringRef Name = "var") {
     Function *F = getFunction();
     auto *Alloca = emitAlloca(TypeMap<T>::get(F->getContext()), Name);
 
     return Variables.emplace_back(
         Alloca, *this, TypeMap<T>::getPointerElemType(F->getContext()));
+  }
+
+  template <typename T> Var &defVar(T Val, StringRef Name = "var") {
+    Function *F = getFunction();
+    auto *Alloca = emitAlloca(TypeMap<T>::get(F->getContext()), Name);
+
+    Var &VarRef = Variables.emplace_back(
+        Alloca, *this, TypeMap<T>::getPointerElemType(F->getContext()));
+
+    VarRef = Val;
+
+    return VarRef;
+  }
+
+  template <typename T>
+  Var &defRuntimeConst(T Val, StringRef Name = "run.const.var") {
+    Function *F = getFunction();
+    auto *Alloca = emitAlloca(TypeMap<T>::get(F->getContext()), Name);
+
+    Var &VarRef = RuntimeConstants.emplace_back(
+        Alloca, *this, TypeMap<T>::getPointerElemType(F->getContext()));
+
+    VarRef = Val;
+
+    HashValue = hash(HashValue, Val);
+
+    return VarRef;
+  }
+
+  template <typename... ArgT> auto defRuntimeConsts(ArgT &&...Args) {
+    return std::tie(defRuntimeConst(std::forward<ArgT>(Args))...);
   }
 
   template <typename... Ts> void declArgs() {
@@ -110,11 +147,31 @@ public:
 
   template <typename RetT, typename... ArgT> void call(StringRef Name);
 
-  Var &callBuiltin(function_ref<Var &(Func &)> Lower) { return Lower(*this); }
+  Var &callBuiltin(function_ref<Var &(FuncBase &)> Lower) {
+    return Lower(*this);
+  }
 
   void ret(std::optional<std::reference_wrapper<Var>> OptRet = std::nullopt);
 
   StringRef getName() { return Name; }
+};
+
+template <typename RetT, typename... ArgT> class Func final : public FuncBase {
+private:
+  Dispatcher &Dispatch;
+
+private:
+  template <std::size_t... Is> auto getArgsImpl(std::index_sequence<Is...>) {
+    return std::tie(getArg(Is)...);
+  }
+
+public:
+  Func(JitModule &J, FunctionCallee FC, Dispatcher &Dispatch)
+      : FuncBase(J, FC), Dispatch(Dispatch) {}
+
+  RetT operator()(ArgT... Args);
+
+  auto getArgs() { return getArgsImpl(std::index_sequence_for<ArgT...>{}); }
 };
 
 } // namespace proteus

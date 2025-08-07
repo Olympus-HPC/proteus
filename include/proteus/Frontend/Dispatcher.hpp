@@ -46,7 +46,8 @@ class Dispatcher {
 public:
   static Dispatcher &getDispatcher(TargetModelType Model);
 
-  virtual void compile(std::unique_ptr<Module> M) = 0;
+  virtual void compile(std::unique_ptr<LLVMContext> Ctx,
+                       std::unique_ptr<Module> M) = 0;
 
   virtual DispatchResult launch(StringRef KernelName, LaunchDims GridDim,
                                 LaunchDims BlockDim,

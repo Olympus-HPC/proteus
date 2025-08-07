@@ -24,7 +24,7 @@ int main() {
   J.print();
   J.compile();
 
-  J.run<void>(F);
+  F();
 
   proteus::finalize();
   return 0;

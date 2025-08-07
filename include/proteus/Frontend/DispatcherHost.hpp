@@ -13,8 +13,9 @@ public:
     return D;
   }
 
-  void compile(std::unique_ptr<Module> M) override {
-    Jit.compileOnly(std::move(M));
+  void compile(std::unique_ptr<LLVMContext> Ctx,
+               std::unique_ptr<Module> M) override {
+    Jit.compileOnly(std::move(Ctx), std::move(M));
   }
 
   DispatchResult launch(StringRef, LaunchDims, LaunchDims, ArrayRef<void *>,

@@ -47,7 +47,7 @@ public:
   void *compileAndLink(StringRef FnName, char *IR, int IRSize, void **Args,
                        ArrayRef<RuntimeConstantInfo *> RCInfoArray);
 
-  void compileOnly(std::unique_ptr<Module> M);
+  void compileOnly(std::unique_ptr<LLVMContext> Ctx, std::unique_ptr<Module> M);
 
   void *getFunctionAddress(StringRef FnName);
 

@@ -4,7 +4,7 @@ namespace proteus {
 
 template <typename IntOp, typename FPOp>
 static Var &binOp(const Var &L, const Var &R, IntOp IOp, FPOp FOp) {
-  Func &Fn = L.Fn;
+  FuncBase &Fn = L.Fn;
   if (&Fn != &R.Fn)
     PROTEUS_FATAL_ERROR("Variables should belong to the same function");
   Function *F = Fn.getFunction();
@@ -35,7 +35,7 @@ static Var &binOp(const Var &L, const Var &R, IntOp IOp, FPOp FOp) {
 
 template <typename IntOp, typename FPOp>
 static Var &cmpOp(const Var &L, const Var &R, IntOp IOp, FPOp FOp) {
-  Func &Fn = L.Fn;
+  FuncBase &Fn = L.Fn;
   if (&Fn != &R.Fn)
     PROTEUS_FATAL_ERROR("Variables should belong to the same function");
   Function *F = Fn.getFunction();
@@ -66,7 +66,7 @@ static Var &cmpOp(const Var &L, const Var &R, IntOp IOp, FPOp FOp) {
   return ResultVar;
 }
 
-Var::Var(AllocaInst *Alloca, Func &Fn, Type *PointerElemType)
+Var::Var(AllocaInst *Alloca, FuncBase &Fn, Type *PointerElemType)
     : Alloca(Alloca), Fn(Fn), PointerElemType(PointerElemType) {}
 
 Value *Var::getValue() const {

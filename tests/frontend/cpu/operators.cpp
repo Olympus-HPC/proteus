@@ -49,7 +49,7 @@ int main() {
   J.compile();
 
   double R0, R1, R2, R3, R4, R5, R6, R7, R8, R9;
-  J.run<double>(F, &R0, &R1, &R2, &R3, &R4, &R5, &R6, &R7, &R8, &R9);
+  F(&R0, &R1, &R2, &R3, &R4, &R5, &R6, &R7, &R8, &R9);
 
   std::cout << "R0 = " << R0 << "\n";
   std::cout << "R1 = " << R1 << "\n";

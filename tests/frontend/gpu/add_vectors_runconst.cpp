@@ -1,8 +1,8 @@
 // clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./add_vectors.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: ./add_vectors_runconst.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./add_vectors.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: ./add_vectors_runconst.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
 // clang-format on
 
@@ -34,12 +34,12 @@ using namespace proteus;
 #error "Expected PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA defined"
 #endif
 
-int main() {
-  auto J = proteus::JitModule(TARGET);
+auto createJitKernel(size_t N) {
+  auto J = std::make_unique<JitModule>(TARGET);
 
-  // Add a kernel with the signature: void add_vectors(double *A, double *B,
-  // size_t N)
-  auto KernelHandle = J.addKernel<double *, double *, size_t>("add_vectors");
+  // Add a kernel with the signature: void add_vectors(double *A, double *B)
+  // using vector_size N as a runtime constant.
+  auto KernelHandle = J->addKernel<double *, double *>("add_vectors");
   auto &F = KernelHandle.F;
 
   // Begin the function body.
@@ -48,9 +48,8 @@ int main() {
     // Declare local variables and argument getters.
     auto &I = F.declVar<size_t>("I");
     auto &Inc = F.declVar<size_t>("Inc");
-    auto &A = F.getArg(0); // Pointer to vector A
-    auto &B = F.getArg(1); // Pointer to vector B
-    auto &N = F.getArg(2); // Vector size
+    auto [A, B] = F.getArgs();
+    auto &RunConstN = F.defRuntimeConst(N);
 
     // Compute the global thread index.
     I = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +
@@ -60,13 +59,18 @@ int main() {
     Inc = F.callBuiltin(getGridDimX) * F.callBuiltin(getBlockDimX);
 
     // Strided loop: each thread processes multiple elements.
-    F.beginFor(I, I, N, Inc);
+    F.beginFor(I, I, RunConstN, Inc);
     { A[I] = A[I] + B[I]; }
     F.endFor();
 
     F.ret();
   }
   F.endFunction();
+
+  return std::make_pair(std::move(J), KernelHandle);
+}
+
+int main() {
 
   // Allocate and initialize input vectors A and B, and specify their size N.
   double *A;       // Pointer to vector A
@@ -79,10 +83,7 @@ int main() {
     B[I] = 2.0;
   }
 
-  J.print();
-  // Finalize and compile the JIT module. No further code can be added after
-  // this.
-  J.compile();
+  auto [J, KernelHandle] = createJitKernel(N);
 
   // Configure the CUDA kernel launch parameters.
   constexpr unsigned ThreadsPerBlock = 256;
@@ -90,11 +91,13 @@ int main() {
 
   // Launch the JIT-compiled kernel with the specified grid and block
   // dimensions. Arguments: grid size, block size, shared memory size (0),
-  // stream (nullptr), kernel arguments (A, B, N).
+  // stream (nullptr), kernel arguments (A, B).
   std::cout << "Launching with NumBlocks " << NumBlocks << " each with "
             << ThreadsPerBlock << " threads...\n";
+  Timer T;
+
   gpuErrCheck(KernelHandle.launch({NumBlocks, 1, 1}, {ThreadsPerBlock, 1, 1}, 0,
-                                  nullptr, A, B, N));
+                                  nullptr, A, B));
 
   // Synchronize to ensure kernel execution is complete.
   gpuErrCheck(gpuDeviceSynchronize());
@@ -119,6 +122,7 @@ int main() {
 
 // clang-format off
 // CHECK: Verification successful!
+// CHECK: JitCache hits 0 total 1
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: JitStorageCache hits 0 total 1
 // CHECK-SECOND: JitStorageCache hits 1 total 1
