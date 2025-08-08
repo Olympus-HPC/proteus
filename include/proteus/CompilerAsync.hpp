@@ -53,8 +53,10 @@ public:
 
   void compile(CompilationTask &&CT) {
     std::unique_lock Lock{Mutex};
+    // Get HashValue before the move of CT.
+    HashT HashValue = CT.getHashValue();
     Worklist.emplace_back(std::move(CT));
-    CompilationResultMap.emplace(CT.getHashValue(),
+    CompilationResultMap.emplace(HashValue,
                                  std::make_unique<CompilationResult>());
     CondVar.notify_one();
   }
@@ -84,7 +86,14 @@ public:
   }
 
   void joinAllThreads() {
-    Active = false;
+    {
+      std::unique_lock Lock{Mutex};
+      // Return if already inactive.
+      if (!Active)
+        return;
+
+      Active = false;
+    }
     CondVar.notify_all();
 
     for (auto &Thread : Threads)
@@ -107,11 +116,14 @@ public:
       return nullptr;
 
     std::unique_ptr<CompilationResult> &CRes = It->second;
-    Lock.unlock();
 
-    if (BlockingWait)
+    if (BlockingWait) {
+      // Release the lock while waiting for the result.
+      Lock.unlock();
       CRes->wait();
-    else {
+      // Reacquire the lock for synchronized access, the result is ready.
+      Lock.lock();
+    } else {
       if (!CRes->isReady())
         return nullptr;
     }
@@ -119,7 +131,6 @@ public:
     // If compilation result is ready, take ownership of the buffer, erase it
     // from the compilation results map and move the buffer to the caller.
     std::unique_ptr<MemoryBuffer> ObjBuf = CRes->take();
-    Lock.lock();
     // Use the HashValue key as the iterator may have been invalidated by
     // insert/emplace from another thread.
     CompilationResultMap.erase(HashValue);
@@ -128,7 +139,7 @@ public:
   }
 
 private:
-  std::atomic<bool> Active;
+  bool Active;
   std::mutex Mutex;
   std::condition_variable CondVar;
   std::unordered_map<HashT, std::unique_ptr<CompilationResult>>
@@ -142,10 +153,7 @@ private:
       Threads.emplace_back(&CompilerAsync::run, this);
   }
 
-  ~CompilerAsync() {
-    if (Threads.size() > 0)
-      joinAllThreads();
-  }
+  ~CompilerAsync() { joinAllThreads(); }
 };
 
 } // namespace proteus
