@@ -2,24 +2,26 @@
 
 namespace proteus {
 
-Func::Func(FunctionCallee FC) : FC(FC), IRB{FC.getCallee()->getContext()} {
+FuncBase::FuncBase(JitModule &J, FunctionCallee FC)
+    : J(J), FC(FC), IRB{FC.getCallee()->getContext()}, HashValue{0} {
   Function *F = cast<Function>(FC.getCallee());
   BasicBlock::Create(F->getContext(), "entry", F);
   Name = F->getName();
 }
 
-IRBuilderBase &Func::getIRB() {
+IRBuilderBase &FuncBase::getIRBuilder() {
   if (!IRB.GetInsertBlock())
     PROTEUS_FATAL_ERROR("Insert point is not set");
   return IRB;
 }
 
-Var &Func::declVarInternal(StringRef Name, Type *Ty, Type *PointerElemType) {
+Var &FuncBase::declVarInternal(StringRef Name, Type *Ty,
+                               Type *PointerElemType) {
   auto *Alloca = emitAlloca(Ty, Name);
   return Variables.emplace_back(Alloca, *this, PointerElemType);
 }
 
-void Func::beginFunction(const char *File, int Line) {
+void FuncBase::beginFunction(const char *File, int Line) {
   Function *F = cast<Function>(FC.getCallee());
   BasicBlock *BodyBB = BasicBlock::Create(F->getContext(), "body", F);
   BasicBlock *ExitBB = BasicBlock::Create(F->getContext(), "exit", F);
@@ -42,7 +44,7 @@ void Func::beginFunction(const char *File, int Line) {
                       IRBuilderBase::InsertPoint(ExitBB, ExitBB->begin()));
 }
 
-void Func::endFunction() {
+void FuncBase::endFunction() {
   if (Scopes.empty())
     PROTEUS_FATAL_ERROR("Expected FUNCTION scope");
 
@@ -53,18 +55,25 @@ void Func::endFunction() {
                         toString(S.Kind) + " @ " + S.File + ":" +
                         std::to_string(S.Line));
   Scopes.pop_back();
+
+  Function *F = getFunction();
+  // TODO: handle updating the Name better. We create a unique symbol by using
+  // the hash value and update both the FuncBase Name and LLVM's Function
+  // object.
+  Name = F->getName().str() + "$" + HashValue.toString();
+  F->setName(Name);
 }
 
-Function *Func::getFunction() {
+Function *FuncBase::getFunction() {
   Function *F = dyn_cast<Function>(FC.getCallee());
   if (!F)
     PROTEUS_FATAL_ERROR("Expected LLVM Function");
   return F;
 }
 
-Var &Func::getArg(unsigned int ArgNo) { return Arguments.at(ArgNo); }
+Var &FuncBase::getArg(unsigned int ArgNo) { return Arguments.at(ArgNo); }
 
-AllocaInst *Func::emitAlloca(Type *Ty, StringRef Name) {
+AllocaInst *FuncBase::emitAlloca(Type *Ty, StringRef Name) {
   auto SaveIP = IRB.saveIP();
   Function *F = getFunction();
   auto AllocaIP = IRBuilderBase::InsertPoint(&F->getEntryBlock(),
@@ -76,7 +85,7 @@ AllocaInst *Func::emitAlloca(Type *Ty, StringRef Name) {
   return Alloca;
 }
 
-void Func::ret(std::optional<std::reference_wrapper<Var>> OptRet) {
+void FuncBase::ret(std::optional<std::reference_wrapper<Var>> OptRet) {
   auto *CurBB = IP.getBlock();
   if (!CurBB->getSingleSuccessor())
     PROTEUS_FATAL_ERROR("Expected single successor for current block");
@@ -93,7 +102,7 @@ void Func::ret(std::optional<std::reference_wrapper<Var>> OptRet) {
   TermI->eraseFromParent();
 }
 
-void Func::beginIf(Var &CondVar, const char *File, int Line) {
+void FuncBase::beginIf(Var &CondVar, const char *File, int Line) {
   Function *F = getFunction();
   // Update the terminator of the current basic block due to the split
   // control-flow.
@@ -127,7 +136,7 @@ void Func::beginIf(Var &CondVar, const char *File, int Line) {
   IRB.restoreIP(IP);
 }
 
-void Func::endIf() {
+void FuncBase::endIf() {
   if (Scopes.empty())
     PROTEUS_FATAL_ERROR("Expected IF scope");
   Scope S = Scopes.back();
@@ -143,8 +152,8 @@ void Func::endIf() {
   IRB.restoreIP(IP);
 }
 
-void Func::beginFor(Var &IterVar, Var &Init, Var &UpperBound, Var &Inc,
-                    const char *File, int Line) {
+void FuncBase::beginFor(Var &IterVar, Var &Init, Var &UpperBound, Var &Inc,
+                        const char *File, int Line) {
   Function *F = getFunction();
   // Update the terminator of the current basic block due to the split
   // control-flow.
@@ -201,7 +210,7 @@ void Func::beginFor(Var &IterVar, Var &Init, Var &UpperBound, Var &Inc,
   IRB.restoreIP(IP);
 }
 
-void Func::endFor() {
+void FuncBase::endFor() {
   if (Scopes.empty())
     PROTEUS_FATAL_ERROR("Expected FOR scope");
 

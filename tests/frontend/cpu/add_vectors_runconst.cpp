@@ -1,5 +1,5 @@
 // RUN: rm -rf .proteus
-// RUN: ./add_vectors | %FILECHECK %s --check-prefixes=CHECK
+// RUN: ./add_vectors_runconst | %FILECHECK %s --check-prefixes=CHECK
 // RUN: rm -rf .proteus
 
 #include <proteus/JitFrontend.hpp>
@@ -7,27 +7,25 @@
 
 using namespace proteus;
 
-int main() {
-  auto J = proteus::JitModule("host");
+auto createJitFunction(size_t N) {
+  auto J = std::make_unique<JitModule>("host");
 
-  // Add a function with the signature:
-  //  void add_vectors(double *A, double *B, size_t N)
-  auto &F = J.addFunction<void, double *, double *, size_t>("add_vectors");
+  // Add a function with the signature: void add_vectors(double *A, double *B)
+  // using the vector size N as a runtime constant.
+  auto &F = J->addFunction<void, double *, double *>("add_vectors");
 
   // Begin the function body.
   F.beginFunction();
   {
+    // Pointers to vectors A, B in arguments.
+    auto [A, B] = F.getArgs();
     // Declare local variables and argument getters.
-    auto &I = F.declVar<size_t>("I");
-    auto &Inc = F.declVar<size_t>("Inc");
-    auto &A = F.getArg(0); // Pointer to vector A
-    auto &B = F.getArg(1); // Pointer to vector B
-    auto &N = F.getArg(2); // Vector size
-
+    auto &I = F.defVar<size_t>(0, "I");
+    auto &Inc = F.defVar<size_t>(1, "Inc");
+    // Runtime constant vector size
+    auto &RunConstN = F.defRuntimeConst(N);
     // Element-wise addition over all vector elements.
-    I = 0;
-    Inc = 1;
-    F.beginFor(I, I, N, Inc);
+    F.beginFor(I, I, RunConstN, Inc);
     { A[I] = A[I] + B[I]; }
     F.endFor();
 
@@ -35,6 +33,10 @@ int main() {
   }
   F.endFunction();
 
+  return std::make_pair(std::move(J), std::ref(F));
+}
+
+int main() {
   // Allocate and initialize input vectors A and B, and specify their size N.
   size_t N = 1024;           // Number of elements in each vector
   double *A = new double[N]; // Pointer to vector A
@@ -44,13 +46,8 @@ int main() {
     B[I] = 2.0;
   }
 
-  J.print();
-  // Finalize and compile the JIT module. No further code can be added after
-  // this.
-  J.compile();
-
-  // Run the function.
-  F(A, B, N);
+  auto [J, F] = createJitFunction(N);
+  F(A, B);
 
   bool Verified = true;
   for (size_t I = 0; I < N; ++I) {

@@ -28,7 +28,7 @@ private:
   std::unique_ptr<Module> Mod;
   std::unique_ptr<MemoryBuffer> CompiledObject;
 
-  std::deque<Func> Functions;
+  std::deque<std::unique_ptr<FuncBase>> Functions;
   TargetModelType TargetModel;
   std::string TargetTriple;
   Dispatcher &Dispatch;
@@ -36,7 +36,7 @@ private:
   bool IsCompiled = false;
 
   template <typename... ArgT> struct KernelHandle {
-    Func &F;
+    Func<void, ArgT...> &F;
     JitModule &M;
 
     // Launch with type-safety.
@@ -59,10 +59,10 @@ private:
       return M.launch(F, Grid, Block, Ptrs, ShmemBytes, Stream);
     }
 
-    Func *operator->() { return &F; }
+    FuncBase *operator->() { return &F; }
   };
 
-  TargetModelType getTargetModel(StringRef Target) {
+  TargetModelType parseTargetModel(StringRef Target) {
     if (Target == "host" || Target == "native") {
       return TargetModelType::HOST;
     }
@@ -96,7 +96,7 @@ private:
             (TargetModel == TargetModelType::HIP));
   }
 
-  void setKernel(Func &F) {
+  void setKernel(FuncBase &F) {
     switch (TargetModel) {
     case TargetModelType::CUDA: {
       NamedMDNode *MD = Mod->getOrInsertNamedMetadata("nvvm.annotations");
@@ -122,11 +122,21 @@ private:
     }
   }
 
+  DispatchResult launch(FuncBase &F, LaunchDims GridDim, LaunchDims BlockDim,
+                        ArrayRef<void *> KernelArgs, uint64_t ShmemSize,
+                        void *Stream) {
+    if (!IsCompiled)
+      compile();
+
+    return Dispatch.launch(F.getName(), GridDim, BlockDim, KernelArgs,
+                           ShmemSize, Stream);
+  }
+
 public:
   JitModule(StringRef Target = "host")
       : Ctx{std::make_unique<LLVMContext>()},
         Mod{std::make_unique<Module>("JitModule", *Ctx)},
-        TargetModel{getTargetModel(Target)},
+        TargetModel{parseTargetModel(Target)},
         TargetTriple(getTargetTriple(TargetModel)),
         Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
 
@@ -136,7 +146,12 @@ public:
   JitModule(JitModule &&) = delete;
   JitModule &operator=(JitModule &&) = delete;
 
-  template <typename RetT, typename... ArgT> Func &addFunction(StringRef Name) {
+  template <typename RetT, typename... ArgT>
+  Func<RetT, ArgT...> &addFunction(StringRef Name) {
+    if (IsCompiled)
+      PROTEUS_FATAL_ERROR(
+          "The module is compiled, no further code can be added");
+
     Mod->setTargetTriple(TargetTriple);
     FunctionCallee FC;
     FC = Mod->getOrInsertFunction(Name, TypeMap<RetT>::get(*Ctx),
@@ -144,15 +159,23 @@ public:
     Function *F = dyn_cast<Function>(FC.getCallee());
     if (!F)
       PROTEUS_FATAL_ERROR("Unexpected");
-    auto &Fn = Functions.emplace_back(FC);
+    auto TypedFn = std::make_unique<Func<RetT, ArgT...>>(*this, FC, Dispatch);
+    Func<RetT, ArgT...> &TypedFnRef = *TypedFn;
+    std::unique_ptr<FuncBase> &Fn = Functions.emplace_back(std::move(TypedFn));
 
-    Fn.declArgs<ArgT...>();
-    return Fn;
+    Fn->declArgs<ArgT...>();
+    return TypedFnRef;
   }
+
+  bool isCompiled() const { return IsCompiled; }
 
   const Module &getModule() const { return *Mod; }
 
   template <typename... ArgT> KernelHandle<ArgT...> addKernel(StringRef Name) {
+    if (IsCompiled)
+      PROTEUS_FATAL_ERROR(
+          "The module is compiled, no further code can be added");
+
     if (!isDeviceModule())
       PROTEUS_FATAL_ERROR("Expected a device module for addKernel");
 
@@ -163,12 +186,14 @@ public:
     Function *F = dyn_cast<Function>(FC.getCallee());
     if (!F)
       PROTEUS_FATAL_ERROR("Unexpected");
-    auto &Fn = Functions.emplace_back(FC);
+    auto TypedFn = std::make_unique<Func<void, ArgT...>>(*this, FC, Dispatch);
+    Func<void, ArgT...> &TypedFnRef = *TypedFn;
+    std::unique_ptr<FuncBase> &Fn = Functions.emplace_back(std::move(TypedFn));
 
-    Fn.declArgs<ArgT...>();
+    Fn->declArgs<ArgT...>();
 
-    setKernel(Fn);
-    return KernelHandle<ArgT...>{Fn, *this};
+    setKernel(*Fn);
+    return KernelHandle<ArgT...>{TypedFnRef, *this};
   }
 
   void compile(bool Verify = false) {
@@ -177,55 +202,28 @@ public:
         PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
       }
 
-    Dispatch.compile(std::move(Mod));
+    Dispatch.compile(std::move(Ctx), std::move(Mod));
     IsCompiled = true;
-  }
-
-  template <typename Ret, typename... ArgT> Ret run(Func &F, ArgT... Args) {
-    if (!IsCompiled)
-      PROTEUS_FATAL_ERROR("Expected compiled JIT module");
-    return Dispatch.run<Ret>(F.getName(), Args...);
-  }
-
-  template <typename... ArgT>
-  KernelHandle<ArgT...> getKernelHandle(StringRef Name) {
-    // Find the kernel function and return a kernel handle.
-    for (auto &Fn : Functions) {
-      if (Fn.getName() == Name)
-        return {Fn, *this};
-    }
-    PROTEUS_FATAL_ERROR("Kernel not found: " + Name);
-    // TODO: add type-checking to make sure parameters match the function
-    // signature.
-  }
-
-  auto launch(Func &F, LaunchDims GridDim, LaunchDims BlockDim,
-              ArrayRef<void *> KernelArgs, uint64_t ShmemSize, void *Stream) {
-    if (!IsCompiled)
-      PROTEUS_FATAL_ERROR("Expected compiled JIT module");
-    return Dispatch.launch(F.getName(), GridDim, BlockDim, KernelArgs,
-                           ShmemSize, Stream);
-  }
-
-  auto launch(StringRef KernelName, LaunchDims GridDim, LaunchDims BlockDim,
-              ArrayRef<void *> KernelArgs, uint64_t ShmemSize, void *Stream) {
-    if (!IsCompiled)
-      PROTEUS_FATAL_ERROR("Expected compiled JIT module");
-    // TODO: check that KernelName is valid.
-    return Dispatch.launch(KernelName, GridDim, BlockDim, KernelArgs, ShmemSize,
-                           Stream);
   }
 
   void print() { Mod->print(outs(), nullptr); }
 };
 
-template <typename RetT, typename... ArgT> void Func::call(StringRef Name) {
+template <typename RetT, typename... ArgT> void FuncBase::call(StringRef Name) {
   auto *F = getFunction();
   Module &M = *F->getParent();
   LLVMContext &Ctx = F->getContext();
   FunctionCallee Callee = M.getOrInsertFunction(Name, TypeMap<RetT>::get(Ctx),
                                                 TypeMap<ArgT>::get(Ctx)...);
   IRB.CreateCall(Callee);
+}
+
+template <typename RetT, typename... ArgT>
+RetT Func<RetT, ArgT...>::operator()(ArgT... Args) {
+  if (!J.isCompiled())
+    J.compile();
+
+  return Dispatch.run<RetT>(getName(), Args...);
 }
 
 } // namespace proteus

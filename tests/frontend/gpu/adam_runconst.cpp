@@ -2,9 +2,9 @@
 
 // clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./adam.%ext 10000 200 100 | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: ./adam_runconst.%ext 10000 200 100 | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./adam.%ext 10000 200 100 | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: ./adam_runconst.%ext 10000 200 100 | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
 // clang-format on
 
@@ -73,22 +73,26 @@ adam(T *__restrict__ p, T *__restrict__ m, T *__restrict__ v,
   }
 }
 
-auto createJitModule() {
+auto createJitModuleSpecial(float _b1, float _b2, float _eps, float _grad_scale,
+                            float _step_size, int _time_step,
+                            size_t _vector_size, int _mode, float _decay) {
   auto J = std::make_unique<JitModule>(TARGET);
-  auto KernelHandle =
-      J->addKernel<float *, float *, float *, float *, float, float, float,
-                   float, float, int, size_t, int, float>("adam");
+  auto KernelHandle = J->addKernel<float *, float *, float *, float *>("adam");
   auto &F = KernelHandle.F;
-  auto [p, m, v, g, b1, b2, eps, grad_scale, step_size, time_step, vector_size,
-        mode, decay] = F.getArgs();
+  auto [p, m, v, g] = F.getArgs();
 
   auto &i = F.declVar<size_t>("i");
   auto &totThreads = F.declVar<size_t>("totThreads");
   auto &j = F.declVar<size_t>("j");
   auto &t = F.declVar<int>("t");
   auto &inc1 = F.declVar<int>("inc1");
+
   F.beginFunction();
   {
+    auto [b1, b2, eps, grad_scale, step_size, time_step, vector_size, mode,
+          decay] = F.defRuntimeConsts(_b1, _b2, _eps, _grad_scale, _step_size,
+                                      _time_step, _vector_size, _mode, _decay);
+
     i = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +
         F.callBuiltin(getThreadIdX);
     totThreads = F.callBuiltin(getGridDimX) * F.callBuiltin(getBlockDimX);
@@ -196,7 +200,9 @@ int main(int argc, char *argv[]) {
   gpuErrCheck(gpuDeviceSynchronize());
 
   std::cout << "Creating JIT module\n";
-  auto [J, KernelHandle] = createJitModule();
+  auto [J, KernelHandle] =
+      createJitModuleSpecial(beta1, beta2, eps, grad_scale, step_size,
+                             time_step, vector_size, mode, decay);
 
   std::cout << "Compiling JIT module\n";
   J->compile();
@@ -210,9 +216,7 @@ int main(int argc, char *argv[]) {
     //                                       vector_size, mode, decay);
 
     gpuErrCheck(KernelHandle.launch({grids.x, 1, 1}, {blocks.x, 1, 1}, 0, 0,
-                                    d_p, d_m, d_v, d_g, beta1, beta2, eps,
-                                    grad_scale, step_size, time_step,
-                                    vector_size, mode, decay));
+                                    d_p, d_m, d_v, d_g));
   }
 
   gpuErrCheck(gpuDeviceSynchronize());

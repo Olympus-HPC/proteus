@@ -11,7 +11,7 @@ int main() {
   proteus::init();
 
   auto J = proteus::JitModule();
-  auto &F = J.addFunction<void, double &>("for");
+  auto &F = J.addFunction<void, double *>("for");
 
   auto &I = F.declVar<int>("i");
   auto &Inc = F.declVar<int>("inc");
@@ -36,7 +36,7 @@ int main() {
     X[I] = 1.0;
   }
 
-  J.run<void>(F, X);
+  F(X);
   for (int I = 0; I < 10; I++)
     std::cout << "X[" << I << "] = " << X[I] << "\n";
 

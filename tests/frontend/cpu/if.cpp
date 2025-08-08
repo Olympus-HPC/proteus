@@ -117,56 +117,56 @@ int main() {
 
   // LT tests
   // Evaluates to true.
-  double Ret = J.run<double, double, double>(LT, 1.0, 2.0);
+  double Ret = LT(1.0, 2.0);
   std::cout << "R LT " << Ret << "\n";
   // Evaluates to false.
-  Ret = J.run<double, double, double>(LT, 2.0, 1.0);
+  Ret = LT(2.0, 1.0);
   std::cout << "R LT " << Ret << "\n";
 
   // LE tests
   // Evaluates to true.
-  Ret = J.run<double, double, double>(LE, 1.0, 2.0);
+  Ret = LE(1.0, 2.0);
   std::cout << "R LE " << Ret << "\n";
   // Evaluates to true (equal).
-  Ret = J.run<double, double, double>(LE, 2.0, 2.0);
+  Ret = LE(2.0, 2.0);
   std::cout << "R LE " << Ret << "\n";
   // Evaluates to false.
-  Ret = J.run<double, double, double>(LE, 3.0, 2.0);
+  Ret = LE(3.0, 2.0);
   std::cout << "R LE " << Ret << "\n";
 
   // GT tests
   // Evaluates to true.
-  Ret = J.run<double, double, double>(GT, 3.0, 2.0);
+  Ret = GT(3.0, 2.0);
   std::cout << "R GT " << Ret << "\n";
   // Evaluates to false.
-  Ret = J.run<double, double, double>(GT, 2.0, 3.0);
+  Ret = GT(2.0, 3.0);
   std::cout << "R GT " << Ret << "\n";
 
   // GE tests
   // Evaluates to true.
-  Ret = J.run<double, double, double>(GE, 3.0, 2.0);
+  Ret = GE(3.0, 2.0);
   std::cout << "R GE " << Ret << "\n";
   // Evaluates to true (equal).
-  Ret = J.run<double, double, double>(GE, 2.0, 2.0);
+  Ret = GE(2.0, 2.0);
   std::cout << "R GE " << Ret << "\n";
   // Evaluates to false.
-  Ret = J.run<double, double, double>(GE, 1.0, 2.0);
+  Ret = GE(1.0, 2.0);
   std::cout << "R GE " << Ret << "\n";
 
   // EQ tests
   // Evaluates to true.
-  Ret = J.run<double, double, double>(EQ, 2.0, 2.0);
+  Ret = EQ(2.0, 2.0);
   std::cout << "R EQ " << Ret << "\n";
   // Evaluates to false.
-  Ret = J.run<double, double, double>(EQ, 2.0, 3.0);
+  Ret = EQ(2.0, 3.0);
   std::cout << "R EQ " << Ret << "\n";
 
   // NE tests
   // Evaluates to true.
-  Ret = J.run<double, double, double>(NE, 2.0, 3.0);
+  Ret = NE(2.0, 3.0);
   std::cout << "R NE " << Ret << "\n";
   // Evaluates to false.
-  Ret = J.run<double, double, double>(NE, 2.0, 2.0);
+  Ret = NE(2.0, 2.0);
   std::cout << "R NE " << Ret << "\n";
 
   proteus::finalize();

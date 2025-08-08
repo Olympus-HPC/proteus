@@ -6,16 +6,18 @@
 
 namespace proteus {
 
-class Func;
+class FuncBase;
 
 using namespace llvm;
 
+template <typename T> struct VarT {};
+
 struct Var {
   AllocaInst *Alloca;
-  Func &Fn;
+  FuncBase &Fn;
   Type *PointerElemType;
 
-  Var(AllocaInst *Alloca, Func &Fn, Type *PointerElemType = nullptr);
+  Var(AllocaInst *Alloca, FuncBase &Fn, Type *PointerElemType = nullptr);
 
   StringRef getName();
 

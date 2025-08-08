@@ -1,6 +1,10 @@
+// clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./if.%ext | %FILECHECK %s --check-prefixes=CHECK
+// RUN: ./if.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// Second run uses the object cache.
+// RUN: ./if.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
+// clang-format on
 
 #include <iostream>
 
@@ -236,3 +240,12 @@ int main() {
 // CHECK-NEXT: R EQ 0
 // CHECK-NEXT: R NE 1
 // CHECK-NEXT: R NE 0
+// CHECK: JitCache hits 8 total 14
+// CHECK-DAG: HashValue {{[0-9]+}} NumExecs 2 NumHits 1
+// CHECK-DAG: HashValue {{[0-9]+}} NumExecs 2 NumHits 1
+// CHECK-DAG: HashValue {{[0-9]+}} NumExecs 3 NumHits 2
+// CHECK-DAG: HashValue {{[0-9]+}} NumExecs 2 NumHits 1
+// CHECK-DAG: HashValue {{[0-9]+}} NumExecs 2 NumHits 1
+// CHECK-DAG: HashValue {{[0-9]+}} NumExecs 3 NumHits 2
+// CHECK-FIRST: JitStorageCache hits 0 total 1
+// CHECK-SECOND: JitStorageCache hits 1 total 1
