@@ -23,7 +23,7 @@ inline Value *getGridDim(FuncBase &Fn, unsigned Offset) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee =
       M.getOrInsertFunction("llvm.amdgcn.implicitarg.ptr",
                             PointerType::get(Ctx, ConstantAddressSpace));
@@ -47,7 +47,7 @@ inline Value *getBlockDim(FuncBase &Fn, unsigned Offset) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee =
       M.getOrInsertFunction("llvm.amdgcn.implicitarg.ptr",
                             PointerType::get(Ctx, ConstantAddressSpace));
@@ -68,7 +68,7 @@ inline Var &getThreadIdX(FuncBase &Fn) {
 
   Var &Ret = Fn.declVarInternal("threadIdx.x", TypeMap<int>::get(Ctx));
 
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.amdgcn.workitem.id.x",
                                                 TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
@@ -83,7 +83,7 @@ inline Var &getBlockIdX(FuncBase &Fn) {
 
   Var &Ret = Fn.declVarInternal("blockIdx.x", TypeMap<int>::get(Ctx));
 
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.amdgcn.workgroup.id.x",
                                                 TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
@@ -124,7 +124,7 @@ inline Var &getThreadIdX(FuncBase &Fn) {
 
   Var &Ret = Fn.declVarInternal("threadIdx.x", TypeMap<int>::get(Ctx));
 
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.nvvm.read.ptx.sreg.tid.x",
                                                 TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
@@ -139,7 +139,7 @@ inline Var &getBlockIdX(FuncBase &Fn) {
 
   Var &Ret = Fn.declVarInternal("blockIdx.x", TypeMap<int>::get(Ctx));
 
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.ctaid.x", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
@@ -154,7 +154,7 @@ inline Var &getBlockDimX(FuncBase &Fn) {
 
   Var &Ret = Fn.declVarInternal("blockDim.x", TypeMap<int>::get(Ctx));
 
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.ntid.x", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
@@ -169,7 +169,7 @@ inline Var &getGridDimX(FuncBase &Fn) {
 
   Var &Ret = Fn.declVarInternal("blockDim.x", TypeMap<int>::get(Ctx));
 
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.nctaid.x", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);

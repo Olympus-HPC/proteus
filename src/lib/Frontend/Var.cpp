@@ -10,7 +10,7 @@ static Var &binOp(const Var &L, const Var &R, IntOp IOp, FPOp FOp) {
   Function *F = Fn.getFunction();
 
   auto &DL = F->getParent()->getDataLayout();
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
   Type *LHSType = L.getValueType();
   Type *RHSType = R.getValueType();
 
@@ -41,7 +41,7 @@ static Var &cmpOp(const Var &L, const Var &R, IntOp IOp, FPOp FOp) {
   Function *F = Fn.getFunction();
 
   auto &DL = F->getParent()->getDataLayout();
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
   Type *LHSType = L.getValueType();
   Type *RHSType = R.getValueType();
 
@@ -70,7 +70,7 @@ Var::Var(AllocaInst *Alloca, FuncBase &Fn, Type *PointerElemType)
     : Alloca(Alloca), Fn(Fn), PointerElemType(PointerElemType) {}
 
 Value *Var::getValue() const {
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
   Type *AllocaType = Alloca->getAllocatedType();
   if (AllocaType->isPointerTy()) {
     auto *Ptr = IRB.CreateLoad(AllocaType, Alloca);
@@ -100,7 +100,7 @@ bool Var::isPointer() const {
 }
 
 void Var::storeValue(Value *Val) {
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
   Type *AllocaType = Alloca->getAllocatedType();
   if (AllocaType->isPointerTy()) {
     auto *Ptr = IRB.CreateLoad(AllocaType, Alloca);
@@ -111,7 +111,7 @@ void Var::storeValue(Value *Val) {
 }
 
 void Var::storePointer(Value *Ptr) {
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
   if (!isPointer())
     PROTEUS_FATAL_ERROR("Expected pointer type");
   IRB.CreateStore(Ptr, Alloca);
@@ -147,7 +147,7 @@ Var &Var::operator/(const Var &Other) const {
 
 Var &Var::operator+=(Var &Other) {
   Var &Res = *this + Other;
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
   this->storeValue(convert(IRB, Res.getValue(), getValueType()));
 
   return *this;
@@ -167,7 +167,7 @@ Var::operator+=(const T &ConstValue) {
 
 Var &Var::operator-=(Var &Other) {
   Var &Res = *this - Other;
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
   this->storeValue(convert(IRB, Res.getValue(), getValueType()));
 
   return *this;
@@ -187,7 +187,7 @@ Var::operator-=(const T &ConstValue) {
 
 Var &Var::operator*=(Var &Other) {
   Var &Res = *this * Other;
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
   this->storeValue(convert(IRB, Res.getValue(), getValueType()));
 
   return *this;
@@ -207,7 +207,7 @@ Var::operator*=(const T &ConstValue) {
 
 Var &Var::operator/=(Var &Other) {
   Var &Res = *this / Other;
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
   this->storeValue(convert(IRB, Res.getValue(), getValueType()));
 
   return *this;
@@ -262,7 +262,7 @@ Var::operator/(const T &ConstValue) const {
 }
 
 Var &Var::operator=(const Var &Other) {
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
   Type *LHSType = getValueType();
 
   Value *RHS = convert(IRB, Other.getValue(), LHSType);
@@ -422,7 +422,7 @@ Var::operator!=(const T &ConstValue) const {
 /// End of comparison operators.
 
 Var &Var::operator[](size_t I) {
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
 
   if (!isPointer())
     PROTEUS_FATAL_ERROR("Expected pointer type: Var " + getName());
@@ -438,7 +438,7 @@ Var &Var::operator[](size_t I) {
 }
 
 Var &Var::operator[](const Var &IdxVar) {
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
 
   if (!isPointer())
     PROTEUS_FATAL_ERROR("Expected pointer type");
@@ -551,7 +551,7 @@ Type *getCommonType(const DataLayout &DL, Type *T1, Type *T2) {
 Var &powf(const Var &L, const Var &R) {
   auto &Fn = L.Fn;
   auto &M = *Fn.getFunction()->getParent();
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
 
   auto *ResultType = IRB.getFloatTy();
   Var &ResultVar = Fn.declVarInternal("res.", ResultType);
@@ -574,7 +574,7 @@ Var &powf(const Var &L, const Var &R) {
 Var &sqrtf(const Var &R) {
   auto &Fn = R.Fn;
   auto &M = *Fn.getFunction()->getParent();
-  auto &IRB = Fn.getIRB();
+  auto &IRB = Fn.getIRBuilder();
 
   auto *ResultType = IRB.getFloatTy();
   Var &ResultVar = Fn.declVarInternal("res.", ResultType);

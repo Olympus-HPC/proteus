@@ -9,7 +9,7 @@ FuncBase::FuncBase(JitModule &J, FunctionCallee FC)
   Name = F->getName();
 }
 
-IRBuilderBase &FuncBase::getIRB() {
+IRBuilderBase &FuncBase::getIRBuilder() {
   if (!IRB.GetInsertBlock())
     PROTEUS_FATAL_ERROR("Insert point is not set");
   return IRB;

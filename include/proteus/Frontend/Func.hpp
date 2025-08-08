@@ -65,7 +65,7 @@ public:
 
   AllocaInst *emitAlloca(Type *Ty, StringRef Name);
 
-  IRBuilderBase &getIRB();
+  IRBuilderBase &getIRBuilder();
 
   Var &declVarInternal(StringRef Name, Type *Ty,
                        Type *PointerElemType = nullptr);
