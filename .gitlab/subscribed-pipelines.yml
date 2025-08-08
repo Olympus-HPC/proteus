@@ -75,7 +75,7 @@ tioga-build-and-test:
   variables:
     CI_MACHINE: "tioga"
   needs: [tioga-up-check]
-  extends: [.build-and-test]
+  extends: [.build-and-test-rocm]
 
 tioga-test-integration:
   variables:
