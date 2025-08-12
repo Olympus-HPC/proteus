@@ -195,7 +195,7 @@ int main(int argc, char **argv) {
     printf("init pathDistanceMatrix[%d] = %u\n", i, pathDistanceMatrix[i]);
   }
 
-  if (blockSize * blockSize > 256U) {
+  if (blockSize * blockSize > 256) {
     blockSize = 16;
   }
 
