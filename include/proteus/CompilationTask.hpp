@@ -119,7 +119,6 @@ public:
 
     replaceGlobalVariablesWithPointers(*M, VarNameToDevPtr);
 
-    std::cout << "Calling compilation task IR\n";
     compileIR(*M);
 
     if (DumpIR) {
