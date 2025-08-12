@@ -1,4 +1,12 @@
 // NOLINTBEGIN
+
+// clang-format off
+// RUN: rm -rf .proteus
+// RUN: ./floydwarshall.%ext 1024 100 16 | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: ./floydwarshall.%ext 1024 100 16 | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: rm -rf .proteus
+// clang-format on
+
 #include <proteus/Frontend/Builtins.hpp>
 #include <proteus/JitFrontend.hpp>
 
@@ -9,7 +17,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include <string.h>
 
 
 constexpr unsigned int MAXDISTANCE = 200;
@@ -59,7 +66,7 @@ using namespace proteus;
 #error "Expected PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA defined"
 #endif
 
-__global__ void floydWarshallPass_ref(
+__global__ void floydWarshallPass(
     unsigned int *__restrict__ pathDistanceBuffer,
     unsigned int *__restrict__ pathBuffer,
     const unsigned int numNodes,
@@ -142,25 +149,14 @@ auto createJitModuleSpecial(unsigned int _numNodes) {
 }
 
 int main(int argc, char **argv) {
-  if (argc < 4 || argc > 5) {
-    printf("Usage: %s <number of nodes> <iterations> <block size> [--print|-p]\n", argv[0]);
+  if (argc != 4) {
+    printf("Usage: %s <number of nodes> <iterations> <block size>\n", argv[0]);
     return 1;
   }
 
   int numNodes = atoi(argv[1]);
   int numIterations = atoi(argv[2]);
   int blockSize = atoi(argv[3]);
-
-  bool printOutput = false;
-  if (argc == 5) {
-    if (strcmp(argv[4], "--print") == 0 || strcmp(argv[4], "-p") == 0) {
-      printOutput = true;
-    } else {
-      printf("Unknown option: %s\n", argv[4]);
-      printf("Usage: %s <number of nodes> <iterations> <block size> [--print|-p]\n", argv[0]);
-      return 1;
-    }
-  }
 
   if (numNodes % blockSize != 0) {
     numNodes = (numNodes / blockSize + 1) * blockSize;
@@ -176,11 +172,11 @@ int main(int argc, char **argv) {
   unsigned int *pathMatrix = (unsigned int *)malloc(matrixSizeBytes);
   assert(pathMatrix != nullptr);
 
-  srand(2);
+  srand(123);
   for (int i = 0; i < numNodes; i++) {
     for (int j = 0; j < numNodes; j++) {
       int index = i * numNodes + j;
-      pathDistanceMatrix[index] = static_cast<unsigned int>(rand() % (MAXDISTANCE + 1));
+      pathDistanceMatrix[index] = static_cast<unsigned int>(1 + (rand() % MAXDISTANCE));
     }
   }
   for (int i = 0; i < numNodes; ++i) {
@@ -195,6 +191,12 @@ int main(int argc, char **argv) {
     }
     pathMatrix[i * numNodes + i] = static_cast<unsigned int>(i);
   }
+  
+  // Print initial matrix values for verification
+  for (int i = 0; i < 10 && i < numNodes * numNodes; i++) {
+    printf("init pathDistanceMatrix[%d] = %u\n", i, pathDistanceMatrix[i]);
+  }
+  
   if (blockSize * blockSize > 256U) {
     blockSize = 16;
   }
@@ -212,7 +214,9 @@ int main(int argc, char **argv) {
 
   float total_time_s = 0.f;
 
+  printf("Creating JIT module\n");
   auto [J, KernelHandle] = createJitModuleSpecial(static_cast<unsigned int>(numNodes));
+  printf("Compiling JIT module\n");
   J->compile();
 
   for (int n = 0; n < numIterations; n++) {
@@ -223,6 +227,8 @@ int main(int argc, char **argv) {
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < numNodes; i++) {
+      // floydWarshallPass<<<numBlocks, threadsPerBlock>>>(pathDistanceBuffer, pathBuffer, numNodes, i);
+
       gpuErrCheck(KernelHandle.launch({static_cast<unsigned>(numBlocks), 1U, 1U},
                                       {static_cast<unsigned>(threadsPerBlock), 1U, 1U}, 0, nullptr,
                                       pathDistanceBuffer, pathBuffer, static_cast<unsigned>(numNodes),
@@ -237,30 +243,90 @@ int main(int argc, char **argv) {
     total_time_s += static_cast<float>(time_ns * 1e-9);
   }
 
-  printf("Average kernel execution time %f (s)\n",
-         total_time_s / numIterations);
+  printf("Average kernel execution time %f (ms)\n",
+         total_time_s / numIterations * 1e3f);
 
   gpuErrCheck(gpuMemcpy(pathDistanceMatrix, pathDistanceBuffer, matrixSizeBytes,
                         gpuMemcpyDeviceToHost));
+
+  // Print sections for FileCheck: first 5, middle 5, last 5
+  {
+    size_t te = static_cast<size_t>(totalElems);
+
+    // First 5
+    size_t firstCount = te < 5 ? te : 5;
+    for (size_t i = 0; i < firstCount; ++i) {
+      printf("dist[%zu] = %u\n", i, pathDistanceMatrix[i]);
+    }
+
+    // Middle 5 (centered around te/2)
+    size_t midStart = 0;
+    if (te > 0) {
+      size_t half = te / 2;
+      midStart = (half > 2) ? (half - 2) : 0;
+      if (midStart + 5 > te) {
+        midStart = te > 5 ? (te - 5) : 0;
+      }
+    }
+    size_t midCount = (te - midStart) < 5 ? (te - midStart) : 5;
+    for (size_t i = 0; i < midCount; ++i) {
+      size_t idx = midStart + i;
+      printf("dist[%zu] = %u\n", idx, pathDistanceMatrix[idx]);
+    }
+
+    // Last 5
+    size_t lastStart = te > 5 ? (te - 5) : 0;
+    size_t lastCount = te < 5 ? te : 5;
+    for (size_t i = 0; i < lastCount; ++i) {
+      size_t idx = lastStart + i;
+      printf("dist[%zu] = %u\n", idx, pathDistanceMatrix[idx]);
+    }
+  }
+
   gpuErrCheck(gpuFree(pathDistanceBuffer));
   gpuErrCheck(gpuFree(pathBuffer));
 
-  if (printOutput) {
-    for (int i = 0; i < numNodes; ++i) {
-      for (int j = 0; j < numNodes; ++j) {
-        unsigned int value = pathDistanceMatrix[i * numNodes + j];
-        if (j + 1 == numNodes) {
-          printf("%u", value);
-        } else {
-          printf("%u ", value);
-        }
-      }
-      printf("\n");
-    }
-  }
+ 
 
   free(pathDistanceMatrix);
   free(pathMatrix);
   return 0;
 }
+
+//clang-format off
+// CHECK: init pathDistanceMatrix[0] = 0
+// CHECK-NEXT: init pathDistanceMatrix[1] = 14
+// CHECK-NEXT: init pathDistanceMatrix[2] = 74
+// CHECK-NEXT: init pathDistanceMatrix[3] = 31
+// CHECK-NEXT: init pathDistanceMatrix[4] = 80
+// CHECK-NEXT: init pathDistanceMatrix[5] = 132
+// CHECK-NEXT: init pathDistanceMatrix[6] = 196
+// CHECK-NEXT: init pathDistanceMatrix[7] = 23
+// CHECK-NEXT: init pathDistanceMatrix[8] = 27
+// CHECK-NEXT: init pathDistanceMatrix[9] = 2
+// CHECK-NEXT: Creating JIT module
+// CHECK-NEXT: Compiling JIT module
+// CHECK-NEXT: Average kernel execution time {{.*}} (ms)
+// CHECK-NEXT: dist[0] = 0
+// CHECK-NEXT: dist[1] = 4
+// CHECK-NEXT: dist[2] = 5
+// CHECK-NEXT: dist[3] = 5
+// CHECK-NEXT: dist[4] = 5
+// CHECK-NEXT: dist[524286] = 4
+// CHECK-NEXT: dist[524287] = 2
+// CHECK-NEXT: dist[524288] = 4
+// CHECK-NEXT: dist[524289] = 3
+// CHECK-NEXT: dist[524290] = 2
+// CHECK-NEXT: dist[1048571] = 5
+// CHECK-NEXT: dist[1048572] = 4
+// CHECK-NEXT: dist[1048573] = 4
+// CHECK-NEXT: dist[1048574] = 4
+// CHECK-NEXT: dist[1048575] = 0
+// CHECK: JitCache hits 102399 total 102400
+// CHECK: HashValue {{[0-9]+}} NumExecs 102400 NumHits 102399
+// CHECK-FIRST: JitStorageCache hits 0 total 1
+// CHECK-SECOND: JitStorageCache hits 1 total 1
+// CHECK: JitCache hits 0 total 0
+// CHECK: JitStorageCache hits 0 total 0
+
 // NOLINTEND
