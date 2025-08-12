@@ -12,12 +12,11 @@
 
 #include "../../gpu/gpu_common.h"
 
+#include <assert.h>
 #include <chrono>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
-
 
 constexpr unsigned int MAXDISTANCE = 200;
 
@@ -31,9 +30,9 @@ constexpr unsigned int MAXDISTANCE = 200;
  * considering the (k-1) nodes (that are introduced in the previous
  * passes) is updated such that
  *
- * ShortestPath(x,y,k) = min(ShortestPath(x,y,k-1), ShortestPath(x,k,k-1) + ShortestPath(k,y,k-1))
- * where x and y are the pair of nodes between which the shortest distance
- * is being calculated.
+ * ShortestPath(x,y,k) = min(ShortestPath(x,y,k-1), ShortestPath(x,k,k-1) +
+ * ShortestPath(k,y,k-1)) where x and y are the pair of nodes between which the
+ * shortest distance is being calculated.
  *
  * pathBuffer stores the intermediate nodes through which the shortest
  * path goes for each pair of nodes.
@@ -66,12 +65,10 @@ using namespace proteus;
 #error "Expected PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA defined"
 #endif
 
-__global__ void floydWarshallPass(
-    unsigned int *__restrict__ pathDistanceBuffer,
-    unsigned int *__restrict__ pathBuffer,
-    const unsigned int numNodes,
-    const unsigned int pass)
-{
+__global__ void floydWarshallPass(unsigned int *__restrict__ pathDistanceBuffer,
+                                  unsigned int *__restrict__ pathBuffer,
+                                  const unsigned int numNodes,
+                                  const unsigned int pass) {
   unsigned int idx = blockIdx.x * blockDim.x + threadIdx.x;
   unsigned int n2 = numNodes * numNodes;
   if (idx >= n2)
@@ -92,60 +89,61 @@ __global__ void floydWarshallPass(
 }
 
 auto createJitModuleSpecial(unsigned int _numNodes) {
-       auto J = std::make_unique<JitModule>(TARGET);
-       auto KernelHandle = J->addKernel<unsigned int *, unsigned int *, unsigned int, unsigned int>("floydWarshallPass");
-       auto &F = KernelHandle.F;
-       auto [pathDistanceBuffer, pathBuffer, numNodes, pass] = F.getArgs();
+  auto J = std::make_unique<JitModule>(TARGET);
+  auto KernelHandle =
+      J->addKernel<unsigned int *, unsigned int *, unsigned int, unsigned int>(
+          "floydWarshallPass");
+  auto &F = KernelHandle.F;
+  auto [pathDistanceBuffer, pathBuffer, numNodes, pass] = F.getArgs();
 
-       F.beginFunction();
-       {
-         // Bake only numNodes as a runtime constant; pass is a dynamic kernel arg
-         auto &rcNumNodes = F.defRuntimeConst(_numNodes);
+  F.beginFunction();
+  {
+    // Bake only numNodes as a runtime constant; pass is a dynamic kernel arg
+    auto &rcNumNodes = F.defRuntimeConst(_numNodes);
 
+    auto &idx = F.declVar<unsigned int>("idx");
+    auto &totThreads = F.declVar<unsigned int>("totThreads");
+    auto &xValue = F.declVar<unsigned int>("xValue");
+    auto &yValue = F.declVar<unsigned int>("yValue");
+    auto &k = F.declVar<unsigned int>("k");
+    auto &oldWeight = F.declVar<unsigned int>("oldWeight");
+    auto &tempWeight = F.declVar<unsigned int>("tempWeight");
 
-         auto &idx = F.declVar<unsigned int>("idx");
-         auto &totThreads = F.declVar<unsigned int>("totThreads");
-         auto &xValue = F.declVar<unsigned int>("xValue");
-         auto &yValue = F.declVar<unsigned int>("yValue");
-         auto &k = F.declVar<unsigned int>("k");
-         auto &oldWeight = F.declVar<unsigned int>("oldWeight");
-         auto &tempWeight = F.declVar<unsigned int>("tempWeight");
+    auto &tidx = F.callBuiltin(getThreadIdX);
+    auto &bidx = F.callBuiltin(getBlockIdX);
+    auto &bdim = F.callBuiltin(getBlockDimX);
+    auto &gdim = F.callBuiltin(getGridDimX);
 
-         auto &tidx = F.callBuiltin(getThreadIdX);
-         auto &bidx = F.callBuiltin(getBlockIdX);
-         auto &bdim = F.callBuiltin(getBlockDimX);
-         auto &gdim = F.callBuiltin(getGridDimX);
+    idx = bidx * bdim + tidx;
+    totThreads = gdim * bdim;
 
-         idx = bidx * bdim + tidx;
-         totThreads = gdim * bdim;
+    // Flattened 1D thread id maps to 2D (y, x)
+    yValue = idx / rcNumNodes;
+    xValue = idx - yValue * rcNumNodes;
+    k = pass;
 
-         // Flattened 1D thread id maps to 2D (y, x)
-         yValue = idx / rcNumNodes;
-         xValue = idx - yValue * rcNumNodes;
-         k = pass;
+    // Guard against overrun when grid > N*N
+    auto &n2 = F.declVar<unsigned int>("n2");
+    n2 = rcNumNodes * rcNumNodes;
+    F.beginIf(idx < n2);
+    {
+      oldWeight = pathDistanceBuffer[yValue * rcNumNodes + xValue];
+      tempWeight = pathDistanceBuffer[yValue * rcNumNodes + k] +
+                   pathDistanceBuffer[k * rcNumNodes + xValue];
 
-         // Guard against overrun when grid > N*N
-         auto &n2 = F.declVar<unsigned int>("n2");
-         n2 = rcNumNodes * rcNumNodes;
-         F.beginIf(idx < n2);
-         {
-           oldWeight = pathDistanceBuffer[yValue * rcNumNodes + xValue];
-           tempWeight = pathDistanceBuffer[yValue * rcNumNodes + k] +
-                        pathDistanceBuffer[k * rcNumNodes + xValue];
+      F.beginIf(tempWeight < oldWeight);
+      {
+        pathDistanceBuffer[yValue * rcNumNodes + xValue] = tempWeight;
+        pathBuffer[yValue * rcNumNodes + xValue] = k;
+      }
+      F.endIf();
+    }
+    F.endIf();
+    F.ret();
+  }
+  F.endFunction();
 
-           F.beginIf(tempWeight < oldWeight);
-           {
-             pathDistanceBuffer[yValue * rcNumNodes + xValue] = tempWeight;
-             pathBuffer[yValue * rcNumNodes + xValue] = k;
-           }
-           F.endIf();
-         }
-         F.endIf();
-         F.ret();
-       }
-       F.endFunction();
-
-        return std::make_pair(std::move(J), KernelHandle);
+  return std::make_pair(std::move(J), KernelHandle);
 }
 
 int main(int argc, char **argv) {
@@ -166,8 +164,7 @@ int main(int argc, char **argv) {
                                  static_cast<size_t>(numNodes) *
                                  sizeof(unsigned int);
 
-  unsigned int *pathDistanceMatrix =
-      (unsigned int *)malloc(matrixSizeBytes);
+  unsigned int *pathDistanceMatrix = (unsigned int *)malloc(matrixSizeBytes);
   assert(pathDistanceMatrix != nullptr);
   unsigned int *pathMatrix = (unsigned int *)malloc(matrixSizeBytes);
   assert(pathMatrix != nullptr);
@@ -176,7 +173,8 @@ int main(int argc, char **argv) {
   for (int i = 0; i < numNodes; i++) {
     for (int j = 0; j < numNodes; j++) {
       int index = i * numNodes + j;
-      pathDistanceMatrix[index] = static_cast<unsigned int>(1 + (rand() % MAXDISTANCE));
+      pathDistanceMatrix[index] =
+          static_cast<unsigned int>(1 + (rand() % MAXDISTANCE));
     }
   }
   for (int i = 0; i < numNodes; ++i) {
@@ -191,12 +189,12 @@ int main(int argc, char **argv) {
     }
     pathMatrix[i * numNodes + i] = static_cast<unsigned int>(i);
   }
-  
+
   // Print initial matrix values for verification
   for (int i = 0; i < 10 && i < numNodes * numNodes; i++) {
     printf("init pathDistanceMatrix[%d] = %u\n", i, pathDistanceMatrix[i]);
   }
-  
+
   if (blockSize * blockSize > 256U) {
     blockSize = 16;
   }
@@ -204,8 +202,7 @@ int main(int argc, char **argv) {
   const int threadsPerBlock = blockSize * blockSize; // 1D launch
   const uint64_t totalElems = (uint64_t)numNodes * (uint64_t)numNodes;
   const int numBlocks =
-      static_cast<int>((totalElems + threadsPerBlock - 1) /
-                                threadsPerBlock);
+      static_cast<int>((totalElems + threadsPerBlock - 1) / threadsPerBlock);
 
   unsigned int *pathDistanceBuffer = nullptr;
   unsigned int *pathBuffer = nullptr;
@@ -215,24 +212,27 @@ int main(int argc, char **argv) {
   float total_time_s = 0.f;
 
   printf("Creating JIT module\n");
-  auto [J, KernelHandle] = createJitModuleSpecial(static_cast<unsigned int>(numNodes));
+  auto [J, KernelHandle] =
+      createJitModuleSpecial(static_cast<unsigned int>(numNodes));
   printf("Compiling JIT module\n");
   J->compile();
 
   for (int n = 0; n < numIterations; n++) {
-    gpuErrCheck(gpuMemcpy(pathDistanceBuffer, pathDistanceMatrix, matrixSizeBytes,
-                          gpuMemcpyHostToDevice));
+    gpuErrCheck(gpuMemcpy(pathDistanceBuffer, pathDistanceMatrix,
+                          matrixSizeBytes, gpuMemcpyHostToDevice));
 
     gpuErrCheck(gpuDeviceSynchronize());
     auto start = std::chrono::steady_clock::now();
 
     for (int i = 0; i < numNodes; i++) {
-      // floydWarshallPass<<<numBlocks, threadsPerBlock>>>(pathDistanceBuffer, pathBuffer, numNodes, i);
+      // floydWarshallPass<<<numBlocks, threadsPerBlock>>>(pathDistanceBuffer,
+      // pathBuffer, numNodes, i);
 
-      gpuErrCheck(KernelHandle.launch({static_cast<unsigned>(numBlocks), 1U, 1U},
-                                      {static_cast<unsigned>(threadsPerBlock), 1U, 1U}, 0, nullptr,
-                                      pathDistanceBuffer, pathBuffer, static_cast<unsigned>(numNodes),
-                                      static_cast<unsigned>(i)));
+      gpuErrCheck(KernelHandle.launch(
+          {static_cast<unsigned>(numBlocks), 1U, 1U},
+          {static_cast<unsigned>(threadsPerBlock), 1U, 1U}, 0, nullptr,
+          pathDistanceBuffer, pathBuffer, static_cast<unsigned>(numNodes),
+          static_cast<unsigned>(i)));
     }
 
     gpuErrCheck(gpuDeviceSynchronize());
@@ -285,8 +285,6 @@ int main(int argc, char **argv) {
 
   gpuErrCheck(gpuFree(pathDistanceBuffer));
   gpuErrCheck(gpuFree(pathBuffer));
-
- 
 
   free(pathDistanceMatrix);
   free(pathMatrix);
