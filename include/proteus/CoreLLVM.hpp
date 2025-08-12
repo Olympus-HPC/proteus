@@ -84,6 +84,37 @@ createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3) {
 }
 
 inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
+                                        const std::string &PassPipeline,
+                                        unsigned CodegenOptLevel = 3) {
+  PipelineTuningOptions PTO;
+
+  std::optional<PGOOptions> PGOOpt;
+  auto TM = createTargetMachine(M, Arch, CodegenOptLevel);
+  if (auto Err = TM.takeError())
+    report_fatal_error(std::move(Err));
+  TargetLibraryInfoImpl TLII(Triple(M.getTargetTriple()));
+
+  PassBuilder PB(TM->get(), PTO, PGOOpt, nullptr);
+  LoopAnalysisManager LAM;
+  FunctionAnalysisManager FAM;
+  CGSCCAnalysisManager CGAM;
+  ModuleAnalysisManager MAM;
+
+  FAM.registerPass([&] { return TargetLibraryAnalysis(TLII); });
+
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+  ModulePassManager Passes;
+  if (auto E = PB.parsePassPipeline(Passes, PassPipeline))
+    PROTEUS_FATAL_ERROR("Error: " + toString(std::move(E)));
+
+  Passes.run(M, MAM);
+}
+
+inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
                                         char OptLevel = '3',
                                         unsigned CodegenOptLevel = 3) {
   PipelineTuningOptions PTO;
@@ -155,6 +186,17 @@ inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                        << "optimizeIR optlevel " << OptLevel << " codegenopt "
                        << CodegenOptLevel << " " << T.elapsed() << " ms\n");
+}
+
+inline void optimizeIR(Module &M, StringRef Arch,
+                       const std::string &PassPipeline,
+                       unsigned CodegenOptLevel) {
+  Timer T;
+  detail::runOptimizationPassPipeline(M, Arch, PassPipeline, CodegenOptLevel);
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                       << "optimizeIR optlevel " << PassPipeline
+                       << " codegenopt " << CodegenOptLevel << " "
+                       << T.elapsed() << " ms\n");
 }
 
 inline std::unique_ptr<Module>

@@ -633,13 +633,16 @@ JitEngineDevice<ImplT>::compileAndRun(
           KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
           GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr,
           GlobalLinkedBinaries, DeviceArch,
-          /* CGOption */ Config::get().ProteusCodegen,
-          /* DumpIR */ Config::get().ProteusDumpLLVMIR,
-          /* RelinkGlobalsByCopy */ Config::get().ProteusRelinkGlobalsByCopy,
-          /*SpecializeArgs=*/Config::get().ProteusSpecializeArgs,
-          /*SpecializeDims=*/Config::get().ProteusSpecializeDims,
+          /*CGOption*/ Config::get().ProteusCodegen,
+          /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
+          /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy,
+          /*SpecializeArgs*/ Config::get().ProteusSpecializeArgs,
+          /*SpecializeDims*/ Config::get().ProteusSpecializeDims,
           /*SpecializeLaunchBounds=*/
-          Config::get().ProteusSpecializeLaunchBounds});
+          Config::get().ProteusSpecializeLaunchBounds,
+          /*OptLevel*/ '3',
+          /*CodeGenOptLevel*/ 3,
+          /*PassPipeline*/ Config::get().ProteusOptPipeline});
     }
 
     // Compilation is pending, try to get the compilation result buffer. If
@@ -657,13 +660,16 @@ JitEngineDevice<ImplT>::compileAndRun(
         KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
         GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr,
         GlobalLinkedBinaries, DeviceArch,
-        /* CGOption */ Config::get().ProteusCodegen,
-        /* DumpIR */ Config::get().ProteusDumpLLVMIR,
-        /* RelinkGlobalsByCopy */ Config::get().ProteusRelinkGlobalsByCopy,
-        /*SpecializeArgs=*/Config::get().ProteusSpecializeArgs,
-        /*SpecializeDims=*/Config::get().ProteusSpecializeDims,
-        /*SpecializeLaunchBounds=*/
-        Config::get().ProteusSpecializeLaunchBounds});
+        /*CGOption*/ Config::get().ProteusCodegen,
+        /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
+        /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy,
+        /*SpecializeArgs*/ Config::get().ProteusSpecializeArgs,
+        /*SpecializeDims*/ Config::get().ProteusSpecializeDims,
+        /*SpecializeLaunchBounds*/
+        Config::get().ProteusSpecializeLaunchBounds,
+        /*OptLevel*/ '3',
+        /*CodeGenOptLevel*/ 3,
+        /*PassPipeline*/ Config::get().ProteusOptPipeline});
   }
 
   if (!ObjBuf)

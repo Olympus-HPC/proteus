@@ -39,6 +39,9 @@ JitEngine::JitEngine() {
                           << Config::get().ProteusSpecializeDims << "\n";
   Logger::logs("proteus") << "PROTEUS_CODEGEN"
                           << toString(Config::get().ProteusCodegen) << "\n";
+  Logger::logs("proteus") << "PROTEUS_OPT_PIPELINE"
+                          << Config::get().ProteusOptPipeline << "\n";
+
 #endif
 }
 

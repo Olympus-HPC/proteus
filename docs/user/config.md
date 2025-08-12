@@ -19,3 +19,4 @@ through environment variables.
 | `PROTEUS_ASYNC_THREADS`            | >=1 (default: 1)                                                                    | Set number of threads for asynchronous compilation                        |
 | `PROTEUS_ASYNC_TEST_BLOCKING`      | 0 or 1 (default: 0)                                                                 | Make asynchronous compilation blocking for testing                        |
 | `PROTEUS_TRACE_OUTPUT`              | 0 or 1 (default: 0)                                                                 | Print trace output in stdout (shows information on Proteus specialization) |
+| `PROTEUS_OPT_PIPELINE`              | Text (default: None)                                                               |Text describing a pure 'opt' pipeline (e.g. default<O1>) , when empty fall back to default O3  |
