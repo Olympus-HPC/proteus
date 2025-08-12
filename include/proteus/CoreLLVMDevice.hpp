@@ -291,19 +291,17 @@ inline void specializeIR(
   F->setName(FnName + Suffix);
 
   if (SpecializeLaunchBounds) {
-    size_t GridSize = GridDim.x * GridDim.y * GridDim.z;
     int BlockSize = BlockDim.x * BlockDim.y * BlockDim.z;
-    auto TraceOut = [](size_t GridSize, int BlockSize) {
+    auto TraceOut = [](int BlockSize) {
       SmallString<128> S;
       raw_svector_ostream OS(S);
-      OS << "[LaunchBoundSpec] GridSize " << GridSize << " BlockSize "
-         << BlockSize << "\n";
+      OS << "[LaunchBoundSpec] BlockSize " << BlockSize << "\n";
 
       return S;
     };
     if (Config::get().ProteusTraceOutput)
-      Logger::trace(TraceOut(GridSize, BlockSize));
-    setLaunchBoundsForKernel(M, *F, GridSize, BlockSize);
+      Logger::trace(TraceOut(BlockSize));
+    setLaunchBoundsForKernel(*F, BlockSize);
   }
 
   runCleanupPassPipeline(M);

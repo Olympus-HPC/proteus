@@ -475,12 +475,6 @@ private:
     return static_cast<ImplT &>(*this).resolveDeviceGlobalAddr(Addr);
   }
 
-  void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
-                                int BlockSize) {
-    static_cast<ImplT &>(*this).setLaunchBoundsForKernel(M, F, GridSize,
-                                                         BlockSize);
-  }
-
   void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
     proteus::setKernelDims(M, GridDim, BlockDim);
   }

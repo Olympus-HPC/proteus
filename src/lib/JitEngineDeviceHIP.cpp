@@ -361,12 +361,6 @@ void JitEngineDeviceHIP::extractModules(BinaryInfo &BinInfo) {
   BinInfo.setExtractedModules(LinkedModules);
 }
 
-void JitEngineDeviceHIP::setLaunchBoundsForKernel(Module &M, Function &F,
-                                                  size_t GridSize,
-                                                  int BlockSize) {
-  proteus::setLaunchBoundsForKernel(M, F, GridSize, BlockSize);
-}
-
 hipFunction_t
 JitEngineDeviceHIP::getKernelFunctionFromImage(StringRef KernelName,
                                                const void *Image) {

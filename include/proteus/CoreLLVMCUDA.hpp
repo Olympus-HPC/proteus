@@ -84,36 +84,40 @@ inline const SmallVector<StringRef> &threadIdxZFnName() {
 
 } // namespace detail
 
-inline void setLaunchBoundsForKernel(Module &M, Function &F,
-                                     size_t /*GridSize*/, int BlockSize) {
-  NamedMDNode *NvvmAnnotations = M.getNamedMetadata("nvvm.annotations");
+inline void setLaunchBoundsForKernel(Function &F, int MaxThreadsPerSM,
+                                     int MinBlocksPerSM = 0) {
+  auto M = F.getParent();
+  NamedMDNode *NvvmAnnotations = M->getNamedMetadata("nvvm.annotations");
   assert(NvvmAnnotations && "Expected non-null nvvm.annotations metadata");
+  auto *FuncMetadata = ConstantAsMetadata::get(&F);
+
+  auto setMDNode = [&](const char *MDName, int MDValue) {
+    auto *MDNodeName = MDString::get(M->getContext(), MDName);
+    auto *MDNodeValue = ConstantAsMetadata::get(
+        ConstantInt::get(Type::getInt32Ty(M->getContext()), MDValue));
+
+    for (auto *MetadataNode : NvvmAnnotations->operands()) {
+      // Expecting 3 operands ptr, desc, i32 value.
+      assert(MetadataNode->getNumOperands() == 3);
+
+      auto *PtrMetadata = MetadataNode->getOperand(0).get();
+      auto *DescMetadata = MetadataNode->getOperand(1).get();
+      if (PtrMetadata == FuncMetadata && MDNodeName == DescMetadata) {
+        MetadataNode->replaceOperandWith(2, MDNodeValue);
+        return;
+      }
+    }
+    Metadata *MDVals[] = {FuncMetadata, MDNodeName, MDNodeValue};
+    NvvmAnnotations->addOperand(MDNode::get(M->getContext(), MDVals));
+  };
+
   // TODO: fix hardcoded 1024 as the maximum, by reading device
   // properties.
-  // TODO: set min GridSize.
-  int MaxThreads = std::min(1024, BlockSize);
-  auto *FuncMetadata = ConstantAsMetadata::get(&F);
-  auto *MaxntidxMetadata = MDString::get(M.getContext(), "maxntidx");
-  auto *MaxThreadsMetadata = ConstantAsMetadata::get(
-      ConstantInt::get(Type::getInt32Ty(M.getContext()), MaxThreads));
-
-  // Replace if the metadata exists.
-  for (auto *MetadataNode : NvvmAnnotations->operands()) {
-    // Expecting 3 operands ptr, desc, i32 value.
-    assert(MetadataNode->getNumOperands() == 3);
-
-    auto *PtrMetadata = MetadataNode->getOperand(0).get();
-    auto *DescMetadata = MetadataNode->getOperand(1).get();
-    if (PtrMetadata == FuncMetadata && MaxntidxMetadata == DescMetadata) {
-      MetadataNode->replaceOperandWith(2, MaxThreadsMetadata);
-      return;
-    }
-  }
-
-  // Otherwise create the metadata and insert.
-  Metadata *MDVals[] = {FuncMetadata, MaxntidxMetadata, MaxThreadsMetadata};
-  NvvmAnnotations->addOperand(MDNode::get(M.getContext(), MDVals));
+  setMDNode("maxntid", std::min(1024, MaxThreadsPerSM));
+  if (MinBlocksPerSM != 0)
+    setMDNode("minctasm", MinBlocksPerSM);
 }
+
 inline void codegenPTX(Module &M, StringRef DeviceArch,
                        SmallVectorImpl<char> &PTXStr) {
   // TODO: It is possbile to use PTX directly through the CUDA PTX JIT
