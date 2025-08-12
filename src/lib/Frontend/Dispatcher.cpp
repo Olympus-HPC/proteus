@@ -12,8 +12,8 @@
 #endif
 
 namespace proteus {
-Dispatcher &Dispatcher::getDispatcher(TargetModelType Model) {
-  switch (Model) {
+Dispatcher &Dispatcher::getDispatcher(TargetModelType TargetModel) {
+  switch (TargetModel) {
   case TargetModelType::HOST:
     return DispatcherHost::instance();
   case TargetModelType::HIP:
