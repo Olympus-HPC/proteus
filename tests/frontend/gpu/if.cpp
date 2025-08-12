@@ -240,12 +240,8 @@ int main() {
 // CHECK-NEXT: R EQ 0
 // CHECK-NEXT: R NE 1
 // CHECK-NEXT: R NE 0
-// CHECK: JitCache hits 8 total 14
-// CHECK-DAG: HashValue {{[0-9]+}} NumExecs 2 NumHits 1
-// CHECK-DAG: HashValue {{[0-9]+}} NumExecs 2 NumHits 1
-// CHECK-DAG: HashValue {{[0-9]+}} NumExecs 3 NumHits 2
-// CHECK-DAG: HashValue {{[0-9]+}} NumExecs 2 NumHits 1
-// CHECK-DAG: HashValue {{[0-9]+}} NumExecs 2 NumHits 1
-// CHECK-DAG: HashValue {{[0-9]+}} NumExecs 3 NumHits 2
+// NOTE: Cache hits are less because the KernelHandle stores the kernel function, avoiding the cache.
+// CHECK: JitCache hits 0 total 6
+// CHECK-COUNT-6: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: JitStorageCache hits 0 total 1
 // CHECK-SECOND: JitStorageCache hits 1 total 1
