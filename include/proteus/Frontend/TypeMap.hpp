@@ -44,6 +44,34 @@ template <> struct TypeMap<int> {
   static bool isSigned() { return true; }
 };
 
+template <> struct TypeMap<unsigned int> {
+  static Type *get(llvm::LLVMContext &Ctx) { return Type::getInt32Ty(Ctx); }
+
+  static Type *getPointerElemType(llvm::LLVMContext &) { return nullptr; }
+
+  static bool isSigned() { return false; }
+};
+
+template <> struct TypeMap<int *> {
+  static Type *get(llvm::LLVMContext &Ctx) {
+    return PointerType::getUnqual(Ctx);
+  }
+
+  static Type *getPointerElemType(llvm::LLVMContext &Ctx) {
+    return Type::getInt32Ty(Ctx);
+  }
+};
+
+template <> struct TypeMap<unsigned int *> {
+  static Type *get(llvm::LLVMContext &Ctx) {
+    return PointerType::getUnqual(Ctx);
+  }
+
+  static Type *getPointerElemType(llvm::LLVMContext &Ctx) {
+    return Type::getInt32Ty(Ctx);
+  }
+};
+
 template <> struct TypeMap<bool> {
   static Type *get(llvm::LLVMContext &Ctx) { return Type::getInt1Ty(Ctx); }
 
