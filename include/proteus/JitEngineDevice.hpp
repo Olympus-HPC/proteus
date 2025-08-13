@@ -640,8 +640,10 @@ JitEngineDevice<ImplT>::compileAndRun(
           /*SpecializeDims*/ Config::get().ProteusSpecializeDims,
           /*SpecializeLaunchBounds=*/
           Config::get().ProteusSpecializeLaunchBounds,
-          /*OptLevel*/ '3',
-          /*CodeGenOptLevel*/ 3,
+          /*OptLevel*/ '3', // TODO: Add environment configuration option to
+                            // define this
+          /*CodeGenOptLevel*/ 3, // TODO: Add environment configuration option
+                                 // to define this
           /*PassPipeline*/ Config::get().ProteusOptPipeline});
     }
 
@@ -667,8 +669,10 @@ JitEngineDevice<ImplT>::compileAndRun(
         /*SpecializeDims*/ Config::get().ProteusSpecializeDims,
         /*SpecializeLaunchBounds*/
         Config::get().ProteusSpecializeLaunchBounds,
-        /*OptLevel*/ '3',
-        /*CodeGenOptLevel*/ 3,
+        /*OptLevel*/ '3',      // TODO: Add environment configuration option to
+                               // define this
+        /*CodeGenOptLevel*/ 3, // TODO: Add environment configuration option
+                               // to define this
         /*PassPipeline*/ Config::get().ProteusOptPipeline});
   }
 

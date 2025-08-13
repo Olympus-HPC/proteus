@@ -192,6 +192,16 @@ inline void optimizeIR(Module &M, StringRef Arch,
                        const std::string &PassPipeline,
                        unsigned CodegenOptLevel) {
   Timer T;
+  auto TraceOut = [](const std::string &PassPipeline) {
+    SmallString<128> S;
+    raw_svector_ostream OS(S);
+    OS << "[CustomPipeline] " << PassPipeline << "\n";
+    return S;
+  };
+
+  if (Config::get().ProteusTraceOutput)
+    Logger::trace(TraceOut(PassPipeline));
+
   detail::runOptimizationPassPipeline(M, Arch, PassPipeline, CodegenOptLevel);
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                        << "optimizeIR optlevel " << PassPipeline

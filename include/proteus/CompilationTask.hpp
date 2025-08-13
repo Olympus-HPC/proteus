@@ -35,7 +35,7 @@ private:
   bool SpecializeLaunchBounds;
   char OptLevel;
   unsigned CodegenOptLevel;
-  std::string PassPipeline;
+  std::optional<std::string> PassPipeline;
 
   std::unique_ptr<Module> cloneKernelModule(LLVMContext &Ctx) {
     auto ClonedModule = parseBitcodeFile(Bitcode, Ctx);
@@ -46,13 +46,13 @@ private:
     return std::move(*ClonedModule);
   }
 
-  void compileIR(Module &M) {
+  void invokeOptimizeIR(Module &M) {
 #if PROTEUS_ENABLE_CUDA
     // For CUDA we always run the optimization pipeline.
-    if (PassPipeline.size() == 0)
+    if (!PassPipeline)
       optimizeIR(M, DeviceArch, OptLevel, CodegenOptLevel);
     else
-      optimizeIR(M, DeviceArch, PassPipeline, CodegenOptLevel);
+      optimizeIR(M, DeviceArch, PassPipeline.value(), CodegenOptLevel);
 #elif PROTEUS_ENABLE_HIP
     // For HIP RTC codegen we run the optimization pipeline only for Serial and
     // Parallel codegen since those do not run it internally. HIP RTC and
@@ -60,10 +60,10 @@ private:
     // TODO: Move optimizeIR inside the codegen routines?
     if (CGOption == CodegenOption::Serial ||
         CGOption == CodegenOption::Parallel) {
-      if (PassPipeline.size() == 0) {
+      if (!PassPipeline) {
         optimizeIR(M, DeviceArch, OptLevel, CodegenOptLevel);
       } else {
-        optimizeIR(M, DeviceArch, PassPipeline, CodegenOptLevel);
+        optimizeIR(M, DeviceArch, PassPipeline.value(), CodegenOptLevel);
       }
     }
 #else
@@ -82,7 +82,7 @@ public:
       const std::string &DeviceArch, CodegenOption CGOption, bool DumpIR,
       bool RelinkGlobalsByCopy, bool SpecializeArgs, bool SpecializeDims,
       bool SpecializeLaunchBounds, char OptLevel, unsigned CodegenOptLevel,
-      std::string PassPipeline)
+      const std::optional<std::string> &PassPipeline)
       : Bitcode(Bitcode), HashValue(HashValue), KernelName(KernelName),
         Suffix(Suffix), BlockDim(BlockDim), GridDim(GridDim), RCVec(RCVec),
         LambdaCalleeInfo(LambdaCalleeInfo), VarNameToDevPtr(VarNameToDevPtr),
@@ -119,7 +119,7 @@ public:
 
     replaceGlobalVariablesWithPointers(*M, VarNameToDevPtr);
 
-    compileIR(*M);
+    invokeOptimizeIR(*M);
 
     if (DumpIR) {
       const auto CreateDumpDirectory = []() {
