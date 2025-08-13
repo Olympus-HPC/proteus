@@ -34,9 +34,6 @@ using namespace llvm;
 class JitEngine {
 public:
   InitLLVMTargets Init;
-  void optimizeIR(Module &M, StringRef Arch, char OptLevel = '3',
-                  unsigned CodegenOptLevel = 3);
-
   bool isProteusDisabled() { return Config::get().ProteusDisable; }
 
   void enable() { Config::get().ProteusDisable = false; }

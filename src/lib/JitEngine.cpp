@@ -49,12 +49,6 @@ std::string JitEngine::mangleSuffix(HashT &HashValue) {
   return "$jit$" + HashValue.toString() + "$";
 }
 
-void JitEngine::optimizeIR(Module &M, StringRef Arch, char OptLevel,
-                           unsigned CodegenOptLevel) {
-  TIMESCOPE("Optimize IR");
-  proteus::optimizeIR(M, Arch, OptLevel, CodegenOptLevel);
-}
-
 template <typename T> inline static T getRuntimeConstantValue(void *Arg) {
   if constexpr (std::is_same_v<T, bool>) {
     return *static_cast<bool *>(Arg);
