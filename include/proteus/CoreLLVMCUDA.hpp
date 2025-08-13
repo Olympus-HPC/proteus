@@ -86,12 +86,12 @@ inline const SmallVector<StringRef> &threadIdxZFnName() {
 
 inline void setLaunchBoundsForKernel(Function &F, int MaxThreadsPerSM,
                                      int MinBlocksPerSM = 0) {
-  auto M = F.getParent();
+  auto *M = F.getParent();
   NamedMDNode *NvvmAnnotations = M->getNamedMetadata("nvvm.annotations");
   assert(NvvmAnnotations && "Expected non-null nvvm.annotations metadata");
   auto *FuncMetadata = ConstantAsMetadata::get(&F);
 
-  auto setMDNode = [&](const char *MDName, int MDValue) {
+  auto SetMDNode = [&](const char *MDName, int MDValue) {
     auto *MDNodeName = MDString::get(M->getContext(), MDName);
     auto *MDNodeValue = ConstantAsMetadata::get(
         ConstantInt::get(Type::getInt32Ty(M->getContext()), MDValue));
@@ -113,9 +113,9 @@ inline void setLaunchBoundsForKernel(Function &F, int MaxThreadsPerSM,
 
   // TODO: fix hardcoded 1024 as the maximum, by reading device
   // properties.
-  setMDNode("maxntid", std::min(1024, MaxThreadsPerSM));
+  SetMDNode("maxntid", std::min(1024, MaxThreadsPerSM));
   if (MinBlocksPerSM != 0)
-    setMDNode("minctasm", MinBlocksPerSM);
+    SetMDNode("minctasm", MinBlocksPerSM);
 }
 
 inline void codegenPTX(Module &M, StringRef DeviceArch,

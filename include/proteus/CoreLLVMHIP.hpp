@@ -532,7 +532,7 @@ inline void setLaunchBoundsForKernel(Function &F, int MaxNumWorkGroups,
   }
 
   PROTEUS_DBG(Logger::logs("proteus")
-              << " => Set Wokgroup size " << MaxNumWorkGroups
+              << " => Set Workgroup size " << MaxNumWorkGroups
               << " WavesPerEU (unused) " << WavesPerEU << "\n");
 }
 
