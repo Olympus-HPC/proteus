@@ -39,17 +39,14 @@ JitEngine::JitEngine() {
                           << Config::get().ProteusSpecializeDims << "\n";
   Logger::logs("proteus") << "PROTEUS_CODEGEN"
                           << toString(Config::get().ProteusCodegen) << "\n";
+  Logger::logs("proteus") << "PROTEUS_OPT_PIPELINE"
+                          << Config::get().ProteusOptPipeline << "\n";
+
 #endif
 }
 
 std::string JitEngine::mangleSuffix(HashT &HashValue) {
   return "$jit$" + HashValue.toString() + "$";
-}
-
-void JitEngine::optimizeIR(Module &M, StringRef Arch, char OptLevel,
-                           unsigned CodegenOptLevel) {
-  TIMESCOPE("Optimize IR");
-  proteus::optimizeIR(M, Arch, OptLevel, CodegenOptLevel);
 }
 
 template <typename T> inline static T getRuntimeConstantValue(void *Arg) {

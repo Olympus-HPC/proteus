@@ -49,6 +49,15 @@ inline std::string toString(KernelCloneOption Option) {
   }
 }
 
+inline std::optional<std::string> getEnvOrDefaultString(const char *VarName) {
+
+  const char *EnvValue = std::getenv(VarName);
+  if (!EnvValue)
+    return std::nullopt;
+
+  return std::string(EnvValue);
+}
+
 inline bool getEnvOrDefaultBool(const char *VarName, bool Default) {
 
   const char *EnvValue = std::getenv(VarName);
@@ -129,9 +138,10 @@ public:
   bool ProteusEnableTimers;
   CodegenOption ProteusCodegen;
   bool ProteusTraceOutput;
+  std::optional<const std::string> ProteusOptPipeline;
 
 private:
-  Config() {
+  Config() : ProteusOptPipeline(getEnvOrDefaultString("PROTEUS_OPT_PIPELINE")) {
     ProteusUseStoredCache =
         getEnvOrDefaultBool("PROTEUS_USE_STORED_CACHE", true);
     ProteusSpecializeLaunchBounds =

@@ -33,6 +33,9 @@ private:
   bool SpecializeArgs;
   bool SpecializeDims;
   bool SpecializeLaunchBounds;
+  char OptLevel;
+  unsigned CodegenOptLevel;
+  std::optional<std::string> PassPipeline;
 
   std::unique_ptr<Module> cloneKernelModule(LLVMContext &Ctx) {
     auto ClonedModule = parseBitcodeFile(Bitcode, Ctx);
@@ -41,6 +44,31 @@ private:
     }
 
     return std::move(*ClonedModule);
+  }
+
+  void invokeOptimizeIR(Module &M) {
+#if PROTEUS_ENABLE_CUDA
+    // For CUDA we always run the optimization pipeline.
+    if (!PassPipeline)
+      optimizeIR(M, DeviceArch, OptLevel, CodegenOptLevel);
+    else
+      optimizeIR(M, DeviceArch, PassPipeline.value(), CodegenOptLevel);
+#elif PROTEUS_ENABLE_HIP
+    // For HIP RTC codegen we run the optimization pipeline only for Serial and
+    // Parallel codegen since those do not run it internally. HIP RTC and
+    // Parallel ThinLTO invoke optimization internally.
+    // TODO: Move optimizeIR inside the codegen routines?
+    if (CGOption == CodegenOption::Serial ||
+        CGOption == CodegenOption::Parallel) {
+      if (!PassPipeline) {
+        optimizeIR(M, DeviceArch, OptLevel, CodegenOptLevel);
+      } else {
+        optimizeIR(M, DeviceArch, PassPipeline.value(), CodegenOptLevel);
+      }
+    }
+#else
+#error "JitEngineDevice requires PROTEUS_ENABLE_CUDA or PROTEUS_ENABLE_HIP"
+#endif
   }
 
 public:
@@ -53,7 +81,8 @@ public:
       const SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
       const std::string &DeviceArch, CodegenOption CGOption, bool DumpIR,
       bool RelinkGlobalsByCopy, bool SpecializeArgs, bool SpecializeDims,
-      bool SpecializeLaunchBounds)
+      bool SpecializeLaunchBounds, char OptLevel, unsigned CodegenOptLevel,
+      const std::optional<std::string> &PassPipeline)
       : Bitcode(Bitcode), HashValue(HashValue), KernelName(KernelName),
         Suffix(Suffix), BlockDim(BlockDim), GridDim(GridDim), RCVec(RCVec),
         LambdaCalleeInfo(LambdaCalleeInfo), VarNameToDevPtr(VarNameToDevPtr),
@@ -61,7 +90,8 @@ public:
         CGOption(CGOption), DumpIR(DumpIR),
         RelinkGlobalsByCopy(RelinkGlobalsByCopy),
         SpecializeArgs(SpecializeArgs), SpecializeDims(SpecializeDims),
-        SpecializeLaunchBounds(SpecializeLaunchBounds) {}
+        SpecializeLaunchBounds(SpecializeLaunchBounds), OptLevel(OptLevel),
+        CodegenOptLevel(CodegenOptLevel), PassPipeline(PassPipeline) {}
 
   // Delete copy operations.
   CompilationTask(const CompilationTask &) = delete;
@@ -89,20 +119,7 @@ public:
 
     replaceGlobalVariablesWithPointers(*M, VarNameToDevPtr);
 
-#if PROTEUS_ENABLE_CUDA
-    // For CUDA we always run the optimization pipeline.
-    optimizeIR(*M, DeviceArch, '3', 3);
-#elif PROTEUS_ENABLE_HIP
-    // For HIP RTC codegen we run the optimization pipeline only for Serial and
-    // Parallel codegen since those do not run it internally. HIP RTC and
-    // Parallel ThinLTO invoke optimization internally.
-    // TODO: Move optimizeIR inside the codegen routines?
-    if (CGOption == CodegenOption::Serial ||
-        CGOption == CodegenOption::Parallel)
-      optimizeIR(*M, DeviceArch, '3', 3);
-#else
-#error "JitEngineDevice requires PROTEUS_ENABLE_CUDA or PROTEUS_ENABLE_HIP"
-#endif
+    invokeOptimizeIR(*M);
 
     if (DumpIR) {
       const auto CreateDumpDirectory = []() {

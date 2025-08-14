@@ -55,14 +55,18 @@ inline Error createSMDiagnosticError(SMDiagnostic &Diag) {
 // module as it passes through the IRTransformLayer.
 class OptimizationTransform {
 public:
-  OptimizationTransform(JitEngineHost &JitEngineImpl)
-      : JitEngineImpl(JitEngineImpl) {}
+  OptimizationTransform() {}
 
   Expected<ThreadSafeModule> operator()(ThreadSafeModule TSM,
                                         MaterializationResponsibility & /*R*/) {
-    TSM.withModuleDo([this](Module &M) {
+    TSM.withModuleDo([](Module &M) {
       TIMESCOPE("Run Optimization Transform");
-      JitEngineImpl.optimizeIR(M, sys::getHostCPUName());
+      auto Pipeline = Config::get().ProteusOptPipeline;
+      if (!Pipeline)
+        proteus::optimizeIR(M, sys::getHostCPUName(), '3', 3);
+      else
+        proteus::optimizeIR(M, sys::getHostCPUName(), Pipeline.value(), 3);
+
 #if PROTEUS_ENABLE_DEBUG
       if (verifyModule(M, &errs()))
         PROTEUS_FATAL_ERROR(
@@ -75,11 +79,15 @@ public:
   }
 
   Expected<ThreadSafeModule> operator()(ThreadSafeModule TSM) {
-    TSM.withModuleDo([this](Module &M) {
+    TSM.withModuleDo([](Module &M) {
       PROTEUS_DBG(Logger::logs("proteus") << "=== Begin Before Optimization\n"
                                           << M << "=== End Before\n");
       TIMESCOPE("Run Optimization Transform");
-      JitEngineImpl.optimizeIR(M, sys::getHostCPUName());
+      auto Pipeline = Config::get().ProteusOptPipeline;
+      if (!Pipeline)
+        proteus::optimizeIR(M, sys::getHostCPUName(), '3', 3);
+      else
+        proteus::optimizeIR(M, sys::getHostCPUName(), Pipeline.value(), 3);
       PROTEUS_DBG(Logger::logs("proteus")
                   << "=== Begin After Optimization\n"
                   << M << "=== End After Optimization\n");
@@ -95,7 +103,6 @@ public:
   }
 
 private:
-  JitEngineHost &JitEngineImpl;
 };
 
 JitEngineHost &JitEngineHost::instance() {
@@ -421,5 +428,5 @@ JitEngineHost::JitEngineHost() {
   addStaticLibrarySymbols();
 
   // (3) Install transform to optimize modules when they're materialized.
-  LLJITPtr->getIRTransformLayer().setTransform(OptimizationTransform(*this));
+  LLJITPtr->getIRTransformLayer().setTransform(OptimizationTransform());
 }
