@@ -513,23 +513,26 @@ inline std::unique_ptr<MemoryBuffer> codegenRTC(Module &M,
 
 } // namespace detail
 
-inline void setLaunchBoundsForKernel(Module & /*M*/, Function &F,
-                                     [[maybe_unused]] size_t GridSize,
-                                     int BlockSize) {
+inline void setLaunchBoundsForKernel(Function &F, int MaxNumWorkGroups,
+                                     int WavesPerEU = 0) {
   // TODO: fix calculation of launch bounds.
   // TODO: find maximum (hardcoded 1024) from device info.
   // TODO: Setting as 1, BlockSize to replicate launch bounds settings
-  // Does setting it as BlockSize, BlockSize help?
-  // Setting the attribute override any previous setting.
   F.addFnAttr("amdgpu-flat-work-group-size",
-              "1," + std::to_string(std::min(1024, BlockSize)));
-  // TODO: find warp size (hardcoded 64) from device info.
-  // int WavesPerEU = (GridSize * BlockSize) / 64 / 110 / 4 / 2;
-  [[maybe_unused]] int WavesPerEU = 0;
+              "1," + std::to_string(std::min(1024, MaxNumWorkGroups)));
   // F->addFnAttr("amdgpu-waves-per-eu", std::to_string(WavesPerEU));
+  if (WavesPerEU != 0) {
+    // NOTE: We are missing a heuristic to define the `WavesPerEU`, as such we
+    // still need to study it. I restrict the waves by setting min equal to max
+    // and disallowing any heuristics that HIP will use internally.
+    // For more information please check:
+    // https://clang.llvm.org/docs/AttributeReference.html#amdgpu-waves-per-eu
+    F.addFnAttr("amdgpu-waves-per-eu",
+                std::to_string(WavesPerEU) + "," + std::to_string(WavesPerEU));
+  }
+
   PROTEUS_DBG(Logger::logs("proteus")
-              << "BlockSize " << BlockSize << " GridSize " << GridSize
-              << " => Set Wokgroup size " << BlockSize
+              << " => Set Workgroup size " << MaxNumWorkGroups
               << " WavesPerEU (unused) " << WavesPerEU << "\n");
 }
 

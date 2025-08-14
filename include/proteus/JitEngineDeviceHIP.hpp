@@ -91,9 +91,6 @@ public:
 
   void *resolveDeviceGlobalAddr(const void *Addr);
 
-  void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
-                                int BlockSize);
-
   void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim);
 
   void extractModules(BinaryInfo &BinInfo);
