@@ -34,7 +34,7 @@ int main() {
 }
 
 // clang-format off
-// CHECK: [LaunchBoundSpec] GridSize 1 BlockSize 1
+// CHECK: [LaunchBoundSpec] BlockSize 1
 // CHECK1: [CustomPipeline] default<O1>
 // CHECK2: [CustomPipeline] default<O2>
 // CHECK3: [CustomPipeline] default<O3>
