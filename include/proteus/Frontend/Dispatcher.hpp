@@ -5,11 +5,12 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <memory>
 
+#include "proteus/Frontend/TargetModel.hpp"
+#include "proteus/Hashing.hpp"
+
 #if PROTEUS_ENABLE_HIP && __HIP__
 #include <hip/hip_runtime.h>
 #endif
-
-enum class TargetModelType { HOST, CUDA, HIP };
 
 struct LaunchDims {
   unsigned X = 1, Y = 1, Z = 1;
@@ -43,28 +44,65 @@ struct DispatchResult {
 struct DispatchResult;
 
 class Dispatcher {
+protected:
+  TargetModelType TargetModel;
+
 public:
-  static Dispatcher &getDispatcher(TargetModelType Model);
+  static Dispatcher &getDispatcher(TargetModelType TargetModel);
 
-  virtual void compile(std::unique_ptr<LLVMContext> Ctx,
-                       std::unique_ptr<Module> M) = 0;
+  virtual std::unique_ptr<MemoryBuffer>
+  compile(std::unique_ptr<LLVMContext> Ctx, std::unique_ptr<Module> M,
+          HashT ModuleHash) = 0;
 
-  virtual DispatchResult launch(StringRef KernelName, LaunchDims GridDim,
+  virtual std::unique_ptr<MemoryBuffer>
+  lookupObjectModule(HashT ModuleHash) = 0;
+
+  virtual DispatchResult
+  launch(StringRef KernelName, LaunchDims GridDim, LaunchDims BlockDim,
+         ArrayRef<void *> KernelArgs, uint64_t ShmemSize, void *Stream,
+         std::optional<MemoryBufferRef> ObjectModule) = 0;
+
+  virtual DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
                                 LaunchDims BlockDim,
                                 ArrayRef<void *> KernelArgs, uint64_t ShmemSize,
                                 void *Stream) = 0;
 
-  template <typename Ret, typename... ArgT>
-  Ret run(StringRef FuncName, ArgT... Args) {
-    void *Addr = getFunctionAddress(FuncName);
-    using FnPtr = Ret (*)(ArgT...);
-    auto Fn = reinterpret_cast<FnPtr>(Addr);
-    return Fn(Args...);
+  virtual StringRef getTargetArch() const = 0;
+
+  // Accepts both a return type or a function signature (needed for C++
+  // reference arguments) and disambiguates at compile time.
+  template <typename RetOrSig, typename... ArgT>
+  auto run(StringRef FuncName, std::optional<MemoryBufferRef> ObjectModule,
+           ArgT &&...Args) {
+    if (TargetModel != TargetModelType::HOST)
+      PROTEUS_FATAL_ERROR("Dispatcher run interface is only support for host");
+
+    void *Addr = getFunctionAddress(FuncName, ObjectModule);
+
+    if constexpr (std::is_function_v<RetOrSig>) {
+      auto Fn = reinterpret_cast<RetOrSig *>(Addr);
+      using Ret = std::invoke_result_t<RetOrSig, ArgT...>;
+
+      if constexpr (std::is_void_v<Ret>) {
+        Fn(std::forward<ArgT>(Args)...);
+        return;
+      } else
+        return Fn(std::forward<ArgT>(Args)...);
+    } else {
+      using FnPtr = RetOrSig (*)(std::decay_t<ArgT>...);
+      auto Fn = reinterpret_cast<FnPtr>(Addr);
+
+      if constexpr (std::is_void_v<RetOrSig>) {
+        Fn(std::forward<ArgT>(Args)...);
+        return;
+      } else
+        return Fn(std::forward<ArgT>(Args)...);
+    }
   }
 
-protected:
-  std::unique_ptr<MemoryBuffer> Library = nullptr;
-  virtual void *getFunctionAddress(StringRef FunctionName) = 0;
+  virtual void *
+  getFunctionAddress(StringRef FunctionName,
+                     std::optional<MemoryBufferRef> ObjectModule) = 0;
 };
 
 } // namespace proteus

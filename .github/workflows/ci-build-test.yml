@@ -29,6 +29,7 @@ jobs:
           conda install -y -c conda-forge \
             clang=${{ matrix.llvm }} \
             clangxx=${{ matrix.llvm }} \
+            clangdev=${{ matrix.llvm }} \
             llvmdev=${{ matrix.llvm }} \
             lit=${{ matrix.llvm }} \
             zlib zstd
