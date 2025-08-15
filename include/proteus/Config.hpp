@@ -12,7 +12,6 @@ enum class CodegenOption {
   RTC,
   Serial,
   Parallel,
-  ParallelThinLTO,
 };
 
 enum class KernelCloneOption {
@@ -29,8 +28,6 @@ inline std::string toString(CodegenOption Option) {
     return "Serial";
   case CodegenOption::Parallel:
     return "Parallel";
-  case CodegenOption::ParallelThinLTO:
-    return "ParallelThinLTO";
   default:
     return "Unknown";
   }
@@ -86,13 +83,8 @@ inline CodegenOption getEnvOrDefaultCG(const char *VarName,
     return CodegenOption::Serial;
   if (EnvValueStr == "parallel")
     return CodegenOption::Parallel;
-  if (EnvValueStr == "thinlto")
-    return CodegenOption::ParallelThinLTO;
 
-  Logger::outs("proteus") << "Unknown codegen option " << EnvValueStr
-                          << ", using default codegen option: "
-                          << toString(Default) << "\n";
-  return Default;
+  PROTEUS_FATAL_ERROR("Unknown codegen option: " + EnvValueStr);
 }
 
 inline KernelCloneOption getEnvOrDefaultKC(const char *VarName,
@@ -166,11 +158,6 @@ private:
           << "Warning: Proteus with LLVM < 18 supports only RTC compilation, "
              "setting Codegen to RTC\n";
       ProteusCodegen = CodegenOption::RTC;
-    }
-#elif LLVM_VERSION_MAJOR > 18
-    if (ProteusCodegen == CodegenOption::Parallel) {
-      PROTEUS_FATAL_ERROR(
-          "Proteus with LLVM > 18 does not support parallel split codegen");
     }
 #endif
 #endif
