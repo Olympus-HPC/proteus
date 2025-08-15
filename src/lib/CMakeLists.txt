@@ -158,11 +158,11 @@ file(GLOB clang_libs "${LLVM_INSTALL_DIR}/lib/libclang*.a")
 # Print what we found for debugging
 message(STATUS "Found Clang libraries: ${clang_libs}")
 
-target_link_libraries(proteus PRIVATE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+# Enclose clang_libs in a link group to avoid linker errors due to unresolved symbols.
+target_link_libraries(proteus PRIVATE ${libs} "-Wl,--start-group" ${clang_libs} "-Wl,--end-group" "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 target_compile_definitions(proteus PRIVATE PROTEUS_CLANGXX_BIN="${CLANGXX}")
 
-# Enclose clang_libs in a link group to avoid linker errors due to unresolved symbols.
-target_link_libraries(proteusFrontend INTERFACE proteus ${libs} "-Wl,--start-group" ${clang_libs} "-Wl,--end-group" "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+target_link_libraries(proteusFrontend INTERFACE proteus ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 
 target_link_libraries(proteusCore INTERFACE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 
