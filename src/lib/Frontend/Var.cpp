@@ -595,91 +595,109 @@ Var &sqrtf(const Var &R) {
 
 // Assignment explicit instantiations.
 template Var &Var::operator= <int>(const int &);
+template Var &Var::operator= <unsigned int>(const unsigned int &);
 template Var &Var::operator= <size_t>(const size_t &);
 template Var &Var::operator= <float>(const float &);
 template Var &Var::operator= <double>(const double &);
 
 // Binary operators explicit instantiations.
 template Var &Var::operator+ <int>(const int &) const;
+template Var &Var::operator+ <unsigned int>(const unsigned int &) const;
 template Var &Var::operator+ <size_t>(const size_t &) const;
 template Var &Var::operator+ <float>(const float &) const;
 template Var &Var::operator+ <double>(const double &) const;
 
 template Var &Var::operator- <int>(const int &) const;
+template Var &Var::operator- <unsigned int>(const unsigned int &) const;
 template Var &Var::operator- <size_t>(const size_t &) const;
 template Var &Var::operator- <float>(const float &) const;
 template Var &Var::operator- <double>(const double &) const;
 
 template Var &Var::operator* <int>(const int &) const;
+template Var &Var::operator* <unsigned int>(const unsigned int &) const;
 template Var &Var::operator* <size_t>(const size_t &) const;
 template Var &Var::operator* <float>(const float &) const;
 template Var &Var::operator* <double>(const double &) const;
 
 template Var &Var::operator/ <int>(const int &) const;
+template Var &Var::operator/ <unsigned int>(const unsigned int &) const;
 template Var &Var::operator/ <size_t>(const size_t &) const;
 template Var &Var::operator/ <float>(const float &) const;
 template Var &Var::operator/ <double>(const double &) const;
 
 // Binary operators with assignment explicit instantiations.
 template Var &Var::operator+= <int>(const int &);
+template Var &Var::operator+= <unsigned int>(const unsigned int &);
 template Var &Var::operator+= <size_t>(const size_t &);
 template Var &Var::operator+= <float>(const float &);
 template Var &Var::operator+= <double>(const double &);
 
 template Var &Var::operator-= <int>(const int &);
+template Var &Var::operator-= <unsigned int>(const unsigned int &);
 template Var &Var::operator-= <size_t>(const size_t &);
 template Var &Var::operator-= <float>(const float &);
 template Var &Var::operator-= <double>(const double &);
 
 template Var &Var::operator*= <int>(const int &);
+template Var &Var::operator*= <unsigned int>(const unsigned int &);
 template Var &Var::operator*= <size_t>(const size_t &);
 template Var &Var::operator*= <float>(const float &);
 template Var &Var::operator*= <double>(const double &);
 
 template Var &Var::operator/= <int>(const int &);
+template Var &Var::operator/= <unsigned int>(const unsigned int &);
 template Var &Var::operator/= <size_t>(const size_t &);
 template Var &Var::operator/= <float>(const float &);
 template Var &Var::operator/= <double>(const double &);
 
 // Non-member binary operator explicit instantiations.
 template Var &operator+ <int>(const int &, const Var &);
+template Var &operator+ <unsigned int>(const unsigned int &, const Var &);
 template Var &operator+ <size_t>(const size_t &, const Var &);
 template Var &operator+ <float>(const float &, const Var &);
 template Var &operator+ <double>(const double &, const Var &);
 
 template Var &operator- <int>(const int &, const Var &);
+template Var &operator- <unsigned int>(const unsigned int &, const Var &);
 template Var &operator- <size_t>(const size_t &, const Var &);
 template Var &operator- <float>(const float &, const Var &);
 template Var &operator- <double>(const double &, const Var &);
 
 template Var &operator* <int>(const int &, const Var &);
+template Var &operator* <unsigned int>(const unsigned int &, const Var &);
 template Var &operator* <size_t>(const size_t &, const Var &);
 template Var &operator* <float>(const float &, const Var &);
 template Var &operator* <double>(const double &, const Var &);
 
 template Var &operator/ <int>(const int &, const Var &);
+template Var &operator/ <unsigned int>(const unsigned int &, const Var &);
 template Var &operator/ <size_t>(const size_t &, const Var &);
 template Var &operator/ <float>(const float &, const Var &);
 template Var &operator/ <double>(const double &, const Var &);
 
 // Comparison explicit instantiations.
 template Var &Var::operator>(const int &ConstValue) const;
+template Var &Var::operator>(const unsigned int &ConstValue) const;
 template Var &Var::operator>(const float &ConstValue) const;
 template Var &Var::operator>(const double &ConstValue) const;
 
 template Var &Var::operator>=(const int &ConstValue) const;
+template Var &Var::operator>=(const unsigned int &ConstValue) const;
 template Var &Var::operator>=(const float &ConstValue) const;
 template Var &Var::operator>=(const double &ConstValue) const;
 
 template Var &Var::operator<(const int &ConstValue) const;
+template Var &Var::operator<(const unsigned int &ConstValue) const;
 template Var &Var::operator<(const float &ConstValue) const;
 template Var &Var::operator<(const double &ConstValue) const;
 
 template Var &Var::operator<=(const int &ConstValue) const;
+template Var &Var::operator<=(const unsigned int &ConstValue) const;
 template Var &Var::operator<=(const float &ConstValue) const;
 template Var &Var::operator<=(const double &ConstValue) const;
 
 template Var &Var::operator==(const int &ConstValue) const;
+template Var &Var::operator==(const unsigned int &ConstValue) const;
 template Var &Var::operator==(const float &ConstValue) const;
 template Var &Var::operator==(const double &ConstValue) const;
 
