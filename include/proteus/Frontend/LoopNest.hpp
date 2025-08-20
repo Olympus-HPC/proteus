@@ -38,8 +38,6 @@ private:
   std::vector<ForLoopBuilder> Loops;
   FuncBase &Fn;
 
-  void emitLoopAtDimension(std::size_t Dim);
-
 public:
   LoopNestBuilder(FuncBase &Fn, std::vector<ForLoopBuilder> Loops);
 

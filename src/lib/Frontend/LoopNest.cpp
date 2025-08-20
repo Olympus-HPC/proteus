@@ -33,51 +33,90 @@ LoopNestBuilder::create(FuncBase &Fn,
   return create(Fn, std::vector<ForLoopBuilder>(Loops));
 }
 
-void LoopNestBuilder::emit() { emitLoopAtDimension(0); }
+void LoopNestBuilder::emit() {
+  const std::size_t NumDims = Loops.size();
+  std::vector<Var *> TileIter(NumDims, nullptr);
+  std::vector<Var *> TileEnd(NumDims, nullptr);
+  std::vector<Var *> TileStep(NumDims, nullptr);
 
-void LoopNestBuilder::emitLoopAtDimension(std::size_t Dim) {
-  if (Dim >= Loops.size()) {
-    return;
-  }
+  std::function<void(std::size_t)> EmitFrom;
+  EmitFrom = [&](std::size_t Dim) {
+    if (Dim >= NumDims) {
+      return;
+    }
 
-  auto &CurLoop = Loops[Dim];
+    auto &CurLoop = Loops[Dim];
+    const bool IsTiled = CurLoop.TileSize.has_value();
 
-  const bool UseTiling = CurLoop.TileSize.has_value();
-  if (UseTiling) {
-    auto &TileIter = Fn.declVar<int>("tile_iter_" + std::to_string(Dim));
-    auto &TileEnd = Fn.declVar<int>("tile_end_" + std::to_string(Dim));
-    auto &TileStep = Fn.declVar<int>("tile_step_" + std::to_string(Dim));
-    TileStep = CurLoop.TileSize.value();
-
-    Fn.beginFor(TileIter, CurLoop.Bounds.Init, CurLoop.Bounds.UpperBound,
-                TileStep);
-    {
-      // Inner loop over the tile range
-      TileEnd = TileIter + TileStep;
-      Fn.beginFor(CurLoop.Bounds.IterVar, TileIter, TileEnd,
-                  CurLoop.Bounds.Inc);
-      {
-        if (CurLoop.Body.has_value()) {
-          CurLoop.Body.value()();
-        }
-        emitLoopAtDimension(Dim + 1);
+    if (IsTiled) {
+      // Determine contiguous group of tiled dimensions starting at 'dim'
+      std::size_t GroupEnd = Dim;
+      while (GroupEnd < NumDims && Loops[GroupEnd].TileSize.has_value()) {
+        ++GroupEnd;
       }
-      Fn.endFor();
+
+      // Declare tile vars for the group
+      for (std::size_t GroupIdx = Dim; GroupIdx < GroupEnd; ++GroupIdx) {
+        TileIter[GroupIdx] = &Fn.declVar<int>("tile_iter_" + std::to_string(GroupIdx));
+        TileEnd[GroupIdx] = &Fn.declVar<int>("tile_end_" + std::to_string(GroupIdx));
+        TileStep[GroupIdx] = &Fn.declVar<int>("tile_step_" + std::to_string(GroupIdx));
+        (*TileStep[GroupIdx]) = Loops[GroupIdx].TileSize.value();
+      }
+
+      // Open nested tile loops for the group in order
+      std::function<void(std::size_t)> OpenTiles;
+      OpenTiles = [&](std::size_t GroupIdx) {
+        if (GroupIdx >= GroupEnd) {
+          // Inside all tile loops: emit element loops for the group
+          std::function<void(std::size_t)> EmitGroupElems;
+          EmitGroupElems = [&](std::size_t ElemIdx) {
+            if (ElemIdx >= GroupEnd) {
+              // Continue with remaining dimensions after the group
+              EmitFrom(GroupEnd);
+              return;
+            }
+            auto &LoopE = Loops[ElemIdx];
+            (*TileEnd[ElemIdx]) = (*TileIter[ElemIdx]) + (*TileStep[ElemIdx]);
+            Fn.beginFor(LoopE.Bounds.IterVar, *TileIter[ElemIdx], *TileEnd[ElemIdx],
+                        LoopE.Bounds.Inc);
+            {
+              if (LoopE.Body.has_value()) {
+                LoopE.Body.value()();
+              }
+              EmitGroupElems(ElemIdx + 1);
+            }
+            Fn.endFor();
+          };
+
+          EmitGroupElems(Dim);
+          return;
+        }
+
+        auto &LoopG = Loops[GroupIdx];
+        Fn.beginFor(*TileIter[GroupIdx], LoopG.Bounds.Init, LoopG.Bounds.UpperBound,
+                    *TileStep[GroupIdx]);
+        {
+          OpenTiles(GroupIdx + 1);
+        }
+        Fn.endFor();
+      };
+
+      OpenTiles(Dim);
+      return;
+    }
+
+    // Non-tiled: emit this dimension's element loop immediately
+    Fn.beginFor(CurLoop.Bounds.IterVar, CurLoop.Bounds.Init, CurLoop.Bounds.UpperBound, CurLoop.Bounds.Inc);
+    {
+      if (CurLoop.Body.has_value()) {
+        CurLoop.Body.value()();
+      }
+      EmitFrom(Dim + 1);
     }
     Fn.endFor();
-    return;
-  }
+  };
 
-  // Non-tiled simple loop
-  Fn.beginFor(CurLoop.Bounds.IterVar, CurLoop.Bounds.Init,
-              CurLoop.Bounds.UpperBound, CurLoop.Bounds.Inc);
-  {
-    if (CurLoop.Body.has_value()) {
-      CurLoop.Body.value()();
-    }
-    emitLoopAtDimension(Dim + 1);
-  }
-  Fn.endFor();
+  EmitFrom(0);
 }
 
 } // namespace proteus
