@@ -38,6 +38,16 @@ private:
   std::vector<ForLoopBuilder> Loops;
   FuncBase &Fn;
 
+  void emitDimension(std::size_t Dim, std::vector<Var *> &TileIter,
+                     std::vector<Var *> &TileEnd, std::vector<Var *> &TileStep);
+  void emitTileLoops(std::size_t GroupIdx, std::size_t GroupEnd,
+                     std::size_t Dim, std::vector<Var *> &TileIter,
+                     std::vector<Var *> &TileEnd, std::vector<Var *> &TileStep);
+  void emitInnerLoops(std::size_t ElemIdx, std::size_t GroupEnd,
+                      std::size_t Dim, std::vector<Var *> &TileIter,
+                      std::vector<Var *> &TileEnd,
+                      std::vector<Var *> &TileStep);
+
 public:
   LoopNestBuilder(FuncBase &Fn, std::vector<ForLoopBuilder> Loops);
 
