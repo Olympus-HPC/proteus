@@ -75,7 +75,7 @@ public:
   auto run(StringRef FuncName, std::optional<MemoryBufferRef> ObjectModule,
            ArgT &&...Args) {
     if (TargetModel != TargetModelType::HOST)
-      PROTEUS_FATAL_ERROR("Dispatcher run interface is only support for host");
+      PROTEUS_FATAL_ERROR("Dispatcher run interface is only supported for host");
 
     void *Addr = getFunctionAddress(FuncName, ObjectModule);
 
