@@ -205,7 +205,7 @@ public:
   HashT getModuleHash() const { return ModuleHash; }
 
   std::optional<MemoryBufferRef> getObjectModuleRef() const {
-    // For host JIT modules there ObjectModule is alway nullptr and unused by
+    // For host JIT modules the ObjectModule is alway nullptr and unused by
     // DispatcherHOST since it is unused by ORC JIT.
     if (!ObjectModule)
       return std::nullopt;
