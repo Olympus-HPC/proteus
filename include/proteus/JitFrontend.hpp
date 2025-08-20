@@ -244,6 +244,115 @@ std::enable_if_t<std::is_void_v<RetT>, void> FuncBase::call(StringRef Name) {
   IRB.CreateCall(Callee);
 }
 
+template <typename ThenLambda>
+void FuncBase::If(Var &CondVar, ThenLambda &&Then, const char *File, int Line) {
+  Function *F = getFunction();
+  BasicBlock *CurBlock = IP.getBlock();
+  BasicBlock *NextBlock =
+      CurBlock->splitBasicBlock(IP.getPoint(), CurBlock->getName() + ".split");
+
+  auto ContIP = IRBuilderBase::InsertPoint(NextBlock, NextBlock->begin());
+  Scopes.emplace_back(File, Line, ScopeKind::IF, ContIP);
+
+  BasicBlock *ThenBlock =
+      BasicBlock::Create(F->getContext(), "if.then", F, NextBlock);
+  BasicBlock *ExitBlock =
+      BasicBlock::Create(F->getContext(), "if.cont", F, NextBlock);
+
+  CurBlock->getTerminator()->eraseFromParent();
+  IRB.SetInsertPoint(CurBlock);
+  {
+    Value *Cond =
+        IRB.CreateLoad(CondVar.Alloca->getAllocatedType(), CondVar.Alloca);
+    IRB.CreateCondBr(Cond, ThenBlock, ExitBlock);
+  }
+
+  IRB.SetInsertPoint(ThenBlock);
+  {
+    IRB.CreateBr(ExitBlock);
+  }
+
+  IRB.SetInsertPoint(ExitBlock);
+  {
+    IRB.CreateBr(NextBlock);
+  }
+
+  IP = IRBuilderBase::InsertPoint(ThenBlock, ThenBlock->begin());
+  IRB.restoreIP(IP);
+  {
+    Then();
+  }
+
+  Scopes.pop_back();
+  IP = IRBuilderBase::InsertPoint(NextBlock, NextBlock->begin());
+  IRB.restoreIP(IP);
+}
+
+template <typename ThenLambda, typename ElseLambda>
+void FuncBase::If(Var &CondVar, ThenLambda &&Then, ElseLambda &&Else,
+                  const char *File, int Line) {
+  Function *F = getFunction();
+  BasicBlock *CurBlock = IP.getBlock();
+  BasicBlock *NextBlock =
+      CurBlock->splitBasicBlock(IP.getPoint(), CurBlock->getName() + ".split");
+
+  auto ContIP = IRBuilderBase::InsertPoint(NextBlock, NextBlock->begin());
+  Scopes.emplace_back(File, Line, ScopeKind::IF_ELSE, ContIP);
+
+  BasicBlock *ThenBlock =
+      BasicBlock::Create(F->getContext(), "if.then", F, NextBlock);
+  BasicBlock *ElseBlock =
+      BasicBlock::Create(F->getContext(), "if.else", F, NextBlock);
+  BasicBlock *ExitBlock =
+      BasicBlock::Create(F->getContext(), "if.cont", F, NextBlock);
+
+  CurBlock->getTerminator()->eraseFromParent();
+  IRB.SetInsertPoint(CurBlock);
+  {
+    Value *Cond =
+        IRB.CreateLoad(CondVar.Alloca->getAllocatedType(), CondVar.Alloca);
+    IRB.CreateCondBr(Cond, ThenBlock, ElseBlock);
+  }
+
+  IRB.SetInsertPoint(ThenBlock);
+  {
+    IRB.CreateBr(ExitBlock);
+  }
+
+  IRB.SetInsertPoint(ElseBlock);
+  {
+    IRB.CreateBr(ExitBlock);
+  }
+
+  IRB.SetInsertPoint(ExitBlock);
+  {
+    IRB.CreateBr(NextBlock);
+  }
+
+  IP = IRBuilderBase::InsertPoint(ThenBlock, ThenBlock->begin());
+  IRB.restoreIP(IP);
+  {
+    Then();
+  }
+  IP = IRBuilderBase::InsertPoint(ElseBlock, ElseBlock->begin());
+  IRB.restoreIP(IP);
+  {
+    Else();
+  }
+
+  IP = IRBuilderBase::InsertPoint(NextBlock, NextBlock->begin());
+  IRB.restoreIP(IP);
+
+  Scope S = Scopes.back();
+  if (S.Kind != ScopeKind::IF_ELSE)
+    PROTEUS_FATAL_ERROR("Syntax error, expected IF_ELSE end scope but "
+                        "found unterminated scope " +
+                        toString(S.Kind) + " @ " + S.File + ":" +
+                        std::to_string(S.Line));
+  Scopes.pop_back();
+  IRB.restoreIP(S.ContIP);
+}
+
 template <typename RetT, typename... ArgT>
 RetT Func<RetT, ArgT...>::operator()(ArgT... Args) {
   if (!J.isCompiled())

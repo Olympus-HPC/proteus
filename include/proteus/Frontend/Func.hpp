@@ -2,6 +2,7 @@
 #define PROTEUS_FRONTEND_FUNC_HPP
 
 #include <deque>
+#include <functional>
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
@@ -30,7 +31,7 @@ protected:
   std::deque<Var> RuntimeConstants;
   std::string Name;
 
-  enum class ScopeKind { FUNCTION, IF, FOR };
+  enum class ScopeKind { FUNCTION, IF, IF_ELSE, FOR };
   struct Scope {
     std::string File;
     int Line;
@@ -49,6 +50,8 @@ protected:
       return "FUNCTION";
     case ScopeKind::IF:
       return "IF";
+    case ScopeKind::IF_ELSE:
+      return "IF_ELSE";
     case ScopeKind::FOR:
       return "FOR";
     default:
@@ -136,6 +139,14 @@ public:
   void beginIf(Var &CondVar, const char *File = __builtin_FILE(),
                int Line = __builtin_LINE());
   void endIf();
+
+  template <typename ThenLambda>
+  void If(Var &CondVar, ThenLambda &&Then, const char *File = __builtin_FILE(),
+          int Line = __builtin_LINE());
+
+  template <typename ThenLambda, typename ElseLambda>
+  void If(Var &CondVar, ThenLambda &&Then, ElseLambda &&Else,
+          const char *File = __builtin_FILE(), int Line = __builtin_LINE());
 
   void beginFor(Var &IterVar, Var &InitVar, Var &UpperBound, Var &IncVar,
                 const char *File = __builtin_FILE(),
