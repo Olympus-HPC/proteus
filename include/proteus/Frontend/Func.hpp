@@ -2,6 +2,8 @@
 #define PROTEUS_FRONTEND_FUNC_HPP
 
 #include <deque>
+#include <functional>
+#include <vector>
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
@@ -16,6 +18,9 @@ namespace proteus {
 
 struct Var;
 class JitModule;
+class LoopBoundsDescription;
+class LoopNestBuilder;
+class ForLoopBuilder;
 
 using namespace llvm;
 
@@ -31,7 +36,7 @@ protected:
   HashT HashValue;
   std::string Name;
 
-  enum class ScopeKind { FUNCTION, IF, FOR };
+  enum class ScopeKind { FUNCTION, IF, FOR, LOOP_NEST };
   struct Scope {
     std::string File;
     int Line;
@@ -52,6 +57,8 @@ protected:
       return "IF";
     case ScopeKind::FOR:
       return "FOR";
+    case ScopeKind::LOOP_NEST:
+      return "LOOP_NEST";
     default:
       PROTEUS_FATAL_ERROR("Unsupported Kind " +
                           std::to_string(static_cast<int>(Kind)));
@@ -150,6 +157,13 @@ public:
   Var &callBuiltin(function_ref<Var &(FuncBase &)> Lower) {
     return Lower(*this);
   }
+
+  ForLoopBuilder ForLoop(LoopBoundsDescription Bounds);
+  ForLoopBuilder ForLoop(LoopBoundsDescription Bounds,
+                         std::function<void()> Body);
+
+  LoopNestBuilder LoopNest(std::vector<ForLoopBuilder> Loops);
+  LoopNestBuilder LoopNest(std::initializer_list<ForLoopBuilder> Loops);
 
   void ret(std::optional<std::reference_wrapper<Var>> OptRet = std::nullopt);
 

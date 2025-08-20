@@ -227,4 +227,22 @@ void FuncBase::endFor() {
   IRB.restoreIP(IP);
 }
 
+ForLoopBuilder FuncBase::ForLoop(LoopBoundsDescription Bounds) {
+  return ForLoopBuilder(std::move(Bounds));
+}
+
+ForLoopBuilder FuncBase::ForLoop(LoopBoundsDescription Bounds,
+                                        std::function<void()> Body) {
+  return ForLoopBuilder(std::move(Bounds), std::move(Body));
+}
+
+LoopNestBuilder FuncBase::LoopNest(std::vector<ForLoopBuilder> Loops) {
+  return LoopNestBuilder::create(*this, std::move(Loops));
+}
+
+LoopNestBuilder
+FuncBase::LoopNest(std::initializer_list<ForLoopBuilder> Loops) {
+  return LoopNestBuilder::create(*this, Loops);
+}
+
 } // namespace proteus
