@@ -65,7 +65,7 @@ private:
       std::string_view P = __FUNCSIG__;
       auto B = P.find("type_name<") + 10;
       auto E = P.find(">(void)", B);
-      return P.substr(a, B - E);
+      return P.substr(B, B - E);
 #else
       PROTEUS_FATAL_ERROR("Unsupported compiler");
 #endif
