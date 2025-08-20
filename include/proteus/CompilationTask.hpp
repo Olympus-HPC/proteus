@@ -54,12 +54,10 @@ private:
     else
       optimizeIR(M, DeviceArch, PassPipeline.value(), CodegenOptLevel);
 #elif PROTEUS_ENABLE_HIP
-    // For HIP RTC codegen we run the optimization pipeline only for Serial and
-    // Parallel codegen since those do not run it internally. HIP RTC and
-    // Parallel ThinLTO invoke optimization internally.
+    // For HIP we run the optimization pipeline only for Serial codegen. HIP RTC
+    // and Parallel codegen, which uses LTO, invoke optimization internally.
     // TODO: Move optimizeIR inside the codegen routines?
-    if (CGOption == CodegenOption::Serial ||
-        CGOption == CodegenOption::Parallel) {
+    if (CGOption == CodegenOption::Serial) {
       if (!PassPipeline) {
         optimizeIR(M, DeviceArch, OptLevel, CodegenOptLevel);
       } else {

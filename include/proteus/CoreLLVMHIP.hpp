@@ -17,12 +17,6 @@
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/WithColor.h>
 #include <llvm/Target/TargetMachine.h>
-#include <llvm/Transforms/IPO/ThinLTOBitcodeWriter.h>
-#include <llvm/Transforms/Utils/SplitModule.h>
-
-#if LLVM_VERSION_MAJOR == 18
-#include <llvm/CodeGen/ParallelCG.h>
-#endif
 
 #if LLVM_VERSION_MAJOR >= 18
 #include <lld/Common/Driver.h>
@@ -126,6 +120,19 @@ inline const SmallVector<StringRef> &threadIdxZFnName() {
   return Names;
 };
 
+inline Expected<sys::fs::TempFile> createTempFile(StringRef Prefix,
+                                                  StringRef Suffix) {
+  SmallString<128> TmpDir;
+  sys::path::system_temp_directory(true, TmpDir);
+
+  SmallString<64> FileName;
+  FileName.append(Prefix);
+  FileName.append(Suffix.empty() ? "-%%%%%%%" : "-%%%%%%%.");
+  FileName.append(Suffix);
+  sys::path::append(TmpDir, FileName);
+  return sys::fs::TempFile::create(TmpDir);
+}
+
 #if LLVM_VERSION_MAJOR >= 18
 inline SmallVector<std::unique_ptr<sys::fs::TempFile>>
 codegenSerial(Module &M, StringRef DeviceArch,
@@ -147,7 +154,7 @@ codegenSerial(Module &M, StringRef DeviceArch,
 
   SmallVector<char, 4096> ObjectCode;
   raw_svector_ostream OS(ObjectCode);
-  auto ExpectedF = sys::fs::TempFile::create("object-%%%%%%.o");
+  auto ExpectedF = createTempFile("object", "o");
   if (auto E = ExpectedF.takeError())
     PROTEUS_FATAL_ERROR("Error creating object tmp file " +
                         toString(std::move(E)));
@@ -167,156 +174,12 @@ codegenSerial(Module &M, StringRef DeviceArch,
   return ObjectFiles;
 }
 
-inline void runPreLinkPipeline(Module &M, StringRef DeviceArch,
-                               unsigned OptLevel, unsigned CodegenOptLevel) {
-  Timer T;
-  auto ExpectedTM =
-      proteus::detail::createTargetMachine(M, DeviceArch, CodegenOptLevel);
-  if (!ExpectedTM)
-    PROTEUS_FATAL_ERROR(toString(ExpectedTM.takeError()));
-  std::unique_ptr<TargetMachine> TM = std::move(*ExpectedTM);
-
-  PassBuilder PB(TM.get());
-  LoopAnalysisManager LAM;
-  FunctionAnalysisManager FAM;
-  CGSCCAnalysisManager CGAM;
-  ModuleAnalysisManager MAM;
-
-  PB.registerModuleAnalyses(MAM);
-  PB.registerCGSCCAnalyses(CGAM);
-  PB.registerFunctionAnalyses(FAM);
-  PB.registerLoopAnalyses(LAM);
-  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-  ModulePassManager MPM;
-  std::optional<OptimizationLevel> OL = std::nullopt;
-  switch (OptLevel) {
-  case 0:
-    OL = OptimizationLevel::O0;
-    break;
-  case 1:
-    OL = OptimizationLevel::O1;
-    break;
-  case 2:
-    OL = OptimizationLevel::O2;
-    break;
-  case 3:
-    OL = OptimizationLevel::O3;
-    break;
-  default:
-    OL = OptimizationLevel();
-    Logger::outs("proteus")
-        << "Unknown optlevel " << OptLevel << " fallback to default "
-        << OL.value().getSpeedupLevel() << "\n";
-  }
-  MPM = PB.buildThinLTOPreLinkDefaultPipeline(OL.value());
-  MPM.run(M, MAM);
-  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
-                       << __FUNCTION__ << " " << T.elapsed() << " ms\n");
-}
-
-#if LLVM_VERSION_MAJOR == 18
-// This interface is available only for LLVM 18.
 inline SmallVector<std::unique_ptr<sys::fs::TempFile>>
-codegenParallel(Module &M, StringRef DeviceArch,
-                [[maybe_unused]] char OptLevel = '3', int CodegenOptLevel = 3) {
-  auto TMFactory = [&]() {
-    auto TMExpected =
-        proteus::detail::createTargetMachine(M, DeviceArch, CodegenOptLevel);
-    if (!TMExpected)
-      PROTEUS_FATAL_ERROR(toString(TMExpected.takeError()));
-
-    return std::move(*TMExpected);
-  };
-
-  const size_t NumShards = std::min(
-      M.size(),
-      static_cast<size_t>(
-          llvm::heavyweight_hardware_concurrency().compute_thread_count()));
-
-  SmallVector<std::unique_ptr<sys::fs::TempFile>> ObjectFiles;
-
-  SmallVector<SmallString<0>> Objects{NumShards};
-  SmallVector<std::unique_ptr<raw_svector_ostream>> OwnedObjectsOS;
-  SmallVector<raw_pwrite_stream *> ObjectsOS;
-
-  for (size_t I = 0; I < NumShards; ++I) {
-    OwnedObjectsOS.push_back(std::make_unique<raw_svector_ostream>(Objects[I]));
-    ObjectsOS.push_back(OwnedObjectsOS.back().get());
-  }
-
-  splitCodeGen(M, ObjectsOS, {}, TMFactory);
-
-  for (unsigned I = 0; I < NumShards; ++I) {
-    PROTEUS_DBG(Logger::logs("proteus") << "Shard #" << I << " object size = "
-                                        << Objects[I].size() << "\n");
-    auto ExpectedF =
-        sys::fs::TempFile::create("shard." + std::to_string(I) + "-%%%%%%%.o");
-    if (auto E = ExpectedF.takeError())
-      PROTEUS_FATAL_ERROR("Error creating tmp file " + toString(std::move(E)));
-    saveToFile(ExpectedF->TmpName, Objects[I]);
-    std::unique_ptr<sys::fs::TempFile> ObjectFilePtr =
-        std::make_unique<sys::fs::TempFile>(std::move(*ExpectedF));
-    ObjectFiles.emplace_back(std::move(ObjectFilePtr));
-  }
-
-  return ObjectFiles;
-}
-#endif
-
-inline SmallVector<std::unique_ptr<sys::fs::TempFile>>
-codegenParallelThinLTO(Module &M, StringRef DeviceArch,
-                       unsigned int OptLevel = 3, int CodegenOptLevel = 3) {
-  const size_t NumShards = std::min(
-      M.size(),
-      static_cast<size_t>(
-          llvm::heavyweight_hardware_concurrency().compute_thread_count()));
-
-  SmallVector<SmallString<0>> Bitcodes{NumShards};
-  SmallVector<std::unique_ptr<raw_svector_ostream>> OwnedBitcodesOS;
-  SmallVector<raw_pwrite_stream *> BitcodesOS;
-  for (unsigned int I = 0; I < NumShards; ++I) {
-    OwnedBitcodesOS.push_back(
-        std::make_unique<raw_svector_ostream>(Bitcodes[I]));
-    BitcodesOS.push_back(OwnedBitcodesOS.back().get());
-  }
-
-  // Running the prelink pipeline is needed for AMDGPU lowering.
-  runPreLinkPipeline(M, DeviceArch, OptLevel, CodegenOptLevel);
-
-  // Split the kernel module to separate bitcodes for thinlto code generation.
-  Timer T;
-  size_t PartIdx = 0;
-  SplitModule(
-      M, BitcodesOS.size(),
-      [&PartIdx, &BitcodesOS](std::unique_ptr<Module> MPart) {
-#if PROTEUS_ENABLE_DEBUG
-        if (verifyModule(*MPart, &errs()))
-          PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
-#endif
-        PassBuilder PB;
-
-        LoopAnalysisManager LAM;
-        FunctionAnalysisManager FAM;
-        CGSCCAnalysisManager CGAM;
-        ModuleAnalysisManager MAM;
-
-        PB.registerModuleAnalyses(MAM);
-        PB.registerCGSCCAnalyses(CGAM);
-        PB.registerFunctionAnalyses(FAM);
-        PB.registerLoopAnalyses(LAM);
-        PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-        ModulePassManager MPM;
-        MPM.addPass(ThinLTOBitcodeWriterPass(*BitcodesOS[PartIdx], nullptr));
-        MPM.run(*MPart, MAM);
-        PartIdx++;
-      },
-      false);
-  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
-                       << "SplitModule " << T.elapsed() << " ms\n");
-
+codegenParallel(Module &M, StringRef DeviceArch, unsigned int OptLevel = 3,
+                int CodegenOptLevel = 3) {
+  // Use regular LTO with parallelism enabled to parallelize codegen.
   std::atomic<bool> LTOError = false;
+
   auto DiagnosticHandler = [&](const DiagnosticInfo &DI) {
     std::string ErrStorage;
     raw_string_ostream OS(ErrStorage);
@@ -352,26 +215,24 @@ codegenParallelThinLTO(Module &M, StringRef DeviceArch,
   Conf.OptLevel = OptLevel;
   Conf.CGOptLevel = static_cast<CodeGenOptLevel>(CodegenOptLevel);
 
-  // Create the backend for multi-threaded, parallel processing/
-  lto::ThinBackend Backend = lto::createInProcessThinBackend(
-      llvm::heavyweight_hardware_concurrency(NumShards));
-  auto LTOBackend = lto::LTO(std::move(Conf), Backend);
-  size_t Idx = 0;
-  BumpPtrAllocator Alloc;
-  StringSaver Identifiers(Alloc);
-  std::set<std::string> PrevailingSymbols;
-  for (auto &BitcodeInput : Bitcodes) {
-    StringRef Identifier =
-        Identifiers.save((std::to_string(Idx) + ".shard.bc"));
-    Idx++;
-    Expected<std::unique_ptr<lto::InputFile>> BitcodeFileOrErr =
-        llvm::lto::InputFile::create(MemoryBufferRef{
-            StringRef{BitcodeInput.data(), BitcodeInput.size()}, Identifier});
-    if (auto E = BitcodeFileOrErr.takeError())
-      PROTEUS_FATAL_ERROR("Error");
+  unsigned ParallelCodeGenParallelismLevel =
+      std::max(1u, std::thread::hardware_concurrency());
+  lto::LTO L(std::move(Conf), nullptr, ParallelCodeGenParallelismLevel);
 
+  SmallString<0> BitcodeBuf;
+  raw_svector_ostream BitcodeOS(BitcodeBuf);
+  WriteBitcodeToFile(M, BitcodeOS);
+
+  // TODO: Module identifier can be empty because you always have on module to
+  // link. However, in the general case, with multiple modules, each one must
+  // have a unique identifier for LTO to work correctly.
+  auto IF = cantFail(lto::InputFile::create(
+      MemoryBufferRef{BitcodeBuf, M.getModuleIdentifier()}));
+
+  std::set<std::string> PrevailingSymbols;
+  auto BuildResolutions = [&]() {
     // Save the input file and the buffer associated with its memory.
-    const auto Symbols = (*BitcodeFileOrErr)->symbols();
+    const auto Symbols = IF->symbols();
     SmallVector<lto::SymbolResolution, 16> Resolutions(Symbols.size());
     size_t SymbolIdx = 0;
     for (auto &Sym : Symbols) {
@@ -436,19 +297,20 @@ codegenParallelThinLTO(Module &M, StringRef DeviceArch,
     }
 
     // Add the bitcode file with its resolved symbols to the LTO job.
-    if (Error Err = LTOBackend.add(std::move(*BitcodeFileOrErr), Resolutions))
-      PROTEUS_FATAL_ERROR("Error adding file to backend");
-  }
+    cantFail(L.add(std::move(IF), Resolutions));
+  };
+
+  BuildResolutions();
 
   // Run the LTO job to compile the bitcode.
-  size_t MaxTasks = LTOBackend.getMaxTasks();
+  size_t MaxTasks = L.getMaxTasks();
   SmallVector<std::unique_ptr<sys::fs::TempFile>> ObjectFiles{MaxTasks};
+
   auto AddStream =
       [&](size_t Task,
           const Twine & /*ModuleName*/) -> std::unique_ptr<CachedFileStream> {
     std::string TaskStr = Task ? "." + std::to_string(Task) : "";
-    auto ExpectedF =
-        sys::fs::TempFile::create("lto.shard" + TaskStr + "-%%%%%%%.o");
+    auto ExpectedF = createTempFile("lto-shard" + TaskStr, "o");
     if (auto E = ExpectedF.takeError())
       PROTEUS_FATAL_ERROR("Error creating tmp file " + toString(std::move(E)));
     ObjectFiles[Task] =
@@ -460,7 +322,7 @@ codegenParallelThinLTO(Module &M, StringRef DeviceArch,
     return Ret;
   };
 
-  if (Error E = LTOBackend.run(AddStream))
+  if (Error E = L.run(AddStream))
     PROTEUS_FATAL_ERROR("Error: " + toString(std::move(E)));
 
   if (LTOError)
@@ -556,14 +418,7 @@ codegenObject(Module &M, StringRef DeviceArch,
     ObjectFiles = detail::codegenSerial(M, DeviceArch);
     break;
   case CodegenOption::Parallel:
-#if LLVM_VERSION_MAJOR == 18
     ObjectFiles = detail::codegenParallel(M, DeviceArch);
-#else
-    PROTEUS_FATAL_ERROR("Parallel split codegen is supported only for LLVM 18");
-#endif
-    break;
-  case CodegenOption::ParallelThinLTO:
-    ObjectFiles = detail::codegenParallelThinLTO(M, DeviceArch);
     break;
 #endif
   default:
@@ -574,7 +429,7 @@ codegenObject(Module &M, StringRef DeviceArch,
     PROTEUS_FATAL_ERROR("Expected non-empty vector of object files");
 
 #if LLVM_VERSION_MAJOR >= 18
-  auto ExpectedF = sys::fs::TempFile::create("proteus-jit-%%%%%%%.o");
+  auto ExpectedF = detail::createTempFile("proteus-jit", "o");
   if (auto E = ExpectedF.takeError())
     PROTEUS_FATAL_ERROR("Error creating shared object file " +
                         toString(std::move(E)));
