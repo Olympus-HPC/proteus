@@ -136,6 +136,10 @@ public:
                      int Line = __builtin_LINE());
   void endFunction();
 
+  template <typename BodyLambda>
+  void function(BodyLambda &&Body, const char *File = __builtin_FILE(),
+                int Line = __builtin_LINE());
+
   void beginIf(Var &CondVar, const char *File = __builtin_FILE(),
                int Line = __builtin_LINE());
   void endIf();
@@ -145,7 +149,7 @@ public:
           int Line = __builtin_LINE());
 
   template <typename ThenLambda, typename ElseLambda>
-  void IfElse(Var &CondVar, ThenLambda &&Then, ElseLambda &&Else,
+  void ifElse(Var &CondVar, ThenLambda &&Then, ElseLambda &&Else,
           const char *File = __builtin_FILE(), int Line = __builtin_LINE());
 
   void beginFor(Var &IterVar, Var &InitVar, Var &UpperBound, Var &IncVar,
@@ -157,6 +161,12 @@ public:
   std::enable_if_t<!std::is_void_v<RetT>, Var &> call(StringRef Name);
   template <typename RetT, typename... ArgT>
   std::enable_if_t<std::is_void_v<RetT>, void> call(StringRef Name);
+  template <typename BodyLambda>
+  void For(Var &IterVar, Var &InitVar, Var &UpperBound, Var &IncVar,
+           BodyLambda &&Body, const char *File = __builtin_FILE(),
+           int Line = __builtin_LINE());
+
+  template <typename RetT, typename... ArgT> void call(StringRef Name);
 
   Var &callBuiltin(function_ref<Var &(FuncBase &)> Lower) {
     return Lower(*this);

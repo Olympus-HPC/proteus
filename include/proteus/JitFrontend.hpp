@@ -318,6 +318,34 @@ void FuncBase::IfElse(Var &CondVar, ThenLambda &&Then, ElseLambda &&Else,
   IRB.restoreIP(S.ContIP);
 }
 
+template <typename BodyLambda>
+void FuncBase::For(Var &IterVar, Var &InitVar, Var &UpperBound, Var &IncVar,
+                   BodyLambda &&Body, const char *File, int Line) {
+  beginFor(IterVar, InitVar, UpperBound, IncVar, File, Line);
+  {
+    Body();
+  }
+  endFor();
+}
+
+template <typename BodyLambda>
+void FuncBase::function(BodyLambda &&Body, const char *File, int Line) {
+  beginFunction(File, Line);
+  {
+    Body();
+  }
+  endFunction();
+}
+
+template <typename RetT, typename... ArgT> void FuncBase::call(StringRef Name) {
+  auto *F = getFunction();
+  Module &M = *F->getParent();
+  LLVMContext &Ctx = F->getContext();
+  FunctionCallee Callee = M.getOrInsertFunction(Name, TypeMap<RetT>::get(Ctx),
+                                                TypeMap<ArgT>::get(Ctx)...);
+  IRB.CreateCall(Callee);
+}
+
 template <typename RetT, typename... ArgT>
 RetT Func<RetT, ArgT...>::operator()(ArgT... Args) {
   if (!J.isCompiled())
