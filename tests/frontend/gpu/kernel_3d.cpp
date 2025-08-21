@@ -60,7 +60,7 @@ int main() {
   F.beginFunction();
   {
     auto &I = F.declVar<size_t>("i");
-    auto &J_Var = F.declVar<size_t>("j");
+    auto &JVar = F.declVar<size_t>("j");
     auto &K = F.declVar<size_t>("k");
     auto &A = F.getArg(0);
     auto &B = F.getArg(1);
@@ -71,7 +71,7 @@ int main() {
 
     I = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +
         F.callBuiltin(getThreadIdX);
-    J_Var = F.callBuiltin(getBlockIdY) * F.callBuiltin(getBlockDimY) +
+    JVar = F.callBuiltin(getBlockIdY) * F.callBuiltin(getBlockDimY) +
             F.callBuiltin(getThreadIdY);
     K = F.callBuiltin(getBlockIdZ) * F.callBuiltin(getBlockDimZ) +
         F.callBuiltin(getThreadIdZ);
@@ -104,20 +104,20 @@ int main() {
   }
   F.endFunction();
 
-  const size_t X_SIZE = 4;
-  const size_t Y_SIZE = 3;
-  const size_t Z_SIZE = 2;
-  const size_t total_size = X_SIZE * Y_SIZE * Z_SIZE;
+  const size_t XSize = 4;
+  const size_t YSize = 3;
+  const size_t ZSize = 2;
+  const size_t TotalSize = XSize * YSize * ZSize;
 
   double *A, *B, *C;
-  gpuErrCheck(gpuMallocManaged(&A, sizeof(double) * total_size));
-  gpuErrCheck(gpuMallocManaged(&B, sizeof(double) * total_size));
-  gpuErrCheck(gpuMallocManaged(&C, sizeof(double) * total_size));
+  gpuErrCheck(gpuMallocManaged(&A, sizeof(double) * TotalSize));
+  gpuErrCheck(gpuMallocManaged(&B, sizeof(double) * TotalSize));
+  gpuErrCheck(gpuMallocManaged(&C, sizeof(double) * TotalSize));
 
-  for (size_t i = 0; i < total_size; ++i) {
-    A[i] = 1.5;
-    B[i] = 2.5;
-    C[i] = 0.0;
+  for (size_t I = 0; I < TotalSize; ++I) {
+    A[I] = 1.5;
+    B[I] = 2.5;
+    C[I] = 0.0;
   }
 
   J.compile();
@@ -125,29 +125,29 @@ int main() {
   constexpr unsigned BlockDimX = 2;
   constexpr unsigned BlockDimY = 2;
   constexpr unsigned BlockDimZ = 2;
-  unsigned GridDimX = (X_SIZE + BlockDimX - 1) / BlockDimX;
-  unsigned GridDimY = (Y_SIZE + BlockDimY - 1) / BlockDimY;
-  unsigned GridDimZ = (Z_SIZE + BlockDimZ - 1) / BlockDimZ;
+  unsigned GridDimX = (XSize + BlockDimX - 1) / BlockDimX;
+  unsigned GridDimY = (YSize + BlockDimY - 1) / BlockDimY;
+  unsigned GridDimZ = (ZSize + BlockDimZ - 1) / BlockDimZ;
 
   std::cout << "Launching 3D kernel with Grid(" << GridDimX << ", " << GridDimY
             << ", " << GridDimZ << ") Block(" << BlockDimX << ", " << BlockDimY
-            << ", " << BlockDimZ << ") for " << X_SIZE << "x" << Y_SIZE << "x"
-            << Z_SIZE << " volume...\n";
+            << ", " << BlockDimZ << ") for " << XSize << "x" << YSize << "x"
+            << ZSize << " volume...\n";
 
   gpuErrCheck(KernelHandle.launch({GridDimX, GridDimY, GridDimZ},
                                   {BlockDimX, BlockDimY, BlockDimZ}, 0, nullptr,
-                                  A, B, C, X_SIZE, Y_SIZE, Z_SIZE));
+                                  A, B, C, XSize, YSize, ZSize));
 
   gpuErrCheck(gpuDeviceSynchronize());
 
   bool Verified = true;
-  for (size_t k = 0; k < Z_SIZE; ++k) {
-    for (size_t j = 0; j < Y_SIZE; ++j) {
-      for (size_t i = 0; i < X_SIZE; ++i) {
-        size_t idx = k * (X_SIZE * Y_SIZE) + j * X_SIZE + i;
-        if (C[idx] != 4.0) {
-          std::cout << "Verification failed: C[" << i << "][" << j << "][" << k
-                    << "] = " << C[idx] << " != 4.0 (expected)\n";
+  for (size_t K = 0; K < ZSize; ++K) {
+    for (size_t J = 0; J < YSize; ++J) {
+      for (size_t I = 0; I < XSize; ++I) {
+        size_t Idx = K * (XSize * YSize) + J * XSize + I;
+        if (C[Idx] != 4.0) {
+          std::cout << "Verification failed: C[" << I << "][" << J << "][" << K
+                    << "] = " << C[Idx] << " != 4.0 (expected)\n";
           Verified = false;
         }
       }

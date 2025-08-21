@@ -82,17 +82,17 @@ int main() {
 
   const size_t M = 4;
   const size_t N = 8;
-  const size_t size = M * N;
+  const size_t Size = M * N;
 
   double *A, *B, *C;
-  gpuErrCheck(gpuMallocManaged(&A, sizeof(double) * size));
-  gpuErrCheck(gpuMallocManaged(&B, sizeof(double) * size));
-  gpuErrCheck(gpuMallocManaged(&C, sizeof(double) * size));
+  gpuErrCheck(gpuMallocManaged(&A, sizeof(double) * Size));
+  gpuErrCheck(gpuMallocManaged(&B, sizeof(double) * Size));
+  gpuErrCheck(gpuMallocManaged(&C, sizeof(double) * Size));
 
-  for (size_t i = 0; i < size; ++i) {
-    A[i] = 1.0;
-    B[i] = 2.0;
-    C[i] = 0.0;
+  for (size_t I = 0; I < Size; ++I) {
+    A[I] = 1.0;
+    B[I] = 2.0;
+    C[I] = 0.0;
   }
 
   J.compile();
@@ -113,12 +113,12 @@ int main() {
   gpuErrCheck(gpuDeviceSynchronize());
 
   bool Verified = true;
-  for (size_t i = 0; i < M; ++i) {
-    for (size_t j = 0; j < N; ++j) {
-      size_t idx = i * N + j;
-      if (C[idx] != 3.0) {
-        std::cout << "Verification failed: C[" << i << "][" << j
-                  << "] = " << C[idx] << " != 3.0 (expected)\n";
+  for (size_t I = 0; I < M; ++I) {
+    for (size_t J = 0; J < N; ++J) {
+      size_t Idx = I * N + J;
+      if (C[Idx] != 3.0) {
+        std::cout << "Verification failed: C[" << I << "][" << J
+                  << "] = " << C[Idx] << " != 3.0 (expected)\n";
         Verified = false;
       }
     }
