@@ -246,46 +246,11 @@ std::enable_if_t<std::is_void_v<RetT>, void> FuncBase::call(StringRef Name) {
 
 template <typename ThenLambda>
 void FuncBase::If(Var &CondVar, ThenLambda &&Then, const char *File, int Line) {
-  Function *F = getFunction();
-  BasicBlock *CurBlock = IP.getBlock();
-  BasicBlock *NextBlock =
-      CurBlock->splitBasicBlock(IP.getPoint(), CurBlock->getName() + ".split");
-
-  auto ContIP = IRBuilderBase::InsertPoint(NextBlock, NextBlock->begin());
-  Scopes.emplace_back(File, Line, ScopeKind::IF, ContIP);
-
-  BasicBlock *ThenBlock =
-      BasicBlock::Create(F->getContext(), "if.then", F, NextBlock);
-  BasicBlock *ExitBlock =
-      BasicBlock::Create(F->getContext(), "if.cont", F, NextBlock);
-
-  CurBlock->getTerminator()->eraseFromParent();
-  IRB.SetInsertPoint(CurBlock);
-  {
-    Value *Cond =
-        IRB.CreateLoad(CondVar.Alloca->getAllocatedType(), CondVar.Alloca);
-    IRB.CreateCondBr(Cond, ThenBlock, ExitBlock);
-  }
-
-  IRB.SetInsertPoint(ThenBlock);
-  {
-    IRB.CreateBr(ExitBlock);
-  }
-
-  IRB.SetInsertPoint(ExitBlock);
-  {
-    IRB.CreateBr(NextBlock);
-  }
-
-  IP = IRBuilderBase::InsertPoint(ThenBlock, ThenBlock->begin());
-  IRB.restoreIP(IP);
+  beginIf(CondVar, File, Line);
   {
     Then();
   }
-
-  Scopes.pop_back();
-  IP = IRBuilderBase::InsertPoint(NextBlock, NextBlock->begin());
-  IRB.restoreIP(IP);
+  endIf();
 }
 
 template <typename ThenLambda, typename ElseLambda>
