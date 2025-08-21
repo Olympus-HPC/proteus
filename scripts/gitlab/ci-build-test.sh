@@ -21,7 +21,7 @@ if [ "${CI_MACHINE}" == "lassen" ]; then
   source ./${MINICONDA_DIR}/bin/activate
   conda create -y -n proteus -c conda-forge \
       python=${PYTHON_VERSION} clang=${PROTEUS_CI_LLVM_VERSION} clangxx=${PROTEUS_CI_LLVM_VERSION} \
-      llvmdev=${PROTEUS_CI_LLVM_VERSION} lit=${PROTEUS_CI_LLVM_VERSION}
+      clangdev=${PROTEUS_CI_LLVM_VERSION} llvmdev=${PROTEUS_CI_LLVM_VERSION} lit=${PROTEUS_CI_LLVM_VERSION}
   conda activate proteus
 
   LLVM_INSTALL_DIR=$(llvm-config --prefix)
