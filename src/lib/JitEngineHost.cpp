@@ -189,13 +189,13 @@ JitEngineHost::~JitEngineHost() { CodeCache.printStats(); }
 
 Expected<orc::ThreadSafeModule> JitEngineHost::specializeIR(
     std::unique_ptr<Module> M, std::unique_ptr<LLVMContext> Ctx,
-    StringRef FnName, StringRef Suffix, ArrayRef<RuntimeConstant> RCArray) {
+    StringRef FnName, StringRef Suffix, HashT HashValue, ArrayRef<RuntimeConstant> RCArray) {
   TIMESCOPE("specializeIR");
   Function *F = M->getFunction(FnName);
   assert(F && "Expected non-null function!");
 
 #if PROTEUS_ENABLE_DEBUG
-  PROTEUS_DBG(Logger::logfile(FnName.str() + ".input.ll", *M));
+  PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".input.ll", *M));
 #endif
   // Find GlobalValue declarations that are externally defined. Resolve them
   // statically as absolute symbols in the ORC linker. Required for resolving
@@ -268,7 +268,7 @@ Expected<orc::ThreadSafeModule> JitEngineHost::specializeIR(
   F->setName(FnName + Suffix);
 
 #if PROTEUS_ENABLE_DEBUG
-  Logger::logfile(FnName.str() + ".specialized.ll", *M);
+  Logger::logfile(HashValue.toString() + ".specialized.ll", *M);
   if (verifyModule(*M, &errs()))
     PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
   else
@@ -339,7 +339,7 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 
   // (3) Add modules.
   ExitOnErr(LLJITPtr->addIRModule(ExitOnErr(
-      specializeIR(std::move(M), std::move(Ctx), FnName, Suffix, RCVec))));
+      specializeIR(std::move(M), std::move(Ctx), FnName, Suffix, HashValue, RCVec))));
 
   PROTEUS_DBG(Logger::logs("proteus")
               << "===\n"
