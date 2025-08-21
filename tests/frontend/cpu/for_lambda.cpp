@@ -21,9 +21,7 @@ int main() {
     I = 0;
     UB = 10;
     Inc = 1;
-    F.For(I, I, UB, Inc, [&]() {
-      Arg[I] = Arg[I] + 1.0;
-    });
+    F.For(I, I, UB, Inc, [&]() { Arg[I] = Arg[I] + 1.0; });
     F.ret();
   });
 

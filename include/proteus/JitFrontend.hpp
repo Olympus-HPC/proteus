@@ -254,8 +254,8 @@ void FuncBase::If(Var &CondVar, ThenLambda &&Then, const char *File, int Line) {
 }
 
 template <typename ThenLambda, typename ElseLambda>
-void FuncBase::IfElse(Var &CondVar, ThenLambda &&Then, ElseLambda &&Else,
-                  const char *File, int Line) {
+void FuncBase::ifElse(Var &CondVar, ThenLambda &&Then, ElseLambda &&Else,
+                      const char *File, int Line) {
   Function *F = getFunction();
   BasicBlock *CurBlock = IP.getBlock();
   BasicBlock *NextBlock =

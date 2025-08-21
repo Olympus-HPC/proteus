@@ -150,7 +150,7 @@ public:
 
   template <typename ThenLambda, typename ElseLambda>
   void ifElse(Var &CondVar, ThenLambda &&Then, ElseLambda &&Else,
-          const char *File = __builtin_FILE(), int Line = __builtin_LINE());
+              const char *File = __builtin_FILE(), int Line = __builtin_LINE());
 
   void beginFor(Var &IterVar, Var &InitVar, Var &UpperBound, Var &IncVar,
                 const char *File = __builtin_FILE(),

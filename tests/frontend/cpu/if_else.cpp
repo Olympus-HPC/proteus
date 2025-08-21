@@ -20,26 +20,24 @@ int main() {
     {
       auto &Ret = Min.declVar<double>("ret");
       Ret = 0;
-      Min.IfElse(Arg0 < Arg1, [&]() {
-             Ret = Arg0;
-             Min.If(Arg0 == 1.0, [&]()
-                   {
-                     Ret = 500.0;
-                    });
-             }, /*else*/[&]() {
-                 Ret = Arg1;
-            });
+      Min.ifElse(
+          Arg0 < Arg1,
+          [&]() {
+            Ret = Arg0;
+            Min.If(Arg0 == 1.0, [&]() { Ret = 500.0; });
+          },
+          /*else*/ [&]() { Ret = Arg1; });
       Min.ret(Ret);
     }
     Min.endFunction();
   }
 
   J.compile();
-  auto ret = Min(1.0, 2.0);
-  std::cout << "R Min " << ret << "\n";
+  auto Ret = Min(1.0, 2.0);
+  std::cout << "R Min " << Ret << "\n";
 
-  ret = Min(3.0, 2.0);
-  std::cout << "R Min " << ret << "\n";
+  Ret = Min(3.0, 2.0);
+  std::cout << "R Min " << Ret << "\n";
 
   proteus::finalize();
   return 0;
