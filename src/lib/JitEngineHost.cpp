@@ -374,7 +374,6 @@ void JitEngineHost::compileOnly(std::unique_ptr<LLVMContext> Ctx,
 }
 
 void *JitEngineHost::getFunctionAddress(StringRef FnName) {
-
   auto EntryAddr = ExitOnErr(LLJITPtr->lookup(FnName));
 
   void *JitFnPtr = (void *)EntryAddr.getValue();

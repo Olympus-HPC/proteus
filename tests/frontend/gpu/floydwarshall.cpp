@@ -320,8 +320,9 @@ int main(int argc, char **argv) {
 // CHECK-NEXT: dist[1048573] = 4
 // CHECK-NEXT: dist[1048574] = 4
 // CHECK-NEXT: dist[1048575] = 0
-// CHECK: JitCache hits 102399 total 102400
-// CHECK: HashValue {{[0-9]+}} NumExecs 102400 NumHits 102399
+// The KernelHandle stores the kernel function avoiding cache lookup
+// CHECK: JitCache hits 0 total 1
+// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: JitStorageCache hits 0 total 1
 // CHECK-SECOND: JitStorageCache hits 1 total 1
 // CHECK: JitCache hits 0 total 0

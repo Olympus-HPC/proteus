@@ -9,6 +9,7 @@ set(SOURCES
   Frontend/Func.cpp
   Frontend/Var.cpp
   Frontend/Dispatcher.cpp
+  Frontend/CppJitModule.cpp
 )
 
 set(PROTEUS_PROJECT_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
@@ -79,7 +80,6 @@ target_include_directories(proteusCore
   $<BUILD_INTERFACE:${PROTEUS_PROJECT_INCLUDE_DIR}>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
-
 if(PROTEUS_LINK_SHARED_LLVM)
   if(LLVM_LINK_LLVM_DYLIB)
     llvm_config(proteus USE_SHARED)
@@ -144,8 +144,26 @@ if(PROTEUS_ENABLE_CUDA)
     ${CUDAToolkit_LIBRARY_DIR}/libnvptxcompiler_static.a)
 endif()
 
-target_link_libraries(proteus PRIVATE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+find_program(CLANGXX
+  NAMES clang++
+  PATHS "${LLVM_INSTALL_DIR}/bin"
+  NO_DEFAULT_PATH
+  REQUIRED
+)
+message(STATUS "Found clang++: ${CLANGXX}")
+
+# Find all libclang*.a libraries in the LLVM installation
+file(GLOB clang_libs "${LLVM_INSTALL_DIR}/lib/libclang*.a")
+
+# Print what we found for debugging
+message(STATUS "Found Clang libraries: ${clang_libs}")
+
+# Enclose clang_libs in a link group to avoid linker errors due to unresolved symbols.
+target_link_libraries(proteus PRIVATE ${libs} "-Wl,--start-group" ${clang_libs} "-Wl,--end-group" "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+target_compile_definitions(proteus PRIVATE PROTEUS_CLANGXX_BIN="${CLANGXX}")
+
 target_link_libraries(proteusFrontend INTERFACE proteus ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+
 target_link_libraries(proteusCore INTERFACE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 
 set_target_properties(proteus PROPERTIES
@@ -154,7 +172,7 @@ set_target_properties(proteus PROPERTIES
 )
 
 install(
-  TARGETS proteus proteusCore
+  TARGETS proteus proteusCore proteusFrontend
   EXPORT proteusTargets
   RUNTIME DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
