@@ -20,7 +20,7 @@ int main() {
     {
       auto &Ret = Min.declVar<double>("ret");
       Ret = 0;
-      Min.If(Arg0 < Arg1, [&]() {
+      Min.IfElse(Arg0 < Arg1, [&]() {
              Ret = Arg0;
              Min.If(Arg0 == 1.0, [&]()
                    {
