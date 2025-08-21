@@ -78,7 +78,7 @@ int main() {
 
     F.beginIf(I < X);
     {
-      F.beginIf(J_Var < Y);
+      F.beginIf(JVar < Y);
       {
         F.beginIf(K < Z);
         {
@@ -89,7 +89,7 @@ int main() {
 
           XY = X * Y;
           KXY = K * XY;
-          JX = J_Var * X;
+          JX = JVar * X;
           Idx = KXY + JX + I;
 
           C[Idx] = A[Idx] + B[Idx];
