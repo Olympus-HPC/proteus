@@ -72,7 +72,7 @@ int main() {
     I = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +
         F.callBuiltin(getThreadIdX);
     JVar = F.callBuiltin(getBlockIdY) * F.callBuiltin(getBlockDimY) +
-            F.callBuiltin(getThreadIdY);
+           F.callBuiltin(getThreadIdY);
     K = F.callBuiltin(getBlockIdZ) * F.callBuiltin(getBlockDimZ) +
         F.callBuiltin(getThreadIdZ);
 
