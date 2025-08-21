@@ -43,11 +43,12 @@ auto getTiledMatmulFunction(int N, int TILE_SIZE) {
                   F.ForLoop({J, Zero, UBN_J, IncOne}).tile(TILE_SIZE),
                   F.ForLoop({K, Zero, UBN_K, IncOne},
                             [&]() {
-                              auto cIdx = I * N + J;
-                              auto aIdx = I * N + K;
-                              auto bIdx = K * N + J;
-                              C[cIdx] += A[aIdx] * B[bIdx];
-                            }).tile(TILE_SIZE)})
+                              auto CIdx = I * N + J;
+                              auto AIdx = I * N + K;
+                              auto BIdx = K * N + J;
+                              C[CIdx] += A[AIdx] * B[BIdx];
+                            }).tile(TILE_SIZE)
+        })
           .emit();
 
       F.ret();

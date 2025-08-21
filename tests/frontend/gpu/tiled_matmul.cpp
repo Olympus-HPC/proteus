@@ -142,7 +142,7 @@ auto getTiledMatmulKernel(int N, int TILE_SIZE) {
                         auto AIdx = Row * N + Idx;
                         auto BIdx = Idx * N + Col;
                         accum += A[AIdx] * B[BIdx];
-                    })//.tile(TILE_SIZE)
+                    }).tile(TILE_SIZE)
         }).emit();
         auto CIdx = Row * N + Col;
         C[CIdx] += accum;
