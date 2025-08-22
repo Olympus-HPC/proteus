@@ -154,8 +154,14 @@ public:
 
   template <typename RetT, typename... ArgT> void call(StringRef Name);
 
-  Var &callBuiltin(function_ref<Var &(FuncBase &)> Lower) {
-    return Lower(*this);
+  template <typename BuiltinFuncT>
+  decltype(auto) callBuiltin(BuiltinFuncT &&BuiltinFunc) {
+    using RetT = std::invoke_result_t<BuiltinFuncT &, FuncBase &>;
+    if constexpr (std::is_void_v<RetT>) {
+      std::invoke(std::forward<BuiltinFuncT>(BuiltinFunc), *this);
+    } else {
+      return std::invoke(std::forward<BuiltinFuncT>(BuiltinFunc), *this);
+    }
   }
 
   ForLoopBuilder ForLoop(LoopBoundsDescription Bounds);
