@@ -2,6 +2,7 @@
 #define PROTEUS_JIT_DEV_HPP
 
 #include <llvm/ADT/StringRef.h>
+#include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Verifier.h>
@@ -26,13 +27,14 @@ class JitModule {
 private:
   std::unique_ptr<LLVMContext> Ctx;
   std::unique_ptr<Module> Mod;
-  std::unique_ptr<MemoryBuffer> CompiledObject;
+  std::unique_ptr<MemoryBuffer> ObjectModule;
 
   std::deque<std::unique_ptr<FuncBase>> Functions;
   TargetModelType TargetModel;
   std::string TargetTriple;
   Dispatcher &Dispatch;
 
+  HashT ModuleHash = 0;
   bool IsCompiled = false;
 
   template <typename... ArgT> struct KernelHandle {
@@ -42,54 +44,36 @@ private:
     // Launch with type-safety.
     [[nodiscard]] auto launch(LaunchDims Grid, LaunchDims Block,
                               uint64_t ShmemBytes, void *Stream, ArgT... Args) {
-      // Create the type-safe tuple.
-      auto Tup = std::make_tuple(static_cast<ArgT>(Args)...);
+      // Pointers to the local parameter copies.
+      void *Ptrs[sizeof...(ArgT)] = {(void *)&Args...};
 
-      // Create the ArrayRef<void*> pointing at each tuple element.
-      std::array<void *, sizeof...(ArgT)> Ptrs;
-      std::apply(
-          [&](auto &...Elts) {
-            size_t I = 0;
-            ((Ptrs[I++] = (void *)&Elts), ...);
-          },
-          Tup);
+      if (!M.isCompiled())
+        M.compile();
 
-      // Call launch through module.
-      // TODO: should it use the dispatcher directly?
-      return M.launch(F, Grid, Block, Ptrs, ShmemBytes, Stream);
+      auto GetKernelFunc = [&]() {
+        // Get the kernel func pointer directly from the Func object if
+        // available.
+        if (auto KernelFunc = F.getCompiledFunc()) {
+          return KernelFunc;
+        }
+
+        // Get the kernel func pointer from the Dispatch and store it to the
+        // Func object to avoid cache lookups.
+        // TODO: Re-think caching and dispatchers.
+        auto KernelFunc = reinterpret_cast<decltype(F.getCompiledFunc())>(
+            M.Dispatch.getFunctionAddress(F.getName(), M.getObjectModuleRef()));
+
+        F.setCompiledFunc(KernelFunc);
+
+        return KernelFunc;
+      };
+
+      return M.Dispatch.launch(reinterpret_cast<void *>(GetKernelFunc()), Grid,
+                               Block, Ptrs, ShmemBytes, Stream);
     }
 
     FuncBase *operator->() { return &F; }
   };
-
-  TargetModelType parseTargetModel(StringRef Target) {
-    if (Target == "host" || Target == "native") {
-      return TargetModelType::HOST;
-    }
-
-    if (Target == "cuda") {
-      return TargetModelType::CUDA;
-    }
-
-    if (Target == "hip") {
-      return TargetModelType::HIP;
-    }
-
-    PROTEUS_FATAL_ERROR("Unsupported target " + Target);
-  }
-
-  std::string getTargetTriple(TargetModelType Model) {
-    switch (Model) {
-    case TargetModelType::HOST:
-      return sys::getProcessTriple();
-    case TargetModelType::CUDA:
-      return "nvptx64-nvidia-cuda";
-    case TargetModelType::HIP:
-      return "amdgcn-amd-amdhsa";
-    default:
-      PROTEUS_FATAL_ERROR("Unsupported target model");
-    }
-  }
 
   bool isDeviceModule() {
     return ((TargetModel == TargetModelType::CUDA) ||
@@ -120,16 +104,6 @@ private:
     default:
       PROTEUS_FATAL_ERROR("Unsupported target " + TargetTriple);
     }
-  }
-
-  DispatchResult launch(FuncBase &F, LaunchDims GridDim, LaunchDims BlockDim,
-                        ArrayRef<void *> KernelArgs, uint64_t ShmemSize,
-                        void *Stream) {
-    if (!IsCompiled)
-      compile();
-
-    return Dispatch.launch(F.getName(), GridDim, BlockDim, KernelArgs,
-                           ShmemSize, Stream);
   }
 
 public:
@@ -197,19 +171,71 @@ public:
   }
 
   void compile(bool Verify = false) {
+    if (IsCompiled)
+      return;
+
     if (Verify)
       if (verifyModule(*Mod, &errs())) {
         PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
       }
 
-    Dispatch.compile(std::move(Ctx), std::move(Mod));
+    SmallVector<char, 0> Buffer;
+    raw_svector_ostream OS(Buffer);
+    WriteBitcodeToFile(*Mod, OS);
+
+    // Create a unique module hash based on the bitcode and append to all
+    // function names to make them unique.
+    // TODO: This is not needed for GPU JIT modules since they are separate
+    // objects. However, CPU JIT modules end up in the same object through the
+    // ORC JIT singleton. Reconsider the CPU JIT process.
+    ModuleHash = hash(StringRef{Buffer.data(), Buffer.size()});
+    for (auto &JitF : Functions) {
+      JitF->setName(JitF->getName().str() + "$" + ModuleHash.toString());
+    }
+
+    if ((ObjectModule = Dispatch.lookupObjectModule(ModuleHash))) {
+      IsCompiled = true;
+      return;
+    }
+
+    ObjectModule = Dispatch.compile(std::move(Ctx), std::move(Mod), ModuleHash);
     IsCompiled = true;
   }
+
+  HashT getModuleHash() const { return ModuleHash; }
+
+  std::optional<MemoryBufferRef> getObjectModuleRef() const {
+    // For host JIT modules the ObjectModule is alway nullptr and unused by
+    // DispatcherHOST since it is unused by ORC JIT.
+    if (!ObjectModule)
+      return std::nullopt;
+
+    return ObjectModule->getMemBufferRef();
+  }
+
+  const Dispatcher &getDispatcher() const { return Dispatch; }
+
+  TargetModelType getTargetModel() const { return TargetModel; }
 
   void print() { Mod->print(outs(), nullptr); }
 };
 
-template <typename RetT, typename... ArgT> void FuncBase::call(StringRef Name) {
+template <typename RetT, typename... ArgT>
+std::enable_if_t<!std::is_void_v<RetT>, Var &> FuncBase::call(StringRef Name) {
+  auto *F = getFunction();
+  Module &M = *F->getParent();
+  LLVMContext &Ctx = F->getContext();
+  FunctionCallee Callee = M.getOrInsertFunction(Name, TypeMap<RetT>::get(Ctx),
+                                                TypeMap<ArgT>::get(Ctx)...);
+  Var &Ret = declVarInternal("ret", TypeMap<RetT>::get(Ctx));
+  auto *Call = IRB.CreateCall(Callee);
+  Ret.storeValue(Call);
+
+  return Ret;
+}
+
+template <typename RetT, typename... ArgT>
+std::enable_if_t<std::is_void_v<RetT>, void> FuncBase::call(StringRef Name) {
   auto *F = getFunction();
   Module &M = *F->getParent();
   LLVMContext &Ctx = F->getContext();
@@ -223,7 +249,11 @@ RetT Func<RetT, ArgT...>::operator()(ArgT... Args) {
   if (!J.isCompiled())
     J.compile();
 
-  return Dispatch.run<RetT>(getName(), Args...);
+  if (J.getTargetModel() != TargetModelType::HOST)
+    PROTEUS_FATAL_ERROR(
+        "Target is a GPU model, cannot directly run functions, use launch()");
+
+  return Dispatch.run<RetT>(getName(), J.getObjectModuleRef(), Args...);
 }
 
 } // namespace proteus
