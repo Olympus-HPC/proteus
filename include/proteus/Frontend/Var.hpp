@@ -13,11 +13,16 @@ using namespace llvm;
 template <typename T> struct VarT {};
 
 struct Var {
+  enum class StorageKind { AllocaStorage, PointerStorage };
+
+  StorageKind Storage;
   AllocaInst *Alloca;
+  Value *PointerValue;
   FuncBase &Fn;
   Type *PointerElemType;
 
   Var(AllocaInst *Alloca, FuncBase &Fn, Type *PointerElemType = nullptr);
+  Var(Value *PointerValue, FuncBase &Fn, Type *PointerElemType);
 
   StringRef getName();
 

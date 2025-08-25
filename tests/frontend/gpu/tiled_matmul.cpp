@@ -52,7 +52,7 @@ using namespace proteus;
 
 #if PROTEUS_ENABLE_HIP
 #ifndef MATMUL_TILE_SIZE
-#define MATMUL_TILE_SIZE 16
+#define MATMUL_TILE_SIZE 32
 #endif
 
 __global__ void hip_tiled_matmul_kernel(const double * __restrict__ A,
@@ -100,6 +100,37 @@ static inline void hip_tiled_matmul_launch(const double *A,
             1);
   hip_tiled_matmul_kernel<<<grid, block>>>(A, B, C, N);
 }
+
+// Non-tiled (naive) HIP kernel for matrix multiplication: C = A * B
+__global__ void hip_nontiled_matmul_kernel(const double * __restrict__ A,
+                                           const double * __restrict__ B,
+                                           double * __restrict__ C,
+                                           int N) {
+  int tx = threadIdx.x;
+  int ty = threadIdx.y;
+  int row = blockIdx.y * blockDim.y + ty;
+  int col = blockIdx.x * blockDim.x + tx;
+
+  if (row < N && col < N) {
+    double sum = 0.0;
+    #pragma unroll 1
+    for (int k = 0; k < N; ++k) {
+      sum += A[row * N + k] * B[k * N + col];
+    }
+    C[row * N + col] = sum;
+  }
+}
+
+static inline void hip_nontiled_matmul_launch(const double *A,
+                                              const double *B,
+                                              double *C,
+                                              int N) {
+  dim3 block(MATMUL_TILE_SIZE, MATMUL_TILE_SIZE, 1);
+  dim3 grid((N + block.x - 1) / block.x,
+            (N + block.y - 1) / block.y,
+            1);
+  hip_nontiled_matmul_kernel<<<grid, block>>>(A, B, C, N);
+}
 #endif
 
 
@@ -110,15 +141,16 @@ auto getTiledMatmulKernel(int N, int TILE_SIZE) {
     auto &F = KernelHandle.F;
   {
 
-
-
     auto Args = F.getArgs();
     auto &C = std::get<0>(Args);
     auto &A = std::get<1>(Args);
     auto &B = std::get<2>(Args);
+    auto &AsTile = F.declArray<double>(TILE_SIZE * TILE_SIZE, Array::AddressSpace::SHARED);
+    auto &BsTile = F.declArray<double>(TILE_SIZE * TILE_SIZE, Array::AddressSpace::SHARED);
 
     F.beginFunction();
     {
+
         auto Tidx = F.callBuiltin(getThreadIdX);
         auto Bidx = F.callBuiltin(getBlockIdX);
         auto Tidy = F.callBuiltin(getThreadIdY);
@@ -131,21 +163,42 @@ auto getTiledMatmulKernel(int N, int TILE_SIZE) {
         Col = Bidx * TILE_SIZE + Tidx;
 
         auto Idx = F.declVar<int>("Idx");
+        auto K = F.declVar<int>("K");
         auto Zero = F.defRuntimeConst(0);
         auto One = F.defRuntimeConst(1);
         auto Nvar = F.defRuntimeConst(N);
-
+        auto TileSizeConst = F.defRuntimeConst(TILE_SIZE);
         auto accum = F.declVar<double>("accum");
+        accum = 0.0;
 
-        F.LoopNest({F.ForLoop({Idx, Zero, Nvar, One},
+        F.LoopNest({F.ForLoop({Idx, Zero, Nvar, TileSizeConst},
                     [&]() {
-                        auto AIdx = Row * N + Idx;
-                        auto BIdx = Idx * N + Col;
-                        accum += A[AIdx] * B[BIdx];
-                    }).tile(TILE_SIZE)
-        }).emit();
+                        auto aCol = Idx + Tidx;
+                        auto bRow = Idx + Tidy;
+                        auto sIdx = Tidy * TILE_SIZE + Tidx;
+
+                        auto AIdx = Row * N + aCol;
+                        auto BIdx = bRow * N + Col;
+
+                        AsTile[sIdx] = A[AIdx];
+                        BsTile[sIdx] = B[BIdx];
+
+                        F.callBuiltin(builtins::hip::syncThreads);
+
+                        F.LoopNest({
+                        F.ForLoop({K, Zero, TileSizeConst, One},
+                                            [&]() {
+                                                auto aVal = AsTile[Tidy * TILE_SIZE + K];
+                                                auto bVal = BsTile[K * TILE_SIZE + Tidx];
+                                                accum += aVal * bVal;
+                                            })
+                                          }).emit();
+                        F.callBuiltin(builtins::hip::syncThreads);
+                        K= 0;
+                    })})
+          .emit();
         auto CIdx = Row * N + Col;
-        C[CIdx] += accum;
+        C[CIdx] = accum;
 
         F.ret();
     }
@@ -157,28 +210,41 @@ auto getTiledMatmulKernel(int N, int TILE_SIZE) {
 int main() {
   proteus::init();
   constexpr int N = 8192;
-  constexpr int TILE_SIZE = 16;
+  constexpr int TILE_SIZE = 32;
   auto [JitMod, KernelHandle] = getTiledMatmulKernel(N, TILE_SIZE);
 
   JitMod->compile();
 
-  double *A; 
-  double *B; 
-  double *C; 
-  gpuErrCheck(gpuMallocManaged(&A, sizeof(double) * N * N));
-  gpuErrCheck(gpuMallocManaged(&B, sizeof(double) * N * N));
-  gpuErrCheck(gpuMallocManaged(&C, sizeof(double) * N * N));
+  // Host allocations
+  double *A_h = (double *)new double[N * N];
+  double *B_h = (double *)new double[N * N];
+  double *C_h = (double *)new double[N * N];
 
-    // for (int i = 0; i < N; i++) {
-    //   for (int j = 0; j < N; j++) {
-    //     A[i*N+j] = (1.0);
-    //     B[i*N+j] = (1.0);
-    //     C[i*N+j] = 0.0;
-    //   }
-    // }
+  // Device allocations
+  double *A_d; 
+  double *B_d; 
+  double *C_d; 
+  size_t bytes = sizeof(double) * N * N;
+  gpuErrCheck(gpuMalloc((void **)&A_d, bytes));
+  gpuErrCheck(gpuMalloc((void **)&B_d, bytes));
+  gpuErrCheck(gpuMalloc((void **)&C_d, bytes));
 
-  gpuErrCheck(KernelHandle.launch({N / TILE_SIZE, N / TILE_SIZE, 1}, {TILE_SIZE, TILE_SIZE, 1}, 0, nullptr, C, A, B));
-//   hip_tiled_matmul_launch(A, B, C, N);
+    for (int i = 0; i < N; i++) {
+      for (int j = 0; j < N; j++) {
+        A_h[i*N+j] = (1.0);
+        B_h[i*N+j] = (1.0);
+        C_h[i*N+j] = 0.0;
+      }
+    }
+
+  // Stage inputs to device
+  gpuErrCheck(gpuMemcpy(A_d, A_h, bytes, gpuMemcpyHostToDevice));
+  gpuErrCheck(gpuMemcpy(B_d, B_h, bytes, gpuMemcpyHostToDevice));
+  gpuErrCheck(gpuMemcpy(C_d, C_h, bytes, gpuMemcpyHostToDevice));
+
+  gpuErrCheck(KernelHandle.launch({N / TILE_SIZE, N / TILE_SIZE, 1}, {TILE_SIZE, TILE_SIZE, 1}, 0, nullptr, C_d, A_d, B_d));
+  // hip_tiled_matmul_launch(A_d, B_d, C_d, N);
+  // hip_nontiled_matmul_launch(A_d, B_d, C_d, N);
   gpuErrCheck(gpuDeviceSynchronize());
 
   // F(C, A, B);
@@ -188,14 +254,17 @@ int main() {
   double total_ms = 0.0;
   auto start = std::chrono::high_resolution_clock::now();
   for (int t = 0; t < num_trials; ++t) {
-    gpuErrCheck(KernelHandle.launch({N / TILE_SIZE, N / TILE_SIZE, 1}, {TILE_SIZE, TILE_SIZE, 1}, 0, nullptr, C, A, B));
-    // hip_tiled_matmul_launch(A, B, C, N);
+    gpuErrCheck(KernelHandle.launch({N / TILE_SIZE, N / TILE_SIZE, 1}, {TILE_SIZE, TILE_SIZE, 1}, 0, nullptr, C_d, A_d, B_d));
+    // hip_tiled_matmul_launch(A_d, B_d, C_d, N);
+    // hip_nontiled_matmul_launch(A_d, B_d, C_d, N);
   }
   gpuErrCheck(gpuDeviceSynchronize());
 
+
   auto end = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> ms = end - start;
-  total_ms = ms.count() / num_trials;
+  total_ms = ms.count();
+
 
   double avg_ms = total_ms / static_cast<double>(num_trials);
   std::cerr.setf(std::ios::fixed);
@@ -203,12 +272,23 @@ int main() {
   std::cerr << "Average over " << num_trials << " trials: " << avg_ms << " ms"
             << '\n';
 
-  // Print a small subset to avoid excessive output
-//   for (int i = 0; i < N; i++) {
-    // for (int j = 0; j < N; j++) {
-    //   std::cout << C[i*N + j] << (j + 1 == N ? '\n' : ' ');
-    // }
-//   }
+  // Final result back to host after timing loop
+  gpuErrCheck(gpuMemcpy(C_h, C_d, bytes, gpuMemcpyDeviceToHost));
+  for (int i = 0; i < N; i++) {
+    for (int j = 0; j < N; j++) {
+      if(C_h[i*N + j] != N) {
+        std::cout << "C_h[" << i << "][" << j << "] = " << C_h[i*N + j] << '\n';
+      }
+    }
+  }
+
+  // Cleanup device and host memory
+  gpuErrCheck(gpuFree(A_d));
+  gpuErrCheck(gpuFree(B_d));
+  gpuErrCheck(gpuFree(C_d));
+  delete[] A_h;
+  delete[] B_h;
+  delete[] C_h;
 
   proteus::finalize();
   return 0;

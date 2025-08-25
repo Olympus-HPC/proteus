@@ -67,10 +67,16 @@ static Var &cmpOp(const Var &L, const Var &R, IntOp IOp, FPOp FOp) {
 }
 
 Var::Var(AllocaInst *Alloca, FuncBase &Fn, Type *PointerElemType)
-    : Alloca(Alloca), Fn(Fn), PointerElemType(PointerElemType) {}
+    : Storage(StorageKind::AllocaStorage), Alloca(Alloca), PointerValue(nullptr), Fn(Fn), PointerElemType(PointerElemType) {}
+
+Var::Var(Value *PointerValue, FuncBase &Fn, Type *PointerElemType)
+    : Storage(StorageKind::PointerStorage), Alloca(nullptr), PointerValue(PointerValue), Fn(Fn), PointerElemType(PointerElemType) {}
 
 Value *Var::getValue() const {
   auto &IRB = Fn.getIRBuilder();
+  if (Storage == StorageKind::PointerStorage) {
+    return IRB.CreateLoad(PointerElemType, PointerValue);
+  }
   Type *AllocaType = Alloca->getAllocatedType();
   if (AllocaType->isPointerTy()) {
     auto *Ptr = IRB.CreateLoad(AllocaType, Alloca);
@@ -80,6 +86,8 @@ Value *Var::getValue() const {
 }
 
 Type *Var::getValueType() const {
+  if (Storage == StorageKind::PointerStorage)
+    return PointerElemType;
   Type *AllocaType = Alloca->getAllocatedType();
   if (AllocaType->isPointerTy()) {
     return PointerElemType;
@@ -87,9 +95,15 @@ Type *Var::getValueType() const {
   return AllocaType;
 }
 
-StringRef Var::getName() { return Alloca->getName(); }
+StringRef Var::getName() {
+  if (Storage == StorageKind::PointerStorage)
+    return "ptr.var";
+  return Alloca->getName();
+}
 
 bool Var::isPointer() const {
+  if (Storage == StorageKind::PointerStorage)
+    return true;
   Type *AllocaType = Alloca->getAllocatedType();
   if (AllocaType->isPointerTy()) {
     if (!PointerElemType)
@@ -101,6 +115,10 @@ bool Var::isPointer() const {
 
 void Var::storeValue(Value *Val) {
   auto &IRB = Fn.getIRBuilder();
+  if (Storage == StorageKind::PointerStorage) {
+    IRB.CreateStore(Val, PointerValue);
+    return;
+  }
   Type *AllocaType = Alloca->getAllocatedType();
   if (AllocaType->isPointerTy()) {
     auto *Ptr = IRB.CreateLoad(AllocaType, Alloca);
@@ -112,6 +130,10 @@ void Var::storeValue(Value *Val) {
 
 void Var::storePointer(Value *Ptr) {
   auto &IRB = Fn.getIRBuilder();
+  if (Storage == StorageKind::PointerStorage) {
+    PointerValue = Ptr;
+    return;
+  }
   if (!isPointer())
     PROTEUS_FATAL_ERROR("Expected pointer type");
   IRB.CreateStore(Ptr, Alloca);

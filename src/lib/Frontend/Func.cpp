@@ -85,6 +85,36 @@ AllocaInst *FuncBase::emitAlloca(Type *Ty, StringRef Name) {
   return Alloca;
 }
 
+Value *FuncBase::emitArrayCreate(Type *Ty, Array::AddressSpace AT, StringRef Name) {
+  if (!Ty || !Ty->isArrayTy())
+    PROTEUS_FATAL_ERROR("Expected LLVM ArrayType for emitArrayCreate");
+
+  auto *ArrTy = cast<ArrayType>(Ty);
+  Type *ElemTy = ArrTy->getElementType();
+  uint64_t NumElems = ArrTy->getNumElements();
+
+  switch (AT) {
+    case Array::AddressSpace::SHARED:
+    case Array::AddressSpace::GLOBAL: {
+      Module *M = getFunction()->getParent();
+      auto *GV = new GlobalVariable(
+          *M, ArrTy, /*isConstant=*/false, GlobalValue::InternalLinkage,
+          UndefValue::get(ArrTy), Name, /*InsertBefore=*/nullptr,
+          GlobalValue::NotThreadLocal, AT, /*ExternallyInitialized=*/false);
+
+      return GV;
+    }
+    case Array::AddressSpace::LOCAL: {
+      auto *Alloca = emitAlloca(ArrTy, Name);
+      return Alloca;
+    }
+    case Array::AddressSpace::CONSTANT:
+      PROTEUS_FATAL_ERROR("Constant arrays are not supported");
+    default:
+      PROTEUS_FATAL_ERROR("Unsupported Array::AddressSpace");
+    }
+}
+
 void FuncBase::ret(std::optional<std::reference_wrapper<Var>> OptRet) {
   auto *CurBB = IP.getBlock();
   if (!CurBB->getSingleSuccessor())

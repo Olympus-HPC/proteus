@@ -12,6 +12,7 @@
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/Frontend/TypeMap.hpp"
 #include "proteus/Frontend/Var.hpp"
+#include "proteus/Frontend/Array.hpp"
 #include "proteus/Hashing.hpp"
 
 namespace proteus {
@@ -33,6 +34,7 @@ protected:
   std::deque<Var> Arguments;
   std::deque<Var> Variables;
   std::deque<Var> RuntimeConstants;
+  std::deque<Array> Arrays;
   HashT HashValue;
   std::string Name;
 
@@ -72,6 +74,8 @@ public:
 
   AllocaInst *emitAlloca(Type *Ty, StringRef Name);
 
+  Value *emitArrayCreate(Type *Ty, Array::AddressSpace AT, StringRef Name);
+
   IRBuilderBase &getIRBuilder();
 
   Var &declVarInternal(StringRef Name, Type *Ty,
@@ -95,6 +99,13 @@ public:
     VarRef = Val;
 
     return VarRef;
+  }
+
+  template <typename T> Array &declArray(size_t NElem, Array::AddressSpace AT, StringRef Name = "array") {
+    Function *F = getFunction();
+    auto *BasePointer = emitArrayCreate(TypeMap<T>::getArrayType(F->getContext(), NElem), AT, Name);
+    return Arrays.emplace_back(
+        BasePointer, *this, TypeMap<T>::getArrayType(F->getContext(), NElem), AT);
   }
 
   template <typename T>
