@@ -57,19 +57,26 @@ void LoopNestBuilder::emitDimension(std::size_t Dim,
 
   if (IsTiled) {
     // Determine contiguous group of tiled dimensions starting at 'dim'
-    std::size_t GroupEnd = Dim;
+    size_t GroupEnd = Dim;
     while (GroupEnd < NumDims && Loops[GroupEnd].TileSize.has_value()) {
       ++GroupEnd;
     }
 
     // Declare tile vars for the group
     for (std::size_t GroupIdx = Dim; GroupIdx < GroupEnd; ++GroupIdx) {
-      TileIter[GroupIdx] =
-          &Fn.declVar<int>("tile_iter_" + std::to_string(GroupIdx));
-      TileEnd[GroupIdx] =
-          &Fn.declVar<int>("tile_end_" + std::to_string(GroupIdx));
-      TileStep[GroupIdx] =
-          &Fn.declVar<int>("tile_step_" + std::to_string(GroupIdx));
+      auto &LB = Loops[GroupIdx].Bounds;
+
+      auto *IndTy = LB.IterVar.getPointerElemType();
+      if (!IndTy || !IndTy->isIntegerTy()) {
+        PROTEUS_FATAL_ERROR("ForLoop tiling requires integral induction type");
+      }
+
+      TileIter[GroupIdx] = &Fn.declVarInternal(
+          "tile_iter_" + std::to_string(GroupIdx), IndTy, IndTy);
+      TileEnd[GroupIdx] = &Fn.declVarInternal(
+          "tile_end_" + std::to_string(GroupIdx), IndTy, IndTy);
+      TileStep[GroupIdx] = &Fn.declVarInternal(
+          "tile_step_" + std::to_string(GroupIdx), IndTy, IndTy);
       (*TileStep[GroupIdx]) = Loops[GroupIdx].TileSize.value();
     }
 
@@ -121,7 +128,10 @@ void LoopNestBuilder::emitInnerLoops(std::size_t ElemIdx, std::size_t GroupEnd,
   }
 
   auto &LoopE = Loops[ElemIdx];
-  (*TileEnd[ElemIdx]) = (*TileIter[ElemIdx]) + (*TileStep[ElemIdx]);
+  // Clamp the tile end to the loop upper bound to handle partial tiles
+  auto &EndCandidate = (*TileIter[ElemIdx]) + (*TileStep[ElemIdx]);
+  auto &ClampedEnd = min(EndCandidate, LoopE.Bounds.UpperBound);
+  (*TileEnd[ElemIdx]) = ClampedEnd;
   Fn.beginFor(LoopE.Bounds.IterVar, *TileIter[ElemIdx], *TileEnd[ElemIdx],
               LoopE.Bounds.Inc);
   {
