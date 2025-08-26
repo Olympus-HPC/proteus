@@ -171,7 +171,7 @@ auto getTiledMatmulKernel(int N, int TILE_SIZE) {
         auto accum = F.declVar<double>("accum");
         accum = 0.0;
 
-        F.LoopNest({F.ForLoop({Idx, Zero, Nvar, TileSizeConst},
+        F.ForLoop({Idx, Zero, Nvar, TileSizeConst},
                     [&]() {
                         auto aCol = Idx + Tidx;
                         auto bRow = Idx + Tidy;
@@ -185,18 +185,15 @@ auto getTiledMatmulKernel(int N, int TILE_SIZE) {
 
                         F.callBuiltin(builtins::hip::syncThreads);
 
-                        F.LoopNest({
                         F.ForLoop({K, Zero, TileSizeConst, One},
                                             [&]() {
                                                 auto aVal = AsTile[Tidy * TILE_SIZE + K];
                                                 auto bVal = BsTile[K * TILE_SIZE + Tidx];
                                                 accum += aVal * bVal;
-                                            })
-                                          }).emit();
+                                            }).emit();
                         F.callBuiltin(builtins::hip::syncThreads);
                         K= 0;
-                    })})
-          .emit();
+                    }).emit();
         auto CIdx = Row * N + Col;
         C[CIdx] = accum;
 
