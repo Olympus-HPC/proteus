@@ -213,7 +213,7 @@ public:
     return ObjectModule->getMemBufferRef();
   }
 
-  const Dispatcher &getDispatcher() const { return Dispatch; }
+  Dispatcher &getDispatcher() const { return Dispatch; }
 
   TargetModelType getTargetModel() const { return TargetModel; }
 
@@ -249,11 +249,22 @@ RetT Func<RetT, ArgT...>::operator()(ArgT... Args) {
   if (!J.isCompiled())
     J.compile();
 
+  if (!CompiledFunc) {
+    CompiledFunc = reinterpret_cast<decltype(CompiledFunc)>(
+        J.getDispatcher().getFunctionAddress(getName(),
+                                             J.getObjectModuleRef()));
+  }
+
   if (J.getTargetModel() != TargetModelType::HOST)
     PROTEUS_FATAL_ERROR(
         "Target is a GPU model, cannot directly run functions, use launch()");
 
-  return Dispatch.run<RetT>(getName(), J.getObjectModuleRef(), Args...);
+  if constexpr (std::is_void_v<RetT>)
+    Dispatch.run<RetT(ArgT...)>(reinterpret_cast<void *>(CompiledFunc),
+                                Args...);
+  else
+    return Dispatch.run<RetT(ArgT...)>(reinterpret_cast<void *>(CompiledFunc),
+                                       Args...);
 }
 
 } // namespace proteus

@@ -33,8 +33,10 @@ int main() {
 
   int V = 42;
   CppJitModule CJM{"host", Code};
-  CJM.run<void>("foo_byval", V);
-  CJM.run<void(int &)>("foo_byref", V);
+  auto FooByVal = CJM.getFunction<void(int)>("foo_byval");
+  auto FooByRef = CJM.getFunction<void(int &)>("foo_byref");
+  FooByVal.run(V);
+  FooByRef.run(V);
 
   std::cout << "main V " << V << "\n";
 

@@ -12,7 +12,8 @@ int main() {
 })cpp";
 
   CppJitModule CJM{"host", Code, {"-fplugin=./libClangPlugin.so"}};
-  CJM.run<void>("foo");
+  auto Foo = CJM.getFunction<void()>("foo");
+  Foo.run();
 
   return 0;
 }

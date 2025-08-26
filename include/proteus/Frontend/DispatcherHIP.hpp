@@ -32,22 +32,6 @@ public:
     return StorageCache.lookup(ModuleHash);
   }
 
-  DispatchResult launch(StringRef KernelName, LaunchDims GridDim,
-                        LaunchDims BlockDim, ArrayRef<void *> KernelArgs,
-                        uint64_t ShmemSize, void *Stream,
-                        std::optional<MemoryBufferRef> ObjectModule) override {
-    auto *KernelFunc = getFunctionAddress(KernelName, ObjectModule);
-
-    dim3 HipGridDim = {GridDim.X, GridDim.Y, GridDim.Z};
-    dim3 HipBlockDim = {BlockDim.X, BlockDim.Y, BlockDim.Z};
-    hipStream_t HipStream = reinterpret_cast<hipStream_t>(Stream);
-
-    void **KernelArgsPtrs = const_cast<void **>(KernelArgs.data());
-    return proteus::launchKernelFunction(
-        reinterpret_cast<hipFunction_t>(KernelFunc), HipGridDim, HipBlockDim,
-        KernelArgsPtrs, ShmemSize, HipStream);
-  }
-
   DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
                         LaunchDims BlockDim, ArrayRef<void *> KernelArgs,
                         uint64_t ShmemSize, void *Stream) override {

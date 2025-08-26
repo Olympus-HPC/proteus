@@ -33,7 +33,8 @@ int main() {
    )cpp";
 
   CppJitModule CJM{TARGET, Code};
-  CJM.launch("foo", {1, 1, 1}, {1, 1, 1}, 0, nullptr, 42);
+  auto Kernel = CJM.getKernel<void(int)>("foo");
+  Kernel.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, 42);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 

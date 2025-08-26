@@ -29,12 +29,6 @@ public:
     return nullptr;
   }
 
-  DispatchResult launch(StringRef, LaunchDims, LaunchDims, ArrayRef<void *>,
-                        uint64_t, void *,
-                        std::optional<MemoryBufferRef>) override {
-    PROTEUS_FATAL_ERROR("Host does not support launch");
-  }
-
   DispatchResult launch(void *, LaunchDims, LaunchDims, ArrayRef<void *>,
                         uint64_t, void *) override {
     PROTEUS_FATAL_ERROR("Host does not support launch");

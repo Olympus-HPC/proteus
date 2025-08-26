@@ -18,6 +18,44 @@ private:
   std::unique_ptr<MemoryBuffer> ObjectModule;
   bool IsCompiled = false;
 
+  template <typename Sig> struct FunctionHandle;
+  template <typename RetT, typename... ArgT>
+  struct FunctionHandle<RetT(ArgT...)> {
+    CppJitModule &M;
+    void *FuncPtr;
+    explicit FunctionHandle(CppJitModule &M, void *FuncPtr)
+        : M(M), FuncPtr(FuncPtr) {}
+
+    RetT run(ArgT... Args) {
+      if constexpr (std::is_void_v<RetT>) {
+        M.Dispatch.template run<RetT(ArgT...)>(FuncPtr,
+                                               std::forward<ArgT>(Args)...);
+      } else {
+        return M.Dispatch.template run<RetT(ArgT...)>(
+            FuncPtr, std::forward<ArgT>(Args)...);
+      }
+    }
+  };
+
+  template <typename Sig> struct KernelHandle;
+  template <typename RetT, typename... ArgT>
+  struct KernelHandle<RetT(ArgT...)> {
+    CppJitModule &M;
+    void *FuncPtr = nullptr;
+    explicit KernelHandle(CppJitModule &M, void *FuncPtr)
+        : M(M), FuncPtr(FuncPtr) {
+      static_assert(std::is_void_v<RetT>, "Kernel function must return void");
+    }
+
+    auto launch(LaunchDims GridDim, LaunchDims BlockDim, uint64_t ShmemSize,
+                void *Stream, ArgT... Args) {
+      void *Ptrs[sizeof...(ArgT)] = {(void *)&Args...};
+
+      return M.Dispatch.launch(FuncPtr, GridDim, BlockDim, Ptrs, ShmemSize,
+                               Stream);
+    }
+  };
+
   // TODO: We don't cache CodeInstances so if a user re-creates the exact same
   // instantiation it will create a new CodeInstance. This creation cost is
   // mitigated because the dispatcher caches the compiled object so we will pay
@@ -32,6 +70,7 @@ private:
     std::string InstanceName;
     std::unique_ptr<CppJitModule> InstanceModule;
     std::string EntryFuncName;
+    void *FuncPtr = nullptr;
 
     CodeInstance(TargetModelType TargetModel, StringRef TemplateCode,
                  StringRef InstanceName)
@@ -125,37 +164,43 @@ private:
       return InstanceCode;
     }
 
+    template <typename RetT, typename... ArgT> void compile() {
+      std::string InstanceCode = buildCode<RetT, ArgT...>();
+      InstanceModule =
+          std::make_unique<CppJitModule>(TargetModel, InstanceCode);
+      InstanceModule->compile();
+
+      FuncPtr = InstanceModule->Dispatch.getFunctionAddress(
+          EntryFuncName, InstanceModule->getObjectModuleRef());
+    }
+
     template <typename... ArgT>
     auto launch(LaunchDims GridDim, LaunchDims BlockDim, uint64_t ShmemSize,
                 void *Stream, ArgT... Args) {
       if (!InstanceModule) {
-        std::string InstanceCode = buildCode<void, ArgT...>();
-        InstanceModule =
-            std::make_unique<CppJitModule>(TargetModel, InstanceCode);
-        InstanceModule->compile();
+        compile<void, ArgT...>();
       }
 
       void *Ptrs[sizeof...(ArgT)] = {(void *)&Args...};
 
-      return InstanceModule->Dispatch.launch(
-          EntryFuncName, GridDim, BlockDim, Ptrs, ShmemSize, Stream,
-          InstanceModule->getObjectModuleRef());
+      return InstanceModule->Dispatch.launch(FuncPtr, GridDim, BlockDim, Ptrs,
+                                             ShmemSize, Stream);
     }
 
-    template <typename RetOrSig, typename... ArgT> auto run(ArgT &&...Args) {
+    template <typename RetOrSig, typename... ArgT>
+    RetOrSig run(ArgT &&...Args) {
       static_assert(!std::is_function_v<RetOrSig>,
                     "Function signature type is not yet supported");
 
       if (!InstanceModule) {
-        std::string InstanceCode = buildCode<RetOrSig, ArgT...>();
-        InstanceModule =
-            std::make_unique<CppJitModule>(TargetModel, InstanceCode);
-        InstanceModule->compile();
+        compile<RetOrSig, ArgT...>();
       }
 
-      return InstanceModule->Dispatch.run<RetOrSig, ArgT...>(
-          EntryFuncName, InstanceModule->getObjectModuleRef(),
-          std::forward<ArgT>(Args)...);
+      if constexpr (std::is_void_v<RetOrSig>)
+        InstanceModule->Dispatch.run<RetOrSig(ArgT...)>(FuncPtr, Args...);
+      else
+        return InstanceModule->Dispatch.run<RetOrSig(ArgT...)>(FuncPtr,
+                                                               Args...);
     }
   };
 
@@ -183,33 +228,6 @@ public:
     return ObjectModule->getMemBufferRef();
   }
 
-  template <typename RetOrSig, typename... ArgT>
-  auto run(const char *FuncName, ArgT &&...Args) {
-    if (!IsCompiled)
-      compile();
-
-    // TODO: We could cache the function address if we have a stateful object to
-    // store and return to the user for invocations, similar to DSL
-    // KernelHandle.
-    return Dispatch.run<RetOrSig, ArgT...>(FuncName, getObjectModuleRef(),
-                                           std::forward<ArgT>(Args)...);
-  }
-
-  template <typename... ArgT>
-  auto launch(StringRef KernelName, LaunchDims GridDim, LaunchDims BlockDim,
-              uint64_t ShmemSize, void *Stream, ArgT... Args) {
-    if (!IsCompiled)
-      compile();
-
-    void *Ptrs[sizeof...(ArgT)] = {(void *)&Args...};
-
-    // TODO: We could cache the function address if we have a stateful object to
-    // store and return to the user for invocations, similar to DSL
-    // KernelHandle.
-    return Dispatch.launch(KernelName, GridDim, BlockDim, Ptrs, ShmemSize,
-                           Stream, getObjectModuleRef());
-  }
-
   template <typename... ArgT>
   auto instantiate([[maybe_unused]] StringRef FuncName,
                    [[maybe_unused]] ArgT... Args) {
@@ -223,6 +241,30 @@ public:
     InstanceName += ">";
 
     return CodeInstance{TargetModel, Code, InstanceName};
+  }
+
+  template <typename Sig> FunctionHandle<Sig> getFunction(StringRef Name) {
+    if (!IsCompiled)
+      compile();
+
+    if (TargetModel != TargetModelType::HOST)
+      PROTEUS_FATAL_ERROR("Error: getFunction() applies only to host modules");
+
+    void *FuncPtr = Dispatch.getFunctionAddress(Name, getObjectModuleRef());
+
+    return FunctionHandle<Sig>(*this, FuncPtr);
+  }
+
+  template <typename Sig> KernelHandle<Sig> getKernel(StringRef Name) {
+    if (!IsCompiled)
+      compile();
+
+    if (TargetModel == TargetModelType::HOST)
+      PROTEUS_FATAL_ERROR("Error: getKernel() applies only to device modules");
+
+    void *FuncPtr = Dispatch.getFunctionAddress(Name, getObjectModuleRef());
+
+    return KernelHandle<Sig>(*this, FuncPtr);
   }
 };
 

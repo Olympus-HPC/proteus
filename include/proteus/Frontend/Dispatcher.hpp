@@ -18,6 +18,13 @@ struct LaunchDims {
 
 namespace proteus {
 
+template <typename T> struct sig_traits;
+
+template <typename R, typename... Args> struct sig_traits<R(Args...)> {
+  using return_type = R;
+  using argument_types = std::tuple<Args...>;
+};
+
 using namespace llvm;
 
 // in Dispatcher.hpp (or a new Errors.hpp)
@@ -57,11 +64,6 @@ public:
   virtual std::unique_ptr<MemoryBuffer>
   lookupObjectModule(HashT ModuleHash) = 0;
 
-  virtual DispatchResult
-  launch(StringRef KernelName, LaunchDims GridDim, LaunchDims BlockDim,
-         ArrayRef<void *> KernelArgs, uint64_t ShmemSize, void *Stream,
-         std::optional<MemoryBufferRef> ObjectModule) = 0;
-
   virtual DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
                                 LaunchDims BlockDim,
                                 ArrayRef<void *> KernelArgs, uint64_t ShmemSize,
@@ -69,36 +71,20 @@ public:
 
   virtual StringRef getTargetArch() const = 0;
 
-  // Accepts both a return type or a function signature (needed for C++
-  // reference arguments) and disambiguates at compile time.
-  template <typename RetOrSig, typename... ArgT>
-  auto run(StringRef FuncName, std::optional<MemoryBufferRef> ObjectModule,
-           ArgT &&...Args) {
+  template <typename Sig, typename... ArgT>
+  typename sig_traits<Sig>::return_type run(void *FuncPtr, ArgT &&...Args) {
     if (TargetModel != TargetModelType::HOST)
       PROTEUS_FATAL_ERROR(
           "Dispatcher run interface is only supported for host");
 
-    void *Addr = getFunctionAddress(FuncName, ObjectModule);
+    auto Fn = reinterpret_cast<Sig *>(FuncPtr);
+    using Ret = typename sig_traits<Sig>::return_type;
 
-    if constexpr (std::is_function_v<RetOrSig>) {
-      auto Fn = reinterpret_cast<RetOrSig *>(Addr);
-      using Ret = std::invoke_result_t<RetOrSig, ArgT...>;
-
-      if constexpr (std::is_void_v<Ret>) {
-        Fn(std::forward<ArgT>(Args)...);
-        return;
-      } else
-        return Fn(std::forward<ArgT>(Args)...);
-    } else {
-      using FnPtr = RetOrSig (*)(std::decay_t<ArgT>...);
-      auto Fn = reinterpret_cast<FnPtr>(Addr);
-
-      if constexpr (std::is_void_v<RetOrSig>) {
-        Fn(std::forward<ArgT>(Args)...);
-        return;
-      } else
-        return Fn(std::forward<ArgT>(Args)...);
-    }
+    if constexpr (std::is_void_v<Ret>) {
+      Fn(std::forward<ArgT>(Args)...);
+      return;
+    } else
+      return Fn(std::forward<ArgT>(Args)...);
   }
 
   virtual void *

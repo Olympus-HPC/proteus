@@ -15,8 +15,9 @@ int main() {
     }
   )cpp";
 
-  CppJitModule CJM("host", CPUCode);
-  CJM.run<void>("foo");
+  CppJitModule CJM{"host", CPUCode};
+  auto Foo = CJM.getFunction<void()>("foo");
+  Foo.run();
 
   const char *GPUCode = R"cpp(
     #include <hip/hip_runtime.h>
@@ -27,7 +28,8 @@ int main() {
   )cpp";
 
   CppJitModule CJMGPU{"hip", GPUCode};
-  CJMGPU.launch("foo", {1, 1, 1}, {1, 1, 1}, 0, nullptr);
+  auto FooKernel = CJMGPU.getKernel<void()>("foo");
+  FooKernel.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr);
   if (hipDeviceSynchronize() != HIP_SUCCESS)
     throw std::runtime_error("hipDeviceSynchronize failed");
 
