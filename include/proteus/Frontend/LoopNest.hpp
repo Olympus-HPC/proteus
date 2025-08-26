@@ -25,12 +25,16 @@ public:
   LoopBoundsDescription Bounds;
   std::optional<int> TileSize;
   std::optional<std::function<void()>> Body;
+  FuncBase &Fn;
 
-  explicit ForLoopBuilder(LoopBoundsDescription Bounds);
+  ForLoopBuilder(LoopBoundsDescription Bounds, FuncBase &Fn);
 
-  ForLoopBuilder(LoopBoundsDescription Bounds, std::function<void()> Body);
+  ForLoopBuilder(LoopBoundsDescription Bounds, std::function<void()> Body,
+                 FuncBase &Fn);
 
   ForLoopBuilder &tile(int Tile);
+
+  void emit();
 };
 
 class LoopNestBuilder {

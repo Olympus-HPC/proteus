@@ -259,12 +259,12 @@ void FuncBase::endFor() {
 }
 
 ForLoopBuilder FuncBase::ForLoop(LoopBoundsDescription Bounds) {
-  return ForLoopBuilder(std::move(Bounds));
+  return ForLoopBuilder(std::move(Bounds), *this);
 }
 
 ForLoopBuilder FuncBase::ForLoop(LoopBoundsDescription Bounds,
                                         std::function<void()> Body) {
-  return ForLoopBuilder(std::move(Bounds), std::move(Body));
+  return ForLoopBuilder(std::move(Bounds), std::move(Body), *this);
 }
 
 LoopNestBuilder FuncBase::LoopNest(std::vector<ForLoopBuilder> Loops) {
