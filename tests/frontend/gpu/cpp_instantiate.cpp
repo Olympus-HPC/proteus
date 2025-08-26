@@ -77,9 +77,9 @@ int main() {
 // CHECK: Ret 24
 // CHECK: bar type double
 // CHECK: bar type float
-// CHECK: JitCache hits 1 total 4
+// CHECK: JitCache hits 0 total 3
 // CHECK-DAG: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-DAG: HashValue {{[0-9]+}} NumExecs 2 NumHits 1
+// CHECK-DAG: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-DAG: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: JitStorageCache hits 0 total 3
 // CHECK-SECOND: JitStorageCache hits 3 total 3

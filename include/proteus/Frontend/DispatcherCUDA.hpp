@@ -40,22 +40,6 @@ public:
     return StorageCache.lookup(ModuleHash);
   }
 
-  DispatchResult launch(StringRef KernelName, LaunchDims GridDim,
-                        LaunchDims BlockDim, ArrayRef<void *> KernelArgs,
-                        uint64_t ShmemSize, void *Stream,
-                        std::optional<MemoryBufferRef> ObjectModule) override {
-    auto *KernelFunc = getFunctionAddress(KernelName, ObjectModule);
-
-    dim3 CudaGridDim = {GridDim.X, GridDim.Y, GridDim.Z};
-    dim3 CudaBlockDim = {BlockDim.X, BlockDim.Y, BlockDim.Z};
-    cudaStream_t CudaStream = reinterpret_cast<cudaStream_t>(Stream);
-
-    void **KernelArgsPtrs = const_cast<void **>(KernelArgs.data());
-    return proteus::launchKernelFunction(
-        reinterpret_cast<cudaFunction_t>(KernelFunc), CudaGridDim, CudaBlockDim,
-        KernelArgsPtrs, ShmemSize, CudaStream);
-  }
-
   DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
                         LaunchDims BlockDim, ArrayRef<void *> KernelArgs,
                         uint64_t ShmemSize, void *Stream) override {

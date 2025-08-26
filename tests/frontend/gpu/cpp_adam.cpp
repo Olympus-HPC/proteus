@@ -135,14 +135,16 @@ int main(int argc, char *argv[]) {
 
   std::cout << "Compiling JIT module\n";
   CJM.compile();
+  using AdamSig = void(float *, float *, float *, const float *, float, float,
+                       float, float, float, int, size_t, adamMode_t, float);
+  auto Kernel = CJM.getKernel<AdamSig>("adam");
 
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    CJM.launch("adam", {grids.x, grids.y, grids.z},
-               {blocks.x, blocks.y, blocks.z}, 0, nullptr, d_p, d_m, d_v, d_g,
-               beta1, beta2, eps, grad_scale, step_size, time_step, vector_size,
-               mode, decay);
+    Kernel.launch({grids.x, grids.y, grids.z}, {blocks.x, blocks.y, blocks.z},
+                  0, nullptr, d_p, d_m, d_v, d_g, beta1, beta2, eps, grad_scale,
+                  step_size, time_step, vector_size, mode, decay);
   }
 
   gpuErrCheck(gpuDeviceSynchronize());
@@ -190,16 +192,16 @@ int main(int argc, char *argv[]) {
 // CHECK-NEXT: p[1] = -0.596034
 // CHECK-NEXT: p[2] = -0.592634
 // CHECK-NEXT: p[3] = -0.588147
-// CUDA and HIP different in the 6th digit.
+// CUDA and HIP differ in the 6th digit.
 // CHECK-NEXT: p[4] = -0.59345{{[3|4]}}
 // CHECK-NEXT: p[5] = -0.591988
-// CUDA and HIP different in the 6th digit.
+// CUDA and HIP differ in the 6th digit.
 // CHECK-NEXT: p[6] = -0.57349{{[3|4]}}
 // CHECK-NEXT: p[7] = -0.599885
 // CHECK-NEXT: p[8] = -0.581569
 // CHECK-NEXT: p[9] = -0.59016
-// CHECK: JitCache hits 99 total 100
-// CHECK: HashValue {{[0-9]+}} NumExecs 100 NumHits 99
+// CHECK: JitCache hits 0 total 1
+// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: JitStorageCache hits 0 total 1
 // CHECK-SECOND: JitStorageCache hits 1 total 1
 
