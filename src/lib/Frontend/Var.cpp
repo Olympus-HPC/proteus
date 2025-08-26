@@ -693,6 +693,40 @@ Var &sqrtf(const Var &R) {
   return ResultVar;
 }
 
+Var &min(const Var &L, const Var &R) {
+  FuncBase &Fn = L.Fn;
+  if (&Fn != &R.Fn)
+    PROTEUS_FATAL_ERROR("Variables should belong to the same function");
+
+  Function *F = Fn.getFunction();
+  auto &DL = F->getParent()->getDataLayout();
+  auto &IRB = Fn.getIRBuilder();
+
+  Type *LHSType = L.getValueType();
+  Type *RHSType = R.getValueType();
+  Type *CommonType = getCommonType(DL, LHSType, RHSType);
+
+  Var &ResultVar = Fn.declVarInternal("res.", CommonType);
+
+  Value *LHS = convert(IRB, L.getValue(), CommonType);
+  Value *RHS = convert(IRB, R.getValue(), CommonType);
+
+  Value *Cmp = nullptr;
+  if (CommonType->isIntegerTy()) {
+    // TODO: fix for unsigned.
+    Cmp = IRB.CreateICmpSLE(LHS, RHS);
+  } else if (CommonType->isFloatingPointTy()) {
+    Cmp = IRB.CreateFCmpOLE(LHS, RHS);
+  } else {
+    PROTEUS_FATAL_ERROR("Unsupported type");
+  }
+
+  Value *Selected = IRB.CreateSelect(Cmp, LHS, RHS);
+  ResultVar.storeValue(Selected);
+
+  return ResultVar;
+}
+
 // Assignment explicit instantiations.
 template Var &Var::operator= <int>(const int &);
 template Var &Var::operator= <unsigned int>(const unsigned int &);
