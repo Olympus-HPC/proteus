@@ -66,7 +66,7 @@ void LoopNestBuilder::emitDimension(std::size_t Dim,
     for (std::size_t GroupIdx = Dim; GroupIdx < GroupEnd; ++GroupIdx) {
       auto &LB = Loops[GroupIdx].Bounds;
 
-      auto *IndTy = LB.IterVar.getPointerElemType();
+      auto *IndTy = LB.IterVar.getValueType();
       if (!IndTy || !IndTy->isIntegerTy()) {
         PROTEUS_FATAL_ERROR("ForLoop tiling requires integral induction type");
       }
