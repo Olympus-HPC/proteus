@@ -85,7 +85,8 @@ AllocaInst *FuncBase::emitAlloca(Type *Ty, StringRef Name) {
   return Alloca;
 }
 
-Value *FuncBase::emitArrayCreate(Type *Ty, Array::AddressSpace AT, StringRef Name) {
+Value *FuncBase::emitArrayCreate(Type *Ty, Array::AddressSpace AT,
+                                 StringRef Name) {
   if (!Ty || !Ty->isArrayTy())
     PROTEUS_FATAL_ERROR("Expected LLVM ArrayType for emitArrayCreate");
 
@@ -124,7 +125,7 @@ void FuncBase::ret(std::optional<std::reference_wrapper<Var>> OptRet) {
   if (OptRet == std::nullopt) {
     IRB.CreateRetVoid();
   } else {
-    auto *RetAlloca = OptRet->get().Alloca;
+    auto *RetAlloca = OptRet->get().getAlloca();
     auto *Ret = IRB.CreateLoad(RetAlloca->getAllocatedType(), RetAlloca);
     IRB.CreateRet(Ret);
   }
@@ -151,8 +152,8 @@ void FuncBase::beginIf(Var &CondVar, const char *File, int Line) {
   CurBlock->getTerminator()->eraseFromParent();
   IRB.SetInsertPoint(CurBlock);
   {
-    Value *Cond =
-        IRB.CreateLoad(CondVar.Alloca->getAllocatedType(), CondVar.Alloca);
+    Value *Cond = IRB.CreateLoad(CondVar.getAlloca()->getAllocatedType(),
+                                 CondVar.getAlloca());
     IRB.CreateCondBr(Cond, ThenBlock, ExitBlock);
   }
 
@@ -219,8 +220,8 @@ void FuncBase::beginFor(Var &IterVar, Var &Init, Var &UpperBound, Var &Inc,
   IRB.SetInsertPoint(LoopCond);
   {
     auto &CondVar = IterVar < UpperBound;
-    Value *Cond =
-        IRB.CreateLoad(CondVar.Alloca->getAllocatedType(), CondVar.Alloca);
+    Value *Cond = IRB.CreateLoad(CondVar.getAlloca()->getAllocatedType(),
+                                 CondVar.getAlloca());
     IRB.CreateCondBr(Cond, Body, LoopExit);
   }
 

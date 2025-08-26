@@ -9,7 +9,7 @@ Array::Array(Value *BasePointer, FuncBase &Fn, Type *ArrayType, AddressSpace AT)
 Var Array::operator[](size_t Index) {
   auto &IRB = Fn.getIRBuilder();
   auto *GEP = IRB.CreateConstInBoundsGEP2_64(ArrayType, BasePointer, 0, Index);
-  return Var(GEP, Fn, ArrayType->getArrayElementType());
+  return Var::fromBorrowed(GEP, Fn, ArrayType->getArrayElementType());
 }
 
 Var Array::operator[](const Var &Index) {
@@ -19,7 +19,7 @@ Var Array::operator[](const Var &Index) {
     PROTEUS_FATAL_ERROR("Expected integer index for array GEP");
   Value *Zero = llvm::ConstantInt::get(Idx->getType(), 0);
   auto *GEP = IRB.CreateInBoundsGEP(ArrayType, BasePointer, {Zero, Idx});
-  return Var(GEP, Fn, ArrayType->getArrayElementType());
+  return Var::fromBorrowed(GEP, Fn, ArrayType->getArrayElementType());
 }
 } // namespace proteus
 

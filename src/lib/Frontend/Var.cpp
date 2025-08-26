@@ -1,4 +1,7 @@
-#include "proteus/JitFrontend.hpp"
+#include "proteus/Error.h"
+#include "proteus/Frontend/Func.hpp"
+#include "proteus/Frontend/TypeMap.hpp"
+#include "proteus/Frontend/Var.hpp"
 
 namespace proteus {
 
@@ -66,17 +69,7 @@ static Var &cmpOp(const Var &L, const Var &R, IntOp IOp, FPOp FOp) {
   return ResultVar;
 }
 
-Var::Var(AllocaInst *Alloca, FuncBase &Fn, Type *PointerElemType)
-    : Storage(StorageKind::AllocaStorage), Alloca(Alloca), PointerValue(nullptr), Fn(Fn), PointerElemType(PointerElemType) {}
-
-Var::Var(Value *PointerValue, FuncBase &Fn, Type *PointerElemType)
-    : Storage(StorageKind::PointerStorage), Alloca(nullptr), PointerValue(PointerValue), Fn(Fn), PointerElemType(PointerElemType) {}
-
-Value *Var::getValue() const {
-  auto &IRB = Fn.getIRBuilder();
-  if (Storage == StorageKind::PointerStorage) {
-    return IRB.CreateLoad(PointerElemType, PointerValue);
-  }
+Value *AllocaStorage::getValue(IRBuilderBase &IRB) const {
   Type *AllocaType = Alloca->getAllocatedType();
   if (AllocaType->isPointerTy()) {
     auto *Ptr = IRB.CreateLoad(AllocaType, Alloca);
@@ -85,9 +78,7 @@ Value *Var::getValue() const {
   return IRB.CreateLoad(AllocaType, Alloca);
 }
 
-Type *Var::getValueType() const {
-  if (Storage == StorageKind::PointerStorage)
-    return PointerElemType;
+Type *AllocaStorage::getValueType() const {
   Type *AllocaType = Alloca->getAllocatedType();
   if (AllocaType->isPointerTy()) {
     return PointerElemType;
@@ -95,30 +86,9 @@ Type *Var::getValueType() const {
   return AllocaType;
 }
 
-StringRef Var::getName() {
-  if (Storage == StorageKind::PointerStorage)
-    return "ptr.var";
-  return Alloca->getName();
-}
+StringRef AllocaStorage::getName() const { return Alloca->getName(); }
 
-bool Var::isPointer() const {
-  if (Storage == StorageKind::PointerStorage)
-    return true;
-  Type *AllocaType = Alloca->getAllocatedType();
-  if (AllocaType->isPointerTy()) {
-    if (!PointerElemType)
-      PROTEUS_FATAL_ERROR("Expected pointer type");
-    return true;
-  }
-  return false;
-}
-
-void Var::storeValue(Value *Val) {
-  auto &IRB = Fn.getIRBuilder();
-  if (Storage == StorageKind::PointerStorage) {
-    IRB.CreateStore(Val, PointerValue);
-    return;
-  }
+void AllocaStorage::storeValue(IRBuilderBase &IRB, Value *Val) {
   Type *AllocaType = Alloca->getAllocatedType();
   if (AllocaType->isPointerTy()) {
     auto *Ptr = IRB.CreateLoad(AllocaType, Alloca);
@@ -128,15 +98,98 @@ void Var::storeValue(Value *Val) {
   }
 }
 
-void Var::storePointer(Value *Ptr) {
-  auto &IRB = Fn.getIRBuilder();
-  if (Storage == StorageKind::PointerStorage) {
-    PointerValue = Ptr;
-    return;
-  }
+void AllocaStorage::storePointer(IRBuilderBase &IRB, Value *Ptr) {
   if (!isPointer())
     PROTEUS_FATAL_ERROR("Expected pointer type");
   IRB.CreateStore(Ptr, Alloca);
+}
+
+bool AllocaStorage::isPointer() const {
+  Type *AllocaType = Alloca->getAllocatedType();
+  if (AllocaType->isPointerTy()) {
+    if (!PointerElemType)
+      PROTEUS_FATAL_ERROR("Expected pointer type");
+    return true;
+  }
+  return false;
+}
+
+Value *BorrowedStorage::getValue(IRBuilderBase &IRB) const {
+  return IRB.CreateLoad(PointerElemType, PointerValue);
+}
+
+Type *BorrowedStorage::getValueType() const { return PointerElemType; }
+
+StringRef BorrowedStorage::getName() const { return PointerValue->getName(); }
+
+void BorrowedStorage::storeValue(IRBuilderBase &IRB, Value *Val) {
+  IRB.CreateStore(Val, PointerValue);
+}
+
+void BorrowedStorage::storePointer(IRBuilderBase &IRB, Value *Ptr) {
+  IRB.CreateStore(Ptr, PointerValue);
+}
+
+bool BorrowedStorage::isPointer() const { return true; }
+
+Var::Var(AllocaInst *Alloca, FuncBase &Fn, Type *PointerElemType)
+    : Storage(AllocaStorage{Alloca, PointerElemType}), Fn(Fn) {}
+
+Var::Var(Value *PointerValue, FuncBase &Fn, Type *PointerElemType)
+    : Storage(BorrowedStorage{PointerValue, PointerElemType}), Fn(Fn) {}
+
+Var Var::fromBorrowed(Value *PointerValue, FuncBase &Fn, Type *PointerElemType) {
+  return Var(PointerValue, Fn, PointerElemType);
+}
+
+Value *Var::getValue() const {
+  auto &IRB = Fn.getIRBuilder();
+  return std::visit([&](const auto &Storage) { return Storage.getValue(IRB); },
+                    Storage);
+}
+
+Type *Var::getValueType() const {
+  return std::visit([](const auto &Storage) { return Storage.getValueType(); },
+                    Storage);
+}
+
+StringRef Var::getName() {
+  return std::visit([](const auto &Storage) { return Storage.getName(); },
+                    Storage);
+}
+
+bool Var::isPointer() const {
+  return std::visit([](const auto &Storage) { return Storage.isPointer(); },
+                    Storage);
+}
+
+void Var::storeValue(Value *Val) {
+  auto &IRB = Fn.getIRBuilder();
+  std::visit([&](auto &Storage) { Storage.storeValue(IRB, Val); }, Storage);
+}
+
+void Var::storePointer(Value *Ptr) {
+  auto &IRB = Fn.getIRBuilder();
+  std::visit([&](auto &Storage) { Storage.storePointer(IRB, Ptr); }, Storage);
+}
+
+AllocaInst *Var::getAlloca() const {
+  return std::visit(
+      [](const auto &Storage) -> AllocaInst * {
+        if constexpr (std::is_same_v<std::decay_t<decltype(Storage)>,
+                                     AllocaStorage>) {
+          return Storage.Alloca;
+        } else {
+          PROTEUS_FATAL_ERROR("Expected AllocaStorage for getAlloca()");
+        }
+      },
+      Storage);
+}
+
+Type *Var::getPointerElemType() const {
+  return std::visit(
+      [](const auto &Storage) { return Storage.PointerElemType; },
+      Storage);
 }
 
 Var &Var::operator+(const Var &Other) const {
@@ -449,14 +502,26 @@ Var &Var::operator[](size_t I) {
   if (!isPointer())
     PROTEUS_FATAL_ERROR("Expected pointer type: Var " + getName());
 
-  auto &ResultVar = Fn.declVarInternal("res.", PointerElemType->getPointerTo(),
-                                       PointerElemType);
-  auto *Ptr = IRB.CreateLoad(Alloca->getAllocatedType(), Alloca);
-  auto *GEP = IRB.CreateConstInBoundsGEP1_64(PointerElemType, Ptr, I);
+  return std::visit(
+      [&](const auto &Storage) -> Var & {
+        Type *PointerElemType = Storage.PointerElemType;
+        auto &ResultVar = Fn.declVarInternal(
+            "res.", PointerElemType->getPointerTo(), PointerElemType);
 
-  ResultVar.storePointer(GEP);
+        if constexpr (std::is_same_v<std::decay_t<decltype(Storage)>,
+                                     AllocaStorage>) {
+          auto *Ptr = IRB.CreateLoad(Storage.Alloca->getAllocatedType(),
+                                     Storage.Alloca);
+          auto *GEP = IRB.CreateConstInBoundsGEP1_64(PointerElemType, Ptr, I);
+          ResultVar.storePointer(GEP);
+        } else {
+          // BorrowedStorage always points to scalar array element.
+          PROTEUS_FATAL_ERROR("Expected AllocaStorage for operator[]");
+        }
 
-  return ResultVar;
+        return ResultVar;
+      },
+      Storage);
 }
 
 Var &Var::operator[](const Var &IdxVar) {
@@ -465,15 +530,28 @@ Var &Var::operator[](const Var &IdxVar) {
   if (!isPointer())
     PROTEUS_FATAL_ERROR("Expected pointer type");
 
-  auto &ResultVar = Fn.declVarInternal("res.", PointerElemType->getPointerTo(),
-                                       PointerElemType);
-  auto *Ptr = IRB.CreateLoad(Alloca->getAllocatedType(), Alloca);
-  Value *Idx = IdxVar.getValue();
-  auto *GEP = IRB.CreateInBoundsGEP(PointerElemType, Ptr, {Idx});
+  return std::visit(
+      [&](const auto &Storage) -> Var & {
+        Type *PointerElemType = Storage.PointerElemType;
+        auto &ResultVar = Fn.declVarInternal(
+            "res.", PointerElemType->getPointerTo(), PointerElemType);
+        Value *Idx = IdxVar.getValue();
 
-  ResultVar.storePointer(GEP);
+        if constexpr (std::is_same_v<std::decay_t<decltype(Storage)>,
+                                     AllocaStorage>) {
+          auto *Ptr = IRB.CreateLoad(Storage.Alloca->getAllocatedType(),
+                                     Storage.Alloca);
+          auto *GEP = IRB.CreateInBoundsGEP(PointerElemType, Ptr, {Idx});
+          ResultVar.storePointer(GEP);
+        } else {
+          auto *GEP = IRB.CreateInBoundsGEP(PointerElemType,
+                                            Storage.PointerValue, {Idx});
+          ResultVar.storePointer(GEP);
+        }
 
-  return ResultVar;
+        return ResultVar;
+      },
+      Storage);
 }
 
 // Define non-member operators.
