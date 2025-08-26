@@ -12,6 +12,7 @@ private:
   TargetModelType TargetModel;
   std::string Code;
   HashT ModuleHash;
+  std::vector<std::string> ExtraArgs;
 
   Dispatcher &Dispatch;
   std::unique_ptr<MemoryBuffer> ObjectModule;
@@ -168,8 +169,10 @@ protected:
   CompilationResult compileCppToIR();
 
 public:
-  explicit CppJitModule(TargetModelType TargetModel, StringRef Code);
-  explicit CppJitModule(StringRef Target, StringRef Code);
+  explicit CppJitModule(TargetModelType TargetModel, StringRef Code,
+                        const std::vector<std::string> &ExtraArgs = {});
+  explicit CppJitModule(StringRef Target, StringRef Code,
+                        const std::vector<std::string> &ExtraArgs = {});
 
   void compile();
 

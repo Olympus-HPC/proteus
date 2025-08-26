@@ -23,12 +23,14 @@ namespace proteus {
 using namespace clang;
 using namespace llvm;
 
-CppJitModule::CppJitModule(TargetModelType TargetModel, StringRef Code)
+CppJitModule::CppJitModule(TargetModelType TargetModel, StringRef Code,
+                           const std::vector<std::string> &ExtraArgs)
     : TargetModel(TargetModel), Code(Code.str()), ModuleHash(hash(Code)),
-      Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
-CppJitModule::CppJitModule(StringRef Target, StringRef Code)
+      ExtraArgs(ExtraArgs), Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
+CppJitModule::CppJitModule(StringRef Target, StringRef Code,
+                           const std::vector<std::string> &ExtraArgs)
     : TargetModel(parseTargetModel(Target)), Code(Code), ModuleHash(hash(Code)),
-      Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
+      ExtraArgs(ExtraArgs), Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
 
 CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
   // Create compiler instance.
@@ -44,18 +46,9 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
   // discovers and other options that are needed for source lowering.
   std::vector<std::string> ArgStorage;
   if (TargetModel == TargetModelType::HOST) {
-    ArgStorage = {PROTEUS_CLANGXX_BIN,
-                  "-emit-llvm",
-                  "-S",
-                  "-std=c++17",
-                  "-Xclang",
-                  "-disable-O0-optnone",
-                  "-Xclang",
-                  "-disable-llvm-passes",
-                  "-x",
-                  "c++",
-                  "-fPIC",
-                  SourceName};
+    ArgStorage = {
+        PROTEUS_CLANGXX_BIN,   "-emit-llvm", "-S",  "-std=c++17", "-Xclang",
+        "-disable-O0-optnone", "-x",         "c++", "-fPIC",      SourceName};
   } else {
     std::string OffloadArch =
         "--offload-arch=" + Dispatch.getTargetArch().str();
@@ -65,14 +58,14 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
                   "-std=c++17",
                   "-Xclang",
                   "-disable-O0-optnone",
-                  "-Xclang",
-                  "-disable-llvm-passes",
                   "-x",
                   (TargetModel == TargetModelType::HIP ? "hip" : "cuda"),
                   "--offload-device-only",
                   OffloadArch,
                   SourceName};
   }
+
+  ArgStorage.insert(ArgStorage.end(), ExtraArgs.begin(), ExtraArgs.end());
 
   std::vector<const char *> DriverArgs;
   DriverArgs.reserve(ArgStorage.size());
@@ -110,6 +103,9 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
 
   // Set the invocation.
   Compiler.setInvocation(Invocation);
+
+  // Load clang plugins, if there are any.
+  Compiler.LoadRequestedPlugins();
 
   std::unique_ptr<MemoryBuffer> Buffer =
       MemoryBuffer::getMemBuffer(Code, SourceName);
