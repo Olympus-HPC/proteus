@@ -14,14 +14,6 @@ static auto getTiledMatmulFunction(int N, int TileSize) {
       JitMod->addFunction<void, double *, double *, double *>("tiled_matmul");
   {
 
-    auto &I = F.declVar<int>("i");
-    auto &J = F.declVar<int>("j");
-    auto &K = F.declVar<int>("k");
-    auto &IncOne = F.declVar<int>("inc");
-    auto &UbnI = F.declVar<int>("ubn_i");
-    auto &UbnJ = F.declVar<int>("ubn_j");
-    auto &UbnK = F.declVar<int>("ubn_k");
-
     auto Args = F.getArgs();
     auto &C = std::get<0>(Args);
     auto &A = std::get<1>(Args);
@@ -29,15 +21,14 @@ static auto getTiledMatmulFunction(int N, int TileSize) {
 
     F.beginFunction();
     {
-      I = 0;
-      J = 0;
-      K = 0;
-      UbnI = N;
-      UbnJ = N;
-      UbnK = N;
-      IncOne = 1;
-      auto &Zero = F.declVar<int>("zero");
-      Zero = 0;
+      auto &I = F.defVar<int>(0, "i");
+      auto &J = F.defVar<int>(0, "j");
+      auto &K = F.defVar<int>(0, "k");
+      auto &UbnI = F.defRuntimeConst(N, "ubn_i");
+      auto &UbnJ = F.defRuntimeConst(N, "ubn_j");
+      auto &UbnK = F.defRuntimeConst(N, "ubn_k");
+      auto &IncOne = F.defRuntimeConst(1, "inc");
+      auto &Zero = F.defRuntimeConst(0, "zero");
 
       F.buildLoopNest(
            {F.transformableForLoop({I, Zero, UbnI, IncOne}).tile(TileSize),
@@ -71,13 +62,13 @@ int main() {
   double *B = (double *)new double[N * N];
   double *C = (double *)new double[N * N];
 
-  //   for (int i = 0; i < N; i++) {
-  //     for (int j = 0; j < N; j++) {
-  //       A[i*N+j] = (1.0);
-  //       B[i*N+j] = (1.0);
-  //       C[i*N+j] = 0.0;
-  //     }
-  //   }
+    for (int I = 0; I < N; I++) {
+      for (int J = 0; J < N; J++) {
+        A[I*N+J] = (1.0);
+        B[I*N+J] = (1.0);
+        C[I*N+J] = 0.0;
+      }
+    }
 
   F(C, A, B);
 
@@ -99,11 +90,14 @@ int main() {
             << '\n';
 
   // Print a small subset to avoid excessive output
-  // for (int i = 0; i < N; i++) {
-  //   for (int j = 0; j < N; j++) {
-  //     std::cout << C[i*N + j] << (j + 1 == N ? '\n' : ' ');
-  //   }
-  // }
+  for (int I = 0; I < N; I++) {
+    for (int J = 0; J < N; J++) {
+      if(C[I*N + J] != 6*N) {
+        std::cout << "C[" << I << "][" << J << "] = " << C[I*N + J] << '\n';
+        break;
+      }
+    }
+  }
 
   proteus::finalize();
   return 0;
