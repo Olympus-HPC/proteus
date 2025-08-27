@@ -45,7 +45,7 @@ public:
         KernelArgsPtrs, ShmemSize, HipStream);
   }
 
-  StringRef getTargetArch() const override { return Jit.getDeviceArch(); }
+  StringRef getDeviceArch() const override { return Jit.getDeviceArch(); }
 
   ~DispatcherHIP() {
     CodeCache.printStats();
@@ -74,6 +74,11 @@ public:
 
     auto KernelFunc = GetKernelFunc();
     return KernelFunc;
+  }
+
+  void loadDynamicLibrary(const SmallString<128> &) override {
+    PROTEUS_FATAL_ERROR(
+        "Device dispatcher does not implement loadDynamicLibrary");
   }
 
 private:

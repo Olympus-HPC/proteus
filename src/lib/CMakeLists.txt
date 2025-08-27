@@ -15,17 +15,17 @@ set(SOURCES
 set(PROTEUS_PROJECT_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
 
 if(PROTEUS_ENABLE_CUDA)
-list(APPEND SOURCES
-  CompilerInterfaceDevice.cpp
-  JitEngineDeviceCUDA.cpp
-)
+  list(APPEND SOURCES
+    CompilerInterfaceDevice.cpp
+    JitEngineDeviceCUDA.cpp
+  )
 endif()
 
 if(PROTEUS_ENABLE_HIP)
-list(APPEND SOURCES
-  CompilerInterfaceDevice.cpp
-  JitEngineDeviceHIP.cpp
-)
+  list(APPEND SOURCES
+    CompilerInterfaceDevice.cpp
+    JitEngineDeviceHIP.cpp
+  )
 endif()
 
 if(BUILD_SHARED)
@@ -45,16 +45,18 @@ target_compile_definitions(proteus PUBLIC ${LLVM_DEFINITIONS})
 target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
 
 target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
+
 if(PROTEUS_ENABLE_HIP)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_HIP)
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_HIP)
 elseif(PROTEUS_ENABLE_CUDA)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_CUDA)
   target_compile_definitions(proteus PRIVATE LIBDEVICE_BC_PATH="${LIBDEVICE_BC_FILE}")
+  target_compile_definitions(proteus PRIVATE PROTEUS_CUDA_LIBDIR="${CUDAToolkit_LIBRARY_DIR}")
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_CUDA)
 endif()
 
-if (PROTEUS_ENABLE_DEBUG)
+if(PROTEUS_ENABLE_DEBUG)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_DEBUG)
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_DEBUG)
 endif()
@@ -68,7 +70,6 @@ target_include_directories(proteus
   SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS})
 target_include_directories(proteusCore
   SYSTEM INTERFACE ${LLVM_INCLUDE_DIRS})
-
 
 target_include_directories(proteus
   PUBLIC
@@ -90,12 +91,13 @@ if(PROTEUS_LINK_SHARED_LLVM)
       PATHS "${LLVM_LIBRARY_DIR}"
       NO_DEFAULT_PATH
     )
+
     if(LLVM_SHARED_LIB)
       message(STATUS "Found libLLVM.so: ${LLVM_SHARED_LIB}")
       set(libs ${LLVM_SHARED_LIB})
     else()
       message(FATAL_ERROR "The LLVM installation at ${LLVM_DIR} does not provide libLLVM.so, required due to "
-      "PROTEUS_LINK_SHARED_LLVM=ON.
+        "PROTEUS_LINK_SHARED_LLVM=ON.
       Change PROTEUS_LINK_SHARED_LLVM to OFF.
       ")
     endif()
@@ -103,14 +105,16 @@ if(PROTEUS_LINK_SHARED_LLVM)
 else()
   if(LLVM_LINK_LLVM_DYLIB)
     message(FATAL_ERROR "The LLVM installation at ${LLVM_DIR} requires to link with "
-    "the LLVM shared library, but PROTEUS_LINK_SHARED_LLVM=OFF.
+      "the LLVM shared library, but PROTEUS_LINK_SHARED_LLVM=OFF.
     Change PROTEUS_LINK_SHARED_LLVM to ON.")
   endif()
+
   set(libs ${LLVM_AVAILABLE_LIBS})
-    # Some LLVM installations include in the LLVM_AVAILABLE_LIBS both an LLVM
-    # shared library AND static libraries. The LLVM shared library bundles those
-    # static libraries and we have to remove it to avoid static initialization
-    # errors from linking with both.
+
+  # Some LLVM installations include in the LLVM_AVAILABLE_LIBS both an LLVM
+  # shared library AND static libraries. The LLVM shared library bundles those
+  # static libraries and we have to remove it to avoid static initialization
+  # errors from linking with both.
   list(REMOVE_ITEM libs "LLVM")
 endif()
 
@@ -121,11 +125,12 @@ endif()
 if(PROTEUS_ENABLE_HIP)
   target_include_directories(proteus SYSTEM PRIVATE ${hip_INCLUDE_DIRS})
   target_include_directories(proteusCore SYSTEM INTERFACE ${hip_INCLUDE_DIRS})
+
   # NOTE: HIP compilation (-x hip) is needed to include the HIP_SYMBOL macro,
   # which depends on the target architecture AMD or NVIDIA.  We define this
   # macro for HIP compilation in our headers to avoid forcing HIP compilation.
-  #target_compile_options(proteus PRIVATE -x hip)
-  #target_compile_options(proteusCore INTERFACE -x hip)
+  # target_compile_options(proteus PRIVATE -x hip)
+  # target_compile_options(proteusCore INTERFACE -x hip)
   list(APPEND libs hip::host)
 
   # Link with LLD libraries for non-RTC codegen. Use explicit location to avoid

@@ -34,8 +34,8 @@ public:
     PROTEUS_FATAL_ERROR("Host does not support launch");
   }
 
-  StringRef getTargetArch() const override {
-    PROTEUS_FATAL_ERROR("Host dispatcher does not implement getTargetArch");
+  StringRef getDeviceArch() const override {
+    PROTEUS_FATAL_ERROR("Host dispatcher does not implement getDeviceArch");
   }
 
   void *getFunctionAddress(StringRef FnName,
@@ -48,15 +48,21 @@ public:
     return FuncAddr;
   }
 
+  void loadDynamicLibrary(const SmallString<128> &Path) override {
+    Jit.loadDynamicLibrary(Path);
+  }
+
+protected:
+  DispatcherHost() : Jit(JitEngineHost::instance()) {
+    TargetModel = TargetModelType::HOST;
+  }
+
 private:
   // TODO: The JitEngineHost is a singleton and consolidates all compiled IR in
   // a single object layer. This creates name collision for same named functions
   // (duplicate definitions) though they are in different Jit modules.
   // Reconsider singletons for both the JitEngineHost and the Dispatcher.
   JitEngineHost &Jit;
-  DispatcherHost() : Jit(JitEngineHost::instance()) {
-    TargetModel = TargetModelType::HOST;
-  }
 };
 
 } // namespace proteus

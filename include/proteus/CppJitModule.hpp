@@ -17,6 +17,11 @@ private:
   Dispatcher &Dispatch;
   std::unique_ptr<MemoryBuffer> ObjectModule;
   bool IsCompiled = false;
+  struct DynamicLibraryRAII {
+    SmallString<128> Path;
+
+    ~DynamicLibraryRAII() { sys::fs::remove(Path); }
+  } DynamicLibrary;
 
   template <typename Sig> struct FunctionHandle;
   template <typename RetT, typename... ArgT>
@@ -117,7 +122,7 @@ private:
       raw_svector_ostream OS(FuncS);
 
       OS << "extern \"C\" " << typeName<RetT>() << " "
-         << ((TargetModel != TargetModelType::HOST) ? "__global__ " : "")
+         << ((!isHostTargetModel(TargetModel)) ? "__global__ " : "")
          << EntryFuncName << "(";
       ((OS << (I ? ", " : "")
            << typeName<
@@ -206,12 +211,13 @@ private:
 
   struct CompilationResult {
     // Declare Ctx first to ensure it is destroyed after Mod.
-    std::unique_ptr<LLVMContext> Ctx;
-    std::unique_ptr<Module> Mod;
+    std::unique_ptr<LLVMContext> Ctx = nullptr;
+    std::unique_ptr<Module> Mod = nullptr;
   };
 
 protected:
   CompilationResult compileCppToIR();
+  void compileCppToDynamicLibrary();
 
 public:
   explicit CppJitModule(TargetModelType TargetModel, StringRef Code,
@@ -247,7 +253,7 @@ public:
     if (!IsCompiled)
       compile();
 
-    if (TargetModel != TargetModelType::HOST)
+    if (!isHostTargetModel(TargetModel))
       PROTEUS_FATAL_ERROR("Error: getFunction() applies only to host modules");
 
     void *FuncPtr = Dispatch.getFunctionAddress(Name, getObjectModuleRef());
