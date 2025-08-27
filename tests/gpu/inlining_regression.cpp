@@ -12,7 +12,6 @@
 #include "raja_style_launch.hpp"
 #include <proteus/JitInterface.hpp>
 
-
 int main() {
   proteus::init();
 
@@ -30,14 +29,14 @@ int main() {
 
   std::cout << Y[10] << std::endl;
   double A = 6.2;
-  forall(N, [=] __host__ __device__ (int I) {
-    Y[I] += X[I] * A;
-  });
+  forall(N, [=] __host__ __device__(int I) { Y[I] += X[I] * A; });
   gpuErrCheck(gpuDeviceSynchronize());
   std::cout << Y[10] << std::endl;
-  forall(N, [=] __host__ __device__ (int I) {
-    Y[I] += X[I] * A;
-  });
+  forall(N, [=] __host__ __device__(int I) { Y[I] += X[I] * A * 2; });
+
+  forall(N, [=] __host__ __device__(int I) { Y[I] += X[I] * A * 3; });
+
+  forall(N, [=] __host__ __device__(int I) { Y[I] -= X[I] * A * 6; });
   gpuErrCheck(gpuDeviceSynchronize());
   std::cout << Y[10] << std::endl;
 
@@ -49,12 +48,12 @@ int main() {
 
 // clang-format off
 // CHECK: 0
-// CHECK-FIRST: [ArgSpec] Replaced Function _Z9daxpyImpldPdS_m ArgNo 3 with value i64 1024
-// CHECK-FIRST: [DimSpec]
-// CHECK-FIRST: [DimSpec]
-// CHECK: 19944.1
-// CHECK: 39888.2
-// CHECK: JitCache hits 1 total 2
-// CHECK: HashValue {{[0-9]+}} NumExecs 2 NumHits 1
-// CHECK-FIRST: JitStorageCache hits 0 total 1
-// CHECK-SECOND: JitStorageCache hits 1 total 1
+// CHECK: 19.4767
+// CHECK: 0
+// CHECK: JitCache hits 0 total 4
+// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: JitStorageCache hits 0 total 4
+// CHECK-SECOND: JitStorageCache hits 4 total 4

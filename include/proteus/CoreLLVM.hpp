@@ -14,6 +14,7 @@ static_assert(__cplusplus >= 201703L,
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/Transforms/IPO/MergeFunctions.h>
+#include "llvm/Transforms/IPO/AlwaysInliner.h"
 
 #if LLVM_VERSION_MAJOR >= 18
 #include <llvm/TargetParser/SubtargetFeature.h>
@@ -108,6 +109,7 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
   ModulePassManager Passes;
+  //Passes.addPass(AlwaysInlinerPass());
   if (auto E = PB.parsePassPipeline(Passes, PassPipeline))
     PROTEUS_FATAL_ERROR("Error: " + toString(std::move(E)));
 
@@ -118,7 +120,11 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
                                         char OptLevel = '3',
                                         unsigned CodegenOptLevel = 3) {
   PipelineTuningOptions PTO;
-
+  // for (Function &F : M) {
+    // F.removeFnAttr(Attribute::NoInline);
+    // F.removeFnAttr(Attribute::OptimizeNone);
+    // F.addFnAttr(Attribute::AlwaysInline);
+  // }
   std::optional<PGOOptions> PGOOpt;
   auto TM = createTargetMachine(M, Arch, CodegenOptLevel);
   if (auto Err = TM.takeError())
@@ -164,7 +170,10 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
   };
 
   ModulePassManager Passes = PB.buildPerModuleDefaultPipeline(OptSetting);
+  //Passes.addPass(GlobalDCEPass());
+  //Passes.addPass(AlwaysInlinerPass());
   Passes.run(M, MAM);
+  // llvm::outs() << "MODULE AFTER OPT " << M << "\n";
 }
 
 } // namespace detail

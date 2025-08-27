@@ -45,7 +45,7 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
       cuModuleGetGlobal(&DevPtr, &Bytes, CUMod, ModuleId.c_str()));
 
   SmallString<4096> DeviceBitcode;
-  DeviceBitcode.reserve(Bytes);
+  DeviceBitcode.resize(Bytes);
   proteusCuErrCheck(cuMemcpyDtoH(DeviceBitcode.data(), DevPtr, Bytes));
 
   Timer T;
