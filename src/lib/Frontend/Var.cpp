@@ -220,6 +220,13 @@ Var &Var::operator/(const Var &Other) const {
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFDiv(L, R); });
 }
 
+Var &Var::operator%(const Var &Other) const {
+  return binOp(
+      *this, Other,
+      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSRem(L, R); },
+      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFRem(L, R); });
+}
+
 Var &Var::operator+=(Var &Other) {
   Var &Res = *this + Other;
   auto &IRB = Fn.getIRBuilder();
@@ -300,6 +307,26 @@ Var::operator/=(const T &ConstValue) {
   return *this;
 }
 
+Var &Var::operator%=(Var &Other) {
+  Var &Res = *this % Other;
+  auto &IRB = Fn.getIRBuilder();
+  this->storeValue(convert(IRB, Res.getValue(), getValueType()));
+
+  return *this;
+}
+
+template <typename T>
+std::enable_if_t<std::is_arithmetic_v<T>, Var &>
+Var::operator%=(const T &ConstValue) {
+  auto &Ctx = Fn.getFunction()->getContext();
+  Var &Tmp = Fn.declVarInternal("tmp.", TypeMap<T>::get(Ctx));
+  Tmp = ConstValue;
+
+  *this %= Tmp;
+
+  return *this;
+}
+
 template <typename T>
 std::enable_if_t<std::is_arithmetic_v<T>, Var &>
 Var::operator+(const T &ConstValue) const {
@@ -334,6 +361,15 @@ Var::operator/(const T &ConstValue) const {
   Var &Tmp = Fn.declVarInternal("tmp.", TypeMap<T>::get(Ctx));
   Tmp = ConstValue;
   return ((*this) / Tmp);
+}
+
+template <typename T>
+std::enable_if_t<std::is_arithmetic_v<T>, Var &>
+Var::operator%(const T &ConstValue) const {
+  auto &Ctx = Fn.getFunction()->getContext();
+  Var &Tmp = Fn.declVarInternal("tmp.", TypeMap<T>::get(Ctx));
+  Tmp = ConstValue;
+  return ((*this) % Tmp);
 }
 
 Var &Var::operator=(const Var &Other) {
@@ -596,6 +632,16 @@ std::enable_if_t<std::is_arithmetic_v<T>, Var &> operator/(const T &ConstValue,
   return (Tmp / V);
 }
 
+template <typename T>
+std::enable_if_t<std::is_arithmetic_v<T>, Var &> operator%(const T &ConstValue,
+                                                           const Var &V) {
+  auto &Ctx = V.Fn.getFunction()->getContext();
+  Var &Tmp = V.Fn.declVarInternal("tmp.", TypeMap<T>::get(Ctx));
+  Tmp = ConstValue;
+
+  return (Tmp % V);
+}
+
 Value *convert(IRBuilderBase IRB, Value *V, Type *TargetType) {
   Type *ValType = V->getType();
 
@@ -759,6 +805,12 @@ template Var &Var::operator/ <size_t>(const size_t &) const;
 template Var &Var::operator/ <float>(const float &) const;
 template Var &Var::operator/ <double>(const double &) const;
 
+template Var &Var::operator% <int>(const int &) const;
+template Var &Var::operator% <unsigned int>(const unsigned int &) const;
+template Var &Var::operator% <size_t>(const size_t &) const;
+template Var &Var::operator% <float>(const float &) const;
+template Var &Var::operator% <double>(const double &) const;
+
 // Binary operators with assignment explicit instantiations.
 template Var &Var::operator+= <int>(const int &);
 template Var &Var::operator+= <unsigned int>(const unsigned int &);
@@ -784,6 +836,12 @@ template Var &Var::operator/= <size_t>(const size_t &);
 template Var &Var::operator/= <float>(const float &);
 template Var &Var::operator/= <double>(const double &);
 
+template Var &Var::operator%= <int>(const int &);
+template Var &Var::operator%= <unsigned int>(const unsigned int &);
+template Var &Var::operator%= <size_t>(const size_t &);
+template Var &Var::operator%= <float>(const float &);
+template Var &Var::operator%= <double>(const double &);
+
 // Non-member binary operator explicit instantiations.
 template Var &operator+ <int>(const int &, const Var &);
 template Var &operator+ <unsigned int>(const unsigned int &, const Var &);
@@ -808,6 +866,12 @@ template Var &operator/ <unsigned int>(const unsigned int &, const Var &);
 template Var &operator/ <size_t>(const size_t &, const Var &);
 template Var &operator/ <float>(const float &, const Var &);
 template Var &operator/ <double>(const double &, const Var &);
+
+template Var &operator% <int>(const int &, const Var &);
+template Var &operator% <unsigned int>(const unsigned int &, const Var &);
+template Var &operator% <size_t>(const size_t &, const Var &);
+template Var &operator% <float>(const float &, const Var &);
+template Var &operator% <double>(const double &, const Var &);
 
 // Comparison explicit instantiations.
 template Var &Var::operator>(const int &ConstValue) const;

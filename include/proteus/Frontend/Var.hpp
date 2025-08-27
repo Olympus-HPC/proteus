@@ -66,6 +66,7 @@ struct Var {
   Var &operator-(const Var &Other) const;
   Var &operator*(const Var &Other) const;
   Var &operator/(const Var &Other) const;
+  Var &operator%(const Var &Other) const;
 
   template <typename T>
   std::enable_if_t<std::is_arithmetic_v<T>, Var &>
@@ -83,10 +84,15 @@ struct Var {
   std::enable_if_t<std::is_arithmetic_v<T>, Var &>
   operator/(const T &ConstValue) const;
 
+  template <typename T>
+  std::enable_if_t<std::is_arithmetic_v<T>, Var &>
+  operator%(const T &ConstValue) const;
+
   Var &operator+=(Var &Other);
   Var &operator-=(Var &Other);
   Var &operator*=(Var &Other);
   Var &operator/=(Var &Other);
+  Var &operator%=(Var &Other);
 
   template <typename T>
   std::enable_if_t<std::is_arithmetic_v<T>, Var &>
@@ -103,6 +109,10 @@ struct Var {
   template <typename T>
   std::enable_if_t<std::is_arithmetic_v<T>, Var &>
   operator/=(const T &ConstValue);
+
+  template <typename T>
+  std::enable_if_t<std::is_arithmetic_v<T>, Var &>
+  operator%=(const T &ConstValue);
 
   Var &operator>(const Var &Other) const;
   Var &operator<(const Var &Other) const;
@@ -156,6 +166,9 @@ std::enable_if_t<std::is_arithmetic_v<T>, Var &> operator*(const T &ConstValue,
                                                            const Var &Other);
 template <typename T>
 std::enable_if_t<std::is_arithmetic_v<T>, Var &> operator/(const T &ConstValue,
+                                                           const Var &Other);
+template <typename T>
+std::enable_if_t<std::is_arithmetic_v<T>, Var &> operator%(const T &ConstValue,
                                                            const Var &Other);
 
 // Declare usual arithmetic conversion helper functions.
