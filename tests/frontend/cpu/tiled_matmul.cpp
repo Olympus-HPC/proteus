@@ -40,15 +40,15 @@ static auto getTiledMatmulFunction(int N, int TileSize) {
       Zero = 0;
 
       F.buildLoopNest(
-           {F.buildForLoop({I, Zero, UbnI, IncOne}).tile(TileSize),
-            F.buildForLoop({J, Zero, UbnJ, IncOne}).tile(TileSize),
-            F.buildForLoop({K, Zero, UbnK, IncOne},
-                             [&]() {
-                               auto CIdx = I * N + J;
-                               auto AIdx = I * N + K;
-                               auto BIdx = K * N + J;
-                               C[CIdx] += A[AIdx] * B[BIdx];
-                             })
+           {F.transformableForLoop({I, Zero, UbnI, IncOne}).tile(TileSize),
+            F.transformableForLoop({J, Zero, UbnJ, IncOne}).tile(TileSize),
+            F.transformableForLoop({K, Zero, UbnK, IncOne},
+                                   [&]() {
+                                     auto CIdx = I * N + J;
+                                     auto AIdx = I * N + K;
+                                     auto BIdx = K * N + J;
+                                     C[CIdx] += A[AIdx] * B[BIdx];
+                                   })
                 .tile(TileSize)})
           .emit();
 

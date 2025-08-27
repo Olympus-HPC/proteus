@@ -181,9 +181,9 @@ public:
 
   void forLoop(LoopBoundsDescription Bounds, std::function<void()> Body);
 
-  ForLoopBuilder buildForLoop(LoopBoundsDescription Bounds);
-  ForLoopBuilder buildForLoop(LoopBoundsDescription Bounds,
-                              std::function<void()> Body);
+  ForLoopBuilder transformableForLoop(LoopBoundsDescription Bounds);
+  ForLoopBuilder transformableForLoop(LoopBoundsDescription Bounds,
+                                      std::function<void()> Body);
 
   LoopNestBuilder buildLoopNest(std::vector<ForLoopBuilder> Loops);
   LoopNestBuilder buildLoopNest(std::initializer_list<ForLoopBuilder> Loops);

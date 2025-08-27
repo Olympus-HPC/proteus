@@ -268,11 +268,11 @@ void FuncBase::forLoop(LoopBoundsDescription Bounds,
   endFor();
 }
 
-ForLoopBuilder FuncBase::buildForLoop(LoopBoundsDescription Bounds) {
+ForLoopBuilder FuncBase::transformableForLoop(LoopBoundsDescription Bounds) {
   return ForLoopBuilder(std::move(Bounds), std::function<void()>(), *this);
 }
 
-ForLoopBuilder FuncBase::buildForLoop(LoopBoundsDescription Bounds,
+ForLoopBuilder FuncBase::transformableForLoop(LoopBoundsDescription Bounds,
                                         std::function<void()> Body) {
   return ForLoopBuilder(std::move(Bounds), std::move(Body), *this);
 }

@@ -9,7 +9,11 @@ LoopBoundsDescription::LoopBoundsDescription(Var &IterVar, Var &Init,
 
 ForLoopBuilder::ForLoopBuilder(LoopBoundsDescription Bounds,
                                std::function<void()> Body, FuncBase &Fn)
-    : Bounds(std::move(Bounds)), Body(std::move(Body)), Fn(Fn) {}
+    : Bounds(std::move(Bounds)), Fn(Fn) {
+  if (Body) {
+    this->Body = std::move(Body);
+  }
+}
 
 ForLoopBuilder ForLoopBuilder::create(LoopBoundsDescription Bounds,
                                       std::function<void()> Body,
@@ -42,6 +46,13 @@ LoopNestBuilder
 LoopNestBuilder::create(FuncBase &Fn,
                         std::initializer_list<ForLoopBuilder> Loops) {
   return create(Fn, std::vector<ForLoopBuilder>(Loops));
+}
+
+LoopNestBuilder &LoopNestBuilder::tile(int Tile) {
+  for (auto &Loop : Loops) {
+    Loop.tile(Tile);
+  }
+  return *this;
 }
 
 void LoopNestBuilder::emit() {

@@ -26,10 +26,9 @@ static auto get1DLoopNestFunction(int N, int TileSize) {
     auto &Zero = F.declVar<int>("zero");
     Zero = 0;
 
-    F.buildLoopNest(
-         {F.buildForLoop({I, Zero, UB, IncOne}, [&]() { A[I] = B[I] * 3.0; })
-              .tile(TileSize)})
-        .emit();
+    F.transformableForLoop({I, Zero, UB, IncOne},
+                           [&]() { A[I] = B[I] * 3.0; })
+        .tile(TileSize).emit();
 
     F.ret();
   }
@@ -59,8 +58,8 @@ static auto get1DSimpleLoopNestFunction(int N) {
     Zero = 0;
 
     // Test non-tiled version
-    F.buildLoopNest({F.buildForLoop({I, Zero, UB, IncOne},
-                                        [&]() { A[I] = B[I] * 3.0; })})
+    F.transformableForLoop({I, Zero, UB, IncOne},
+                           [&]() { A[I] = B[I] * 3.0; })
         .emit();
 
     F.ret();

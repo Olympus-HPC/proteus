@@ -35,15 +35,14 @@ static auto getTiled2DTransposeFunction(int ROWS, int COLS, int TileSize) {
     Zero = 0;
 
     F.buildLoopNest(
-         {F.buildForLoop({I, Zero, UBRows, IncOne}).tile(TileSize),
-          F.buildForLoop({J, Zero, UBCols, IncOne},
-                           [&]() {
-                             auto AIdx = J * ROWS + I;
-                             auto BIdx = I * COLS + J;
-                             A[AIdx] = B[BIdx];
-                           })
-              .tile(TileSize)})
-        .emit();
+         {F.transformableForLoop({I, Zero, UBRows, IncOne}),
+          F.transformableForLoop({J, Zero, UBCols, IncOne},
+                                 [&]() {
+                                   auto AIdx = J * ROWS + I;
+                                   auto BIdx = I * COLS + J;
+                                   A[AIdx] = B[BIdx];
+                                 })
+              }).tile(TileSize).emit();
 
     F.ret();
   }

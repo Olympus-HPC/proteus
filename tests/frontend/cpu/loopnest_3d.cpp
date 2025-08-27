@@ -7,7 +7,7 @@
 #include <proteus/JitInterface.hpp>
 
 static auto get3DLoopNestFunction(int DI, int DJ, int DK, int TileI, int TileJ,
-                           int TileK) {
+                                  int TileK) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
   auto &F = JitMod->addFunction<void, double *, double *>("loopnest_3d");
 
@@ -35,14 +35,15 @@ static auto get3DLoopNestFunction(int DI, int DJ, int DK, int TileI, int TileJ,
     auto &Zero = F.declVar<int>("zero");
     Zero = 0;
 
-    F.buildLoopNest({F.buildForLoop({I, Zero, UBI, IncOne}).tile(TileI),
-                       F.buildForLoop({J, Zero, UBJ, IncOne}).tile(TileJ),
-                       F.buildForLoop({K, Zero, UBK, IncOne},
-                                        [&]() {
-                                          auto Idx = I * DJ * DK + J * DK + K;
-                                          A[Idx] = B[Idx] + I + J + K;
-                                        })
-                           .tile(TileK)})
+    F.buildLoopNest({F.transformableForLoop({I, Zero, UBI, IncOne}).tile(TileI),
+                     F.transformableForLoop({J, Zero, UBJ, IncOne}).tile(TileJ),
+                     F.transformableForLoop({K, Zero, UBK, IncOne},
+                                            [&]() {
+                                              auto Idx =
+                                                  I * DJ * DK + J * DK + K;
+                                              A[Idx] = B[Idx] + I + J + K;
+                                            })
+                         .tile(TileK)})
         .emit();
 
     F.ret();
@@ -81,14 +82,15 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int TileSize) {
     auto &Zero = F.declVar<int>("zero");
     Zero = 0;
 
-    F.buildLoopNest({F.buildForLoop({I, Zero, UBI, IncOne}).tile(TileSize),
-                       F.buildForLoop({J, Zero, UBJ, IncOne}).tile(TileSize),
-                       F.buildForLoop({K, Zero, UBK, IncOne},
-                                        [&]() {
-                                          auto Idx = I * DJ * DK + J * DK + K;
-                                          A[Idx] = B[Idx] * 2;
-                                        })
-                           .tile(TileSize)})
+    F.buildLoopNest(
+         {F.transformableForLoop({I, Zero, UBI, IncOne}).tile(TileSize),
+          F.transformableForLoop({J, Zero, UBJ, IncOne}).tile(TileSize),
+          F.transformableForLoop({K, Zero, UBK, IncOne},
+                                 [&]() {
+                                   auto Idx = I * DJ * DK + J * DK + K;
+                                   A[Idx] = B[Idx] + I + J + K;
+                                 })
+              .tile(TileSize)})
         .emit();
 
     F.ret();
@@ -106,8 +108,7 @@ int main() {
   constexpr int SIZE = DI * DJ * DK;
 
   // Test 3D variadic tiling
-  auto [JitMod1, F1] =
-      get3DLoopNestFunction(DI, DJ, DK, TileI, TileJ, TileK);
+  auto [JitMod1, F1] = get3DLoopNestFunction(DI, DJ, DK, TileI, TileJ, TileK);
   JitMod1->compile();
 
   double *A1 = new double[SIZE];
@@ -173,17 +174,17 @@ int main() {
 // CHECK: 3D Uniform Tiling Results:
 // CHECK-NEXT: A2[0] = 0
 // CHECK-NEXT: A2[1] = 2
-// CHECK-NEXT: A2[2] = 4
-// CHECK-NEXT: A2[3] = 6
-// CHECK-NEXT: A2[4] = 8
-// CHECK-NEXT: A2[5] = 10
-// CHECK-NEXT: A2[6] = 12
-// CHECK-NEXT: A2[7] = 14
-// CHECK-NEXT: A2[8] = 16
-// CHECK-NEXT: A2[9] = 18
-// CHECK-NEXT: A2[10] = 20
-// CHECK-NEXT: A2[11] = 22
-// CHECK-NEXT: A2[12] = 24
-// CHECK-NEXT: A2[13] = 26
-// CHECK-NEXT: A2[14] = 28
-// CHECK-NEXT: A2[15] = 30
+// CHECK-NEXT: A2[2] = 3
+// CHECK-NEXT: A2[3] = 5
+// CHECK-NEXT: A2[4] = 5
+// CHECK-NEXT: A2[5] = 7
+// CHECK-NEXT: A2[6] = 8
+// CHECK-NEXT: A2[7] = 10
+// CHECK-NEXT: A2[8] = 10
+// CHECK-NEXT: A2[9] = 12
+// CHECK-NEXT: A2[10] = 13
+// CHECK-NEXT: A2[11] = 15
+// CHECK-NEXT: A2[12] = 15
+// CHECK-NEXT: A2[13] = 17
+// CHECK-NEXT: A2[14] = 18
+// CHECK-NEXT: A2[15] = 20

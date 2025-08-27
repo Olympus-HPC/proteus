@@ -62,6 +62,8 @@ public:
   static LoopNestBuilder create(FuncBase &Fn,
                                 std::initializer_list<ForLoopBuilder> Loops);
 
+  LoopNestBuilder &tile(int Tile);
+
   void emit();
 };
 } // namespace proteus
