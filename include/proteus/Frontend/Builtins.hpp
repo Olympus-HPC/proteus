@@ -113,6 +113,16 @@ inline Var &getGridDimX(FuncBase &Fn) {
   return Ret;
 }
 
+
+inline void syncThreads(FuncBase &Fn) {
+  auto &Ctx = Fn.getFunction()->getContext();
+  auto &M = *Fn.getFunction()->getParent();
+  auto &IRB = Fn.getIRBuilder();
+  FunctionCallee Callee = M.getOrInsertFunction("llvm.amdgcn.s.barrier",
+                                                TypeMap<void>::get(Ctx));
+  IRB.CreateCall(Callee);
+}
+
 } // namespace hip
 #endif
 
@@ -176,6 +186,16 @@ inline Var &getGridDimX(FuncBase &Fn) {
   Ret.storeValue(Call);
 
   return Ret;
+}
+
+
+inline void syncThreads(FuncBase &Fn) {
+  auto &Ctx = Fn.getFunction()->getContext();
+  auto &M = *Fn.getFunction()->getParent();
+  auto &IRB = Fn.getIRBuilder();
+  FunctionCallee Callee =
+      M.getOrInsertFunction("llvm.nvvm.barrier0", TypeMap<void>::get(Ctx));
+  IRB.CreateCall(Callee);
 }
 
 } // namespace cuda
