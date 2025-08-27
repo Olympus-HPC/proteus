@@ -22,18 +22,30 @@ template <> struct TypeMap<float> {
   static Type *get(llvm::LLVMContext &Ctx) { return Type::getFloatTy(Ctx); }
 
   static Type *getPointerElemType(llvm::LLVMContext &) { return nullptr; }
+
+  static Type *getArrayType(llvm::LLVMContext &Ctx, size_t NElem) {
+    return ArrayType::get(Type::getFloatTy(Ctx), NElem);
+  }
 };
 
 template <> struct TypeMap<double> {
   static Type *get(llvm::LLVMContext &Ctx) { return Type::getDoubleTy(Ctx); }
 
   static Type *getPointerElemType(llvm::LLVMContext &) { return nullptr; }
+
+  static Type *getArrayType(llvm::LLVMContext &Ctx, size_t NElem) {
+    return ArrayType::get(Type::getDoubleTy(Ctx), NElem);
+  }
 };
 
 template <> struct TypeMap<size_t> {
   static Type *get(llvm::LLVMContext &Ctx) { return Type::getInt64Ty(Ctx); }
 
   static Type *getPointerElemType(llvm::LLVMContext &) { return nullptr; }
+
+  static Type *getArrayType(llvm::LLVMContext &Ctx, size_t NElem) {
+    return ArrayType::get(Type::getInt64Ty(Ctx), NElem);
+  }
 };
 
 template <> struct TypeMap<int> {
@@ -42,6 +54,10 @@ template <> struct TypeMap<int> {
   static Type *getPointerElemType(llvm::LLVMContext &) { return nullptr; }
 
   static bool isSigned() { return true; }
+
+  static Type *getArrayType(llvm::LLVMContext &Ctx, size_t NElem) {
+    return ArrayType::get(Type::getInt32Ty(Ctx), NElem);
+  }
 };
 
 template <> struct TypeMap<unsigned int> {
@@ -50,6 +66,10 @@ template <> struct TypeMap<unsigned int> {
   static Type *getPointerElemType(llvm::LLVMContext &) { return nullptr; }
 
   static bool isSigned() { return false; }
+
+  static Type *getArrayType(llvm::LLVMContext &Ctx, size_t NElem) {
+    return ArrayType::get(Type::getInt32Ty(Ctx), NElem);
+  }
 };
 
 template <> struct TypeMap<int *> {
@@ -76,6 +96,10 @@ template <> struct TypeMap<bool> {
   static Type *get(llvm::LLVMContext &Ctx) { return Type::getInt1Ty(Ctx); }
 
   static Type *getPointerElemType(llvm::LLVMContext &) { return nullptr; }
+
+  static Type *getArrayType(llvm::LLVMContext &Ctx, size_t NElem) {
+    return ArrayType::get(Type::getInt1Ty(Ctx), NElem);
+  }
 };
 
 template <> struct TypeMap<double &> {

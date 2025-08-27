@@ -3,6 +3,7 @@
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
+#include <variant>
 
 namespace proteus {
 
@@ -12,13 +13,40 @@ using namespace llvm;
 
 template <typename T> struct VarT {};
 
-struct Var {
+struct AllocaStorage {
   AllocaInst *Alloca;
-  FuncBase &Fn;
   Type *PointerElemType;
 
+  Value *getValue(IRBuilderBase &IRB) const;
+  Type *getValueType() const;
+  StringRef getName() const;
+  void storeValue(IRBuilderBase &IRB, Value *Val);
+  void storePointer(IRBuilderBase &IRB, Value *Ptr);
+  bool isPointer() const;
+};
+
+struct BorrowedStorage {
+  Value *PointerValue;
+  Type *PointerElemType;
+
+  Value *getValue(IRBuilderBase &IRB) const;
+  Type *getValueType() const;
+  StringRef getName() const;
+  void storeValue(IRBuilderBase &IRB, Value *Val);
+  void storePointer(IRBuilderBase &IRB, Value *Ptr);
+  bool isPointer() const;
+};
+
+using VarStorage = std::variant<AllocaStorage, BorrowedStorage>;
+
+struct Var {
+  VarStorage Storage;
+  FuncBase &Fn;
+
   Var(AllocaInst *Alloca, FuncBase &Fn, Type *PointerElemType = nullptr);
-  Var(const Var &) = default;
+  Var(Value *PointerValue, FuncBase &Fn, Type *PointerElemType);
+
+  static Var fromBorrowed(Value *PointerValue, FuncBase &Fn, Type *PointerElemType);
 
   StringRef getName();
 
@@ -28,6 +56,9 @@ struct Var {
   void storePointer(Value *Ptr);
 
   bool isPointer() const;
+
+  AllocaInst *getAlloca() const;
+  Type *getPointerElemType() const;
 
   // Declare member Operators.
 

@@ -7,6 +7,8 @@
 #include <llvm/IR/Module.h>
 
 #include "proteus/Error.h"
+#include "proteus/Frontend/Array.hpp"
+#include "proteus/AddressSpace.hpp"
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/Frontend/TypeMap.hpp"
 #include "proteus/Frontend/Var.hpp"
@@ -34,6 +36,8 @@ protected:
   std::deque<Var> Arguments;
   std::deque<Var> Variables;
   std::deque<Var> RuntimeConstants;
+  std::deque<Array> Arrays;
+  HashT HashValue;
   std::string Name;
 
   enum class ScopeKind { FUNCTION, IF, FOR };
@@ -68,7 +72,9 @@ public:
 
   Function *getFunction();
 
-  AllocaInst *emitAlloca(Type *Ty, StringRef Name);
+  AllocaInst *emitAlloca(Type *Ty, StringRef Name, AddressSpace AS = AddressSpace::DEFAULT);
+
+  Value *emitArrayCreate(Type *Ty, AddressSpace AT, StringRef Name);
 
   IRBuilderBase &getIRBuilder();
 
@@ -93,6 +99,17 @@ public:
     VarRef = Val;
 
     return VarRef;
+  }
+
+  template <typename T>
+  Array &declArray(size_t NElem, AddressSpace AT = AddressSpace::DEFAULT,
+                   StringRef Name = "array") {
+    Function *F = getFunction();
+    auto *BasePointer = emitArrayCreate(
+        TypeMap<T>::getArrayType(F->getContext(), NElem), AT, Name);
+    return Arrays.emplace_back(BasePointer, *this,
+                               TypeMap<T>::getArrayType(F->getContext(), NElem),
+                               AT);
   }
 
   template <typename T>
@@ -153,8 +170,14 @@ public:
   template <typename RetT, typename... ArgT>
   std::enable_if_t<std::is_void_v<RetT>, void> call(StringRef Name);
 
-  Var &callBuiltin(function_ref<Var &(FuncBase &)> Lower) {
-    return Lower(*this);
+  template <typename BuiltinFuncT>
+  decltype(auto) callBuiltin(BuiltinFuncT &&BuiltinFunc) {
+    using RetT = std::invoke_result_t<BuiltinFuncT &, FuncBase &>;
+    if constexpr (std::is_void_v<RetT>) {
+      std::invoke(std::forward<BuiltinFuncT>(BuiltinFunc), *this);
+    } else {
+      return std::invoke(std::forward<BuiltinFuncT>(BuiltinFunc), *this);
+    }
   }
 
   template <typename BodyLambda = EmptyLambda>
