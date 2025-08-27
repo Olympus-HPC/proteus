@@ -2,14 +2,13 @@
 
 // clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./adam_runconst.%ext 10000 200 100 | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: ./cpp_adam.%ext 10000 200 100 | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./adam_runconst.%ext 10000 200 100 | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: ./cpp_adam.%ext 10000 200 100 | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
 // clang-format on
 
-#include <proteus/Frontend/Builtins.hpp>
-#include <proteus/JitFrontend.hpp>
+#include <proteus/CppJitModule.hpp>
 
 #include "../../gpu/gpu_common.h"
 
@@ -22,20 +21,12 @@
 using namespace proteus;
 
 #if PROTEUS_ENABLE_HIP
-
 #define TARGET "hip"
-#define getThreadIdX builtins::hip::getThreadIdX
-#define getBlockIdX builtins::hip::getBlockIdX
-#define getBlockDimX builtins::hip::getBlockDimX
-#define getGridDimX builtins::hip::getGridDimX
+#define INCLUDE "#include <hip/hip_runtime.h>"
 
 #elif PROTEUS_ENABLE_CUDA
-
 #define TARGET "cuda"
-#define getThreadIdX builtins::cuda::getThreadIdX
-#define getBlockIdX builtins::cuda::getBlockIdX
-#define getBlockDimX builtins::cuda::getBlockDimX
-#define getGridDimX builtins::cuda::getGridDimX
+#define INCLUDE "#include <cuda_runtime.h>"
 
 #else
 #error "Expected PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA defined"
@@ -46,18 +37,25 @@ typedef enum {
   ADAM_MODE_1 = 1  // eps outside square root
 } adamMode_t;
 
-template <typename T, typename G>
-__global__ void
-adam(T *__restrict__ p, T *__restrict__ m, T *__restrict__ v,
-     const G *__restrict__ g, const float b1, const float b2, const float eps,
-     const float grad_scale, const float step_size, const int time_step,
-     const size_t vector_size, adamMode_t mode, const float decay) {
+const char *Code = INCLUDE R"cpp(
+typedef enum {
+    ADAM_MODE_0 = 0, // eps under square root
+    ADAM_MODE_1 = 1  // eps outside square root
+} adamMode_t;
+
+extern "C" __global__ void adam(float *__restrict__ p, float *__restrict__ m,
+                               float *__restrict__ v,
+                               const float *__restrict__ g, const float b1,
+                               const float b2, const float eps,
+                               const float grad_scale, const float step_size,
+                               const int time_step, const size_t vector_size,
+                               adamMode_t mode, const float decay) {
   const size_t i = blockIdx.x * blockDim.x + threadIdx.x;
   const size_t totThreads = gridDim.x * blockDim.x;
 
   for (size_t j = i; j < vector_size; j += totThreads) {
     for (int t = 1; t <= time_step; t++) {
-      T scaled_grad = g[j] / grad_scale;
+      float scaled_grad = g[j] / grad_scale;
       m[j] = b1 * m[j] + (1.f - b1) * scaled_grad;
       v[j] = b2 * v[j] + (1.f - b2) * scaled_grad * scaled_grad;
       float m_corrected = m[j] / (1.f - powf(b1, t));
@@ -71,74 +69,7 @@ adam(T *__restrict__ p, T *__restrict__ m, T *__restrict__ v,
       p[j] -= (step_size * update);
     }
   }
-}
-
-auto createJitModuleSpecial(float _b1, float _b2, float _eps, float _grad_scale,
-                            float _step_size, int _time_step,
-                            size_t _vector_size, int _mode, float _decay) {
-  auto J = std::make_unique<JitModule>(TARGET);
-  auto KernelHandle = J->addKernel<float *, float *, float *, float *>("adam");
-  auto &F = KernelHandle.F;
-  auto [p, m, v, g] = F.getArgs();
-
-  auto &i = F.declVar<size_t>("i");
-  auto &totThreads = F.declVar<size_t>("totThreads");
-  auto &j = F.declVar<size_t>("j");
-  auto &t = F.declVar<int>("t");
-  auto &inc1 = F.declVar<int>("inc1");
-
-  F.beginFunction();
-  {
-    auto [b1, b2, eps, grad_scale, step_size, time_step, vector_size, mode,
-          decay] = F.defRuntimeConsts(_b1, _b2, _eps, _grad_scale, _step_size,
-                                      _time_step, _vector_size, _mode, _decay);
-
-    i = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +
-        F.callBuiltin(getThreadIdX);
-    totThreads = F.callBuiltin(getGridDimX) * F.callBuiltin(getBlockDimX);
-
-    F.beginFor(j, i, vector_size, totThreads);
-    {
-      auto &lim = F.declVar<int>("lim");
-      t = 1;
-      inc1 = 1;
-      lim = time_step + 1;
-      F.beginFor(t, t, lim, inc1);
-      {
-        auto &scaled_grad = F.declVar<float>("scale_grad");
-        scaled_grad = g[j] / grad_scale;
-
-        m[j] = b1 * m[j] + (1.f - b1) * scaled_grad;
-        v[j] = b2 * v[j] + (1.f - b2) * scaled_grad * scaled_grad;
-
-        auto &m_corrected = F.declVar<float>("m_corrected");
-        auto &v_corrected = F.declVar<float>("v_corrected");
-        m_corrected = m[j] / (1.f - powf(b1, t));
-        v_corrected = v[j] / (1.f - powf(b2, t));
-
-        auto &denom = F.declVar<float>("denom");
-        F.beginIf(mode == 0);
-        { denom = sqrtf(v_corrected + eps); }
-        F.endIf();
-
-        F.beginIf(mode == 1);
-        { denom = sqrtf(v_corrected) + eps; }
-        F.endIf();
-
-        auto &update = F.declVar<float>("update");
-        update = (m_corrected / denom) + (decay * p[j]);
-
-        p[j] -= (step_size * update);
-      }
-      F.endFor();
-    }
-    F.endFor();
-    F.ret();
-  }
-  F.endFunction();
-
-  return std::make_pair(std::move(J), KernelHandle);
-}
+})cpp";
 
 int main(int argc, char *argv[]) {
   if (argc != 4) {
@@ -200,23 +131,20 @@ int main(int argc, char *argv[]) {
   gpuErrCheck(gpuDeviceSynchronize());
 
   std::cout << "Creating JIT module\n";
-  auto [J, KernelHandle] =
-      createJitModuleSpecial(beta1, beta2, eps, grad_scale, step_size,
-                             time_step, vector_size, mode, decay);
+  CppJitModule CJM{TARGET, Code};
 
   std::cout << "Compiling JIT module\n";
-  J->compile();
+  CJM.compile();
+  using AdamSig = void(float *, float *, float *, const float *, float, float,
+                       float, float, float, int, size_t, adamMode_t, float);
+  auto Kernel = CJM.getKernel<AdamSig>("adam");
 
   auto start = std::chrono::steady_clock::now();
 
   for (int i = 0; i < repeat; i++) {
-    // adam<float, float><<<grids, blocks>>>(d_p, d_m, d_v, d_g, beta1, beta2,
-    // eps,
-    //                                       grad_scale, step_size, time_step,
-    //                                       vector_size, mode, decay);
-
-    gpuErrCheck(KernelHandle.launch({grids.x, 1, 1}, {blocks.x, 1, 1}, 0, 0,
-                                    d_p, d_m, d_v, d_g));
+    Kernel.launch({grids.x, grids.y, grids.z}, {blocks.x, blocks.y, blocks.z},
+                  0, nullptr, d_p, d_m, d_v, d_g, beta1, beta2, eps, grad_scale,
+                  step_size, time_step, vector_size, mode, decay);
   }
 
   gpuErrCheck(gpuDeviceSynchronize());
@@ -260,16 +188,18 @@ int main(int argc, char *argv[]) {
 // CHECK-NEXT: Creating JIT module
 // CHECK-NEXT: Compiling JIT module
 // CHECK-NEXT: Average kernel execution time {{.*}} (ms)
-// CHECK-NEXT: p[0] = -0.57293
-// CHECK-NEXT: p[1] = -0.59603
+// CHECK-NEXT: p[0] = -0.572924
+// CHECK-NEXT: p[1] = -0.596034
 // CHECK-NEXT: p[2] = -0.592634
-// CHECK-NEXT: p[3] = -0.588154
-// CHECK-NEXT: p[4] = -0.593454
-// CHECK-NEXT: p[5] = -0.59199
-// CHECK-NEXT: p[6] = -0.573486
-// CHECK-NEXT: p[7] = -0.599872
-// CHECK-NEXT: p[8] = -0.58157
-// CHECK-NEXT: p[9] = -0.59015{{[7|8]}}
+// CHECK-NEXT: p[3] = -0.588147
+// CUDA and HIP differ in the 6th digit.
+// CHECK-NEXT: p[4] = -0.59345{{[3|4]}}
+// CHECK-NEXT: p[5] = -0.591988
+// CUDA and HIP differ in the 6th digit.
+// CHECK-NEXT: p[6] = -0.57349{{[3|4]}}
+// CHECK-NEXT: p[7] = -0.599885
+// CHECK-NEXT: p[8] = -0.581569
+// CHECK-NEXT: p[9] = -0.59016
 // CHECK: JitCache hits 0 total 1
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: JitStorageCache hits 0 total 1
