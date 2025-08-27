@@ -3,7 +3,7 @@
 namespace proteus {
 
 FuncBase::FuncBase(JitModule &J, FunctionCallee FC)
-    : J(J), FC(FC), IRB{FC.getCallee()->getContext()} {
+    : J(J), FC(FC), IRB{FC.getCallee()->getContext()}, HashValue{0} {
   Function *F = cast<Function>(FC.getCallee());
   BasicBlock::Create(F->getContext(), "entry", F);
   Name = F->getName();
