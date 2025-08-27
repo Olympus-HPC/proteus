@@ -11,7 +11,7 @@ namespace proteus {
 
 using namespace llvm;
 
-enum class TargetModelType { HOST, CUDA, HIP };
+enum class TargetModelType { HOST, CUDA, HIP, HOST_HIP, HOST_CUDA };
 
 inline TargetModelType parseTargetModel(StringRef Target) {
   if (Target == "host" || Target == "native") {
@@ -26,11 +26,21 @@ inline TargetModelType parseTargetModel(StringRef Target) {
     return TargetModelType::HIP;
   }
 
+  if (Target == "host_hip") {
+    return TargetModelType::HOST_HIP;
+  }
+
+  if (Target == "host_cuda") {
+    return TargetModelType::HOST_CUDA;
+  }
+
   PROTEUS_FATAL_ERROR("Unsupported target " + Target);
 }
 
 inline std::string getTargetTriple(TargetModelType Model) {
   switch (Model) {
+  case TargetModelType::HOST_HIP:
+  case TargetModelType::HOST_CUDA:
   case TargetModelType::HOST:
     return sys::getProcessTriple();
   case TargetModelType::CUDA:
@@ -40,6 +50,12 @@ inline std::string getTargetTriple(TargetModelType Model) {
   default:
     PROTEUS_FATAL_ERROR("Unsupported target model");
   }
+}
+
+inline bool isHostTargetModel(TargetModelType TargetModel) {
+  return (TargetModel == TargetModelType::HOST) ||
+         (TargetModel == TargetModelType::HOST_HIP) ||
+         (TargetModel == TargetModelType::HOST_CUDA);
 }
 
 } // namespace proteus

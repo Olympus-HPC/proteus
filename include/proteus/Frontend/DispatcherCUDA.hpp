@@ -53,7 +53,7 @@ public:
         KernelArgsPtrs, ShmemSize, CudaStream);
   }
 
-  StringRef getTargetArch() const override { return Jit.getDeviceArch(); }
+  StringRef getDeviceArch() const override { return Jit.getDeviceArch(); }
 
   void *
   getFunctionAddress(StringRef KernelName,
@@ -77,6 +77,11 @@ public:
 
     auto KernelFunc = GetKernelFunc();
     return KernelFunc;
+  }
+
+  void loadDynamicLibrary(const SmallString<128> &) override {
+    PROTEUS_FATAL_ERROR(
+        "Device dispatcher does not implement loadDynamicLibrary");
   }
 
   ~DispatcherCUDA() {

@@ -69,13 +69,13 @@ public:
                                 ArrayRef<void *> KernelArgs, uint64_t ShmemSize,
                                 void *Stream) = 0;
 
-  virtual StringRef getTargetArch() const = 0;
+  virtual StringRef getDeviceArch() const = 0;
 
   template <typename Sig, typename... ArgT>
   typename sig_traits<Sig>::return_type run(void *FuncPtr, ArgT &&...Args) {
-    if (TargetModel != TargetModelType::HOST)
+    if (!isHostTargetModel(TargetModel))
       PROTEUS_FATAL_ERROR(
-          "Dispatcher run interface is only supported for host");
+          "Dispatcher run interface is only supported for host derived models");
 
     auto Fn = reinterpret_cast<Sig *>(FuncPtr);
     using Ret = typename sig_traits<Sig>::return_type;
@@ -90,6 +90,8 @@ public:
   virtual void *
   getFunctionAddress(StringRef FunctionName,
                      std::optional<MemoryBufferRef> ObjectModule) = 0;
+
+  virtual void loadDynamicLibrary(const SmallString<128> &Path) = 0;
 };
 
 } // namespace proteus
