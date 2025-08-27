@@ -72,8 +72,7 @@ void CppJitModule::compileCppToDynamicLibrary() {
       PROTEUS_CLANGXX_BIN,
       "-shared",
       "-std=c++17",
-      "-Xclang",
-      "-disable-O0-optnone",
+      "-O3",
       "-x",
       (TargetModel == TargetModelType::HOST_HIP ? "hip" : "cuda"),
       "-fPIC",
@@ -132,9 +131,15 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
   // discovers and other options that are needed for source lowering.
   std::vector<std::string> ArgStorage;
   if (TargetModel == TargetModelType::HOST) {
-    ArgStorage = {
-        PROTEUS_CLANGXX_BIN,   "-emit-llvm", "-S",  "-std=c++17", "-Xclang",
-        "-disable-O0-optnone", "-x",         "c++", "-fPIC",      SourceName};
+    ArgStorage = {PROTEUS_CLANGXX_BIN,
+                  "-emit-llvm",
+                  "-S",
+                  "-std=c++17",
+                  "-O1",
+                  "-x",
+                  "c++",
+                  "-fPIC",
+                  SourceName};
   } else {
     std::string OffloadArch =
         "--offload-arch=" + Dispatch.getDeviceArch().str();
@@ -142,8 +147,7 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
                   "-emit-llvm",
                   "-S",
                   "-std=c++17",
-                  "-Xclang",
-                  "-disable-O0-optnone",
+                  "-O1",
                   "-x",
                   (TargetModel == TargetModelType::HIP ? "hip" : "cuda"),
                   "--offload-device-only",
