@@ -38,7 +38,7 @@ protected:
   HashT HashValue;
   std::string Name;
 
-  enum class ScopeKind { FUNCTION, IF, FOR, LOOP_NEST };
+  enum class ScopeKind { FUNCTION, IF, FOR };
   struct Scope {
     std::string File;
     int Line;
@@ -59,8 +59,6 @@ protected:
       return "IF";
     case ScopeKind::FOR:
       return "FOR";
-    case ScopeKind::LOOP_NEST:
-      return "LOOP_NEST";
     default:
       PROTEUS_FATAL_ERROR("Unsupported Kind " +
                           std::to_string(static_cast<int>(Kind)));

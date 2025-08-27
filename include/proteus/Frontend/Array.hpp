@@ -22,6 +22,7 @@ struct Array {
     SHARED = 3,
     CONSTANT = 4,
     LOCAL = 5,
+    REGISTER = 6,
   };
 
   AddressSpace AT;

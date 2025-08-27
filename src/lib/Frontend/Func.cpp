@@ -105,7 +105,7 @@ Value *FuncBase::emitArrayCreate(Type *Ty, Array::AddressSpace AT,
 
       return GV;
     }
-    case Array::AddressSpace::LOCAL: {
+    case Array::AddressSpace::REGISTER: {
       auto *Alloca = emitAlloca(ArrTy, Name);
       return Alloca;
     }
