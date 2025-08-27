@@ -27,7 +27,8 @@ int main() {
   auto J = proteus::JitModule(TARGET);
   auto KernelHandle =
       J.addKernel<double *, double *, double *, double *, double *, double *,
-                  double *, double *, double *, double *>("operators");
+                  double *, double *, double *, double *, double *, double *>(
+          "operators");
   auto &F = KernelHandle.F;
   auto &Arg0 = F.getArg(0);
   auto &Arg1 = F.getArg(1);
@@ -39,6 +40,8 @@ int main() {
   auto &Arg7 = F.getArg(7);
   auto &Arg8 = F.getArg(8);
   auto &Arg9 = F.getArg(9);
+  auto &Arg10 = F.getArg(10);
+  auto &Arg11 = F.getArg(11);
   F.beginFunction();
   {
     Arg0[0] = 2;
@@ -49,12 +52,15 @@ int main() {
     Arg4[0] = Arg0 * Arg1;
     Arg5[0] = Arg0 / Arg1;
 
-    Arg6[0] = Arg7[0] = Arg8[0] = Arg9[0] = 5;
+    Arg6[0] = Arg7[0] = Arg8[0] = Arg9[0] = Arg10[0] = Arg11[0] = 5;
 
     Arg6[0] += Arg0[0];
     Arg7[0] -= Arg0[0];
     Arg8[0] *= Arg0[0];
     Arg9[0] /= Arg0[0];
+
+    Arg10[0] = Arg0 % Arg1;
+    Arg11[0] %= Arg0[0];
 
     F.ret();
   }
@@ -62,7 +68,7 @@ int main() {
 
   J.compile();
 
-  double *R0, *R1, *R2, *R3, *R4, *R5, *R6, *R7, *R8, *R9;
+  double *R0, *R1, *R2, *R3, *R4, *R5, *R6, *R7, *R8, *R9, *R10, *R11;
   gpuErrCheck(gpuMallocManaged(&R0, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R1, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R2, sizeof(double)));
@@ -73,9 +79,11 @@ int main() {
   gpuErrCheck(gpuMallocManaged(&R7, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R8, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R9, sizeof(double)));
+  gpuErrCheck(gpuMallocManaged(&R10, sizeof(double)));
+  gpuErrCheck(gpuMallocManaged(&R11, sizeof(double)));
 
   gpuErrCheck(KernelHandle.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, R0, R1, R2,
-                                  R3, R4, R5, R6, R7, R8, R9));
+                                  R3, R4, R5, R6, R7, R8, R9, R10, R11));
   gpuErrCheck(gpuDeviceSynchronize());
 
   std::cout << "R0 = " << *R0 << "\n";
@@ -88,6 +96,8 @@ int main() {
   std::cout << "R7 = " << *R7 << "\n";
   std::cout << "R8 = " << *R8 << "\n";
   std::cout << "R9 = " << *R9 << "\n";
+  std::cout << "R10 = " << *R10 << "\n";
+  std::cout << "R11 = " << *R11 << "\n";
 
   gpuErrCheck(gpuFree(R0));
   gpuErrCheck(gpuFree(R1));
@@ -99,6 +109,8 @@ int main() {
   gpuErrCheck(gpuFree(R7));
   gpuErrCheck(gpuFree(R8));
   gpuErrCheck(gpuFree(R9));
+  gpuErrCheck(gpuFree(R10));
+  gpuErrCheck(gpuFree(R11));
 
   proteus::finalize();
   return 0;
@@ -115,6 +127,8 @@ int main() {
 // CHECK-NEXT: R7 = 3
 // CHECK-NEXT: R8 = 10
 // CHECK-NEXT: R9 = 2.5
+// CHECK-NEXT: R10 = 2
+// CHECK-NEXT: R11 = 1
 // CHECK-NEXT: JitCache hits 0 total 1
 // CHECK-NEXT: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: JitStorageCache hits 0 total 1
