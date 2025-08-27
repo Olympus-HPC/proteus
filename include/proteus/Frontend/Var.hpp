@@ -18,6 +18,7 @@ struct Var {
   Type *PointerElemType;
 
   Var(AllocaInst *Alloca, FuncBase &Fn, Type *PointerElemType = nullptr);
+  Var(const Var &) = default;
 
   StringRef getName();
 
