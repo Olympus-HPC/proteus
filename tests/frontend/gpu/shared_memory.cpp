@@ -34,13 +34,12 @@ constexpr unsigned WarpSize = 32;
 int main() {
   auto J = proteus::JitModule(TARGET);
 
-  auto KernelHandle = J.addKernel<double *, size_t>("shared_reverse_warp");
+  auto KernelHandle = J.addKernel<double *>("shared_reverse_warp");
   auto &F = KernelHandle.F;
 
   F.beginFunction();
   {
     auto &A = F.getArg(0);
-    auto &N = F.getArg(1);
 
     auto &Tid = F.callBuiltin(getThreadIdX);
     auto &Bid = F.callBuiltin(getBlockIdX);
@@ -78,7 +77,7 @@ int main() {
   std::cout << "Launching with NumBlocks " << NumBlocks << " each with "
             << ThreadsPerBlock << " threads...\n";
   gpuErrCheck(KernelHandle.launch({NumBlocks, 1, 1}, {ThreadsPerBlock, 1, 1}, 0,
-                                  nullptr, A, N));
+                                  nullptr, A));
 
   gpuErrCheck(gpuDeviceSynchronize());
 
