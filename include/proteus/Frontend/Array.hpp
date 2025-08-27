@@ -5,6 +5,7 @@
 #include <llvm/IR/Module.h>
 
 #include "proteus/Frontend/Var.hpp"
+#include "proteus/AddressSpace.hpp"
 
 namespace proteus {
 
@@ -16,14 +17,6 @@ struct Array {
   Value *BasePointer;
   FuncBase &Fn;
   Type *ArrayType;
-
-  enum AddressSpace : unsigned int {
-    DEFAULT = 0,
-    GLOBAL = 1,
-    SHARED = 3,
-    CONSTANT = 4,
-    LOCAL = 5,
-  };
 
   AddressSpace AT;
 

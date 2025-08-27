@@ -10,6 +10,7 @@
 
 #include "proteus/Error.h"
 #include "proteus/Frontend/Array.hpp"
+#include "proteus/AddressSpace.hpp"
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/Frontend/TypeMap.hpp"
 #include "proteus/Frontend/Var.hpp"
@@ -70,9 +71,9 @@ public:
 
   Function *getFunction();
 
-  AllocaInst *emitAlloca(Type *Ty, StringRef Name);
+  AllocaInst *emitAlloca(Type *Ty, StringRef Name, AddressSpace AS = AddressSpace::DEFAULT);
 
-  Value *emitArrayCreate(Type *Ty, Array::AddressSpace AT, StringRef Name);
+  Value *emitArrayCreate(Type *Ty, AddressSpace AT, StringRef Name);
 
   IRBuilderBase &getIRBuilder();
 
@@ -108,7 +109,7 @@ public:
   }
 
   template <typename T>
-  Array &declArray(size_t NElem, Array::AddressSpace AT = Array::AddressSpace::DEFAULT,
+  Array &declArray(size_t NElem, AddressSpace AT = AddressSpace::DEFAULT,
                    StringRef Name = "array") {
     Function *F = getFunction();
     auto *BasePointer = emitArrayCreate(

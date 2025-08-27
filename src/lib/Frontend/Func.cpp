@@ -73,19 +73,19 @@ Function *FuncBase::getFunction() {
 
 Var &FuncBase::getArg(unsigned int ArgNo) { return Arguments.at(ArgNo); }
 
-AllocaInst *FuncBase::emitAlloca(Type *Ty, StringRef Name) {
+AllocaInst *FuncBase::emitAlloca(Type *Ty, StringRef Name, AddressSpace AS) {
   auto SaveIP = IRB.saveIP();
   Function *F = getFunction();
   auto AllocaIP = IRBuilderBase::InsertPoint(&F->getEntryBlock(),
                                              F->getEntryBlock().begin());
   IRB.restoreIP(AllocaIP);
-  auto *Alloca = IRB.CreateAlloca(Ty, nullptr, Name);
+  auto *Alloca = IRB.CreateAlloca(Ty, static_cast<unsigned>(AS), nullptr, Name);
 
   IRB.restoreIP(SaveIP);
   return Alloca;
 }
 
-Value *FuncBase::emitArrayCreate(Type *Ty, Array::AddressSpace AT,
+Value *FuncBase::emitArrayCreate(Type *Ty, AddressSpace AT,
                                  StringRef Name) {
   if (!Ty || !Ty->isArrayTy())
     PROTEUS_FATAL_ERROR("Expected LLVM ArrayType for emitArrayCreate");
@@ -95,22 +95,25 @@ Value *FuncBase::emitArrayCreate(Type *Ty, Array::AddressSpace AT,
   uint64_t NumElems = ArrTy->getNumElements();
 
   switch (AT) {
-    case Array::AddressSpace::SHARED:
-    case Array::AddressSpace::GLOBAL: {
+    case AddressSpace::SHARED:
+    case AddressSpace::GLOBAL: {
       Module *M = getFunction()->getParent();
       auto *GV = new GlobalVariable(
           *M, ArrTy, /*isConstant=*/false, GlobalValue::InternalLinkage,
           UndefValue::get(ArrTy), Name, /*InsertBefore=*/nullptr,
-          GlobalValue::NotThreadLocal, AT, /*ExternallyInitialized=*/false);
+          GlobalValue::NotThreadLocal, static_cast<unsigned>(AT), /*ExternallyInitialized=*/false);
 
       return GV;
     }
-    case Array::AddressSpace::DEFAULT: {
-      auto *Alloca = emitAlloca(ArrTy, Name);
+    case AddressSpace::DEFAULT:
+    case AddressSpace::LOCAL: {
+      auto *Alloca = emitAlloca(ArrTy, Name, AT);
       return Alloca;
     }
+    case AddressSpace::CONSTANT:
+      PROTEUS_FATAL_ERROR("Constant arrays are not supported");
     default:
-      PROTEUS_FATAL_ERROR("Unsupported Array::AddressSpace");
+      PROTEUS_FATAL_ERROR("Unsupported AddressSpace");
     }
 }
 
