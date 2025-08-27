@@ -94,8 +94,6 @@ Value *FuncBase::emitArrayCreate(Type *Ty, AddressSpace AT,
     PROTEUS_FATAL_ERROR("Expected LLVM ArrayType for emitArrayCreate");
 
   auto *ArrTy = cast<ArrayType>(Ty);
-  Type *ElemTy = ArrTy->getElementType();
-  uint64_t NumElems = ArrTy->getNumElements();
 
   switch (AT) {
     case AddressSpace::SHARED:
