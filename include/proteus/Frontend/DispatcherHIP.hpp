@@ -16,38 +16,54 @@ public:
     return D;
   }
 
-  void compile([[maybe_unused]] std::unique_ptr<LLVMContext> Ctx,
-               std::unique_ptr<Module> M) override {
-    Timer T;
-    SmallString<4096> Bitcode;
-    raw_svector_ostream OS(Bitcode);
-    WriteBitcodeToFile(*M, OS);
-
-    HashT HashValue = hash(StringRef{Bitcode.data(), Bitcode.size()});
-    auto StoredObject = StorageCache.lookup(HashValue);
-    if (StoredObject) {
-      Library = std::move(StoredObject);
-      return;
-    }
-
-    Library = Jit.compileOnly(*M);
-    if (!Library)
+  std::unique_ptr<MemoryBuffer>
+  compile([[maybe_unused]] std::unique_ptr<LLVMContext> Ctx,
+          std::unique_ptr<Module> M, HashT ModuleHash) override {
+    std::unique_ptr<MemoryBuffer> ObjectModule = Jit.compileOnly(*M);
+    if (!ObjectModule)
       PROTEUS_FATAL_ERROR("Expected non-null object library");
 
-    StorageCache.store(HashValue, Library->getMemBufferRef());
+    StorageCache.store(ModuleHash, ObjectModule->getMemBufferRef());
+
+    return ObjectModule;
   }
 
-  DispatchResult launch(StringRef KernelName, LaunchDims GridDim,
+  std::unique_ptr<MemoryBuffer> lookupObjectModule(HashT ModuleHash) override {
+    return StorageCache.lookup(ModuleHash);
+  }
+
+  DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
                         LaunchDims BlockDim, ArrayRef<void *> KernelArgs,
                         uint64_t ShmemSize, void *Stream) override {
+    dim3 HipGridDim = {GridDim.X, GridDim.Y, GridDim.Z};
+    dim3 HipBlockDim = {BlockDim.X, BlockDim.Y, BlockDim.Z};
+    hipStream_t HipStream = reinterpret_cast<hipStream_t>(Stream);
+
+    void **KernelArgsPtrs = const_cast<void **>(KernelArgs.data());
+    return proteus::launchKernelFunction(
+        reinterpret_cast<hipFunction_t>(KernelFunc), HipGridDim, HipBlockDim,
+        KernelArgsPtrs, ShmemSize, HipStream);
+  }
+
+  StringRef getDeviceArch() const override { return Jit.getDeviceArch(); }
+
+  ~DispatcherHIP() {
+    CodeCache.printStats();
+    StorageCache.printStats();
+  }
+
+  void *
+  getFunctionAddress(StringRef KernelName,
+                     std::optional<MemoryBufferRef> ObjectModule) override {
     auto GetKernelFunc = [&]() {
+      // Hash the kernel name to get a unique id.
       HashT HashValue = hash(KernelName);
 
       if (auto KernelFunc = CodeCache.lookup(HashValue))
         return KernelFunc;
 
       auto KernelFunc = proteus::getKernelFunctionFromImage(
-          KernelName, Library->getBufferStart(),
+          KernelName, ObjectModule->getBufferStart(),
           /*RelinkGlobalsByCopy*/ false,
           /* VarNameToDevPtr */ {});
 
@@ -57,29 +73,19 @@ public:
     };
 
     auto KernelFunc = GetKernelFunc();
-
-    dim3 HipGridDim = {GridDim.X, GridDim.Y, GridDim.Z};
-    dim3 HipBlockDim = {BlockDim.X, BlockDim.Y, BlockDim.Z};
-    hipStream_t HipStream = reinterpret_cast<hipStream_t>(Stream);
-
-    void **KernelArgsPtrs = const_cast<void **>(KernelArgs.data());
-    return proteus::launchKernelFunction(KernelFunc, HipGridDim, HipBlockDim,
-                                         KernelArgsPtrs, ShmemSize, HipStream);
+    return KernelFunc;
   }
 
-  ~DispatcherHIP() {
-    CodeCache.printStats();
-    StorageCache.printStats();
-  }
-
-protected:
-  void *getFunctionAddress(StringRef) override {
-    PROTEUS_FATAL_ERROR("HIP does not support getFunctionAddress");
+  void loadDynamicLibrary(const SmallString<128> &) override {
+    PROTEUS_FATAL_ERROR(
+        "Device dispatcher does not implement loadDynamicLibrary");
   }
 
 private:
   JitEngineDeviceHIP &Jit;
-  DispatcherHIP() : Jit(JitEngineDeviceHIP::instance()) {}
+  DispatcherHIP() : Jit(JitEngineDeviceHIP::instance()) {
+    TargetModel = TargetModelType::HIP;
+  }
   JitCache<hipFunction_t> CodeCache;
   JitStorageCache<hipFunction_t> StorageCache;
 };
