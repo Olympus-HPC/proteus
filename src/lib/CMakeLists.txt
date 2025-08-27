@@ -9,6 +9,7 @@ set(SOURCES
   Frontend/Func.cpp
   Frontend/Var.cpp
   Frontend/Dispatcher.cpp
+  Frontend/LoopNest.cpp
 )
 
 set(PROTEUS_PROJECT_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")

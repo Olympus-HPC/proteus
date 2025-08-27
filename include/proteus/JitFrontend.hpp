@@ -15,6 +15,7 @@
 #include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/Frontend/Func.hpp"
+#include "proteus/Frontend/LoopNest.hpp"
 #include "proteus/Frontend/TypeMap.hpp"
 
 #include <iostream>
