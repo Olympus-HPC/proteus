@@ -105,12 +105,10 @@ Value *FuncBase::emitArrayCreate(Type *Ty, Array::AddressSpace AT,
 
       return GV;
     }
-    case Array::AddressSpace::REGISTER: {
+    case Array::AddressSpace::DEFAULT: {
       auto *Alloca = emitAlloca(ArrTy, Name);
       return Alloca;
     }
-    case Array::AddressSpace::CONSTANT:
-      PROTEUS_FATAL_ERROR("Constant arrays are not supported");
     default:
       PROTEUS_FATAL_ERROR("Unsupported Array::AddressSpace");
     }

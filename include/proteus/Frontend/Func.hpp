@@ -108,7 +108,7 @@ public:
   }
 
   template <typename T>
-  Array &declArray(size_t NElem, Array::AddressSpace AT,
+  Array &declArray(size_t NElem, Array::AddressSpace AT = Array::AddressSpace::DEFAULT,
                    StringRef Name = "array") {
     Function *F = getFunction();
     auto *BasePointer = emitArrayCreate(
