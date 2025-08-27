@@ -6,8 +6,8 @@
 #include <proteus/JitFrontend.hpp>
 #include <proteus/JitInterface.hpp>
 
-auto get3DLoopNestFunction(int DI, int DJ, int DK, int TILE_I, int TILE_J,
-                           int TILE_K) {
+static auto get3DLoopNestFunction(int DI, int DJ, int DK, int TileI, int TileJ,
+                           int TileK) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
   auto &F = JitMod->addFunction<void, double *, double *>("loopnest_3d");
 
@@ -19,9 +19,9 @@ auto get3DLoopNestFunction(int DI, int DJ, int DK, int TILE_I, int TILE_J,
   auto &UBJ = F.declVar<int>("ubj");
   auto &UBK = F.declVar<int>("ubk");
 
-  auto args = F.getArgs();
-  auto &A = std::get<0>(args);
-  auto &B = std::get<1>(args);
+  auto Args = F.getArgs();
+  auto &A = std::get<0>(Args);
+  auto &B = std::get<1>(Args);
 
   F.beginFunction();
   {
@@ -35,14 +35,14 @@ auto get3DLoopNestFunction(int DI, int DJ, int DK, int TILE_I, int TILE_J,
     auto &Zero = F.declVar<int>("zero");
     Zero = 0;
 
-    F.LoopNest({F.ForLoop({I, Zero, UBI, IncOne}).tile(TILE_I),
-                F.ForLoop({J, Zero, UBJ, IncOne}).tile(TILE_J),
-                F.ForLoop({K, Zero, UBK, IncOne},
-                          [&]() {
-                            auto idx = I * DJ * DK + J * DK + K;
-                            A[idx] = B[idx] + I + J + K;
-                          })
-                    .tile(TILE_K)})
+    F.buildLoopNest({F.buildForLoop({I, Zero, UBI, IncOne}).tile(TileI),
+                       F.buildForLoop({J, Zero, UBJ, IncOne}).tile(TileJ),
+                       F.buildForLoop({K, Zero, UBK, IncOne},
+                                        [&]() {
+                                          auto Idx = I * DJ * DK + J * DK + K;
+                                          A[Idx] = B[Idx] + I + J + K;
+                                        })
+                           .tile(TileK)})
         .emit();
 
     F.ret();
@@ -52,7 +52,7 @@ auto get3DLoopNestFunction(int DI, int DJ, int DK, int TILE_I, int TILE_J,
   return std::make_pair(std::move(JitMod), std::ref(F));
 }
 
-auto get3DUniformTileFunction(int DI, int DJ, int DK, int TILE_SIZE) {
+static auto get3DUniformTileFunction(int DI, int DJ, int DK, int TileSize) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
   auto &F =
       JitMod->addFunction<void, double *, double *>("loopnest_3d_uniform");
@@ -65,9 +65,9 @@ auto get3DUniformTileFunction(int DI, int DJ, int DK, int TILE_SIZE) {
   auto &UBJ = F.declVar<int>("ubj");
   auto &UBK = F.declVar<int>("ubk");
 
-  auto args = F.getArgs();
-  auto &A = std::get<0>(args);
-  auto &B = std::get<1>(args);
+  auto Args = F.getArgs();
+  auto &A = std::get<0>(Args);
+  auto &B = std::get<1>(Args);
 
   F.beginFunction();
   {
@@ -81,14 +81,14 @@ auto get3DUniformTileFunction(int DI, int DJ, int DK, int TILE_SIZE) {
     auto &Zero = F.declVar<int>("zero");
     Zero = 0;
 
-    F.LoopNest({F.ForLoop({I, Zero, UBI, IncOne}).tile(TILE_SIZE),
-                F.ForLoop({J, Zero, UBJ, IncOne}).tile(TILE_SIZE),
-                F.ForLoop({K, Zero, UBK, IncOne},
-                          [&]() {
-                            auto idx = I * DJ * DK + J * DK + K;
-                            A[idx] = B[idx] * 2;
-                          })
-                    .tile(TILE_SIZE)})
+    F.buildLoopNest({F.buildForLoop({I, Zero, UBI, IncOne}).tile(TileSize),
+                       F.buildForLoop({J, Zero, UBJ, IncOne}).tile(TileSize),
+                       F.buildForLoop({K, Zero, UBK, IncOne},
+                                        [&]() {
+                                          auto Idx = I * DJ * DK + J * DK + K;
+                                          A[Idx] = B[Idx] * 2;
+                                        })
+                           .tile(TileSize)})
         .emit();
 
     F.ret();
@@ -101,47 +101,47 @@ auto get3DUniformTileFunction(int DI, int DJ, int DK, int TILE_SIZE) {
 int main() {
   proteus::init();
   constexpr int DI = 4, DJ = 2, DK = 2;
-  constexpr int TILE_I = 2, TILE_J = 1, TILE_K = 2;
-  constexpr int UNIFORM_TILE = 2;
+  constexpr int TileI = 2, TileJ = 1, TileK = 2;
+  constexpr int UniformTile = 2;
   constexpr int SIZE = DI * DJ * DK;
 
   // Test 3D variadic tiling
   auto [JitMod1, F1] =
-      get3DLoopNestFunction(DI, DJ, DK, TILE_I, TILE_J, TILE_K);
+      get3DLoopNestFunction(DI, DJ, DK, TileI, TileJ, TileK);
   JitMod1->compile();
 
   double *A1 = new double[SIZE];
   double *B1 = new double[SIZE];
 
-  for (int i = 0; i < SIZE; i++) {
-    B1[i] = i;
-    A1[i] = 0.0;
+  for (int I = 0; I < SIZE; I++) {
+    B1[I] = I;
+    A1[I] = 0.0;
   }
 
   F1(A1, B1);
 
   std::cout << "3D Variadic Tiling Results:\n";
-  for (int i = 0; i < SIZE; i++) {
-    std::cout << "A1[" << i << "] = " << A1[i] << "\n";
+  for (int I = 0; I < SIZE; I++) {
+    std::cout << "A1[" << I << "] = " << A1[I] << "\n";
   }
 
   // Test 3D uniform tiling
-  auto [JitMod2, F2] = get3DUniformTileFunction(DI, DJ, DK, UNIFORM_TILE);
+  auto [JitMod2, F2] = get3DUniformTileFunction(DI, DJ, DK, UniformTile);
   JitMod2->compile();
 
   double *A2 = new double[SIZE];
   double *B2 = new double[SIZE];
 
-  for (int i = 0; i < SIZE; i++) {
-    B2[i] = i;
-    A2[i] = 0.0;
+  for (int I = 0; I < SIZE; I++) {
+    B2[I] = I;
+    A2[I] = 0.0;
   }
 
   F2(A2, B2);
 
   std::cout << "3D Uniform Tiling Results:\n";
-  for (int i = 0; i < SIZE; i++) {
-    std::cout << "A2[" << i << "] = " << A2[i] << "\n";
+  for (int I = 0; I < SIZE; I++) {
+    std::cout << "A2[" << I << "] = " << A2[I] << "\n";
   }
 
   delete[] A1;

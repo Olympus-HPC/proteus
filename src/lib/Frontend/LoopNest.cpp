@@ -6,12 +6,16 @@ LoopBoundsDescription::LoopBoundsDescription(Var &IterVar, Var &Init,
                                              Var &UpperBound, Var &Inc)
     : IterVar(IterVar), Init(Init), UpperBound(UpperBound), Inc(Inc) {}
 
-ForLoopBuilder::ForLoopBuilder(LoopBoundsDescription Bounds, FuncBase &Fn)
-    : Bounds(std::move(Bounds)), Fn(Fn) {}
 
 ForLoopBuilder::ForLoopBuilder(LoopBoundsDescription Bounds,
                                std::function<void()> Body, FuncBase &Fn)
     : Bounds(std::move(Bounds)), Body(std::move(Body)), Fn(Fn) {}
+
+ForLoopBuilder ForLoopBuilder::create(LoopBoundsDescription Bounds,
+                                      std::function<void()> Body,
+                                      FuncBase &Fn) {
+  return ForLoopBuilder(std::move(Bounds), std::move(Body), Fn);
+}
 
 ForLoopBuilder &ForLoopBuilder::tile(int Tile) {
   TileSize = Tile;

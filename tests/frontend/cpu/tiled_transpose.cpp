@@ -7,7 +7,7 @@
 #include <proteus/JitFrontend.hpp>
 #include <proteus/JitInterface.hpp>
 
-auto getTiled2DTransposeFunction(int ROWS, int COLS, int TILE_SIZE) {
+static auto getTiled2DTransposeFunction(int ROWS, int COLS, int TileSize) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
   // TODO: Should JitModule handle de-duplicate function names?
   static int Counter = 0;
@@ -20,9 +20,9 @@ auto getTiled2DTransposeFunction(int ROWS, int COLS, int TILE_SIZE) {
   auto &UBRows = F.declVar<int>("ub_rows");
   auto &UBCols = F.declVar<int>("ub_cols");
 
-  auto args = F.getArgs();
-  auto &A = std::get<0>(args);
-  auto &B = std::get<1>(args);
+  auto Args = F.getArgs();
+  auto &A = std::get<0>(Args);
+  auto &B = std::get<1>(Args);
 
   F.beginFunction();
   {
@@ -34,14 +34,15 @@ auto getTiled2DTransposeFunction(int ROWS, int COLS, int TILE_SIZE) {
     auto &Zero = F.declVar<int>("zero");
     Zero = 0;
 
-    F.LoopNest({F.ForLoop({I, Zero, UBRows, IncOne}).tile(TILE_SIZE),
-                F.ForLoop({J, Zero, UBCols, IncOne},
-                          [&]() {
-                            auto aIdx = J * ROWS + I;
-                            auto bIdx = I * COLS + J;
-                            A[aIdx] = B[bIdx];
-                          })
-                    .tile(TILE_SIZE)})
+    F.buildLoopNest(
+         {F.buildForLoop({I, Zero, UBRows, IncOne}).tile(TileSize),
+          F.buildForLoop({J, Zero, UBCols, IncOne},
+                           [&]() {
+                             auto AIdx = J * ROWS + I;
+                             auto BIdx = I * COLS + J;
+                             A[AIdx] = B[BIdx];
+                           })
+              .tile(TileSize)})
         .emit();
 
     F.ret();
@@ -57,25 +58,25 @@ int main() {
   {
     constexpr int ROWS = 4;
     constexpr int COLS = 4;
-    constexpr int TILE_SIZE = 2;
-    auto [JitMod, F] = getTiled2DTransposeFunction(ROWS, COLS, TILE_SIZE);
+    constexpr int TileSize = 2;
+    auto [JitMod, F] = getTiled2DTransposeFunction(ROWS, COLS, TileSize);
 
     JitMod->compile();
 
     double *A = (double *)new double[ROWS * COLS];
     double *B = (double *)new double[ROWS * COLS];
 
-    for (int i = 0; i < ROWS; i++) {
-      for (int j = 0; j < COLS; j++) {
-        B[i * COLS + j] = i * COLS + j;
-        A[i * COLS + j] = 0.0;
+    for (int I = 0; I < ROWS; I++) {
+      for (int J = 0; J < COLS; J++) {
+        B[I * COLS + J] = I * COLS + J;
+        A[I * COLS + J] = 0.0;
       }
     }
 
     std::cout << "Input B:\n";
-    for (int i = 0; i < ROWS; i++) {
-      for (int j = 0; j < COLS; j++) {
-        std::cout << B[i * COLS + j] << " ";
+    for (int I = 0; I < ROWS; I++) {
+      for (int J = 0; J < COLS; J++) {
+        std::cout << B[I * COLS + J] << " ";
       }
       std::cout << "\n";
     }
@@ -83,9 +84,9 @@ int main() {
     F(A, B);
 
     std::cout << "Transposed A:\n";
-    for (int i = 0; i < COLS; i++) {
-      for (int j = 0; j < ROWS; j++) {
-        std::cout << A[i * ROWS + j] << " ";
+    for (int I = 0; I < COLS; I++) {
+      for (int J = 0; J < ROWS; J++) {
+        std::cout << A[I * ROWS + J] << " ";
       }
       std::cout << "\n";
     }
@@ -98,25 +99,25 @@ int main() {
   {
     constexpr int ROWS = 5;
     constexpr int COLS = 4;
-    constexpr int TILE_SIZE = 3;
-    auto [JitMod, F] = getTiled2DTransposeFunction(ROWS, COLS, TILE_SIZE);
+    constexpr int TileSize = 3;
+    auto [JitMod, F] = getTiled2DTransposeFunction(ROWS, COLS, TileSize);
 
     JitMod->compile();
 
     double *A = (double *)new double[ROWS * COLS];
     double *B = (double *)new double[ROWS * COLS];
 
-    for (int i = 0; i < ROWS; i++) {
-      for (int j = 0; j < COLS; j++) {
-        B[i * COLS + j] = i * COLS + j;
-        A[i * COLS + j] = 0.0;
+    for (int I = 0; I < ROWS; I++) {
+      for (int J = 0; J < COLS; J++) {
+        B[I * COLS + J] = I * COLS + J;
+        A[I * COLS + J] = 0.0;
       }
     }
 
     std::cout << "Input B:\n";
-    for (int i = 0; i < ROWS; i++) {
-      for (int j = 0; j < COLS; j++) {
-        std::cout << B[i * COLS + j] << " ";
+    for (int I = 0; I < ROWS; I++) {
+      for (int J = 0; J < COLS; J++) {
+        std::cout << B[I * COLS + J] << " ";
       }
       std::cout << "\n";
     }
@@ -124,9 +125,9 @@ int main() {
     F(A, B);
 
     std::cout << "Transposed A:\n";
-    for (int i = 0; i < COLS; i++) {
-      for (int j = 0; j < ROWS; j++) {
-        std::cout << A[i * ROWS + j] << " ";
+    for (int I = 0; I < COLS; I++) {
+      for (int J = 0; J < ROWS; J++) {
+        std::cout << A[I * ROWS + J] << " ";
       }
       std::cout << "\n";
     }

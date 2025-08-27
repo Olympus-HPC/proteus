@@ -6,7 +6,7 @@
 #include <proteus/JitFrontend.hpp>
 #include <proteus/JitInterface.hpp>
 
-auto get1DLoopNestFunction(int N, int TILE_SIZE) {
+static auto get1DLoopNestFunction(int N, int TileSize) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
   auto &F = JitMod->addFunction<void, double *, double *>("loopnest_1d");
 
@@ -14,9 +14,9 @@ auto get1DLoopNestFunction(int N, int TILE_SIZE) {
   auto &IncOne = F.declVar<int>("inc");
   auto &UB = F.declVar<int>("ub");
 
-  auto args = F.getArgs();
-  auto &A = std::get<0>(args);
-  auto &B = std::get<1>(args);
+  auto Args = F.getArgs();
+  auto &A = std::get<0>(Args);
+  auto &B = std::get<1>(Args);
 
   F.beginFunction();
   {
@@ -26,8 +26,9 @@ auto get1DLoopNestFunction(int N, int TILE_SIZE) {
     auto &Zero = F.declVar<int>("zero");
     Zero = 0;
 
-    F.LoopNest({F.ForLoop({I, Zero, UB, IncOne}, [&]() { A[I] = B[I] * 3.0; })
-                    .tile(TILE_SIZE)})
+    F.buildLoopNest(
+         {F.buildForLoop({I, Zero, UB, IncOne}, [&]() { A[I] = B[I] * 3.0; })
+              .tile(TileSize)})
         .emit();
 
     F.ret();
@@ -37,7 +38,7 @@ auto get1DLoopNestFunction(int N, int TILE_SIZE) {
   return std::make_pair(std::move(JitMod), std::ref(F));
 }
 
-auto get1DSimpleLoopNestFunction(int N) {
+static auto get1DSimpleLoopNestFunction(int N) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
   auto &F = JitMod->addFunction<void, double *, double *>("loopnest_1d_simple");
 
@@ -45,9 +46,9 @@ auto get1DSimpleLoopNestFunction(int N) {
   auto &IncOne = F.declVar<int>("inc");
   auto &UB = F.declVar<int>("ub");
 
-  auto args = F.getArgs();
-  auto &A = std::get<0>(args);
-  auto &B = std::get<1>(args);
+  auto Args = F.getArgs();
+  auto &A = std::get<0>(Args);
+  auto &B = std::get<1>(Args);
 
   F.beginFunction();
   {
@@ -58,7 +59,8 @@ auto get1DSimpleLoopNestFunction(int N) {
     Zero = 0;
 
     // Test non-tiled version
-    F.LoopNest({F.ForLoop({I, Zero, UB, IncOne}, [&]() { A[I] = B[I] * 3.0; })})
+    F.buildLoopNest({F.buildForLoop({I, Zero, UB, IncOne},
+                                        [&]() { A[I] = B[I] * 3.0; })})
         .emit();
 
     F.ret();
@@ -71,25 +73,25 @@ auto get1DSimpleLoopNestFunction(int N) {
 int main() {
   proteus::init();
   constexpr int N = 8;
-  constexpr int TILE_SIZE = 4;
+  constexpr int TileSize = 4;
 
   // Test 1D tiled loop
-  auto [JitMod1, F1] = get1DLoopNestFunction(N, TILE_SIZE);
+  auto [JitMod1, F1] = get1DLoopNestFunction(N, TileSize);
   JitMod1->compile();
 
   double *A1 = new double[N];
   double *B1 = new double[N];
 
-  for (int i = 0; i < N; i++) {
-    B1[i] = i + 1;
-    A1[i] = 0.0;
+  for (int I = 0; I < N; I++) {
+    B1[I] = I + 1;
+    A1[I] = 0.0;
   }
 
   F1(A1, B1);
 
   std::cout << "1D Tiled Results:\n";
-  for (int i = 0; i < N; i++) {
-    std::cout << "A1[" << i << "] = " << A1[i] << "\n";
+  for (int I = 0; I < N; I++) {
+    std::cout << "A1[" << I << "] = " << A1[I] << "\n";
   }
 
   // Test 1D simple (non-tiled) loop
@@ -99,16 +101,16 @@ int main() {
   double *A2 = new double[N];
   double *B2 = new double[N];
 
-  for (int i = 0; i < N; i++) {
-    B2[i] = i + 1;
-    A2[i] = 0.0;
+  for (int I = 0; I < N; I++) {
+    B2[I] = I + 1;
+    A2[I] = 0.0;
   }
 
   F2(A2, B2);
 
   std::cout << "1D Simple Results:\n";
-  for (int i = 0; i < N; i++) {
-    std::cout << "A2[" << i << "] = " << A2[i] << "\n";
+  for (int I = 0; I < N; I++) {
+    std::cout << "A2[" << I << "] = " << A2[I] << "\n";
   }
 
   delete[] A1;

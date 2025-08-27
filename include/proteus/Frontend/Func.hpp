@@ -9,10 +9,10 @@
 #include <llvm/IR/Module.h>
 
 #include "proteus/Error.h"
+#include "proteus/Frontend/Array.hpp"
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/Frontend/TypeMap.hpp"
 #include "proteus/Frontend/Var.hpp"
-#include "proteus/Frontend/Array.hpp"
 #include "proteus/Hashing.hpp"
 
 namespace proteus {
@@ -101,11 +101,15 @@ public:
     return VarRef;
   }
 
-  template <typename T> Array &declArray(size_t NElem, Array::AddressSpace AT, StringRef Name = "array") {
+  template <typename T>
+  Array &declArray(size_t NElem, Array::AddressSpace AT,
+                   StringRef Name = "array") {
     Function *F = getFunction();
-    auto *BasePointer = emitArrayCreate(TypeMap<T>::getArrayType(F->getContext(), NElem), AT, Name);
-    return Arrays.emplace_back(
-        BasePointer, *this, TypeMap<T>::getArrayType(F->getContext(), NElem), AT);
+    auto *BasePointer = emitArrayCreate(
+        TypeMap<T>::getArrayType(F->getContext(), NElem), AT, Name);
+    return Arrays.emplace_back(BasePointer, *this,
+                               TypeMap<T>::getArrayType(F->getContext(), NElem),
+                               AT);
   }
 
   template <typename T>
@@ -175,12 +179,14 @@ public:
     }
   }
 
-  ForLoopBuilder ForLoop(LoopBoundsDescription Bounds);
-  ForLoopBuilder ForLoop(LoopBoundsDescription Bounds,
-                         std::function<void()> Body);
+  void forLoop(LoopBoundsDescription Bounds, std::function<void()> Body);
 
-  LoopNestBuilder LoopNest(std::vector<ForLoopBuilder> Loops);
-  LoopNestBuilder LoopNest(std::initializer_list<ForLoopBuilder> Loops);
+  ForLoopBuilder buildForLoop(LoopBoundsDescription Bounds);
+  ForLoopBuilder buildForLoop(LoopBoundsDescription Bounds,
+                              std::function<void()> Body);
+
+  LoopNestBuilder buildLoopNest(std::vector<ForLoopBuilder> Loops);
+  LoopNestBuilder buildLoopNest(std::initializer_list<ForLoopBuilder> Loops);
 
   void ret(std::optional<std::reference_wrapper<Var>> OptRet = std::nullopt);
 

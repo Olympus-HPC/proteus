@@ -27,10 +27,11 @@ public:
   std::optional<std::function<void()>> Body;
   FuncBase &Fn;
 
-  ForLoopBuilder(LoopBoundsDescription Bounds, FuncBase &Fn);
-
   ForLoopBuilder(LoopBoundsDescription Bounds, std::function<void()> Body,
                  FuncBase &Fn);
+
+  static ForLoopBuilder create(LoopBoundsDescription Bounds,
+                               std::function<void()> Body, FuncBase &Fn);
 
   ForLoopBuilder &tile(int Tile);
 

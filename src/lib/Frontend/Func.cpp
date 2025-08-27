@@ -258,21 +258,31 @@ void FuncBase::endFor() {
   IRB.restoreIP(IP);
 }
 
-ForLoopBuilder FuncBase::ForLoop(LoopBoundsDescription Bounds) {
-  return ForLoopBuilder(std::move(Bounds), *this);
+void FuncBase::forLoop(LoopBoundsDescription Bounds,
+                       std::function<void()> Body) {
+  if (!Body) {
+    PROTEUS_FATAL_ERROR("forLoop requires a valid body function");
+  }
+  beginFor(Bounds.IterVar, Bounds.Init, Bounds.UpperBound, Bounds.Inc);
+  Body();
+  endFor();
 }
 
-ForLoopBuilder FuncBase::ForLoop(LoopBoundsDescription Bounds,
+ForLoopBuilder FuncBase::buildForLoop(LoopBoundsDescription Bounds) {
+  return ForLoopBuilder(std::move(Bounds), std::function<void()>(), *this);
+}
+
+ForLoopBuilder FuncBase::buildForLoop(LoopBoundsDescription Bounds,
                                         std::function<void()> Body) {
   return ForLoopBuilder(std::move(Bounds), std::move(Body), *this);
 }
 
-LoopNestBuilder FuncBase::LoopNest(std::vector<ForLoopBuilder> Loops) {
+LoopNestBuilder FuncBase::buildLoopNest(std::vector<ForLoopBuilder> Loops) {
   return LoopNestBuilder::create(*this, std::move(Loops));
 }
 
 LoopNestBuilder
-FuncBase::LoopNest(std::initializer_list<ForLoopBuilder> Loops) {
+FuncBase::buildLoopNest(std::initializer_list<ForLoopBuilder> Loops) {
   return LoopNestBuilder::create(*this, Loops);
 }
 
