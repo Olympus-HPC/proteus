@@ -28,7 +28,6 @@ protected:
   std::deque<Var> Arguments;
   std::deque<Var> Variables;
   std::deque<Var> RuntimeConstants;
-  HashT HashValue;
   std::string Name;
 
   enum class ScopeKind { FUNCTION, IF, FOR };
@@ -108,8 +107,6 @@ public:
 
     VarRef = Val;
 
-    HashValue = hash(HashValue, Val);
-
     return VarRef;
   }
 
@@ -153,7 +150,10 @@ public:
                 int Line = __builtin_LINE());
   void endFor();
 
-  template <typename RetT, typename... ArgT> void call(StringRef Name);
+  template <typename RetT, typename... ArgT>
+  std::enable_if_t<!std::is_void_v<RetT>, Var &> call(StringRef Name);
+  template <typename RetT, typename... ArgT>
+  std::enable_if_t<std::is_void_v<RetT>, void> call(StringRef Name);
 
   Var &callBuiltin(function_ref<Var &(FuncBase &)> Lower) {
     return Lower(*this);
@@ -161,12 +161,19 @@ public:
 
   void ret(std::optional<std::reference_wrapper<Var>> OptRet = std::nullopt);
 
-  StringRef getName() { return Name; }
+  StringRef getName() const { return Name; }
+
+  void setName(StringRef NewName) {
+    Name = NewName.str();
+    Function *F = getFunction();
+    F->setName(Name);
+  }
 };
 
 template <typename RetT, typename... ArgT> class Func final : public FuncBase {
 private:
   Dispatcher &Dispatch;
+  RetT (*CompiledFunc)(ArgT...) = nullptr;
 
 private:
   template <std::size_t... Is> auto getArgsImpl(std::index_sequence<Is...>) {
@@ -180,6 +187,12 @@ public:
   RetT operator()(ArgT... Args);
 
   auto getArgs() { return getArgsImpl(std::index_sequence_for<ArgT...>{}); }
+
+  auto getCompiledFunc() const { return CompiledFunc; }
+
+  void setCompiledFunc(RetT (*CompiledFuncIn)(ArgT...)) {
+    CompiledFunc = CompiledFuncIn;
+  }
 };
 
 } // namespace proteus

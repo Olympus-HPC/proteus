@@ -16,6 +16,21 @@ option(BUILD_SHARED "Builds the JIT library as shared" OFF)
 option(ENABLE_TESTS "Enable tests" ON)
 option(ENABLE_DEVELOPER_COMPILER_FLAGS "Enable developer compiler flags: -Wall -Wextra -Werror" OFF)
 
+# Enforce LLVM_INSTALL_DIR requirement.
+if(NOT DEFINED LLVM_INSTALL_DIR OR LLVM_INSTALL_DIR STREQUAL "")
+  message(FATAL_ERROR
+    "LLVM_INSTALL_DIR is required but not defined. "
+    "Please specify it with: cmake -DLLVM_INSTALL_DIR=/path/to/llvm/install ...")
+endif()
+
+# Verify LLVM_INSTALL_DIR exists.
+if(NOT EXISTS "${LLVM_INSTALL_DIR}")
+  message(FATAL_ERROR
+    "LLVM_INSTALL_DIR points to non-existent directory: ${LLVM_INSTALL_DIR}")
+endif()
+
+message(STATUS "Using LLVM installation: ${LLVM_INSTALL_DIR}")
+
 if (ENABLE_DEVELOPER_COMPILER_FLAGS)
   add_compile_options(-Wall -Wextra -Werror "-Wno-error=\#warnings" -Wno-error=unknown-cuda-version)
 endif()

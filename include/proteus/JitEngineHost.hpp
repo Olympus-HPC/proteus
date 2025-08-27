@@ -49,6 +49,8 @@ public:
 
   void compileOnly(std::unique_ptr<LLVMContext> Ctx, std::unique_ptr<Module> M);
 
+  void loadDynamicLibrary(const SmallString<128> &Path);
+
   void *getFunctionAddress(StringRef FnName);
 
 private:

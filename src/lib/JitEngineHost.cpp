@@ -373,8 +373,13 @@ void JitEngineHost::compileOnly(std::unique_ptr<LLVMContext> Ctx,
   ExitOnErr(LLJITPtr->addIRModule(std::move(TSM)));
 }
 
-void *JitEngineHost::getFunctionAddress(StringRef FnName) {
+void JitEngineHost::loadDynamicLibrary(const SmallString<128> &Path) {
+  LLJITPtr->getMainJITDylib().addGenerator(
+      ExitOnErr(llvm::orc::DynamicLibrarySearchGenerator::Load(
+          Path.data(), LLJITPtr->getDataLayout().getGlobalPrefix())));
+}
 
+void *JitEngineHost::getFunctionAddress(StringRef FnName) {
   auto EntryAddr = ExitOnErr(LLJITPtr->lookup(FnName));
 
   void *JitFnPtr = (void *)EntryAddr.getValue();

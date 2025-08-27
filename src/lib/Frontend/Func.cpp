@@ -3,7 +3,7 @@
 namespace proteus {
 
 FuncBase::FuncBase(JitModule &J, FunctionCallee FC)
-    : J(J), FC(FC), IRB{FC.getCallee()->getContext()}, HashValue{0} {
+    : J(J), FC(FC), IRB{FC.getCallee()->getContext()} {
   Function *F = cast<Function>(FC.getCallee());
   BasicBlock::Create(F->getContext(), "entry", F);
   Name = F->getName();
@@ -55,13 +55,6 @@ void FuncBase::endFunction() {
                         toString(S.Kind) + " @ " + S.File + ":" +
                         std::to_string(S.Line));
   Scopes.pop_back();
-
-  Function *F = getFunction();
-  // TODO: handle updating the Name better. We create a unique symbol by using
-  // the hash value and update both the FuncBase Name and LLVM's Function
-  // object.
-  Name = F->getName().str() + "$" + HashValue.toString();
-  F->setName(Name);
 }
 
 Function *FuncBase::getFunction() {

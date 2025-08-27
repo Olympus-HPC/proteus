@@ -102,6 +102,14 @@ bool Var::isPointer() const {
 void Var::storeValue(Value *Val) {
   auto &IRB = Fn.getIRBuilder();
   Type *AllocaType = Alloca->getAllocatedType();
+  // TODO: This is too permissive and allows assigning a value to a pointer's
+  // memory location, e.g:
+  // ...
+  // Var &V = declVar<double *>();
+  // V = 42 <--- Will store 42 to the memory location pointed by V!
+  // ...
+  // Fix for compliance with C++ typing and rules, use traits and compile-time
+  // processing when possible.
   if (AllocaType->isPointerTy()) {
     auto *Ptr = IRB.CreateLoad(AllocaType, Alloca);
     IRB.CreateStore(Val, Ptr);
