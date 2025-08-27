@@ -99,6 +99,14 @@ public:
     return VarRef;
   }
 
+  Var &defVar(const Var &Val, StringRef Name = "var") {
+    if (&Val.Fn != this)
+      PROTEUS_FATAL_ERROR("Variables should belong to the same function");
+    Var &VarRef = declVarInternal(Name, Val.getValueType());
+    VarRef = Val;
+    return VarRef;
+  }
+
   template <typename T>
   Array &declArray(size_t NElem, Array::AddressSpace AT,
                    StringRef Name = "array") {
