@@ -21,7 +21,7 @@ int main() {
     }
    )cpp";
 
-  CppJitModule CJM{"host_hip", Code};
+  CppJitModule CJM{"host", Code};
   auto Func = CJM.getFunction<void(int)>("foo");
   Func.run(42);
   FuncStore FS{Func};
