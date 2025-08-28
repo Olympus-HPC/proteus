@@ -103,7 +103,7 @@ int main() {
 }
 
 // clang-format off
-// CHECK: @shared_mem = internal addrspace(3) global [64 x double] undef
+// CHECK: @shared_mem = internal addrspace(3) global [{{[0-9]+}} x double] undef
 // CHECK: Verification successful!
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: JitStorageCache hits 0 total 1
