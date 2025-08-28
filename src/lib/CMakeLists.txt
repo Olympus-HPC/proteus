@@ -165,7 +165,7 @@ message(STATUS "Found LLVM libraries: ${libs}")
 message(STATUS "Found Clang libraries: ${clang_libs}")
 
 # Enclose linked libraries in a link group to avoid linker errors due to unresolved symbols.
-target_link_libraries(proteus PRIVATE
+target_link_libraries(proteus PUBLIC
   "$<$<PLATFORM_ID:Linux>:-Wl,--start-group>"
   ${libs} ${clang_libs}
   "$<$<PLATFORM_ID:Linux>:-Wl,--end-group>"
