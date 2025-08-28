@@ -23,44 +23,6 @@ private:
     ~DynamicLibraryRAII() { sys::fs::remove(Path); }
   } DynamicLibrary;
 
-  template <typename Sig> struct FunctionHandle;
-  template <typename RetT, typename... ArgT>
-  struct FunctionHandle<RetT(ArgT...)> {
-    CppJitModule &M;
-    void *FuncPtr;
-    explicit FunctionHandle(CppJitModule &M, void *FuncPtr)
-        : M(M), FuncPtr(FuncPtr) {}
-
-    RetT run(ArgT... Args) {
-      if constexpr (std::is_void_v<RetT>) {
-        M.Dispatch.template run<RetT(ArgT...)>(FuncPtr,
-                                               std::forward<ArgT>(Args)...);
-      } else {
-        return M.Dispatch.template run<RetT(ArgT...)>(
-            FuncPtr, std::forward<ArgT>(Args)...);
-      }
-    }
-  };
-
-  template <typename Sig> struct KernelHandle;
-  template <typename RetT, typename... ArgT>
-  struct KernelHandle<RetT(ArgT...)> {
-    CppJitModule &M;
-    void *FuncPtr = nullptr;
-    explicit KernelHandle(CppJitModule &M, void *FuncPtr)
-        : M(M), FuncPtr(FuncPtr) {
-      static_assert(std::is_void_v<RetT>, "Kernel function must return void");
-    }
-
-    auto launch(LaunchDims GridDim, LaunchDims BlockDim, uint64_t ShmemSize,
-                void *Stream, ArgT... Args) {
-      void *Ptrs[sizeof...(ArgT)] = {(void *)&Args...};
-
-      return M.Dispatch.launch(FuncPtr, GridDim, BlockDim, Ptrs, ShmemSize,
-                               Stream);
-    }
-  };
-
   // TODO: We don't cache CodeInstances so if a user re-creates the exact same
   // instantiation it will create a new CodeInstance. This creation cost is
   // mitigated because the dispatcher caches the compiled object so we will pay
@@ -249,6 +211,43 @@ public:
     return CodeInstance{TargetModel, Code, InstanceName};
   }
 
+  template <typename Sig> struct FunctionHandle;
+  template <typename RetT, typename... ArgT>
+  struct FunctionHandle<RetT(ArgT...)> {
+    CppJitModule &M;
+    void *FuncPtr;
+    explicit FunctionHandle(CppJitModule &M, void *FuncPtr)
+        : M(M), FuncPtr(FuncPtr) {}
+
+    RetT run(ArgT... Args) {
+      if constexpr (std::is_void_v<RetT>) {
+        M.Dispatch.template run<RetT(ArgT...)>(FuncPtr,
+                                               std::forward<ArgT>(Args)...);
+      } else {
+        return M.Dispatch.template run<RetT(ArgT...)>(
+            FuncPtr, std::forward<ArgT>(Args)...);
+      }
+    }
+  };
+
+  template <typename Sig> struct KernelHandle;
+  template <typename RetT, typename... ArgT>
+  struct KernelHandle<RetT(ArgT...)> {
+    CppJitModule &M;
+    void *FuncPtr = nullptr;
+    explicit KernelHandle(CppJitModule &M, void *FuncPtr)
+        : M(M), FuncPtr(FuncPtr) {
+      static_assert(std::is_void_v<RetT>, "Kernel function must return void");
+    }
+
+    auto launch(LaunchDims GridDim, LaunchDims BlockDim, uint64_t ShmemSize,
+                void *Stream, ArgT... Args) {
+      void *Ptrs[sizeof...(ArgT)] = {(void *)&Args...};
+
+      return M.Dispatch.launch(FuncPtr, GridDim, BlockDim, Ptrs, ShmemSize,
+                               Stream);
+    }
+  };
   template <typename Sig> FunctionHandle<Sig> getFunction(StringRef Name) {
     if (!IsCompiled)
       compile();
