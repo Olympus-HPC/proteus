@@ -34,15 +34,19 @@ static auto get3DLoopNestFunction(int DI, int DJ, int DK, int TileI, int TileJ,
     IncOne = 1;
     auto &Zero = F.declVar<int>("zero");
     Zero = 0;
+    auto &RowBias = F.defVar<int>(0, "row_bias");
 
     F.buildLoopNest({F.forLoop({I, Zero, UBI, IncOne}).tile(TileI),
-                     F.forLoop({J, Zero, UBJ, IncOne}).tile(TileJ),
+                     F.forLoop({J, Zero, UBJ, IncOne},
+                                    [&]() {
+                                      RowBias = J;
+                                    })
+                         .tile(TileJ),
                      F.forLoop({K, Zero, UBK, IncOne},
-                                            [&]() {
-                                              auto Idx =
-                                                  I * DJ * DK + J * DK + K;
-                                              A[Idx] = B[Idx] + I + J + K;
-                                            })
+                                    [&]() {
+                                      auto Idx = I * DJ * DK + J * DK + K;
+                                      A[Idx] = B[Idx] + I + J + K + RowBias;
+                                    })
                          .tile(TileK)})
         .emit();
 
@@ -81,15 +85,20 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int TileSize) {
     IncOne = 1;
     auto &Zero = F.declVar<int>("zero");
     Zero = 0;
+    auto &RowBias = F.defVar<int>(0, "row_bias");
 
     F.buildLoopNest(
          {F.forLoop({I, Zero, UBI, IncOne}).tile(TileSize),
-          F.forLoop({J, Zero, UBJ, IncOne}).tile(TileSize),
+          F.forLoop({J, Zero, UBJ, IncOne},
+                         [&]() {
+                           RowBias = J;
+                         })
+              .tile(TileSize),
           F.forLoop({K, Zero, UBK, IncOne},
-                                 [&]() {
-                                   auto Idx = I * DJ * DK + J * DK + K;
-                                   A[Idx] = B[Idx] + I + J + K;
-                                 })
+                         [&]() {
+                           auto Idx = I * DJ * DK + J * DK + K;
+                           A[Idx] = B[Idx] + I + J + K + RowBias;
+                         })
               .tile(TileSize)})
         .emit();
 
@@ -157,34 +166,34 @@ int main() {
 // CHECK: 3D Variadic Tiling Results:
 // CHECK-NEXT: A1[0] = 0
 // CHECK-NEXT: A1[1] = 2
-// CHECK-NEXT: A1[2] = 3
-// CHECK-NEXT: A1[3] = 5
+// CHECK-NEXT: A1[2] = 4
+// CHECK-NEXT: A1[3] = 6
 // CHECK-NEXT: A1[4] = 5
 // CHECK-NEXT: A1[5] = 7
-// CHECK-NEXT: A1[6] = 8
-// CHECK-NEXT: A1[7] = 10
+// CHECK-NEXT: A1[6] = 9
+// CHECK-NEXT: A1[7] = 11
 // CHECK-NEXT: A1[8] = 10
 // CHECK-NEXT: A1[9] = 12
-// CHECK-NEXT: A1[10] = 13
-// CHECK-NEXT: A1[11] = 15
+// CHECK-NEXT: A1[10] = 14
+// CHECK-NEXT: A1[11] = 16
 // CHECK-NEXT: A1[12] = 15
 // CHECK-NEXT: A1[13] = 17
-// CHECK-NEXT: A1[14] = 18
-// CHECK-NEXT: A1[15] = 20
+// CHECK-NEXT: A1[14] = 19
+// CHECK-NEXT: A1[15] = 21
 // CHECK: 3D Uniform Tiling Results:
 // CHECK-NEXT: A2[0] = 0
 // CHECK-NEXT: A2[1] = 2
-// CHECK-NEXT: A2[2] = 3
-// CHECK-NEXT: A2[3] = 5
+// CHECK-NEXT: A2[2] = 4
+// CHECK-NEXT: A2[3] = 6
 // CHECK-NEXT: A2[4] = 5
 // CHECK-NEXT: A2[5] = 7
-// CHECK-NEXT: A2[6] = 8
-// CHECK-NEXT: A2[7] = 10
+// CHECK-NEXT: A2[6] = 9
+// CHECK-NEXT: A2[7] = 11
 // CHECK-NEXT: A2[8] = 10
 // CHECK-NEXT: A2[9] = 12
-// CHECK-NEXT: A2[10] = 13
-// CHECK-NEXT: A2[11] = 15
+// CHECK-NEXT: A2[10] = 14
+// CHECK-NEXT: A2[11] = 16
 // CHECK-NEXT: A2[12] = 15
 // CHECK-NEXT: A2[13] = 17
-// CHECK-NEXT: A2[14] = 18
-// CHECK-NEXT: A2[15] = 20
+// CHECK-NEXT: A2[14] = 19
+// CHECK-NEXT: A2[15] = 21
