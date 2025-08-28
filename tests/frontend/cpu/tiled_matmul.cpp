@@ -1,14 +1,13 @@
 // RUN: rm -rf .proteus
-// RUN: ./tiled_matmul
+// RUN: ./tiled_matmul | %FILECHECK %s --check-prefixes=CHECK
 // RUN: rm -rf .proteus
 
-#include <chrono>
 #include <iostream>
 
 #include <proteus/JitFrontend.hpp>
 #include <proteus/JitInterface.hpp>
 
-static auto getTiledMatmulFunction(int N, int TileSize) {
+static auto getTiledMatmulFunction(int N) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
   auto &F =
       JitMod->addFunction<void, double *, double *, double *>("tiled_matmul");
@@ -31,16 +30,16 @@ static auto getTiledMatmulFunction(int N, int TileSize) {
       auto &Zero = F.defRuntimeConst(0, "zero");
 
       F.buildLoopNest(
-           {F.transformableForLoop({I, Zero, UbnI, IncOne}).tile(TileSize),
-            F.transformableForLoop({J, Zero, UbnJ, IncOne}).tile(TileSize),
-            F.transformableForLoop({K, Zero, UbnK, IncOne},
+           {F.forLoop({I, Zero, UbnI, IncOne}).tile(3),
+            F.forLoop({J, Zero, UbnJ, IncOne}).tile(4),
+            F.forLoop({K, Zero, UbnK, IncOne},
                                    [&]() {
                                      auto CIdx = I * N + J;
                                      auto AIdx = I * N + K;
                                      auto BIdx = K * N + J;
                                      C[CIdx] += A[AIdx] * B[BIdx];
                                    })
-                .tile(TileSize)})
+                .tile(5)})
           .emit();
 
       F.ret();
@@ -53,8 +52,7 @@ static auto getTiledMatmulFunction(int N, int TileSize) {
 int main() {
   proteus::init();
   constexpr int N = 16;
-  constexpr int TileSize = 3;
-  auto [JitMod, F] = getTiledMatmulFunction(N, TileSize);
+  auto [JitMod, F] = getTiledMatmulFunction(N);
 
   JitMod->compile();
 
@@ -72,31 +70,19 @@ int main() {
 
   F(C, A, B);
 
-  // Timed trials
-  const int NumTrials = 5;
-  double TotalMs = 0.0;
-  for (int T = 0; T < NumTrials; ++T) {
-    auto Start = std::chrono::high_resolution_clock::now();
-    F(C, A, B);
-    auto End = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> Ms = End - Start;
-    TotalMs += Ms.count();
-  }
-
-  double AvgMs = TotalMs / static_cast<double>(NumTrials);
-  std::cerr.setf(std::ios::fixed);
-  std::cerr.precision(3);
-  std::cerr << "Average over " << NumTrials << " trials: " << AvgMs << " ms"
-            << '\n';
-
-  // Print a small subset to avoid excessive output
+  bool Success = true;
   for (int I = 0; I < N; I++) {
     for (int J = 0; J < N; J++) {
-      if(C[I*N + J] != 6*N) {
+      if(C[I*N + J] != N) {
         std::cout << "C[" << I << "][" << J << "] = " << C[I*N + J] << '\n';
+        Success = false;
         break;
       }
     }
+  }
+
+  if(Success) {
+    std::cout << "Verification successful\n";
   }
 
   proteus::finalize();
@@ -104,5 +90,5 @@ int main() {
 }
 
 // clang-format off
-// No FileCheck for now; program prints the resulting C matrix
+// CHECK: Verification successful
 

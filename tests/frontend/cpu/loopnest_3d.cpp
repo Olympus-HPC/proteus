@@ -35,9 +35,9 @@ static auto get3DLoopNestFunction(int DI, int DJ, int DK, int TileI, int TileJ,
     auto &Zero = F.declVar<int>("zero");
     Zero = 0;
 
-    F.buildLoopNest({F.transformableForLoop({I, Zero, UBI, IncOne}).tile(TileI),
-                     F.transformableForLoop({J, Zero, UBJ, IncOne}).tile(TileJ),
-                     F.transformableForLoop({K, Zero, UBK, IncOne},
+    F.buildLoopNest({F.forLoop({I, Zero, UBI, IncOne}).tile(TileI),
+                     F.forLoop({J, Zero, UBJ, IncOne}).tile(TileJ),
+                     F.forLoop({K, Zero, UBK, IncOne},
                                             [&]() {
                                               auto Idx =
                                                   I * DJ * DK + J * DK + K;
@@ -83,9 +83,9 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int TileSize) {
     Zero = 0;
 
     F.buildLoopNest(
-         {F.transformableForLoop({I, Zero, UBI, IncOne}).tile(TileSize),
-          F.transformableForLoop({J, Zero, UBJ, IncOne}).tile(TileSize),
-          F.transformableForLoop({K, Zero, UBK, IncOne},
+         {F.forLoop({I, Zero, UBI, IncOne}).tile(TileSize),
+          F.forLoop({J, Zero, UBJ, IncOne}).tile(TileSize),
+          F.forLoop({K, Zero, UBK, IncOne},
                                  [&]() {
                                    auto Idx = I * DJ * DK + J * DK + K;
                                    A[Idx] = B[Idx] + I + J + K;

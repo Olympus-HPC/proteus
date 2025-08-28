@@ -10,7 +10,6 @@
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/Frontend/TypeMap.hpp"
 #include "proteus/Frontend/Var.hpp"
-#include "proteus/Hashing.hpp"
 
 namespace proteus {
 
@@ -154,11 +153,9 @@ public:
     return Lower(*this);
   }
 
-  void forLoop(LoopBoundsDescription Bounds, std::function<void()> Body);
-
-  ForLoopBuilder transformableForLoop(LoopBoundsDescription Bounds);
-  ForLoopBuilder transformableForLoop(LoopBoundsDescription Bounds,
-                                      std::function<void()> Body);
+  ForLoopBuilder forLoop(LoopBoundsDescription Bounds);
+  ForLoopBuilder forLoop(LoopBoundsDescription Bounds,
+                         std::function<void()> Body);
 
   LoopNestBuilder buildLoopNest(std::vector<ForLoopBuilder> Loops);
   LoopNestBuilder buildLoopNest(std::initializer_list<ForLoopBuilder> Loops);

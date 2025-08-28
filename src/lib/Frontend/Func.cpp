@@ -220,22 +220,12 @@ void FuncBase::endFor() {
   IRB.restoreIP(IP);
 }
 
-void FuncBase::forLoop(LoopBoundsDescription Bounds,
-                       std::function<void()> Body) {
-  if (!Body) {
-    PROTEUS_FATAL_ERROR("forLoop requires a valid body function");
-  }
-  beginFor(Bounds.IterVar, Bounds.Init, Bounds.UpperBound, Bounds.Inc);
-  Body();
-  endFor();
-}
-
-ForLoopBuilder FuncBase::transformableForLoop(LoopBoundsDescription Bounds) {
+ForLoopBuilder FuncBase::forLoop(LoopBoundsDescription Bounds) {
   return ForLoopBuilder(std::move(Bounds), std::function<void()>(), *this);
 }
 
-ForLoopBuilder FuncBase::transformableForLoop(LoopBoundsDescription Bounds,
-                                        std::function<void()> Body) {
+ForLoopBuilder FuncBase::forLoop(LoopBoundsDescription Bounds,
+                                 std::function<void()> Body) {
   return ForLoopBuilder(std::move(Bounds), std::move(Body), *this);
 }
 
