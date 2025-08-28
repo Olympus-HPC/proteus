@@ -1,34 +1,41 @@
 # Installation
 
-Currently, Proteus is distributed using its git repo to build and install it.
-We recommend using the **latest main** branch version, which is well tested and
-robust while including the most recent features.
+Proteus is currently distributed through its Git repository, which you can use
+to build and install the library.
+We recommend using the latest `main` branch, which is well-tested, stable, and
+includes the most recent features.
 
-Proteus builds and installs two components: the Proteus LLVM plugin pass
-(ProteusPass) and the Proteus runtime library (libproteus).
-The user must integrate both of them in their application build system.
-We provide information on how to integrate Proteus with your application in the
-[Integration](integration.md) section.
+Building Proteus installs two components:
+- the **Proteus LLVM plugin pass** (`ProteusPass`), and
+- the **Proteus runtime library** (`libproteus`).
+
+The LLVM plugin pass is necessary **only if** you use the Code annotation
+interface and requires compiling your application with Clang, besides linking with `libproteus`.
+If you the DSL or C++ frontend APIs then you only need to link your code with `libproteus`.
+Both must be integrated into your application’s build system.
+See [Integration](integration.md) section for more details on integrating with your build system.
+
 
 ## Building
 
-The project uses `cmake` for building and depends on an LLVM installation (CI
-tests cover LLVM 18, 19 and AMD ROCm versions 6.2.1, 6.3.1, 6.4.1).
-The top-level `CMakeLists.txt` has the following (binary) build options:
+Proteus uses `cmake` for building and requires an existing LLVM installation (CI
+tests cover LLVM 18/19 with CUDA 12.2 and AMD ROCm versions 6.2.1, 6.3.1, 6.4.1).
 
-* `BUILD_SHARED`: builds Proteus as a shared library (default is static).
-* `ENABLE_TESTS`: builds Proteus tests.
-* `PROTEUS_ENABLE_HIP`: enables HIP support.
+The top-level `CMakeLists.txt` defines the following build options:
+
+* `BUILD_SHARED`: build Proteus as a shared library (default is static).
+* `ENABLE_TESTS`: build Proteus tests.
+* `PROTEUS_ENABLE_HIP`: enable HIP support.
 * `PROTEUS_ENABLE_CUDA`: enable CUDA support.
-* `PROTEUS_ENABLE_DEBUG`: logs debugging information (for developers).
-* `PROTEUS_ENABLE_TIME_TRACING`: stores a time trace file in JSON format for Proteus operations using flame graphs.
+* `PROTEUS_ENABLE_DEBUG`: enable debug logging (for developers).
+* `PROTEUS_ENABLE_TIME_TRACING`: generate a JSON time-trace file for Proteus operations (for flame graphs visualization).
 
 !!! info "Host, CUDA and HIP support"
-    Proteus supports host JIT compilation in all cases.
-    On top of that, it supports either CUDA or HIP JIT compilation, setting
+    Proteus always supports host JIT compilation.
+    You can additionally enable CUDA or HIP JIT compilation by setting
     `PROTEUS_ENABLE_CUDA` or `PROTEUS_ENABLE_HIP` respectively.
 
-A typical build process is:
+A typical build looks like this:
 ```shell
 git clone https://github.com/Olympus-HPC/proteus.git
 cd proteus
@@ -39,12 +46,11 @@ make -j install
 
 ## Testing
 
-It is advised to enable tests when deploying Proteus on a machine for the first
-time and run them:
+We recommend enabling tests when deploying Proteus on a new machine and running them once to verify the installation:
 ```shell
 cd build
 make test
 ```
 
-We are keen to help with bugs or any other issues in our repo's
-[issues](https://github.com/Olympus-HPC/proteus/issues) page!
+If you encounter bugs or issues, please let us know via the
+[Github issue tracker](https://github.com/Olympus-HPC/proteus/issues).
