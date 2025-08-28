@@ -416,7 +416,6 @@ inline void syncThreads(FuncBase &Fn) {
       M.getOrInsertFunction("llvm.nvvm.barrier0", TypeMap<void>::get(Ctx));
   IRB.CreateCall(Callee);
 }
-}
 
 } // namespace cuda
 #endif
