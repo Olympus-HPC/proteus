@@ -18,5 +18,3 @@ inline constexpr unsigned toLLVM(AddressSpace AS) {
 } // namespace proteus
 
 #endif // PROTEUS_ADDRESS_SPACE_HPP
-
-
