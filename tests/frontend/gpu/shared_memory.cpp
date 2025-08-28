@@ -47,7 +47,7 @@ int main() {
     auto &I = F.declVar<size_t>("I");
     I = Bid * WarpSize + Tid;
 
-    auto &S = F.declArray<double>(WarpSize, AddressSpace::SHARED, "shared_mem");
+    auto &S = F.declVar<double[]>(WarpSize, AddressSpace::SHARED, "shared_mem");
 
     // Load from global into shared, then sync, then write reversed index.
     S[Tid] = A[I];

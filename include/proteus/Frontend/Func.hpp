@@ -81,12 +81,25 @@ public:
   Var &declVarInternal(StringRef Name, Type *Ty,
                        Type *PointerElemType = nullptr);
 
-  template <typename T> Var &declVar(StringRef Name = "var") {
+  template <typename T> decltype(auto) declVar(StringRef Name = "var") {
+    static_assert(!std::is_array_v<T>, "Expected non-array type");
+
     Function *F = getFunction();
     auto *Alloca = emitAlloca(TypeMap<T>::get(F->getContext()), Name);
 
     return Variables.emplace_back(
         Alloca, *this, TypeMap<T>::getPointerElemType(F->getContext()));
+  }
+
+  template <typename T> decltype(auto) declVar(size_t NElem, AddressSpace AS = AddressSpace::DEFAULT, StringRef Name = "array_var") {
+    static_assert(std::is_array_v<T>, "Expected array type");
+
+    Function *F = getFunction();
+    auto *BasePointer = emitArrayCreate(
+        TypeMap<T>::get(F->getContext(), NElem), AS, Name);
+    return Arrays.emplace_back(BasePointer, *this,
+                               TypeMap<T>::get(F->getContext(), NElem),
+                               AS);
   }
 
   template <typename T> Var &defVar(T Val, StringRef Name = "var") {
@@ -101,16 +114,6 @@ public:
     return VarRef;
   }
 
-  template <typename T>
-  Array &declArray(size_t NElem, AddressSpace AT = AddressSpace::DEFAULT,
-                   StringRef Name = "array") {
-    Function *F = getFunction();
-    auto *BasePointer = emitArrayCreate(
-        TypeMap<T>::getArrayType(F->getContext(), NElem), AT, Name);
-    return Arrays.emplace_back(BasePointer, *this,
-                               TypeMap<T>::getArrayType(F->getContext(), NElem),
-                               AT);
-  }
 
   template <typename T>
   Var &defRuntimeConst(T Val, StringRef Name = "run.const.var") {
