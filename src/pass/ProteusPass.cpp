@@ -109,8 +109,10 @@ public:
     // For device compilation, just extract the module IR of device code
     // and return.
     if (isDeviceCompilation(M)) {
+      for (auto &JFI : JitFunctionInfoMap) {
+        markAllReachableFunctionsNoMerge(M, JFI.first);
+      }
       emitJitModuleDevice(M, IsLTO);
-
       return true;
     }
 
@@ -1327,6 +1329,36 @@ private:
           CB->setArgOperand(1, C);
           CB->setArgOperand(2, C);
         }
+      }
+    }
+  }
+
+  void markAllReachableFunctionsNoMerge(Module &M, Function *F) {
+    CallGraph CG(M);
+    SmallVector<Function *, 8> ToVisit;
+    SmallPtrSet<Function *, 8> ReachableFunctions;
+    ToVisit.push_back(F);
+    while (!ToVisit.empty()) {
+      Function *VisitF = ToVisit.pop_back_val();
+      CallGraphNode *CGNode = CG[VisitF];
+
+      for (const auto &Callee : *CGNode) {
+        Function *CalleeF = Callee.second->getFunction();
+        if (!CalleeF)
+          continue;
+        if (ReachableFunctions.contains(CalleeF))
+          continue;
+        ReachableFunctions.insert(CalleeF);
+        ToVisit.push_back(CalleeF);
+      }
+    }
+    for (Function *Func : ReachableFunctions) {
+      if (llvm::demangle(Func->getName()).find("::'lambda") !=
+          std::string::npos) {
+        // There's nothing special about this particular attribute, but adding
+        // any unique attribute prevents the bodies of the functions from being
+        // merged.
+        Func->addFnAttr("nomerge-tag", Func->getName());
       }
     }
   }
