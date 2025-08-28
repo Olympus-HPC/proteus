@@ -16,6 +16,8 @@ void launcher(FuncStore &FS) { FS.Func.run(42); }
 
 int main() {
   const char *Code = R"cpp(
+    #include <cstdio>
+
     extern "C" void foo(int a) {
         printf("Function %d\n", a);
     }
