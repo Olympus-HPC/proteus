@@ -9,6 +9,7 @@ set(SOURCES
   Frontend/Func.cpp
   Frontend/Var.cpp
   Frontend/Dispatcher.cpp
+  Frontend/LoopNest.cpp
   Frontend/CppJitModule.cpp
 )
 

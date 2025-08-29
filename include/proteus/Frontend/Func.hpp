@@ -10,12 +10,14 @@
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/Frontend/TypeMap.hpp"
 #include "proteus/Frontend/Var.hpp"
-#include "proteus/Hashing.hpp"
 
 namespace proteus {
 
 struct Var;
 class JitModule;
+class LoopBoundsDescription;
+class LoopNestBuilder;
+class ForLoopBuilder;
 
 using namespace llvm;
 
@@ -150,6 +152,13 @@ public:
   Var &callBuiltin(function_ref<Var &(FuncBase &)> Lower) {
     return Lower(*this);
   }
+
+  ForLoopBuilder forLoop(LoopBoundsDescription Bounds);
+  ForLoopBuilder forLoop(LoopBoundsDescription Bounds,
+                         std::function<void()> Body);
+
+  LoopNestBuilder buildLoopNest(std::vector<ForLoopBuilder> Loops);
+  LoopNestBuilder buildLoopNest(std::initializer_list<ForLoopBuilder> Loops);
 
   void ret(std::optional<std::reference_wrapper<Var>> OptRet = std::nullopt);
 
