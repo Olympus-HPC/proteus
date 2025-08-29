@@ -17,17 +17,21 @@ public:
 
   std::unique_ptr<MemoryBuffer>
   compile([[maybe_unused]] std::unique_ptr<LLVMContext> Ctx,
-          std::unique_ptr<Module> M, HashT ModuleHash) override {
+          std::unique_ptr<Module> Mod, HashT ModuleHash) override {
+    // This is necessary to ensure Ctx outlives M. Setting [[maybe_unused]] can
+    // trigger a lifetime bug.
+    auto CtxOwner = std::move(Ctx);
+    auto ModOwner = std::move(Mod);
 
     // CMake finds LIBDEVICE_BC_PATH.
     auto LibDeviceBuffer = llvm::MemoryBuffer::getFile(LIBDEVICE_BC_PATH);
     auto LibDeviceModule = llvm::parseBitcodeFile(
-        LibDeviceBuffer->get()->getMemBufferRef(), M->getContext());
+        LibDeviceBuffer->get()->getMemBufferRef(), ModOwner->getContext());
 
-    llvm::Linker linker(*M);
+    llvm::Linker linker(*ModOwner);
     linker.linkInModule(std::move(LibDeviceModule.get()));
 
-    std::unique_ptr<MemoryBuffer> ObjectModule = Jit.compileOnly(*M);
+    std::unique_ptr<MemoryBuffer> ObjectModule = Jit.compileOnly(*ModOwner);
     if (!ObjectModule)
       PROTEUS_FATAL_ERROR("Expected non-null object library");
 
