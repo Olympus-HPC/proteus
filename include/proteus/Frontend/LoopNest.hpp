@@ -104,7 +104,7 @@ private:
     (
         [&]() {
           // Force unpacking so we emit enough endFors
-          (void) std::get<Is>(Loops);
+          (void)std::get<Is>(Loops);
           Fn.endFor();
         }(),
         ...);
