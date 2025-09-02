@@ -91,9 +91,7 @@ private:
         if(Loop.TileSize.has_value()) {
           auto &TiledBounds = *TiledLoopBounds[Is];
           auto &EndCandidate = TiledBounds.IterVar + TiledBounds.Inc;
-          Fn.beginIf(EndCandidate > TiledBounds.UpperBound);
-          { EndCandidate = TiledBounds.UpperBound; }
-          Fn.endIf();
+          EndCandidate = min(EndCandidate, TiledBounds.UpperBound);
           Fn.beginFor(Loop.Bounds.IterVar, TiledBounds.IterVar, EndCandidate, Loop.Bounds.Inc);
         } else {
           Fn.beginFor(Loop.Bounds.IterVar, Loop.Bounds.Init, Loop.Bounds.UpperBound, Loop.Bounds.Inc);
