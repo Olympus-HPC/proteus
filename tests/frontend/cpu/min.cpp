@@ -40,16 +40,16 @@ int main() {
 
   J.compile();
 
-  float rf0, rf1, rfRes;
-  int ri0, ri1, riRes;
-  F(&rf0, &rf1, &rfRes, &ri0, &ri1, &riRes);
+  float Rf0, Rf1, RfRes;
+  int Ri0, Ri1, RiRes;
+  F(&Rf0, &Rf1, &RfRes, &Ri0, &Ri1, &RiRes);
 
-  std::cout << "rf0 = " << rf0 << "\n";
-  std::cout << "rf1 = " << rf1 << "\n";
-  std::cout << "rfRes = " << rfRes << "\n";
-  std::cout << "ri0 = " << ri0 << "\n";
-  std::cout << "ri1 = " << ri1 << "\n";
-  std::cout << "riRes = " << riRes << "\n";
+  std::cout << "rf0 = " << Rf0 << "\n";
+  std::cout << "rf1 = " << Rf1 << "\n";
+  std::cout << "rfRes = " << RfRes << "\n";
+  std::cout << "ri0 = " << Ri0 << "\n";
+  std::cout << "ri1 = " << Ri1 << "\n";
+  std::cout << "riRes = " << RiRes << "\n";
 
   proteus::finalize();
   return 0;
@@ -63,5 +63,3 @@ int main() {
 // CHECK-NEXT: ri1 = 9
 // CHECK-NEXT: riRes = 7
 // clang-format on
-
-

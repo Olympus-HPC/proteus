@@ -2,7 +2,6 @@
 
 namespace proteus {
 
-LoopBoundInfo::LoopBoundInfo(Var &IterVar, Var &Init,
-                                             Var &UpperBound, Var &Inc)
+LoopBoundInfo::LoopBoundInfo(Var &IterVar, Var &Init, Var &UpperBound, Var &Inc)
     : IterVar(IterVar), Init(Init), UpperBound(UpperBound), Inc(Inc) {}
 } // namespace proteus

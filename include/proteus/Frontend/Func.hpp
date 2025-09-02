@@ -16,10 +16,8 @@ namespace proteus {
 struct Var;
 class JitModule;
 class LoopBoundInfo;
-template<typename... ForLoopBuilders>
-class LoopNestBuilder;
-template<typename BodyLambda>
-class ForLoopBuilder;
+template <typename... ForLoopBuilders> class LoopNestBuilder;
+template <typename BodyLambda> class ForLoopBuilder;
 
 using namespace llvm;
 
@@ -159,14 +157,13 @@ public:
     return Lower(*this);
   }
 
-  template<typename BodyLambda = EmptyLambda>
-  auto forLoop(const LoopBoundInfo &Bounds,
-                         BodyLambda &&Body = {}) {
-                          return ForLoopBuilder(Bounds, *this, std::move(Body));
-                         }
+  template <typename BodyLambda = EmptyLambda>
+  auto forLoop(const LoopBoundInfo &Bounds, BodyLambda &&Body = {}) {
+    return ForLoopBuilder(Bounds, *this, std::move(Body));
+  }
 
-  template<typename... LoopBuilders>
-  auto buildLoopNest(LoopBuilders ...Loops) {
+  template <typename... LoopBuilders>
+  auto buildLoopNest(LoopBuilders... Loops) {
     return LoopNestBuilder(*this, std::move(Loops)...);
   }
 

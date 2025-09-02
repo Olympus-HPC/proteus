@@ -30,17 +30,16 @@ static auto getTiledMatmulFunction(int N, int TileI, int TileJ, int TileK) {
       auto &IncOne = F.defRuntimeConst(1, "inc");
       auto &Zero = F.defRuntimeConst(0, "zero");
 
-      F.buildLoopNest(
-           F.forLoop({I, Zero, UbnI, IncOne}).tile(TileI),
-            F.forLoop({J, Zero, UbnJ, IncOne}).tile(TileJ),
-            F.forLoop({K, Zero, UbnK, IncOne},
-                                   [&]() {
-                                     auto CIdx = I * N + J;
-                                     auto AIdx = I * N + K;
-                                     auto BIdx = K * N + J;
-                                     C[CIdx] += A[AIdx] * B[BIdx];
-                                   })
-                .tile(TileK))
+      F.buildLoopNest(F.forLoop({I, Zero, UbnI, IncOne}).tile(TileI),
+                      F.forLoop({J, Zero, UbnJ, IncOne}).tile(TileJ),
+                      F.forLoop({K, Zero, UbnK, IncOne},
+                                [&]() {
+                                  auto CIdx = I * N + J;
+                                  auto AIdx = I * N + K;
+                                  auto BIdx = K * N + J;
+                                  C[CIdx] += A[AIdx] * B[BIdx];
+                                })
+                          .tile(TileK))
           .emit();
 
       F.ret();
@@ -54,7 +53,8 @@ int main(int argc, char **argv) {
   proteus::init();
 
   if (argc != 3 && argc != 5) {
-    std::cerr << "Usage: " << argv[0] << " <N> <Tile> | <N> <TileI> <TileJ> <TileK>\n";
+    std::cerr << "Usage: " << argv[0]
+              << " <N> <Tile> | <N> <TileI> <TileJ> <TileK>\n";
     proteus::finalize();
     return 1;
   }
@@ -78,28 +78,28 @@ int main(int argc, char **argv) {
   double *B = (double *)new double[N * N];
   double *C = (double *)new double[N * N];
 
-    for (int I = 0; I < N; I++) {
-      for (int J = 0; J < N; J++) {
-        A[I*N+J] = (1.0);
-        B[I*N+J] = (1.0);
-        C[I*N+J] = 0.0;
-      }
+  for (int I = 0; I < N; I++) {
+    for (int J = 0; J < N; J++) {
+      A[I * N + J] = (1.0);
+      B[I * N + J] = (1.0);
+      C[I * N + J] = 0.0;
     }
+  }
 
   F(C, A, B);
 
   bool Success = true;
   for (int I = 0; I < N; I++) {
     for (int J = 0; J < N; J++) {
-      if(C[I*N + J] != N) {
-        std::cout << "C[" << I << "][" << J << "] = " << C[I*N + J] << '\n';
+      if (C[I * N + J] != N) {
+        std::cout << "C[" << I << "][" << J << "] = " << C[I * N + J] << '\n';
         Success = false;
         break;
       }
     }
   }
 
-  if(Success) {
+  if (Success) {
     std::cout << "Verification successful\n";
   }
 
