@@ -163,8 +163,8 @@ public:
   }
 
   template <typename... LoopBuilders>
-  auto buildLoopNest(LoopBuilders... Loops) {
-    return LoopNestBuilder(*this, std::move(Loops)...);
+  auto buildLoopNest(LoopBuilders &&...Loops) {
+    return LoopNestBuilder(*this, std::forward<LoopBuilders>(Loops)...);
   }
 
   void ret(std::optional<std::reference_wrapper<Var>> OptRet = std::nullopt);
