@@ -1,13 +1,14 @@
 // RUN: rm -rf .proteus
-// RUN: ./tiled_matmul | %FILECHECK %s --check-prefixes=CHECK
+// RUN: ./tiled_matmul 16 3 4 5 | %FILECHECK %s --check-prefixes=CHECK
 // RUN: rm -rf .proteus
 
+#include <cstdlib>
 #include <iostream>
 
 #include <proteus/JitFrontend.hpp>
 #include <proteus/JitInterface.hpp>
 
-static auto getTiledMatmulFunction(int N) {
+static auto getTiledMatmulFunction(int N, int TileI, int TileJ, int TileK) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
   auto &F =
       JitMod->addFunction<void, double *, double *, double *>("tiled_matmul");
@@ -30,8 +31,8 @@ static auto getTiledMatmulFunction(int N) {
       auto &Zero = F.defRuntimeConst(0, "zero");
 
       F.buildLoopNest(
-           F.forLoop({I, Zero, UbnI, IncOne}).tile(3),
-            F.forLoop({J, Zero, UbnJ, IncOne}).tile(4),
+           F.forLoop({I, Zero, UbnI, IncOne}).tile(TileI),
+            F.forLoop({J, Zero, UbnJ, IncOne}).tile(TileJ),
             F.forLoop({K, Zero, UbnK, IncOne},
                                    [&]() {
                                      auto CIdx = I * N + J;
@@ -39,7 +40,7 @@ static auto getTiledMatmulFunction(int N) {
                                      auto BIdx = K * N + J;
                                      C[CIdx] += A[AIdx] * B[BIdx];
                                    })
-                .tile(5))
+                .tile(TileK))
           .emit();
 
       F.ret();
@@ -49,10 +50,27 @@ static auto getTiledMatmulFunction(int N) {
   return std::make_pair(std::move(JitMod), std::ref(F));
 }
 
-int main() {
+int main(int argc, char **argv) {
   proteus::init();
-  constexpr int N = 16;
-  auto [JitMod, F] = getTiledMatmulFunction(N);
+
+  if (argc != 3 && argc != 5) {
+    std::cerr << "Usage: " << argv[0] << " <N> <Tile> | <N> <TileI> <TileJ> <TileK>\n";
+    proteus::finalize();
+    return 1;
+  }
+
+  int N = std::atoi(argv[1]);
+  int TileI = 0, TileJ = 0, TileK = 0;
+  if (argc == 3) {
+    int Tile = std::atoi(argv[2]);
+    TileI = TileJ = TileK = Tile;
+  } else {
+    TileI = std::atoi(argv[2]);
+    TileJ = std::atoi(argv[3]);
+    TileK = std::atoi(argv[4]);
+  }
+
+  auto [JitMod, F] = getTiledMatmulFunction(N, TileI, TileJ, TileK);
 
   JitMod->compile();
 
@@ -91,4 +109,3 @@ int main() {
 
 // clang-format off
 // CHECK: Verification successful
-
