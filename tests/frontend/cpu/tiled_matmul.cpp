@@ -30,7 +30,7 @@ static auto getTiledMatmulFunction(int N) {
       auto &Zero = F.defRuntimeConst(0, "zero");
 
       F.buildLoopNest(
-           {F.forLoop({I, Zero, UbnI, IncOne}).tile(3),
+           F.forLoop({I, Zero, UbnI, IncOne}).tile(3),
             F.forLoop({J, Zero, UbnJ, IncOne}).tile(4),
             F.forLoop({K, Zero, UbnK, IncOne},
                                    [&]() {
@@ -39,7 +39,7 @@ static auto getTiledMatmulFunction(int N) {
                                      auto BIdx = K * N + J;
                                      C[CIdx] += A[AIdx] * B[BIdx];
                                    })
-                .tile(5)})
+                .tile(5))
           .emit();
 
       F.ret();

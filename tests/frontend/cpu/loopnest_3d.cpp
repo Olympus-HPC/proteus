@@ -36,7 +36,7 @@ static auto get3DLoopNestFunction(int DI, int DJ, int DK, int TileI, int TileJ,
     Zero = 0;
     auto &RowBias = F.defVar<int>(0, "row_bias");
 
-    F.buildLoopNest({F.forLoop({I, Zero, UBI, IncOne}).tile(TileI),
+    F.buildLoopNest(F.forLoop({I, Zero, UBI, IncOne}).tile(TileI),
                      F.forLoop({J, Zero, UBJ, IncOne},
                                     [&]() {
                                       RowBias = J;
@@ -47,7 +47,7 @@ static auto get3DLoopNestFunction(int DI, int DJ, int DK, int TileI, int TileJ,
                                       auto Idx = I * DJ * DK + J * DK + K;
                                       A[Idx] = B[Idx] + I + J + K + RowBias;
                                     })
-                         .tile(TileK)})
+                         .tile(TileK))
         .emit();
 
     F.ret();
@@ -88,7 +88,7 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int TileSize) {
     auto &RowBias = F.defVar<int>(0, "row_bias");
 
     F.buildLoopNest(
-         {F.forLoop({I, Zero, UBI, IncOne}).tile(TileSize),
+         F.forLoop({I, Zero, UBI, IncOne}).tile(TileSize),
           F.forLoop({J, Zero, UBJ, IncOne},
                          [&]() {
                            RowBias = J;
@@ -96,10 +96,11 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int TileSize) {
               .tile(TileSize),
           F.forLoop({K, Zero, UBK, IncOne},
                          [&]() {
+                           std::cout << "Emitting inner loop body " << "\n";
                            auto Idx = I * DJ * DK + J * DK + K;
                            A[Idx] = B[Idx] + I + J + K + RowBias;
                          })
-              .tile(TileSize)})
+              .tile(TileSize))
         .emit();
 
     F.ret();

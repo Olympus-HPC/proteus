@@ -1,70 +1,138 @@
 #ifndef PROTEUS_FRONTEND_LOOP_NEST_HPP
 #define PROTEUS_FRONTEND_LOOP_NEST_HPP
 
-#include <functional>
+#include <memory>
 #include <optional>
-#include <vector>
 
 #include "proteus/Frontend/Func.hpp"
 #include "proteus/Frontend/Var.hpp"
 
 namespace proteus {
 
-class LoopBoundsDescription {
+class LoopBoundInfo {
 public:
   Var &IterVar;
   Var &Init;
   Var &UpperBound;
   Var &Inc;
 
-  LoopBoundsDescription(Var &IterVar, Var &Init, Var &UpperBound, Var &Inc);
+  LoopBoundInfo(Var &IterVar, Var &Init, Var &UpperBound, Var &Inc);
 };
 
+template <typename BodyLambda>
 class ForLoopBuilder {
 public:
-  LoopBoundsDescription Bounds;
+  LoopBoundInfo Bounds;
   std::optional<int> TileSize;
-  std::optional<std::function<void()>> Body;
+  BodyLambda Body;
   FuncBase &Fn;
 
-  ForLoopBuilder(LoopBoundsDescription Bounds, std::function<void()> Body,
-                 FuncBase &Fn);
+  ForLoopBuilder(const LoopBoundInfo &Bounds, FuncBase &Fn, BodyLambda &&Body) : Bounds(Bounds), Body(std::move(Body)), Fn(Fn) {}
+  ForLoopBuilder &tile(int Tile) {
+    TileSize = Tile;
+    return *this;
+  }
 
-  static ForLoopBuilder create(LoopBoundsDescription Bounds,
-                               std::function<void()> Body, FuncBase &Fn);
-
-  ForLoopBuilder &tile(int Tile);
-
-  void emit();
+  void emit() {
+    Fn.beginFor(Bounds.IterVar, Bounds.Init, Bounds.UpperBound, Bounds.Inc);
+    Body();
+    Fn.endFor();
+  }
 };
 
+template <typename... LoopBuilders>
 class LoopNestBuilder {
 private:
-  std::vector<ForLoopBuilder> Loops;
+  std::tuple<LoopBuilders...> Loops;
+  std::array<std::unique_ptr<LoopBoundInfo>, std::tuple_size_v<decltype(Loops)>> TiledLoopBounds;
   FuncBase &Fn;
 
-  void emitDimension(std::size_t Dim, std::vector<Var *> &TileIter,
-                     std::vector<Var *> &TileEnd, std::vector<Var *> &TileStep);
-  void emitTileLoops(std::size_t GroupIdx, std::size_t GroupEnd,
-                     std::size_t Dim, std::vector<Var *> &TileIter,
-                     std::vector<Var *> &TileEnd, std::vector<Var *> &TileStep);
-  void emitInnerLoops(std::size_t ElemIdx, std::size_t GroupEnd,
-                      std::size_t Dim, std::vector<Var *> &TileIter,
-                      std::vector<Var *> &TileEnd,
-                      std::vector<Var *> &TileStep);
+  template <std::size_t... Is>
+  void setupTiledLoops(std::index_sequence<Is...>) {
+    (
+      [&]() {
+        auto &Loop = std::get<Is>(Loops);
+        if (Loop.TileSize.has_value()) {
+          auto &Bounds = std::get<Is>(Loops).Bounds;
+
+          auto &TileIter =
+              Fn.declVarInternal("tile_iter_" + std::to_string(Is),
+                                 Bounds.IterVar.getValueType());
+          auto &TileStep =
+              Fn.declVarInternal("tile_step_" + std::to_string(Is),
+                                 Bounds.IterVar.getValueType());
+
+          TileStep = Loop.TileSize.value();
+          TiledLoopBounds[Is] = std::make_unique<LoopBoundInfo>(
+              TileIter, Bounds.Init, Bounds.UpperBound, TileStep);
+        }
+      }(),
+      ...);
+  }
+
+  template<std::size_t... Is>
+  void beginTiledLoops(std::index_sequence<Is...>) {
+    (
+      [&]() {
+        auto &Loop = std::get<Is>(Loops);
+        if(Loop.TileSize.has_value()) {
+          auto &Bounds = *TiledLoopBounds[Is];
+          Fn.beginFor(Bounds.IterVar, Bounds.Init, Bounds.UpperBound, Bounds.Inc);
+        }
+      }(),
+      ...);
+  }
+
+  template<std::size_t... Is>
+  void emitInnerLoops(std::index_sequence<Is...>) {
+    (
+      [&]() {
+        auto &Loop = std::get<Is>(Loops);
+        if(Loop.TileSize.has_value()) {
+          auto &TiledBounds = *TiledLoopBounds[Is];
+          auto &EndCandidate = TiledBounds.IterVar + TiledBounds.Inc;
+          Fn.beginIf(EndCandidate > TiledBounds.UpperBound);
+          { EndCandidate = TiledBounds.UpperBound; }
+          Fn.endIf();
+          Fn.beginFor(Loop.Bounds.IterVar, TiledBounds.IterVar, EndCandidate, Loop.Bounds.Inc);
+        } else {
+          Fn.beginFor(Loop.Bounds.IterVar, Loop.Bounds.Init, Loop.Bounds.UpperBound, Loop.Bounds.Inc);
+        }
+        Loop.Body();
+      }(),
+      ...);
+    (
+      [&]() {
+        auto &Loop = std::get<sizeof...(Is) - 1U - Is>(Loops);
+        Fn.endFor();
+      }(),
+      ...);
+  }
+
+  template<std::size_t... Is>
+  void endTiledLoops(std::index_sequence<Is...>) {
+        ([&]() {
+          auto &Loop = std::get<sizeof...(Is) - 1U - Is>(Loops);
+          if (Loop.TileSize.has_value()) {
+            Fn.endFor();
+          }
+        }(), ...);
+  }
 
 public:
-  LoopNestBuilder(FuncBase &Fn, std::vector<ForLoopBuilder> Loops);
+  LoopNestBuilder(FuncBase &Fn, LoopBuilders... Loops) : Loops(std::move(Loops)...), Fn(Fn) {}
 
-  static LoopNestBuilder create(FuncBase &Fn,
-                                std::vector<ForLoopBuilder> Loops);
-
-  static LoopNestBuilder create(FuncBase &Fn,
-                                std::initializer_list<ForLoopBuilder> Loops);
-
-  LoopNestBuilder &tile(int Tile);
-
-  void emit();
+  LoopNestBuilder &tile(int Tile) {
+    (std::get<LoopBuilders>(Loops).tile(Tile), ...);
+    return *this;
+  }
+  void emit() {
+      auto IdxSeq = std::index_sequence_for<LoopBuilders...>{};
+      setupTiledLoops(IdxSeq);
+      beginTiledLoops(IdxSeq);
+      emitInnerLoops(IdxSeq);
+      endTiledLoops(IdxSeq);
+  }
 };
 } // namespace proteus
 

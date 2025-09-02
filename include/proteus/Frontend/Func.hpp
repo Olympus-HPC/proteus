@@ -15,11 +15,17 @@ namespace proteus {
 
 struct Var;
 class JitModule;
-class LoopBoundsDescription;
+class LoopBoundInfo;
+template<typename... ForLoopBuilders>
 class LoopNestBuilder;
+template<typename BodyLambda>
 class ForLoopBuilder;
 
 using namespace llvm;
+
+struct EmptyLambda {
+  void operator()() const {}
+};
 
 class FuncBase {
 protected:
@@ -153,12 +159,16 @@ public:
     return Lower(*this);
   }
 
-  ForLoopBuilder forLoop(LoopBoundsDescription Bounds);
-  ForLoopBuilder forLoop(LoopBoundsDescription Bounds,
-                         std::function<void()> Body);
+  template<typename BodyLambda = EmptyLambda>
+  auto forLoop(const LoopBoundInfo &Bounds,
+                         BodyLambda &&Body = {}) {
+                          return ForLoopBuilder(Bounds, *this, std::move(Body));
+                         }
 
-  LoopNestBuilder buildLoopNest(std::vector<ForLoopBuilder> Loops);
-  LoopNestBuilder buildLoopNest(std::initializer_list<ForLoopBuilder> Loops);
+  template<typename... LoopBuilders>
+  auto buildLoopNest(LoopBuilders ...Loops) {
+    return LoopNestBuilder(*this, std::move(Loops)...);
+  }
 
   void ret(std::optional<std::reference_wrapper<Var>> OptRet = std::nullopt);
 
