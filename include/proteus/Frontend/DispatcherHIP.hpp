@@ -33,7 +33,8 @@ public:
     return ObjectModule;
   }
 
-  std::unique_ptr<MemoryBuffer> lookupObjectModule(HashT ModuleHash) override {
+  std::unique_ptr<CompiledLibrary>
+  lookupCompiledLibrary(HashT ModuleHash) override {
     return StorageCache.lookup(ModuleHash);
   }
 
@@ -57,18 +58,17 @@ public:
     StorageCache.printStats();
   }
 
-  void *
-  getFunctionAddress(StringRef KernelName,
-                     std::optional<MemoryBufferRef> ObjectModule) override {
+  void *getFunctionAddress(StringRef KernelName, HashT ModuleHash,
+                           CompiledLibrary &Library) override {
     auto GetKernelFunc = [&]() {
       // Hash the kernel name to get a unique id.
-      HashT HashValue = hash(KernelName);
+      HashT HashValue = hash(KernelName, ModuleHash);
 
       if (auto KernelFunc = CodeCache.lookup(HashValue))
         return KernelFunc;
 
       auto KernelFunc = proteus::getKernelFunctionFromImage(
-          KernelName, ObjectModule->getBufferStart(),
+          KernelName, Library.ObjectModule->getBufferStart(),
           /*RelinkGlobalsByCopy*/ false,
           /* VarNameToDevPtr */ {});
 
@@ -81,9 +81,8 @@ public:
     return KernelFunc;
   }
 
-  void loadDynamicLibrary(const SmallString<128> &) override {
-    PROTEUS_FATAL_ERROR(
-        "Device dispatcher does not implement loadDynamicLibrary");
+  void registerDynamicLibrary(HashT, const SmallString<128> &) override {
+    PROTEUS_FATAL_ERROR("Dispatch HIP does not support registerDynamicLibrary");
   }
 
 private:
@@ -92,7 +91,7 @@ private:
     TargetModel = TargetModelType::HIP;
   }
   JitCache<hipFunction_t> CodeCache;
-  JitStorageCache<hipFunction_t> StorageCache;
+  JitStorageCache StorageCache;
 };
 
 } // namespace proteus

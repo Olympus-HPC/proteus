@@ -1,6 +1,8 @@
 // clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./cpp_host_device | %FILECHECK %s --check-prefixes=CHECK
+// RUN: ./cpp_host_device | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// Second run uses the object cache.
+// RUN: ./cpp_host_device | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
 // clang-format on
 
@@ -105,3 +107,6 @@ int main() {
 // CHECK: a[4] = 16.000000
 // CHECK: a[16] = 256.000000
 // CHECK: a[1023] = 1046529.000000
+// CHECK-COUNT-2: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: JitStorageCache hits 1 total 2
+// CHECK-SECOND: JitStorageCache hits 1 total 1

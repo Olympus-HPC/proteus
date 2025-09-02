@@ -1,6 +1,8 @@
 // clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./multi_module | %FILECHECK %s --check-prefixes=CHECK
+// RUN: ./multi_module | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// Second run uses the object cache.
+// RUN: ./multi_module | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
 // clang-format on
 
@@ -96,4 +98,7 @@ int main() {
 // CHECK-NEXT: V 23
 // CHECK-NEXT: V 142
 // CHECK-NEXT: V 123
-// CHECK-NEXT: JitCache hits 0 total 0
+// CHECK-NEXT: JitCache hits 0 total 4
+// CHECK-COUNT-4: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: JitStorageCache hits 0 total 2
+// CHECK-SECOND: JitStorageCache hits 2 total 2

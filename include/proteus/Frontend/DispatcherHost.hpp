@@ -1,8 +1,10 @@
 #ifndef PROTEUS_FRONTEND_DISPATCHER_HOST_HPP
 #define PROTEUS_FRONTEND_DISPATCHER_HOST_HPP
 
+#include "proteus/CompiledLibrary.hpp"
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/JitEngineHost.hpp"
+#include "proteus/JitStorageCache.hpp"
 
 namespace proteus {
 
@@ -13,20 +15,23 @@ public:
     return D;
   }
 
-  std::unique_ptr<MemoryBuffer>
-  compile(std::unique_ptr<LLVMContext> Ctx, std::unique_ptr<Module> M,
-          [[maybe_unused]] HashT ModuleHash) override {
-    // ModuleHash is unused since we do not implement an object cache for host
-    // JIT.
-    Jit.compileOnly(std::move(Ctx), std::move(M));
-    // TODO: Host compilation is managed by ORC lazy JIT and does not support
-    // synchronous object creation.
-    return nullptr;
+  std::unique_ptr<MemoryBuffer> compile(std::unique_ptr<LLVMContext> Ctx,
+                                        std::unique_ptr<Module> Mod,
+                                        HashT ModuleHash) override {
+    auto CtxOnwer = std::move(Ctx);
+    auto ModOwner = std::move(Mod);
+    std::unique_ptr<MemoryBuffer> ObjectModule = Jit.compileOnly(*ModOwner);
+    if (!ObjectModule)
+      PROTEUS_FATAL_ERROR("Expected non-null object library");
+
+    StorageCache.store(ModuleHash, ObjectModule->getMemBufferRef());
+
+    return ObjectModule;
   }
 
-  std::unique_ptr<MemoryBuffer> lookupObjectModule(HashT) override {
-    // Host JIT does not implement object caching.
-    return nullptr;
+  std::unique_ptr<CompiledLibrary>
+  lookupCompiledLibrary(HashT ModuleHash) override {
+    return StorageCache.lookup(ModuleHash);
   }
 
   DispatchResult launch(void *, LaunchDims, LaunchDims, ArrayRef<void *>,
@@ -38,18 +43,30 @@ public:
     PROTEUS_FATAL_ERROR("Host dispatcher does not implement getDeviceArch");
   }
 
-  void *getFunctionAddress(StringRef FnName,
-                           std::optional<MemoryBufferRef>) override {
-    // ObjectModule is unused, the ORC JIT singleton has a single global module.
-    void *FuncAddr = Jit.getFunctionAddress(FnName);
+  void *getFunctionAddress(StringRef FnName, HashT ModuleHash,
+                           CompiledLibrary &Library) override {
+    HashT FuncHash = hash(FnName, ModuleHash);
+
+    if (void *FuncPtr = CodeCache.lookup(FuncHash))
+      return FuncPtr;
+
+    if (!Library.IsLoaded) {
+      Jit.loadCompiledLibrary(Library);
+      Library.IsLoaded = true;
+    }
+
+    void *FuncAddr = Jit.getFunctionAddress(FnName, Library);
     if (!FuncAddr)
       PROTEUS_FATAL_ERROR("Failed to find address for function " + FnName);
+
+    CodeCache.insert(FuncHash, FuncAddr, FnName);
 
     return FuncAddr;
   }
 
-  void loadDynamicLibrary(const SmallString<128> &Path) override {
-    Jit.loadDynamicLibrary(Path);
+  void registerDynamicLibrary(HashT HashValue,
+                              const SmallString<128> &Path) override {
+    StorageCache.storeDynamicLibrary(HashValue, Path);
   }
 
 protected:
@@ -57,12 +74,15 @@ protected:
     TargetModel = TargetModelType::HOST;
   }
 
+  ~DispatcherHost() {
+    CodeCache.printStats();
+    StorageCache.printStats();
+  }
+
 private:
-  // TODO: The JitEngineHost is a singleton and consolidates all compiled IR in
-  // a single object layer. This creates name collision for same named functions
-  // (duplicate definitions) though they are in different Jit modules.
-  // Reconsider singletons for both the JitEngineHost and the Dispatcher.
   JitEngineHost &Jit;
+  JitCache<void *> CodeCache;
+  JitStorageCache StorageCache;
 };
 
 } // namespace proteus

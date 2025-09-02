@@ -21,6 +21,7 @@
 
 #include <llvm/ADT/StringRef.h>
 
+#include "proteus/CompiledLibrary.hpp"
 #include "proteus/Hashing.hpp"
 #include "proteus/Utils.h"
 
@@ -33,23 +34,30 @@ using namespace llvm;
 // assembly (PTX) or binary (ELF), then device globals may have different
 // addresses that render it invalid. In this case, store LLVM IR to re-link
 // globals.
-template <typename Function_t> class JitStorageCache {
+class JitStorageCache {
 public:
   JitStorageCache() { std::filesystem::create_directory(StorageDirectory); }
 
-  std::unique_ptr<MemoryBuffer> lookup(HashT &HashValue) {
+  std::unique_ptr<CompiledLibrary> lookup(HashT &HashValue) {
     TIMESCOPE("object lookup");
     Accesses++;
 
     std::string Filebase =
         StorageDirectory + "/cache-jit-" + HashValue.toString();
 
-    auto CacheBuf = MemoryBuffer::getFileAsStream(Filebase + ".o");
-    if (!CacheBuf)
-      return nullptr;
+    auto CacheBuf = MemoryBuffer::getFile(Filebase + ".o");
+    if (CacheBuf) {
+      Hits++;
+      return std::make_unique<CompiledLibrary>(std::move(*CacheBuf));
+    }
 
-    Hits++;
-    return std::move(*CacheBuf);
+    if (std::filesystem::exists(Filebase + ".so")) {
+      Hits++;
+      return std::make_unique<CompiledLibrary>(
+          SmallString<128>{Filebase + ".so"});
+    }
+
+    return nullptr;
   }
 
   void store(HashT &HashValue, MemoryBufferRef ObjBufRef) {
@@ -60,6 +68,15 @@ public:
 
     saveToFile(Filebase + ".o", StringRef{ObjBufRef.getBufferStart(),
                                           ObjBufRef.getBufferSize()});
+  }
+
+  void storeDynamicLibrary(HashT &HashValue, const SmallString<128> &Path) {
+    TIMESCOPE("Store cache");
+
+    std::string Filebase =
+        StorageDirectory + "/cache-jit-" + HashValue.toString();
+
+    sys::fs::copy_file(Path, Filebase + ".so");
   }
 
   void printStats() {

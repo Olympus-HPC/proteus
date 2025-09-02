@@ -3,6 +3,7 @@
 
 #include <llvm/Support/Debug.h>
 
+#include "proteus/CompiledLibrary.hpp"
 #include "proteus/Frontend/Dispatcher.hpp"
 
 namespace proteus {
@@ -15,13 +16,8 @@ private:
   std::vector<std::string> ExtraArgs;
 
   Dispatcher &Dispatch;
-  std::unique_ptr<MemoryBuffer> ObjectModule;
+  std::unique_ptr<CompiledLibrary> Library = nullptr;
   bool IsCompiled = false;
-  struct DynamicLibraryRAII {
-    SmallString<128> Path;
-
-    ~DynamicLibraryRAII() { sys::fs::remove(Path); }
-  } DynamicLibrary;
 
   // TODO: We don't cache CodeInstances so if a user re-creates the exact same
   // instantiation it will create a new CodeInstance. This creation cost is
@@ -138,7 +134,8 @@ private:
       InstanceModule->compile();
 
       FuncPtr = InstanceModule->Dispatch.getFunctionAddress(
-          EntryFuncName, InstanceModule->getObjectModuleRef());
+          EntryFuncName, InstanceModule->ModuleHash,
+          InstanceModule->getLibrary());
     }
 
     template <typename... ArgT>
@@ -189,11 +186,14 @@ public:
 
   void compile();
 
-  std::optional<MemoryBufferRef> getObjectModuleRef() const {
-    if (!ObjectModule)
-      return std::nullopt;
+  CompiledLibrary &getLibrary() {
+    if (!IsCompiled)
+      compile();
 
-    return ObjectModule->getMemBufferRef();
+    if (!Library)
+      PROTEUS_FATAL_ERROR("Expected non-null library after compilation");
+
+    return *Library;
   }
 
   template <typename... ArgT>
@@ -255,7 +255,7 @@ public:
     if (!isHostTargetModel(TargetModel))
       PROTEUS_FATAL_ERROR("Error: getFunction() applies only to host modules");
 
-    void *FuncPtr = Dispatch.getFunctionAddress(Name, getObjectModuleRef());
+    void *FuncPtr = Dispatch.getFunctionAddress(Name, ModuleHash, getLibrary());
 
     return FunctionHandle<Sig>(*this, FuncPtr);
   }
@@ -267,7 +267,7 @@ public:
     if (TargetModel == TargetModelType::HOST)
       PROTEUS_FATAL_ERROR("Error: getKernel() applies only to device modules");
 
-    void *FuncPtr = Dispatch.getFunctionAddress(Name, getObjectModuleRef());
+    void *FuncPtr = Dispatch.getFunctionAddress(Name, ModuleHash, getLibrary());
 
     return KernelHandle<Sig>(*this, FuncPtr);
   }

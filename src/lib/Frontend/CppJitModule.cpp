@@ -62,7 +62,8 @@ void CppJitModule::compileCppToDynamicLibrary() {
   }
 
   // Create temp output file path
-  EC = sys::fs::createTemporaryFile("proteus", "o", DynamicLibrary.Path);
+  SmallString<128> OutputPath;
+  EC = sys::fs::createTemporaryFile("proteus", "so", OutputPath);
   if (EC)
     PROTEUS_FATAL_ERROR("Failed to create temp output file");
 
@@ -78,7 +79,7 @@ void CppJitModule::compileCppToDynamicLibrary() {
       "-fPIC",
       OffloadArch,
       "-o",
-      DynamicLibrary.Path.c_str(),
+      OutputPath.c_str(),
       SourcePath.c_str()};
 
   ArgStorage.insert(ArgStorage.end(), ExtraToolchainArgs.begin(),
@@ -109,12 +110,16 @@ void CppJitModule::compileCppToDynamicLibrary() {
 
   if (Res != 0 || !FailingCommands.empty()) {
     sys::fs::remove(SourcePath);
+    sys::fs::remove(OutputPath);
     PROTEUS_FATAL_ERROR("Compilation failed");
   }
 
-  Dispatch.loadDynamicLibrary(DynamicLibrary.Path);
+  // Register the dynamic library file with the dispatcher to make it available
+  // post compilation.
+  Dispatch.registerDynamicLibrary(ModuleHash, OutputPath);
 
   sys::fs::remove(SourcePath);
+  sys::fs::remove(OutputPath);
 }
 
 CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
@@ -221,7 +226,7 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
 void CppJitModule::compile() {
   // Lookup in the object cache of the dispatcher before lowering the cpp code
   // to LLVM IR.
-  if ((ObjectModule = Dispatch.lookupObjectModule(ModuleHash))) {
+  if ((Library = Dispatch.lookupCompiledLibrary(ModuleHash))) {
     IsCompiled = true;
     return;
   }
@@ -230,11 +235,17 @@ void CppJitModule::compile() {
   case TargetModelType::HOST_HIP:
   case TargetModelType::HOST_CUDA:
     compileCppToDynamicLibrary();
+    // Retrieve the compiled library from the dispatcher which stores the
+    // dynamic library file.
+    Library = Dispatch.lookupCompiledLibrary(ModuleHash);
+    if (!Library)
+      PROTEUS_FATAL_ERROR("Expected non-null library after compilation");
     break;
   default:
     auto CRes = compileCppToIR();
-    ObjectModule =
+    auto ObjectModule =
         Dispatch.compile(std::move(CRes.Ctx), std::move(CRes.Mod), ModuleHash);
+    Library = std::make_unique<CompiledLibrary>(std::move(ObjectModule));
   }
 
   IsCompiled = true;

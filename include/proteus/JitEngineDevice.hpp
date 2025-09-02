@@ -521,7 +521,7 @@ protected:
   }
 
   JitCache<KernelFunction_t> CodeCache;
-  JitStorageCache<KernelFunction_t> StorageCache;
+  JitStorageCache StorageCache;
   std::string DeviceArch;
   std::unordered_map<std::string, const void *> VarNameToDevPtr;
 
@@ -596,22 +596,13 @@ JitEngineDevice<ImplT>::compileAndRun(
   std::string KernelMangled = (KernelInfo.getName() + Suffix);
 
   if (Config::get().ProteusUseStoredCache) {
-    // If there device global variables, lookup the IR and codegen object
-    // before launching. Else, if there aren't device global variables, lookup
-    // the object and launch.
-
-    // TODO: Check for globals is very conservative and always re-builds from
-    // LLVM IR even if the Jit module does not use global variables.  A better
-    // solution is to keep track of whether a kernel uses gvars (store a flag in
-    // the cache file?) and load the object in case it does not use any.
-    // TODO: Can we use RTC interfaces for fast linking on object files?
-    auto CacheBuf = StorageCache.lookup(HashValue);
-    if (CacheBuf) {
+    auto CompiledLib = StorageCache.lookup(HashValue);
+    if (CompiledLib) {
       if (!Config::get().ProteusRelinkGlobalsByCopy)
-        relinkGlobalsObject(CacheBuf->getMemBufferRef());
+        relinkGlobalsObject(CompiledLib->ObjectModule->getMemBufferRef());
 
-      auto KernelFunc =
-          getKernelFunctionFromImage(KernelMangled, CacheBuf->getBufferStart());
+      auto KernelFunc = getKernelFunctionFromImage(
+          KernelMangled, CompiledLib->ObjectModule->getBufferStart());
 
       CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
 

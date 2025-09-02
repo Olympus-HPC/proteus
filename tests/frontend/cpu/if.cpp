@@ -1,5 +1,7 @@
 // RUN: rm -rf .proteus
-// RUN: ./if | %FILECHECK %s --check-prefixes=CHECK
+// RUN: ./if | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// Second run uses the object cache.
+// RUN: ./if | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
 
 #include <iostream>
@@ -188,3 +190,5 @@ int main() {
 // CHECK-NEXT: R EQ 0
 // CHECK-NEXT: R NE 1
 // CHECK-NEXT: R NE 0
+// CHECK-FIRST: JitStorageCache hits 0 total 1
+// CHECK-SECOND: JitStorageCache hits 1 total 1
