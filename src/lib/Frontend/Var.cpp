@@ -609,9 +609,7 @@ Var &min(const Var &L, const Var &R) {
   Var &ResultVar = Fn.declVarInternal("res.", L.getValueType());
   ResultVar = R;
   Fn.beginIf(L < R);
-  {
-    ResultVar = L;
-  }
+  { ResultVar = L; }
   Fn.endIf();
   return ResultVar;
 }
