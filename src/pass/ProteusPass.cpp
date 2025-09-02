@@ -176,7 +176,6 @@ private:
     PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
     ModulePassManager Passes;
-    Passes.addPass(MergeFunctionsPass());
     Passes.addPass(GlobalOptPass());
     Passes.addPass(GlobalDCEPass());
     Passes.addPass(StripDeadDebugInfoPass());
