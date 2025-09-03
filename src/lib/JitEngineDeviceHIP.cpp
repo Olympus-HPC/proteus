@@ -388,7 +388,7 @@ JitEngineDeviceHIP::JitEngineDeviceHIP() {
 
 std::unique_ptr<MemoryBuffer> JitEngineDeviceHIP::compileOnly(Module &M) {
   proteus::optimizeIR(M, DeviceArch, '3', 3);
-  auto DeviceObject =
-      proteus::codegenObject(M, DeviceArch, GlobalLinkedBinaries);
+  auto DeviceObject = proteus::codegenObject(
+      M, DeviceArch, GlobalLinkedBinaries, Config::get().ProteusCodegen);
   return DeviceObject;
 }

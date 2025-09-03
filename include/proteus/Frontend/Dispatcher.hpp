@@ -5,17 +5,25 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <memory>
 
+#include "proteus/Frontend/TargetModel.hpp"
+#include "proteus/Hashing.hpp"
+
 #if PROTEUS_ENABLE_HIP && __HIP__
 #include <hip/hip_runtime.h>
 #endif
-
-enum class TargetModelType { HOST, CUDA, HIP };
 
 struct LaunchDims {
   unsigned X = 1, Y = 1, Z = 1;
 };
 
 namespace proteus {
+
+template <typename T> struct sig_traits;
+
+template <typename R, typename... Args> struct sig_traits<R(Args...)> {
+  using return_type = R;
+  using argument_types = std::tuple<Args...>;
+};
 
 using namespace llvm;
 
@@ -43,28 +51,47 @@ struct DispatchResult {
 struct DispatchResult;
 
 class Dispatcher {
+protected:
+  TargetModelType TargetModel;
+
 public:
-  static Dispatcher &getDispatcher(TargetModelType Model);
+  static Dispatcher &getDispatcher(TargetModelType TargetModel);
 
-  virtual void compile(std::unique_ptr<LLVMContext> Ctx,
-                       std::unique_ptr<Module> M) = 0;
+  virtual std::unique_ptr<MemoryBuffer>
+  compile(std::unique_ptr<LLVMContext> Ctx, std::unique_ptr<Module> M,
+          HashT ModuleHash) = 0;
 
-  virtual DispatchResult launch(StringRef KernelName, LaunchDims GridDim,
+  virtual std::unique_ptr<MemoryBuffer>
+  lookupObjectModule(HashT ModuleHash) = 0;
+
+  virtual DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
                                 LaunchDims BlockDim,
                                 ArrayRef<void *> KernelArgs, uint64_t ShmemSize,
                                 void *Stream) = 0;
 
-  template <typename Ret, typename... ArgT>
-  Ret run(StringRef FuncName, ArgT... Args) {
-    void *Addr = getFunctionAddress(FuncName);
-    using FnPtr = Ret (*)(ArgT...);
-    auto Fn = reinterpret_cast<FnPtr>(Addr);
-    return Fn(Args...);
+  virtual StringRef getDeviceArch() const = 0;
+
+  template <typename Sig, typename... ArgT>
+  typename sig_traits<Sig>::return_type run(void *FuncPtr, ArgT &&...Args) {
+    if (!isHostTargetModel(TargetModel))
+      PROTEUS_FATAL_ERROR(
+          "Dispatcher run interface is only supported for host derived models");
+
+    auto Fn = reinterpret_cast<Sig *>(FuncPtr);
+    using Ret = typename sig_traits<Sig>::return_type;
+
+    if constexpr (std::is_void_v<Ret>) {
+      Fn(std::forward<ArgT>(Args)...);
+      return;
+    } else
+      return Fn(std::forward<ArgT>(Args)...);
   }
 
-protected:
-  std::unique_ptr<MemoryBuffer> Library = nullptr;
-  virtual void *getFunctionAddress(StringRef FunctionName) = 0;
+  virtual void *
+  getFunctionAddress(StringRef FunctionName,
+                     std::optional<MemoryBufferRef> ObjectModule) = 0;
+
+  virtual void loadDynamicLibrary(const SmallString<128> &Path) = 0;
 };
 
 } // namespace proteus

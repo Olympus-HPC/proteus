@@ -15,45 +15,62 @@ public:
     return D;
   }
 
-  void compile([[maybe_unused]] std::unique_ptr<LLVMContext> Ctx,
-               std::unique_ptr<Module> M) override {
-    SmallString<4096> Bitcode;
-    raw_svector_ostream OS(Bitcode);
-    WriteBitcodeToFile(*M, OS);
-
-    HashT HashValue = hash(StringRef{Bitcode.data(), Bitcode.size()});
-    auto StoredObject = StorageCache.lookup(HashValue);
-    if (StoredObject) {
-      Library = std::move(StoredObject);
-      return;
-    }
+  std::unique_ptr<MemoryBuffer>
+  compile([[maybe_unused]] std::unique_ptr<LLVMContext> Ctx,
+          std::unique_ptr<Module> Mod, HashT ModuleHash) override {
+    // This is necessary to ensure Ctx outlives M. Setting [[maybe_unused]] can
+    // trigger a lifetime bug.
+    auto CtxOwner = std::move(Ctx);
+    auto ModOwner = std::move(Mod);
 
     // CMake finds LIBDEVICE_BC_PATH.
     auto LibDeviceBuffer = llvm::MemoryBuffer::getFile(LIBDEVICE_BC_PATH);
     auto LibDeviceModule = llvm::parseBitcodeFile(
-        LibDeviceBuffer->get()->getMemBufferRef(), M->getContext());
+        LibDeviceBuffer->get()->getMemBufferRef(), ModOwner->getContext());
 
-    llvm::Linker linker(*M);
+    llvm::Linker linker(*ModOwner);
     linker.linkInModule(std::move(LibDeviceModule.get()));
 
-    Library = Jit.compileOnly(*M);
-    if (!Library)
+    std::unique_ptr<MemoryBuffer> ObjectModule = Jit.compileOnly(*ModOwner);
+    if (!ObjectModule)
       PROTEUS_FATAL_ERROR("Expected non-null object library");
 
-    StorageCache.store(HashValue, Library->getMemBufferRef());
+    StorageCache.store(ModuleHash, ObjectModule->getMemBufferRef());
+
+    return ObjectModule;
   }
 
-  DispatchResult launch(StringRef KernelName, LaunchDims GridDim,
+  std::unique_ptr<MemoryBuffer> lookupObjectModule(HashT ModuleHash) override {
+    return StorageCache.lookup(ModuleHash);
+  }
+
+  DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
                         LaunchDims BlockDim, ArrayRef<void *> KernelArgs,
                         uint64_t ShmemSize, void *Stream) override {
+    dim3 CudaGridDim = {GridDim.X, GridDim.Y, GridDim.Z};
+    dim3 CudaBlockDim = {BlockDim.X, BlockDim.Y, BlockDim.Z};
+    cudaStream_t CudaStream = reinterpret_cast<cudaStream_t>(Stream);
+
+    void **KernelArgsPtrs = const_cast<void **>(KernelArgs.data());
+    return proteus::launchKernelFunction(
+        reinterpret_cast<cudaFunction_t>(KernelFunc), CudaGridDim, CudaBlockDim,
+        KernelArgsPtrs, ShmemSize, CudaStream);
+  }
+
+  StringRef getDeviceArch() const override { return Jit.getDeviceArch(); }
+
+  void *
+  getFunctionAddress(StringRef KernelName,
+                     std::optional<MemoryBufferRef> ObjectModule) override {
     auto GetKernelFunc = [&]() {
+      // Hash the kernel name to get a unique id.
       HashT HashValue = hash(KernelName);
 
       if (auto KernelFunc = CodeCache.lookup(HashValue))
         return KernelFunc;
 
       auto KernelFunc = proteus::getKernelFunctionFromImage(
-          KernelName, Library->getBufferStart(),
+          KernelName, ObjectModule->getBufferStart(),
           /*RelinkGlobalsByCopy*/ false,
           /* VarNameToDevPtr */ {});
 
@@ -63,14 +80,12 @@ public:
     };
 
     auto KernelFunc = GetKernelFunc();
+    return KernelFunc;
+  }
 
-    dim3 CudaGridDim = {GridDim.X, GridDim.Y, GridDim.Z};
-    dim3 CudaBlockDim = {BlockDim.X, BlockDim.Y, BlockDim.Z};
-    cudaStream_t CudaStream = reinterpret_cast<cudaStream_t>(Stream);
-
-    void **KernelArgsPtrs = const_cast<void **>(KernelArgs.data());
-    return proteus::launchKernelFunction(KernelFunc, CudaGridDim, CudaBlockDim,
-                                         KernelArgsPtrs, ShmemSize, CudaStream);
+  void loadDynamicLibrary(const SmallString<128> &) override {
+    PROTEUS_FATAL_ERROR(
+        "Device dispatcher does not implement loadDynamicLibrary");
   }
 
   ~DispatcherCUDA() {
@@ -78,14 +93,11 @@ public:
     StorageCache.printStats();
   }
 
-protected:
-  void *getFunctionAddress(StringRef) override {
-    PROTEUS_FATAL_ERROR("CUDA does not support getFunctionAddress");
-  }
-
 private:
   JitEngineDeviceCUDA &Jit;
-  DispatcherCUDA() : Jit(JitEngineDeviceCUDA::instance()) {}
+  DispatcherCUDA() : Jit(JitEngineDeviceCUDA::instance()) {
+    TargetModel = TargetModelType::CUDA;
+  }
   JitCache<CUfunction> CodeCache;
   JitStorageCache<CUfunction> StorageCache;
 };

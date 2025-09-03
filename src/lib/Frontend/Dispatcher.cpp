@@ -5,31 +5,67 @@
 
 #if PROTEUS_ENABLE_HIP
 #include "proteus/Frontend/DispatcherHIP.hpp"
+#include "proteus/Frontend/DispatcherHostHIP.hpp"
 #endif
 
 #if PROTEUS_ENABLE_CUDA
 #include "proteus/Frontend/DispatcherCUDA.hpp"
+#include "proteus/Frontend/DispatcherHostCUDA.hpp"
 #endif
 
 namespace proteus {
-Dispatcher &Dispatcher::getDispatcher(TargetModelType Model) {
-  switch (Model) {
-  case TargetModelType::HOST:
-    return DispatcherHost::instance();
-  case TargetModelType::HIP:
+
+namespace {
+
+Dispatcher &getHostHIPDispatcher() {
 #if PROTEUS_ENABLE_HIP
-    return DispatcherHIP::instance();
+  return DispatcherHostHIP::instance();
 #else
-    PROTEUS_FATAL_ERROR("HIP support is not enabled");
+  PROTEUS_FATAL_ERROR("HIP support is not enabled");
 #endif
-  case TargetModelType::CUDA:
+}
+
+Dispatcher &getHostCUDADispatcher() {
 #if PROTEUS_ENABLE_CUDA
-    return DispatcherCUDA::instance();
+  return DispatcherHostCUDA::instance();
 #else
-    PROTEUS_FATAL_ERROR("CUDA support is not enabled");
+  PROTEUS_FATAL_ERROR("CUDA support is not enabled");
 #endif
+}
+
+Dispatcher &getHostDispatcher() { return DispatcherHost::instance(); }
+
+Dispatcher &getHIPDispatcher() {
+#if PROTEUS_ENABLE_HIP
+  return DispatcherHIP::instance();
+#else
+  PROTEUS_FATAL_ERROR("HIP support is not enabled");
+#endif
+}
+
+Dispatcher &getCUDADispatcher() {
+#if PROTEUS_ENABLE_CUDA
+  return DispatcherCUDA::instance();
+#else
+  PROTEUS_FATAL_ERROR("CUDA support is not enabled");
+#endif
+}
+} // anonymous namespace
+
+Dispatcher &Dispatcher::getDispatcher(TargetModelType TargetModel) {
+  switch (TargetModel) {
+  case TargetModelType::HOST_HIP:
+    return getHostHIPDispatcher();
+  case TargetModelType::HOST_CUDA:
+    return getHostCUDADispatcher();
+  case TargetModelType::HOST:
+    return getHostDispatcher();
+  case TargetModelType::HIP:
+    return getHIPDispatcher();
+  case TargetModelType::CUDA:
+    return getCUDADispatcher();
   default:
-    PROTEUS_FATAL_ERROR("Unsupport model type");
+    PROTEUS_FATAL_ERROR("Unsupported model type");
   }
 }
 

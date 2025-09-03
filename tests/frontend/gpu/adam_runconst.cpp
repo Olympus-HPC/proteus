@@ -270,8 +270,8 @@ int main(int argc, char *argv[]) {
 // CHECK-NEXT: p[7] = -0.599872
 // CHECK-NEXT: p[8] = -0.58157
 // CHECK-NEXT: p[9] = -0.59015{{[7|8]}}
-// CHECK: JitCache hits 99 total 100
-// CHECK: HashValue {{[0-9]+}} NumExecs 100 NumHits 99
+// CHECK: JitCache hits 0 total 1
+// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: JitStorageCache hits 0 total 1
 // CHECK-SECOND: JitStorageCache hits 1 total 1
 

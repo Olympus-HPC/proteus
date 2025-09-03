@@ -467,6 +467,8 @@ public:
           .joinAllThreads();
   }
 
+  StringRef getDeviceArch() const { return DeviceArch; }
+
 private:
   //------------------------------------------------------------------
   // Begin Methods implemented in the derived device engine class.
