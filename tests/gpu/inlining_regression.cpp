@@ -12,7 +12,6 @@
 #include "raja_style_launch.hpp"
 #include <proteus/JitInterface.hpp>
 
-
 int main() {
   proteus::init();
 
@@ -30,14 +29,10 @@ int main() {
 
   std::cout << Y[10] << std::endl;
   double A = 6.2;
-  forall(N, [=] __host__ __device__ (int I) {
-    Y[I] += X[I] * A;
-  });
+  forall(N, [=] __host__ __device__(int I) { Y[I] += X[I] * A; });
   gpuErrCheck(gpuDeviceSynchronize());
   std::cout << Y[10] << std::endl;
-  forall(N, [=] __host__ __device__ (int I) {
-    Y[I] += X[I] * A;
-  });
+  forall(N, [=] __host__ __device__(int I) { Y[I] += X[I] * A; });
   gpuErrCheck(gpuDeviceSynchronize());
   std::cout << Y[10] << std::endl;
 
