@@ -45,6 +45,9 @@ public:
     std::string Filebase =
         StorageDirectory + "/cache-jit-" + HashValue.toString();
 
+    // We first try to load a relocatable object file to create the code
+    // library. If that fails, we try to find a dynamic library file to setup
+    // the code library. If both fail, this hash is not cached.
     auto CacheBuf = MemoryBuffer::getFileAsStream(Filebase + ".o");
     if (CacheBuf) {
       Hits++;
