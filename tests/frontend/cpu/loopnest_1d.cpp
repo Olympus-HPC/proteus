@@ -57,7 +57,7 @@ static auto get1DSimpleLoopNestFunction(int N) {
     auto &Zero = F.declVar<int>("zero");
     Zero = 0;
 
-    // Test non-tiled version
+    // Test non-tiled version.
     F.forLoop({I, Zero, UB, IncOne}, [&]() { A[I] = B[I] * 3.0; }).emit();
 
     F.ret();
@@ -72,7 +72,7 @@ int main() {
   constexpr int N = 8;
   constexpr int TileSize = 4;
 
-  // Test 1D tiled loop
+  // Test 1D tiled loop.
   auto [JitMod1, F1] = get1DLoopNestFunction(N, TileSize);
   JitMod1->compile();
 
@@ -91,7 +91,7 @@ int main() {
     std::cout << "A1[" << I << "] = " << A1[I] << "\n";
   }
 
-  // Test 1D simple (non-tiled) loop
+  // Test 1D simple (non-tiled) loop.
   auto [JitMod2, F2] = get1DSimpleLoopNestFunction(N);
   JitMod2->compile();
 

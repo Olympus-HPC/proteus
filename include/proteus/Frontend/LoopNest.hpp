@@ -50,8 +50,8 @@ private:
   template <std::size_t... Is>
   void setupTiledLoops(std::index_sequence<Is...>) {
     (
-        // declare the tile iter and step variables for each tiled loop,
-        // storing them in the TiledLoopBounds array
+        // Declare the tile iter and step variables for each tiled loop,
+        // storing them in the TiledLoopBounds array.
         [&]() {
           auto &Loop = std::get<Is>(Loops);
           if (Loop.TileSize.has_value()) {
@@ -75,7 +75,7 @@ private:
   template <std::size_t... Is>
   void beginTiledLoops(std::index_sequence<Is...>) {
     (
-        // begin the tiled loops, using the computed tile bounds
+        // Begin the tiled loops, using the computed tile bounds.
         [&]() {
           auto &Loop = std::get<Is>(Loops);
           if (Loop.TileSize.has_value()) {
@@ -89,13 +89,13 @@ private:
 
   template <std::size_t... Is> void emitInnerLoops(std::index_sequence<Is...>) {
     (
-        // emit the inner loops, using this tile's iter var as init
+        // Emit the inner loops, using this tile's iter var as init.
         [&]() {
           auto &Loop = std::get<Is>(Loops);
           if (Loop.TileSize.has_value()) {
             auto &TiledBounds = *TiledLoopBounds[Is];
             auto &EndCandidate = TiledBounds.IterVar + TiledBounds.Inc;
-            // Clamp to handle partial tiles
+            // Clamp to handle partial tiles.
             EndCandidate = min(EndCandidate, TiledBounds.UpperBound);
             Fn.beginFor(Loop.Bounds.IterVar, TiledBounds.IterVar, EndCandidate,
                         Loop.Bounds.Inc);
@@ -108,7 +108,7 @@ private:
         ...);
     (
         [&]() {
-          // Force unpacking so we emit enough endFors
+          // Force unpacking so we emit enough endFors.
           (void)std::get<Is>(Loops);
           Fn.endFor();
         }(),
@@ -118,7 +118,7 @@ private:
   template <std::size_t... Is> void endTiledLoops(std::index_sequence<Is...>) {
     (
         [&]() {
-          // close tiled loops in reverse order to properly handle nesting
+          // Close tiled loops in reverse order to properly handle nesting.
           auto &Loop = std::get<sizeof...(Is) - 1U - Is>(Loops);
           if (Loop.TileSize.has_value()) {
             Fn.endFor();

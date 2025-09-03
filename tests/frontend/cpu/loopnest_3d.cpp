@@ -111,7 +111,7 @@ int main() {
   constexpr int UniformTile = 2;
   constexpr int SIZE = DI * DJ * DK;
 
-  // Test 3D variadic tiling
+  // Test 3D variadic tiling.
   auto [JitMod1, F1] = get3DLoopNestFunction(DI, DJ, DK, TileI, TileJ, TileK);
   JitMod1->compile();
 
@@ -130,7 +130,7 @@ int main() {
     std::cout << "A1[" << I << "] = " << A1[I] << "\n";
   }
 
-  // Test 3D uniform tiling
+  // Test 3D uniform tiling.
   auto [JitMod2, F2] = get3DUniformTileFunction(DI, DJ, DK, UniformTile);
   JitMod2->compile();
 
