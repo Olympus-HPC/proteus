@@ -1,7 +1,7 @@
 // clang-format off
 // RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 ./daxpy.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
-// ./daxpy.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: PROTEUS_TRACE_OUTPUT=1 ./inlining_regression.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST,CHECK-SECOND
+// ./inlining_regression.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
 // clang-format on
 
@@ -32,7 +32,16 @@ int main() {
   forall(N, [=] __host__ __device__(int I) { Y[I] += X[I] * A; });
   gpuErrCheck(gpuDeviceSynchronize());
   std::cout << Y[10] << std::endl;
-  forall(N, [=] __host__ __device__(int I) { Y[I] += X[I] * A; });
+
+  forall(N, [=] __host__ __device__(int I) { Y[I] += 2 * X[I] * A; });
+  gpuErrCheck(gpuDeviceSynchronize());
+  std::cout << Y[10] << std::endl;
+
+  forall(N, [=] __host__ __device__(int I) { Y[I] += 3 * X[I] * A; });
+  gpuErrCheck(gpuDeviceSynchronize());
+  std::cout << Y[10] << std::endl;
+
+  forall(N, [=] __host__ __device__(int I) { Y[I] -= 6 * X[I] * A; });
   gpuErrCheck(gpuDeviceSynchronize());
   std::cout << Y[10] << std::endl;
 
@@ -44,12 +53,14 @@ int main() {
 
 // clang-format off
 // CHECK: 0
-// CHECK-FIRST: [ArgSpec] Replaced Function _Z9daxpyImpldPdS_m ArgNo 3 with value i64 1024
-// CHECK-FIRST: [DimSpec]
-// CHECK-FIRST: [DimSpec]
-// CHECK: 19944.1
-// CHECK: 39888.2
-// CHECK: JitCache hits 1 total 2
-// CHECK: HashValue {{[0-9]+}} NumExecs 2 NumHits 1
-// CHECK-FIRST: JitStorageCache hits 0 total 1
-// CHECK-SECOND: JitStorageCache hits 1 total 1
+// CHECK: 19.4767
+// CHECK: 58.43
+// CHECK: 116.86
+// CHECK: 5.17836e-15
+// CHECK: JitCache hits 0 total 4
+// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: JitStorageCache hits 0 total 4
+// CHECK-SECOND: JitStorageCache hits 4 total 4

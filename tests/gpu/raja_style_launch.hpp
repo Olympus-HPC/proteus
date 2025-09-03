@@ -1,9 +1,10 @@
+// NOLINTBEGIN
 #include "gpu_common.h"
 
 template <typename T> struct Privatizer {
   using value_type = T;
   using reference_type = value_type &;
-  value_type Priv;
+  value_type priv;
 
   __host__ __device__ Privatizer(const T &o) : priv{o} {}
 
@@ -39,3 +40,4 @@ void forall(size_t N, Lambda &&lam, Args &&...args) {
 #error Must provide PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA
 #endif
 }
+// NOLINTEND
