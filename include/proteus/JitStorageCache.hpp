@@ -45,7 +45,7 @@ public:
     std::string Filebase =
         StorageDirectory + "/cache-jit-" + HashValue.toString();
 
-    auto CacheBuf = MemoryBuffer::getFile(Filebase + ".o");
+    auto CacheBuf = MemoryBuffer::getFileAsStream(Filebase + ".o");
     if (CacheBuf) {
       Hits++;
       return std::make_unique<CompiledLibrary>(std::move(*CacheBuf));
