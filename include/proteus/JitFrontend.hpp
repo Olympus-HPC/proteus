@@ -27,7 +27,7 @@ class JitModule {
 private:
   std::unique_ptr<LLVMContext> Ctx;
   std::unique_ptr<Module> Mod;
-  std::unique_ptr<MemoryBuffer> ObjectModule;
+  std::unique_ptr<CompiledLibrary> Library;
 
   std::deque<std::unique_ptr<FuncBase>> Functions;
   TargetModelType TargetModel;
@@ -61,7 +61,8 @@ private:
         // Func object to avoid cache lookups.
         // TODO: Re-think caching and dispatchers.
         auto KernelFunc = reinterpret_cast<decltype(F.getCompiledFunc())>(
-            M.Dispatch.getFunctionAddress(F.getName(), M.getObjectModuleRef()));
+            M.Dispatch.getFunctionAddress(F.getName(), M.ModuleHash,
+                                          M.getLibrary()));
 
         F.setCompiledFunc(KernelFunc);
 
@@ -185,37 +186,37 @@ public:
 
     // Create a unique module hash based on the bitcode and append to all
     // function names to make them unique.
-    // TODO: This is not needed for GPU JIT modules since they are separate
-    // objects. However, CPU JIT modules end up in the same object through the
-    // ORC JIT singleton. Reconsider the CPU JIT process.
+    // TODO: Is this necessary?
     ModuleHash = hash(StringRef{Buffer.data(), Buffer.size()});
     for (auto &JitF : Functions) {
       JitF->setName(JitF->getName().str() + "$" + ModuleHash.toString());
     }
 
-    if ((ObjectModule = Dispatch.lookupObjectModule(ModuleHash))) {
+    if ((Library = Dispatch.lookupCompiledLibrary(ModuleHash))) {
       IsCompiled = true;
       return;
     }
 
-    ObjectModule = Dispatch.compile(std::move(Ctx), std::move(Mod), ModuleHash);
+    Library = std::make_unique<CompiledLibrary>(
+        Dispatch.compile(std::move(Ctx), std::move(Mod), ModuleHash));
     IsCompiled = true;
   }
 
   HashT getModuleHash() const { return ModuleHash; }
 
-  std::optional<MemoryBufferRef> getObjectModuleRef() const {
-    // For host JIT modules the ObjectModule is alway nullptr and unused by
-    // DispatcherHOST since it is unused by ORC JIT.
-    if (!ObjectModule)
-      return std::nullopt;
-
-    return ObjectModule->getMemBufferRef();
-  }
-
   Dispatcher &getDispatcher() const { return Dispatch; }
 
   TargetModelType getTargetModel() const { return TargetModel; }
+
+  CompiledLibrary &getLibrary() {
+    if (!IsCompiled)
+      compile();
+
+    if (!Library)
+      PROTEUS_FATAL_ERROR("Expected non-null library after compilation");
+
+    return *Library;
+  }
 
   void print() { Mod->print(outs(), nullptr); }
 };
@@ -251,8 +252,8 @@ RetT Func<RetT, ArgT...>::operator()(ArgT... Args) {
 
   if (!CompiledFunc) {
     CompiledFunc = reinterpret_cast<decltype(CompiledFunc)>(
-        J.getDispatcher().getFunctionAddress(getName(),
-                                             J.getObjectModuleRef()));
+        J.getDispatcher().getFunctionAddress(getName(), J.getModuleHash(),
+                                             J.getLibrary()));
   }
 
   if (J.getTargetModel() != TargetModelType::HOST)

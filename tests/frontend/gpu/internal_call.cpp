@@ -24,9 +24,6 @@
 
 using namespace proteus;
 
-// TODO: Defined functions across different modules must have different symbol
-// names to avoid duplicate definitions, due to the singleton design for
-// JitEngineHost and DispatcherHost. Reconsider.
 auto createJitModule1() {
   auto J = std::make_unique<JitModule>(TARGET);
 

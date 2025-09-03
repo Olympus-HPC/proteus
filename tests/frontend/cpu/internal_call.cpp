@@ -1,6 +1,8 @@
 // clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./internal_call | %FILECHECK %s --check-prefixes=CHECK
+// RUN: ./internal_call | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// Second run uses the object cache.
+// RUN: ./internal_call | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
 // clang-format on
 
@@ -9,9 +11,6 @@
 
 using namespace proteus;
 
-// TODO: Defined functions across different modules must have different symbol
-// names to avoid duplicate definitions, due to the singleton design for
-// JitEngineHost and DispatcherHost. Reconsider.
 auto createJitModule1() {
   auto J = std::make_unique<JitModule>("host");
 
@@ -58,4 +57,7 @@ int main() {
 
 // clang-format off
 // CHECK: V 42
-// CHECK-NEXT: JitCache hits 0 total 0
+// CHECK: JitCache hits 0 total 1
+// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: JitStorageCache hits 0 total 1
+// CHECK-SECOND: JitStorageCache hits 1 total 1
