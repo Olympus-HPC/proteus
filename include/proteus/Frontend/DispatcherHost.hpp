@@ -18,7 +18,9 @@ public:
   std::unique_ptr<MemoryBuffer> compile(std::unique_ptr<LLVMContext> Ctx,
                                         std::unique_ptr<Module> Mod,
                                         HashT ModuleHash) override {
-    auto CtxOnwer = std::move(Ctx);
+    // This is necessary to ensure Ctx outlives M. Setting [[maybe_unused]] can
+    // trigger a lifetime bug.
+    auto CtxOwner = std::move(Ctx);
     auto ModOwner = std::move(Mod);
     std::unique_ptr<MemoryBuffer> ObjectModule = Jit.compileOnly(*ModOwner);
     if (!ObjectModule)

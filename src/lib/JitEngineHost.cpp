@@ -367,6 +367,7 @@ void *JitEngineHost::getFunctionAddress(StringRef FnName,
                                         CompiledLibrary &Library) {
   // Lookup the function address corresponding the dynamic library context of
   // the compiled library.
+  assert(Library.JitDyLib && "Expected non-null JIT dylib");
   auto EntryAddr = ExitOnErr(LLJITPtr->lookup(*Library.JitDyLib, FnName));
 
   void *JitFnPtr = (void *)EntryAddr.getValue();
