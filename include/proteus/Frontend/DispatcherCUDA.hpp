@@ -84,7 +84,8 @@ public:
   }
 
   void registerDynamicLibrary(HashT, const SmallString<128> &) override {
-    PROTEUS_FATAL_ERROR("Dispatch CUDA does not support registerDynamicLibrary");
+    PROTEUS_FATAL_ERROR(
+        "Dispatch CUDA does not support registerDynamicLibrary");
   }
 
   ~DispatcherCUDA() {

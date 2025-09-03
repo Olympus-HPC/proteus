@@ -16,8 +16,8 @@ struct CompiledLibrary {
   SmallString<128> DynLibPath;
   bool IsDynLib;
   bool IsLoaded = false;
-  // JitDyLib holds a pointer to the ORC JIT dynamic library context for the host
-  // JIT engine.
+  // JitDyLib holds a pointer to the ORC JIT dynamic library context for the
+  // host JIT engine.
   llvm::orc::JITDylib *JitDyLib = nullptr;
 
   CompiledLibrary(std::unique_ptr<MemoryBuffer> ObjectModule)
