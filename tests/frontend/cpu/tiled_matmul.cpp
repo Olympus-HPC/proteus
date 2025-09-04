@@ -1,6 +1,8 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/tiled_matmul 16 3 4 5 | %FILECHECK %s --check-prefixes=CHECK
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/tiled_matmul 16 3 4 5 | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// Second run uses the object cache.
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/tiled_matmul 16 3 4 5 | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
@@ -111,3 +113,5 @@ int main(int argc, char **argv) {
 
 // clang-format off
 // CHECK: Verification successful
+// CHECK-FIRST: JitStorageCache hits 0 total 1
+// CHECK-SECOND: JitStorageCache hits 1 total 1

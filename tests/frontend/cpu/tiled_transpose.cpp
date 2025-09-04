@@ -1,8 +1,10 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/tiled_transpose 4 4 2 | %FILECHECK %s --check-prefixes=FIRST
-// RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/tiled_transpose 5 4 3 | %FILECHECK %s --check-prefixes=SECOND
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/tiled_transpose 4 4 2 | %FILECHECK %s --check-prefixes=FIRST,CHECK-FIRST
+// Second run uses the object cache.
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/tiled_transpose 4 4 2 | %FILECHECK %s --check-prefixes=FIRST,CHECK-SECOND
+// Third run does not use the object cache.
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/tiled_transpose 5 4 3 | %FILECHECK %s --check-prefixes=THIRD,CHECK-THIRD
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
@@ -117,14 +119,17 @@ int main(int argc, char **argv) {
 // FIRST-NEXT: 1 5 9 13
 // FIRST-NEXT: 2 6 10 14
 // FIRST-NEXT: 3 7 11 15
-// SECOND: Input B:
-// SECOND-NEXT: 0 1 2 3
-// SECOND-NEXT: 4 5 6 7
-// SECOND-NEXT: 8 9 10 11
-// SECOND-NEXT: 12 13 14 15
-// SECOND-NEXT: 16 17 18 19
-// SECOND: Transposed A:
-// SECOND-NEXT: 0 4 8 12 16
-// SECOND-NEXT: 1 5 9 13 17
-// SECOND-NEXT: 2 6 10 14 18
-// SECOND-NEXT: 3 7 11 15 19
+// CHECK-FIRST: JitStorageCache hits 0 total 1
+// CHECK-SECOND: JitStorageCache hits 1 total 1
+// THIRD: Input B:
+// THIRD-NEXT: 0 1 2 3
+// THIRD-NEXT: 4 5 6 7
+// THIRD-NEXT: 8 9 10 11
+// THIRD-NEXT: 12 13 14 15
+// THIRD-NEXT: 16 17 18 19
+// THIRD: Transposed A:
+// THIRD-NEXT: 0 4 8 12 16
+// THIRD-NEXT: 1 5 9 13 17
+// THIRD-NEXT: 2 6 10 14 18
+// THIRD-NEXT: 3 7 11 15 19
+//CHECK-THIRD: JitStorageCache hits 0 total 1
