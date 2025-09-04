@@ -1,6 +1,8 @@
-// RUN: rm -rf .proteus
-// RUN: ./tiled_matmul 16 3 4 5 | %FILECHECK %s --check-prefixes=CHECK
-// RUN: rm -rf .proteus
+// clang-format off
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/tiled_matmul 16 3 4 5 | %FILECHECK %s --check-prefixes=CHECK
+// RUN: rm -rf "%t.$$.proteus"
+// clang-format on
 
 #include <cstdlib>
 #include <iostream>

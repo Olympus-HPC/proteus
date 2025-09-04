@@ -131,9 +131,12 @@ public:
   CodegenOption ProteusCodegen;
   int ProteusTraceOutput;
   std::optional<const std::string> ProteusOptPipeline;
+  std::optional<const std::string> ProteusCacheDir;
 
 private:
-  Config() : ProteusOptPipeline(getEnvOrDefaultString("PROTEUS_OPT_PIPELINE")) {
+  Config()
+      : ProteusOptPipeline(getEnvOrDefaultString("PROTEUS_OPT_PIPELINE")),
+        ProteusCacheDir(getEnvOrDefaultString("PROTEUS_CACHE_DIR")) {
     ProteusUseStoredCache =
         getEnvOrDefaultBool("PROTEUS_USE_STORED_CACHE", true);
     ProteusSpecializeLaunchBounds =

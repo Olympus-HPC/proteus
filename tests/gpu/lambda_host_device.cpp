@@ -1,9 +1,9 @@
 // clang-format off
-// RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 ./lambda_host_device.%ext |  %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 %build/lambda_host_device.%ext |  %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./lambda_host_device.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
-// RUN: rm -rf .proteus
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/lambda_host_device.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
 #include <iostream>
@@ -26,7 +26,7 @@ template <typename T> void launcher(T &&LB) {
 int main() {
   proteus::init();
   int A = 42;
-  launcher([=, A = proteus::jit_variable(A)] __host__ __device__()
+  launcher([ =, A = proteus::jit_variable(A) ] __host__ __device__()
                __attribute__((annotate("jit"))) { printf("Lambda %d\n", A); });
   proteus::finalize();
 }

@@ -74,39 +74,39 @@ fi
 
 # Test synchronous compilation (default) and kernel clone options.
 echo "### $(date) START TESTING SYNC COMPILATION KERNEL_CLONE cross-clone ###"
-PROTEUS_KERNEL_CLONE=cross-clone ctest -T test --output-on-failure
+PROTEUS_KERNEL_CLONE=cross-clone ctest -j8 -T test --output-on-failure
 echo "### $(date) END TESTING SYNC COMPILATION KERNEL_CLONE cross-clone ###"
 
 echo "### $(date) START TESTING SYNC COMPILATION KERNEL_CLONE link-clone-light ###"
-PROTEUS_KERNEL_CLONE=link-clone-light ctest -T test --output-on-failure
+PROTEUS_KERNEL_CLONE=link-clone-light ctest -j8 -T test --output-on-failure
 echo "### $(date) END TESTING SYNC COMPILATION KERNEL_CLONE link-clone-light ###"
 
 echo "### $(date) START TESTING SYNC COMPILATION KERNEL_CLONE link-clone-prune ###"
-PROTEUS_KERNEL_CLONE=link-clone-prune ctest -T test --output-on-failure
+PROTEUS_KERNEL_CLONE=link-clone-prune ctest -j8 -T test --output-on-failure
 echo "### $(date) END TESTING SYNC COMPILATION KERNEL_CLONE link-clone-prune ###"
 
 # Test asynchronous compilation.
 echo "### $(date) START TESTING (BLOCKING) ASYNC COMPILATION ###"
-PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 ctest -T test --output-on-failure
+PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 ctest -j8 -T test --output-on-failure
 echo "### $(date) END TESTING (BLOCKING) ASYNC COMPILATION ###"
 
 # Test also our faster, alternative to HIP RTC codegen.
 if [ "${CI_MACHINE}" == "tioga" ]; then
   echo "### $(date) START TESTING SYNC COMPILATION WITH PROTEUS CODEGEN SERIAL ###"
-  PROTEUS_CODEGEN=serial ctest -T test --output-on-failure
+  PROTEUS_CODEGEN=serial ctest -j8 -T test --output-on-failure
   echo "### $(date) END TESTING SYNC COMPILATION WITH PROTEUS HIP CODEGEN SERIAL ###"
 
   echo "### $(date) START TESTING (BLOCKING) ASYNC COMPILATION WITH PROTEUS CODEGEN SERIAL ###"
-  PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 PROTEUS_CODEGEN=serial ctest -T test --output-on-failure
+  PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 PROTEUS_CODEGEN=serial ctest -j8 -T test --output-on-failure
   echo "### $(date) END TESTING (BLOCKING) ASYNC COMPILATION WITH PROTEUS CODEGEN SERIAL ###"
 
   if [ "${PROTEUS_CI_ROCM_VERSION}" == "6.2.1" ] || [ "${PROTEUS_CI_ROCM_VERSION}" == "6.3.1" ];  then
     echo "### $(date) START TESTING SYNC COMPILATION WITH PROTEUS CODEGEN PARALLEL ###"
-    PROTEUS_CODEGEN=parallel ctest -T test --output-on-failure
+    PROTEUS_CODEGEN=parallel ctest -j8 -T test --output-on-failure
     echo "### $(date) END TESTING SYNC COMPILATION WITH PROTEUS HIP CODEGEN PARALLEL ###"
 
     echo "### $(date) START TESTING (BLOCKING) ASYNC COMPILATION WITH PROTEUS CODEGEN PARALLEL ###"
-    PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 PROTEUS_CODEGEN=parallel ctest -T test --output-on-failure
+    PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 PROTEUS_CODEGEN=parallel ctest -j8 -T test --output-on-failure
     echo "### $(date) END TESTING (BLOCKING) ASYNC COMPILATION WITH PROTEUS CODEGEN PARALLEL ###"
   fi
 fi
