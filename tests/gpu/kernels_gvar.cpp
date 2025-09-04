@@ -1,8 +1,11 @@
-// RUN: rm -rf .proteus
-// RUN: ./kernels_gvar.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// clang-format off
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/kernels_gvar.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./kernels_gvar.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
-// RUN: rm -rf .proteus
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/kernels_gvar.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: rm -rf "%t.$$.proteus"
+// clang-format on
+
 #include <climits>
 #include <cstdio>
 

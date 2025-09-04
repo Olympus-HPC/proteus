@@ -1,17 +1,17 @@
 // clang-format off
-// RUN: rm -rf .proteus
-// RUN: PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 ./kernel_pass_pipeline.%ext | %FILECHECK %s --check-prefixes=CHECK
-// RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<O3>' ./kernel_pass_pipeline.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK3
-// RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<O2>' ./kernel_pass_pipeline.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK2
-// RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<O1>' ./kernel_pass_pipeline.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK1
-// RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<Os>' ./kernel_pass_pipeline.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECKs
-// RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<Oz>' ./kernel_pass_pipeline.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECKz
-// RUN: rm -rf .proteus
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 %build/kernel_pass_pipeline.%ext | %FILECHECK %s --check-prefixes=CHECK
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<O3>' %build/kernel_pass_pipeline.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK3
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<O2>' %build/kernel_pass_pipeline.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK2
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<O1>' %build/kernel_pass_pipeline.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK1
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<Os>' %build/kernel_pass_pipeline.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECKs
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<Oz>' %build/kernel_pass_pipeline.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECKz
+// RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 #include <climits>
 #include <cstdio>

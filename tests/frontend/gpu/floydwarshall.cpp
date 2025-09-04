@@ -1,10 +1,10 @@
 // NOLINTBEGIN
 
 // clang-format off
-// RUN: rm -rf .proteus
-// RUN: ./floydwarshall.%ext 1024 100 16 | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
-// RUN: ./floydwarshall.%ext 1024 100 16 | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
-// RUN: rm -rf .proteus
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/floydwarshall.%ext 1024 100 16 | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/floydwarshall.%ext 1024 100 16 | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
 #include <proteus/Frontend/Builtins.hpp>

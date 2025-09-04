@@ -1,8 +1,8 @@
 // clang-format off
-// RUN: rm -rf .proteus
-// RUN: ./kernel_3d.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
-// RUN: ./kernel_3d.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
-// RUN: rm -rf .proteus
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/kernel_3d.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/kernel_3d.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
 #include <proteus/Frontend/Builtins.hpp>

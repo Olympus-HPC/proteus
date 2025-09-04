@@ -1,8 +1,3 @@
-// rm -rf .proteus
-// RUN: ./daxpy.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
-// Second run uses the object cache.
-// RUN: ./daxpy.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
-// rm -rf .proteus
 #include <cstddef>
 #include <cstdlib>
 #include <iostream>
@@ -35,11 +30,3 @@ int main(int argc, char **argv) {
   gpuErrCheck(gpuFree(X));
   gpuErrCheck(gpuFree(Y));
 }
-
-// CHECK: 0
-// CHECK: 19944.1
-// CHECK: 39888.2
-// CHECK: JitCache hits 1 total 2
-// CHECK: HashValue {{[0-9]+}} NumExecs 2 NumHits 1
-// CHECK-FIRST: JitStorageCache hits 0 total 1
-// CHECK-SECOND: JitStorageCache hits 1 total 1

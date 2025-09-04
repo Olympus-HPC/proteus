@@ -1,8 +1,8 @@
 // clang-format off
-// RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 ./jit_struct | %FILECHECK %s --check-prefixes=CHECK,CHECK-%target_arch,CHECK-FIRST
+// RUN: rm -rf %t.$$.proteus
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 %build/jit_struct | %FILECHECK %s --check-prefixes=CHECK,CHECK-%target_arch,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./jit_struct | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/jit_struct | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // clang-format on
 
 #include <climits>

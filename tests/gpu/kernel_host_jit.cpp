@@ -1,6 +1,9 @@
-// RUN: rm -rf .proteus
-// RUN: ./kernel_host_jit.%ext | %FILECHECK %s --check-prefixes=CHECK
-// RUN: rm -rf .proteus
+// clang-format off
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/kernel_host_jit.%ext | %FILECHECK %s --check-prefixes=CHECK
+// RUN: rm -rf "%t.$$.proteus"
+// clang-format on
+
 #include <climits>
 #include <cstdio>
 
