@@ -219,5 +219,4 @@ void FuncBase::endFor() {
 
   IRB.restoreIP(IP);
 }
-
 } // namespace proteus

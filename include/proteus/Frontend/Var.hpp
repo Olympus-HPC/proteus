@@ -18,6 +18,7 @@ struct Var {
   Type *PointerElemType;
 
   Var(AllocaInst *Alloca, FuncBase &Fn, Type *PointerElemType = nullptr);
+  Var(const Var &) = default;
 
   StringRef getName();
 
@@ -133,6 +134,7 @@ Type *getCommonType(const DataLayout &DL, Type *T1, Type *T2);
 // Declare intrinsic math functions.
 Var &powf(const Var &L, const Var &R);
 Var &sqrtf(const Var &R);
+Var &min(const Var &L, const Var &R);
 
 } // namespace proteus
 

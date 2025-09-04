@@ -601,6 +601,19 @@ Var &sqrtf(const Var &R) {
   return ResultVar;
 }
 
+Var &min(const Var &L, const Var &R) {
+  FuncBase &Fn = L.Fn;
+  if (&Fn != &R.Fn)
+    PROTEUS_FATAL_ERROR("Variables should belong to the same function");
+
+  Var &ResultVar = Fn.declVarInternal("res.", L.getValueType());
+  ResultVar = R;
+  Fn.beginIf(L < R);
+  { ResultVar = L; }
+  Fn.endIf();
+  return ResultVar;
+}
+
 // Assignment explicit instantiations.
 template Var &Var::operator= <int>(const int &);
 template Var &Var::operator= <unsigned int>(const unsigned int &);
