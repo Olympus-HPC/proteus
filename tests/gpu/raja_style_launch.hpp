@@ -31,7 +31,8 @@ template <typename Lambda, typename... Args>
 void forall(size_t N, Lambda &&lam, Args &&...args) {
   const std::size_t GridSize = (((N) + (256) - 1) / (256));
 #if PROTEUS_ENABLE_HIP
-  hipLaunchKernelGGL((globalWrapper<Lambda>), dim3(GridSize), dim3(256), 0, 0, lam, N);
+  hipLaunchKernelGGL((globalWrapper<Lambda>), dim3(GridSize), dim3(256), 0, 0,
+                     lam, N);
 #elif PROTEUS_ENABLE_CUDA
   auto func = reinterpret_cast<const void *>(&globalWrapper<Lambda>);
   void *AArgs[] = {&lam, &N};
