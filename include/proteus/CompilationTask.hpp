@@ -118,7 +118,9 @@ public:
     replaceGlobalVariablesWithPointers(*M, VarNameToDevPtr);
 
     invokeOptimizeIR(*M);
-
+    if (Config::get().ProteusTraceOutput == 2) {
+      llvm::outs() << "LLVM IR module post optimization " << *M << "\n";
+    }
     if (DumpIR) {
       const auto CreateDumpDirectory = []() {
         const std::string DumpDirectory = ".proteus-dump";

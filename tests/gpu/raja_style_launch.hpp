@@ -28,7 +28,7 @@ __global__ __attribute__((annotate("jit", 2))) void globalWrapper(Lambda lam,
 }
 
 template <typename Lambda, typename... Args>
-void forall(size_t N, Lambda &&lam, Args &&...args) {
+void forall(size_t N, Lambda &&lam, Args &&...) {
   const std::size_t GridSize = (((N) + (256) - 1) / (256));
 #if PROTEUS_ENABLE_HIP
   hipLaunchKernelGGL((globalWrapper<Lambda>), dim3(GridSize), dim3(256), 0, 0,

@@ -92,7 +92,7 @@ private:
     Constant *C = getConstant(M.getContext(), User->getType(), *Arg);
     User->replaceAllUsesWith(C);
     PROTEUS_DBG(Logger::logs("proteus") << traceOut(Arg->Pos, C));
-    if (Config::get().ProteusTraceOutput)
+    if (Config::get().ProteusTraceOutput >= 1)
       Logger::trace(traceOut(Arg->Pos, C));
   }
 
@@ -116,7 +116,7 @@ private:
       Constant *C = getConstant(M.getContext(), LoadType, *Arg);
       LI->replaceAllUsesWith(C);
       PROTEUS_DBG(Logger::logs("proteus") << traceOut(Arg->Pos, C));
-      if (Config::get().ProteusTraceOutput)
+      if (Config::get().ProteusTraceOutput >= 1)
         Logger::trace(traceOut(Arg->Pos, C));
     }
   }

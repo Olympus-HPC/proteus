@@ -184,7 +184,7 @@ public:
       };
 
       PROTEUS_DBG(Logger::logs("proteus") << TraceOut(F, ArgNo, C));
-      if (Config::get().ProteusTraceOutput)
+      if (Config::get().ProteusTraceOutput >= 1)
         Logger::trace(TraceOut(F, ArgNo, C));
       Arg->replaceAllUsesWith(C);
     }

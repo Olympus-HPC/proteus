@@ -1,7 +1,7 @@
 // clang-format off
 // RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 ./inlining_regression.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST,CHECK-SECOND
-// ./inlining_regression.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: PROTEUS_TRACE_OUTPUT=2 ./inlining_regression.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// PROTEUS_TRACE_OUTPUT=2 ./inlining_regression.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
 // clang-format on
 
@@ -53,10 +53,15 @@ int main() {
 
 // clang-format off
 // CHECK: 0
+// CHECK-NOT: thread_privatize
 // CHECK: 19.4767
+// CHECK-NOT: thread_privatize
 // CHECK: 58.43
+// CHECK-NOT: thread_privatize
 // CHECK: 116.86
+// CHECK-NOT: thread_privatize
 // CHECK: 5.17836e-15
+// CHECK-NOT: thread_privatize
 // CHECK: JitCache hits 0 total 4
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
