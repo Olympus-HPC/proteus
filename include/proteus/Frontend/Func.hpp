@@ -10,14 +10,20 @@
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/Frontend/TypeMap.hpp"
 #include "proteus/Frontend/Var.hpp"
-#include "proteus/Hashing.hpp"
 
 namespace proteus {
 
 struct Var;
 class JitModule;
+class LoopBoundInfo;
+template <typename... ForLoopBuilders> class LoopNestBuilder;
+template <typename BodyLambda> class ForLoopBuilder;
 
 using namespace llvm;
+
+struct EmptyLambda {
+  void operator()() const {}
+};
 
 class FuncBase {
 protected:
@@ -149,6 +155,16 @@ public:
 
   Var &callBuiltin(function_ref<Var &(FuncBase &)> Lower) {
     return Lower(*this);
+  }
+
+  template <typename BodyLambda = EmptyLambda>
+  auto forLoop(const LoopBoundInfo &Bounds, BodyLambda &&Body = {}) {
+    return ForLoopBuilder(Bounds, *this, std::move(Body));
+  }
+
+  template <typename... LoopBuilders>
+  auto buildLoopNest(LoopBuilders &&...Loops) {
+    return LoopNestBuilder(*this, std::forward<LoopBuilders>(Loops)...);
   }
 
   void ret(std::optional<std::reference_wrapper<Var>> OptRet = std::nullopt);
