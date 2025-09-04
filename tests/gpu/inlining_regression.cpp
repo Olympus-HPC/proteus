@@ -1,7 +1,7 @@
 // clang-format off
 // RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=2 ./inlining_regression.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
-// PROTEUS_TRACE_OUTPUT=2 ./inlining_regression.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=2 %build/inlining_regression.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=2 %build/inlining_regression.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
 // clang-format on
 
@@ -53,6 +53,7 @@ int main() {
 
 // clang-format off
 // CHECK: 0
+// These checks guarantee that thread_privatize is fully inlined by Proteus
 // CHECK-NOT: thread_privatize
 // CHECK: 19.4767
 // CHECK-NOT: thread_privatize
