@@ -258,6 +258,7 @@ CREATE_GPU_TEST(indirect_launcher_tpl_multi_arg_api indirect_launcher_tpl_multi_
 CREATE_GPU_TEST(indirect_launcher_multi indirect_launcher_multi.cpp)
 CREATE_GPU_TEST(indirect_launcher_multi_arg indirect_launcher_multi_arg.cpp)
 CREATE_GPU_TEST(indirect_fallthrough indirect_fallthrough.cpp)
+CREATE_GPU_TEST(inlining_regression inlining_regression.cpp)
 CREATE_GPU_TEST(multi_file file1_kernel.cpp file2_kernel.cpp)
 CREATE_GPU_TEST(daxpy daxpy.cpp)
 CREATE_GPU_TEST(daxpy_api daxpy_api.cpp)
