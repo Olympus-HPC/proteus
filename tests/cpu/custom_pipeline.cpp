@@ -35,6 +35,6 @@ int main() {
 // CHECK3: [CustomPipeline] default<O3>
 // CHECKs: [CustomPipeline] default<Os>
 // CHECKz: [CustomPipeline] default<Oz>
-// CHECK: foo 
+// CHECK: foo
 // CHECK: JitCache hits 0 total 1
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0

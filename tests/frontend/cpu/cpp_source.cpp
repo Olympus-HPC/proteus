@@ -1,6 +1,8 @@
 // clang-format off
 // RUN: rm -rf .proteus
-// RUN: ./cpp_source | %FILECHECK %s --check-prefixes=CHECK
+// RUN: ./cpp_source | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// Second run uses the object cache.
+// RUN: ./cpp_source | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf .proteus
 // clang-format on
 
@@ -29,6 +31,10 @@ int main() {
       printf("foo_byref V %d\n", V);
       foo<int>(V);
     }
+
+    extern "C" void bar() {
+      printf("bar from code\n");
+    }
    )cpp";
 
   int V = 42;
@@ -37,6 +43,18 @@ int main() {
   auto FooByRef = CJM.getFunction<void(int &)>("foo_byref");
   FooByVal.run(V);
   FooByRef.run(V);
+  auto Bar = CJM.getFunction<void()>("bar");
+  Bar.run();
+
+  const char *Code2 = R"cpp(
+     #include <cstdio>
+     extern "C" void bar() {
+       printf("bar from code2\n");
+     }
+    )cpp";
+  CppJitModule CJM2{"host", Code2};
+  auto Bar2 = CJM2.getFunction<void()>("bar");
+  Bar2.run();
 
   std::cout << "main V " << V << "\n";
 
@@ -49,3 +67,5 @@ int main() {
 // CHECK: foo_byref V 43
 // CHECK: foo V 43
 // CHECK: main V 43
+// CHECK-FIRST: JitStorageCache hits 0 total 2
+// CHECK-SECOND: JitStorageCache hits 2 total 2

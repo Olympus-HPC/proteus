@@ -5,6 +5,7 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <memory>
 
+#include "proteus/CompiledLibrary.hpp"
 #include "proteus/Frontend/TargetModel.hpp"
 #include "proteus/Hashing.hpp"
 
@@ -61,8 +62,8 @@ public:
   compile(std::unique_ptr<LLVMContext> Ctx, std::unique_ptr<Module> M,
           HashT ModuleHash) = 0;
 
-  virtual std::unique_ptr<MemoryBuffer>
-  lookupObjectModule(HashT ModuleHash) = 0;
+  virtual std::unique_ptr<CompiledLibrary>
+  lookupCompiledLibrary(HashT ModuleHash) = 0;
 
   virtual DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
                                 LaunchDims BlockDim,
@@ -87,11 +88,11 @@ public:
       return Fn(std::forward<ArgT>(Args)...);
   }
 
-  virtual void *
-  getFunctionAddress(StringRef FunctionName,
-                     std::optional<MemoryBufferRef> ObjectModule) = 0;
+  virtual void *getFunctionAddress(StringRef FunctionName, HashT ModuleHash,
+                                   CompiledLibrary &Library) = 0;
 
-  virtual void loadDynamicLibrary(const SmallString<128> &Path) = 0;
+  virtual void registerDynamicLibrary(HashT HashValue,
+                                      const SmallString<128> &Path) = 0;
 };
 
 } // namespace proteus
