@@ -132,4 +132,4 @@ int main(int argc, char **argv) {
 // THIRD-NEXT: 1 5 9 13 17
 // THIRD-NEXT: 2 6 10 14 18
 // THIRD-NEXT: 3 7 11 15 19
-//CHECK-THIRD: JitStorageCache hits 0 total 1
+// CHECK-THIRD: JitStorageCache hits 0 total 1
