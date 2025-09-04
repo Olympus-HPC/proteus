@@ -22,6 +22,7 @@
 #include <llvm/ADT/StringRef.h>
 
 #include "proteus/CompiledLibrary.hpp"
+#include "proteus/Config.hpp"
 #include "proteus/Hashing.hpp"
 #include "proteus/Utils.h"
 
@@ -36,7 +37,12 @@ using namespace llvm;
 // globals.
 class JitStorageCache {
 public:
-  JitStorageCache() { std::filesystem::create_directory(StorageDirectory); }
+  JitStorageCache()
+      : StorageDirectory(Config::get().ProteusCacheDir
+                             ? Config::get().ProteusCacheDir.value()
+                             : ".proteus") {
+    std::filesystem::create_directory(StorageDirectory);
+  }
 
   std::unique_ptr<CompiledLibrary> lookup(HashT &HashValue) {
     TIMESCOPE("object lookup");
@@ -90,7 +96,7 @@ public:
 private:
   uint64_t Hits = 0;
   uint64_t Accesses = 0;
-  const std::string StorageDirectory = ".proteus";
+  const std::string StorageDirectory;
 };
 
 } // namespace proteus

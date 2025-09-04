@@ -1,8 +1,10 @@
-// RUN: rm -rf .proteus
-// RUN: ./tiled_transpose 4 4 2 | %FILECHECK %s --check-prefixes=FIRST
-// RUN: rm -rf .proteus
-// RUN: ./tiled_transpose 5 4 3 | %FILECHECK %s --check-prefixes=SECOND
-// RUN: rm -rf .proteus
+// clang-format off
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/tiled_transpose 4 4 2 | %FILECHECK %s --check-prefixes=FIRST
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/tiled_transpose 5 4 3 | %FILECHECK %s --check-prefixes=SECOND
+// RUN: rm -rf "%t.$$.proteus"
+// clang-format on
 
 #include <cstdlib>
 #include <iostream>

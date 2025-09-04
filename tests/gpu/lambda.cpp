@@ -1,9 +1,9 @@
 // clang-format off
-// RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 ./lambda.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 %build/lambda.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./lambda.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
-// RUN: rm -rf .proteus
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/lambda.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
 #include <iostream>
@@ -47,7 +47,7 @@ template <typename T> void run(T &&LB) {
 }
 
 inline void launch(double C, double *X) {
-  registerRun([=, C = proteus::jit_variable(C)] __device__
+  registerRun([ =, C = proteus::jit_variable(C) ] __device__
               __attribute__((annotate("jit"))) () { X[0] = C + 2; });
   std::cout << "x[0] = " << X[0] << "\n";
 }
@@ -61,19 +61,20 @@ int main() {
   double *X;
   gpuErrCheck(gpuMallocManaged(&X, sizeof(double) * 2));
 
-  registerRun([=, A = proteus::jit_variable(A)] __device__
+  registerRun([ =, A = proteus::jit_variable(A) ] __device__
               __attribute__((annotate("jit"))) () { X[0] = A; });
 
   std::cout << "x[0] = " << X[0] << "\n";
 
-  registerRun(2, [=, C = proteus::jit_variable(C)] __device__
-              __attribute__((annotate("jit"))) (int I) { X[I] = C; });
+  registerRun(
+      2, [ =, C = proteus::jit_variable(C) ] __device__
+      __attribute__((annotate("jit"))) (int I) { X[I] = C; });
 
   std::cout << "x[0:1] = " << X[0] << "," << X[1] << "\n";
 
-  run(proteus::register_lambda(
-      [=, A = proteus::jit_variable(A), B = proteus::jit_variable(B)] __device__
-      __attribute__((annotate("jit"))) () { X[0] = A + B; }));
+  run(proteus::register_lambda([
+    =, A = proteus::jit_variable(A), B = proteus::jit_variable(B)
+  ] __device__ __attribute__((annotate("jit"))) () { X[0] = A + B; }));
   std::cout << "x[0] = " << X[0] << "\n";
 
   launch(C, X);

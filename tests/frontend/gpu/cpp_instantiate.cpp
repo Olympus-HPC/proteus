@@ -1,8 +1,8 @@
 // clang-format off
-// RUN: rm -rf .proteus
-// RUN: ./cpp_instantiate.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
-// RUN: ./cpp_instantiate.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
-// RUN: rm -rf .proteus
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/cpp_instantiate.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/cpp_instantiate.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
 #include "proteus/CppJitModule.hpp"

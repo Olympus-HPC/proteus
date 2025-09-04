@@ -1,6 +1,8 @@
-// RUN: rm -rf .proteus
-// RUN: ./min | %FILECHECK %s --check-prefixes=CHECK
-// RUN: rm -rf .proteus
+// clang-format off
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/min | %FILECHECK %s --check-prefixes=CHECK
+// RUN: rm -rf "%t.$$.proteus"
+// clang-format on
 
 #include <iostream>
 

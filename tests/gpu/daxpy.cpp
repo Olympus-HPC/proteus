@@ -1,8 +1,8 @@
 // clang-format off
-// RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 ./daxpy.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
-// ./daxpy.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
-// RUN: rm -rf .proteus
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 %build/daxpy.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/daxpy.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
 #include <cstddef>
