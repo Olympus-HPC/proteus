@@ -142,24 +142,7 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
 #if PROTEUS_ENABLE_DEBUG
   PROTEUS_DBG(Logger::logfile(FnName.str() + ".input.ll", M));
 #endif
-  // Find GlobalValue declarations that are externally defined. Resolve them
-  // statically as absolute symbols in the ORC linker. Required for resolving
-  // __jit_launch_kernel for a host JIT function when libproteus is compiled
-  // as a static library. For other non-resolved symbols, return a fatal error
-  // to investigate.
-  for (auto &GV : M.global_values()) {
-    if (!GV.isDeclaration())
-      continue;
 
-    if (Function *F = dyn_cast<Function>(&GV))
-      if (F->isIntrinsic())
-        continue;
-
-    auto ExecutorAddr = LLJITPtr->lookup(GV.getName());
-    if (auto Error = ExecutorAddr.takeError())
-      PROTEUS_FATAL_ERROR("Unknown global value " + GV.getName() +
-                          " to resolve: " + toString(std::move(Error)));
-  }
   // Replace argument uses with runtime constants.
   // TODO: change NumRuntimeConstants to size_t at interface.
   MDNode *Node = F->getMetadata("jit_arg_nos");

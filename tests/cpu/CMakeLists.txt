@@ -22,6 +22,10 @@ function(CREATE_CPU_TEST exe check_source)
         ${NATIVE_OPT_FLAGS}
     )
 
+    target_link_options(${exe} PRIVATE
+        $<LINK_ONLY:-rdynamic>
+    )
+
     add_test(NAME ${exe} COMMAND ${LIT} -vv -D FILECHECK=${FILECHECK} ${check_source})
     set_tests_properties(${exe} PROPERTIES LABELS "cpu")
 endfunction()
