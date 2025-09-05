@@ -6,7 +6,9 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
 
-#include "proteus/Error.h"
+#include "proteus/AddressSpace.hpp"
+#include "proteus/AddressSpace.hpp"
+#include "proteus/Frontend/Array.hpp"
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/Frontend/TypeMap.hpp"
 #include "proteus/Frontend/Var.hpp"
@@ -34,6 +36,8 @@ protected:
   std::deque<Var> Arguments;
   std::deque<Var> Variables;
   std::deque<Var> RuntimeConstants;
+  std::deque<Array> Arrays;
+  HashT HashValue;
   std::string Name;
 
   enum class ScopeKind { FUNCTION, IF, FOR };
@@ -68,19 +72,36 @@ public:
 
   Function *getFunction();
 
-  AllocaInst *emitAlloca(Type *Ty, StringRef Name);
+  AllocaInst *emitAlloca(Type *Ty, StringRef Name,
+                         AddressSpace AS = AddressSpace::DEFAULT);
+
+  Value *emitArrayCreate(Type *Ty, AddressSpace AT, StringRef Name);
 
   IRBuilderBase &getIRBuilder();
 
   Var &declVarInternal(StringRef Name, Type *Ty,
                        Type *PointerElemType = nullptr);
 
-  template <typename T> Var &declVar(StringRef Name = "var") {
+  template <typename T> decltype(auto) declVar(StringRef Name = "var") {
+    static_assert(!std::is_array_v<T>, "Expected non-array type");
+
     Function *F = getFunction();
     auto *Alloca = emitAlloca(TypeMap<T>::get(F->getContext()), Name);
 
     return Variables.emplace_back(
         Alloca, *this, TypeMap<T>::getPointerElemType(F->getContext()));
+  }
+
+  template <typename T>
+  decltype(auto) declVar(size_t NElem, AddressSpace AS = AddressSpace::DEFAULT,
+                         StringRef Name = "array_var") {
+    static_assert(std::is_array_v<T>, "Expected array type");
+
+    Function *F = getFunction();
+    auto *BasePointer =
+        emitArrayCreate(TypeMap<T>::get(F->getContext(), NElem), AS, Name);
+    return Arrays.emplace_back(BasePointer, *this,
+                               TypeMap<T>::get(F->getContext(), NElem), AS);
   }
 
   template <typename T> Var &defVar(T Val, StringRef Name = "var") {
@@ -153,8 +174,14 @@ public:
   template <typename RetT, typename... ArgT>
   std::enable_if_t<std::is_void_v<RetT>, void> call(StringRef Name);
 
-  Var &callBuiltin(function_ref<Var &(FuncBase &)> Lower) {
-    return Lower(*this);
+  template <typename BuiltinFuncT>
+  decltype(auto) callBuiltin(BuiltinFuncT &&BuiltinFunc) {
+    using RetT = std::invoke_result_t<BuiltinFuncT &, FuncBase &>;
+    if constexpr (std::is_void_v<RetT>) {
+      std::invoke(std::forward<BuiltinFuncT>(BuiltinFunc), *this);
+    } else {
+      return std::invoke(std::forward<BuiltinFuncT>(BuiltinFunc), *this);
+    }
   }
 
   template <typename BodyLambda = EmptyLambda>

@@ -185,6 +185,15 @@ Var &getGridDimZ(FuncBase &Fn) {
   return Ret;
 }
 
+void syncThreads(FuncBase &Fn) {
+  auto &Ctx = Fn.getFunction()->getContext();
+  auto &M = *Fn.getFunction()->getParent();
+  auto &IRB = Fn.getIRBuilder();
+  FunctionCallee Callee =
+      M.getOrInsertFunction("llvm.nvvm.barrier0", TypeMap<void>::get(Ctx));
+  IRB.CreateCall(Callee);
+}
+
 } // namespace gpu
 } // namespace builtins
 } // namespace proteus
