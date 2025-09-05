@@ -12,39 +12,12 @@
 #include "../../gpu/gpu_common.h"
 
 using namespace proteus;
+using namespace builtins::gpu;
 
 #if PROTEUS_ENABLE_HIP
-
 #define TARGET "hip"
-#define getThreadIdX builtins::hip::getThreadIdX
-#define getThreadIdY builtins::hip::getThreadIdY
-#define getThreadIdZ builtins::hip::getThreadIdZ
-#define getBlockIdX builtins::hip::getBlockIdX
-#define getBlockIdY builtins::hip::getBlockIdY
-#define getBlockIdZ builtins::hip::getBlockIdZ
-#define getBlockDimX builtins::hip::getBlockDimX
-#define getBlockDimY builtins::hip::getBlockDimY
-#define getBlockDimZ builtins::hip::getBlockDimZ
-#define getGridDimX builtins::hip::getGridDimX
-#define getGridDimY builtins::hip::getGridDimY
-#define getGridDimZ builtins::hip::getGridDimZ
-
 #elif PROTEUS_ENABLE_CUDA
-
 #define TARGET "cuda"
-#define getThreadIdX builtins::cuda::getThreadIdX
-#define getThreadIdY builtins::cuda::getThreadIdY
-#define getThreadIdZ builtins::cuda::getThreadIdZ
-#define getBlockIdX builtins::cuda::getBlockIdX
-#define getBlockIdY builtins::cuda::getBlockIdY
-#define getBlockIdZ builtins::cuda::getBlockIdZ
-#define getBlockDimX builtins::cuda::getBlockDimX
-#define getBlockDimY builtins::cuda::getBlockDimY
-#define getBlockDimZ builtins::cuda::getBlockDimZ
-#define getGridDimX builtins::cuda::getGridDimX
-#define getGridDimY builtins::cuda::getGridDimY
-#define getGridDimZ builtins::cuda::getGridDimZ
-
 #else
 #error "Expected PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA defined"
 #endif
