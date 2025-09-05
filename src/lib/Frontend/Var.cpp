@@ -1,7 +1,7 @@
+#include "proteus/Frontend/Var.hpp"
 #include "proteus/Error.h"
 #include "proteus/Frontend/Func.hpp"
 #include "proteus/Frontend/TypeMap.hpp"
-#include "proteus/Frontend/Var.hpp"
 
 namespace proteus {
 
@@ -138,7 +138,8 @@ Var::Var(AllocaInst *Alloca, FuncBase &Fn, Type *PointerElemType)
 Var::Var(Value *PointerValue, FuncBase &Fn, Type *PointerElemType)
     : Storage(BorrowedStorage{PointerValue, PointerElemType}), Fn(Fn) {}
 
-Var Var::fromBorrowed(Value *PointerValue, FuncBase &Fn, Type *PointerElemType) {
+Var Var::fromBorrowed(Value *PointerValue, FuncBase &Fn,
+                      Type *PointerElemType) {
   return Var(PointerValue, Fn, PointerElemType);
 }
 
@@ -187,9 +188,8 @@ AllocaInst *Var::getAlloca() const {
 }
 
 Type *Var::getPointerElemType() const {
-  return std::visit(
-      [](const auto &Storage) { return Storage.PointerElemType; },
-      Storage);
+  return std::visit([](const auto &Storage) { return Storage.PointerElemType; },
+                    Storage);
 }
 
 Var &Var::operator+(const Var &Other) const {
@@ -701,7 +701,9 @@ Var &min(const Var &L, const Var &R) {
   Var &ResultVar = Fn.declVarInternal("res.", L.getValueType());
   ResultVar = R;
   Fn.beginIf(L < R);
-  { ResultVar = L; }
+  {
+    ResultVar = L;
+  }
   Fn.endIf();
   return ResultVar;
 }

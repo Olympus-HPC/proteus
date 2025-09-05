@@ -4,11 +4,11 @@
 namespace proteus {
 
 enum class AddressSpace : unsigned int {
-  DEFAULT  = 0,
-  GLOBAL   = 1,
-  SHARED   = 3,
+  DEFAULT = 0,
+  GLOBAL = 1,
+  SHARED = 3,
   CONSTANT = 4,
-  LOCAL    = 5,
+  LOCAL = 5,
 };
 
 inline constexpr unsigned toLLVM(AddressSpace AS) {

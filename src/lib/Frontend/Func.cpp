@@ -88,34 +88,34 @@ AllocaInst *FuncBase::emitAlloca(Type *Ty, StringRef Name, AddressSpace AS) {
   return Alloca;
 }
 
-Value *FuncBase::emitArrayCreate(Type *Ty, AddressSpace AT,
-                                 StringRef Name) {
+Value *FuncBase::emitArrayCreate(Type *Ty, AddressSpace AT, StringRef Name) {
   if (!Ty || !Ty->isArrayTy())
     PROTEUS_FATAL_ERROR("Expected LLVM ArrayType for emitArrayCreate");
 
   auto *ArrTy = cast<ArrayType>(Ty);
 
   switch (AT) {
-    case AddressSpace::SHARED:
-    case AddressSpace::GLOBAL: {
-      Module *M = getFunction()->getParent();
-      auto *GV = new GlobalVariable(
-          *M, ArrTy, /*isConstant=*/false, GlobalValue::InternalLinkage,
-          UndefValue::get(ArrTy), Name, /*InsertBefore=*/nullptr,
-          GlobalValue::NotThreadLocal, static_cast<unsigned>(AT), /*ExternallyInitialized=*/false);
+  case AddressSpace::SHARED:
+  case AddressSpace::GLOBAL: {
+    Module *M = getFunction()->getParent();
+    auto *GV = new GlobalVariable(
+        *M, ArrTy, /*isConstant=*/false, GlobalValue::InternalLinkage,
+        UndefValue::get(ArrTy), Name, /*InsertBefore=*/nullptr,
+        GlobalValue::NotThreadLocal, static_cast<unsigned>(AT),
+        /*ExternallyInitialized=*/false);
 
-      return GV;
-    }
-    case AddressSpace::DEFAULT:
-    case AddressSpace::LOCAL: {
-      auto *Alloca = emitAlloca(ArrTy, Name, AT);
-      return Alloca;
-    }
-    case AddressSpace::CONSTANT:
-      PROTEUS_FATAL_ERROR("Constant arrays are not supported");
-    default:
-      PROTEUS_FATAL_ERROR("Unsupported AddressSpace");
-    }
+    return GV;
+  }
+  case AddressSpace::DEFAULT:
+  case AddressSpace::LOCAL: {
+    auto *Alloca = emitAlloca(ArrTy, Name, AT);
+    return Alloca;
+  }
+  case AddressSpace::CONSTANT:
+    PROTEUS_FATAL_ERROR("Constant arrays are not supported");
+  default:
+    PROTEUS_FATAL_ERROR("Unsupported AddressSpace");
+  }
 }
 
 void FuncBase::ret(std::optional<std::reference_wrapper<Var>> OptRet) {

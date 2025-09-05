@@ -1,5 +1,5 @@
-#include "proteus/JitFrontend.hpp"
 #include "proteus/Error.h"
+#include "proteus/JitFrontend.hpp"
 
 namespace proteus {
 
@@ -22,4 +22,3 @@ Var Array::operator[](const Var &Index) {
   return Var::fromBorrowed(GEP, Fn, ArrayType->getArrayElementType());
 }
 } // namespace proteus
-

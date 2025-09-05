@@ -212,8 +212,8 @@ void syncThreads(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
   auto &IRB = Fn.getIRBuilder();
-  FunctionCallee Callee = M.getOrInsertFunction("llvm.amdgcn.s.barrier",
-                                                TypeMap<void>::get(Ctx));
+  FunctionCallee Callee =
+      M.getOrInsertFunction("llvm.amdgcn.s.barrier", TypeMap<void>::get(Ctx));
   IRB.CreateCall(Callee);
 }
 
