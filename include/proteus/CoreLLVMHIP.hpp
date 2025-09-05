@@ -360,11 +360,14 @@ inline std::unique_ptr<MemoryBuffer> codegenRTC(Module &M,
   // compilation time and on the resulting optimization, better or worse
   // depending on code specifics.
   std::string MArchOpt = ("-march=" + DeviceArch).str();
-  const char *OptArgs[] = {"-mllvm", "-unroll-threshold=1000",
-                           MArchOpt.c_str()};
+
+  // NOTE: We used to pass these options as well. "-mllvm",
+  // "-unroll-threshold=1000",
+  //  We removed them cause we saw on bezier they cause slowdowns
+  const char *OptArgs[] = {MArchOpt.c_str()};
   std::vector<hiprtcJIT_option> JITOptions = {
       HIPRTC_JIT_IR_TO_ISA_OPT_EXT, HIPRTC_JIT_IR_TO_ISA_OPT_COUNT_EXT};
-  size_t OptArgsSize = 3;
+  size_t OptArgsSize = 1;
   const void *JITOptionsValues[] = {(void *)OptArgs, (void *)(OptArgsSize)};
   proteusHiprtcErrCheck(hiprtcLinkCreate(JITOptions.size(), JITOptions.data(),
                                          (void **)JITOptionsValues,
