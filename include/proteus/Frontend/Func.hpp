@@ -116,6 +116,14 @@ public:
     return VarRef;
   }
 
+  Var &defVar(const Var &Val, StringRef Name = "var") {
+    if (&Val.Fn != this)
+      PROTEUS_FATAL_ERROR("Variables should belong to the same function");
+    Var &VarRef = declVarInternal(Name, Val.getValueType());
+    VarRef = Val;
+    return VarRef;
+  }
+
   template <typename T>
   Var &defRuntimeConst(T Val, StringRef Name = "run.const.var") {
     Function *F = getFunction();
