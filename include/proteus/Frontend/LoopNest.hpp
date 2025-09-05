@@ -127,12 +127,18 @@ private:
         ...);
   }
 
+  template <std::size_t... Is>
+  void tileImpl(int Tile, std::index_sequence<Is...>) {
+    (std::get<Is>(Loops).tile(Tile), ...);
+  }
+
 public:
   LoopNestBuilder(FuncBase &Fn, LoopBuilders... Loops)
       : Loops(std::move(Loops)...), Fn(Fn) {}
 
   LoopNestBuilder &tile(int Tile) {
-    (std::get<LoopBuilders>(Loops).tile(Tile), ...);
+    auto IdxSeq = std::index_sequence_for<LoopBuilders...>{};
+    tileImpl(Tile, IdxSeq);
     return *this;
   }
   void emit() {
