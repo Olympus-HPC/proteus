@@ -26,30 +26,22 @@ int main() {
     auto &Bound = F.defRuntimeConst<size_t>(16, "Bound");
 
     F.beginFor(I, I, Bound, Inc);
-    {
-      Local[I] = 2.0 * I;
-    }
+    { Local[I] = 2.0 * I; }
     F.endFor();
 
     I = 0;
     F.beginFor(I, I, Bound, Inc);
-    {
-      Global[I] = 1000.0 + I;
-    }
+    { Global[I] = 1000.0 + I; }
     F.endFor();
 
     I = 0;
     F.beginFor(I, I, Bound, Inc);
-    {
-      OutLocal[I] = Local[I];
-    }
+    { OutLocal[I] = Local[I]; }
     F.endFor();
 
     I = 0;
     F.beginFor(I, I, Bound, Inc);
-    {
-      OutGlobal[I] = Global[I];
-    }
+    { OutGlobal[I] = Global[I]; }
     F.endFor();
 
     F.ret();

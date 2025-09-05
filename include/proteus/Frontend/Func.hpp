@@ -7,7 +7,7 @@
 #include <llvm/IR/Module.h>
 
 #include "proteus/AddressSpace.hpp"
-#include "proteus/Error.h"
+#include "proteus/AddressSpace.hpp"
 #include "proteus/Frontend/Array.hpp"
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/Frontend/TypeMap.hpp"

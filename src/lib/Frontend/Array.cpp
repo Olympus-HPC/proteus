@@ -1,4 +1,4 @@
-#include "proteus/Error.h"
+#include "proteus/JitFrontend.hpp"
 #include "proteus/JitFrontend.hpp"
 
 namespace proteus {

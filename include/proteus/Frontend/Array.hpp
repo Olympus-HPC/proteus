@@ -4,7 +4,7 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
 
-#include "proteus/AddressSpace.hpp"
+#include "proteus/Frontend/Var.hpp"
 #include "proteus/Frontend/Var.hpp"
 
 namespace proteus {

@@ -1,5 +1,5 @@
 #include "proteus/Frontend/Var.hpp"
-#include "proteus/Error.h"
+#include "proteus/Frontend/Var.hpp"
 #include "proteus/Frontend/Func.hpp"
 #include "proteus/Frontend/TypeMap.hpp"
 
@@ -701,9 +701,7 @@ Var &min(const Var &L, const Var &R) {
   Var &ResultVar = Fn.declVarInternal("res.", L.getValueType());
   ResultVar = R;
   Fn.beginIf(L < R);
-  {
-    ResultVar = L;
-  }
+  { ResultVar = L; }
   Fn.endIf();
   return ResultVar;
 }
