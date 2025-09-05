@@ -20,27 +20,36 @@ int main() {
     auto &Inc = F.defVar<size_t>(1, "Inc");
 
     auto &Local = F.declVar<double[]>(16, AddressSpace::DEFAULT, "local_array");
-    auto &Global = F.declVar<double[]>(16, AddressSpace::GLOBAL, "global_array");
+    auto &Global =
+        F.declVar<double[]>(16, AddressSpace::GLOBAL, "global_array");
 
     auto &Bound = F.defRuntimeConst<size_t>(16, "Bound");
 
     F.beginFor(I, I, Bound, Inc);
-    { Local[I] = 2.0 * I; }
+    {
+      Local[I] = 2.0 * I;
+    }
     F.endFor();
 
     I = 0;
     F.beginFor(I, I, Bound, Inc);
-    { Global[I] = 1000.0 + I; }
+    {
+      Global[I] = 1000.0 + I;
+    }
     F.endFor();
 
     I = 0;
     F.beginFor(I, I, Bound, Inc);
-    { OutLocal[I] = Local[I]; }
+    {
+      OutLocal[I] = Local[I];
+    }
     F.endFor();
 
     I = 0;
     F.beginFor(I, I, Bound, Inc);
-    { OutGlobal[I] = Global[I]; }
+    {
+      OutGlobal[I] = Global[I];
+    }
     F.endFor();
 
     F.ret();
@@ -61,14 +70,16 @@ int main() {
     double ExpectedLocal = 2.0 * I;
     double ExpectedGlobal = 1000.0 + I;
     if (OutLocal[I] != ExpectedLocal) {
-      std::cout << "Verification failed: OutLocal[" << I << "] = "
-                << OutLocal[I] << " != " << ExpectedLocal << " (expected)\n";
+      std::cout << "Verification failed: OutLocal[" << I
+                << "] = " << OutLocal[I] << " != " << ExpectedLocal
+                << " (expected)\n";
       Verified = false;
       break;
     }
     if (OutGlobal[I] != ExpectedGlobal) {
-      std::cout << "Verification failed: OutGlobal[" << I << "] = "
-                << OutGlobal[I] << " != " << ExpectedGlobal << " (expected)\n";
+      std::cout << "Verification failed: OutGlobal[" << I
+                << "] = " << OutGlobal[I] << " != " << ExpectedGlobal
+                << " (expected)\n";
       Verified = false;
       break;
     }

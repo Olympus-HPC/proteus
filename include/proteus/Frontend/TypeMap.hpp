@@ -43,9 +43,7 @@ template <> struct TypeMap<double[]> {
     return ArrayType::get(Type::getDoubleTy(Ctx), NElem);
   }
 
-  static Type *getPointerElemType(llvm::LLVMContext &) {
-    return nullptr;
-  }
+  static Type *getPointerElemType(llvm::LLVMContext &) { return nullptr; }
 };
 
 template <> struct TypeMap<size_t> {

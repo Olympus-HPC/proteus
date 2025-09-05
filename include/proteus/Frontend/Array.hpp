@@ -4,8 +4,8 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
 
-#include "proteus/Frontend/Var.hpp"
 #include "proteus/AddressSpace.hpp"
+#include "proteus/Frontend/Var.hpp"
 
 namespace proteus {
 
@@ -23,7 +23,6 @@ struct Array {
   Array(Value *BasePointer, FuncBase &Fn, Type *ArrayType, AddressSpace AT);
   Var operator[](size_t Index);
   Var operator[](const Var &Index);
-
 };
 
 } // namespace proteus

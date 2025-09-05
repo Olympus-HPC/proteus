@@ -46,7 +46,8 @@ struct Var {
   Var(AllocaInst *Alloca, FuncBase &Fn, Type *PointerElemType = nullptr);
   Var(Value *PointerValue, FuncBase &Fn, Type *PointerElemType);
 
-  static Var fromBorrowed(Value *PointerValue, FuncBase &Fn, Type *PointerElemType);
+  static Var fromBorrowed(Value *PointerValue, FuncBase &Fn,
+                          Type *PointerElemType);
 
   StringRef getName();
 

@@ -6,9 +6,9 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
 
+#include "proteus/AddressSpace.hpp"
 #include "proteus/Error.h"
 #include "proteus/Frontend/Array.hpp"
-#include "proteus/AddressSpace.hpp"
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/Frontend/TypeMap.hpp"
 #include "proteus/Frontend/Var.hpp"
@@ -72,7 +72,8 @@ public:
 
   Function *getFunction();
 
-  AllocaInst *emitAlloca(Type *Ty, StringRef Name, AddressSpace AS = AddressSpace::DEFAULT);
+  AllocaInst *emitAlloca(Type *Ty, StringRef Name,
+                         AddressSpace AS = AddressSpace::DEFAULT);
 
   Value *emitArrayCreate(Type *Ty, AddressSpace AT, StringRef Name);
 
@@ -91,15 +92,16 @@ public:
         Alloca, *this, TypeMap<T>::getPointerElemType(F->getContext()));
   }
 
-  template <typename T> decltype(auto) declVar(size_t NElem, AddressSpace AS = AddressSpace::DEFAULT, StringRef Name = "array_var") {
+  template <typename T>
+  decltype(auto) declVar(size_t NElem, AddressSpace AS = AddressSpace::DEFAULT,
+                         StringRef Name = "array_var") {
     static_assert(std::is_array_v<T>, "Expected array type");
 
     Function *F = getFunction();
-    auto *BasePointer = emitArrayCreate(
-        TypeMap<T>::get(F->getContext(), NElem), AS, Name);
+    auto *BasePointer =
+        emitArrayCreate(TypeMap<T>::get(F->getContext(), NElem), AS, Name);
     return Arrays.emplace_back(BasePointer, *this,
-                               TypeMap<T>::get(F->getContext(), NElem),
-                               AS);
+                               TypeMap<T>::get(F->getContext(), NElem), AS);
   }
 
   template <typename T> Var &defVar(T Val, StringRef Name = "var") {
@@ -113,7 +115,6 @@ public:
 
     return VarRef;
   }
-
 
   template <typename T>
   Var &defRuntimeConst(T Val, StringRef Name = "run.const.var") {
