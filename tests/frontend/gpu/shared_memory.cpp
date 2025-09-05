@@ -14,18 +14,12 @@
 #include "../../gpu/gpu_common.h"
 
 using namespace proteus;
-
+using namespace builtins::gpu;
 #if PROTEUS_ENABLE_HIP
 #define TARGET "hip"
-#define getThreadIdX builtins::hip::getThreadIdX
-#define getBlockIdX builtins::hip::getBlockIdX
-#define syncThreads builtins::hip::syncThreads
 constexpr unsigned WarpSize = 64;
 #elif PROTEUS_ENABLE_CUDA
 #define TARGET "cuda"
-#define getThreadIdX builtins::cuda::getThreadIdX
-#define getBlockIdX builtins::cuda::getBlockIdX
-#define syncThreads builtins::cuda::syncThreads
 constexpr unsigned WarpSize = 32;
 #else
 #error "Expected PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA defined"
