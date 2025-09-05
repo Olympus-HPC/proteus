@@ -13,31 +13,12 @@
 #include "../../gpu/gpu_common.h"
 
 using namespace proteus;
+using namespace builtins::gpu;
 
 #if PROTEUS_ENABLE_HIP
-
 #define TARGET "hip"
-#define getThreadIdX builtins::hip::getThreadIdX
-#define getThreadIdY builtins::hip::getThreadIdY
-#define getBlockIdX builtins::hip::getBlockIdX
-#define getBlockIdY builtins::hip::getBlockIdY
-#define getBlockDimX builtins::hip::getBlockDimX
-#define getBlockDimY builtins::hip::getBlockDimY
-#define getGridDimX builtins::hip::getGridDimX
-#define getGridDimY builtins::hip::getGridDimY
-
 #elif PROTEUS_ENABLE_CUDA
-
 #define TARGET "cuda"
-#define getThreadIdX builtins::cuda::getThreadIdX
-#define getThreadIdY builtins::cuda::getThreadIdY
-#define getBlockIdX builtins::cuda::getBlockIdX
-#define getBlockIdY builtins::cuda::getBlockIdY
-#define getBlockDimX builtins::cuda::getBlockDimX
-#define getBlockDimY builtins::cuda::getBlockDimY
-#define getGridDimX builtins::cuda::getGridDimX
-#define getGridDimY builtins::cuda::getGridDimY
-
 #else
 #error "Expected PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA defined"
 #endif

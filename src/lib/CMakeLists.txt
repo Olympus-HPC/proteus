@@ -19,6 +19,7 @@ if(PROTEUS_ENABLE_CUDA)
   list(APPEND SOURCES
     CompilerInterfaceDevice.cpp
     JitEngineDeviceCUDA.cpp
+    Frontend/BuiltinsCUDA.cpp
   )
 endif()
 
@@ -26,6 +27,7 @@ if(PROTEUS_ENABLE_HIP)
   list(APPEND SOURCES
     CompilerInterfaceDevice.cpp
     JitEngineDeviceHIP.cpp
+    Frontend/BuiltinsHIP.cpp
   )
 endif()
 
