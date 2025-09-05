@@ -1,5 +1,5 @@
-#include "proteus/Frontend/Func.hpp"
 #include "proteus/Frontend/Builtins.hpp"
+#include "proteus/Frontend/Func.hpp"
 
 namespace proteus {
 namespace builtins {
