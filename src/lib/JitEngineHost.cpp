@@ -134,7 +134,7 @@ JitEngineHost::~JitEngineHost() {
 }
 
 void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
-                                 HashT HashValue,
+                                 [[maybe_unused]] HashT HashValue,
                                  ArrayRef<RuntimeConstant> RCArray) {
   TIMESCOPE("specializeIR");
   Function *F = M.getFunction(FnName);
