@@ -1,7 +1,7 @@
 // clang-format off
-// RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 ./kernel_host_device_jit_api.%ext | %FILECHECK %s --check-prefixes=CHECK
-// RUN: rm -rf .proteus
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 %build/kernel_host_device_jit_api.%ext | %FILECHECK %s --check-prefixes=CHECK
+// RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
 #include <climits>

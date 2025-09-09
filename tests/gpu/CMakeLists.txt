@@ -217,6 +217,9 @@ endif()
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/lit.cfg.py "
 import lit.formats
 import os
+import tempfile
+import atexit
+import shutil
 
 config.name = 'LIT tests'
 config.test_format = lit.formats.ShTest(True)
@@ -224,11 +227,16 @@ config.environment = os.environ.copy()
 
 config.suffixes = ['.cpp']
 config.test_source_root = '${CMAKE_CURRENT_SOURCE_DIR}'
-config.test_exec_root = '${CMAKE_CURRENT_BINARY_DIR}'
+# Create a unique temp exec_root to avoid races on lit_test_times.txt
+exec_root = tempfile.mkdtemp(prefix='lit.tmp.', dir='${CMAKE_CURRENT_BINARY_DIR}')
+config.test_exec_root = exec_root
+atexit.register(lambda: shutil.rmtree(exec_root, ignore_errors=False))
+
 ext = lit_config.params['EXT']
 FILECHECK = lit_config.params['FILECHECK']
 config.substitutions.append(('%ext', ext))
 config.substitutions.append(('%FILECHECK', FILECHECK))
+config.substitutions.append(('%build', '${CMAKE_CURRENT_BINARY_DIR}'))
 "
 )
 
@@ -250,6 +258,7 @@ CREATE_GPU_TEST(indirect_launcher_tpl_multi_arg_api indirect_launcher_tpl_multi_
 CREATE_GPU_TEST(indirect_launcher_multi indirect_launcher_multi.cpp)
 CREATE_GPU_TEST(indirect_launcher_multi_arg indirect_launcher_multi_arg.cpp)
 CREATE_GPU_TEST(indirect_fallthrough indirect_fallthrough.cpp)
+CREATE_GPU_TEST(inlining_regression inlining_regression.cpp)
 CREATE_GPU_TEST(multi_file file1_kernel.cpp file2_kernel.cpp)
 CREATE_GPU_TEST(daxpy daxpy.cpp)
 CREATE_GPU_TEST(daxpy_api daxpy_api.cpp)

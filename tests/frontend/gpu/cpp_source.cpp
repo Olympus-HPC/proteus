@@ -1,9 +1,9 @@
 // clang-format off
-// RUN: rm -rf .proteus
-// RUN: ./cpp_source.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/cpp_source.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./cpp_source.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
-// RUN: rm -rf .proteus
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/cpp_source.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
 #include "proteus/CppJitModule.hpp"
@@ -33,7 +33,8 @@ int main() {
    )cpp";
 
   CppJitModule CJM{TARGET, Code};
-  CJM.launch("foo", {1, 1, 1}, {1, 1, 1}, 0, nullptr, 42);
+  auto Kernel = CJM.getKernel<void(int)>("foo");
+  Kernel.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, 42);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 

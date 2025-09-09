@@ -199,7 +199,7 @@ inline void optimizeIR(Module &M, StringRef Arch,
     return S;
   };
 
-  if (Config::get().ProteusTraceOutput)
+  if (Config::get().ProteusTraceOutput >= 1)
     Logger::trace(TraceOut(PassPipeline));
 
   detail::runOptimizationPassPipeline(M, Arch, PassPipeline, CodegenOptLevel);

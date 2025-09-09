@@ -176,7 +176,6 @@ private:
     PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
     ModulePassManager Passes;
-    Passes.addPass(MergeFunctionsPass());
     Passes.addPass(GlobalOptPass());
     Passes.addPass(GlobalDCEPass());
     Passes.addPass(StripDeadDebugInfoPass());
@@ -243,40 +242,6 @@ private:
     // symbols and reduce the IR to JIT at runtime.
     runCleanupPassPipeline(*JitMod);
     runOptimizationPassPipeline(*JitMod);
-
-    // Update linkage and visibility in the original module only for
-    // globals included in the JIT module required for external
-    // linking.
-    for (auto &GVar : M.globals()) {
-      [[maybe_unused]] auto PrintGVarInfo = [](auto &GVar) {
-        Logger::logs("proteus-pass") << "=== GVar\n";
-        Logger::logs("proteus-pass") << GVar.getName() << "\n";
-        Logger::logs("proteus-pass") << "Linkage " << GVar.getLinkage() << "\n";
-        Logger::logs("proteus-pass")
-            << "Visibility " << GVar.getVisibility() << "\n";
-        Logger::logs("proteus-pass") << "=== End GV\n";
-      };
-
-      if (VMap[&GVar]) {
-        DEBUG(PrintGVarInfo(GVar));
-
-        if (GVar.isConstant())
-          continue;
-
-        if (GVar.getName() == "llvm.global_ctors") {
-          DEBUG(Logger::logs("proteus-pass") << "Skip llvm.global_ctors");
-          continue;
-        }
-
-        if (GVar.hasAvailableExternallyLinkage()) {
-          DEBUG(Logger::logs("proteus-pass") << "Skip available externally");
-          continue;
-        }
-
-        GVar.setLinkage(GlobalValue::ExternalLinkage);
-        GVar.setVisibility(GlobalValue::VisibilityTypes::DefaultVisibility);
-      }
-    }
 
     // TODO: Do we want to keep debug info to use for GDB/LLDB
     // interfaces for debugging jitted code?

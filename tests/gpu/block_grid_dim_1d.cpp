@@ -1,9 +1,9 @@
 // clang-format off
-// RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 ./block_grid_dim_1d.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 %build/block_grid_dim_1d.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./block_grid_dim_1d.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
-// RUN: rm -rf .proteus
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/block_grid_dim_1d.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
 #include <climits>

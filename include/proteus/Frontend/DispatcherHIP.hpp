@@ -16,10 +16,15 @@ public:
     return D;
   }
 
-  std::unique_ptr<MemoryBuffer>
-  compile([[maybe_unused]] std::unique_ptr<LLVMContext> Ctx,
-          std::unique_ptr<Module> M, HashT ModuleHash) override {
-    std::unique_ptr<MemoryBuffer> ObjectModule = Jit.compileOnly(*M);
+  std::unique_ptr<MemoryBuffer> compile(std::unique_ptr<LLVMContext> Ctx,
+                                        std::unique_ptr<Module> Mod,
+                                        HashT ModuleHash) override {
+    // This is necessary to ensure Ctx outlives M. Setting [[maybe_unused]] can
+    // trigger a lifetime bug.
+    auto CtxOwner = std::move(Ctx);
+    auto ModOwner = std::move(Mod);
+
+    std::unique_ptr<MemoryBuffer> ObjectModule = Jit.compileOnly(*ModOwner);
     if (!ObjectModule)
       PROTEUS_FATAL_ERROR("Expected non-null object library");
 
@@ -28,24 +33,9 @@ public:
     return ObjectModule;
   }
 
-  std::unique_ptr<MemoryBuffer> lookupObjectModule(HashT ModuleHash) override {
+  std::unique_ptr<CompiledLibrary>
+  lookupCompiledLibrary(HashT ModuleHash) override {
     return StorageCache.lookup(ModuleHash);
-  }
-
-  DispatchResult launch(StringRef KernelName, LaunchDims GridDim,
-                        LaunchDims BlockDim, ArrayRef<void *> KernelArgs,
-                        uint64_t ShmemSize, void *Stream,
-                        std::optional<MemoryBufferRef> ObjectModule) override {
-    auto *KernelFunc = getFunctionAddress(KernelName, ObjectModule);
-
-    dim3 HipGridDim = {GridDim.X, GridDim.Y, GridDim.Z};
-    dim3 HipBlockDim = {BlockDim.X, BlockDim.Y, BlockDim.Z};
-    hipStream_t HipStream = reinterpret_cast<hipStream_t>(Stream);
-
-    void **KernelArgsPtrs = const_cast<void **>(KernelArgs.data());
-    return proteus::launchKernelFunction(
-        reinterpret_cast<hipFunction_t>(KernelFunc), HipGridDim, HipBlockDim,
-        KernelArgsPtrs, ShmemSize, HipStream);
   }
 
   DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
@@ -61,25 +51,24 @@ public:
         KernelArgsPtrs, ShmemSize, HipStream);
   }
 
-  StringRef getTargetArch() const override { return Jit.getDeviceArch(); }
+  StringRef getDeviceArch() const override { return Jit.getDeviceArch(); }
 
   ~DispatcherHIP() {
     CodeCache.printStats();
     StorageCache.printStats();
   }
 
-  void *
-  getFunctionAddress(StringRef KernelName,
-                     std::optional<MemoryBufferRef> ObjectModule) override {
+  void *getFunctionAddress(StringRef KernelName, HashT ModuleHash,
+                           CompiledLibrary &Library) override {
     auto GetKernelFunc = [&]() {
       // Hash the kernel name to get a unique id.
-      HashT HashValue = hash(KernelName);
+      HashT HashValue = hash(KernelName, ModuleHash);
 
       if (auto KernelFunc = CodeCache.lookup(HashValue))
         return KernelFunc;
 
       auto KernelFunc = proteus::getKernelFunctionFromImage(
-          KernelName, ObjectModule->getBufferStart(),
+          KernelName, Library.ObjectModule->getBufferStart(),
           /*RelinkGlobalsByCopy*/ false,
           /* VarNameToDevPtr */ {});
 
@@ -92,13 +81,17 @@ public:
     return KernelFunc;
   }
 
+  void registerDynamicLibrary(HashT, const SmallString<128> &) override {
+    PROTEUS_FATAL_ERROR("Dispatch HIP does not support registerDynamicLibrary");
+  }
+
 private:
   JitEngineDeviceHIP &Jit;
   DispatcherHIP() : Jit(JitEngineDeviceHIP::instance()) {
     TargetModel = TargetModelType::HIP;
   }
   JitCache<hipFunction_t> CodeCache;
-  JitStorageCache<hipFunction_t> StorageCache;
+  JitStorageCache StorageCache;
 };
 
 } // namespace proteus

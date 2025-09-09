@@ -56,5 +56,5 @@ jobs:
       - name: Test
         run: |
           pushd build
-          ctest -T test --output-on-failure
+          ctest -j8 -T test --output-on-failure
           popd

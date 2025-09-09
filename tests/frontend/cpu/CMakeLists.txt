@@ -26,6 +26,9 @@ endfunction()
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/lit.cfg.py "
 import lit.formats
 import os
+import tempfile
+import atexit
+import shutil
 
 config.name = 'LIT tests'
 config.test_format = lit.formats.ShTest(True)
@@ -33,9 +36,14 @@ config.environment = os.environ.copy()
 
 config.suffixes = ['.cpp']
 config.test_source_root = '${CMAKE_CURRENT_SOURCE_DIR}'
-config.test_exec_root = '${CMAKE_CURRENT_BINARY_DIR}'
+# Create a unique temp exec_root to avoid races on lit_test_times.txt
+exec_root = tempfile.mkdtemp(prefix='lit.tmp.', dir='${CMAKE_CURRENT_BINARY_DIR}')
+config.test_exec_root = exec_root
+atexit.register(lambda: shutil.rmtree(exec_root, ignore_errors=False))
+
 FILECHECK = lit_config.params['FILECHECK']
 config.substitutions.append(('%FILECHECK', FILECHECK))
+config.substitutions.append(('%build', '${CMAKE_CURRENT_BINARY_DIR}'))
 "
 )
 
@@ -49,3 +57,11 @@ CREATE_FRONTEND_TEST(internal_call internal_call.cpp)
 CREATE_FRONTEND_TEST(multi_module multi_module.cpp)
 CREATE_FRONTEND_TEST(cpp_source cpp_source.cpp)
 CREATE_FRONTEND_TEST(cpp_instantiate cpp_instantiate.cpp)
+CREATE_FRONTEND_TEST(cpp_store_handle cpp_store_handle.cpp)
+CREATE_FRONTEND_TEST(cpp_same_symbol cpp_same_symbol.cpp)
+CREATE_FRONTEND_TEST(tiled_transpose tiled_transpose.cpp)
+CREATE_FRONTEND_TEST(tiled_matmul tiled_matmul.cpp)
+CREATE_FRONTEND_TEST(loopnest_1d loopnest_1d.cpp)
+CREATE_FRONTEND_TEST(loopnest_3d loopnest_3d.cpp)
+CREATE_FRONTEND_TEST(min min.cpp)
+CREATE_FRONTEND_TEST(loopnest_3d_uniformtile loopnest_3d_uniformtile.cpp)

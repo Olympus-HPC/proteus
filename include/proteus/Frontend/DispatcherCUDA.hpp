@@ -17,17 +17,21 @@ public:
 
   std::unique_ptr<MemoryBuffer>
   compile([[maybe_unused]] std::unique_ptr<LLVMContext> Ctx,
-          std::unique_ptr<Module> M, HashT ModuleHash) override {
+          std::unique_ptr<Module> Mod, HashT ModuleHash) override {
+    // This is necessary to ensure Ctx outlives M. Setting [[maybe_unused]] can
+    // trigger a lifetime bug.
+    auto CtxOwner = std::move(Ctx);
+    auto ModOwner = std::move(Mod);
 
     // CMake finds LIBDEVICE_BC_PATH.
     auto LibDeviceBuffer = llvm::MemoryBuffer::getFile(LIBDEVICE_BC_PATH);
     auto LibDeviceModule = llvm::parseBitcodeFile(
-        LibDeviceBuffer->get()->getMemBufferRef(), M->getContext());
+        LibDeviceBuffer->get()->getMemBufferRef(), ModOwner->getContext());
 
-    llvm::Linker linker(*M);
+    llvm::Linker linker(*ModOwner);
     linker.linkInModule(std::move(LibDeviceModule.get()));
 
-    std::unique_ptr<MemoryBuffer> ObjectModule = Jit.compileOnly(*M);
+    std::unique_ptr<MemoryBuffer> ObjectModule = Jit.compileOnly(*ModOwner);
     if (!ObjectModule)
       PROTEUS_FATAL_ERROR("Expected non-null object library");
 
@@ -36,24 +40,9 @@ public:
     return ObjectModule;
   }
 
-  std::unique_ptr<MemoryBuffer> lookupObjectModule(HashT ModuleHash) override {
+  std::unique_ptr<CompiledLibrary>
+  lookupCompiledLibrary(HashT ModuleHash) override {
     return StorageCache.lookup(ModuleHash);
-  }
-
-  DispatchResult launch(StringRef KernelName, LaunchDims GridDim,
-                        LaunchDims BlockDim, ArrayRef<void *> KernelArgs,
-                        uint64_t ShmemSize, void *Stream,
-                        std::optional<MemoryBufferRef> ObjectModule) override {
-    auto *KernelFunc = getFunctionAddress(KernelName, ObjectModule);
-
-    dim3 CudaGridDim = {GridDim.X, GridDim.Y, GridDim.Z};
-    dim3 CudaBlockDim = {BlockDim.X, BlockDim.Y, BlockDim.Z};
-    cudaStream_t CudaStream = reinterpret_cast<cudaStream_t>(Stream);
-
-    void **KernelArgsPtrs = const_cast<void **>(KernelArgs.data());
-    return proteus::launchKernelFunction(
-        reinterpret_cast<cudaFunction_t>(KernelFunc), CudaGridDim, CudaBlockDim,
-        KernelArgsPtrs, ShmemSize, CudaStream);
   }
 
   DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
@@ -69,20 +58,19 @@ public:
         KernelArgsPtrs, ShmemSize, CudaStream);
   }
 
-  StringRef getTargetArch() const override { return Jit.getDeviceArch(); }
+  StringRef getDeviceArch() const override { return Jit.getDeviceArch(); }
 
-  void *
-  getFunctionAddress(StringRef KernelName,
-                     std::optional<MemoryBufferRef> ObjectModule) override {
+  void *getFunctionAddress(StringRef KernelName, HashT ModuleHash,
+                           CompiledLibrary &Library) override {
     auto GetKernelFunc = [&]() {
       // Hash the kernel name to get a unique id.
-      HashT HashValue = hash(KernelName);
+      HashT HashValue = hash(KernelName, ModuleHash);
 
       if (auto KernelFunc = CodeCache.lookup(HashValue))
         return KernelFunc;
 
       auto KernelFunc = proteus::getKernelFunctionFromImage(
-          KernelName, ObjectModule->getBufferStart(),
+          KernelName, Library.ObjectModule->getBufferStart(),
           /*RelinkGlobalsByCopy*/ false,
           /* VarNameToDevPtr */ {});
 
@@ -93,6 +81,11 @@ public:
 
     auto KernelFunc = GetKernelFunc();
     return KernelFunc;
+  }
+
+  void registerDynamicLibrary(HashT, const SmallString<128> &) override {
+    PROTEUS_FATAL_ERROR(
+        "Dispatch CUDA does not support registerDynamicLibrary");
   }
 
   ~DispatcherCUDA() {
@@ -106,7 +99,7 @@ private:
     TargetModel = TargetModelType::CUDA;
   }
   JitCache<CUfunction> CodeCache;
-  JitStorageCache<CUfunction> StorageCache;
+  JitStorageCache StorageCache;
 };
 
 } // namespace proteus

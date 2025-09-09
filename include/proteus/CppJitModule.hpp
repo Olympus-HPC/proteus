@@ -3,6 +3,7 @@
 
 #include <llvm/Support/Debug.h>
 
+#include "proteus/CompiledLibrary.hpp"
 #include "proteus/Frontend/Dispatcher.hpp"
 
 namespace proteus {
@@ -12,9 +13,10 @@ private:
   TargetModelType TargetModel;
   std::string Code;
   HashT ModuleHash;
+  std::vector<std::string> ExtraArgs;
 
   Dispatcher &Dispatch;
-  std::unique_ptr<MemoryBuffer> ObjectModule;
+  std::unique_ptr<CompiledLibrary> Library = nullptr;
   bool IsCompiled = false;
 
   // TODO: We don't cache CodeInstances so if a user re-creates the exact same
@@ -31,6 +33,7 @@ private:
     std::string InstanceName;
     std::unique_ptr<CppJitModule> InstanceModule;
     std::string EntryFuncName;
+    void *FuncPtr = nullptr;
 
     CodeInstance(TargetModelType TargetModel, StringRef TemplateCode,
                  StringRef InstanceName)
@@ -77,7 +80,7 @@ private:
       raw_svector_ostream OS(FuncS);
 
       OS << "extern \"C\" " << typeName<RetT>() << " "
-         << ((TargetModel != TargetModelType::HOST) ? "__global__ " : "")
+         << ((!isHostTargetModel(TargetModel)) ? "__global__ " : "")
          << EntryFuncName << "(";
       ((OS << (I ? ", " : "")
            << typeName<
@@ -124,87 +127,73 @@ private:
       return InstanceCode;
     }
 
+    template <typename RetT, typename... ArgT> void compile() {
+      std::string InstanceCode = buildCode<RetT, ArgT...>();
+      InstanceModule =
+          std::make_unique<CppJitModule>(TargetModel, InstanceCode);
+      InstanceModule->compile();
+
+      FuncPtr = InstanceModule->Dispatch.getFunctionAddress(
+          EntryFuncName, InstanceModule->ModuleHash,
+          InstanceModule->getLibrary());
+    }
+
     template <typename... ArgT>
     auto launch(LaunchDims GridDim, LaunchDims BlockDim, uint64_t ShmemSize,
                 void *Stream, ArgT... Args) {
       if (!InstanceModule) {
-        std::string InstanceCode = buildCode<void, ArgT...>();
-        InstanceModule =
-            std::make_unique<CppJitModule>(TargetModel, InstanceCode);
-        InstanceModule->compile();
+        compile<void, ArgT...>();
       }
 
       void *Ptrs[sizeof...(ArgT)] = {(void *)&Args...};
 
-      return InstanceModule->Dispatch.launch(
-          EntryFuncName, GridDim, BlockDim, Ptrs, ShmemSize, Stream,
-          InstanceModule->getObjectModuleRef());
+      return InstanceModule->Dispatch.launch(FuncPtr, GridDim, BlockDim, Ptrs,
+                                             ShmemSize, Stream);
     }
 
-    template <typename RetOrSig, typename... ArgT> auto run(ArgT &&...Args) {
+    template <typename RetOrSig, typename... ArgT>
+    RetOrSig run(ArgT &&...Args) {
       static_assert(!std::is_function_v<RetOrSig>,
                     "Function signature type is not yet supported");
 
       if (!InstanceModule) {
-        std::string InstanceCode = buildCode<RetOrSig, ArgT...>();
-        InstanceModule =
-            std::make_unique<CppJitModule>(TargetModel, InstanceCode);
-        InstanceModule->compile();
+        compile<RetOrSig, ArgT...>();
       }
 
-      return InstanceModule->Dispatch.run<RetOrSig, ArgT...>(
-          EntryFuncName, InstanceModule->getObjectModuleRef(),
-          std::forward<ArgT>(Args)...);
+      if constexpr (std::is_void_v<RetOrSig>)
+        InstanceModule->Dispatch.run<RetOrSig(ArgT...)>(FuncPtr, Args...);
+      else
+        return InstanceModule->Dispatch.run<RetOrSig(ArgT...)>(FuncPtr,
+                                                               Args...);
     }
   };
 
   struct CompilationResult {
     // Declare Ctx first to ensure it is destroyed after Mod.
-    std::unique_ptr<LLVMContext> Ctx;
-    std::unique_ptr<Module> Mod;
+    std::unique_ptr<LLVMContext> Ctx = nullptr;
+    std::unique_ptr<Module> Mod = nullptr;
   };
 
 protected:
   CompilationResult compileCppToIR();
+  void compileCppToDynamicLibrary();
 
 public:
-  explicit CppJitModule(TargetModelType TargetModel, StringRef Code);
-  explicit CppJitModule(StringRef Target, StringRef Code);
+  explicit CppJitModule(TargetModelType TargetModel, StringRef Code,
+                        const std::vector<std::string> &ExtraArgs = {});
+  explicit CppJitModule(StringRef Target, StringRef Code,
+                        const std::vector<std::string> &ExtraArgs = {});
 
   void compile();
 
-  std::optional<MemoryBufferRef> getObjectModuleRef() const {
-    if (!ObjectModule)
-      return std::nullopt;
-
-    return ObjectModule->getMemBufferRef();
-  }
-
-  template <typename RetOrSig, typename... ArgT>
-  auto run(const char *FuncName, ArgT &&...Args) {
+  CompiledLibrary &getLibrary() {
     if (!IsCompiled)
       compile();
 
-    // TODO: We could cache the function address if we have a stateful object to
-    // store and return to the user for invocations, similar to DSL
-    // KernelHandle.
-    return Dispatch.run<RetOrSig, ArgT...>(FuncName, getObjectModuleRef(),
-                                           std::forward<ArgT>(Args)...);
-  }
+    if (!Library)
+      PROTEUS_FATAL_ERROR("Expected non-null library after compilation");
 
-  template <typename... ArgT>
-  auto launch(StringRef KernelName, LaunchDims GridDim, LaunchDims BlockDim,
-              uint64_t ShmemSize, void *Stream, ArgT... Args) {
-    if (!IsCompiled)
-      compile();
-
-    void *Ptrs[sizeof...(ArgT)] = {(void *)&Args...};
-
-    // TODO: We could cache the function address if we have a stateful object to
-    // store and return to the user for invocations, similar to DSL
-    // KernelHandle.
-    return Dispatch.launch(KernelName, GridDim, BlockDim, Ptrs, ShmemSize,
-                           Stream, getObjectModuleRef());
+    return *Library;
   }
 
   template <typename... ArgT>
@@ -220,6 +209,67 @@ public:
     InstanceName += ">";
 
     return CodeInstance{TargetModel, Code, InstanceName};
+  }
+
+  template <typename Sig> struct FunctionHandle;
+  template <typename RetT, typename... ArgT>
+  struct FunctionHandle<RetT(ArgT...)> {
+    CppJitModule &M;
+    void *FuncPtr;
+    explicit FunctionHandle(CppJitModule &M, void *FuncPtr)
+        : M(M), FuncPtr(FuncPtr) {}
+
+    RetT run(ArgT... Args) {
+      if constexpr (std::is_void_v<RetT>) {
+        M.Dispatch.template run<RetT(ArgT...)>(FuncPtr,
+                                               std::forward<ArgT>(Args)...);
+      } else {
+        return M.Dispatch.template run<RetT(ArgT...)>(
+            FuncPtr, std::forward<ArgT>(Args)...);
+      }
+    }
+  };
+
+  template <typename Sig> struct KernelHandle;
+  template <typename RetT, typename... ArgT>
+  struct KernelHandle<RetT(ArgT...)> {
+    CppJitModule &M;
+    void *FuncPtr = nullptr;
+    explicit KernelHandle(CppJitModule &M, void *FuncPtr)
+        : M(M), FuncPtr(FuncPtr) {
+      static_assert(std::is_void_v<RetT>, "Kernel function must return void");
+    }
+
+    auto launch(LaunchDims GridDim, LaunchDims BlockDim, uint64_t ShmemSize,
+                void *Stream, ArgT... Args) {
+      void *Ptrs[sizeof...(ArgT)] = {(void *)&Args...};
+
+      return M.Dispatch.launch(FuncPtr, GridDim, BlockDim, Ptrs, ShmemSize,
+                               Stream);
+    }
+  };
+  template <typename Sig> FunctionHandle<Sig> getFunction(StringRef Name) {
+    if (!IsCompiled)
+      compile();
+
+    if (!isHostTargetModel(TargetModel))
+      PROTEUS_FATAL_ERROR("Error: getFunction() applies only to host modules");
+
+    void *FuncPtr = Dispatch.getFunctionAddress(Name, ModuleHash, getLibrary());
+
+    return FunctionHandle<Sig>(*this, FuncPtr);
+  }
+
+  template <typename Sig> KernelHandle<Sig> getKernel(StringRef Name) {
+    if (!IsCompiled)
+      compile();
+
+    if (TargetModel == TargetModelType::HOST)
+      PROTEUS_FATAL_ERROR("Error: getKernel() applies only to device modules");
+
+    void *FuncPtr = Dispatch.getFunctionAddress(Name, ModuleHash, getLibrary());
+
+    return KernelHandle<Sig>(*this, FuncPtr);
   }
 };
 

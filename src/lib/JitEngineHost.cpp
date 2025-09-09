@@ -19,6 +19,7 @@
 #include <llvm/ExecutionEngine/Orc/Shared/ExecutorAddress.h>
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm/ExecutionEngine/SectionMemoryManager.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/IRReader/IRReader.h>
 #include <llvm/Object/SymbolSize.h>
@@ -42,69 +43,6 @@ using namespace llvm::orc;
 #include "proteus/CompilerInterfaceDevice.h"
 #endif
 
-inline Error createSMDiagnosticError(SMDiagnostic &Diag) {
-  std::string Msg;
-  {
-    raw_string_ostream OS(Msg);
-    Diag.print("", OS);
-  }
-  return make_error<StringError>(std::move(Msg), inconvertibleErrorCode());
-}
-
-// A function object that creates a simple pass pipeline to apply to each
-// module as it passes through the IRTransformLayer.
-class OptimizationTransform {
-public:
-  OptimizationTransform() {}
-
-  Expected<ThreadSafeModule> operator()(ThreadSafeModule TSM,
-                                        MaterializationResponsibility & /*R*/) {
-    TSM.withModuleDo([](Module &M) {
-      TIMESCOPE("Run Optimization Transform");
-      auto Pipeline = Config::get().ProteusOptPipeline;
-      if (!Pipeline)
-        proteus::optimizeIR(M, sys::getHostCPUName(), '3', 3);
-      else
-        proteus::optimizeIR(M, sys::getHostCPUName(), Pipeline.value(), 3);
-
-#if PROTEUS_ENABLE_DEBUG
-      if (verifyModule(M, &errs()))
-        PROTEUS_FATAL_ERROR(
-            "Broken module found after optimization, JIT compilation aborted!");
-      else
-        Logger::logs("proteus") << "Module after optimization verified!\n";
-#endif
-    });
-    return std::move(TSM);
-  }
-
-  Expected<ThreadSafeModule> operator()(ThreadSafeModule TSM) {
-    TSM.withModuleDo([](Module &M) {
-      PROTEUS_DBG(Logger::logs("proteus") << "=== Begin Before Optimization\n"
-                                          << M << "=== End Before\n");
-      TIMESCOPE("Run Optimization Transform");
-      auto Pipeline = Config::get().ProteusOptPipeline;
-      if (!Pipeline)
-        proteus::optimizeIR(M, sys::getHostCPUName(), '3', 3);
-      else
-        proteus::optimizeIR(M, sys::getHostCPUName(), Pipeline.value(), 3);
-      PROTEUS_DBG(Logger::logs("proteus")
-                  << "=== Begin After Optimization\n"
-                  << M << "=== End After Optimization\n");
-#if PROTEUS_ENABLE_DEBUG
-      if (verifyModule(M, &errs()))
-        PROTEUS_FATAL_ERROR(
-            "Broken module found after optimization, JIT compilation aborted!");
-      else
-        Logger::logs("proteus") << "Module after optimization verified!\n";
-#endif
-    });
-    return std::move(TSM);
-  }
-
-private:
-};
-
 JitEngineHost &JitEngineHost::instance() {
   static JitEngineHost Jit;
   return Jit;
@@ -119,10 +57,6 @@ void JitEngineHost::addStaticLibrarySymbols() {
   // global variables. So, if the host JIT module uses CUDA functions, we
   // need to resolve them statically in the JIT module's linker.
 
-  // TODO: Instead of manually adding symbols, can we handle
-  // materialization errors through a notify callback and automatically add
-  // those symbols?
-
   // Insert symbols in the SymbolMap, disambiguate if needed.
   using CudaLaunchKernelFn =
       cudaError_t (*)(const void *, dim3, dim3, void **, size_t, cudaStream_t);
@@ -133,50 +67,59 @@ void JitEngineHost::addStaticLibrarySymbols() {
           JITSymbolFlags::Exported);
 
 #endif
-  // Register the symbol manually.
+
+#if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
+  // Add __jit_launch_kernel as a static symbol.
+  SymbolMap[LLJITPtr->mangleAndIntern("__jit_launch_kernel")] =
+      orc::ExecutorSymbolDef(
+          orc::ExecutorAddr{reinterpret_cast<uintptr_t>(__jit_launch_kernel)},
+          JITSymbolFlags::Exported);
+
+#endif
+  // Register the symbol in the main JIT dynamic library.
   cantFail(LLJITPtr->getMainJITDylib().define(absoluteSymbols(SymbolMap)));
 }
 
 void JitEngineHost::dumpSymbolInfo(
-    const object::ObjectFile &loadedObj,
-    const RuntimeDyld::LoadedObjectInfo &objInfo) {
+    const object::ObjectFile &LoadedObj,
+    const RuntimeDyld::LoadedObjectInfo &ObjInfo) {
   // Dump information about symbols.
-  auto pid = sys::Process::getProcessId();
+  auto Pid = sys::Process::getProcessId();
   std::error_code EC;
-  raw_fd_ostream ofd("/tmp/perf-" + std::to_string(pid) + ".map", EC,
+  raw_fd_ostream OFD("/tmp/perf-" + std::to_string(Pid) + ".map", EC,
                      sys::fs::OF_Append);
   if (EC)
     PROTEUS_FATAL_ERROR("Cannot open perf map file");
-  for (auto symSizePair : object::computeSymbolSizes(loadedObj)) {
-    auto sym = symSizePair.first;
-    auto size = symSizePair.second;
-    auto symName = sym.getName();
+  for (auto SymSizePair : object::computeSymbolSizes(LoadedObj)) {
+    auto Sym = SymSizePair.first;
+    auto Size = SymSizePair.second;
+    auto SymName = Sym.getName();
     // Skip any unnamed symbols.
-    if (!symName || symName->empty())
+    if (!SymName || SymName->empty())
       continue;
     // The relative address of the symbol inside its section.
-    auto symAddr = sym.getAddress();
-    if (!symAddr)
+    auto SymAddr = Sym.getAddress();
+    if (!SymAddr)
       continue;
     // The address the functions was loaded at.
-    auto loadedSymAddress = *symAddr;
-    auto symbolSection = sym.getSection();
-    if (symbolSection) {
+    auto LoadedSymAddress = *SymAddr;
+    auto SymbolSection = Sym.getSection();
+    if (SymbolSection) {
       // Compute the load address of the symbol by adding the section load
       // address.
-      loadedSymAddress += objInfo.getSectionLoadAddress(*symbolSection.get());
+      LoadedSymAddress += ObjInfo.getSectionLoadAddress(*SymbolSection.get());
     }
     PROTEUS_DBG(Logger::logs("proteus")
-                << format("Address range: [%12p, %12p]", loadedSymAddress,
-                          loadedSymAddress + size)
-                << "\tSymbol: " << *symName << "\n");
+                << format("Address range: [%12p, %12p]", LoadedSymAddress,
+                          LoadedSymAddress + Size)
+                << "\tSymbol: " << *SymName << "\n");
 
-    if (size > 0)
-      ofd << format("%lx %x)", loadedSymAddress, size) << " " << *symName
+    if (Size > 0)
+      OFD << format("%lx %x)", LoadedSymAddress, Size) << " " << *SymName
           << "\n";
   }
 
-  ofd.close();
+  OFD.close();
 }
 
 void JitEngineHost::notifyLoaded(MaterializationResponsibility & /*R*/,
@@ -185,7 +128,10 @@ void JitEngineHost::notifyLoaded(MaterializationResponsibility & /*R*/,
   dumpSymbolInfo(Obj, LOI);
 }
 
-JitEngineHost::~JitEngineHost() { CodeCache.printStats(); }
+JitEngineHost::~JitEngineHost() {
+  CodeCache.printStats();
+  StorageCache.printStats();
+}
 
 Expected<orc::ThreadSafeModule>
 JitEngineHost::specializeIR(std::unique_ptr<Module> M,
@@ -193,54 +139,13 @@ JitEngineHost::specializeIR(std::unique_ptr<Module> M,
                             StringRef Suffix, HashT HashValue,
                             ArrayRef<RuntimeConstant> RCArray) {
   TIMESCOPE("specializeIR");
-  Function *F = M->getFunction(FnName);
+  Function *F = M.getFunction(FnName);
   assert(F && "Expected non-null function!");
 
 #if PROTEUS_ENABLE_DEBUG
   PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".input.ll", *M));
 #endif
-  // Find GlobalValue declarations that are externally defined. Resolve them
-  // statically as absolute symbols in the ORC linker. Required for resolving
-  // __jit_launch_kernel for a host JIT function when libproteus is compiled
-  // as a static library. For other non-resolved symbols, return a fatal error
-  // to investigate.
-  for (auto &GV : M->global_values()) {
-    if (!GV.isDeclaration())
-      continue;
 
-    if (Function *F = dyn_cast<Function>(&GV))
-      if (F->isIntrinsic())
-        continue;
-
-    auto ExecutorAddr = LLJITPtr->lookup(GV.getName());
-    auto Error = ExecutorAddr.takeError();
-    if (!Error)
-      continue;
-    // Consume the error and fix with static linking.
-    consumeError(std::move(Error));
-
-    PROTEUS_DBG(Logger::logs("proteus")
-                << "Resolve statically missing GV symbol " << GV.getName()
-                << "\n");
-
-#if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
-    if (GV.getName() == "__jit_launch_kernel") {
-      PROTEUS_DBG(Logger::logs("proteus")
-                  << "Resolving via ORC jit_launch_kernel\n");
-      SymbolMap SymbolMap;
-      SymbolMap[LLJITPtr->mangleAndIntern("__jit_launch_kernel")] =
-          orc::ExecutorSymbolDef(orc::ExecutorAddr{reinterpret_cast<uintptr_t>(
-                                     __jit_launch_kernel)},
-                                 JITSymbolFlags::Exported);
-
-      cantFail(LLJITPtr->getMainJITDylib().define(absoluteSymbols(SymbolMap)));
-
-      continue;
-    }
-#endif
-
-    PROTEUS_FATAL_ERROR("Unknown global value" + GV.getName() + " to resolve");
-  }
   // Replace argument uses with runtime constants.
   // TODO: change NumRuntimeConstants to size_t at interface.
   MDNode *Node = F->getMetadata("jit_arg_nos");
@@ -257,13 +162,13 @@ JitEngineHost::specializeIR(std::unique_ptr<Module> M,
     ArgPos.push_back(ArgNo);
   }
 
-  TransformArgumentSpecialization::transform(*M, *F, RCArray);
+  TransformArgumentSpecialization::transform(M, *F, RCArray);
 
   if (!LambdaRegistry::instance().empty()) {
     if (auto OptionalMapIt =
             LambdaRegistry::instance().matchJitVariableMap(F->getName())) {
       auto &RCVec = OptionalMapIt.value()->getSecond();
-      TransformLambdaSpecialization::transform(*M, *F, RCVec);
+      TransformLambdaSpecialization::transform(M, *F, RCVec);
     }
   }
 
@@ -276,7 +181,6 @@ JitEngineHost::specializeIR(std::unique_ptr<Module> M,
   else
     Logger::logs("proteus") << "Module verified!\n";
 #endif
-  return ThreadSafeModule(std::move(M), std::move(Ctx));
 }
 
 void getLambdaJitValues(StringRef FnName,
@@ -332,51 +236,128 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
     Logger::logs("proteus") << RC.Value.Int64Val << ",";
   Logger::logs("proteus") << " ] -> Hash " << HashValue.getValue() << "\n";
 #endif
+
+  // Lookup the function pointer in the code cache.
   void *JitFnPtr = CodeCache.lookup(HashValue);
   if (JitFnPtr)
     return JitFnPtr;
 
   std::string Suffix = mangleSuffix(HashValue);
   std::string MangledFnName = FnName.str() + Suffix;
+  std::unique_ptr<CompiledLibrary> Library;
+  // Lookup the code library in the storage cache to load without compiling, if
+  // found.
+  if ((Library = StorageCache.lookup(HashValue))) {
+    loadCompiledLibrary(*Library);
+  } else {
+    // Specialize the module using runtime values.
+    specializeIR(*M, FnName, Suffix, RCVec);
+    // Compile the object.
+    auto ObjectModule = compileOnly(*M);
+
+    StorageCache.store(HashValue, ObjectModule->getMemBufferRef());
+
+    // Create the compiled library and load it.
+    Library = std::make_unique<CompiledLibrary>(std::move(ObjectModule));
+    loadCompiledLibrary(*Library);
+  }
 
   // (3) Add modules.
   ExitOnErr(LLJITPtr->addIRModule(ExitOnErr(specializeIR(
       std::move(M), std::move(Ctx), FnName, Suffix, HashValue, RCVec))));
+  // Retrieve the function address and store it in the code cache.
+  JitFnPtr = getFunctionAddress(MangledFnName, *Library);
+  CodeCache.insert(HashValue, JitFnPtr, FnName);
 
   PROTEUS_DBG(Logger::logs("proteus")
               << "===\n"
               << *LLJITPtr->getExecutionSession().getSymbolStringPool()
               << "===\n");
 
-  // (4) Look up the JIT'd function.
   PROTEUS_DBG(Logger::logs("proteus")
-              << "Lookup FnName " << FnName << " mangled as " << MangledFnName
-              << "\n");
-  auto EntryAddr = ExitOnErr(LLJITPtr->lookup(MangledFnName));
-
-  JitFnPtr = (void *)EntryAddr.getValue();
-  PROTEUS_DBG(Logger::logs("proteus")
-              << "FnName " << FnName << " Mangled " << MangledFnName
-              << " address " << JitFnPtr << "\n");
-  assert(JitFnPtr && "Expected non-null JIT function pointer");
-  CodeCache.insert(HashValue, JitFnPtr, FnName);
-
-  Logger::logs("proteus") << "=== JIT compile: " << FnName << " Mangled "
-                          << MangledFnName << " RC HashValue "
-                          << HashValue.toString() << " Addr " << JitFnPtr
-                          << "\n";
+              << "=== JIT compile: " << FnName << " Mangled " << MangledFnName
+              << " RC HashValue " << HashValue.toString() << " Addr "
+              << JitFnPtr << "\n");
   return JitFnPtr;
 }
 
-void JitEngineHost::compileOnly(std::unique_ptr<LLVMContext> Ctx,
-                                std::unique_ptr<Module> M) {
-  auto TSM = ThreadSafeModule{std::move(M), std::move(Ctx)};
-  // (3) Add modules.
-  ExitOnErr(LLJITPtr->addIRModule(std::move(TSM)));
+std::unique_ptr<MemoryBuffer> JitEngineHost::compileOnly(Module &M) {
+  // Create the target machine using JITTargetMachineBuilder to match ORC JIT
+  // loading.
+  auto ExpectedTM =
+      JITTargetMachineBuilder::detectHost()->createTargetMachine();
+  if (auto E = ExpectedTM.takeError())
+    PROTEUS_FATAL_ERROR("Expected target machine: " + toString(std::move(E)));
+  std::unique_ptr<TargetMachine> TM = std::move(*ExpectedTM);
+
+  // Set up the output stream.
+  SmallVector<char, 0> ObjBuffer;
+  raw_svector_ostream ObjStream(ObjBuffer);
+
+  // Set up the pass manager.
+  legacy::PassManager PM;
+  // Add optimization passes.
+  if (Config::get().ProteusOptPipeline) {
+    optimizeIR(M, sys::getHostCPUName(),
+               Config::get().ProteusOptPipeline.value(), 3);
+  } else
+    optimizeIR(M, sys::getHostCPUName(), '3', 3);
+
+  // Add the target passes to emit object code.
+  if (TM->addPassesToEmitFile(PM, ObjStream, nullptr,
+                              CodeGenFileType::ObjectFile)) {
+    PROTEUS_FATAL_ERROR("Target machine cannot emit object file");
+  }
+
+  // Run the passes.
+  PM.run(M);
+
+  return MemoryBuffer::getMemBufferCopy(
+      StringRef(ObjBuffer.data(), ObjBuffer.size()));
 }
 
-void *JitEngineHost::getFunctionAddress(StringRef FnName) {
-  auto EntryAddr = ExitOnErr(LLJITPtr->lookup(FnName));
+void JitEngineHost::loadCompiledLibrary(CompiledLibrary &Library) {
+  // Create an isolated JITDyLib context and load the compiled library for
+  // linking and symbol retrieval.
+  auto &ES = LLJITPtr->getExecutionSession();
+  auto ExpectedJitDyLib = ES.createJITDylib(
+      "JitDyLib_" + std::to_string(reinterpret_cast<uintptr_t>(&Library)));
+  if (auto E = ExpectedJitDyLib.takeError()) {
+    PROTEUS_FATAL_ERROR("Error creating library jit dylib: " +
+                        toString(std::move(E)));
+  }
+
+  JITDylib &CreatedDylib = *ExpectedJitDyLib;
+  Library.JitDyLib = &CreatedDylib;
+
+  if (Library.isDynLib()) {
+    // Load the dynamic library through a generator using the dynamic library
+    // file.
+    auto Gen = ExitOnErr(llvm::orc::DynamicLibrarySearchGenerator::Load(
+        Library.DynLibPath.c_str(),
+        LLJITPtr->getDataLayout().getGlobalPrefix()));
+    Library.JitDyLib->addGenerator(std::move(Gen));
+  } else {
+    // Resolve symbols from main/process before materialization through the main
+    // JIT dynamic library. It is simpler and avoids duplication than adding
+    // symbols to the code library JIT dylib every time.
+    Library.JitDyLib->addToLinkOrder(LLJITPtr->getMainJITDylib(),
+                                     JITDylibLookupFlags::MatchAllSymbols);
+
+    // Add the object from the compiled library.
+    if (auto E = LLJITPtr->addObjectFile(*Library.JitDyLib,
+                                         std::move(Library.ObjectModule)))
+      PROTEUS_FATAL_ERROR("Error loading object file: " +
+                          toString(std::move(E)));
+  }
+}
+
+void *JitEngineHost::getFunctionAddress(StringRef FnName,
+                                        CompiledLibrary &Library) {
+  // Lookup the function address corresponding the dynamic library context of
+  // the compiled library.
+  assert(Library.JitDyLib && "Expected non-null JIT dylib");
+  auto EntryAddr = ExitOnErr(LLJITPtr->lookup(*Library.JitDyLib, FnName));
 
   void *JitFnPtr = (void *)EntryAddr.getValue();
   assert(JitFnPtr && "Expected non-null JIT function pointer");
@@ -408,26 +389,22 @@ JitEngineHost::JitEngineHost() {
                       // Make sure the debug info sections aren't stripped.
                       ObjLinkingLayer->setProcessAllSections(true);
 
-#if defined(PROTEUS_ENABLE_DEBUG) || defined(ENABLE_PERFMAP)
+#if PROTEUS_ENABLE_DEBUG
                       ObjLinkingLayer->setNotifyLoaded(notifyLoaded);
 #endif
                       return ObjLinkingLayer;
                     })
                     .create());
-  // (2) Resolve symbols in the main process.
+  // Use the main JIT dynamic library to add a generate for host proces symbols.
   orc::MangleAndInterner Mangle(LLJITPtr->getExecutionSession(),
                                 LLJITPtr->getDataLayout());
   LLJITPtr->getMainJITDylib().addGenerator(
       ExitOnErr(orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
           LLJITPtr->getDataLayout().getGlobalPrefix(),
           [MainName = Mangle("main")](const orc::SymbolStringPtr &Name) {
-            // Logger::logs("proteus") << "Search name " << Name << "\n";
             return Name != MainName;
           })));
 
-  // Add static library functions for JIT linking.
+  // Add static library functions to the main JIT dynamic library.
   addStaticLibrarySymbols();
-
-  // (3) Install transform to optimize modules when they're materialized.
-  LLJITPtr->getIRTransformLayer().setTransform(OptimizationTransform());
 }

@@ -33,6 +33,9 @@ endfunction()
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/lit.cfg.py "
 import lit.formats
 import os
+import tempfile
+import atexit
+import shutil
 
 config.name = 'LIT tests'
 config.test_format = lit.formats.ShTest(True)
@@ -40,11 +43,16 @@ config.environment = os.environ.copy()
 
 config.suffixes = ['.cpp']
 config.test_source_root = '${CMAKE_CURRENT_SOURCE_DIR}'
-config.test_exec_root = '${CMAKE_CURRENT_BINARY_DIR}'
+# Create a unique temp exec_root to avoid races on lit_test_times.txt
+exec_root = tempfile.mkdtemp(prefix='lit.tmp.', dir='${CMAKE_CURRENT_BINARY_DIR}')
+config.test_exec_root = exec_root
+atexit.register(lambda: shutil.rmtree(exec_root, ignore_errors=False))
+
 ext = lit_config.params['EXT']
 FILECHECK = lit_config.params['FILECHECK']
 config.substitutions.append(('%ext', ext))
 config.substitutions.append(('%FILECHECK', FILECHECK))
+config.substitutions.append(('%build', '${CMAKE_CURRENT_BINARY_DIR}'))
 "
 )
 
@@ -55,9 +63,13 @@ CREATE_FRONTEND_TEST_GPU(add_vectors add_vectors.cpp)
 CREATE_FRONTEND_TEST_GPU(add_vectors_runconst add_vectors_runconst.cpp)
 CREATE_FRONTEND_TEST_GPU(adam adam.cpp)
 CREATE_FRONTEND_TEST_GPU(adam_runconst adam_runconst.cpp)
+CREATE_FRONTEND_TEST_GPU(kernel_2d kernel_2d.cpp)
+CREATE_FRONTEND_TEST_GPU(kernel_3d kernel_3d.cpp)
 CREATE_FRONTEND_TEST_GPU(floydwarshall floydwarshall.cpp)
 CREATE_FRONTEND_TEST_GPU(multi_module multi_module.cpp)
 CREATE_FRONTEND_TEST_GPU(internal_call internal_call.cpp)
 CREATE_FRONTEND_TEST_GPU(cpp_source cpp_source.cpp)
 CREATE_FRONTEND_TEST_GPU(cpp_adam cpp_adam.cpp)
 CREATE_FRONTEND_TEST_GPU(cpp_instantiate cpp_instantiate.cpp)
+CREATE_FRONTEND_TEST_GPU(cpp_store_handle cpp_store_handle.cpp)
+CREATE_FRONTEND_TEST_GPU(cpp_same_symbol cpp_same_symbol.cpp)

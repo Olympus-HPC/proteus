@@ -17,9 +17,11 @@
 
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
 
+#include "proteus/CompiledLibrary.hpp"
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/JitCache.hpp"
 #include "proteus/JitEngine.hpp"
+#include "proteus/JitStorageCache.hpp"
 
 namespace proteus {
 
@@ -44,17 +46,23 @@ public:
                StringRef FnName, StringRef Suffix, HashT HashValue,
                ArrayRef<RuntimeConstant> RCArray);
 
+  void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
+                    ArrayRef<RuntimeConstant> RCArray);
+
   void *compileAndLink(StringRef FnName, char *IR, int IRSize, void **Args,
                        ArrayRef<RuntimeConstantInfo *> RCInfoArray);
 
-  void compileOnly(std::unique_ptr<LLVMContext> Ctx, std::unique_ptr<Module> M);
+  std::unique_ptr<MemoryBuffer> compileOnly(Module &M);
 
-  void *getFunctionAddress(StringRef FnName);
+  void loadCompiledLibrary(CompiledLibrary &Library);
+
+  void *getFunctionAddress(StringRef FnName, CompiledLibrary &Library);
 
 private:
   JitEngineHost();
   void addStaticLibrarySymbols();
   JitCache<void *> CodeCache;
+  JitStorageCache StorageCache;
 };
 
 } // namespace proteus

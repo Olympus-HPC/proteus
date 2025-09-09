@@ -129,11 +129,14 @@ public:
   KernelCloneOption ProteusKernelClone;
   bool ProteusEnableTimers;
   CodegenOption ProteusCodegen;
-  bool ProteusTraceOutput;
+  int ProteusTraceOutput;
   std::optional<const std::string> ProteusOptPipeline;
+  std::optional<const std::string> ProteusCacheDir;
 
 private:
-  Config() : ProteusOptPipeline(getEnvOrDefaultString("PROTEUS_OPT_PIPELINE")) {
+  Config()
+      : ProteusOptPipeline(getEnvOrDefaultString("PROTEUS_OPT_PIPELINE")),
+        ProteusCacheDir(getEnvOrDefaultString("PROTEUS_CACHE_DIR")) {
     ProteusUseStoredCache =
         getEnvOrDefaultBool("PROTEUS_USE_STORED_CACHE", true);
     ProteusSpecializeLaunchBounds =
@@ -173,7 +176,7 @@ private:
     ProteusKernelClone = getEnvOrDefaultKC("PROTEUS_KERNEL_CLONE",
                                            KernelCloneOption::CrossClone);
     ProteusEnableTimers = getEnvOrDefaultBool("PROTEUS_ENABLE_TIMERS", false);
-    ProteusTraceOutput = getEnvOrDefaultBool("PROTEUS_TRACE_OUTPUT", false);
+    ProteusTraceOutput = getEnvOrDefaultInt("PROTEUS_TRACE_OUTPUT", 0);
   }
 };
 } // namespace proteus

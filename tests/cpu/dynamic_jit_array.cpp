@@ -1,6 +1,9 @@
 // clang-format off
-// RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 ./dynamic_jit_array | %FILECHECK %s --check-prefixes=CHECK
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 %build/dynamic_jit_array | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// Second run uses the object cache.
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/dynamic_jit_array | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
 #include <climits>
@@ -60,9 +63,11 @@ int main() {
 }
 
 // clang-format off
-// CHECK: [ArgSpec] Replaced Function _Z9testConstIiEvPT_ ArgNo 0 with value @0 = private constant [3 x i32] [i32 3, i32 2, i32 1]
-// CHECK: [ArgSpec] Replaced Function _Z12testRunConstIiEvPT_m ArgNo 0 with value @0 = private constant [3 x i32] [i32 3, i32 2, i32 1]
-// CHECK: [ArgSpec] Replaced Function _Z12testRunConstIiEvPT_m ArgNo 1 with value i64 3
+// CHECK-FIRST: [ArgSpec] Replaced Function _Z9testConstIiEvPT_ ArgNo 0 with value @0 = private constant [3 x i32] [i32 3, i32 2, i32 1]
+// CHECK-FIRST: [ArgSpec] Replaced Function _Z12testRunConstIiEvPT_m ArgNo 0 with value @0 = private constant [3 x i32] [i32 3, i32 2, i32 1]
+// CHECK-FIRST: [ArgSpec] Replaced Function _Z12testRunConstIiEvPT_m ArgNo 1 with value i64 3
 // CHECK: JitCache hits 0 total 2
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: JitStorageCache hits 0 total 2
+// CHECK-SECOND: JitStorageCache hits 2 total 2

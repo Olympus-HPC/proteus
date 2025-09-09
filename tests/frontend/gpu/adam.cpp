@@ -1,11 +1,11 @@
 // NOLINTBEGIN
 
 // clang-format off
-// RUN: rm -rf .proteus
-// RUN: ./adam.%ext 10000 200 100 | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/adam.%ext 10000 200 100 | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: ./adam.%ext 10000 200 100 | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
-// RUN: rm -rf .proteus
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/adam.%ext 10000 200 100 | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
 #include <proteus/Frontend/Builtins.hpp>
@@ -20,23 +20,12 @@
 #include <stdlib.h>
 
 using namespace proteus;
+using namespace builtins::gpu;
 
 #if PROTEUS_ENABLE_HIP
-
 #define TARGET "hip"
-#define getThreadIdX builtins::hip::getThreadIdX
-#define getBlockIdX builtins::hip::getBlockIdX
-#define getBlockDimX builtins::hip::getBlockDimX
-#define getGridDimX builtins::hip::getGridDimX
-
 #elif PROTEUS_ENABLE_CUDA
-
 #define TARGET "cuda"
-#define getThreadIdX builtins::cuda::getThreadIdX
-#define getBlockIdX builtins::cuda::getBlockIdX
-#define getBlockDimX builtins::cuda::getBlockDimX
-#define getGridDimX builtins::cuda::getGridDimX
-
 #else
 #error "Expected PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA defined"
 #endif

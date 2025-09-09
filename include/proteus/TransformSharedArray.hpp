@@ -71,7 +71,7 @@ public:
 
           PROTEUS_DBG(Logger::logs("proteus")
                       << TraceOut(DemangledName, SharedMemGV));
-          if (Config::get().ProteusTraceOutput)
+          if (Config::get().ProteusTraceOutput >= 1)
             Logger::trace(TraceOut(DemangledName, SharedMemGV));
 
           CB->replaceAllUsesWith(ConstantExpr::getAddrSpaceCast(

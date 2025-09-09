@@ -41,7 +41,8 @@ JitEngine::JitEngine() {
                           << toString(Config::get().ProteusCodegen) << "\n";
   Logger::logs("proteus") << "PROTEUS_OPT_PIPELINE"
                           << Config::get().ProteusOptPipeline << "\n";
-
+  Logger::logs("proteus") << "PROTEUS_CACHE_DIR"
+                          << Config::get().ProteusCacheDir << "\n";
 #endif
 }
 

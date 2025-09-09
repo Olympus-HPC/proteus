@@ -1,8 +1,8 @@
 // clang-format off
-// RUN: rm -rf .proteus
-// RUN: ./cpp_instantiate.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
-// RUN: ./cpp_instantiate.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
-// RUN: rm -rf .proteus
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/cpp_instantiate.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/cpp_instantiate.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
 #include "proteus/CppJitModule.hpp"
@@ -77,9 +77,9 @@ int main() {
 // CHECK: Ret 24
 // CHECK: bar type double
 // CHECK: bar type float
-// CHECK: JitCache hits 1 total 4
+// CHECK: JitCache hits 0 total 3
 // CHECK-DAG: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-DAG: HashValue {{[0-9]+}} NumExecs 2 NumHits 1
+// CHECK-DAG: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-DAG: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: JitStorageCache hits 0 total 3
 // CHECK-SECOND: JitStorageCache hits 3 total 3

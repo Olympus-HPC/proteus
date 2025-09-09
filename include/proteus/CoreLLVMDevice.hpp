@@ -62,7 +62,7 @@ inline void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
         Value *ConstantValue =
             ConstantInt::get(Type::getInt32Ty(M.getContext()), DimValue);
         Call->replaceAllUsesWith(ConstantValue);
-        if (Config::get().ProteusTraceOutput)
+        if (Config::get().ProteusTraceOutput >= 1)
           Logger::trace(TraceOut(IntrinsicFunction, ConstantValue));
         Call->eraseFromParent();
       }
@@ -106,7 +106,7 @@ inline void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
         Function *AssumeIntrinsic =
             Intrinsic::getDeclaration(&M, Intrinsic::assume);
         Builder.CreateCall(AssumeIntrinsic, Cmp);
-        if (Config::get().ProteusTraceOutput)
+        if (Config::get().ProteusTraceOutput >= 1)
           Logger::trace(TraceOut(IntrinsicFunction, DimValue));
       }
     }
@@ -300,7 +300,7 @@ inline void specializeIR(
 
       return S;
     };
-    if (Config::get().ProteusTraceOutput)
+    if (Config::get().ProteusTraceOutput >= 1)
       Logger::trace(TraceOut(BlockSize));
     setLaunchBoundsForKernel(*F, BlockSize);
   }

@@ -1,10 +1,10 @@
 // NOLINTBEGIN
 
 // clang-format off
-// RUN: rm -rf .proteus
-// RUN: ./floydwarshall.%ext 1024 100 16 | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
-// RUN: ./floydwarshall.%ext 1024 100 16 | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
-// RUN: rm -rf .proteus
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/floydwarshall.%ext 1024 100 16 | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/floydwarshall.%ext 1024 100 16 | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
 #include <proteus/Frontend/Builtins.hpp>
@@ -44,23 +44,12 @@ constexpr unsigned int MAXDISTANCE = 200;
  */
 
 using namespace proteus;
+using namespace builtins::gpu;
 
 #if PROTEUS_ENABLE_HIP
-
 #define TARGET "hip"
-#define getThreadIdX builtins::hip::getThreadIdX
-#define getBlockIdX builtins::hip::getBlockIdX
-#define getBlockDimX builtins::hip::getBlockDimX
-#define getGridDimX builtins::hip::getGridDimX
-
 #elif PROTEUS_ENABLE_CUDA
-
 #define TARGET "cuda"
-#define getThreadIdX builtins::cuda::getThreadIdX
-#define getBlockIdX builtins::cuda::getBlockIdX
-#define getBlockDimX builtins::cuda::getBlockDimX
-#define getGridDimX builtins::cuda::getGridDimX
-
 #else
 #error "Expected PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA defined"
 #endif

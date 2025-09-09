@@ -20,15 +20,107 @@
 
 namespace proteus {
 
+#if PROTEUS_ENABLE_CUDA
+static std::vector<std::string> ExtraToolchainArgs = {"-L" PROTEUS_CUDA_LIBDIR,
+                                                      "-lcudart"};
+#else
+static std::vector<std::string> ExtraToolchainArgs = {};
+#endif
+
 using namespace clang;
 using namespace llvm;
 
-CppJitModule::CppJitModule(TargetModelType TargetModel, StringRef Code)
+CppJitModule::CppJitModule(TargetModelType TargetModel, StringRef Code,
+                           const std::vector<std::string> &ExtraArgs)
     : TargetModel(TargetModel), Code(Code.str()), ModuleHash(hash(Code)),
-      Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
-CppJitModule::CppJitModule(StringRef Target, StringRef Code)
+      ExtraArgs(ExtraArgs), Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
+CppJitModule::CppJitModule(StringRef Target, StringRef Code,
+                           const std::vector<std::string> &ExtraArgs)
     : TargetModel(parseTargetModel(Target)), Code(Code), ModuleHash(hash(Code)),
-      Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
+      ExtraArgs(ExtraArgs), Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
+
+void CppJitModule::compileCppToDynamicLibrary() {
+  // Create compiler instance.
+  CompilerInstance Compiler;
+  // Create diagnostics engine.
+  Compiler.createDiagnostics();
+
+  // We build a driver to compile to a dynamic library object.
+  // Create temp source file
+  SmallString<128> SourcePath;
+  std::error_code EC =
+      sys::fs::createTemporaryFile("proteus", "cpp", SourcePath);
+  if (EC)
+    PROTEUS_FATAL_ERROR("Failed to create temp source file");
+
+  // Write source code to temp file
+  {
+    raw_fd_ostream OS(SourcePath, EC);
+    if (EC)
+      PROTEUS_FATAL_ERROR("Failed to write source file");
+    OS << Code;
+  }
+
+  // Create temp output file path
+  SmallString<128> OutputPath;
+  EC = sys::fs::createTemporaryFile("proteus", "so", OutputPath);
+  if (EC)
+    PROTEUS_FATAL_ERROR("Failed to create temp output file");
+
+  std::string OffloadArch = "--offload-arch=" + Dispatch.getDeviceArch().str();
+
+  std::vector<std::string> ArgStorage = {
+      PROTEUS_CLANGXX_BIN,
+      "-shared",
+      "-std=c++17",
+      "-O3",
+      "-x",
+      (TargetModel == TargetModelType::HOST_HIP ? "hip" : "cuda"),
+      "-fPIC",
+      OffloadArch,
+      "-o",
+      OutputPath.c_str(),
+      SourcePath.c_str()};
+
+  ArgStorage.insert(ArgStorage.end(), ExtraToolchainArgs.begin(),
+                    ExtraToolchainArgs.end());
+  ArgStorage.insert(ArgStorage.end(), ExtraArgs.begin(), ExtraArgs.end());
+
+  std::vector<const char *> DriverArgs;
+  for (const auto &S : ArgStorage)
+    DriverArgs.push_back(S.c_str());
+
+  // Create driver
+  clang::driver::Driver D(PROTEUS_CLANGXX_BIN, sys::getDefaultTargetTriple(),
+                          Compiler.getDiagnostics());
+
+  auto *C = D.BuildCompilation(DriverArgs);
+  if (!C || Compiler.getDiagnostics().hasErrorOccurred())
+    PROTEUS_FATAL_ERROR("Building Driver failed");
+
+  // Extract the argument from the compilation job.
+  const clang::driver::JobList &Jobs = C->getJobs();
+  if (Jobs.empty())
+    PROTEUS_FATAL_ERROR("Expected compilation job, found empty joblist");
+
+  // Execute ALL jobs (device compilation, bundling, host compilation)
+  SmallVector<std::pair<int, const clang::driver::Command *>, 4>
+      FailingCommands;
+  int Res = D.ExecuteCompilation(*C, FailingCommands);
+
+  if (Res != 0 || !FailingCommands.empty()) {
+    sys::fs::remove(SourcePath);
+    sys::fs::remove(OutputPath);
+    PROTEUS_FATAL_ERROR("Compilation failed");
+  }
+
+  // Register the dynamic library file with the dispatcher to make it available
+  // post compilation.
+  Dispatch.registerDynamicLibrary(ModuleHash, OutputPath);
+
+  sys::fs::remove(SourcePath);
+  sys::fs::remove(OutputPath);
+}
 
 CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
   // Create compiler instance.
@@ -48,31 +140,27 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
                   "-emit-llvm",
                   "-S",
                   "-std=c++17",
-                  "-Xclang",
-                  "-disable-O0-optnone",
-                  "-Xclang",
-                  "-disable-llvm-passes",
+                  "-O1",
                   "-x",
                   "c++",
                   "-fPIC",
                   SourceName};
   } else {
     std::string OffloadArch =
-        "--offload-arch=" + Dispatch.getTargetArch().str();
+        "--offload-arch=" + Dispatch.getDeviceArch().str();
     ArgStorage = {PROTEUS_CLANGXX_BIN,
                   "-emit-llvm",
                   "-S",
                   "-std=c++17",
-                  "-Xclang",
-                  "-disable-O0-optnone",
-                  "-Xclang",
-                  "-disable-llvm-passes",
+                  "-O1",
                   "-x",
                   (TargetModel == TargetModelType::HIP ? "hip" : "cuda"),
                   "--offload-device-only",
                   OffloadArch,
                   SourceName};
   }
+
+  ArgStorage.insert(ArgStorage.end(), ExtraArgs.begin(), ExtraArgs.end());
 
   std::vector<const char *> DriverArgs;
   DriverArgs.reserve(ArgStorage.size());
@@ -111,6 +199,9 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
   // Set the invocation.
   Compiler.setInvocation(Invocation);
 
+  // Load clang plugins, if there are any.
+  Compiler.LoadRequestedPlugins();
+
   std::unique_ptr<MemoryBuffer> Buffer =
       MemoryBuffer::getMemBuffer(Code, SourceName);
 
@@ -135,14 +226,27 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
 void CppJitModule::compile() {
   // Lookup in the object cache of the dispatcher before lowering the cpp code
   // to LLVM IR.
-  if ((ObjectModule = Dispatch.lookupObjectModule(ModuleHash))) {
+  if ((Library = Dispatch.lookupCompiledLibrary(ModuleHash))) {
     IsCompiled = true;
     return;
   }
 
-  auto CRes = compileCppToIR();
-  ObjectModule =
-      Dispatch.compile(std::move(CRes.Ctx), std::move(CRes.Mod), ModuleHash);
+  switch (TargetModel) {
+  case TargetModelType::HOST_HIP:
+  case TargetModelType::HOST_CUDA:
+    compileCppToDynamicLibrary();
+    // Retrieve the compiled library from the dispatcher which stores the
+    // dynamic library file.
+    Library = Dispatch.lookupCompiledLibrary(ModuleHash);
+    if (!Library)
+      PROTEUS_FATAL_ERROR("Expected non-null library after compilation");
+    break;
+  default:
+    auto CRes = compileCppToIR();
+    auto ObjectModule =
+        Dispatch.compile(std::move(CRes.Ctx), std::move(CRes.Mod), ModuleHash);
+    Library = std::make_unique<CompiledLibrary>(std::move(ObjectModule));
+  }
 
   IsCompiled = true;
 }

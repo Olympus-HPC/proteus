@@ -1,17 +1,17 @@
 // clang-format off
-// RUN: rm -rf .proteus
-// RUN: PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 ./custom_pipeline | %FILECHECK %s --check-prefixes=CHECK
-// RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<O3>' ./custom_pipeline | %FILECHECK %s --check-prefixes=CHECK,CHECK3
-// RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<O2>' ./custom_pipeline | %FILECHECK %s --check-prefixes=CHECK,CHECK2
-// RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<O1>' ./custom_pipeline | %FILECHECK %s --check-prefixes=CHECK,CHECK1
-// RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<Os>' ./custom_pipeline | %FILECHECK %s --check-prefixes=CHECK,CHECKs
-// RUN: rm -rf .proteus
-// RUN: PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<Oz>' ./custom_pipeline | %FILECHECK %s --check-prefixes=CHECK,CHECKz
-// RUN: rm -rf .proteus
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 %build/custom_pipeline | %FILECHECK %s --check-prefixes=CHECK
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<O3>' %build/custom_pipeline | %FILECHECK %s --check-prefixes=CHECK,CHECK3
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<O2>' %build/custom_pipeline | %FILECHECK %s --check-prefixes=CHECK,CHECK2
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<O1>' %build/custom_pipeline | %FILECHECK %s --check-prefixes=CHECK,CHECK1
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<Os>' %build/custom_pipeline | %FILECHECK %s --check-prefixes=CHECK,CHECKs
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT=1 PROTEUS_OPT_PIPELINE='default<Oz>' %build/custom_pipeline | %FILECHECK %s --check-prefixes=CHECK,CHECKz
+// RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
 #include <cstddef>
@@ -35,6 +35,6 @@ int main() {
 // CHECK3: [CustomPipeline] default<O3>
 // CHECKs: [CustomPipeline] default<Os>
 // CHECKz: [CustomPipeline] default<Oz>
-// CHECK: foo 
+// CHECK: foo
 // CHECK: JitCache hits 0 total 1
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
