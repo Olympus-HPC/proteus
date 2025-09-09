@@ -133,17 +133,15 @@ JitEngineHost::~JitEngineHost() {
   StorageCache.printStats();
 }
 
-Expected<orc::ThreadSafeModule>
-JitEngineHost::specializeIR(std::unique_ptr<Module> M,
-                            std::unique_ptr<LLVMContext> Ctx, StringRef FnName,
-                            StringRef Suffix, HashT HashValue,
-                            ArrayRef<RuntimeConstant> RCArray) {
+void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
+                                 HashT HashValue,
+                                 ArrayRef<RuntimeConstant> RCArray) {
   TIMESCOPE("specializeIR");
   Function *F = M.getFunction(FnName);
   assert(F && "Expected non-null function!");
 
 #if PROTEUS_ENABLE_DEBUG
-  PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".input.ll", *M));
+  PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".input.ll", M));
 #endif
 
   // Replace argument uses with runtime constants.
@@ -175,8 +173,8 @@ JitEngineHost::specializeIR(std::unique_ptr<Module> M,
   F->setName(FnName + Suffix);
 
 #if PROTEUS_ENABLE_DEBUG
-  Logger::logfile(HashValue.toString() + ".specialized.ll", *M);
-  if (verifyModule(*M, &errs()))
+  Logger::logfile(HashValue.toString() + ".specialized.ll", M);
+  if (verifyModule(M, &errs()))
     PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
   else
     Logger::logs("proteus") << "Module verified!\n";
@@ -251,7 +249,7 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
     loadCompiledLibrary(*Library);
   } else {
     // Specialize the module using runtime values.
-    specializeIR(*M, FnName, Suffix, RCVec);
+    specializeIR(*M, FnName, Suffix, HashValue, RCVec);
     // Compile the object.
     auto ObjectModule = compileOnly(*M);
 
@@ -262,9 +260,6 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
     loadCompiledLibrary(*Library);
   }
 
-  // (3) Add modules.
-  ExitOnErr(LLJITPtr->addIRModule(ExitOnErr(specializeIR(
-      std::move(M), std::move(Ctx), FnName, Suffix, HashValue, RCVec))));
   // Retrieve the function address and store it in the code cache.
   JitFnPtr = getFunctionAddress(MangledFnName, *Library);
   CodeCache.insert(HashValue, JitFnPtr, FnName);
