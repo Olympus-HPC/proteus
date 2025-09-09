@@ -187,9 +187,11 @@ void JitEngineHost::notifyLoaded(MaterializationResponsibility & /*R*/,
 
 JitEngineHost::~JitEngineHost() { CodeCache.printStats(); }
 
-Expected<orc::ThreadSafeModule> JitEngineHost::specializeIR(
-    std::unique_ptr<Module> M, std::unique_ptr<LLVMContext> Ctx,
-    StringRef FnName, StringRef Suffix, HashT HashValue, ArrayRef<RuntimeConstant> RCArray) {
+Expected<orc::ThreadSafeModule>
+JitEngineHost::specializeIR(std::unique_ptr<Module> M,
+                            std::unique_ptr<LLVMContext> Ctx, StringRef FnName,
+                            StringRef Suffix, HashT HashValue,
+                            ArrayRef<RuntimeConstant> RCArray) {
   TIMESCOPE("specializeIR");
   Function *F = M->getFunction(FnName);
   assert(F && "Expected non-null function!");
@@ -338,8 +340,8 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   std::string MangledFnName = FnName.str() + Suffix;
 
   // (3) Add modules.
-  ExitOnErr(LLJITPtr->addIRModule(ExitOnErr(
-      specializeIR(std::move(M), std::move(Ctx), FnName, Suffix, HashValue, RCVec))));
+  ExitOnErr(LLJITPtr->addIRModule(ExitOnErr(specializeIR(
+      std::move(M), std::move(Ctx), FnName, Suffix, HashValue, RCVec))));
 
   PROTEUS_DBG(Logger::logs("proteus")
               << "===\n"

@@ -20,11 +20,11 @@
 #include <llvm/Transforms/Utils/Cloning.h>
 
 #include "proteus/CoreDevice.hpp"
+#include "proteus/Hashing.hpp"
 #include "proteus/LambdaRegistry.hpp"
 #include "proteus/TransformArgumentSpecialization.hpp"
 #include "proteus/TransformLambdaSpecialization.hpp"
 #include "proteus/TransformSharedArray.hpp"
-#include "proteus/Hashing.hpp"
 
 namespace proteus {
 
@@ -256,8 +256,8 @@ inline void relinkGlobalsObject(
 }
 
 inline void specializeIR(
-    Module &M, StringRef FnName, HashT HashValue, StringRef Suffix, dim3 &BlockDim,
-    dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
+    Module &M, StringRef FnName, HashT HashValue, StringRef Suffix,
+    dim3 &BlockDim, dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
     const SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo,
     bool SpecializeArgs, bool SpecializeDims, bool SpecializeLaunchBounds) {
   Timer T;
