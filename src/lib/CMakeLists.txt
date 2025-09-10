@@ -8,7 +8,6 @@ set(SOURCES
   JitEngineHost.cpp
   Frontend/Func.cpp
   Frontend/Var.cpp
-  Frontend/Array.cpp
   Frontend/Dispatcher.cpp
   Frontend/CppJitModule.cpp
   Frontend/LoopNest.cpp

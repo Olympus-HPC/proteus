@@ -28,7 +28,15 @@ IRBuilderBase &FuncBase::getIRBuilder() {
 Var &FuncBase::declVarInternal(StringRef Name, Type *Ty,
                                Type *PointerElemType) {
   auto *Alloca = emitAlloca(Ty, Name);
-  return Variables.emplace_back(Alloca, *this, PointerElemType);
+
+  if (PointerElemType) {
+    Variables.emplace_back(
+        std::make_unique<PointerVar>(Alloca, *this, PointerElemType));
+    return *Variables.back();
+  }
+
+  Variables.emplace_back(std::make_unique<ScalarVar>(Alloca, *this));
+  return *Variables.back();
 }
 
 void FuncBase::beginFunction(const char *File, int Line) {
@@ -74,7 +82,7 @@ Function *FuncBase::getFunction() {
   return F;
 }
 
-Var &FuncBase::getArg(unsigned int ArgNo) { return Arguments.at(ArgNo); }
+Var &FuncBase::getArg(unsigned int ArgNo) { return *Arguments.at(ArgNo); }
 
 AllocaInst *FuncBase::emitAlloca(Type *Ty, StringRef Name, AddressSpace AS) {
   auto SaveIP = IRB.saveIP();
