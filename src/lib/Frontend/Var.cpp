@@ -541,21 +541,30 @@ Var &Var::operator[](size_t I) {
   return std::visit(
       [&](const auto &Storage) -> Var & {
         Type *PointerElemType = Storage.PointerElemType;
-        auto &ResultVar = Fn.declVarInternal(
-            "res.", PointerElemType->getPointerTo(), PointerElemType);
 
         if constexpr (std::is_same_v<std::decay_t<decltype(Storage)>,
                                      AllocaStorage>) {
           auto *Ptr = IRB.CreateLoad(Storage.Alloca->getAllocatedType(),
                                      Storage.Alloca);
           auto *GEP = IRB.CreateConstInBoundsGEP1_64(PointerElemType, Ptr, I);
+          auto *BasePtrTy = cast<PointerType>(Ptr->getType());
+          unsigned AddrSpace = BasePtrTy->getAddressSpace();
+          Type *ElemPtrTy = PointerType::get(PointerElemType, AddrSpace);
+          auto &ResultVar =
+              Fn.declVarInternal("res.", ElemPtrTy, PointerElemType);
           ResultVar.storePointer(GEP);
+          return ResultVar;
         } else {
-          // BorrowedStorage always points to scalar array element.
-          PROTEUS_FATAL_ERROR("Expected AllocaStorage for operator[]");
+          auto *GEP = IRB.CreateConstInBoundsGEP1_64(PointerElemType,
+                                                     Storage.PointerValue, I);
+          auto *BasePtrTy = cast<PointerType>(Storage.PointerValue->getType());
+          unsigned AddrSpace = BasePtrTy->getAddressSpace();
+          Type *ElemPtrTy = PointerType::get(PointerElemType, AddrSpace);
+          auto &ResultVar =
+              Fn.declVarInternal("res.", ElemPtrTy, PointerElemType);
+          ResultVar.storePointer(GEP);
+          return ResultVar;
         }
-
-        return ResultVar;
       },
       Storage);
 }
@@ -569,8 +578,6 @@ Var &Var::operator[](const Var &IdxVar) {
   return std::visit(
       [&](const auto &Storage) -> Var & {
         Type *PointerElemType = Storage.PointerElemType;
-        auto &ResultVar = Fn.declVarInternal(
-            "res.", PointerElemType->getPointerTo(), PointerElemType);
         Value *Idx = IdxVar.getValue();
 
         if constexpr (std::is_same_v<std::decay_t<decltype(Storage)>,
@@ -578,14 +585,24 @@ Var &Var::operator[](const Var &IdxVar) {
           auto *Ptr = IRB.CreateLoad(Storage.Alloca->getAllocatedType(),
                                      Storage.Alloca);
           auto *GEP = IRB.CreateInBoundsGEP(PointerElemType, Ptr, {Idx});
+          auto *BasePtrTy = cast<PointerType>(Ptr->getType());
+          unsigned AddrSpace = BasePtrTy->getAddressSpace();
+          Type *ElemPtrTy = PointerType::get(PointerElemType, AddrSpace);
+          auto &ResultVar =
+              Fn.declVarInternal("res.", ElemPtrTy, PointerElemType);
           ResultVar.storePointer(GEP);
+          return ResultVar;
         } else {
           auto *GEP = IRB.CreateInBoundsGEP(PointerElemType,
                                             Storage.PointerValue, {Idx});
+          auto *BasePtrTy = cast<PointerType>(Storage.PointerValue->getType());
+          unsigned AddrSpace = BasePtrTy->getAddressSpace();
+          Type *ElemPtrTy = PointerType::get(PointerElemType, AddrSpace);
+          auto &ResultVar =
+              Fn.declVarInternal("res.", ElemPtrTy, PointerElemType);
           ResultVar.storePointer(GEP);
+          return ResultVar;
         }
-
-        return ResultVar;
       },
       Storage);
 }
