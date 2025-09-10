@@ -1,6 +1,6 @@
-// RUN: rm -rf .proteus
-// RUN: ./array | %FILECHECK %s --check-prefixes=CHECK
-// RUN: rm -rf .proteus
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/array | %FILECHECK %s
+// --check-prefixes=CHECK RUN: rm -rf "%t.$$.proteus"
 
 #include <proteus/JitFrontend.hpp>
 
@@ -26,30 +26,22 @@ int main() {
     auto &Bound = F.defRuntimeConst<size_t>(16, "Bound");
 
     F.beginFor(I, I, Bound, Inc);
-    {
-      Local[I] = 2.0 * I;
-    }
+    { Local[I] = 2.0 * I; }
     F.endFor();
 
     I = 0;
     F.beginFor(I, I, Bound, Inc);
-    {
-      Global[I] = 1000.0 + I;
-    }
+    { Global[I] = 1000.0 + I; }
     F.endFor();
 
     I = 0;
     F.beginFor(I, I, Bound, Inc);
-    {
-      OutLocal[I] = Local[I];
-    }
+    { OutLocal[I] = Local[I]; }
     F.endFor();
 
     I = 0;
     F.beginFor(I, I, Bound, Inc);
-    {
-      OutGlobal[I] = Global[I];
-    }
+    { OutGlobal[I] = Global[I]; }
     F.endFor();
 
     F.ret();
@@ -97,4 +89,3 @@ int main() {
 // CHECK: @global_array = internal addrspace(1) global [{{[0-9]+}} x double] undef
 // CHECK: %local_array = alloca [{{[0-9]+}} x double], align 8
 // CHECK: Verification successful!
-
