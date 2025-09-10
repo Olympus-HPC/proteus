@@ -47,7 +47,7 @@ public:
                ArrayRef<RuntimeConstant> RCArray);
 
   void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
-                    ArrayRef<RuntimeConstant> RCArray);
+                    HashT HashValue, ArrayRef<RuntimeConstant> RCArray);
 
   void *compileAndLink(StringRef FnName, char *IR, int IRSize, void **Args,
                        ArrayRef<RuntimeConstantInfo *> RCInfoArray);

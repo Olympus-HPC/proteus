@@ -20,6 +20,7 @@
 #include <llvm/Transforms/Utils/Cloning.h>
 
 #include "proteus/CoreDevice.hpp"
+#include "proteus/Hashing.hpp"
 #include "proteus/LambdaRegistry.hpp"
 #include "proteus/TransformArgumentSpecialization.hpp"
 #include "proteus/TransformLambdaSpecialization.hpp"
@@ -255,15 +256,16 @@ inline void relinkGlobalsObject(
 }
 
 inline void specializeIR(
-    Module &M, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
-    dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
+    Module &M, StringRef FnName, [[maybe_unused]] HashT HashValue,
+    StringRef Suffix, dim3 &BlockDim, dim3 &GridDim,
+    ArrayRef<RuntimeConstant> RCArray,
     const SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo,
     bool SpecializeArgs, bool SpecializeDims, bool SpecializeLaunchBounds) {
   Timer T;
   Function *F = M.getFunction(FnName);
 
 #if PROTEUS_ENABLE_DEBUG
-  PROTEUS_DBG(Logger::logfile(FnName.str() + ".input.ll", M));
+  PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".input.ll", M));
 #endif
 
   assert(F && "Expected non-null function!");
@@ -308,7 +310,7 @@ inline void specializeIR(
 
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                        << "specializeIR " << T.elapsed() << " ms\n");
-  PROTEUS_DBG(Logger::logfile(FnName.str() + ".specialized.ll", M));
+  PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".specialized.ll", M));
 }
 
 } // namespace proteus
