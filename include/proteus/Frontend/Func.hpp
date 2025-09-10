@@ -2,13 +2,13 @@
 #define PROTEUS_FRONTEND_FUNC_HPP
 
 #include <deque>
+#include <memory>
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
 
 #include "proteus/AddressSpace.hpp"
 #include "proteus/Error.h"
-#include "proteus/Frontend/Array.hpp"
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/Frontend/TypeMap.hpp"
 #include "proteus/Frontend/Var.hpp"
@@ -33,10 +33,11 @@ protected:
   FunctionCallee FC;
   IRBuilder<> IRB;
   IRBuilderBase::InsertPoint IP;
-  std::deque<Var> Arguments;
-  std::deque<Var> Variables;
-  std::deque<Var> RuntimeConstants;
-  std::deque<Array> Arrays;
+
+  std::deque<std::unique_ptr<Var>> Arguments;
+  std::deque<std::unique_ptr<Var>> Variables;
+  std::deque<std::unique_ptr<Var>> RuntimeConstants;
+
   HashT HashValue;
   std::string Name;
 
@@ -79,40 +80,37 @@ public:
 
   IRBuilderBase &getIRBuilder();
 
+  // Create a variable. If PointerElemType is non-null, a PointerVar is created
+  // with an alloca-backed pointer slot; otherwise a ScalarVar is created.
   Var &declVarInternal(StringRef Name, Type *Ty,
                        Type *PointerElemType = nullptr);
 
-  template <typename T> decltype(auto) declVar(StringRef Name = "var") {
+  template <typename T> Var &declVar(StringRef Name = "var") {
     static_assert(!std::is_array_v<T>, "Expected non-array type");
 
     Function *F = getFunction();
-    auto *Alloca = emitAlloca(TypeMap<T>::get(F->getContext()), Name);
-
-    return Variables.emplace_back(
-        Alloca, *this, TypeMap<T>::getPointerElemType(F->getContext()));
+    return declVarInternal(Name, TypeMap<T>::get(F->getContext()));
   }
 
   template <typename T>
-  decltype(auto) declVar(size_t NElem, AddressSpace AS = AddressSpace::DEFAULT,
-                         StringRef Name = "array_var") {
+  Var &declVar(size_t NElem, AddressSpace AS = AddressSpace::DEFAULT,
+               StringRef Name = "array_var") {
     static_assert(std::is_array_v<T>, "Expected array type");
 
     Function *F = getFunction();
     auto *BasePointer =
         emitArrayCreate(TypeMap<T>::get(F->getContext(), NElem), AS, Name);
-    return Arrays.emplace_back(BasePointer, *this,
-                               TypeMap<T>::get(F->getContext(), NElem), AS);
+
+    auto *ArrTy = cast<ArrayType>(TypeMap<T>::get(F->getContext(), NElem));
+    auto &Ref = *Variables.emplace_back(
+        std::make_unique<ArrayVar>(BasePointer, *this, ArrTy));
+    return Ref;
   }
 
   template <typename T> Var &defVar(T Val, StringRef Name = "var") {
     Function *F = getFunction();
-    auto *Alloca = emitAlloca(TypeMap<T>::get(F->getContext()), Name);
-
-    Var &VarRef = Variables.emplace_back(
-        Alloca, *this, TypeMap<T>::getPointerElemType(F->getContext()));
-
+    Var &VarRef = declVarInternal(Name, TypeMap<T>::get(F->getContext()));
     VarRef = Val;
-
     return VarRef;
   }
 
@@ -127,13 +125,8 @@ public:
   template <typename T>
   Var &defRuntimeConst(T Val, StringRef Name = "run.const.var") {
     Function *F = getFunction();
-    auto *Alloca = emitAlloca(TypeMap<T>::get(F->getContext()), Name);
-
-    Var &VarRef = RuntimeConstants.emplace_back(
-        Alloca, *this, TypeMap<T>::getPointerElemType(F->getContext()));
-
+    Var &VarRef = declVarInternal(Name, TypeMap<T>::get(F->getContext()));
     VarRef = Val;
-
     return VarRef;
   }
 
@@ -149,14 +142,28 @@ public:
 
     (
         [&]() {
-          auto *Alloca = emitAlloca(TypeMap<Ts>::get(F->getContext()),
-                                    "arg." + std::to_string(Arguments.size()));
+          // Determine if this argument is a pointer-like type.
+          auto &Ctx = F->getContext();
+          Type *ArgTy = TypeMap<Ts>::get(Ctx);
+          Type *PtrElemTy = TypeMap<Ts>::getPointerElemType(Ctx);
+
+          // Allocate a slot to hold the incoming argument value (pointer or
+          // scalar).
+          auto *Alloca =
+              emitAlloca(ArgTy, "arg." + std::to_string(Arguments.size()));
 
           auto *Arg = F->getArg(Arguments.size());
           IRB.CreateStore(Arg, Alloca);
 
-          Arguments.emplace_back(
-              Alloca, *this, TypeMap<Ts>::getPointerElemType(F->getContext()));
+          if (PtrElemTy) {
+            // Pointer argument: create a PointerVar with the correct element
+            // type.
+            Arguments.emplace_back(
+                std::make_unique<PointerVar>(Alloca, *this, PtrElemTy));
+          } else {
+            // Scalar argument.
+            Arguments.emplace_back(std::make_unique<ScalarVar>(Alloca, *this));
+          }
         }(),
         ...);
     IRB.ClearInsertionPoint();

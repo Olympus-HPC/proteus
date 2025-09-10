@@ -3,7 +3,6 @@
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
-#include <variant>
 
 namespace proteus {
 
@@ -11,58 +10,41 @@ class FuncBase;
 
 using namespace llvm;
 
+enum class VarKind { Invalid, Scalar, Pointer, Array };
+
 template <typename T> struct VarT {};
 
-struct AllocaStorage {
-  AllocaInst *Alloca;
-  Type *PointerElemType;
-
-  Value *getValue(IRBuilderBase &IRB) const;
-  Type *getValueType() const;
-  StringRef getName() const;
-  void storeValue(IRBuilderBase &IRB, Value *Val);
-  void storePointer(IRBuilderBase &IRB, Value *Ptr);
-  bool isPointer() const;
-};
-
-struct BorrowedStorage {
-  Value *PointerValue;
-  Type *PointerElemType;
-
-  Value *getValue(IRBuilderBase &IRB) const;
-  Type *getValueType() const;
-  StringRef getName() const;
-  void storeValue(IRBuilderBase &IRB, Value *Val);
-  void storePointer(IRBuilderBase &IRB, Value *Ptr);
-  bool isPointer() const;
-};
-
-using VarStorage = std::variant<AllocaStorage, BorrowedStorage>;
-
 struct Var {
-  VarStorage Storage;
+  AllocaInst *Alloca;
   FuncBase &Fn;
 
-  Var(AllocaInst *Alloca, FuncBase &Fn, Type *PointerElemType = nullptr);
-  Var(Value *PointerValue, FuncBase &Fn, Type *PointerElemType);
+  VarKind Kind = VarKind::Invalid;
 
-  static Var fromBorrowed(Value *PointerValue, FuncBase &Fn,
-                          Type *PointerElemType);
+  virtual ~Var() = default;
 
-  StringRef getName();
+  Var(AllocaInst *Alloca, FuncBase &Fn);
+  Var(Value *PointerValue, FuncBase &Fn);
 
-  Value *getValue() const;
-  Type *getValueType() const;
-  void storeValue(Value *Val);
-  void storePointer(Value *Ptr);
+  virtual StringRef getName() const;
 
-  bool isPointer() const;
+  // Value accessors
+  virtual Value *getValue() const;
+  virtual Type *getValueType() const;
 
-  AllocaInst *getAlloca() const;
-  Type *getPointerElemType() const;
+  virtual void storeValue(Value *Val);
+
+  // Pointer-only hooks
+  virtual Value *getPointerValue() const;
+  virtual void storePointer(Value *Ptr);
+
+  virtual AllocaInst *getAlloca() const;
+
+  virtual VarKind kind() const;
+
+  virtual Var &index(size_t I);
+  virtual Var &index(const Var &I);
 
   // Declare member Operators.
-
   Var &operator+(const Var &Other) const;
   Var &operator-(const Var &Other) const;
   Var &operator*(const Var &Other) const;
@@ -180,6 +162,56 @@ Type *getCommonType(const DataLayout &DL, Type *T1, Type *T2);
 Var &powf(const Var &L, const Var &R);
 Var &sqrtf(const Var &R);
 Var &min(const Var &L, const Var &R);
+
+struct ScalarVar final : Var {
+  // ScalarVar: wraps an alloca of a scalar value.
+  // Backing slot for the scalar value.
+  AllocaInst *Slot = nullptr;
+
+  explicit ScalarVar(AllocaInst *Slot, FuncBase &Fn);
+
+  StringRef getName() const override;
+  Type *getValueType() const override;
+  Value *getValue() const override;
+  void storeValue(Value *Val) override;
+  VarKind kind() const override;
+  AllocaInst *getAlloca() const override;
+};
+struct PointerVar final : Var {
+  Type *PointerElemTy = nullptr;
+
+  explicit PointerVar(AllocaInst *PtrSlot, FuncBase &Fn, Type *ElemTy);
+
+  StringRef getName() const override;
+  Type *getValueType() const override;
+  Value *getValue() const override;
+  void storeValue(Value *Val) override;
+
+  Value *getPointerValue() const override;
+  void storePointer(Value *Ptr) override;
+
+  VarKind kind() const override;
+  AllocaInst *getAlloca() const override;
+
+  Var &index(size_t I) override;
+  Var &index(const Var &I) override;
+};
+struct ArrayVar final : Var {
+  // Holds a pointer to an array aggregate and its type.
+  Value *BasePointer = nullptr;
+  ArrayType *ArrayTy = nullptr;
+
+  explicit ArrayVar(Value *BasePointer, FuncBase &Fn, ArrayType *ArrayTy);
+
+  StringRef getName() const override;
+  Type *getValueType() const override;
+  Value *getValue() const override;
+  void storeValue(Value *Val) override;
+  VarKind kind() const override;
+
+  Var &index(size_t I) override;
+  Var &index(const Var &I) override;
+};
 
 } // namespace proteus
 
