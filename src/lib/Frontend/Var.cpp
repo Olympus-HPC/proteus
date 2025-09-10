@@ -73,23 +73,37 @@ Var::Var(AllocaInst *Alloca, FuncBase &Fn) : Alloca(Alloca), Fn(Fn) {}
 
 Var::Var(Value * /*PointerValue*/, FuncBase &Fn) : Alloca(nullptr), Fn(Fn) {}
 
-StringRef Var::getName() const { PROTEUS_FATAL_ERROR("Invalid Var::getName()"); }
+StringRef Var::getName() const {
+  PROTEUS_FATAL_ERROR("Invalid Var::getName()");
+}
 
 Value *Var::getValue() const { PROTEUS_FATAL_ERROR("Invalid Var::getValue()"); }
 
-Type *Var::getValueType() const { PROTEUS_FATAL_ERROR("Invalid Var::getValueType()"); }
+Type *Var::getValueType() const {
+  PROTEUS_FATAL_ERROR("Invalid Var::getValueType()");
+}
 
-void Var::storeValue(Value * /*Val*/) { PROTEUS_FATAL_ERROR("Invalid Var::storeValue()"); }
+void Var::storeValue(Value * /*Val*/) {
+  PROTEUS_FATAL_ERROR("Invalid Var::storeValue()");
+}
 
-Value *Var::getPointerValue() const { PROTEUS_FATAL_ERROR("Invalid Var::getPointerValue()"); }
+Value *Var::getPointerValue() const {
+  PROTEUS_FATAL_ERROR("Invalid Var::getPointerValue()");
+}
 
-void Var::storePointer(Value * /*Ptr*/) { PROTEUS_FATAL_ERROR("Invalid Var::storePointer()"); }
+void Var::storePointer(Value * /*Ptr*/) {
+  PROTEUS_FATAL_ERROR("Invalid Var::storePointer()");
+}
 
 AllocaInst *Var::getAlloca() const { return Alloca; }
 
-Var &Var::index(size_t /*I*/) { PROTEUS_FATAL_ERROR("Invalid Var::index(size_t)"); }
+Var &Var::index(size_t /*I*/) {
+  PROTEUS_FATAL_ERROR("Invalid Var::index(size_t)");
+}
 
-Var &Var::index(const Var & /*I*/) { PROTEUS_FATAL_ERROR("Invalid Var::index(Var)"); }
+Var &Var::index(const Var & /*I*/) {
+  PROTEUS_FATAL_ERROR("Invalid Var::index(Var)");
+}
 
 Var &Var::operator+(const Var &Other) const {
   return binOp(
@@ -594,9 +608,7 @@ Var &min(const Var &L, const Var &R) {
   Var &ResultVar = Fn.declVarInternal("res.", L.getValueType());
   ResultVar = R;
   Fn.beginIf(L < R);
-  {
-    ResultVar = L;
-  }
+  { ResultVar = L; }
   Fn.endIf();
   return ResultVar;
 }
