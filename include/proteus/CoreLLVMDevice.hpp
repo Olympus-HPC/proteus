@@ -256,8 +256,9 @@ inline void relinkGlobalsObject(
 }
 
 inline void specializeIR(
-    Module &M, StringRef FnName, HashT HashValue, StringRef Suffix,
-    dim3 &BlockDim, dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
+    Module &M, StringRef FnName, [[maybe_unused]] HashT HashValue,
+    StringRef Suffix, dim3 &BlockDim, dim3 &GridDim,
+    ArrayRef<RuntimeConstant> RCArray,
     const SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo,
     bool SpecializeArgs, bool SpecializeDims, bool SpecializeLaunchBounds) {
   Timer T;
