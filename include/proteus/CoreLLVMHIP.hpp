@@ -220,6 +220,14 @@ codegenParallel(Module &M, StringRef DeviceArch, unsigned int OptLevel = 3,
       std::max(1u, std::thread::hardware_concurrency());
   lto::LTO L(std::move(Conf), nullptr, ParallelCodeGenParallelismLevel);
 
+  // Ensure module has the correct DataLayout prior to emitting bitcode.
+  auto ExpectedTM =
+      proteus::detail::createTargetMachine(M, DeviceArch, CodegenOptLevel);
+  if (!ExpectedTM)
+    PROTEUS_FATAL_ERROR(toString(ExpectedTM.takeError()));
+  std::unique_ptr<TargetMachine> TM = std::move(*ExpectedTM);
+  M.setDataLayout(TM->createDataLayout());
+
   SmallString<0> BitcodeBuf;
   raw_svector_ostream BitcodeOS(BitcodeBuf);
   WriteBitcodeToFile(M, BitcodeOS);
