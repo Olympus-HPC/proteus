@@ -831,6 +831,7 @@ Value *ArrayVar::getValue() const {
 }
 
 void ArrayVar::storeValue(Value *Val) {
+  (void)Val;
   PROTEUS_FATAL_ERROR(
       "ArrayVar does not support load/store of aggregate value");
 }
