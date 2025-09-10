@@ -791,10 +791,13 @@ AllocaInst *PointerVar::getAlloca() const { return Alloca; }
 Var &PointerVar::index(size_t I) {
   auto &IRB = Fn.getIRBuilder();
 
-  auto &ResultVar =
-      Fn.declVarInternal("res.", PointerElemTy->getPointerTo(), PointerElemTy);
   auto *Ptr = IRB.CreateLoad(Alloca->getAllocatedType(), Alloca);
   auto *GEP = IRB.CreateConstInBoundsGEP1_64(PointerElemTy, Ptr, I);
+  auto *BasePtrTy = cast<PointerType>(Ptr->getType());
+  unsigned AddrSpace = BasePtrTy->getAddressSpace();
+  Type *ElemPtrTy = PointerType::get(PointerElemTy, AddrSpace);
+
+  auto &ResultVar = Fn.declVarInternal("res.", ElemPtrTy, PointerElemTy);
   ResultVar.storePointer(GEP);
   return ResultVar;
 }
@@ -802,10 +805,13 @@ Var &PointerVar::index(size_t I) {
 Var &PointerVar::index(const Var &I) {
   auto &IRB = Fn.getIRBuilder();
 
-  auto &ResultVar =
-      Fn.declVarInternal("res.", PointerElemTy->getPointerTo(), PointerElemTy);
   auto *Ptr = IRB.CreateLoad(Alloca->getAllocatedType(), Alloca);
   auto *GEP = IRB.CreateInBoundsGEP(PointerElemTy, Ptr, I.getValue());
+  auto *BasePtrTy = cast<PointerType>(Ptr->getType());
+  unsigned AddrSpace = BasePtrTy->getAddressSpace();
+  Type *ElemPtrTy = PointerType::get(PointerElemTy, AddrSpace);
+
+  auto &ResultVar = Fn.declVarInternal("res.", ElemPtrTy, PointerElemTy);
   ResultVar.storePointer(GEP);
   return ResultVar;
 }
