@@ -150,7 +150,6 @@ codegenSerial(Module &M, StringRef DeviceArch,
 
   legacy::PassManager PM;
   PM.add(new TargetLibraryInfoWrapperPass(TLII));
-  PM.add(createTargetTransformInfoWrapperPass(TM->getTargetIRAnalysis()));
   MachineModuleInfoWrapperPass *MMIWP = new MachineModuleInfoWrapperPass(
       reinterpret_cast<LLVMTargetMachine *>(TM.get()));
 
