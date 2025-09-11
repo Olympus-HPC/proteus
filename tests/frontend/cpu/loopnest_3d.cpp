@@ -45,7 +45,7 @@ static auto get3DLoopNestFunction(int DI, int DJ, int DK, int TileI, int TileJ,
          F.forLoop({J, Zero, UBJ, IncOne}, [&]() { RowBias = J; }).tile(TileJ),
          F.forLoop({K, Zero, UBK, IncOne},
                    [&]() {
-                     auto Idx = I * DJ * DK + J * DK + K;
+                     auto &Idx = I * DJ * DK + J * DK + K;
                      A[Idx] = B[Idx] + I + J + K + RowBias;
                    })
              .tile(TileK))
@@ -93,9 +93,7 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int TileSize) {
                         .tile(TileSize),
                     F.forLoop({K, Zero, UBK, IncOne},
                               [&]() {
-                                std::cout << "Emitting inner loop body "
-                                          << "\n";
-                                auto Idx = I * DJ * DK + J * DK + K;
+                                auto &Idx = I * DJ * DK + J * DK + K;
                                 A[Idx] = B[Idx] + I + J + K + RowBias;
                               })
                         .tile(TileSize))
