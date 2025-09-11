@@ -792,6 +792,14 @@ Value *PointerVar::getValue() const {
 
 void PointerVar::storeValue(Value *Val) {
   auto &IRB = Fn.getIRBuilder();
+  // TODO: This is too permissive and allows assigning a value to a pointer's
+  // memory location, e.g:
+  // ...
+  // Var &V = declVar<double *>();
+  // V = 42 <--- Will store 42 to the memory location pointed by V!
+  // ...
+  // Fix for compliance with C++ typing and rules, use traits and compile-time
+  // processing when possible.
   Value *Ptr = getPointerValue();
   IRB.CreateStore(Val, Ptr);
 }
