@@ -38,7 +38,6 @@ protected:
   std::deque<std::unique_ptr<Var>> Variables;
   std::deque<std::unique_ptr<Var>> RuntimeConstants;
 
-  HashT HashValue;
   std::string Name;
 
   enum class ScopeKind { FUNCTION, IF, FOR };
