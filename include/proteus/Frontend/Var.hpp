@@ -25,6 +25,10 @@ struct Var {
   Var(AllocaInst *Alloca, FuncBase &Fn);
   Var(Value *PointerValue, FuncBase &Fn);
 
+  // Disable copying/moving to prevent object slicing and enforce reference semantics.
+  Var(const Var &) = delete;
+  Var(Var &&) = delete;
+
   virtual StringRef getName() const;
 
   // Value accessors
