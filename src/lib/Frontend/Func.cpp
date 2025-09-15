@@ -7,6 +7,16 @@ FuncBase::FuncBase(JitModule &J, FunctionCallee FC)
   Function *F = cast<Function>(FC.getCallee());
   BasicBlock::Create(F->getContext(), "entry", F);
   Name = F->getName();
+
+  // Clang enables the 'contract' rewrite rule by default to enable FMA
+  // instructions.
+  // (Controllable via the '-ffp-contract' flag.)
+  // Without this, PJ-DSL performance does not match JIT frontends
+  // that use FMA instructions.
+  // TODO: Make such things configurable.
+  FastMathFlags FMF;
+  FMF.setAllowContract(true);
+  IRB.setFastMathFlags(FMF);
 }
 
 IRBuilderBase &FuncBase::getIRBuilder() {
