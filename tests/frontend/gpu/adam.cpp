@@ -250,7 +250,7 @@ int main(int argc, char *argv[]) {
 // CHECK-NEXT: p[2] = -0.592634
 // CHECK-NEXT: p[3] = -0.588154
 // CHECK-NEXT: p[4] = -0.593454
-// CHECK-NEXT: p[5] = -0.59199
+// CHECK-NEXT: p[5] = -0.591989
 // CHECK-NEXT: p[6] = -0.573486
 // CHECK-NEXT: p[7] = -0.599872
 // CHECK-NEXT: p[8] = -0.58157
