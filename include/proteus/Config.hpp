@@ -164,7 +164,11 @@ private:
     }
 #endif
 #endif
+#ifdef PROTEUS_DISABLE_BY_DEFAULT
+    ProteusDisable = getEnvOrDefaultBool("PROTEUS_DISABLE", true);
+#else
     ProteusDisable = getEnvOrDefaultBool("PROTEUS_DISABLE", false);
+#endif
     ProteusDumpLLVMIR = getEnvOrDefaultBool("PROTEUS_DUMP_LLVM_IR", false);
     ProteusRelinkGlobalsByCopy =
         getEnvOrDefaultBool("PROTEUS_RELINK_GLOBALS_BY_COPY", false);

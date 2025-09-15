@@ -29,6 +29,7 @@ The top-level `CMakeLists.txt` defines the following build options:
 * `PROTEUS_ENABLE_CUDA`: enable CUDA support.
 * `PROTEUS_ENABLE_DEBUG`: enable debug logging (for developers).
 * `PROTEUS_ENABLE_TIME_TRACING`: generate a JSON time-trace file for Proteus operations (for flame graphs visualization).
+* `PROTEUS_DISABLE_BY_DEFAULT`: build Proteus so that it is disabled by default (enable at runtime with `PROTEUS_DISABLE=0`)
 
 !!! info "Host, CUDA and HIP support"
     Proteus always supports host JIT compilation.

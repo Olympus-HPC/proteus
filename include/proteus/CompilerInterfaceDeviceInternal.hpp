@@ -11,7 +11,11 @@ inline auto __jit_launch_kernel_internal(void *Kernel, dim3 GridDim,
   using namespace proteus;
 
   static const bool IsProteusDisabledEnvVar =
+#ifdef PROTEUS_DISABLE_BY_DEFAULT
+      getEnvOrDefaultBool("PROTEUS_DISABLE", true);
+#else
       getEnvOrDefaultBool("PROTEUS_DISABLE", false);
+#endif
 
   if (IsProteusDisabledEnvVar) {
     return proteus::launchKernelDirect(

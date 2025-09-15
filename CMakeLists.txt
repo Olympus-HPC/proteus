@@ -12,6 +12,7 @@ option(PROTEUS_ENABLE_CUDA "Enable CUDA" OFF)
 option(PROTEUS_ENABLE_DEBUG "Enable debugging output" OFF)
 option(PROTEUS_ENABLE_TIME_TRACING "Enable time tracing for the JIT engine" OFF)
 option(PROTEUS_LINK_SHARED_LLVM "Link with the LLVM shared library" OFF)
+option(PROTEUS_DISABLE_BY_DEFAULT "Disable by default (set PROTEUS_DISABLE=0 at runtime to enable)" OFF)
 option(BUILD_SHARED "Builds the JIT library as shared" OFF)
 option(ENABLE_TESTS "Enable tests" ON)
 option(ENABLE_DEVELOPER_COMPILER_FLAGS "Enable developer compiler flags: -Wall -Wextra -Werror" OFF)
@@ -62,6 +63,10 @@ endif()
 
 if(PROTEUS_ENABLE_DEBUG)
   add_definitions("-DPROTEUS_ENABLE_DEBUG")
+endif()
+
+if(PROTEUS_DISABLE_BY_DEFAULT)
+  add_definitions("-DPROTEUS_DISABLE_BY_DEFAULT")
 endif()
 
 include(cmake/SetupLLVM.cmake)
