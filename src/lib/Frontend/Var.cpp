@@ -73,7 +73,6 @@ Var::Var(AllocaInst *Alloca, FuncBase &Fn) : Alloca(Alloca), Fn(Fn) {}
 
 Var::Var(Value * /*PointerValue*/, FuncBase &Fn) : Alloca(nullptr), Fn(Fn) {}
 
-
 AllocaInst *Var::getAlloca() const { return Alloca; }
 
 Var &Var::operator+(const Var &Other) const {
@@ -734,7 +733,7 @@ VarKind ScalarVar::kind() const { return VarKind::Scalar; }
 AllocaInst *ScalarVar::getAlloca() const { return Slot; }
 
 Value *ScalarVar::getPointerValue() const {
-PROTEUS_FATAL_ERROR("ScalarVar does not hold a pointer");
+  PROTEUS_FATAL_ERROR("ScalarVar does not hold a pointer");
 }
 
 void ScalarVar::storePointer(Value * /*Ptr*/) {
