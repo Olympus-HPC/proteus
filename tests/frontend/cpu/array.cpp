@@ -1,6 +1,8 @@
+// clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/array | %FILECHECK %s
-// --check-prefixes=CHECK RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/array | %FILECHECK %s --check-prefixes=CHECK
+// RUN: rm -rf "%t.$$.proteus"
+// clang-format on
 
 #include <proteus/JitFrontend.hpp>
 
@@ -86,6 +88,6 @@ int main() {
 }
 
 // clang-format off
-// CHECK: @global_array = internal addrspace(1) global [{{[0-9]+}} x double] undef
-// CHECK: %local_array = alloca [{{[0-9]+}} x double], align 8
+// CHECK: @global_array = internal addrspace(1) global [16 x double] undef
+// CHECK: %local_array = alloca [16 x double], align 8
 // CHECK: Verification successful!

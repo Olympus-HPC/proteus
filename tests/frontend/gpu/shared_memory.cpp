@@ -1,4 +1,3 @@
-// tests/frontend/gpu/shared_memory.cpp
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
 // RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/shared_memory.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
