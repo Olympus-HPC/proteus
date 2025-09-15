@@ -73,37 +73,8 @@ Var::Var(AllocaInst *Alloca, FuncBase &Fn) : Alloca(Alloca), Fn(Fn) {}
 
 Var::Var(Value * /*PointerValue*/, FuncBase &Fn) : Alloca(nullptr), Fn(Fn) {}
 
-StringRef Var::getName() const {
-  PROTEUS_FATAL_ERROR("Invalid Var::getName()");
-}
-
-Value *Var::getValue() const { PROTEUS_FATAL_ERROR("Invalid Var::getValue()"); }
-
-Type *Var::getValueType() const {
-  PROTEUS_FATAL_ERROR("Invalid Var::getValueType()");
-}
-
-void Var::storeValue(Value * /*Val*/) {
-  PROTEUS_FATAL_ERROR("Invalid Var::storeValue()");
-}
-
-Value *Var::getPointerValue() const {
-  PROTEUS_FATAL_ERROR("Invalid Var::getPointerValue()");
-}
-
-void Var::storePointer(Value * /*Ptr*/) {
-  PROTEUS_FATAL_ERROR("Invalid Var::storePointer()");
-}
 
 AllocaInst *Var::getAlloca() const { return Alloca; }
-
-Var &Var::index(size_t /*I*/) {
-  PROTEUS_FATAL_ERROR("Invalid Var::index(size_t)");
-}
-
-Var &Var::index(const Var & /*I*/) {
-  PROTEUS_FATAL_ERROR("Invalid Var::index(Var)");
-}
 
 Var &Var::operator+(const Var &Other) const {
   return binOp(
@@ -762,6 +733,22 @@ VarKind ScalarVar::kind() const { return VarKind::Scalar; }
 
 AllocaInst *ScalarVar::getAlloca() const { return Slot; }
 
+Value *ScalarVar::getPointerValue() const {
+PROTEUS_FATAL_ERROR("ScalarVar does not hold a pointer");
+}
+
+void ScalarVar::storePointer(Value * /*Ptr*/) {
+  PROTEUS_FATAL_ERROR("ScalarVar does not hold a pointer");
+}
+
+Var &ScalarVar::index(size_t /*I*/) {
+  PROTEUS_FATAL_ERROR("ScalarVar does not support indexing");
+}
+
+Var &ScalarVar::index(const Var & /*I*/) {
+  PROTEUS_FATAL_ERROR("ScalarVar does not support indexing");
+}
+
 PointerVar::PointerVar(AllocaInst *PtrSlot, FuncBase &Fn, Type *ElemTy)
     : Var(PtrSlot, Fn), PointerElemTy(ElemTy) {
   Kind = VarKind::Pointer;
@@ -854,6 +841,14 @@ void ArrayVar::storeValue(Value *Val) {
   (void)Val;
   PROTEUS_FATAL_ERROR(
       "ArrayVar does not support load/store of aggregate value");
+}
+
+Value *ArrayVar::getPointerValue() const {
+  PROTEUS_FATAL_ERROR("ArrayVar does not support getPointerValue");
+}
+
+void ArrayVar::storePointer(Value * /*Ptr*/) {
+  PROTEUS_FATAL_ERROR("ArrayVar does not support storePointer");
 }
 
 VarKind ArrayVar::kind() const { return VarKind::Array; }

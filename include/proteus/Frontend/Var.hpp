@@ -30,24 +30,24 @@ struct Var {
   Var(const Var &) = delete;
   Var(Var &&) = delete;
 
-  virtual StringRef getName() const;
+  virtual StringRef getName() const = 0;
 
   // Value accessors
-  virtual Value *getValue() const;
-  virtual Type *getValueType() const;
+  virtual Value *getValue() const = 0;
+  virtual Type *getValueType() const = 0;
 
-  virtual void storeValue(Value *Val);
+  virtual void storeValue(Value *Val) = 0;
 
   // Pointer-only hooks
-  virtual Value *getPointerValue() const;
-  virtual void storePointer(Value *Ptr);
+  virtual Value *getPointerValue() const = 0;
+  virtual void storePointer(Value *Ptr) = 0;
 
   virtual AllocaInst *getAlloca() const;
 
   virtual VarKind kind() const;
 
-  virtual Var &index(size_t I);
-  virtual Var &index(const Var &I);
+  virtual Var &index(size_t I) = 0;
+  virtual Var &index(const Var &I) = 0;
 
   // Declare member Operators.
   Var &operator+(const Var &Other) const;
@@ -179,6 +179,11 @@ struct ScalarVar final : Var {
   Type *getValueType() const override;
   Value *getValue() const override;
   void storeValue(Value *Val) override;
+  // Scalar does not support pointer semantics or indexing
+  Value *getPointerValue() const override;
+  void storePointer(Value *Ptr) override;
+  Var &index(size_t I) override;
+  Var &index(const Var &I) override;
   VarKind kind() const override;
   AllocaInst *getAlloca() const override;
 };
@@ -212,6 +217,8 @@ struct ArrayVar final : Var {
   Type *getValueType() const override;
   Value *getValue() const override;
   void storeValue(Value *Val) override;
+  Value *getPointerValue() const override;
+  void storePointer(Value *Ptr) override;
   VarKind kind() const override;
 
   Var &index(size_t I) override;
