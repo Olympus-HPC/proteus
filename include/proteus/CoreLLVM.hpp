@@ -241,7 +241,6 @@ inline void runCleanupPassPipeline(Module &M) {
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
   ModulePassManager Passes;
-  Passes.addPass(MergeFunctionsPass());
   Passes.addPass(GlobalDCEPass());
   // Passes.addPass(StripDeadDebugInfoPass());
   Passes.addPass(StripDeadPrototypesPass());

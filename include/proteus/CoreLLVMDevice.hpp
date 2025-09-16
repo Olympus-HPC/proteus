@@ -111,6 +111,8 @@ inline void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
     }
   };
 
+// These optimizations cause regressions for CUDA
+#if defined(PROTEUS_ENABLE_HIP)
   // Inform LLVM about the range of possible values of threadIdx.*.
   InsertAssume(detail::threadIdxXFnName(), BlockDim.x);
   InsertAssume(detail::threadIdxYFnName(), BlockDim.y);
@@ -120,6 +122,7 @@ inline void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
   InsertAssume(detail::blockIdxXFnName(), GridDim.x);
   InsertAssume(detail::blockIdxYFnName(), GridDim.y);
   InsertAssume(detail::blockIdxZFnName(), GridDim.z);
+#endif
 }
 
 inline void replaceGlobalVariablesWithPointers(
