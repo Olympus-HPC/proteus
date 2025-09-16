@@ -263,8 +263,8 @@ FuncBase::call(StringRef Name, ArgVarTs &...Args) {
 }
 
 template <typename RetT, typename... ArgVarTs>
-std::enable_if_t<std::is_void_v<RetT>, void>
-FuncBase::call(StringRef Name, ArgVarTs &...Args) {
+std::enable_if_t<std::is_void_v<RetT>, void> FuncBase::call(StringRef Name,
+                                                            ArgVarTs &...Args) {
   auto *F = getFunction();
   Module &M = *F->getParent();
   LLVMContext &Ctx = F->getContext();
