@@ -71,7 +71,7 @@ static Var &cmpOp(const Var &L, const Var &R, IntOp IOp, FPOp FOp) {
 
 Var::Var(AllocaInst *Alloca, FuncBase &Fn) : Alloca(Alloca), Fn(Fn) {}
 
-Var::Var(Value * /*PointerValue*/, FuncBase &Fn) : Alloca(nullptr), Fn(Fn) {}
+Var::Var(FuncBase &Fn) : Alloca(nullptr), Fn(Fn) {}
 
 AllocaInst *Var::getAlloca() const { return Alloca; }
 
@@ -823,7 +823,7 @@ Var &PointerVar::index(const Var &I) {
 }
 
 ArrayVar::ArrayVar(Value *BasePointer, FuncBase &Fn, ArrayType *ArrayTy)
-    : Var(BasePointer, Fn), BasePointer(BasePointer), ArrayTy(ArrayTy) {
+    : Var(Fn), BasePointer(BasePointer), ArrayTy(ArrayTy) {
   Kind = VarKind::Array;
 }
 

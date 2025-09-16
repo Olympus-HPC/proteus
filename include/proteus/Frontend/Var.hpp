@@ -23,7 +23,7 @@ struct Var {
   virtual ~Var() = default;
 
   Var(AllocaInst *Alloca, FuncBase &Fn);
-  Var(Value *PointerValue, FuncBase &Fn);
+  Var(FuncBase &Fn);
 
   // Disable copying/moving to prevent object slicing and enforce reference
   // semantics.
