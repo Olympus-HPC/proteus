@@ -66,7 +66,6 @@
 #include <llvm/Transforms/IPO/AlwaysInliner.h>
 #include <llvm/Transforms/IPO/GlobalDCE.h>
 #include <llvm/Transforms/IPO/GlobalOpt.h>
-#include <llvm/Transforms/IPO/MergeFunctions.h>
 #include <llvm/Transforms/IPO/StripDeadPrototypes.h>
 #include <llvm/Transforms/IPO/StripSymbols.h>
 #include <llvm/Transforms/Utils/Cloning.h>
@@ -284,7 +283,8 @@ private:
     SmallVector<char> Bitcode;
     raw_svector_ostream OS(Bitcode);
     WriteBitcodeToFile(EmbedM, OS);
-
+    // llvm::outs () << "MODULE " << M << "\n";
+    // llvm::outs() << EmbedM << "\n";
     HashT HashValue = hash(StringRef{Bitcode.data(), Bitcode.size()});
 
     std::string GVName = "_jit_bitcode_" + Id.str() +

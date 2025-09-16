@@ -296,11 +296,11 @@ public:
                            << toString(Config::get().ProteusKernelClone) << " "
                            << T.elapsed() << " ms\n");
     }
-
     // Internalize and cleanup to simplify the module and prepare it for
     // optimization.
     internalize(*KernelModule, KernelName);
     proteus::runCleanupPassPipeline(*KernelModule);
+    // llvm::outs() << "MODULE AFTER INTERNALIZE AND CLEANUP " << *KernelModule << "\n";
 
     // If the module is not in the provided context due to cloning, roundtrip it
     // using bitcode. Re-use the roundtrip bitcode to return it.

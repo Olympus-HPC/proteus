@@ -110,7 +110,7 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
   ModulePassManager Passes;
   if (auto E = PB.parsePassPipeline(Passes, PassPipeline))
     PROTEUS_FATAL_ERROR("Error: " + toString(std::move(E)));
-
+  // Passes.addPass(MergeFunctionsPass());
   Passes.run(M, MAM);
 }
 
@@ -164,6 +164,7 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
   };
 
   ModulePassManager Passes = PB.buildPerModuleDefaultPipeline(OptSetting);
+  // Passes.addPass(MergeFunctionsPass());
   Passes.run(M, MAM);
 }
 
