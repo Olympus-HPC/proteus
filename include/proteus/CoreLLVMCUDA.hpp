@@ -134,6 +134,7 @@ inline void codegenPTX(Module &M, StringRef DeviceArch,
 
   std::unique_ptr<TargetMachine> TM = std::move(*TMExpected);
   TargetLibraryInfoImpl TLII(Triple(M.getTargetTriple()));
+  M.setDataLayout(TM->createDataLayout());
 
   legacy::PassManager PM;
   PM.add(new TargetLibraryInfoWrapperPass(TLII));

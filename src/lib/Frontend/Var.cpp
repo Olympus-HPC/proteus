@@ -1,4 +1,7 @@
-#include "proteus/JitFrontend.hpp"
+#include "proteus/Frontend/Var.hpp"
+#include "proteus/Error.h"
+#include "proteus/Frontend/Func.hpp"
+#include "proteus/Frontend/TypeMap.hpp"
 
 namespace proteus {
 
@@ -66,64 +69,11 @@ static Var &cmpOp(const Var &L, const Var &R, IntOp IOp, FPOp FOp) {
   return ResultVar;
 }
 
-Var::Var(AllocaInst *Alloca, FuncBase &Fn, Type *PointerElemType)
-    : Alloca(Alloca), Fn(Fn), PointerElemType(PointerElemType) {}
+Var::Var(AllocaInst *Alloca, FuncBase &Fn) : Alloca(Alloca), Fn(Fn) {}
 
-Value *Var::getValue() const {
-  auto &IRB = Fn.getIRBuilder();
-  Type *AllocaType = Alloca->getAllocatedType();
-  if (AllocaType->isPointerTy()) {
-    auto *Ptr = IRB.CreateLoad(AllocaType, Alloca);
-    return IRB.CreateLoad(PointerElemType, Ptr);
-  }
-  return IRB.CreateLoad(AllocaType, Alloca);
-}
+Var::Var(FuncBase &Fn) : Alloca(nullptr), Fn(Fn) {}
 
-Type *Var::getValueType() const {
-  Type *AllocaType = Alloca->getAllocatedType();
-  if (AllocaType->isPointerTy()) {
-    return PointerElemType;
-  }
-  return AllocaType;
-}
-
-StringRef Var::getName() { return Alloca->getName(); }
-
-bool Var::isPointer() const {
-  Type *AllocaType = Alloca->getAllocatedType();
-  if (AllocaType->isPointerTy()) {
-    if (!PointerElemType)
-      PROTEUS_FATAL_ERROR("Expected pointer type");
-    return true;
-  }
-  return false;
-}
-
-void Var::storeValue(Value *Val) {
-  auto &IRB = Fn.getIRBuilder();
-  Type *AllocaType = Alloca->getAllocatedType();
-  // TODO: This is too permissive and allows assigning a value to a pointer's
-  // memory location, e.g:
-  // ...
-  // Var &V = declVar<double *>();
-  // V = 42 <--- Will store 42 to the memory location pointed by V!
-  // ...
-  // Fix for compliance with C++ typing and rules, use traits and compile-time
-  // processing when possible.
-  if (AllocaType->isPointerTy()) {
-    auto *Ptr = IRB.CreateLoad(AllocaType, Alloca);
-    IRB.CreateStore(Val, Ptr);
-  } else {
-    IRB.CreateStore(Val, Alloca);
-  }
-}
-
-void Var::storePointer(Value *Ptr) {
-  auto &IRB = Fn.getIRBuilder();
-  if (!isPointer())
-    PROTEUS_FATAL_ERROR("Expected pointer type");
-  IRB.CreateStore(Ptr, Alloca);
-}
+AllocaInst *Var::getAlloca() const { return Alloca; }
 
 Var &Var::operator+(const Var &Other) const {
   return binOp(
@@ -151,6 +101,13 @@ Var &Var::operator/(const Var &Other) const {
       *this, Other,
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSDiv(L, R); },
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFDiv(L, R); });
+}
+
+Var &Var::operator%(const Var &Other) const {
+  return binOp(
+      *this, Other,
+      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSRem(L, R); },
+      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFRem(L, R); });
 }
 
 Var &Var::operator+=(Var &Other) {
@@ -233,6 +190,26 @@ Var::operator/=(const T &ConstValue) {
   return *this;
 }
 
+Var &Var::operator%=(Var &Other) {
+  Var &Res = *this % Other;
+  auto &IRB = Fn.getIRBuilder();
+  this->storeValue(convert(IRB, Res.getValue(), getValueType()));
+
+  return *this;
+}
+
+template <typename T>
+std::enable_if_t<std::is_arithmetic_v<T>, Var &>
+Var::operator%=(const T &ConstValue) {
+  auto &Ctx = Fn.getFunction()->getContext();
+  Var &Tmp = Fn.declVarInternal("tmp.", TypeMap<T>::get(Ctx));
+  Tmp = ConstValue;
+
+  *this %= Tmp;
+
+  return *this;
+}
+
 template <typename T>
 std::enable_if_t<std::is_arithmetic_v<T>, Var &>
 Var::operator+(const T &ConstValue) const {
@@ -267,6 +244,15 @@ Var::operator/(const T &ConstValue) const {
   Var &Tmp = Fn.declVarInternal("tmp.", TypeMap<T>::get(Ctx));
   Tmp = ConstValue;
   return ((*this) / Tmp);
+}
+
+template <typename T>
+std::enable_if_t<std::is_arithmetic_v<T>, Var &>
+Var::operator%(const T &ConstValue) const {
+  auto &Ctx = Fn.getFunction()->getContext();
+  Var &Tmp = Fn.declVarInternal("tmp.", TypeMap<T>::get(Ctx));
+  Tmp = ConstValue;
+  return ((*this) % Tmp);
 }
 
 Var &Var::operator=(const Var &Other) {
@@ -429,38 +415,11 @@ Var::operator!=(const T &ConstValue) const {
 
 /// End of comparison operators.
 
-Var &Var::operator[](size_t I) {
-  auto &IRB = Fn.getIRBuilder();
+VarKind Var::kind() const { return Kind; }
 
-  if (!isPointer())
-    PROTEUS_FATAL_ERROR("Expected pointer type: Var " + getName());
+Var &Var::operator[](size_t I) { return index(I); }
 
-  auto &ResultVar = Fn.declVarInternal("res.", PointerElemType->getPointerTo(),
-                                       PointerElemType);
-  auto *Ptr = IRB.CreateLoad(Alloca->getAllocatedType(), Alloca);
-  auto *GEP = IRB.CreateConstInBoundsGEP1_64(PointerElemType, Ptr, I);
-
-  ResultVar.storePointer(GEP);
-
-  return ResultVar;
-}
-
-Var &Var::operator[](const Var &IdxVar) {
-  auto &IRB = Fn.getIRBuilder();
-
-  if (!isPointer())
-    PROTEUS_FATAL_ERROR("Expected pointer type");
-
-  auto &ResultVar = Fn.declVarInternal("res.", PointerElemType->getPointerTo(),
-                                       PointerElemType);
-  auto *Ptr = IRB.CreateLoad(Alloca->getAllocatedType(), Alloca);
-  Value *Idx = IdxVar.getValue();
-  auto *GEP = IRB.CreateInBoundsGEP(PointerElemType, Ptr, {Idx});
-
-  ResultVar.storePointer(GEP);
-
-  return ResultVar;
-}
+Var &Var::operator[](const Var &IdxVar) { return index(IdxVar); }
 
 // Define non-member operators.
 
@@ -502,6 +461,16 @@ std::enable_if_t<std::is_arithmetic_v<T>, Var &> operator/(const T &ConstValue,
   Tmp = ConstValue;
 
   return (Tmp / V);
+}
+
+template <typename T>
+std::enable_if_t<std::is_arithmetic_v<T>, Var &> operator%(const T &ConstValue,
+                                                           const Var &V) {
+  auto &Ctx = V.Fn.getFunction()->getContext();
+  Var &Tmp = V.Fn.declVarInternal("tmp.", TypeMap<T>::get(Ctx));
+  Tmp = ConstValue;
+
+  return (Tmp % V);
 }
 
 Value *convert(IRBuilderBase IRB, Value *V, Type *TargetType) {
@@ -646,6 +615,12 @@ template Var &Var::operator/ <size_t>(const size_t &) const;
 template Var &Var::operator/ <float>(const float &) const;
 template Var &Var::operator/ <double>(const double &) const;
 
+template Var &Var::operator% <int>(const int &) const;
+template Var &Var::operator% <unsigned int>(const unsigned int &) const;
+template Var &Var::operator% <size_t>(const size_t &) const;
+template Var &Var::operator% <float>(const float &) const;
+template Var &Var::operator% <double>(const double &) const;
+
 // Binary operators with assignment explicit instantiations.
 template Var &Var::operator+= <int>(const int &);
 template Var &Var::operator+= <unsigned int>(const unsigned int &);
@@ -670,6 +645,12 @@ template Var &Var::operator/= <unsigned int>(const unsigned int &);
 template Var &Var::operator/= <size_t>(const size_t &);
 template Var &Var::operator/= <float>(const float &);
 template Var &Var::operator/= <double>(const double &);
+
+template Var &Var::operator%= <int>(const int &);
+template Var &Var::operator%= <unsigned int>(const unsigned int &);
+template Var &Var::operator%= <size_t>(const size_t &);
+template Var &Var::operator%= <float>(const float &);
+template Var &Var::operator%= <double>(const double &);
 
 // Non-member binary operator explicit instantiations.
 template Var &operator+ <int>(const int &, const Var &);
@@ -696,6 +677,12 @@ template Var &operator/ <size_t>(const size_t &, const Var &);
 template Var &operator/ <float>(const float &, const Var &);
 template Var &operator/ <double>(const double &, const Var &);
 
+template Var &operator% <int>(const int &, const Var &);
+template Var &operator% <unsigned int>(const unsigned int &, const Var &);
+template Var &operator% <size_t>(const size_t &, const Var &);
+template Var &operator% <float>(const float &, const Var &);
+template Var &operator% <double>(const double &, const Var &);
+
 // Comparison explicit instantiations.
 template Var &Var::operator>(const int &ConstValue) const;
 template Var &Var::operator>(const unsigned int &ConstValue) const;
@@ -721,5 +708,179 @@ template Var &Var::operator==(const int &ConstValue) const;
 template Var &Var::operator==(const unsigned int &ConstValue) const;
 template Var &Var::operator==(const float &ConstValue) const;
 template Var &Var::operator==(const double &ConstValue) const;
+
+ScalarVar::ScalarVar(AllocaInst *Slot, FuncBase &Fn)
+    : Var(Slot, Fn), Slot(Slot) {
+  Kind = VarKind::Scalar;
+}
+
+StringRef ScalarVar::getName() const { return Slot->getName(); }
+
+Type *ScalarVar::getValueType() const { return Slot->getAllocatedType(); }
+
+Value *ScalarVar::getValue() const {
+  auto &IRB = Fn.getIRBuilder();
+  return IRB.CreateLoad(Slot->getAllocatedType(), Slot);
+}
+
+void ScalarVar::storeValue(Value *Val) {
+  auto &IRB = Fn.getIRBuilder();
+  IRB.CreateStore(Val, Slot);
+}
+
+VarKind ScalarVar::kind() const { return VarKind::Scalar; }
+
+AllocaInst *ScalarVar::getAlloca() const { return Slot; }
+
+Value *ScalarVar::getPointerValue() const {
+  PROTEUS_FATAL_ERROR("ScalarVar does not hold a pointer");
+}
+
+void ScalarVar::storePointer(Value * /*Ptr*/) {
+  PROTEUS_FATAL_ERROR("ScalarVar does not hold a pointer");
+}
+
+Var &ScalarVar::index(size_t /*I*/) {
+  PROTEUS_FATAL_ERROR("ScalarVar does not support indexing");
+}
+
+Var &ScalarVar::index(const Var & /*I*/) {
+  PROTEUS_FATAL_ERROR("ScalarVar does not support indexing");
+}
+
+PointerVar::PointerVar(AllocaInst *PtrSlot, FuncBase &Fn, Type *ElemTy)
+    : Var(PtrSlot, Fn), PointerElemTy(ElemTy) {
+  Kind = VarKind::Pointer;
+}
+
+StringRef PointerVar::getName() const { return Alloca->getName(); }
+
+Type *PointerVar::getValueType() const { return PointerElemTy; }
+
+Value *PointerVar::getPointerValue() const {
+  auto &IRB = Fn.getIRBuilder();
+  Type *SlotTy = Alloca->getAllocatedType();
+  if (!SlotTy->isPointerTy())
+    PROTEUS_FATAL_ERROR("PointerVar alloca must allocate a pointer type");
+  return IRB.CreateLoad(SlotTy, Alloca);
+}
+
+void PointerVar::storePointer(Value *Ptr) {
+  auto &IRB = Fn.getIRBuilder();
+  IRB.CreateStore(Ptr, Alloca);
+}
+
+Value *PointerVar::getValue() const {
+  auto &IRB = Fn.getIRBuilder();
+  Value *Ptr = getPointerValue();
+  return IRB.CreateLoad(PointerElemTy, Ptr);
+}
+
+void PointerVar::storeValue(Value *Val) {
+  auto &IRB = Fn.getIRBuilder();
+  // TODO: This is too permissive and allows assigning a value to a pointer's
+  // memory location, e.g:
+  // ...
+  // Var &V = declVar<double *>();
+  // V = 42 <--- Will store 42 to the memory location pointed by V!
+  // ...
+  // Fix for compliance with C++ typing and rules, use traits and compile-time
+  // processing when possible.
+  Value *Ptr = getPointerValue();
+  IRB.CreateStore(Val, Ptr);
+}
+
+VarKind PointerVar::kind() const { return VarKind::Pointer; }
+
+AllocaInst *PointerVar::getAlloca() const { return Alloca; }
+
+Var &PointerVar::index(size_t I) {
+  auto &IRB = Fn.getIRBuilder();
+
+  auto *Ptr = IRB.CreateLoad(Alloca->getAllocatedType(), Alloca);
+  auto *GEP = IRB.CreateConstInBoundsGEP1_64(PointerElemTy, Ptr, I);
+  auto *BasePtrTy = cast<PointerType>(Ptr->getType());
+  unsigned AddrSpace = BasePtrTy->getAddressSpace();
+  Type *ElemPtrTy = PointerType::get(PointerElemTy, AddrSpace);
+
+  auto &ResultVar = Fn.declVarInternal("res.", ElemPtrTy, PointerElemTy);
+  ResultVar.storePointer(GEP);
+  return ResultVar;
+}
+
+Var &PointerVar::index(const Var &I) {
+  auto &IRB = Fn.getIRBuilder();
+
+  auto *Ptr = IRB.CreateLoad(Alloca->getAllocatedType(), Alloca);
+  auto *GEP = IRB.CreateInBoundsGEP(PointerElemTy, Ptr, I.getValue());
+  auto *BasePtrTy = cast<PointerType>(Ptr->getType());
+  unsigned AddrSpace = BasePtrTy->getAddressSpace();
+  Type *ElemPtrTy = PointerType::get(PointerElemTy, AddrSpace);
+
+  auto &ResultVar = Fn.declVarInternal("res.", ElemPtrTy, PointerElemTy);
+  ResultVar.storePointer(GEP);
+  return ResultVar;
+}
+
+ArrayVar::ArrayVar(Value *BasePointer, FuncBase &Fn, ArrayType *ArrayTy)
+    : Var(Fn), BasePointer(BasePointer), ArrayTy(ArrayTy) {
+  Kind = VarKind::Array;
+}
+
+StringRef ArrayVar::getName() const { return BasePointer->getName(); }
+
+Type *ArrayVar::getValueType() const { return ArrayTy; }
+
+Value *ArrayVar::getValue() const {
+  PROTEUS_FATAL_ERROR(
+      "ArrayVar does not support load/store of aggregate value");
+}
+
+void ArrayVar::storeValue(Value *Val) {
+  (void)Val;
+  PROTEUS_FATAL_ERROR(
+      "ArrayVar does not support load/store of aggregate value");
+}
+
+Value *ArrayVar::getPointerValue() const {
+  PROTEUS_FATAL_ERROR("ArrayVar does not support getPointerValue");
+}
+
+void ArrayVar::storePointer(Value * /*Ptr*/) {
+  PROTEUS_FATAL_ERROR("ArrayVar does not support storePointer");
+}
+
+VarKind ArrayVar::kind() const { return VarKind::Array; }
+
+Var &ArrayVar::index(size_t I) {
+  auto &IRB = Fn.getIRBuilder();
+  // GEP into the array aggregate: [0, I]
+  auto *GEP = IRB.CreateConstInBoundsGEP2_64(ArrayTy, BasePointer, 0, I);
+  Type *ElemTy = ArrayTy->getArrayElementType();
+  auto *BasePtrTy = cast<PointerType>(BasePointer->getType());
+  unsigned AddrSpace = BasePtrTy->getAddressSpace();
+  Type *ElemPtrTy = PointerType::get(ElemTy, AddrSpace);
+
+  auto &ResultVar = Fn.declVarInternal("res.", ElemPtrTy, ElemTy);
+  ResultVar.storePointer(GEP);
+  return ResultVar;
+}
+
+Var &ArrayVar::index(const Var &I) {
+  auto &IRB = Fn.getIRBuilder();
+  Value *IdxVal = I.getValue();
+  if (!IdxVal->getType()->isIntegerTy())
+    PROTEUS_FATAL_ERROR("Expected integer index for array GEP");
+  Value *Zero = llvm::ConstantInt::get(IdxVal->getType(), 0);
+  auto *GEP = IRB.CreateInBoundsGEP(ArrayTy, BasePointer, {Zero, IdxVal});
+  Type *ElemTy = ArrayTy->getArrayElementType();
+  auto *BasePtrTy = cast<PointerType>(BasePointer->getType());
+  unsigned AddrSpace = BasePtrTy->getAddressSpace();
+  Type *ElemPtrTy = PointerType::get(ElemTy, AddrSpace);
+
+  auto &ResultVar = Fn.declVarInternal("res.", ElemPtrTy, ElemTy);
+  ResultVar.storePointer(GEP);
+  return ResultVar;
+}
 
 } // namespace proteus

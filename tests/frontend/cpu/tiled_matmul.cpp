@@ -38,9 +38,9 @@ static auto getTiledMatmulFunction(int N, int TileI, int TileJ, int TileK) {
                       F.forLoop({J, Zero, UbnJ, IncOne}).tile(TileJ),
                       F.forLoop({K, Zero, UbnK, IncOne},
                                 [&]() {
-                                  auto CIdx = I * N + J;
-                                  auto AIdx = I * N + K;
-                                  auto BIdx = K * N + J;
+                                  auto &CIdx = I * N + J;
+                                  auto &AIdx = I * N + K;
+                                  auto &BIdx = K * N + J;
                                   C[CIdx] += A[AIdx] * B[BIdx];
                                 })
                           .tile(TileK))
