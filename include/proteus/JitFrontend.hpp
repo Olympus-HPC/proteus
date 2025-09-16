@@ -246,6 +246,34 @@ std::enable_if_t<std::is_void_v<RetT>, void> FuncBase::call(StringRef Name) {
   IRB.CreateCall(Callee);
 }
 
+template <typename RetT, typename... ArgVarTs>
+std::enable_if_t<!std::is_void_v<RetT>, Var &>
+FuncBase::call(StringRef Name, ArgVarTs &...Args) {
+  auto *F = getFunction();
+  Module &M = *F->getParent();
+  LLVMContext &Ctx = F->getContext();
+
+  FunctionCallee Callee = M.getOrInsertFunction(Name, TypeMap<RetT>::get(Ctx),
+                                                TypeMap<ArgVarTs>::get(Ctx)...);
+  Var &Ret = declVarInternal("ret", TypeMap<RetT>::get(Ctx));
+  auto *Call = IRB.CreateCall(Callee, {Args.getValue()...});
+  Ret.storeValue(Call);
+
+  return Ret;
+}
+
+template <typename RetT, typename... ArgVarTs>
+std::enable_if_t<std::is_void_v<RetT>, void>
+FuncBase::call(StringRef Name, ArgVarTs &...Args) {
+  auto *F = getFunction();
+  Module &M = *F->getParent();
+  LLVMContext &Ctx = F->getContext();
+
+  FunctionCallee Callee = M.getOrInsertFunction(Name, TypeMap<RetT>::get(Ctx),
+                                                TypeMap<ArgVarTs>::get(Ctx)...);
+  IRB.CreateCall(Callee, {Args.getValue()...});
+}
+
 template <typename RetT, typename... ArgT>
 RetT Func<RetT, ArgT...>::operator()(ArgT... Args) {
   if (!J.isCompiled())

@@ -188,6 +188,13 @@ public:
   template <typename RetT, typename... ArgT>
   std::enable_if_t<std::is_void_v<RetT>, void> call(StringRef Name);
 
+  template <typename RetT, typename... ArgVarTs>
+  std::enable_if_t<!std::is_void_v<RetT>, Var &>
+  call(StringRef Name, ArgVarTs &...Args);
+  template <typename RetT, typename... ArgVarTs>
+  std::enable_if_t<std::is_void_v<RetT>, void>
+  call(StringRef Name, ArgVarTs &...Args);
+
   template <typename BuiltinFuncT>
   decltype(auto) callBuiltin(BuiltinFuncT &&BuiltinFunc) {
     using RetT = std::invoke_result_t<BuiltinFuncT &, FuncBase &>;
