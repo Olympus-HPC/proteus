@@ -44,12 +44,12 @@ fi
 
 echo "Install miniconda..."
 PYTHON_VERSION=3.12
-MINICONDA_DIR=miniconda3
+MINICONDA_DIR=/tmp/proteus-ci-${CI_JOB_ID}/miniconda3
 mkdir -p ${MINICONDA_DIR}
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -m).sh -O ./${MINICONDA_DIR}/miniconda.sh
-bash ./${MINICONDA_DIR}/miniconda.sh -b -u -p ./${MINICONDA_DIR}
-rm ./${MINICONDA_DIR}/miniconda.sh
-source ./${MINICONDA_DIR}/bin/activate
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -m).sh -O ${MINICONDA_DIR}/miniconda.sh
+bash ${MINICONDA_DIR}/miniconda.sh -b -u -p ${MINICONDA_DIR}
+rm ${MINICONDA_DIR}/miniconda.sh
+source ${MINICONDA_DIR}/bin/activate
 conda create -y -q -n proteus -c conda-forge \
     python=${PYTHON_VERSION} pandas==2.2.3 matplotlib==3.10.0
 conda activate proteus
