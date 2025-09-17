@@ -22,7 +22,7 @@ int main() {
   auto J = proteus::JitModule();
   auto &F = J.addFunction<int>("ExternalCall");
   F.beginFunction();
-  { 
+  {
     F.call<void>("hello");
     auto &V1 = F.defVar<int>(22);
     auto &V2 = F.defVar<int>(20);
