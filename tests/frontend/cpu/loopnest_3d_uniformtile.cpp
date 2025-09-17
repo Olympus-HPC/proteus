@@ -13,7 +13,7 @@
 
 static auto get3DUniformTileFunction(int DI, int DJ, int DK, int Tile) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
-  auto &F = JitMod->addFunction<void, double *>("loopnest_3d_uniformtile");
+  auto &F = JitMod->addFunction<void(double *)>("loopnest_3d_uniformtile");
 
   auto &I = F.declVar<int>("i");
   auto &J = F.declVar<int>("j");

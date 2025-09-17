@@ -20,7 +20,7 @@ int main() {
   proteus::init();
 
   auto J = proteus::JitModule();
-  auto &F = J.addFunction<int>("ExternalCall");
+  auto &F = J.addFunction<int(void)>("ExternalCall");
   F.beginFunction();
   {
     F.call<void(void)>("hello");
@@ -34,7 +34,7 @@ int main() {
   J.print();
   J.compile();
 
-  auto V = F();
+  int V = F();
   std::cout << "V " << V << "\n";
 
   proteus::finalize();

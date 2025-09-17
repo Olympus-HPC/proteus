@@ -80,7 +80,7 @@ __global__ void floydWarshallPass(unsigned int *__restrict__ pathDistanceBuffer,
 auto createJitModuleSpecial(unsigned int _numNodes) {
   auto J = std::make_unique<JitModule>(TARGET);
   auto KernelHandle =
-      J->addKernel<unsigned int *, unsigned int *, unsigned int, unsigned int>(
+      J->addKernel<void(unsigned int *, unsigned int *, unsigned int, unsigned int)>(
           "floydWarshallPass");
   auto &F = KernelHandle.F;
   auto [pathDistanceBuffer, pathBuffer, numNodes, pass] = F.getArgs();
