@@ -35,8 +35,8 @@ auto createJitModule1() {
       auto [V] = F.getArgs();
 
       Var &X = F.defVar<double>(21);
-      Var &C = F.call<double>("f2");
-      Var &Res = F.call<double, double, double>("f3", X, C);
+      Var &C = F.call<double(void)>("f2");
+      Var &Res = F.call<double(double, double)>("f3", X, C);
       V[0] = Res;
 
       F.ret();

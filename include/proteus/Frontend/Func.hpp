@@ -183,17 +183,28 @@ public:
                 int Line = __builtin_LINE());
   void endFor();
 
-  template <typename RetT, typename... ArgT>
-  std::enable_if_t<!std::is_void_v<RetT>, Var &> call(StringRef Name);
-  template <typename RetT, typename... ArgT>
-  std::enable_if_t<std::is_void_v<RetT>, void> call(StringRef Name);
+  // We can't partially-specialize function templates, but we can do so
+  // with a struct that represents the signature of a function.
+  template <typename T> struct FnSig;
+  template <typename RetT, typename... ArgT> struct FnSig<RetT(ArgT...)> {
+    using return_t = RetT;
+  };
 
-  template <typename RetT, typename... ArgT, typename... ArgVars>
-  std::enable_if_t<!std::is_void_v<RetT>, Var &> call(StringRef Name,
-                                                      ArgVars &&...ArgsVars);
-  template <typename RetT, typename... ArgT, typename... ArgVars>
-  std::enable_if_t<std::is_void_v<RetT>, void> call(StringRef Name,
-                                                    ArgVars &&...ArgsVars);
+  template <typename Sig, typename... ArgT>
+  std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::return_t>, Var &>
+  call(StringRef Name);
+
+  template <typename Sig, typename... ArgT>
+  std::enable_if_t<std::is_void_v<typename FnSig<Sig>::return_t>, void>
+  call(StringRef Name);
+
+  template <typename Sig, typename... ArgT, typename... ArgVars>
+  std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::return_t>, Var &>
+  call(StringRef Name, ArgVars &&...ArgsVars);
+
+  template <typename Sig, typename... ArgT, typename... ArgVars>
+  std::enable_if_t<std::is_void_v<typename FnSig<Sig>::return_t>, void>
+  call(StringRef Name, ArgVars &&...ArgsVars);
 
   template <typename BuiltinFuncT>
   decltype(auto) callBuiltin(BuiltinFuncT &&BuiltinFunc) {

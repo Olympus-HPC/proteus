@@ -222,22 +222,27 @@ public:
   void print() { Mod->print(outs(), nullptr); }
 };
 
-template <typename RetT, typename... ArgT>
-std::enable_if_t<!std::is_void_v<RetT>, Var &> FuncBase::call(StringRef Name) {
+template <typename Sig, typename... ArgT>
+std::enable_if_t<
+    !std::is_void_v<typename FuncBase::template FnSig<Sig>::return_t>, Var &>
+FuncBase::call(StringRef Name) {
+  using RetT = typename FuncBase::template FnSig<Sig>::return_t;
   auto *F = getFunction();
   Module &M = *F->getParent();
   LLVMContext &Ctx = F->getContext();
   FunctionCallee Callee = M.getOrInsertFunction(Name, TypeMap<RetT>::get(Ctx),
                                                 TypeMap<ArgT>::get(Ctx)...);
-  Var &Ret = declVarInternal("ret", TypeMap<RetT>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
+  Var &Ret = declVarInternal("ret", TypeMap<RetT>::get(Ctx));
   Ret.storeValue(Call);
-
   return Ret;
 }
 
-template <typename RetT, typename... ArgT>
-std::enable_if_t<std::is_void_v<RetT>, void> FuncBase::call(StringRef Name) {
+template <typename Sig, typename... ArgT>
+std::enable_if_t<
+    std::is_void_v<typename FuncBase::template FnSig<Sig>::return_t>, void>
+FuncBase::call(StringRef Name) {
+  using RetT = typename FuncBase::template FnSig<Sig>::return_t;
   auto *F = getFunction();
   Module &M = *F->getParent();
   LLVMContext &Ctx = F->getContext();
@@ -246,29 +251,33 @@ std::enable_if_t<std::is_void_v<RetT>, void> FuncBase::call(StringRef Name) {
   IRB.CreateCall(Callee);
 }
 
-template <typename RetT, typename... ArgT, typename... ArgVars>
-std::enable_if_t<!std::is_void_v<RetT>, Var &>
+template <typename Sig, typename... ArgT, typename... ArgVars>
+std::enable_if_t<
+    !std::is_void_v<typename FuncBase::template FnSig<Sig>::return_t>, Var &>
 FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
   auto *F = getFunction();
   Module &M = *F->getParent();
   LLVMContext &Ctx = F->getContext();
 
+  using RetT = typename FuncBase::template FnSig<Sig>::return_t;
   FunctionCallee Callee = M.getOrInsertFunction(Name, TypeMap<RetT>::get(Ctx),
                                                 TypeMap<ArgT>::get(Ctx)...);
-  Var &Ret = declVarInternal("ret", TypeMap<RetT>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee, {ArgsVars.getValue()...});
-  Ret.storeValue(Call);
 
+  Var &Ret = declVarInternal("ret", TypeMap<RetT>::get(Ctx));
+  Ret.storeValue(Call);
   return Ret;
 }
 
-template <typename RetT, typename... ArgT, typename... ArgVars>
-std::enable_if_t<std::is_void_v<RetT>, void>
+template <typename Sig, typename... ArgT, typename... ArgVars>
+std::enable_if_t<
+    std::is_void_v<typename FuncBase::template FnSig<Sig>::return_t>, void>
 FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
   auto *F = getFunction();
   Module &M = *F->getParent();
   LLVMContext &Ctx = F->getContext();
 
+  using RetT = typename FuncBase::template FnSig<Sig>::return_t;
   FunctionCallee Callee = M.getOrInsertFunction(Name, TypeMap<RetT>::get(Ctx),
                                                 TypeMap<ArgT>::get(Ctx)...);
   IRB.CreateCall(Callee, {ArgsVars.getValue()...});
