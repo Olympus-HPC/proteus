@@ -42,8 +42,16 @@ else
   exit 0
 fi
 
-echo "Activate proteus environment..."
-source /usr/workspace/proteusdev/${CI_MACHINE}/miniconda3/bin/activate
+echo "Install miniconda..."
+PYTHON_VERSION=3.12
+MINICONDA_DIR=/tmp/proteus-ci-${CI_JOB_ID}/miniconda3
+mkdir -p ${MINICONDA_DIR}
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -m).sh -O ${MINICONDA_DIR}/miniconda.sh
+bash ${MINICONDA_DIR}/miniconda.sh -b -u -p ${MINICONDA_DIR}
+rm ${MINICONDA_DIR}/miniconda.sh
+source ${MINICONDA_DIR}/bin/activate
+conda create -y -q -n proteus -c conda-forge \
+    python=${PYTHON_VERSION} pandas==2.2.3 matplotlib==3.10.0
 conda activate proteus
 
 if [ "${CI_MACHINE}" == "lassen" ]; then
@@ -55,11 +63,19 @@ if [ "${CI_MACHINE}" == "lassen" ]; then
     echo "LBANN benchmarks can only run on tioga.  Exiting."
     exit 0
   fi
+
+  ml load cmake/3.23.1
   ml load cuda/12.2.2
+
+  PROTEUS_CI_LLVM_VERSION=18.1.8
+  conda install -y -q -c conda-forge \
+    python=${PYTHON_VERSION} clang=${PROTEUS_CI_LLVM_VERSION} clangxx=${PROTEUS_CI_LLVM_VERSION} \
+    clangdev=${PROTEUS_CI_LLVM_VERSION} llvmdev=${PROTEUS_CI_LLVM_VERSION} lit=${PROTEUS_CI_LLVM_VERSION}
 
   LLVM_INSTALL_DIR=$(llvm-config --prefix)
 
   CMAKE_MACHINE_OPTIONS="\
+    -DCMAKE_PREFIX_PATH=$CONDA_PREFIX;$CONDA_PREFIX/lib/cmake \
     -DPROTEUS_LINK_SHARED_LLVM=on \
     -DPROTEUS_ENABLE_CUDA=on \
     -DCMAKE_CUDA_ARCHITECTURES=70 \
@@ -152,6 +168,12 @@ for file in plots/*.png; do
   # Add to the comment body.
   COMMENT+="\n<img src=https://${RESULTS_REPO}/blob/main/${ARTIFACT_DIR}/${FILENAME}?raw=true width=49%>"
 done
+
+mkdir -p ${OUTPUT_DIR}/${ARTIFACT_DIR}/results
+for file in results/*.csv; do
+  cp ${file} ${OUTPUT_DIR}/${ARTIFACT_DIR}/results
+done
+
 COMMENT+="\n</p>"
 cd ${OUTPUT_DIR}
 git add PR${PR_ID}
@@ -165,3 +187,6 @@ curl -L -X POST \
   -H "X-GitHub-Api-Version: 2022-11-28" \
   "https://api.github.com/repos/Olympus-HPC/proteus/issues/${PR_ID}/comments" \
   -d "{\"body\": \"${COMMENT}\"}"
+
+conda deactivate
+rm -rf ${MINICONDA_DIR}
