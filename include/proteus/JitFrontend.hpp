@@ -248,7 +248,8 @@ std::enable_if_t<std::is_void_v<RetT>, void> FuncBase::call(StringRef Name) {
 
 template <typename RetT, typename... ArgT>
 std::enable_if_t<!std::is_void_v<RetT>, Var &>
-FuncBase::call(StringRef Name, std::initializer_list<std::reference_wrapper<Var>> Args) {
+FuncBase::call(StringRef Name,
+               std::initializer_list<std::reference_wrapper<Var>> Args) {
   auto *F = getFunction();
   Module &M = *F->getParent();
   LLVMContext &Ctx = F->getContext();
@@ -268,8 +269,9 @@ FuncBase::call(StringRef Name, std::initializer_list<std::reference_wrapper<Var>
 }
 
 template <typename RetT, typename... ArgT>
-std::enable_if_t<std::is_void_v<RetT>, void> FuncBase::call(StringRef Name,
-                                                            std::initializer_list<std::reference_wrapper<Var>> Args) {
+std::enable_if_t<std::is_void_v<RetT>, void>
+FuncBase::call(StringRef Name,
+               std::initializer_list<std::reference_wrapper<Var>> Args) {
   auto *F = getFunction();
   Module &M = *F->getParent();
   LLVMContext &Ctx = F->getContext();
