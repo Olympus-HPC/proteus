@@ -13,7 +13,7 @@
 
 extern "C" {
 void hello() { std::cout << "Hello!\n"; }
-int add(int a, int b) { return a + b; }
+int add(int A, int B) { return A + B; }
 }
 
 int main() {
