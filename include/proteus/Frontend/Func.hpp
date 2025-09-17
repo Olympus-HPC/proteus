@@ -21,6 +21,21 @@ class LoopBoundInfo;
 template <typename... ForLoopBuilders> class LoopNestBuilder;
 template <typename BodyLambda> class ForLoopBuilder;
 
+// Helper struct to represent the signature of a function.
+// Useful to partially-specialize function templates.
+template <typename... ArgTs> struct ArgTypeList {};
+template <typename T> struct FnSig;
+template <typename RetT_, typename... ArgT> struct FnSig<RetT_(ArgT...)> {
+  using ArgsTList = ArgTypeList<ArgT...>;
+  using RetT = RetT_;
+};
+
+  template <typename RetT, typename... ArgT>
+  static FunctionCallee getFunctionCallee(Module &M, LLVMContext &Ctx, StringRef Name, ArgTypeList<ArgT...>) {
+    return M.getOrInsertFunction(Name, TypeMap<RetT>::get(Ctx),
+                                  TypeMap<ArgT>::get(Ctx)...);
+  }
+
 using namespace llvm;
 
 struct EmptyLambda {
@@ -183,27 +198,20 @@ public:
                 int Line = __builtin_LINE());
   void endFor();
 
-  // We can't partially-specialize function templates, but we can do so
-  // with a struct that represents the signature of a function.
-  template <typename T> struct FnSig;
-  template <typename RetT, typename... ArgT> struct FnSig<RetT(ArgT...)> {
-    using return_t = RetT;
-  };
-
-  template <typename Sig, typename... ArgT>
-  std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::return_t>, Var &>
+  template <typename Sig>
+  std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, Var &>
   call(StringRef Name);
 
-  template <typename Sig, typename... ArgT>
-  std::enable_if_t<std::is_void_v<typename FnSig<Sig>::return_t>, void>
+  template <typename Sig>
+  std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
   call(StringRef Name);
 
-  template <typename Sig, typename... ArgT, typename... ArgVars>
-  std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::return_t>, Var &>
+  template <typename Sig, typename... ArgVars>
+  std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, Var &>
   call(StringRef Name, ArgVars &&...ArgsVars);
 
-  template <typename Sig, typename... ArgT, typename... ArgVars>
-  std::enable_if_t<std::is_void_v<typename FnSig<Sig>::return_t>, void>
+  template <typename Sig, typename... ArgVars>
+  std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
   call(StringRef Name, ArgVars &&...ArgsVars);
 
   template <typename BuiltinFuncT>
