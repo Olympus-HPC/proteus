@@ -246,10 +246,10 @@ std::enable_if_t<std::is_void_v<RetT>, void> FuncBase::call(StringRef Name) {
   IRB.CreateCall(Callee);
 }
 
-template <typename RetT, typename... ArgT>
+template <typename RetT, typename... ArgT, typename... ArgVars>
 std::enable_if_t<!std::is_void_v<RetT>, Var &>
 FuncBase::call(StringRef Name,
-               std::initializer_list<std::reference_wrapper<Var>> Args) {
+               ArgVars &&...ArgsVars) {
   auto *F = getFunction();
   Module &M = *F->getParent();
   LLVMContext &Ctx = F->getContext();
@@ -257,33 +257,23 @@ FuncBase::call(StringRef Name,
   FunctionCallee Callee = M.getOrInsertFunction(Name, TypeMap<RetT>::get(Ctx),
                                                 TypeMap<ArgT>::get(Ctx)...);
   Var &Ret = declVarInternal("ret", TypeMap<RetT>::get(Ctx));
-  std::vector<Value *> Vals;
-  Vals.reserve(Args.size());
-  for (auto &Arg : Args) {
-    Vals.push_back(Arg.get().getValue());
-  }
-  auto *Call = IRB.CreateCall(Callee, Vals);
+  auto *Call = IRB.CreateCall(Callee, {ArgsVars.getValue()...});
   Ret.storeValue(Call);
 
   return Ret;
 }
 
-template <typename RetT, typename... ArgT>
+template <typename RetT, typename... ArgT, typename... ArgVars>
 std::enable_if_t<std::is_void_v<RetT>, void>
 FuncBase::call(StringRef Name,
-               std::initializer_list<std::reference_wrapper<Var>> Args) {
+               ArgVars &&...ArgsVars) {
   auto *F = getFunction();
   Module &M = *F->getParent();
   LLVMContext &Ctx = F->getContext();
 
   FunctionCallee Callee = M.getOrInsertFunction(Name, TypeMap<RetT>::get(Ctx),
                                                 TypeMap<ArgT>::get(Ctx)...);
-  std::vector<Value *> Vals;
-  Vals.reserve(Args.size());
-  for (auto &Arg : Args) {
-    Vals.push_back(Arg.get().getValue());
-  }
-  IRB.CreateCall(Callee, Vals);
+  IRB.CreateCall(Callee, {ArgsVars.getValue()...});
 }
 
 template <typename RetT, typename... ArgT>
