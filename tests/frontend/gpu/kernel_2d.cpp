@@ -26,7 +26,7 @@ using namespace builtins::gpu;
 int main() {
   auto J = proteus::JitModule(TARGET);
 
-  auto KernelHandle = J.addKernel<double *, double *, double *, size_t, size_t>(
+  auto KernelHandle = J.addKernel<void(double *, double *, double *, size_t, size_t)>(
       "matrix_add_2d");
   auto &F = KernelHandle.F;
 

@@ -27,7 +27,7 @@ using namespace proteus;
 auto createJitModule1() {
   auto J = std::make_unique<JitModule>(TARGET);
 
-  auto KernelHandle = J->addKernel<double *>("kernel");
+  auto KernelHandle = J->addKernel<void(double *)>("kernel");
   {
     auto &F = KernelHandle.F;
     F.beginFunction();
@@ -45,7 +45,7 @@ auto createJitModule1() {
   }
 
   {
-    auto &F = J->addFunction<double>("f2");
+    auto &F = J->addFunction<double(void)>("f2");
     F.beginFunction();
     {
       Var &C = F.defVar<double>(2.0);
@@ -55,7 +55,7 @@ auto createJitModule1() {
   }
 
   {
-    auto &F = J->addFunction<double, double, double>("f3");
+    auto &F = J->addFunction<double(double, double)>("f3");
     F.beginFunction();
     {
       auto [X, C] = F.getArgs();
