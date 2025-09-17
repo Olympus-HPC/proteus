@@ -246,32 +246,42 @@ std::enable_if_t<std::is_void_v<RetT>, void> FuncBase::call(StringRef Name) {
   IRB.CreateCall(Callee);
 }
 
-template <typename RetT, typename... ArgVarTs>
+template <typename RetT, typename... ArgT>
 std::enable_if_t<!std::is_void_v<RetT>, Var &>
-FuncBase::call(StringRef Name, ArgVarTs &...Args) {
+FuncBase::call(StringRef Name, std::initializer_list<std::reference_wrapper<Var>> Args) {
   auto *F = getFunction();
   Module &M = *F->getParent();
   LLVMContext &Ctx = F->getContext();
 
   FunctionCallee Callee = M.getOrInsertFunction(Name, TypeMap<RetT>::get(Ctx),
-                                                TypeMap<ArgVarTs>::get(Ctx)...);
+                                                TypeMap<ArgT>::get(Ctx)...);
   Var &Ret = declVarInternal("ret", TypeMap<RetT>::get(Ctx));
-  auto *Call = IRB.CreateCall(Callee, {Args.getValue()...});
+  std::vector<Value *> Vals;
+  Vals.reserve(Args.size());
+  for (auto &Arg : Args) {
+    Vals.push_back(Arg.get().getValue());
+  }
+  auto *Call = IRB.CreateCall(Callee, Vals);
   Ret.storeValue(Call);
 
   return Ret;
 }
 
-template <typename RetT, typename... ArgVarTs>
+template <typename RetT, typename... ArgT>
 std::enable_if_t<std::is_void_v<RetT>, void> FuncBase::call(StringRef Name,
-                                                            ArgVarTs &...Args) {
+                                                            std::initializer_list<std::reference_wrapper<Var>> Args) {
   auto *F = getFunction();
   Module &M = *F->getParent();
   LLVMContext &Ctx = F->getContext();
 
   FunctionCallee Callee = M.getOrInsertFunction(Name, TypeMap<RetT>::get(Ctx),
-                                                TypeMap<ArgVarTs>::get(Ctx)...);
-  IRB.CreateCall(Callee, {Args.getValue()...});
+                                                TypeMap<ArgT>::get(Ctx)...);
+  std::vector<Value *> Vals;
+  Vals.reserve(Args.size());
+  for (auto &Arg : Args) {
+    Vals.push_back(Arg.get().getValue());
+  }
+  IRB.CreateCall(Callee, Vals);
 }
 
 template <typename RetT, typename... ArgT>

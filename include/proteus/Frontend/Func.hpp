@@ -188,12 +188,12 @@ public:
   template <typename RetT, typename... ArgT>
   std::enable_if_t<std::is_void_v<RetT>, void> call(StringRef Name);
 
-  template <typename RetT, typename... ArgVarTs>
+  template <typename RetT, typename... ArgT>
   std::enable_if_t<!std::is_void_v<RetT>, Var &> call(StringRef Name,
-                                                      ArgVarTs &...Args);
-  template <typename RetT, typename... ArgVarTs>
+                                                      std::initializer_list<std::reference_wrapper<Var>> Args);
+  template <typename RetT, typename... ArgT>
   std::enable_if_t<std::is_void_v<RetT>, void> call(StringRef Name,
-                                                    ArgVarTs &...Args);
+                                                    std::initializer_list<std::reference_wrapper<Var>> Args);
 
   template <typename BuiltinFuncT>
   decltype(auto) callBuiltin(BuiltinFuncT &&BuiltinFunc) {
