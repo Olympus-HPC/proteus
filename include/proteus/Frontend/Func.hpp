@@ -30,11 +30,12 @@ template <typename RetT_, typename... ArgT> struct FnSig<RetT_(ArgT...)> {
   using RetT = RetT_;
 };
 
-  template <typename RetT, typename... ArgT>
-  static FunctionCallee getFunctionCallee(Module &M, LLVMContext &Ctx, StringRef Name, ArgTypeList<ArgT...>) {
-    return M.getOrInsertFunction(Name, TypeMap<RetT>::get(Ctx),
-                                  TypeMap<ArgT>::get(Ctx)...);
-  }
+template <typename RetT, typename... ArgT>
+static FunctionCallee getFunctionCallee(Module &M, LLVMContext &Ctx,
+                                        StringRef Name, ArgTypeList<ArgT...>) {
+  return M.getOrInsertFunction(Name, TypeMap<RetT>::get(Ctx),
+                               TypeMap<ArgT>::get(Ctx)...);
+}
 
 using namespace llvm;
 

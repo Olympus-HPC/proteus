@@ -66,7 +66,8 @@ auto createJitModuleSpecial(float _b1, float _b2, float _eps, float _grad_scale,
                             float _step_size, int _time_step,
                             size_t _vector_size, int _mode, float _decay) {
   auto J = std::make_unique<JitModule>(TARGET);
-  auto KernelHandle = J->addKernel<void(float *, float *, float *, float *)>("adam");
+  auto KernelHandle =
+      J->addKernel<void(float *, float *, float *, float *)>("adam");
   auto &F = KernelHandle.F;
   auto [p, m, v, g] = F.getArgs();
 

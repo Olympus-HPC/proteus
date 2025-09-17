@@ -15,9 +15,9 @@ int main() {
   proteus::init();
 
   auto J = proteus::JitModule();
-  auto &F = J.addFunction<void(double *, double *, double *, double *,
-                          double *, double *, double *, double *, double *,
-                          double *, double *, double *)>("operators");
+  auto &F = J.addFunction<void(double *, double *, double *, double *, double *,
+                               double *, double *, double *, double *, double *,
+                               double *, double *)>("operators");
   auto &Arg0 = F.getArg(0);
   auto &Arg1 = F.getArg(1);
   auto &Arg2 = F.getArg(2);

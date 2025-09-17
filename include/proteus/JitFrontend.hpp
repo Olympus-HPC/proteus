@@ -147,8 +147,7 @@ public:
   JitModule(JitModule &&) = delete;
   JitModule &operator=(JitModule &&) = delete;
 
-  template <typename Sig>
-  auto &addFunction(StringRef Name) {
+  template <typename Sig> auto &addFunction(StringRef Name) {
     using RetT = typename FnSig<Sig>::RetT;
     using ArgT = typename FnSig<Sig>::ArgsTList;
 
@@ -242,14 +241,13 @@ public:
 };
 
 template <typename Sig>
-std::enable_if_t<
-    !std::is_void_v<typename FnSig<Sig>::RetT>, Var &>
+std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, Var &>
 FuncBase::call(StringRef Name) {
   using RetT = typename FnSig<Sig>::RetT;
   auto *F = getFunction();
   Module &M = *F->getParent();
   LLVMContext &Ctx = F->getContext();
-  
+
   using RetT = typename FnSig<Sig>::RetT;
   using ArgT = typename FnSig<Sig>::ArgsTList;
   FunctionCallee Callee = getFunctionCallee<RetT>(M, Ctx, Name, ArgT{});
@@ -260,8 +258,7 @@ FuncBase::call(StringRef Name) {
 }
 
 template <typename Sig>
-std::enable_if_t<
-    std::is_void_v<typename FnSig<Sig>::RetT>, void>
+std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
 FuncBase::call(StringRef Name) {
   using RetT = typename FnSig<Sig>::RetT;
   auto *F = getFunction();
@@ -275,8 +272,7 @@ FuncBase::call(StringRef Name) {
 }
 
 template <typename Sig, typename... ArgVars>
-std::enable_if_t<
-    !std::is_void_v<typename FnSig<Sig>::RetT>, Var &>
+std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, Var &>
 FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
   auto *F = getFunction();
   Module &M = *F->getParent();
@@ -293,8 +289,7 @@ FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
 }
 
 template <typename Sig, typename... ArgVars>
-std::enable_if_t<
-    std::is_void_v<typename FnSig<Sig>::RetT>, void>
+std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
 FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
   auto *F = getFunction();
   Module &M = *F->getParent();
