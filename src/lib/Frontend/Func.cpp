@@ -7,6 +7,16 @@ FuncBase::FuncBase(JitModule &J, FunctionCallee FC)
   Function *F = cast<Function>(FC.getCallee());
   BasicBlock::Create(F->getContext(), "entry", F);
   Name = F->getName();
+
+  // Clang enables the 'contract' rewrite rule by default to enable FMA
+  // instructions.
+  // (Controllable via the '-ffp-contract' flag.)
+  // Without this, PJ-DSL performance does not match JIT frontends
+  // that use FMA instructions.
+  // TODO: Make such things configurable.
+  FastMathFlags FMF;
+  FMF.setAllowContract(true);
+  IRB.setFastMathFlags(FMF);
 }
 
 IRBuilderBase &FuncBase::getIRBuilder() {
@@ -18,7 +28,15 @@ IRBuilderBase &FuncBase::getIRBuilder() {
 Var &FuncBase::declVarInternal(StringRef Name, Type *Ty,
                                Type *PointerElemType) {
   auto *Alloca = emitAlloca(Ty, Name);
-  return Variables.emplace_back(Alloca, *this, PointerElemType);
+
+  if (PointerElemType) {
+    Variables.emplace_back(
+        std::make_unique<PointerVar>(Alloca, *this, PointerElemType));
+    return *Variables.back();
+  }
+
+  Variables.emplace_back(std::make_unique<ScalarVar>(Alloca, *this));
+  return *Variables.back();
 }
 
 void FuncBase::beginFunction(const char *File, int Line) {
@@ -64,18 +82,48 @@ Function *FuncBase::getFunction() {
   return F;
 }
 
-Var &FuncBase::getArg(unsigned int ArgNo) { return Arguments.at(ArgNo); }
+Var &FuncBase::getArg(unsigned int ArgNo) { return *Arguments.at(ArgNo); }
 
-AllocaInst *FuncBase::emitAlloca(Type *Ty, StringRef Name) {
+AllocaInst *FuncBase::emitAlloca(Type *Ty, StringRef Name, AddressSpace AS) {
   auto SaveIP = IRB.saveIP();
   Function *F = getFunction();
   auto AllocaIP = IRBuilderBase::InsertPoint(&F->getEntryBlock(),
                                              F->getEntryBlock().begin());
   IRB.restoreIP(AllocaIP);
-  auto *Alloca = IRB.CreateAlloca(Ty, nullptr, Name);
+  auto *Alloca = IRB.CreateAlloca(Ty, static_cast<unsigned>(AS), nullptr, Name);
 
   IRB.restoreIP(SaveIP);
   return Alloca;
+}
+
+Value *FuncBase::emitArrayCreate(Type *Ty, AddressSpace AT, StringRef Name) {
+  if (!Ty || !Ty->isArrayTy())
+    PROTEUS_FATAL_ERROR("Expected LLVM ArrayType for emitArrayCreate");
+
+  auto *ArrTy = cast<ArrayType>(Ty);
+
+  switch (AT) {
+  case AddressSpace::SHARED:
+  case AddressSpace::GLOBAL: {
+    Module *M = getFunction()->getParent();
+    auto *GV = new GlobalVariable(
+        *M, ArrTy, /*isConstant=*/false, GlobalValue::InternalLinkage,
+        UndefValue::get(ArrTy), Name, /*InsertBefore=*/nullptr,
+        GlobalValue::NotThreadLocal, static_cast<unsigned>(AT),
+        /*ExternallyInitialized=*/false);
+
+    return GV;
+  }
+  case AddressSpace::DEFAULT:
+  case AddressSpace::LOCAL: {
+    auto *Alloca = emitAlloca(ArrTy, Name, AT);
+    return Alloca;
+  }
+  case AddressSpace::CONSTANT:
+    PROTEUS_FATAL_ERROR("Constant arrays are not supported");
+  default:
+    PROTEUS_FATAL_ERROR("Unsupported AddressSpace");
+  }
 }
 
 void FuncBase::ret(std::optional<std::reference_wrapper<Var>> OptRet) {
@@ -87,7 +135,7 @@ void FuncBase::ret(std::optional<std::reference_wrapper<Var>> OptRet) {
   if (OptRet == std::nullopt) {
     IRB.CreateRetVoid();
   } else {
-    auto *RetAlloca = OptRet->get().Alloca;
+    auto *RetAlloca = OptRet->get().getAlloca();
     auto *Ret = IRB.CreateLoad(RetAlloca->getAllocatedType(), RetAlloca);
     IRB.CreateRet(Ret);
   }
@@ -114,8 +162,8 @@ void FuncBase::beginIf(Var &CondVar, const char *File, int Line) {
   CurBlock->getTerminator()->eraseFromParent();
   IRB.SetInsertPoint(CurBlock);
   {
-    Value *Cond =
-        IRB.CreateLoad(CondVar.Alloca->getAllocatedType(), CondVar.Alloca);
+    Value *Cond = IRB.CreateLoad(CondVar.getAlloca()->getAllocatedType(),
+                                 CondVar.getAlloca());
     IRB.CreateCondBr(Cond, ThenBlock, ExitBlock);
   }
 
@@ -182,8 +230,8 @@ void FuncBase::beginFor(Var &IterVar, Var &Init, Var &UpperBound, Var &Inc,
   IRB.SetInsertPoint(LoopCond);
   {
     auto &CondVar = IterVar < UpperBound;
-    Value *Cond =
-        IRB.CreateLoad(CondVar.Alloca->getAllocatedType(), CondVar.Alloca);
+    Value *Cond = IRB.CreateLoad(CondVar.getAlloca()->getAllocatedType(),
+                                 CondVar.getAlloca());
     IRB.CreateCondBr(Cond, Body, LoopExit);
   }
 

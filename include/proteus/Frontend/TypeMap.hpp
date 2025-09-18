@@ -24,14 +24,38 @@ template <> struct TypeMap<float> {
   static Type *getPointerElemType(llvm::LLVMContext &) { return nullptr; }
 };
 
+template <> struct TypeMap<float[]> {
+  static Type *get(llvm::LLVMContext &Ctx, size_t NElem) {
+    return ArrayType::get(Type::getFloatTy(Ctx), NElem);
+  }
+
+  static Type *getPointerElemType(llvm::LLVMContext &) { return nullptr; }
+};
+
 template <> struct TypeMap<double> {
   static Type *get(llvm::LLVMContext &Ctx) { return Type::getDoubleTy(Ctx); }
 
   static Type *getPointerElemType(llvm::LLVMContext &) { return nullptr; }
 };
 
+template <> struct TypeMap<double[]> {
+  static Type *get(llvm::LLVMContext &Ctx, size_t NElem) {
+    return ArrayType::get(Type::getDoubleTy(Ctx), NElem);
+  }
+
+  static Type *getPointerElemType(llvm::LLVMContext &) { return nullptr; }
+};
+
 template <> struct TypeMap<size_t> {
   static Type *get(llvm::LLVMContext &Ctx) { return Type::getInt64Ty(Ctx); }
+
+  static Type *getPointerElemType(llvm::LLVMContext &) { return nullptr; }
+};
+
+template <> struct TypeMap<size_t[]> {
+  static Type *get(llvm::LLVMContext &Ctx, size_t NElem) {
+    return ArrayType::get(Type::getInt64Ty(Ctx), NElem);
+  }
 
   static Type *getPointerElemType(llvm::LLVMContext &) { return nullptr; }
 };
@@ -44,12 +68,28 @@ template <> struct TypeMap<int> {
   static bool isSigned() { return true; }
 };
 
+template <> struct TypeMap<int[]> {
+  static Type *get(llvm::LLVMContext &Ctx, size_t NElem) {
+    return ArrayType::get(Type::getInt32Ty(Ctx), NElem);
+  }
+
+  static Type *getPointerElemType(llvm::LLVMContext &) { return nullptr; }
+};
+
 template <> struct TypeMap<unsigned int> {
   static Type *get(llvm::LLVMContext &Ctx) { return Type::getInt32Ty(Ctx); }
 
   static Type *getPointerElemType(llvm::LLVMContext &) { return nullptr; }
 
   static bool isSigned() { return false; }
+};
+
+template <> struct TypeMap<unsigned int[]> {
+  static Type *get(llvm::LLVMContext &Ctx, size_t NElem) {
+    return ArrayType::get(Type::getInt32Ty(Ctx), NElem);
+  }
+
+  static Type *getPointerElemType(llvm::LLVMContext &) { return nullptr; }
 };
 
 template <> struct TypeMap<int *> {
@@ -74,6 +114,14 @@ template <> struct TypeMap<unsigned int *> {
 
 template <> struct TypeMap<bool> {
   static Type *get(llvm::LLVMContext &Ctx) { return Type::getInt1Ty(Ctx); }
+
+  static Type *getPointerElemType(llvm::LLVMContext &) { return nullptr; }
+};
+
+template <> struct TypeMap<bool[]> {
+  static Type *get(llvm::LLVMContext &Ctx, size_t NElem) {
+    return ArrayType::get(Type::getInt1Ty(Ctx), NElem);
+  }
 
   static Type *getPointerElemType(llvm::LLVMContext &) { return nullptr; }
 };
