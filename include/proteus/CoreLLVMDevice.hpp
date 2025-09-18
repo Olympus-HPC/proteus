@@ -255,17 +255,12 @@ inline void relinkGlobalsObject(
 }
 
 inline void specializeIR(
-    Module &M, StringRef FnName,
-    [[maybe_unused]] const std::string &HashValueStr, StringRef Suffix,
-    dim3 &BlockDim, dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
+    Module &M, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
+    dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
     const SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo,
     bool SpecializeArgs, bool SpecializeDims, bool SpecializeLaunchBounds) {
   Timer T;
   Function *F = M.getFunction(FnName);
-
-#if PROTEUS_ENABLE_DEBUG
-  PROTEUS_DBG(Logger::logfile(HashValueStr + ".input.ll", M));
-#endif
 
   assert(F && "Expected non-null function!");
   // Replace argument uses with runtime constants.
@@ -309,7 +304,6 @@ inline void specializeIR(
 
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                        << "specializeIR " << T.elapsed() << " ms\n");
-  PROTEUS_DBG(Logger::logfile(HashValueStr + ".specialized.ll", M));
 }
 
 } // namespace proteus

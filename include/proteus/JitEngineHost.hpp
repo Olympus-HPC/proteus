@@ -47,7 +47,6 @@ public:
                ArrayRef<RuntimeConstant> RCArray);
 
   void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
-                    const std::string &HashValueStr,
                     ArrayRef<RuntimeConstant> RCArray);
 
   void *compileAndLink(StringRef FnName, char *IR, int IRSize, void **Args,

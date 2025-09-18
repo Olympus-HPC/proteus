@@ -50,6 +50,7 @@
 #include <llvm/Transforms/IPO/Internalize.h>
 #include <llvm/Transforms/Utils/Cloning.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
+
 #include "proteus/Cloning.h"
 #include "proteus/CompilerAsync.hpp"
 #include "proteus/CompilerInterfaceTypes.h"
