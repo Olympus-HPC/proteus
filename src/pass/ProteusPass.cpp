@@ -283,8 +283,7 @@ private:
     SmallVector<char> Bitcode;
     raw_svector_ostream OS(Bitcode);
     WriteBitcodeToFile(EmbedM, OS);
-    // llvm::outs () << "MODULE " << M << "\n";
-    // llvm::outs() << EmbedM << "\n";
+
     HashT HashValue = hash(StringRef{Bitcode.data(), Bitcode.size()});
 
     std::string GVName = "_jit_bitcode_" + Id.str() +

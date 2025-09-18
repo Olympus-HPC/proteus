@@ -134,14 +134,14 @@ JitEngineHost::~JitEngineHost() {
 }
 
 void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
-                                 [[maybe_unused]] HashT HashValue,
+                                 [[maybe_unused]] const std::string& HashValueStr,
                                  ArrayRef<RuntimeConstant> RCArray) {
   TIMESCOPE("specializeIR");
   Function *F = M.getFunction(FnName);
   assert(F && "Expected non-null function!");
 
 #if PROTEUS_ENABLE_DEBUG
-  PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".input.ll", M));
+  PROTEUS_DBG(Logger::logfile(HashValueStr + ".input.ll", M));
 #endif
 
   // Replace argument uses with runtime constants.
@@ -173,7 +173,7 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
   F->setName(FnName + Suffix);
 
 #if PROTEUS_ENABLE_DEBUG
-  Logger::logfile(HashValue.toString() + ".specialized.ll", M);
+  Logger::logfile(HashValueStr + ".specialized.ll", M);
   if (verifyModule(M, &errs()))
     PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
   else
@@ -249,7 +249,7 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
     loadCompiledLibrary(*Library);
   } else {
     // Specialize the module using runtime values.
-    specializeIR(*M, FnName, Suffix, HashValue, RCVec);
+    specializeIR(*M, FnName, Suffix, HashValue.toString(), RCVec);
     // Compile the object.
     auto ObjectModule = compileOnly(*M);
 

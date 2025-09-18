@@ -50,7 +50,6 @@
 #include <llvm/Transforms/IPO/Internalize.h>
 #include <llvm/Transforms/Utils/Cloning.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
-
 #include "proteus/Cloning.h"
 #include "proteus/CompilerAsync.hpp"
 #include "proteus/CompilerInterfaceTypes.h"
@@ -296,11 +295,11 @@ public:
                            << toString(Config::get().ProteusKernelClone) << " "
                            << T.elapsed() << " ms\n");
     }
+
     // Internalize and cleanup to simplify the module and prepare it for
     // optimization.
     internalize(*KernelModule, KernelName);
     proteus::runCleanupPassPipeline(*KernelModule);
-    // llvm::outs() << "MODULE AFTER INTERNALIZE AND CLEANUP " << *KernelModule << "\n";
 
     // If the module is not in the provided context due to cloning, roundtrip it
     // using bitcode. Re-use the roundtrip bitcode to return it.

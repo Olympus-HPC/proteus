@@ -111,9 +111,10 @@ public:
 
     std::string KernelMangled = (KernelName + Suffix);
 
-    proteus::specializeIR(*M, KernelName, HashValue, Suffix, BlockDim, GridDim,
-                          RCVec, LambdaCalleeInfo, SpecializeArgs,
-                          SpecializeDims, SpecializeLaunchBounds);
+    proteus::specializeIR(*M, KernelName, HashValue.toString(), Suffix,
+                          BlockDim, GridDim, RCVec, LambdaCalleeInfo,
+                          SpecializeArgs, SpecializeDims,
+                          SpecializeLaunchBounds);
 
     replaceGlobalVariablesWithPointers(*M, VarNameToDevPtr);
 
