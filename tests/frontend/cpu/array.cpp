@@ -11,7 +11,7 @@ using namespace proteus;
 int main() {
   auto J = proteus::JitModule("host");
 
-  auto &F = J.addFunction<void, double *, double *>("arrays_test");
+  auto &F = J.addFunction<void(double *, double *)>("arrays_test");
 
   F.beginFunction();
   {

@@ -16,7 +16,7 @@ int main() {
 
   // Add a function with the signature:
   //  void add_vectors(double *A, double *B, size_t N)
-  auto &F = J.addFunction<void, double *, double *, size_t>("add_vectors");
+  auto &F = J.addFunction<void(double *, double *, size_t)>("add_vectors");
 
   // Begin the function body.
   F.beginFunction();

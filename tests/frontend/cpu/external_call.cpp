@@ -13,28 +13,36 @@
 
 extern "C" {
 void hello() { std::cout << "Hello!\n"; }
+int add(int A, int B) { return A + B; }
 }
 
 int main() {
   proteus::init();
 
   auto J = proteus::JitModule();
-  auto &F = J.addFunction<void>("ExternalCall");
+  auto &F = J.addFunction<int(void)>("ExternalCall");
   F.beginFunction();
-  { F.call<void>("hello"); }
-  F.ret();
+  {
+    F.call<void(void)>("hello");
+    auto &V1 = F.defVar<int>(22);
+    auto &V2 = F.defVar<int>(20);
+    auto &V3 = F.call<int(int, int)>("add", V1, V2);
+    F.ret(V3);
+  }
   F.endFunction();
 
   J.print();
   J.compile();
 
-  F();
+  int V = F();
+  std::cout << "V " << V << "\n";
 
   proteus::finalize();
   return 0;
 }
 
 // clang-format off
-//CHECK: Hello!
+// CHECK: Hello!
+// CHECK-NEXT: V 42
 // CHECK-FIRST: JitStorageCache hits 0 total 1
 // CHECK-SECOND: JitStorageCache hits 1 total 1

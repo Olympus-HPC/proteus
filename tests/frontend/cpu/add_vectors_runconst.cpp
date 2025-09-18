@@ -16,7 +16,7 @@ auto createJitFunction(size_t N) {
 
   // Add a function with the signature: void add_vectors(double *A, double *B)
   // using the vector size N as a runtime constant.
-  auto &F = J->addFunction<void, double *, double *>("add_vectors");
+  auto &F = J->addFunction<void(double *, double *)>("add_vectors");
 
   // Begin the function body.
   F.beginFunction();

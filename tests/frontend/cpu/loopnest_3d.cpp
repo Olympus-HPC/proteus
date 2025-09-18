@@ -13,7 +13,7 @@
 static auto get3DLoopNestFunction(int DI, int DJ, int DK, int TileI, int TileJ,
                                   int TileK) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
-  auto &F = JitMod->addFunction<void, double *, double *>("loopnest_3d");
+  auto &F = JitMod->addFunction<void(double *, double *)>("loopnest_3d");
 
   auto &I = F.declVar<int>("i");
   auto &J = F.declVar<int>("j");
@@ -61,7 +61,7 @@ static auto get3DLoopNestFunction(int DI, int DJ, int DK, int TileI, int TileJ,
 static auto get3DUniformTileFunction(int DI, int DJ, int DK, int TileSize) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
   auto &F =
-      JitMod->addFunction<void, double *, double *>("loopnest_3d_uniform");
+      JitMod->addFunction<void(double *, double *)>("loopnest_3d_uniform");
 
   auto &I = F.declVar<int>("i");
   auto &J = F.declVar<int>("j");

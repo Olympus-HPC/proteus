@@ -28,7 +28,8 @@ int main() {
 
   // Add a kernel with the signature: void add_vectors(double *A, double *B,
   // size_t N)
-  auto KernelHandle = J.addKernel<double *, double *, size_t>("add_vectors");
+  auto KernelHandle =
+      J.addKernel<void(double *, double *, size_t)>("add_vectors");
   auto &F = KernelHandle.F;
 
   // Begin the function body.
