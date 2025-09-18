@@ -139,10 +139,6 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
   Function *F = M.getFunction(FnName);
   assert(F && "Expected non-null function!");
 
-#if PROTEUS_ENABLE_DEBUG
-  PROTEUS_DBG(Logger::logfile(FnName.str() + ".input.ll", M));
-#endif
-
   // Replace argument uses with runtime constants.
   // TODO: change NumRuntimeConstants to size_t at interface.
   MDNode *Node = F->getMetadata("jit_arg_nos");
@@ -172,7 +168,6 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
   F->setName(FnName + Suffix);
 
 #if PROTEUS_ENABLE_DEBUG
-  Logger::logfile(FnName.str() + ".specialized.ll", M);
   if (verifyModule(M, &errs()))
     PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
   else
@@ -247,8 +242,10 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   if ((Library = StorageCache.lookup(HashValue))) {
     loadCompiledLibrary(*Library);
   } else {
+    PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".input.ll", *M));
     // Specialize the module using runtime values.
     specializeIR(*M, FnName, Suffix, RCVec);
+    PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".specialized.ll", *M));
     // Compile the object.
     auto ObjectModule = compileOnly(*M);
 

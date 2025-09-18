@@ -265,10 +265,6 @@ inline void specializeIR(
   Timer T;
   Function *F = M.getFunction(FnName);
 
-#if PROTEUS_ENABLE_DEBUG
-  PROTEUS_DBG(Logger::logfile(FnName.str() + ".input.ll", M));
-#endif
-
   assert(F && "Expected non-null function!");
   // Replace argument uses with runtime constants.
   if (SpecializeArgs)
@@ -312,7 +308,6 @@ inline void specializeIR(
 
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                        << "specializeIR " << T.elapsed() << " ms\n");
-  PROTEUS_DBG(Logger::logfile(FnName.str() + ".specialized.ll", M));
 }
 
 } // namespace proteus
