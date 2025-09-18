@@ -3,6 +3,9 @@
 #include "proteus/Frontend/Func.hpp"
 #include "proteus/Frontend/TypeMap.hpp"
 
+#include <llvm/ADT/ArrayRef.h>
+#include <llvm/ADT/SmallVector.h>
+
 namespace proteus {
 
 template <typename IntOp, typename FPOp>
@@ -108,6 +111,30 @@ Var &Var::operator%(const Var &Other) const {
       *this, Other,
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSRem(L, R); },
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFRem(L, R); });
+}
+
+Var &Var::operator!() const {
+  FuncBase &FnRef = Fn;
+  Function *F = FnRef.getFunction();
+  auto &IRB = FnRef.getIRBuilder();
+
+  Type *ValTy = getValueType();
+  Type *BoolTy = Type::getInt1Ty(F->getContext());
+  Var &ResultVar = FnRef.declVarInternal("res.", BoolTy);
+
+  Value *Val = getValue();
+  Value *Result = nullptr;
+
+  if (ValTy->isIntegerTy()) {
+    Result = IRB.CreateICmpEQ(Val, ConstantInt::get(ValTy, 0));
+  } else if (ValTy->isFloatingPointTy()) {
+    Result = IRB.CreateFCmpOEQ(Val, ConstantFP::get(ValTy, 0.0));
+  } else {
+    PROTEUS_FATAL_ERROR("Unsupported type");
+  }
+
+  ResultVar.storeValue(Result);
+  return ResultVar;
 }
 
 Var &Var::operator+=(Var &Other) {
@@ -525,49 +552,83 @@ Type *getCommonType(const DataLayout &DL, Type *T1, Type *T2) {
   PROTEUS_FATAL_ERROR("Unsupported conversion types");
 }
 
-Var &powf(const Var &L, const Var &R) {
-  auto &Fn = L.Fn;
-  auto &M = *Fn.getFunction()->getParent();
-  auto &IRB = Fn.getIRBuilder();
+// this should be changed to parameter pack
+static Var &emitIntrinsic(StringRef IntrinsicName, Type *ResultType,
+                          ArrayRef<const Var *> Operands) {
+  if (Operands.empty())
+    PROTEUS_FATAL_ERROR("Intrinsic requires at least one operand");
 
-  auto *ResultType = IRB.getFloatTy();
+  FuncBase &Fn = Operands.front()->Fn;
+  for (const Var *Operand : Operands) {
+    if (&Operand->Fn != &Fn)
+      PROTEUS_FATAL_ERROR("Variables should belong to the same function");
+  }
+
+  auto &IRB = Fn.getIRBuilder();
+  auto &M = *Fn.getFunction()->getParent();
+
   Var &ResultVar = Fn.declVarInternal("res.", ResultType);
 
-#if PROTEUS_ENABLE_CUDA
-  std::string IntrinsicName = "__nv_powf";
-#else
-  std::string IntrinsicName = "llvm.pow.f32";
-#endif
+  llvm::SmallVector<Value *, 4> Arguments;
+  Arguments.reserve(Operands.size());
+  llvm::SmallVector<Type *, 4> ParamTypes;
+  ParamTypes.reserve(Operands.size());
 
-  FunctionCallee Callee =
-      M.getOrInsertFunction(IntrinsicName, ResultType, ResultType, ResultType);
-  auto *Call = IRB.CreateCall(Callee, {convert(IRB, L.getValue(), ResultType),
-                                       convert(IRB, R.getValue(), ResultType)});
+  for (const Var *Operand : Operands) {
+    Arguments.push_back(convert(IRB, Operand->getValue(), ResultType));
+    ParamTypes.push_back(ResultType);
+  }
+
+  auto *FunctionTy = FunctionType::get(ResultType, ParamTypes, false);
+  FunctionCallee Callee = M.getOrInsertFunction(IntrinsicName, FunctionTy);
+  Value *Call = IRB.CreateCall(Callee, Arguments);
   ResultVar.storeValue(Call);
 
   return ResultVar;
 }
 
-Var &sqrtf(const Var &R) {
-  auto &Fn = R.Fn;
-  auto &M = *Fn.getFunction()->getParent();
-  auto &IRB = Fn.getIRBuilder();
-
-  auto *ResultType = IRB.getFloatTy();
-  Var &ResultVar = Fn.declVarInternal("res.", ResultType);
-
+Var &powf(const Var &L, const Var &R) {
 #if PROTEUS_ENABLE_CUDA
-  std::string IntrinsicName = "__nv_sqrtf";
+  StringRef IntrinsicName = "__nv_powf";
 #else
-  std::string IntrinsicName = "llvm.sqrt.f32";
+  StringRef IntrinsicName = "llvm.pow.f32";
 #endif
 
-  FunctionCallee Callee =
-      M.getOrInsertFunction(IntrinsicName, ResultType, ResultType);
-  auto *Call = IRB.CreateCall(Callee, {R.getValue()});
-  ResultVar.storeValue(Call);
+  auto *ResultType = L.Fn.getIRBuilder().getFloatTy();
+  return emitIntrinsic(IntrinsicName, ResultType, {&L, &R});
+}
 
-  return ResultVar;
+Var &sqrtf(const Var &R) {
+#if PROTEUS_ENABLE_CUDA
+  StringRef IntrinsicName = "__nv_sqrtf";
+#else
+  StringRef IntrinsicName = "llvm.sqrt.f32";
+#endif
+
+  auto *ResultType = R.Fn.getIRBuilder().getFloatTy();
+  return emitIntrinsic(IntrinsicName, ResultType, {&R});
+}
+
+Var &expf(const Var &R) {
+#if PROTEUS_ENABLE_CUDA
+  StringRef IntrinsicName = "__nv_expf";
+#else
+  StringRef IntrinsicName = "llvm.exp.f32";
+#endif
+
+  auto *ResultType = R.Fn.getIRBuilder().getFloatTy();
+  return emitIntrinsic(IntrinsicName, ResultType, {&R});
+}
+
+Var &logf(const Var &R) {
+#if PROTEUS_ENABLE_CUDA
+  StringRef IntrinsicName = "__nv_logf";
+#else
+  StringRef IntrinsicName = "llvm.log.f32";
+#endif
+
+  auto *ResultType = R.Fn.getIRBuilder().getFloatTy();
+  return emitIntrinsic(IntrinsicName, ResultType, {&R});
 }
 
 Var &min(const Var &L, const Var &R) {

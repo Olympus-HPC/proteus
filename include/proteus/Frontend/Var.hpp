@@ -56,6 +56,8 @@ struct Var {
   Var &operator/(const Var &Other) const;
   Var &operator%(const Var &Other) const;
 
+  Var &operator!() const;
+
   template <typename T>
   std::enable_if_t<std::is_arithmetic_v<T>, Var &>
   operator+(const T &ConstValue) const;
@@ -166,6 +168,8 @@ Type *getCommonType(const DataLayout &DL, Type *T1, Type *T2);
 // Declare intrinsic math functions.
 Var &powf(const Var &L, const Var &R);
 Var &sqrtf(const Var &R);
+Var &expf(const Var &R);
+Var &logf(const Var &R);
 Var &min(const Var &L, const Var &R);
 
 struct ScalarVar final : Var {
