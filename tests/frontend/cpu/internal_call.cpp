@@ -14,30 +14,42 @@ using namespace proteus;
 auto createJitModule1() {
   auto J = std::make_unique<JitModule>("host");
 
-  auto &F1 = J->addFunction<void, double *>("f1");
+  auto &F1 = J->addFunction<void(double *)>("f1");
   {
     F1.beginFunction();
     {
       auto [V] = F1.getArgs();
 
-      Var &Ret = F1.call<double>("f2");
-      V[0] = Ret;
+      Var &X = F1.defVar<double>(21);
+      Var &C = F1.call<double(void)>("f2");
+      Var &Res = F1.call<double(double, double)>("f3", X, C);
+      V[0] = Res;
 
       F1.ret();
     }
     F1.endFunction();
   }
 
-  auto &F2 = J->addFunction<double>("f2");
+  auto &F2 = J->addFunction<double(void)>("f2");
   {
     F2.beginFunction();
     {
-      Var &V = F2.declVar<double>();
-      V = 42;
-
-      F2.ret(V);
+      Var &C = F2.defVar<double>(2.0);
+      F2.ret(C);
     }
     F2.endFunction();
+  }
+
+  auto &F3 = J->addFunction<double(double, double)>("f3");
+  {
+    F3.beginFunction();
+    {
+      auto [X, C] = F3.getArgs();
+      Var &P = F3.declVar<double>();
+      P = X * C;
+      F3.ret(P);
+    }
+    F3.endFunction();
   }
 
   return std::make_tuple(std::move(J), std::ref(F1), std::ref(F2));

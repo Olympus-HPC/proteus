@@ -26,7 +26,7 @@ int main() {
   auto J = proteus::JitModule(TARGET);
 
   auto KernelHandle =
-      J.addKernel<double *, double *, double *, size_t, size_t, size_t>(
+      J.addKernel<void(double *, double *, double *, size_t, size_t, size_t)>(
           "volume_add_3d");
   auto &F = KernelHandle.F;
 

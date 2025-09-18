@@ -14,7 +14,7 @@ using namespace proteus;
 auto createJitModule1() {
   auto J = std::make_unique<JitModule>("host");
 
-  auto &F1 = J->addFunction<void, double *>("f1");
+  auto &F1 = J->addFunction<void(double *)>("f1");
   {
     F1.beginFunction();
     {
@@ -26,7 +26,7 @@ auto createJitModule1() {
     F1.endFunction();
   }
 
-  auto &F2 = J->addFunction<void, double *>("f2");
+  auto &F2 = J->addFunction<void(double *)>("f2");
   {
 
     F2.beginFunction();
@@ -45,7 +45,7 @@ auto createJitModule1() {
 auto createJitModule2() {
   auto J = std::make_unique<JitModule>("host");
 
-  auto &F1 = J->addFunction<void, double *>("f1");
+  auto &F1 = J->addFunction<void(double *)>("f1");
   {
     F1.beginFunction();
     {
@@ -57,7 +57,7 @@ auto createJitModule2() {
     F1.endFunction();
   }
 
-  auto &F2 = J->addFunction<void, double *>("f2");
+  auto &F2 = J->addFunction<void(double *)>("f2");
   {
     F2.beginFunction();
     {
