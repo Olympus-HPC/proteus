@@ -635,6 +635,7 @@ JitEngineDevice<ImplT>::compileAndRun(
           /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy,
           /*SpecializeArgs*/ Config::get().ProteusSpecializeArgs,
           /*SpecializeDims*/ Config::get().ProteusSpecializeDims,
+          /*SpecializeDimsAssume*/ Config::get().ProteusSpecializeDimsAssume,
           /*SpecializeLaunchBounds=*/
           Config::get().ProteusSpecializeLaunchBounds,
           /*OptLevel*/ '3', // TODO: Add environment configuration option to
@@ -664,6 +665,7 @@ JitEngineDevice<ImplT>::compileAndRun(
         /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy,
         /*SpecializeArgs*/ Config::get().ProteusSpecializeArgs,
         /*SpecializeDims*/ Config::get().ProteusSpecializeDims,
+        /*SpecializeDimsAssume*/ Config::get().ProteusSpecializeDimsAssume,
         /*SpecializeLaunchBounds*/
         Config::get().ProteusSpecializeLaunchBounds,
         /*OptLevel*/ '3',      // TODO: Add environment configuration option to

@@ -32,6 +32,7 @@ private:
   bool RelinkGlobalsByCopy;
   bool SpecializeArgs;
   bool SpecializeDims;
+  bool SpecializeDimsAssume;
   bool SpecializeLaunchBounds;
   char OptLevel;
   unsigned CodegenOptLevel;
@@ -79,8 +80,8 @@ public:
       const SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
       const std::string &DeviceArch, CodegenOption CGOption, bool DumpIR,
       bool RelinkGlobalsByCopy, bool SpecializeArgs, bool SpecializeDims,
-      bool SpecializeLaunchBounds, char OptLevel, unsigned CodegenOptLevel,
-      const std::optional<std::string> &PassPipeline)
+      bool SpecializeDimsAssume, bool SpecializeLaunchBounds, char OptLevel,
+      unsigned CodegenOptLevel, const std::optional<std::string> &PassPipeline)
       : Bitcode(Bitcode), HashValue(HashValue), KernelName(KernelName),
         Suffix(Suffix), BlockDim(BlockDim), GridDim(GridDim), RCVec(RCVec),
         LambdaCalleeInfo(LambdaCalleeInfo), VarNameToDevPtr(VarNameToDevPtr),
@@ -88,6 +89,7 @@ public:
         CGOption(CGOption), DumpIR(DumpIR),
         RelinkGlobalsByCopy(RelinkGlobalsByCopy),
         SpecializeArgs(SpecializeArgs), SpecializeDims(SpecializeDims),
+        SpecializeDimsAssume(SpecializeDimsAssume),
         SpecializeLaunchBounds(SpecializeLaunchBounds), OptLevel(OptLevel),
         CodegenOptLevel(CodegenOptLevel), PassPipeline(PassPipeline) {}
 
@@ -113,7 +115,7 @@ public:
 
     proteus::specializeIR(*M, KernelName, Suffix, BlockDim, GridDim, RCVec,
                           LambdaCalleeInfo, SpecializeArgs, SpecializeDims,
-                          SpecializeLaunchBounds);
+                          SpecializeDimsAssume, SpecializeLaunchBounds);
 
     replaceGlobalVariablesWithPointers(*M, VarNameToDevPtr);
 
