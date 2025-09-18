@@ -481,6 +481,10 @@ private:
     proteus::setKernelDims(M, GridDim, BlockDim);
   }
 
+  void setKernelDimsAssume(Module &M, dim3 &GridDim, dim3 &BlockDim) {
+    proteus::setKernelDimsAssume(M, GridDim, BlockDim);
+  }
+
   DeviceError_t launchKernelFunction(KernelFunction_t KernelFunc, dim3 GridDim,
                                      dim3 BlockDim, void **KernelArgs,
                                      uint64_t ShmemSize,
@@ -631,6 +635,7 @@ JitEngineDevice<ImplT>::compileAndRun(
           /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy,
           /*SpecializeArgs*/ Config::get().ProteusSpecializeArgs,
           /*SpecializeDims*/ Config::get().ProteusSpecializeDims,
+          /*SpecializeDimsAssume*/ Config::get().ProteusSpecializeDimsAssume,
           /*SpecializeLaunchBounds=*/
           Config::get().ProteusSpecializeLaunchBounds,
           /*OptLevel*/ '3', // TODO: Add environment configuration option to
@@ -660,6 +665,7 @@ JitEngineDevice<ImplT>::compileAndRun(
         /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy,
         /*SpecializeArgs*/ Config::get().ProteusSpecializeArgs,
         /*SpecializeDims*/ Config::get().ProteusSpecializeDims,
+        /*SpecializeDimsAssume*/ Config::get().ProteusSpecializeDimsAssume,
         /*SpecializeLaunchBounds*/
         Config::get().ProteusSpecializeLaunchBounds,
         /*OptLevel*/ '3',      // TODO: Add environment configuration option to

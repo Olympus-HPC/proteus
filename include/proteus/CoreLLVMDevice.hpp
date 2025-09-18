@@ -75,7 +75,9 @@ inline void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
   ReplaceIntrinsicDim(detail::blockDimXFnName(), BlockDim.x);
   ReplaceIntrinsicDim(detail::blockDimYFnName(), BlockDim.y);
   ReplaceIntrinsicDim(detail::blockDimZFnName(), BlockDim.z);
+}
 
+inline void setKernelDimsAssume(Module &M, dim3 &GridDim, dim3 &BlockDim) {
   auto InsertAssume = [&](ArrayRef<StringRef> IntrinsicNames, int DimValue) {
     for (auto IntrinsicName : IntrinsicNames) {
       Function *IntrinsicFunction = M.getFunction(IntrinsicName);
@@ -258,7 +260,8 @@ inline void specializeIR(
     Module &M, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
     dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
     const SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo,
-    bool SpecializeArgs, bool SpecializeDims, bool SpecializeLaunchBounds) {
+    bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsAssume,
+    bool SpecializeLaunchBounds) {
   Timer T;
   Function *F = M.getFunction(FnName);
 
@@ -283,7 +286,8 @@ inline void specializeIR(
   // Replace uses of blockDim.* and gridDim.* with constants.
   if (SpecializeDims)
     setKernelDims(M, GridDim, BlockDim);
-
+  if (SpecializeDimsAssume)
+    setKernelDimsAssume(M, GridDim, BlockDim);
   F->setName(FnName + Suffix);
 
   if (SpecializeLaunchBounds) {
