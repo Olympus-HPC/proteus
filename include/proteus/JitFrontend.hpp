@@ -156,7 +156,7 @@ public:
           "The module is compiled, no further code can be added");
 
     Mod->setTargetTriple(TargetTriple);
-    FunctionCallee FC = getFunctionCallee<RetT>(*Mod, *Ctx, Name, ArgT{});
+    FunctionCallee FC = getFunctionCallee<RetT>(Name, ArgT{});
 
     Function *F = dyn_cast<Function>(FC.getCallee());
     if (!F)
@@ -182,7 +182,7 @@ public:
       PROTEUS_FATAL_ERROR("Expected a device module for addKernel");
 
     Mod->setTargetTriple(TargetTriple);
-    FunctionCallee FC = getFunctionCallee<void>(*Mod, *Ctx, Name, ArgT{});
+    FunctionCallee FC = getFunctionCallee<void>(Name, ArgT{});
     Function *F = dyn_cast<Function>(FC.getCallee());
     if (!F)
       PROTEUS_FATAL_ERROR("Unexpected");
@@ -237,6 +237,12 @@ public:
     return *Library;
   }
 
+  template <typename RetT, typename... ArgT>
+  FunctionCallee getFunctionCallee(StringRef Name, ArgTypeList<ArgT...>) {
+    return Mod->getOrInsertFunction(Name, TypeMap<RetT>::get(*Ctx),
+                                    TypeMap<ArgT>::get(*Ctx)...);
+  }
+
   void print() { Mod->print(outs(), nullptr); }
 };
 
@@ -245,12 +251,11 @@ std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, Var &>
 FuncBase::call(StringRef Name) {
   using RetT = typename FnSig<Sig>::RetT;
   auto *F = getFunction();
-  Module &M = *F->getParent();
   LLVMContext &Ctx = F->getContext();
 
   using RetT = typename FnSig<Sig>::RetT;
   using ArgT = typename FnSig<Sig>::ArgsTList;
-  FunctionCallee Callee = getFunctionCallee<RetT>(M, Ctx, Name, ArgT{});
+  FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
   auto *Call = IRB.CreateCall(Callee);
   Var &Ret = declVarInternal("ret", TypeMap<RetT>::get(Ctx));
   Ret.storeValue(Call);
@@ -261,13 +266,10 @@ template <typename Sig>
 std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
 FuncBase::call(StringRef Name) {
   using RetT = typename FnSig<Sig>::RetT;
-  auto *F = getFunction();
-  Module &M = *F->getParent();
-  LLVMContext &Ctx = F->getContext();
 
   using RetT = typename FnSig<Sig>::RetT;
   using ArgT = typename FnSig<Sig>::ArgsTList;
-  FunctionCallee Callee = getFunctionCallee<RetT>(M, Ctx, Name, ArgT{});
+  FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
   IRB.CreateCall(Callee);
 }
 
@@ -275,12 +277,11 @@ template <typename Sig, typename... ArgVars>
 std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, Var &>
 FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
   auto *F = getFunction();
-  Module &M = *F->getParent();
   LLVMContext &Ctx = F->getContext();
 
   using RetT = typename FnSig<Sig>::RetT;
   using ArgT = typename FnSig<Sig>::ArgsTList;
-  FunctionCallee Callee = getFunctionCallee<RetT>(M, Ctx, Name, ArgT{});
+  FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
   auto *Call = IRB.CreateCall(Callee, {ArgsVars.getValue()...});
 
   Var &Ret = declVarInternal("ret", TypeMap<RetT>::get(Ctx));
@@ -291,13 +292,10 @@ FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
 template <typename Sig, typename... ArgVars>
 std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
 FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
-  auto *F = getFunction();
-  Module &M = *F->getParent();
-  LLVMContext &Ctx = F->getContext();
-
   using RetT = typename FnSig<Sig>::RetT;
   using ArgT = typename FnSig<Sig>::ArgsTList;
-  FunctionCallee Callee = getFunctionCallee<RetT>(M, Ctx, Name, ArgT{});
+
+  FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
   IRB.CreateCall(Callee, {ArgsVars.getValue()...});
 }
 
