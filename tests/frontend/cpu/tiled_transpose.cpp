@@ -17,7 +17,7 @@
 static auto getTiled2DTransposeFunction(int ROWS, int COLS, int TileSize) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
   static int Counter = 0;
-  auto &F = JitMod->addFunction<void, double *, double *>(
+  auto &F = JitMod->addFunction<void(double *, double *)>(
       "tiled_transpose_" + std::to_string(Counter++));
 
   auto &I = F.declVar<int>("i");

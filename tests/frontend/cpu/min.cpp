@@ -17,7 +17,7 @@ int main() {
   proteus::init();
 
   auto J = JitModule();
-  auto &F = J.addFunction<void, float *, float *, float *, int *, int *, int *>(
+  auto &F = J.addFunction<void(float *, float *, float *, int *, int *, int *)>(
       "min_test");
 
   auto &Ff0 = F.getArg(0);

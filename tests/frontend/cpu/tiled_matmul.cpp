@@ -15,7 +15,7 @@
 static auto getTiledMatmulFunction(int N, int TileI, int TileJ, int TileK) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
   auto &F =
-      JitMod->addFunction<void, double *, double *, double *>("tiled_matmul");
+      JitMod->addFunction<void(double *, double *, double *)>("tiled_matmul");
   {
 
     auto Args = F.getArgs();

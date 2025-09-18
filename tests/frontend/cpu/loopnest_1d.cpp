@@ -12,7 +12,7 @@
 
 static auto get1DLoopNestFunction(int N, int TileSize) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
-  auto &F = JitMod->addFunction<void, double *, double *>("loopnest_1d");
+  auto &F = JitMod->addFunction<void(double *, double *)>("loopnest_1d");
 
   auto &I = F.declVar<int>("i");
   auto &IncOne = F.declVar<int>("inc");
@@ -43,7 +43,7 @@ static auto get1DLoopNestFunction(int N, int TileSize) {
 
 static auto get1DSimpleLoopNestFunction(int N) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
-  auto &F = JitMod->addFunction<void, double *, double *>("loopnest_1d_simple");
+  auto &F = JitMod->addFunction<void(double *, double *)>("loopnest_1d_simple");
 
   auto &I = F.declVar<int>("i");
   auto &IncOne = F.declVar<int>("inc");

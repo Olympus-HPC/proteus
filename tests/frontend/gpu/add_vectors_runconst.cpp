@@ -28,7 +28,7 @@ auto createJitKernel(size_t N) {
 
   // Add a kernel with the signature: void add_vectors(double *A, double *B)
   // using vector_size N as a runtime constant.
-  auto KernelHandle = J->addKernel<double *, double *>("add_vectors");
+  auto KernelHandle = J->addKernel<void(double *, double *)>("add_vectors");
   auto &F = KernelHandle.F;
 
   // Begin the function body.
