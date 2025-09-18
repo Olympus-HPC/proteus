@@ -133,9 +133,10 @@ JitEngineHost::~JitEngineHost() {
   StorageCache.printStats();
 }
 
-void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
-                                 [[maybe_unused]] const std::string& HashValueStr,
-                                 ArrayRef<RuntimeConstant> RCArray) {
+void JitEngineHost::specializeIR(
+    Module &M, StringRef FnName, StringRef Suffix,
+    [[maybe_unused]] const std::string &HashValueStr,
+    ArrayRef<RuntimeConstant> RCArray) {
   TIMESCOPE("specializeIR");
   Function *F = M.getFunction(FnName);
   assert(F && "Expected non-null function!");
