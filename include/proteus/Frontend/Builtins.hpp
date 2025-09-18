@@ -23,6 +23,8 @@ Var &getGridDimX(FuncBase &Fn);
 Var &getGridDimY(FuncBase &Fn);
 Var &getGridDimZ(FuncBase &Fn);
 
+void syncThreads(FuncBase &Fn);
+
 } // namespace gpu
 } // namespace builtins
 } // namespace proteus

@@ -42,7 +42,7 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int Tile) {
                     F.forLoop({J, Zero, UBJ, IncOne}),
                     F.forLoop({K, Zero, UBK, IncOne},
                               [&]() {
-                                auto Idx = I * DJ * DK + J * DK + K;
+                                auto &Idx = I * DJ * DK + J * DK + K;
                                 A[Idx] = I * 10000 + J * 100 + K;
                               }))
         .tile(Tile)
