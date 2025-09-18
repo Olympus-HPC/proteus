@@ -481,6 +481,10 @@ private:
     proteus::setKernelDims(M, GridDim, BlockDim);
   }
 
+  void setKernelDimsAssume(Module &M, dim3 &GridDim, dim3 &BlockDim) {
+    proteus::setKernelDimsAssume(M, GridDim, BlockDim);
+  }
+
   DeviceError_t launchKernelFunction(KernelFunction_t KernelFunc, dim3 GridDim,
                                      dim3 BlockDim, void **KernelArgs,
                                      uint64_t ShmemSize,

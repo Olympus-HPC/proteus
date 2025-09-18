@@ -120,6 +120,7 @@ public:
   bool ProteusSpecializeLaunchBounds;
   bool ProteusSpecializeArgs;
   bool ProteusSpecializeDims;
+  bool ProteusSpecializeDimsAssume;
   bool ProteusDisable;
   bool ProteusDumpLLVMIR;
   bool ProteusRelinkGlobalsByCopy;
@@ -147,12 +148,17 @@ private:
         getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS", true);
     ProteusCodegen = getEnvOrDefaultCG("PROTEUS_CODEGEN", CodegenOption::RTC);
 #if PROTEUS_ENABLE_CUDA
+    ProteusSpecializeDimsAssume =
+        getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS_ASSUME", false);
     if (ProteusCodegen != CodegenOption::RTC) {
       Logger::outs("proteus")
           << "Warning: Proteus supports only RTC compilation for CUDA, "
              "setting Codegen to RTC\n";
       ProteusCodegen = CodegenOption::RTC;
     }
+#else
+    ProteusSpecializeDimsAssume =
+        getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS_ASSUME", true);
 #endif
 #if PROTEUS_ENABLE_HIP
 #if LLVM_VERSION_MAJOR < 18
