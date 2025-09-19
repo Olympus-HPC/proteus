@@ -4,6 +4,8 @@ include(CMakeFindDependencyMacro)
 set(PROTEUS_LLVM_DIR "@LLVM_DIR@")
 find_dependency(LLVM REQUIRED CONFIG)
 
+file(REAL_PATH "${LLVM_DIR}" LLVM_DIR)
+
 if (NOT "${LLVM_DIR}" STREQUAL "${PROTEUS_LLVM_DIR}")
     message(FATAL_ERROR "Mismatch between target LLVM_DIR = ${LLVM_DIR} "
     "and Proteus LLVM_DIR = ${PROTEUS_LLVM_DIR}. "
