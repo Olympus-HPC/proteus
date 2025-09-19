@@ -11,7 +11,7 @@ if [ -z "${PROTEUS_CI_ROCM_VERSION}" ]; then
 fi
 echo "PROTEUS_CI_ROCM_VERSION ${PROTEUS_CI_ROCM_VERSION}"
 
-export LLVM_INSTALL_DIR=${ROCM_PATH}/llvm
+export LLVM_INSTALL_DIR=$(realpath ${ROCM_PATH}/llvm)
 if [ -z "${LLVM_INSTALL_DIR}" ]; then
     echo "Expected non-empty LLVM_INSTALL_DIR env var"
     exit 1
