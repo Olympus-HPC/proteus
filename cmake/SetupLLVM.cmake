@@ -3,9 +3,9 @@
 list(APPEND CMAKE_PREFIX_PATH "${LLVM_INSTALL_DIR}/lib/cmake/llvm/")
 list(APPEND CMAKE_PREFIX_PATH "${LLVM_INSTALL_DIR}/lib/cmake/clang/")
 set(LLVM_DIR "${LLVM_INSTALL_DIR}/lib/cmake/llvm")
-get_filename_component(LLVM_DIR "${LLVM_DIR}" REALPATH)
+file(REAL_PATH "${LLVM_DIR}" LLVM_DIR)
 set(Clang_DIR "${LLVM_INSTALL_DIR}/lib/cmake/clang")
-get_filename_component(Clang_DIR "${Clang_DIR}" REALPATH)
+file(REAL_PATH "${Clang_DIR}" Clang_DIR)
 
 find_package(LLVM REQUIRED CONFIG NO_DEFAULT_PATH)
 
