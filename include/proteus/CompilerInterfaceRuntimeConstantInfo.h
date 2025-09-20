@@ -111,7 +111,7 @@ struct RuntimeConstantInfo {
   }
 };
 
-template <typename T> inline static T getRuntimeConstantValue(void *Arg) {
+template <typename T> inline T getRuntimeConstantValue(void *Arg) {
   if constexpr (std::is_same_v<T, bool>) {
     return *static_cast<bool *>(Arg);
   } else if constexpr (std::is_same_v<T, int8_t>) {
@@ -133,7 +133,7 @@ template <typename T> inline static T getRuntimeConstantValue(void *Arg) {
   }
 }
 
-inline static RuntimeConstant
+inline RuntimeConstant
 dispatchGetRuntimeConstantValue(void **Args,
                                 const RuntimeConstantInfo &RCInfo) {
   RuntimeConstant RC{RCInfo.ArgInfo.Type, RCInfo.ArgInfo.Pos};
