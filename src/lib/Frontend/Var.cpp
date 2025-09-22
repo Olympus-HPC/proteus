@@ -644,6 +644,18 @@ Var &min(const Var &L, const Var &R) {
   return ResultVar;
 }
 
+// Cast this Var's value to type T and return a new Var holding the converted value.
+template <typename T>
+std::enable_if_t<std::is_arithmetic_v<T>, Var &> Var::cast() {
+  auto &Ctx = Fn.getFunction()->getContext();
+  auto &IRB = Fn.getIRBuilder();
+  Type *TargetTy = TypeMap<T>::get(Ctx);
+  Var &Res = Fn.declVarInternal("cast.", TargetTy);
+  Value *Converted = convert(IRB, getValue(), TargetTy);
+  Res.storeValue(Converted);
+  return Res;
+}
+
 // Assignment explicit instantiations.
 template Var &Var::operator= <int>(const int &);
 template Var &Var::operator= <unsigned int>(const unsigned int &);
@@ -743,6 +755,12 @@ template Var &operator% <unsigned int>(const unsigned int &, const Var &);
 template Var &operator% <size_t>(const size_t &, const Var &);
 template Var &operator% <float>(const float &, const Var &);
 template Var &operator% <double>(const double &, const Var &);
+// Explicit instantiations for Var::cast<T>().
+template Var &Var::cast<int>();
+template Var &Var::cast<unsigned int>();
+template Var &Var::cast<size_t>();
+template Var &Var::cast<float>();
+template Var &Var::cast<double>();
 
 // Comparison explicit instantiations.
 template Var &Var::operator>(const int &ConstValue) const;
@@ -860,7 +878,7 @@ Var &PointerVar::index(size_t I) {
 
   auto *Ptr = IRB.CreateLoad(Alloca->getAllocatedType(), Alloca);
   auto *GEP = IRB.CreateConstInBoundsGEP1_64(PointerElemTy, Ptr, I);
-  auto *BasePtrTy = cast<PointerType>(Ptr->getType());
+  auto *BasePtrTy = llvm::cast<PointerType>(Ptr->getType());
   unsigned AddrSpace = BasePtrTy->getAddressSpace();
   Type *ElemPtrTy = PointerType::get(PointerElemTy, AddrSpace);
 
@@ -874,7 +892,7 @@ Var &PointerVar::index(const Var &I) {
 
   auto *Ptr = IRB.CreateLoad(Alloca->getAllocatedType(), Alloca);
   auto *GEP = IRB.CreateInBoundsGEP(PointerElemTy, Ptr, I.getValue());
-  auto *BasePtrTy = cast<PointerType>(Ptr->getType());
+  auto *BasePtrTy = llvm::cast<PointerType>(Ptr->getType());
   unsigned AddrSpace = BasePtrTy->getAddressSpace();
   Type *ElemPtrTy = PointerType::get(PointerElemTy, AddrSpace);
 
@@ -918,7 +936,7 @@ Var &ArrayVar::index(size_t I) {
   // GEP into the array aggregate: [0, I]
   auto *GEP = IRB.CreateConstInBoundsGEP2_64(ArrayTy, BasePointer, 0, I);
   Type *ElemTy = ArrayTy->getArrayElementType();
-  auto *BasePtrTy = cast<PointerType>(BasePointer->getType());
+  auto *BasePtrTy = llvm::cast<PointerType>(BasePointer->getType());
   unsigned AddrSpace = BasePtrTy->getAddressSpace();
   Type *ElemPtrTy = PointerType::get(ElemTy, AddrSpace);
 
@@ -935,7 +953,7 @@ Var &ArrayVar::index(const Var &I) {
   Value *Zero = llvm::ConstantInt::get(IdxVal->getType(), 0);
   auto *GEP = IRB.CreateInBoundsGEP(ArrayTy, BasePointer, {Zero, IdxVal});
   Type *ElemTy = ArrayTy->getArrayElementType();
-  auto *BasePtrTy = cast<PointerType>(BasePointer->getType());
+  auto *BasePtrTy = llvm::cast<PointerType>(BasePointer->getType());
   unsigned AddrSpace = BasePtrTy->getAddressSpace();
   Type *ElemPtrTy = PointerType::get(ElemTy, AddrSpace);
 

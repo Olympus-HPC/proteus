@@ -142,6 +142,10 @@ struct Var {
 
   Var &operator[](size_t I);
   Var &operator[](const Var &I);
+  
+  // Cast this Var's value to type T and return a new Var holding the converted value.
+  template <typename T>
+  std::enable_if_t<std::is_arithmetic_v<T>, Var &> cast();
 };
 
 // Declare non-member operators.
