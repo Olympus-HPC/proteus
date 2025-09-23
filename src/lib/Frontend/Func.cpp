@@ -42,19 +42,31 @@ Var &FuncBase::declVarInternal(StringRef Name, Type *Ty,
 void FuncBase::beginFunction(const char *File, int Line) {
   Function *F = cast<Function>(FC.getCallee());
   BasicBlock *BodyBB = BasicBlock::Create(F->getContext(), "body", F);
-  BasicBlock *ExitBB = BasicBlock::Create(F->getContext(), "exit", F);
-  IP =
-      IRBuilderBase::InsertPoint(&F->getEntryBlock(), F->getEntryBlock().end());
+  ExitBB = BasicBlock::Create(F->getContext(), "exit", F);
+
+  // entry -> body
+  IP = IRBuilderBase::InsertPoint(&F->getEntryBlock(), F->getEntryBlock().end());
   IRB.restoreIP(IP);
   IRB.CreateBr(BodyBB);
 
+  // body ... -> exit
   IP = IRBuilderBase::InsertPoint(BodyBB, BodyBB->end());
   IRB.restoreIP(IP);
   IRB.CreateBr(ExitBB);
 
+  // Configure the canonical exit block to return.
   IRB.SetInsertPoint(ExitBB);
-  { IRB.CreateUnreachable(); }
+  {
+    if (hasVoidReturnType()) {
+      IRB.CreateRetVoid();
+    } else {
+      auto *RetTy = F->getReturnType();
+      RetPhi = IRB.CreatePHI(RetTy, /*NumReservedValues=*/1, "ret.phi");
+      IRB.CreateRet(RetPhi);
+    }
+  }
 
+  // Set insertion point at the beginning of the body for user code.
   IP = IRBuilderBase::InsertPoint(BodyBB, BodyBB->begin());
   IRB.restoreIP(IP);
 
@@ -65,6 +77,12 @@ void FuncBase::beginFunction(const char *File, int Line) {
 void FuncBase::endFunction() {
   if (Scopes.empty())
     PROTEUS_FATAL_ERROR("Expected FUNCTION scope");
+
+  // Validate non-void functions have at least one provided return value.
+  if (!hasVoidReturnType()) {
+    if (!RetPhi || RetPhi->getNumIncomingValues() == 0)
+      PROTEUS_FATAL_ERROR("Function " + Name + " does not provide a return value");
+  }
 
   Scope S = Scopes.back();
   if (S.Kind != ScopeKind::FUNCTION)
@@ -128,19 +146,28 @@ Value *FuncBase::emitArrayCreate(Type *Ty, AddressSpace AT, StringRef Name) {
 
 void FuncBase::ret(std::optional<std::reference_wrapper<Var>> OptRet) {
   auto *CurBB = IP.getBlock();
-  if (!CurBB->getSingleSuccessor())
-    PROTEUS_FATAL_ERROR("Expected single successor for current block");
-  auto *TermI = CurBB->getTerminator();
+  auto *OldTerm = CurBB ? CurBB->getTerminator() : nullptr;
 
-  if (OptRet == std::nullopt) {
-    IRB.CreateRetVoid();
-  } else {
+  bool IsVoid = hasVoidReturnType();
+
+  if (!IsVoid) {
+    if (OptRet == std::nullopt)
+      PROTEUS_FATAL_ERROR("Non-void function requires ret(var)");
+
     auto *RetAlloca = OptRet->get().getAlloca();
-    auto *Ret = IRB.CreateLoad(RetAlloca->getAllocatedType(), RetAlloca);
-    IRB.CreateRet(Ret);
+    auto *Val = IRB.CreateLoad(RetAlloca->getAllocatedType(), RetAlloca);
+    RetPhi->addIncoming(Val, CurBB);
   }
 
-  TermI->eraseFromParent();
+  if (OldTerm)
+    OldTerm->eraseFromParent();
+
+  IRB.SetInsertPoint(CurBB);
+  IRB.CreateBr(ExitBB);
+
+  // Prevent accidental insertion into a terminated block; structured scope
+  // handlers will restore IP to their continuation points.
+  IRB.ClearInsertionPoint();
 }
 
 void FuncBase::beginIf(Var &CondVar, const char *File, int Line) {

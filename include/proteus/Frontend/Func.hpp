@@ -6,6 +6,8 @@
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Instructions.h>
 
 #include "proteus/AddressSpace.hpp"
 #include "proteus/Error.h"
@@ -49,6 +51,10 @@ protected:
 
   std::string Name;
 
+  // Canonical function exit and return PHI (for non-void functions)
+  llvm::BasicBlock *ExitBB = nullptr;
+  llvm::PHINode *RetPhi = nullptr;
+
   enum class ScopeKind { FUNCTION, IF, FOR };
   struct Scope {
     std::string File;
@@ -74,6 +80,10 @@ protected:
       PROTEUS_FATAL_ERROR("Unsupported Kind " +
                           std::to_string(static_cast<int>(Kind)));
     }
+  }
+
+  bool hasVoidReturnType() {
+    return getFunction()->getReturnType()->isVoidTy();
   }
 
 public:
