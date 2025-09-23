@@ -148,7 +148,9 @@ Value *FuncBase::emitArrayCreate(Type *Ty, AddressSpace AT, StringRef Name) {
 
 void FuncBase::ret(std::optional<std::reference_wrapper<Var>> OptRet) {
   auto *CurBB = IP.getBlock();
-  auto *OldTerm = CurBB ? CurBB->getTerminator() : nullptr;
+  auto *OldTerm = CurBB->getTerminator();
+  if(!OldTerm)
+    PROTEUS_FATAL_ERROR("Expected terminator");
 
   if (!hasVoidReturnType()) {
     if (OptRet == std::nullopt)
@@ -159,8 +161,7 @@ void FuncBase::ret(std::optional<std::reference_wrapper<Var>> OptRet) {
     RetPhi->addIncoming(Val, CurBB);
   }
 
-  if (OldTerm)
-    OldTerm->eraseFromParent();
+  OldTerm->eraseFromParent();
 
   IRB.SetInsertPoint(CurBB);
   IRB.CreateBr(ExitBB);
