@@ -57,6 +57,7 @@ struct Var {
   Var &operator%(const Var &Other) const;
 
   Var &operator!() const;
+  Var &operator-() const;
 
   template <typename T>
   std::enable_if_t<std::is_arithmetic_v<T>, Var &>

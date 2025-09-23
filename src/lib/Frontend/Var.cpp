@@ -137,6 +137,28 @@ Var &Var::operator!() const {
   return ResultVar;
 }
 
+Var &Var::operator-() const {
+  FuncBase &FnRef = Fn;
+  auto &IRB = FnRef.getIRBuilder();
+
+  Type *ValTy = getValueType();
+  Var &ResultVar = FnRef.declVarInternal("res.", ValTy);
+
+  Value *Val = getValue();
+  Value *Result = nullptr;
+
+  if (ValTy->isIntegerTy()) {
+    Result = IRB.CreateNeg(Val);
+  } else if (ValTy->isFloatingPointTy()) {
+    Result = IRB.CreateFNeg(Val);
+  } else {
+    PROTEUS_FATAL_ERROR("Unsupported type");
+  }
+
+  ResultVar.storeValue(Result);
+  return ResultVar;
+}
+
 Var &Var::operator+=(Var &Other) {
   Var &Res = *this + Other;
   auto &IRB = Fn.getIRBuilder();
@@ -799,7 +821,14 @@ Type *ScalarVar::getValueType() const { return Slot->getAllocatedType(); }
 
 Value *ScalarVar::getValue() const {
   auto &IRB = Fn.getIRBuilder();
-  return IRB.CreateLoad(Slot->getAllocatedType(), Slot);
+  auto *AllocatedType = Slot->getAllocatedType();
+  AllocatedType->print(llvm::errs());
+  llvm::errs() << "\n";
+  Slot->print(llvm::errs());
+  llvm::errs() << "\n";
+  if(!AllocatedType)
+    PROTEUS_FATAL_ERROR("ScalarVar alloca must allocate a type");
+  return IRB.CreateLoad(AllocatedType, Slot);
 }
 
 void ScalarVar::storeValue(Value *Val) {
