@@ -51,9 +51,9 @@ protected:
 
   std::string Name;
 
-  // Canonical function exit and return PHI (for non-void functions)
-  llvm::BasicBlock *ExitBB = nullptr;
-  llvm::PHINode *RetPhi = nullptr;
+  // Canonical function exit and return PHI (for non-void functions).
+  BasicBlock *ExitBB = nullptr;
+  PHINode *RetPhi = nullptr;
 
   enum class ScopeKind { FUNCTION, IF, FOR };
   struct Scope {
