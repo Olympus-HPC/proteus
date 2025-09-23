@@ -630,7 +630,7 @@ JitEngineDevice<ImplT>::compileAndRun(
           KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
           GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr,
           GlobalLinkedBinaries, DeviceArch,
-          /*CodeGenConfig */ Config::get().getCGConfig(),
+          /*CodeGenConfig */ Config::get().getCGConfig(KernelInfo.getName()),
           /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
           /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy});
     }
@@ -650,7 +650,7 @@ JitEngineDevice<ImplT>::compileAndRun(
         KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
         GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr,
         GlobalLinkedBinaries, DeviceArch,
-        /*CodeGenConfig */ Config::get().getCGConfig(),
+        /*CodeGenConfig */ Config::get().getCGConfig(KernelInfo.getName()),
         /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
         /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy});
   }
