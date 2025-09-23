@@ -5,6 +5,7 @@
 #include <llvm/Bitcode/BitcodeWriter.h>
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Config.hpp"
 #include "proteus/CoreLLVM.hpp"
 #include "proteus/Debug.h"
 #include "proteus/Hashing.hpp"
@@ -78,20 +79,21 @@ public:
       const SmallVector<std::pair<std::string, StringRef>> &LambdaCalleeInfo,
       const std::unordered_map<std::string, const void *> &VarNameToDevPtr,
       const SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
-      const std::string &DeviceArch, CodegenOption CGOption, bool DumpIR,
-      bool RelinkGlobalsByCopy, bool SpecializeArgs, bool SpecializeDims,
-      bool SpecializeDimsAssume, bool SpecializeLaunchBounds, char OptLevel,
-      unsigned CodegenOptLevel, const std::optional<std::string> &PassPipeline)
+      const std::string &DeviceArch, const CodeGenerationConfig &CGConfig,
+      bool DumpIR, bool RelinkGlobalsByCopys)
       : Bitcode(Bitcode), HashValue(HashValue), KernelName(KernelName),
         Suffix(Suffix), BlockDim(BlockDim), GridDim(GridDim), RCVec(RCVec),
         LambdaCalleeInfo(LambdaCalleeInfo), VarNameToDevPtr(VarNameToDevPtr),
         GlobalLinkedBinaries(GlobalLinkedBinaries), DeviceArch(DeviceArch),
-        CGOption(CGOption), DumpIR(DumpIR),
+        CGOption(CGConfig.codeGenOption()), DumpIR(DumpIR),
         RelinkGlobalsByCopy(RelinkGlobalsByCopy),
-        SpecializeArgs(SpecializeArgs), SpecializeDims(SpecializeDims),
-        SpecializeDimsAssume(SpecializeDimsAssume),
-        SpecializeLaunchBounds(SpecializeLaunchBounds), OptLevel(OptLevel),
-        CodegenOptLevel(CodegenOptLevel), PassPipeline(PassPipeline) {}
+        SpecializeArgs(CGConfig.specializeArgs()),
+        SpecializeDims(CGConfig.specializeDims()),
+        SpecializeDimsAssume(CGConfig.specializeDimsAssume()),
+        SpecializeLaunchBounds(CGConfig.specializeLaunchBounds()),
+        OptLevel(CGConfig.optLevel()),
+        CodegenOptLevel(CGConfig.codeGenOptLevel()),
+        PassPipeline(CGConfig.optPipeline()) {}
 
   // Delete copy operations.
   CompilationTask(const CompilationTask &) = delete;

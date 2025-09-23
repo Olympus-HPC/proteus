@@ -630,19 +630,9 @@ JitEngineDevice<ImplT>::compileAndRun(
           KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
           GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr,
           GlobalLinkedBinaries, DeviceArch,
-          /*CGOption*/ Config::get().ProteusCodegen,
+          /*CodeGenConfig */ Config::get().getCGConfig(),
           /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
-          /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy,
-          /*SpecializeArgs*/ Config::get().ProteusSpecializeArgs,
-          /*SpecializeDims*/ Config::get().ProteusSpecializeDims,
-          /*SpecializeDimsAssume*/ Config::get().ProteusSpecializeDimsAssume,
-          /*SpecializeLaunchBounds=*/
-          Config::get().ProteusSpecializeLaunchBounds,
-          /*OptLevel*/ '3', // TODO: Add environment configuration option to
-                            // define this
-          /*CodeGenOptLevel*/ 3, // TODO: Add environment configuration option
-                                 // to define this
-          /*PassPipeline*/ Config::get().ProteusOptPipeline});
+          /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy});
     }
 
     // Compilation is pending, try to get the compilation result buffer. If
@@ -660,19 +650,9 @@ JitEngineDevice<ImplT>::compileAndRun(
         KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
         GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr,
         GlobalLinkedBinaries, DeviceArch,
-        /*CGOption*/ Config::get().ProteusCodegen,
+        /*CodeGenConfig */ Config::get().getCGConfig(),
         /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
-        /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy,
-        /*SpecializeArgs*/ Config::get().ProteusSpecializeArgs,
-        /*SpecializeDims*/ Config::get().ProteusSpecializeDims,
-        /*SpecializeDimsAssume*/ Config::get().ProteusSpecializeDimsAssume,
-        /*SpecializeLaunchBounds*/
-        Config::get().ProteusSpecializeLaunchBounds,
-        /*OptLevel*/ '3',      // TODO: Add environment configuration option to
-                               // define this
-        /*CodeGenOptLevel*/ 3, // TODO: Add environment configuration option
-                               // to define this
-        /*PassPipeline*/ Config::get().ProteusOptPipeline});
+        /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy});
   }
 
   if (!ObjBuf)
