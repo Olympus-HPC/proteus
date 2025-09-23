@@ -150,9 +150,7 @@ void FuncBase::ret(std::optional<std::reference_wrapper<Var>> OptRet) {
   auto *CurBB = IP.getBlock();
   auto *OldTerm = CurBB ? CurBB->getTerminator() : nullptr;
 
-  bool IsVoid = hasVoidReturnType();
-
-  if (!IsVoid) {
+  if (!hasVoidReturnType()) {
     if (OptRet == std::nullopt)
       PROTEUS_FATAL_ERROR("Non-void function requires ret(var)");
 
