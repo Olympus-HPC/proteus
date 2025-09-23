@@ -45,7 +45,8 @@ void FuncBase::beginFunction(const char *File, int Line) {
   ExitBB = BasicBlock::Create(F->getContext(), "exit", F);
 
   // entry -> body
-  IP = IRBuilderBase::InsertPoint(&F->getEntryBlock(), F->getEntryBlock().end());
+  IP =
+      IRBuilderBase::InsertPoint(&F->getEntryBlock(), F->getEntryBlock().end());
   IRB.restoreIP(IP);
   IRB.CreateBr(BodyBB);
 
@@ -81,7 +82,8 @@ void FuncBase::endFunction() {
   // Validate non-void functions have at least one provided return value.
   if (!hasVoidReturnType()) {
     if (!RetPhi || RetPhi->getNumIncomingValues() == 0)
-      PROTEUS_FATAL_ERROR("Function " + Name + " does not provide a return value");
+      PROTEUS_FATAL_ERROR("Function " + Name +
+                          " does not provide a return value");
   }
 
   Scope S = Scopes.back();

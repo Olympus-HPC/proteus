@@ -27,7 +27,7 @@ int main() {
   auto J = proteus::JitModule(TARGET);
 
   // Void early-terminate inside loop after i == 5.
-  auto KHVoid = J.addKernel<void(double*)>("for_early_void");
+  auto KHVoid = J.addKernel<void(double *)>("for_early_void");
   auto &FV = KHVoid.F;
   {
     auto &Arr = FV.getArg(0);
@@ -52,7 +52,6 @@ int main() {
     }
     FV.endFunction();
   }
-
 
   J.compile();
 

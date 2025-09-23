@@ -27,7 +27,10 @@ int main() {
       auto &Ret = F.declVar<double>("ret");
       Ret = 0;
       F.beginIf(A < B);
-      { Ret = 1; F.ret(Ret); }
+      {
+        Ret = 1;
+        F.ret(Ret);
+      }
       F.endIf();
       F.ret(Ret);
     }

@@ -27,7 +27,7 @@ int main() {
   auto J = proteus::JitModule(TARGET);
 
   // Void with early-return in IF guarding a side effect.
-  auto KHVoid = J.addKernel<void(double*, double, double)>("if_early_void");
+  auto KHVoid = J.addKernel<void(double *, double, double)>("if_early_void");
   auto &G = KHVoid.F;
   {
     auto &Arr = G.getArg(0);
