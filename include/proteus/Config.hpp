@@ -5,6 +5,9 @@
 
 #include "proteus/Error.h"
 #include "proteus/Logger.hpp"
+#include "llvm/ADT/StringMap.h"
+#include <llvm/Support/JSON.h>
+#include <llvm/Support/MemoryBuffer.h>
 
 namespace proteus {
 
@@ -73,6 +76,18 @@ inline int getEnvOrDefaultInt(const char *VarName, int Default) {
   return EnvValue ? std::stoi(EnvValue) : Default;
 }
 
+inline CodegenOption StrToCG(std::string CGstr) {
+  std::transform(CGstr.begin(), CGstr.end(), CGstr.begin(), ::tolower);
+  if (CGstr == "rtc")
+    return CodegenOption::RTC;
+  if (CGstr == "serial")
+    return CodegenOption::Serial;
+  if (CGstr == "parallel")
+    return CodegenOption::Parallel;
+
+  PROTEUS_FATAL_ERROR("Unknown codegen option: " + CGstr);
+}
+
 inline CodegenOption getEnvOrDefaultCG(const char *VarName,
                                        CodegenOption Default) {
 
@@ -80,17 +95,14 @@ inline CodegenOption getEnvOrDefaultCG(const char *VarName,
   if (!EnvValue)
     return Default;
 
-  std::string EnvValueStr{EnvValue};
-  std::transform(EnvValueStr.begin(), EnvValueStr.end(), EnvValueStr.begin(),
-                 ::tolower);
-  if (EnvValueStr == "rtc")
-    return CodegenOption::RTC;
-  if (EnvValueStr == "serial")
-    return CodegenOption::Serial;
-  if (EnvValueStr == "parallel")
-    return CodegenOption::Parallel;
+  return StrToCG(EnvValue);
+}
 
-  PROTEUS_FATAL_ERROR("Unknown codegen option: " + EnvValueStr);
+template <typename T>
+T getDefaultValueFromOptional(std::optional<T> JSONValue, T Default) {
+  if (JSONValue)
+    return JSONValue.value();
+  return Default;
 }
 
 inline KernelCloneOption getEnvOrDefaultKC(const char *VarName,
@@ -116,6 +128,13 @@ inline KernelCloneOption getEnvOrDefaultKC(const char *VarName,
 }
 
 class CodeGenerationConfig {
+  static constexpr bool DefaultSpecializeDimsAssume =
+#if PROTEUS_ENABLE_CUDA
+      false;
+#else
+      true;
+#endif
+
   static CodegenOption getCodeGen(CodegenOption ProteusCodegen) {
     constexpr bool SupportOnlyRTC =
 #if defined(PROTEUS_ENABLE_CUDA)
@@ -163,7 +182,6 @@ public:
 #else
         true;
 #endif
-
     return CodeGenerationConfig(
         getEnvOrDefaultString("PROTEUS_OPT_PIPELINE"),
         getCodeGen(getEnvOrDefaultCG("PROTEUS_CODEGEN", CodegenOption::RTC)),
@@ -176,6 +194,30 @@ public:
         getEnvOrDefaultInt("PROTEUS_CODEGEN_OPT_LEVEL", 3));
   }
 
+  static CodeGenerationConfig
+  createFromJSONEntry(const llvm::json::Object &Config) {
+    auto Pipeline = Config.getString("Pipeline");
+    std::optional<std::string> ProteusPipeline;
+    if (Pipeline)
+      ProteusPipeline = Pipeline.value().str();
+
+    return CodeGenerationConfig(
+        ProteusPipeline,
+        getCodeGen(
+            StrToCG(getDefaultValueFromOptional(Config.getString("CodeGen"),
+                                                llvm::StringRef("rtc"))
+                        .str())),
+        getDefaultValueFromOptional(Config.getBoolean("SpecializeArgs"), true),
+        getDefaultValueFromOptional(Config.getBoolean("LaunchBounds"), true),
+        getDefaultValueFromOptional(Config.getBoolean("SpecializeDims"), true),
+        getDefaultValueFromOptional(Config.getBoolean("SpecializeDimsAssume"),
+                                    DefaultSpecializeDimsAssume),
+        getDefaultValueFromOptional(Config.getString("OptLevel"),
+                                    llvm::StringRef("3"))[0],
+        getDefaultValueFromOptional(Config.getInteger("CodeGenOptLevel"),
+                                    static_cast<int64_t>(3)));
+  }
+
   CodegenOption codeGenOption() const { return ProteusCodegen; }
   bool specializeArgs() const { return ProteusSpecializeArgs; }
   bool specializeDims() const { return ProteusSpecializeDims; }
@@ -186,7 +228,56 @@ public:
   std::optional<const std::string> optPipeline() const {
     return ProteusOptPipeline;
   }
+
+  template <typename T> void dump(T &OS) const {
+    if (ProteusOptPipeline)
+      OS << "Pipeline:" << ProteusOptPipeline.value() << " ";
+
+    OS << "CG:" << toString(ProteusCodegen) << " ";
+    OS << "SA:" << ProteusSpecializeArgs << " ";
+    OS << "LB:" << ProteusSpecializeLaunchBounds << " ";
+    OS << "SD:" << ProteusSpecializeDims << " ";
+    OS << "SDA:" << ProteusSpecializeDimsAssume << " ";
+    OS << "OL:" << ProteusOptLevel << " ";
+    OS << "CGL:" << ProteusCodeGenOptLevel << " ";
+  }
 };
+
+inline llvm::StringMap<const CodeGenerationConfig>
+parseJSONConfig(std::optional<std::string> JSONFn) {
+  llvm::StringMap<const CodeGenerationConfig> TunedConfigs;
+  if (!JSONFn)
+    return TunedConfigs;
+
+  auto JSONRoot = [&JSONFn]() -> std::optional<llvm::json::Object> {
+    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> JSONBuf =
+        llvm::MemoryBuffer::getFile(JSONFn.value(), /* isText */ true,
+                                    /* RequiresNullTerminator */ true);
+    if (!JSONBuf)
+      PROTEUS_FATAL_ERROR("Error when opening json file: " +
+                          JSONBuf.getError().message() + "\n");
+
+    llvm::json::Value JsonInfo =
+        llvm::cantFail(llvm::json::parse(JSONBuf.get()->getBuffer()),
+                       "Cannot convert buffer to json value");
+
+    if (auto *Obj = JsonInfo.getAsObject())
+      return *Obj; // copies the object, safe after return
+    return std::nullopt;
+  }();
+
+  if (!JSONRoot)
+    PROTEUS_FATAL_ERROR("Top-level JSON is not an object.\n");
+
+  for (auto &KV : JSONRoot.value()) {
+    auto KernelName = KV.first;
+    if (const auto *Options = KV.second.getAsObject()) {
+      TunedConfigs.try_emplace(
+          KernelName, CodeGenerationConfig::createFromJSONEntry(*Options));
+    }
+  }
+  return TunedConfigs;
+}
 
 class Config {
 public:
@@ -194,7 +285,8 @@ public:
     static Config Conf;
     return Conf;
   }
-  const CodeGenerationConfig CodeGenConfig;
+  const CodeGenerationConfig GlobalCodeGenConfig;
+  const llvm::StringMap<const CodeGenerationConfig> TunedConfigs;
   bool ProteusUseStoredCache;
   bool ProteusDisable;
   bool ProteusDumpLLVMIR;
@@ -207,11 +299,41 @@ public:
   int ProteusTraceOutput;
   std::optional<const std::string> ProteusCacheDir;
 
-  const CodeGenerationConfig &getCGConfig() const { return CodeGenConfig; }
+  const CodeGenerationConfig &getCGConfig(llvm::StringRef KName = "") const {
+
+    if (TunedConfigs.empty())
+      return GlobalCodeGenConfig;
+
+    if (auto It = TunedConfigs.find(KName); It != TunedConfigs.end())
+      return It->second;
+
+    return GlobalCodeGenConfig;
+  }
+
+  void dump(llvm::raw_ostream &OS) const {
+    auto PrintOut = [](llvm::StringRef ID,
+                       const CodeGenerationConfig &KConfig) {
+      llvm::SmallString<128> S;
+      llvm::raw_svector_ostream OS(S);
+      OS << "ID:" << ID << " ";
+      KConfig.dump(OS);
+      return S;
+    };
+
+    OS << "PROTEUS_USE_STORED_CACHE " << ProteusUseStoredCache << "\n";
+    OS << "PROTEUS_CACHE_DIR " << Config::get().ProteusCacheDir << "\n";
+
+    OS << PrintOut("Default", GlobalCodeGenConfig) << "\n";
+    for (auto &KV : TunedConfigs) {
+      OS << PrintOut(KV.getKey(), KV.second) << "\n";
+    }
+  }
 
 private:
   Config()
-      : CodeGenConfig(CodeGenerationConfig::createFromEnv()),
+      : GlobalCodeGenConfig(CodeGenerationConfig::createFromEnv()),
+        TunedConfigs(
+            parseJSONConfig(getEnvOrDefaultString("PROTEUS_TUNED_KERNELS"))),
         ProteusCacheDir(getEnvOrDefaultString("PROTEUS_CACHE_DIR")) {
     ProteusUseStoredCache =
         getEnvOrDefaultBool("PROTEUS_USE_STORED_CACHE", true);
