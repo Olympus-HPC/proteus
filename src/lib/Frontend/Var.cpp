@@ -3,8 +3,7 @@
 #include "proteus/Frontend/Func.hpp"
 #include "proteus/Frontend/TypeMap.hpp"
 
-#include <llvm/ADT/ArrayRef.h>
-#include <llvm/ADT/SmallVector.h>
+#include <tuple>
 
 namespace proteus {
 
@@ -574,36 +573,32 @@ Type *getCommonType(const DataLayout &DL, Type *T1, Type *T2) {
   PROTEUS_FATAL_ERROR("Unsupported conversion types");
 }
 
-// this should be changed to parameter pack
+template <typename... Operands>
 static Var &emitIntrinsic(StringRef IntrinsicName, Type *ResultType,
-                          ArrayRef<const Var *> Operands) {
-  if (Operands.empty())
-    PROTEUS_FATAL_ERROR("Intrinsic requires at least one operand");
+                          const Operands &... Ops) {
+  static_assert(sizeof...(Ops) > 0,
+                "Intrinsic requires at least one operand");
 
-  FuncBase &Fn = Operands.front()->Fn;
-  for (const Var *Operand : Operands) {
-    if (&Operand->Fn != &Fn)
+  auto &Fn = std::get<0>(std::tie(Ops...)).Fn;
+  auto CheckFn = [&Fn](const Var &Operand) {
+    if (&Operand.Fn != &Fn)
       PROTEUS_FATAL_ERROR("Variables should belong to the same function");
-  }
+  };
+  (CheckFn(Ops), ...);
 
   auto &IRB = Fn.getIRBuilder();
   auto &M = *Fn.getFunction()->getParent();
 
   Var &ResultVar = Fn.declVarInternal("res.", ResultType);
 
-  llvm::SmallVector<Value *, 4> Arguments;
-  Arguments.reserve(Operands.size());
-  llvm::SmallVector<Type *, 4> ParamTypes;
-  ParamTypes.reserve(Operands.size());
+  auto ConvertOperand = [&](const Var &Operand) {
+    return convert(IRB, Operand.getValue(), ResultType);
+  };
 
-  for (const Var *Operand : Operands) {
-    Arguments.push_back(convert(IRB, Operand->getValue(), ResultType));
-    ParamTypes.push_back(ResultType);
-  }
-
-  auto *FunctionTy = FunctionType::get(ResultType, ParamTypes, false);
-  FunctionCallee Callee = M.getOrInsertFunction(IntrinsicName, FunctionTy);
-  Value *Call = IRB.CreateCall(Callee, Arguments);
+  FunctionCallee Callee = M.getOrInsertFunction(
+      IntrinsicName, ResultType, ((void)Ops, ResultType)...);
+  Value *Call = IRB.CreateCall(
+      Callee, {ConvertOperand(Ops)...});
   ResultVar.storeValue(Call);
 
   return ResultVar;
@@ -617,7 +612,7 @@ Var &powf(const Var &L, const Var &R) {
 #endif
 
   auto *ResultType = L.Fn.getIRBuilder().getFloatTy();
-  return emitIntrinsic(IntrinsicName, ResultType, {&L, &R});
+  return emitIntrinsic(IntrinsicName, ResultType, L, R);
 }
 
 Var &sqrtf(const Var &R) {
@@ -628,7 +623,7 @@ Var &sqrtf(const Var &R) {
 #endif
 
   auto *ResultType = R.Fn.getIRBuilder().getFloatTy();
-  return emitIntrinsic(IntrinsicName, ResultType, {&R});
+  return emitIntrinsic(IntrinsicName, ResultType, R);
 }
 
 Var &expf(const Var &R) {
@@ -639,7 +634,7 @@ Var &expf(const Var &R) {
 #endif
 
   auto *ResultType = R.Fn.getIRBuilder().getFloatTy();
-  return emitIntrinsic(IntrinsicName, ResultType, {&R});
+  return emitIntrinsic(IntrinsicName, ResultType, R);
 }
 
 Var &logf(const Var &R) {
@@ -650,7 +645,7 @@ Var &logf(const Var &R) {
 #endif
 
   auto *ResultType = R.Fn.getIRBuilder().getFloatTy();
-  return emitIntrinsic(IntrinsicName, ResultType, {&R});
+  return emitIntrinsic(IntrinsicName, ResultType, R);
 }
 
 Var &min(const Var &L, const Var &R) {
@@ -683,13 +678,13 @@ Var &absf(const Var &R) {
   FuncBase &Fn = R.Fn;
   auto *ResultType = Fn.getIRBuilder().getFloatTy();
   StringRef IntrinsicName = "llvm.fabs.f32";
-  return emitIntrinsic(IntrinsicName, ResultType, {&R});
+  return emitIntrinsic(IntrinsicName, ResultType, R);
 }
 
 Var &truncf(const Var &R) {
   StringRef IntrinsicName = "llvm.trunc.f32";
   auto *ResultType = R.Fn.getIRBuilder().getFloatTy();
-  return emitIntrinsic(IntrinsicName, ResultType, {&R});
+  return emitIntrinsic(IntrinsicName, ResultType, R);
 }
 
 // Cast this Var's value to type T and return a new Var holding the converted value.
