@@ -9,6 +9,8 @@
 #include "proteus/CoreLLVMCUDA.hpp"
 #endif
 
+#include "proteus/CoreLLVM.hpp"
+
 #if defined(PROTEUS_ENABLE_HIP) || defined(PROTEUS_ENABLE_CUDA)
 
 #include <llvm/Analysis/CallGraph.h>
