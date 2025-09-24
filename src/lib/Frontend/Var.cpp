@@ -685,19 +685,6 @@ Var &truncf(const Var &R) {
   return emitIntrinsic(IntrinsicName, ResultType, R);
 }
 
-// Cast this Var's value to type T and return a new Var holding the converted
-// value.
-template <typename T>
-std::enable_if_t<std::is_arithmetic_v<T>, Var &> Var::cast() {
-  auto &Ctx = Fn.getFunction()->getContext();
-  auto &IRB = Fn.getIRBuilder();
-  Type *TargetTy = TypeMap<T>::get(Ctx);
-  Var &Res = Fn.declVarInternal("cast.", TargetTy);
-  Value *Converted = convert(IRB, getValue(), TargetTy);
-  Res.storeValue(Converted);
-  return Res;
-}
-
 // Assignment explicit instantiations.
 template Var &Var::operator= <int>(const int &);
 template Var &Var::operator= <unsigned int>(const unsigned int &);
@@ -797,12 +784,6 @@ template Var &operator% <unsigned int>(const unsigned int &, const Var &);
 template Var &operator% <size_t>(const size_t &, const Var &);
 template Var &operator% <float>(const float &, const Var &);
 template Var &operator% <double>(const double &, const Var &);
-// Explicit instantiations for Var::cast<T>().
-template Var &Var::cast<int>();
-template Var &Var::cast<unsigned int>();
-template Var &Var::cast<size_t>();
-template Var &Var::cast<float>();
-template Var &Var::cast<double>();
 
 // Comparison explicit instantiations.
 template Var &Var::operator>(const int &ConstValue) const;

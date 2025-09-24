@@ -35,23 +35,23 @@ int main() {
     Ii = -7;
     Fi = 2.5f;
 
-    auto &IfromD = Di.cast<int>();
-    auto &FfromI = Ii.cast<float>();
-    auto &DfromF = Fi.cast<double>();
+    auto &IfromD = F.cast<int>(Di);
+    auto &FfromI = F.cast<float>(Ii);
+    auto &DfromF = F.cast<double>(Fi);
 
     DOut[0] = DfromF;
     IOut[0] = IfromD;
     FOut[0] = FfromI;
 
-    auto &D2 = IfromD.cast<double>();
-    auto &I2 = FfromI.cast<int>();
-    auto &F2 = DfromF.cast<float>();
+    auto &D2 = F.cast<double>(IfromD);
+    auto &I2 = F.cast<int>(FfromI);
+    auto &F2 = F.cast<float>(DfromF);
 
     DOut2[0] = D2;
     IOut2[0] = I2;
     FOut2[0] = F2;
 
-    auto &I3 = Di.cast<int>();
+    auto &I3 = F.cast<int>(Di);
     IOut3[0] = I3;
 
     F.ret();
