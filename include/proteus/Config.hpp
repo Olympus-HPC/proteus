@@ -161,10 +161,11 @@ public:
   static CodeGenerationConfig createFromEnv() {
     constexpr bool DefaultSpecializeDimsAssume =
 #if PROTEUS_ENABLE_CUDA
-        true;
-#else
         false;
+#else
+        true;
 #endif
+
     return CodeGenerationConfig(
         getEnvOrDefaultString("PROTEUS_OPT_PIPELINE"),
         getCodeGen(getEnvOrDefaultCG("PROTEUS_CODEGEN", CodegenOption::RTC)),
