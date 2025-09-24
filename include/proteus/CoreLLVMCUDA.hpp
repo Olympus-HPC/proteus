@@ -11,7 +11,6 @@
 #include <llvm/Target/TargetMachine.h>
 
 #include "proteus/CoreLLVM.hpp"
-#include "proteus/CoreDeviceCUDA.hpp"
 #include "proteus/Debug.h"
 #include "proteus/Logger.hpp"
 #include "proteus/TimeTracing.hpp"
