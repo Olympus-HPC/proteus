@@ -69,14 +69,21 @@ private:
     JitModule &M;
 
     void setLaunchBounds(int MaxThreadsPerBlock, int MinBlocksPerSM = 0) {
+      if(!M.isDeviceModule())
+        PROTEUS_FATAL_ERROR("Expected a device module for setLaunchBounds");
+
       if (M.isCompiled())
         PROTEUS_FATAL_ERROR("setLaunchBounds must be called before compile()");
 
+      #if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
       Function *Fn = F.getFunction();
       if (!Fn)
         PROTEUS_FATAL_ERROR("Expected non-null Function");
 
       setLaunchBoundsForKernel(*Fn, MaxThreadsPerBlock, MinBlocksPerSM);
+      #else
+      PROTEUS_FATAL_ERROR("Unsupported target for setLaunchBounds");
+      #endif
     }
 
     // Launch with type-safety.
