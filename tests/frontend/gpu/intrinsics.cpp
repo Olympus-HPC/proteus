@@ -27,8 +27,8 @@ int main() {
 
   auto J = JitModule(TARGET);
   auto KernelHandle =
-      J.addKernel<void(float *, float *, float *, float *, float *, int *, float *, int *, float *, float *)>(
-          "intrinsics");
+      J.addKernel<void(float *, float *, float *, float *, float *, int *,
+                       float *, int *, float *, float *)>("intrinsics");
   auto &F = KernelHandle.F;
   auto &Arg0 = F.getArg(0);
   auto &Arg1 = F.getArg(1);
@@ -66,19 +66,19 @@ int main() {
     auto &I1 = F.declVar<int>();
     I1 = -9;
 
-    Arg0[0] = powf(X, Y);   // 8
-    Arg1[0] = sqrtf(Z);     // 3
-    Arg2[0] = expf(W);      // 1
-    Arg3[0] = logf(A);      // 0
-    Arg4[0] = min(F0, F1);  // -1
-    Arg5[0] = min(I0, I1);  // -9
-    Arg6[0] = max(F0, F1);  // 4.5
-    Arg7[0] = max(I0, I1);  // 7
-    Arg8[0] = absf(F0);     // 1
+    Arg0[0] = powf(X, Y);  // 8
+    Arg1[0] = sqrtf(Z);    // 3
+    Arg2[0] = expf(W);     // 1
+    Arg3[0] = logf(A);     // 0
+    Arg4[0] = min(F0, F1); // -1
+    Arg5[0] = min(I0, I1); // -9
+    Arg6[0] = max(F0, F1); // 4.5
+    Arg7[0] = max(I0, I1); // 7
+    Arg8[0] = absf(F0);    // 1
 
     auto &T = F.declVar<float>();
     T = -3.7f;
-    Arg9[0] = truncf(T);    // -3
+    Arg9[0] = truncf(T); // -3
 
     F.ret();
   }
@@ -99,8 +99,8 @@ int main() {
   gpuErrCheck(gpuMallocManaged(&R8, sizeof(float)));
   gpuErrCheck(gpuMallocManaged(&R9, sizeof(float)));
 
-  gpuErrCheck(KernelHandle.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, R0, R1, R2, R3,
-                                   R4, R5, R6, R7, R8, R9));
+  gpuErrCheck(KernelHandle.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, R0, R1, R2,
+                                  R3, R4, R5, R6, R7, R8, R9));
   gpuErrCheck(gpuDeviceSynchronize());
 
   std::cout << "R0 = " << *R0 << "\n";

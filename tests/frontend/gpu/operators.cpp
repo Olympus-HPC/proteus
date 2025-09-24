@@ -27,8 +27,8 @@ int main() {
   auto J = proteus::JitModule(TARGET);
   auto KernelHandle =
       J.addKernel<void(double *, double *, double *, double *, double *,
-                       double *, double *, double *, double *, double *, int *, int *, double *, double *, int *, int *)>(
-          "operators");
+                       double *, double *, double *, double *, double *, int *,
+                       int *, double *, double *, int *, int *)>("operators");
   auto &F = KernelHandle.F;
   auto &Arg0 = F.getArg(0);
   auto &Arg1 = F.getArg(1);
@@ -102,7 +102,10 @@ int main() {
 
   J.compile();
 
-  double *R0, *R1, *R2, *R3, *R4, *R5, *R6, *R7, *R8, *R9; int *R10, *R11; double *R12, *R13; int *R14, *R15;
+  double *R0, *R1, *R2, *R3, *R4, *R5, *R6, *R7, *R8, *R9;
+  int *R10, *R11;
+  double *R12, *R13;
+  int *R14, *R15;
   gpuErrCheck(gpuMallocManaged(&R0, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R1, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R2, sizeof(double)));
@@ -121,7 +124,8 @@ int main() {
   gpuErrCheck(gpuMallocManaged(&R15, sizeof(int)));
 
   gpuErrCheck(KernelHandle.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, R0, R1, R2,
-                                  R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15));
+                                  R3, R4, R5, R6, R7, R8, R9, R10, R11, R12,
+                                  R13, R14, R15));
   gpuErrCheck(gpuDeviceSynchronize());
 
   std::cout << "R0 = " << *R0 << "\n";

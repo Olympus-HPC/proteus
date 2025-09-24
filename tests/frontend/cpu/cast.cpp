@@ -15,7 +15,8 @@ int main() {
   proteus::init();
 
   auto J = proteus::JitModule();
-  auto &F = J.addFunction<void(double *, int *, float *, double *, int *, float *, int *)>("cast");
+  auto &F = J.addFunction<void(double *, int *, float *, double *, int *,
+                               float *, int *)>("cast");
   auto &DOut = F.getArg(0);
   auto &IOut = F.getArg(1);
   auto &FOut = F.getArg(2);
@@ -59,7 +60,9 @@ int main() {
 
   J.compile();
 
-  double RD0, RD1; int RI0, RI1, RI2; float RF0, RF1;
+  double RD0, RD1;
+  int RI0, RI1, RI2;
+  float RF0, RF1;
   F(&RD0, &RI0, &RF0, &RD1, &RI1, &RF1, &RI2);
 
   std::cout << "RD0 = " << RD0 << "\n";

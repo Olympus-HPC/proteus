@@ -16,8 +16,9 @@ using namespace proteus;
 int main() {
 
   auto J = JitModule();
-  auto &F = J.addFunction<void(float *, float *, float *, float *, float *, int *, float *, int *, float *, float *)>(
-      "intrinsics");
+  auto &F =
+      J.addFunction<void(float *, float *, float *, float *, float *, int *,
+                         float *, int *, float *, float *)>("intrinsics");
   auto &Arg0 = F.getArg(0);
   auto &Arg1 = F.getArg(1);
   auto &Arg2 = F.getArg(2);
@@ -54,19 +55,19 @@ int main() {
     auto &I1 = F.declVar<int>();
     I1 = -9;
 
-    Arg0[0] = powf(X, Y);   // 8
-    Arg1[0] = sqrtf(Z);     // 3
-    Arg2[0] = expf(W);      // 1
-    Arg3[0] = logf(A);      // 0
-    Arg4[0] = min(F0, F1);  // -1
-    Arg5[0] = min(I0, I1);  // -9
-    Arg6[0] = max(F0, F1);  // 4.5
-    Arg7[0] = max(I0, I1);  // 7
-    Arg8[0] = absf(F0);     // 1
+    Arg0[0] = powf(X, Y);  // 8
+    Arg1[0] = sqrtf(Z);    // 3
+    Arg2[0] = expf(W);     // 1
+    Arg3[0] = logf(A);     // 0
+    Arg4[0] = min(F0, F1); // -1
+    Arg5[0] = min(I0, I1); // -9
+    Arg6[0] = max(F0, F1); // 4.5
+    Arg7[0] = max(I0, I1); // 7
+    Arg8[0] = absf(F0);    // 1
 
     auto &T = F.declVar<float>();
     T = -3.7f;
-    Arg9[0] = truncf(T);    // -3
+    Arg9[0] = truncf(T); // -3
 
     F.ret();
   }

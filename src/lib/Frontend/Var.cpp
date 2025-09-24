@@ -575,9 +575,8 @@ Type *getCommonType(const DataLayout &DL, Type *T1, Type *T2) {
 
 template <typename... Operands>
 static Var &emitIntrinsic(StringRef IntrinsicName, Type *ResultType,
-                          const Operands &... Ops) {
-  static_assert(sizeof...(Ops) > 0,
-                "Intrinsic requires at least one operand");
+                          const Operands &...Ops) {
+  static_assert(sizeof...(Ops) > 0, "Intrinsic requires at least one operand");
 
   auto &Fn = std::get<0>(std::tie(Ops...)).Fn;
   auto CheckFn = [&Fn](const Var &Operand) {
@@ -595,10 +594,9 @@ static Var &emitIntrinsic(StringRef IntrinsicName, Type *ResultType,
     return convert(IRB, Operand.getValue(), ResultType);
   };
 
-  FunctionCallee Callee = M.getOrInsertFunction(
-      IntrinsicName, ResultType, ((void)Ops, ResultType)...);
-  Value *Call = IRB.CreateCall(
-      Callee, {ConvertOperand(Ops)...});
+  FunctionCallee Callee = M.getOrInsertFunction(IntrinsicName, ResultType,
+                                                ((void)Ops, ResultType)...);
+  Value *Call = IRB.CreateCall(Callee, {ConvertOperand(Ops)...});
   ResultVar.storeValue(Call);
 
   return ResultVar;
@@ -687,7 +685,8 @@ Var &truncf(const Var &R) {
   return emitIntrinsic(IntrinsicName, ResultType, R);
 }
 
-// Cast this Var's value to type T and return a new Var holding the converted value.
+// Cast this Var's value to type T and return a new Var holding the converted
+// value.
 template <typename T>
 std::enable_if_t<std::is_arithmetic_v<T>, Var &> Var::cast() {
   auto &Ctx = Fn.getFunction()->getContext();
@@ -843,7 +842,7 @@ Type *ScalarVar::getValueType() const { return Slot->getAllocatedType(); }
 Value *ScalarVar::getValue() const {
   auto &IRB = Fn.getIRBuilder();
   auto *AllocatedType = Slot->getAllocatedType();
-  if(!AllocatedType)
+  if (!AllocatedType)
     PROTEUS_FATAL_ERROR("ScalarVar alloca must allocate a type");
   return IRB.CreateLoad(AllocatedType, Slot);
 }

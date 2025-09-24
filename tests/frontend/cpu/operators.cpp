@@ -17,7 +17,8 @@ int main() {
   auto J = proteus::JitModule();
   auto &F = J.addFunction<void(double *, double *, double *, double *, double *,
                                double *, double *, double *, double *, double *,
-                               double *, double *, int *, int *, double *, double *, int *, int *)>("operators");
+                               double *, double *, int *, int *, double *,
+                               double *, int *, int *)>("operators");
   auto &Arg0 = F.getArg(0);
   auto &Arg1 = F.getArg(1);
   auto &Arg2 = F.getArg(2);
@@ -94,8 +95,12 @@ int main() {
 
   J.compile();
 
-  double R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11; int R12, R13; double R14, R15; int R16, R17;
-  F(&R0, &R1, &R2, &R3, &R4, &R5, &R6, &R7, &R8, &R9, &R10, &R11, &R12, &R13, &R14, &R15, &R16, &R17);
+  double R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11;
+  int R12, R13;
+  double R14, R15;
+  int R16, R17;
+  F(&R0, &R1, &R2, &R3, &R4, &R5, &R6, &R7, &R8, &R9, &R10, &R11, &R12, &R13,
+    &R14, &R15, &R16, &R17);
 
   std::cout << "R0 = " << R0 << "\n";
   std::cout << "R1 = " << R1 << "\n";
