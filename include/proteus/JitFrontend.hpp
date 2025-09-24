@@ -13,7 +13,7 @@
 
 #include <deque>
 
-#include "proteus/CoreLLVM.hpp"
+#include "proteus/CoreLLVMDevice.hpp"
 #include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/Frontend/Func.hpp"
