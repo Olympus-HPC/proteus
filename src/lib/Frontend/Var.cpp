@@ -686,6 +686,12 @@ Var &absf(const Var &R) {
   return emitIntrinsic(IntrinsicName, ResultType, {&R});
 }
 
+Var &truncf(const Var &R) {
+  StringRef IntrinsicName = "llvm.trunc.f32";
+  auto *ResultType = R.Fn.getIRBuilder().getFloatTy();
+  return emitIntrinsic(IntrinsicName, ResultType, {&R});
+}
+
 // Cast this Var's value to type T and return a new Var holding the converted value.
 template <typename T>
 std::enable_if_t<std::is_arithmetic_v<T>, Var &> Var::cast() {
@@ -842,10 +848,6 @@ Type *ScalarVar::getValueType() const { return Slot->getAllocatedType(); }
 Value *ScalarVar::getValue() const {
   auto &IRB = Fn.getIRBuilder();
   auto *AllocatedType = Slot->getAllocatedType();
-  AllocatedType->print(llvm::errs());
-  llvm::errs() << "\n";
-  Slot->print(llvm::errs());
-  llvm::errs() << "\n";
   if(!AllocatedType)
     PROTEUS_FATAL_ERROR("ScalarVar alloca must allocate a type");
   return IRB.CreateLoad(AllocatedType, Slot);

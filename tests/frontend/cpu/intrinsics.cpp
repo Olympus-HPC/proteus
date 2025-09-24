@@ -16,7 +16,7 @@ using namespace proteus;
 int main() {
 
   auto J = JitModule();
-  auto &F = J.addFunction<void(float *, float *, float *, float *, float *, int *, float *, int *, float *)>(
+  auto &F = J.addFunction<void(float *, float *, float *, float *, float *, int *, float *, int *, float *, float *)>(
       "intrinsics");
   auto &Arg0 = F.getArg(0);
   auto &Arg1 = F.getArg(1);
@@ -27,6 +27,7 @@ int main() {
   auto &Arg6 = F.getArg(6);
   auto &Arg7 = F.getArg(7);
   auto &Arg8 = F.getArg(8);
+  auto &Arg9 = F.getArg(9);
   F.beginFunction();
   {
     auto &X = F.declVar<float>();
@@ -63,15 +64,19 @@ int main() {
     Arg7[0] = max(I0, I1);  // 7
     Arg8[0] = absf(F0);     // 1
 
+    auto &T = F.declVar<float>();
+    T = -3.7f;
+    Arg9[0] = truncf(T);    // -3
+
     F.ret();
   }
   F.endFunction();
 
   J.compile();
 
-  float R0, R1, R2, R3, R4, R6, R8;
+  float R0, R1, R2, R3, R4, R6, R8, R9;
   int R5, R7;
-  F(&R0, &R1, &R2, &R3, &R4, &R5, &R6, &R7, &R8);
+  F(&R0, &R1, &R2, &R3, &R4, &R5, &R6, &R7, &R8, &R9);
 
   std::cout << "R0 = " << R0 << "\n";
   std::cout << "R1 = " << R1 << "\n";
@@ -82,6 +87,7 @@ int main() {
   std::cout << "R6 = " << R6 << "\n";
   std::cout << "R7 = " << R7 << "\n";
   std::cout << "R8 = " << R8 << "\n";
+  std::cout << "R9 = " << R9 << "\n";
 
   return 0;
 }
@@ -96,6 +102,7 @@ int main() {
 // CHECK-NEXT: R6 = 4.5
 // CHECK-NEXT: R7 = 7
 // CHECK-NEXT: R8 = 1
+// CHECK-NEXT: R9 = -3
 // CHECK-FIRST: JitStorageCache hits 0 total 1
 // CHECK-SECOND: JitStorageCache hits 1 total 1
 // clang-format on
