@@ -23,7 +23,6 @@
 LLD_HAS_DRIVER(elf)
 #endif
 
-#include "proteus/CoreLLVM.hpp"
 #include "proteus/Debug.h"
 #include "proteus/Error.h"
 #include "proteus/Logger.hpp"
