@@ -176,6 +176,7 @@ Var &sqrtf(const Var &R);
 Var &expf(const Var &R);
 Var &logf(const Var &R);
 Var &min(const Var &L, const Var &R);
+Var &max(const Var &L, const Var &R);
 
 struct ScalarVar final : Var {
   // ScalarVar: wraps an alloca of a scalar value.

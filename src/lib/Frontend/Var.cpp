@@ -666,6 +666,19 @@ Var &min(const Var &L, const Var &R) {
   return ResultVar;
 }
 
+Var &max(const Var &L, const Var &R) {
+  FuncBase &Fn = L.Fn;
+  if (&Fn != &R.Fn)
+    PROTEUS_FATAL_ERROR("Variables should belong to the same function");
+
+  Var &ResultVar = Fn.declVarInternal("res.", L.getValueType());
+  ResultVar = R;
+  Fn.beginIf(L > R);
+  { ResultVar = L; }
+  Fn.endIf();
+  return ResultVar;
+}
+
 // Cast this Var's value to type T and return a new Var holding the converted value.
 template <typename T>
 std::enable_if_t<std::is_arithmetic_v<T>, Var &> Var::cast() {
