@@ -175,10 +175,8 @@ public:
                             DefaultSpecializeDimsAssume),
         getEnvOrDefaultChar("PROTEUS_OPT_LEVEL", '3'),
         getEnvOrDefaultInt("PROTEUS_CODE_GEN_OPT_LEVEL", 3));
-
-    {
-    }
   }
+
   CodegenOption codeGenOption() const { return ProteusCodegen; }
   bool specializeArgs() const { return ProteusSpecializeArgs; }
   bool specializeDims() const { return ProteusSpecializeDims; }

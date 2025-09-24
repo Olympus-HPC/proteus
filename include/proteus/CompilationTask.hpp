@@ -80,7 +80,7 @@ public:
       const std::unordered_map<std::string, const void *> &VarNameToDevPtr,
       const SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
       const std::string &DeviceArch, const CodeGenerationConfig &CGConfig,
-      bool DumpIR, bool RelinkGlobalsByCopys)
+      bool DumpIR, bool RelinkGlobalsByCopy)
       : Bitcode(Bitcode), HashValue(HashValue), KernelName(KernelName),
         Suffix(Suffix), BlockDim(BlockDim), GridDim(GridDim), RCVec(RCVec),
         LambdaCalleeInfo(LambdaCalleeInfo), VarNameToDevPtr(VarNameToDevPtr),

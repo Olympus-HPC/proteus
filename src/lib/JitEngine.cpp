@@ -27,17 +27,21 @@ JitEngine::JitEngine() {
 #if PROTEUS_ENABLE_DEBUG
   Logger::logs("proteus") << "PROTEUS_USE_STORED_CACHE "
                           << Config::get().ProteusUseStoredCache << "\n";
-  Logger::logs("proteus") << "PROTEUS_SET_LAUNCH_BOUNDS "
-                          << Config::get().ProteusSpecializeLaunchBounds
-                          << "\n";
+  Logger::logs("proteus")
+      << "PROTEUS_SET_LAUNCH_BOUNDS "
+      << Config::get().getCGConfig().specializeLaunchBounds() << "\n";
   Logger::logs("proteus") << "PROTEUS_SPECIALIZE_ARGS "
-                          << Config::get().ProteusSpecializeArgs << "\n";
+                          << Config::get().getCGConfig().specializeArgs()
+                          << "\n";
   Logger::logs("proteus") << "PROTEUS_SPECIALIZE_DIMS "
-                          << Config::get().ProteusSpecializeDims << "\n";
+                          << Config::get().getCGConfig().specializeDims()
+                          << "\n";
   Logger::logs("proteus") << "PROTEUS_CODEGEN"
-                          << toString(Config::get().ProteusCodegen) << "\n";
+                          << toString(
+                                 Config::get().getCGConfig().codeGenOption())
+                          << "\n";
   Logger::logs("proteus") << "PROTEUS_OPT_PIPELINE"
-                          << Config::get().ProteusOptPipeline << "\n";
+                          << Config::get().getCGConfig().optPipeline() << "\n";
   Logger::logs("proteus") << "PROTEUS_CACHE_DIR"
                           << Config::get().ProteusCacheDir << "\n";
 #endif
