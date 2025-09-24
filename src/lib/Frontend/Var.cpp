@@ -3,6 +3,8 @@
 #include "proteus/Frontend/Func.hpp"
 #include "proteus/Frontend/TypeMap.hpp"
 
+#include <tuple>
+
 namespace proteus {
 
 template <typename IntOp, typename FPOp>
@@ -108,6 +110,52 @@ Var &Var::operator%(const Var &Other) const {
       *this, Other,
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSRem(L, R); },
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFRem(L, R); });
+}
+
+Var &Var::operator!() const {
+  FuncBase &FnRef = Fn;
+  Function *F = FnRef.getFunction();
+  auto &IRB = FnRef.getIRBuilder();
+
+  Type *ValTy = getValueType();
+  Type *BoolTy = Type::getInt1Ty(F->getContext());
+  Var &ResultVar = FnRef.declVarInternal("res.", BoolTy);
+
+  Value *Val = getValue();
+  Value *Result = nullptr;
+
+  if (ValTy->isIntegerTy()) {
+    Result = IRB.CreateICmpEQ(Val, ConstantInt::get(ValTy, 0));
+  } else if (ValTy->isFloatingPointTy()) {
+    Result = IRB.CreateFCmpOEQ(Val, ConstantFP::get(ValTy, 0.0));
+  } else {
+    PROTEUS_FATAL_ERROR("Unsupported type");
+  }
+
+  ResultVar.storeValue(Result);
+  return ResultVar;
+}
+
+Var &Var::operator-() const {
+  FuncBase &FnRef = Fn;
+  auto &IRB = FnRef.getIRBuilder();
+
+  Type *ValTy = getValueType();
+  Var &ResultVar = FnRef.declVarInternal("res.", ValTy);
+
+  Value *Val = getValue();
+  Value *Result = nullptr;
+
+  if (ValTy->isIntegerTy()) {
+    Result = IRB.CreateNeg(Val);
+  } else if (ValTy->isFloatingPointTy()) {
+    Result = IRB.CreateFNeg(Val);
+  } else {
+    PROTEUS_FATAL_ERROR("Unsupported type");
+  }
+
+  ResultVar.storeValue(Result);
+  return ResultVar;
 }
 
 Var &Var::operator+=(Var &Other) {
@@ -525,49 +573,77 @@ Type *getCommonType(const DataLayout &DL, Type *T1, Type *T2) {
   PROTEUS_FATAL_ERROR("Unsupported conversion types");
 }
 
-Var &powf(const Var &L, const Var &R) {
-  auto &Fn = L.Fn;
-  auto &M = *Fn.getFunction()->getParent();
-  auto &IRB = Fn.getIRBuilder();
+template <typename... Operands>
+static Var &emitIntrinsic(StringRef IntrinsicName, Type *ResultType,
+                          const Operands &...Ops) {
+  static_assert(sizeof...(Ops) > 0, "Intrinsic requires at least one operand");
 
-  auto *ResultType = IRB.getFloatTy();
+  auto &Fn = std::get<0>(std::tie(Ops...)).Fn;
+  auto CheckFn = [&Fn](const Var &Operand) {
+    if (&Operand.Fn != &Fn)
+      PROTEUS_FATAL_ERROR("Variables should belong to the same function");
+  };
+  (CheckFn(Ops), ...);
+
+  auto &IRB = Fn.getIRBuilder();
+  auto &M = *Fn.getFunction()->getParent();
+
   Var &ResultVar = Fn.declVarInternal("res.", ResultType);
 
-#if PROTEUS_ENABLE_CUDA
-  std::string IntrinsicName = "__nv_powf";
-#else
-  std::string IntrinsicName = "llvm.pow.f32";
-#endif
+  auto ConvertOperand = [&](const Var &Operand) {
+    return convert(IRB, Operand.getValue(), ResultType);
+  };
 
-  FunctionCallee Callee =
-      M.getOrInsertFunction(IntrinsicName, ResultType, ResultType, ResultType);
-  auto *Call = IRB.CreateCall(Callee, {convert(IRB, L.getValue(), ResultType),
-                                       convert(IRB, R.getValue(), ResultType)});
+  FunctionCallee Callee = M.getOrInsertFunction(IntrinsicName, ResultType,
+                                                ((void)Ops, ResultType)...);
+  Value *Call = IRB.CreateCall(Callee, {ConvertOperand(Ops)...});
   ResultVar.storeValue(Call);
 
   return ResultVar;
 }
 
-Var &sqrtf(const Var &R) {
-  auto &Fn = R.Fn;
-  auto &M = *Fn.getFunction()->getParent();
-  auto &IRB = Fn.getIRBuilder();
-
-  auto *ResultType = IRB.getFloatTy();
-  Var &ResultVar = Fn.declVarInternal("res.", ResultType);
-
+Var &powf(const Var &L, const Var &R) {
 #if PROTEUS_ENABLE_CUDA
-  std::string IntrinsicName = "__nv_sqrtf";
+  StringRef IntrinsicName = "__nv_powf";
 #else
-  std::string IntrinsicName = "llvm.sqrt.f32";
+  StringRef IntrinsicName = "llvm.pow.f32";
 #endif
 
-  FunctionCallee Callee =
-      M.getOrInsertFunction(IntrinsicName, ResultType, ResultType);
-  auto *Call = IRB.CreateCall(Callee, {R.getValue()});
-  ResultVar.storeValue(Call);
+  auto *ResultType = L.Fn.getIRBuilder().getFloatTy();
+  return emitIntrinsic(IntrinsicName, ResultType, L, R);
+}
 
-  return ResultVar;
+Var &sqrtf(const Var &R) {
+#if PROTEUS_ENABLE_CUDA
+  StringRef IntrinsicName = "__nv_sqrtf";
+#else
+  StringRef IntrinsicName = "llvm.sqrt.f32";
+#endif
+
+  auto *ResultType = R.Fn.getIRBuilder().getFloatTy();
+  return emitIntrinsic(IntrinsicName, ResultType, R);
+}
+
+Var &expf(const Var &R) {
+#if PROTEUS_ENABLE_CUDA
+  StringRef IntrinsicName = "__nv_expf";
+#else
+  StringRef IntrinsicName = "llvm.exp.f32";
+#endif
+
+  auto *ResultType = R.Fn.getIRBuilder().getFloatTy();
+  return emitIntrinsic(IntrinsicName, ResultType, R);
+}
+
+Var &logf(const Var &R) {
+#if PROTEUS_ENABLE_CUDA
+  StringRef IntrinsicName = "__nv_logf";
+#else
+  StringRef IntrinsicName = "llvm.log.f32";
+#endif
+
+  auto *ResultType = R.Fn.getIRBuilder().getFloatTy();
+  return emitIntrinsic(IntrinsicName, ResultType, R);
 }
 
 Var &min(const Var &L, const Var &R) {
@@ -581,6 +657,40 @@ Var &min(const Var &L, const Var &R) {
   { ResultVar = L; }
   Fn.endIf();
   return ResultVar;
+}
+
+Var &max(const Var &L, const Var &R) {
+  FuncBase &Fn = L.Fn;
+  if (&Fn != &R.Fn)
+    PROTEUS_FATAL_ERROR("Variables should belong to the same function");
+
+  Var &ResultVar = Fn.declVarInternal("res.", L.getValueType());
+  ResultVar = R;
+  Fn.beginIf(L > R);
+  { ResultVar = L; }
+  Fn.endIf();
+  return ResultVar;
+}
+
+Var &absf(const Var &R) {
+  FuncBase &Fn = R.Fn;
+  auto *ResultType = Fn.getIRBuilder().getFloatTy();
+#if PROTEUS_ENABLE_CUDA
+  StringRef IntrinsicName = "__nv_fabsf";
+#else
+  StringRef IntrinsicName = "llvm.fabs.f32";
+#endif
+  return emitIntrinsic(IntrinsicName, ResultType, R);
+}
+
+Var &truncf(const Var &R) {
+#if PROTEUS_ENABLE_CUDA
+  StringRef IntrinsicName = "__nv_truncf";
+#else
+  StringRef IntrinsicName = "llvm.trunc.f32";
+#endif
+  auto *ResultType = R.Fn.getIRBuilder().getFloatTy();
+  return emitIntrinsic(IntrinsicName, ResultType, R);
 }
 
 // Assignment explicit instantiations.
@@ -720,7 +830,10 @@ Type *ScalarVar::getValueType() const { return Slot->getAllocatedType(); }
 
 Value *ScalarVar::getValue() const {
   auto &IRB = Fn.getIRBuilder();
-  return IRB.CreateLoad(Slot->getAllocatedType(), Slot);
+  auto *AllocatedType = Slot->getAllocatedType();
+  if (!AllocatedType)
+    PROTEUS_FATAL_ERROR("ScalarVar alloca must allocate a type");
+  return IRB.CreateLoad(AllocatedType, Slot);
 }
 
 void ScalarVar::storeValue(Value *Val) {
@@ -799,7 +912,7 @@ Var &PointerVar::index(size_t I) {
 
   auto *Ptr = IRB.CreateLoad(Alloca->getAllocatedType(), Alloca);
   auto *GEP = IRB.CreateConstInBoundsGEP1_64(PointerElemTy, Ptr, I);
-  auto *BasePtrTy = cast<PointerType>(Ptr->getType());
+  auto *BasePtrTy = llvm::cast<PointerType>(Ptr->getType());
   unsigned AddrSpace = BasePtrTy->getAddressSpace();
   Type *ElemPtrTy = PointerType::get(PointerElemTy, AddrSpace);
 
@@ -813,7 +926,7 @@ Var &PointerVar::index(const Var &I) {
 
   auto *Ptr = IRB.CreateLoad(Alloca->getAllocatedType(), Alloca);
   auto *GEP = IRB.CreateInBoundsGEP(PointerElemTy, Ptr, I.getValue());
-  auto *BasePtrTy = cast<PointerType>(Ptr->getType());
+  auto *BasePtrTy = llvm::cast<PointerType>(Ptr->getType());
   unsigned AddrSpace = BasePtrTy->getAddressSpace();
   Type *ElemPtrTy = PointerType::get(PointerElemTy, AddrSpace);
 
@@ -857,7 +970,7 @@ Var &ArrayVar::index(size_t I) {
   // GEP into the array aggregate: [0, I]
   auto *GEP = IRB.CreateConstInBoundsGEP2_64(ArrayTy, BasePointer, 0, I);
   Type *ElemTy = ArrayTy->getArrayElementType();
-  auto *BasePtrTy = cast<PointerType>(BasePointer->getType());
+  auto *BasePtrTy = llvm::cast<PointerType>(BasePointer->getType());
   unsigned AddrSpace = BasePtrTy->getAddressSpace();
   Type *ElemPtrTy = PointerType::get(ElemTy, AddrSpace);
 
@@ -874,7 +987,7 @@ Var &ArrayVar::index(const Var &I) {
   Value *Zero = llvm::ConstantInt::get(IdxVal->getType(), 0);
   auto *GEP = IRB.CreateInBoundsGEP(ArrayTy, BasePointer, {Zero, IdxVal});
   Type *ElemTy = ArrayTy->getArrayElementType();
-  auto *BasePtrTy = cast<PointerType>(BasePointer->getType());
+  auto *BasePtrTy = llvm::cast<PointerType>(BasePointer->getType());
   unsigned AddrSpace = BasePtrTy->getAddressSpace();
   Type *ElemPtrTy = PointerType::get(ElemTy, AddrSpace);
 
