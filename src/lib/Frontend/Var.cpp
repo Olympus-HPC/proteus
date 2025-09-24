@@ -675,12 +675,20 @@ Var &max(const Var &L, const Var &R) {
 Var &absf(const Var &R) {
   FuncBase &Fn = R.Fn;
   auto *ResultType = Fn.getIRBuilder().getFloatTy();
+#if PROTEUS_ENABLE_CUDA
+  StringRef IntrinsicName = "__nv_fabsf";
+#else
   StringRef IntrinsicName = "llvm.fabs.f32";
+#endif
   return emitIntrinsic(IntrinsicName, ResultType, R);
 }
 
 Var &truncf(const Var &R) {
+#if PROTEUS_ENABLE_CUDA
+  StringRef IntrinsicName = "__nv_truncf";
+#else
   StringRef IntrinsicName = "llvm.trunc.f32";
+#endif
   auto *ResultType = R.Fn.getIRBuilder().getFloatTy();
   return emitIntrinsic(IntrinsicName, ResultType, R);
 }
