@@ -68,8 +68,7 @@ private:
     Func<void, ArgT...> &F;
     JitModule &M;
 
-    void setLaunchBounds(int MaxThreadsPerBlock,
-                                  int MinBlocksPerSM = 0) {
+    void setLaunchBounds(int MaxThreadsPerBlock, int MinBlocksPerSM = 0) {
       if (M.isCompiled())
         PROTEUS_FATAL_ERROR("setLaunchBounds must be called before compile()");
 
