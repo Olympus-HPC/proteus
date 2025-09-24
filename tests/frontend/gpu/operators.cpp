@@ -27,7 +27,7 @@ int main() {
   auto J = proteus::JitModule(TARGET);
   auto KernelHandle =
       J.addKernel<void(double *, double *, double *, double *, double *,
-                       double *, double *, double *, double *, double *, double *, double *, double *, double *, int *, int *)>(
+                       double *, double *, double *, double *, double *, int *, int *, double *, double *, int *, int *)>(
           "operators");
   auto &F = KernelHandle.F;
   auto &Arg0 = F.getArg(0);
@@ -66,7 +66,7 @@ int main() {
     auto &I0 = F.declVar<int>();
     I0 = 0;
     auto &I1 = F.declVar<int>();
-    I1 = 5;
+    I1 = 1;
 
     auto &B0 = !I0;
     auto &B1 = !I1;
@@ -102,7 +102,7 @@ int main() {
 
   J.compile();
 
-  double *R0, *R1, *R2, *R3, *R4, *R5, *R6, *R7, *R8, *R9, *R10, *R11, *R12, *R13; int *R14, *R15;
+  double *R0, *R1, *R2, *R3, *R4, *R5, *R6, *R7, *R8, *R9; int *R10, *R11; double *R12, *R13; int *R14, *R15;
   gpuErrCheck(gpuMallocManaged(&R0, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R1, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R2, sizeof(double)));
