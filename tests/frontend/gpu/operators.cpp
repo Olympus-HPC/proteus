@@ -27,8 +27,9 @@ int main() {
   auto J = proteus::JitModule(TARGET);
   auto KernelHandle =
       J.addKernel<void(double *, double *, double *, double *, double *,
-                       double *, double *, double *, double *, double *, int *,
-                       int *, double *, double *, int *, int *)>("operators");
+                       double *, double *, double *, double *, double *,
+                       double *, double *, int *, int *, int *, int *)>(
+          "operators");
   auto &F = KernelHandle.F;
   auto &Arg0 = F.getArg(0);
   auto &Arg1 = F.getArg(1);
@@ -71,8 +72,8 @@ int main() {
     auto &B0 = !I0;
     auto &B1 = !I1;
 
-    Arg10[0] = B0;
-    Arg11[0] = B1;
+    Arg14[0] = B0;
+    Arg15[0] = B1;
 
     auto &I2 = F.declVar<int>();
     I2 = 10;
@@ -82,8 +83,8 @@ int main() {
     auto &I4 = -I2; // -10
     auto &I5 = -I3; // 7
 
-    Arg12[0] = I4;
-    Arg13[0] = I5;
+    Arg10[0] = I4;
+    Arg11[0] = I5;
 
     auto &D0 = F.declVar<double>();
     D0 = 3.14;
@@ -93,8 +94,8 @@ int main() {
     auto &D2 = -D0; // -3.14
     auto &D3 = -D1; // 5.5
 
-    Arg14[0] = D2;
-    Arg15[0] = D3;
+    Arg12[0] = D2;
+    Arg13[0] = D3;
 
     F.ret();
   }
@@ -102,10 +103,8 @@ int main() {
 
   J.compile();
 
-  double *R0, *R1, *R2, *R3, *R4, *R5, *R6, *R7, *R8, *R9;
-  int *R10, *R11;
-  double *R12, *R13;
-  int *R14, *R15;
+  double *R0, *R1, *R2, *R3, *R4, *R5, *R6, *R7, *R8, *R9, *R10, *R11;
+  int *R12, *R13, *R14, *R15;
   gpuErrCheck(gpuMallocManaged(&R0, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R1, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R2, sizeof(double)));
@@ -177,12 +176,12 @@ int main() {
 // CHECK-NEXT: R7 = 3
 // CHECK-NEXT: R8 = 10
 // CHECK-NEXT: R9 = 2.5
-// CHECK-NEXT: R10 = 1
-// CHECK-NEXT: R11 = 0
-// CHECK-NEXT: R12 = -10
-// CHECK-NEXT: R13 = 7
-// CHECK-NEXT: R14 = -3
-// CHECK-NEXT: R15 = 5
+// CHECK-NEXT: R10 = -10
+// CHECK-NEXT: R11 = 7
+// CHECK-NEXT: R12 = -3
+// CHECK-NEXT: R13 = 5
+// CHECK-NEXT: R14 = 1
+// CHECK-NEXT: R15 = 0
 // CHECK-NEXT: JitCache hits 0 total 1
 // CHECK-NEXT: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: JitStorageCache hits 0 total 1
