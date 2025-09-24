@@ -1,6 +1,6 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/dsl_static_bounds.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-%ext
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/launch_bounds.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-%ext
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
