@@ -82,6 +82,8 @@ private:
 
       setLaunchBoundsForKernel(*Fn, MaxThreadsPerBlock, MinBlocksPerSM);
 #else
+      (void)MaxThreadsPerBlock;
+      (void)MinBlocksPerSM;
       PROTEUS_FATAL_ERROR("Unsupported target for setLaunchBounds");
 #endif
     }
