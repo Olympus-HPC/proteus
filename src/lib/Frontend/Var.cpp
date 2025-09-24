@@ -679,6 +679,13 @@ Var &max(const Var &L, const Var &R) {
   return ResultVar;
 }
 
+Var &absf(const Var &R) {
+  FuncBase &Fn = R.Fn;
+  auto *ResultType = Fn.getIRBuilder().getFloatTy();
+  StringRef IntrinsicName = "llvm.fabs.f32";
+  return emitIntrinsic(IntrinsicName, ResultType, {&R});
+}
+
 // Cast this Var's value to type T and return a new Var holding the converted value.
 template <typename T>
 std::enable_if_t<std::is_arithmetic_v<T>, Var &> Var::cast() {
