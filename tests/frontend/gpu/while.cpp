@@ -61,8 +61,8 @@ int main() {
   double *X;
   int NHost = 10;
   gpuErrCheck(gpuMallocManaged(&X, sizeof(double) * NHost));
-  for (int i = 0; i < NHost; i++)
-    X[i] = 1.0;
+  for (int I = 0; I < NHost; I++)
+    X[I] = 1.0;
 
   gpuErrCheck(KernelHandle.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, X, NHost));
   gpuErrCheck(gpuDeviceSynchronize());
