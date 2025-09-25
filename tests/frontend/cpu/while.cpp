@@ -1,0 +1,64 @@
+// clang-format off
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/while | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// Second run uses the object cache.
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/while | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: rm -rf "%t.$$.proteus"
+// clang-format on
+
+#include <iostream>
+
+#include <proteus/JitFrontend.hpp>
+#include <proteus/JitInterface.hpp>
+
+int main() {
+  proteus::init();
+
+  auto J = proteus::JitModule();
+  auto &F = J.addFunction<void(double *)>("while");
+
+  auto &I = F.declVar<int>("i");
+  auto &N = F.declVar<int>("n");
+  auto &Arg = F.getArg(0);
+
+  F.beginFunction();
+  {
+    I = 0;
+    N = 10;
+    auto &Cond = F.declVar<bool>("cond");
+    Cond = I < N;
+    F.beginWhile(Cond);
+    {
+      Arg[I] = Arg[I] + I;
+      I = I + 1;
+      Cond = I < N;
+    }
+    F.endWhile();
+    F.ret();
+  }
+  F.endFunction();
+
+  J.compile();
+
+  double X[10];
+  for (int i = 0; i < 10; i++) X[i] = 1.0;
+  F(X);
+  for (int i = 0; i < 10; i++) std::cout << "X[" << i << "] = " << X[i] << "\n";
+
+  proteus::finalize();
+  return 0;
+}
+
+// clang-format off
+// CHECK: X[0] = 1
+// CHECK-NEXT: X[1] = 2
+// CHECK-NEXT: X[2] = 3
+// CHECK-NEXT: X[3] = 4
+// CHECK-NEXT: X[4] = 5
+// CHECK-NEXT: X[5] = 6
+// CHECK-NEXT: X[6] = 7
+// CHECK-NEXT: X[7] = 8
+// CHECK-NEXT: X[8] = 9
+// CHECK-NEXT: X[9] = 10
+// CHECK-FIRST: JitStorageCache hits 0 total 1
+// CHECK-SECOND: JitStorageCache hits 1 total 1
