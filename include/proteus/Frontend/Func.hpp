@@ -109,7 +109,7 @@ public:
     auto *BasePointer =
         emitArrayCreate(TypeMap<T>::get(F->getContext(), NElem), AS, Name);
 
-    auto *ArrTy = cast<ArrayType>(TypeMap<T>::get(F->getContext(), NElem));
+    auto *ArrTy = llvm::cast<ArrayType>(TypeMap<T>::get(F->getContext(), NElem));
     auto &Ref = *Variables.emplace_back(
         std::make_unique<ArrayVar>(BasePointer, *this, ArrTy));
     return Ref;
@@ -236,6 +236,19 @@ public:
     Name = NewName.str();
     Function *F = getFunction();
     F->setName(Name);
+  }
+
+  // Cast the given Var's value to type T and return a new Var holding
+  // the converted value.
+  template <typename T>
+  std::enable_if_t<std::is_arithmetic_v<T>, Var &> cast(Var &V) {
+    auto &Ctx = getFunction()->getContext();
+    auto &IRBRef = getIRBuilder();
+    Type *TargetTy = TypeMap<T>::get(Ctx);
+    Var &Res = declVarInternal("cast.", TargetTy);
+    Value *Converted = convert(IRBRef, V.getValue(), TargetTy);
+    Res.storeValue(Converted);
+    return Res;
   }
 };
 
