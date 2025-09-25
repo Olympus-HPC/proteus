@@ -41,9 +41,11 @@ int main() {
   J.compile();
 
   double X[10];
-  for (int i = 0; i < 10; i++) X[i] = 1.0;
+  for (int I = 0; I < 10; I++)
+    X[I] = 1.0;
   F(X);
-  for (int i = 0; i < 10; i++) std::cout << "X[" << i << "] = " << X[i] << "\n";
+  for (int I = 0; I < 10; I++)
+    std::cout << "X[" << I << "] = " << X[I] << "\n";
 
   proteus::finalize();
   return 0;

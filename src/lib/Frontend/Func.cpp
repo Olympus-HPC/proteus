@@ -311,9 +311,9 @@ void FuncBase::endWhile() {
     PROTEUS_FATAL_ERROR("Expected WHILE scope");
   Scope S = Scopes.back();
   if (S.Kind != ScopeKind::WHILE)
-    PROTEUS_FATAL_ERROR("Syntax error, expected WHILE end scope but found unterminated scope " +
-                        toString(S.Kind) + " @ " + S.File + ":" +
-                        std::to_string(S.Line));
+    PROTEUS_FATAL_ERROR(
+        "Syntax error, expected WHILE end scope but found unterminated scope " +
+        toString(S.Kind) + " @ " + S.File + ":" + std::to_string(S.Line));
 
   IP = S.ContIP;
   Scopes.pop_back();

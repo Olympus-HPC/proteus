@@ -40,7 +40,8 @@ int main() {
 
   F.beginFunction();
   {
-    I = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) + F.callBuiltin(getThreadIdX);
+    I = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +
+        F.callBuiltin(getThreadIdX);
     Stride = F.callBuiltin(getGridDimX) * F.callBuiltin(getBlockDimX);
     auto &Cond = F.declVar<bool>("cond");
     Cond = I < N;
@@ -57,14 +58,17 @@ int main() {
 
   J.compile();
 
-  double *X; int NHost = 10;
+  double *X;
+  int NHost = 10;
   gpuErrCheck(gpuMallocManaged(&X, sizeof(double) * NHost));
-  for (int i = 0; i < NHost; i++) X[i] = 1.0;
+  for (int i = 0; i < NHost; i++)
+    X[i] = 1.0;
 
   gpuErrCheck(KernelHandle.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, X, NHost));
   gpuErrCheck(gpuDeviceSynchronize());
 
-  for (int i = 0; i < NHost; i++) std::cout << "X[" << i << "] = " << X[i] << "\n";
+  for (int I = 0; I < NHost; I++)
+    std::cout << "X[" << I << "] = " << X[I] << "\n";
 
   gpuErrCheck(gpuFree(X));
 
