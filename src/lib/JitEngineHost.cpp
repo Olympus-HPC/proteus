@@ -288,11 +288,13 @@ std::unique_ptr<MemoryBuffer> JitEngineHost::compileOnly(Module &M) {
   // Set up the pass manager.
   legacy::PassManager PM;
   // Add optimization passes.
-  if (Config::get().ProteusOptPipeline) {
-    optimizeIR(M, sys::getHostCPUName(),
-               Config::get().ProteusOptPipeline.value(), 3);
+  const auto &CGConfig = Config::get().getCGConfig();
+  if (CGConfig.optPipeline()) {
+    optimizeIR(M, sys::getHostCPUName(), CGConfig.optPipeline().value(),
+               CGConfig.codeGenOptLevel());
   } else
-    optimizeIR(M, sys::getHostCPUName(), '3', 3);
+    optimizeIR(M, sys::getHostCPUName(), CGConfig.optLevel(),
+               CGConfig.codeGenOptLevel());
 
   // Add the target passes to emit object code.
   if (TM->addPassesToEmitFile(PM, ObjStream, nullptr,

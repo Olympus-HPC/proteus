@@ -55,6 +55,12 @@ inline std::optional<std::string> getEnvOrDefaultString(const char *VarName) {
   return std::string(EnvValue);
 }
 
+inline char getEnvOrDefaultChar(const char *VarName, char Default) {
+
+  const char *EnvValue = std::getenv(VarName);
+  return EnvValue ? EnvValue[0] : Default;
+}
+
 inline bool getEnvOrDefaultBool(const char *VarName, bool Default) {
 
   const char *EnvValue = std::getenv(VarName);
@@ -109,18 +115,87 @@ inline KernelCloneOption getEnvOrDefaultKC(const char *VarName,
   return Default;
 }
 
+class CodeGenerationConfig {
+  static CodegenOption getCodeGen(CodegenOption ProteusCodegen) {
+    constexpr bool SupportOnlyRTC =
+#if defined(PROTEUS_ENABLE_CUDA)
+        true;
+#else
+        false;
+#endif
+    if (SupportOnlyRTC && ProteusCodegen != CodegenOption::RTC) {
+      Logger::outs("proteus") << "Warning: Proteus supports only RTC in the "
+                                 "current build system configuration, "
+                                 "defaulting Codegen to RTC\n";
+      ProteusCodegen = CodegenOption::RTC;
+    }
+    return ProteusCodegen;
+  }
+
+  std::optional<const std::string> ProteusOptPipeline;
+  CodegenOption ProteusCodegen;
+  bool ProteusSpecializeArgs;
+  bool ProteusSpecializeLaunchBounds;
+  bool ProteusSpecializeDims;
+  bool ProteusSpecializeDimsAssume;
+  char ProteusOptLevel;
+  int ProteusCodeGenOptLevel;
+
+  CodeGenerationConfig(std::optional<const std::string> ProteusOptPipeline,
+                       CodegenOption ProteusCodegen, bool ProteusSpecializeArgs,
+                       bool ProteusSpecializeLaunchBounds,
+                       bool ProteusSpecializeDims,
+                       bool ProteusSpecializeDimsAssume, char ProteusOptLevel,
+                       int ProteusCodeGenOptLevel)
+      : ProteusOptPipeline(ProteusOptPipeline), ProteusCodegen(ProteusCodegen),
+        ProteusSpecializeArgs(ProteusSpecializeArgs),
+        ProteusSpecializeLaunchBounds(ProteusSpecializeLaunchBounds),
+        ProteusSpecializeDims(ProteusSpecializeDims),
+        ProteusSpecializeDimsAssume(ProteusSpecializeDimsAssume),
+        ProteusOptLevel(ProteusOptLevel),
+        ProteusCodeGenOptLevel(ProteusCodeGenOptLevel) {}
+
+public:
+  static CodeGenerationConfig createFromEnv() {
+    constexpr bool DefaultSpecializeDimsAssume =
+#if PROTEUS_ENABLE_CUDA
+        false;
+#else
+        true;
+#endif
+
+    return CodeGenerationConfig(
+        getEnvOrDefaultString("PROTEUS_OPT_PIPELINE"),
+        getCodeGen(getEnvOrDefaultCG("PROTEUS_CODEGEN", CodegenOption::RTC)),
+        getEnvOrDefaultBool("PROTEUS_SPECIALIZE_ARGS", true),
+        getEnvOrDefaultBool("PROTEUS_SPECIALIZE_LAUNCH_BOUNDS", true),
+        getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS", true),
+        getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS_ASSUME",
+                            DefaultSpecializeDimsAssume),
+        getEnvOrDefaultChar("PROTEUS_OPT_LEVEL", '3'),
+        getEnvOrDefaultInt("PROTEUS_CODEGEN_OPT_LEVEL", 3));
+  }
+
+  CodegenOption codeGenOption() const { return ProteusCodegen; }
+  bool specializeArgs() const { return ProteusSpecializeArgs; }
+  bool specializeDims() const { return ProteusSpecializeDims; }
+  bool specializeDimsAssume() const { return ProteusSpecializeDimsAssume; }
+  bool specializeLaunchBounds() const { return ProteusSpecializeLaunchBounds; }
+  char optLevel() const { return ProteusOptLevel; }
+  int codeGenOptLevel() const { return ProteusCodeGenOptLevel; }
+  std::optional<const std::string> optPipeline() const {
+    return ProteusOptPipeline;
+  }
+};
+
 class Config {
 public:
   static Config &get() {
     static Config Conf;
     return Conf;
   }
-
+  const CodeGenerationConfig CodeGenConfig;
   bool ProteusUseStoredCache;
-  bool ProteusSpecializeLaunchBounds;
-  bool ProteusSpecializeArgs;
-  bool ProteusSpecializeDims;
-  bool ProteusSpecializeDimsAssume;
   bool ProteusDisable;
   bool ProteusDumpLLVMIR;
   bool ProteusRelinkGlobalsByCopy;
@@ -129,47 +204,17 @@ public:
   bool ProteusAsyncTestBlocking;
   KernelCloneOption ProteusKernelClone;
   bool ProteusEnableTimers;
-  CodegenOption ProteusCodegen;
   int ProteusTraceOutput;
-  std::optional<const std::string> ProteusOptPipeline;
   std::optional<const std::string> ProteusCacheDir;
+
+  const CodeGenerationConfig &getCGConfig() const { return CodeGenConfig; }
 
 private:
   Config()
-      : ProteusOptPipeline(getEnvOrDefaultString("PROTEUS_OPT_PIPELINE")),
+      : CodeGenConfig(CodeGenerationConfig::createFromEnv()),
         ProteusCacheDir(getEnvOrDefaultString("PROTEUS_CACHE_DIR")) {
     ProteusUseStoredCache =
         getEnvOrDefaultBool("PROTEUS_USE_STORED_CACHE", true);
-    ProteusSpecializeLaunchBounds =
-        getEnvOrDefaultBool("PROTEUS_SPECIALIZE_LAUNCH_BOUNDS", true);
-    ProteusSpecializeArgs =
-        getEnvOrDefaultBool("PROTEUS_SPECIALIZE_ARGS", true);
-    ProteusSpecializeDims =
-        getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS", true);
-    ProteusCodegen = getEnvOrDefaultCG("PROTEUS_CODEGEN", CodegenOption::RTC);
-#if PROTEUS_ENABLE_CUDA
-    ProteusSpecializeDimsAssume =
-        getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS_ASSUME", false);
-    if (ProteusCodegen != CodegenOption::RTC) {
-      Logger::outs("proteus")
-          << "Warning: Proteus supports only RTC compilation for CUDA, "
-             "setting Codegen to RTC\n";
-      ProteusCodegen = CodegenOption::RTC;
-    }
-#else
-    ProteusSpecializeDimsAssume =
-        getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS_ASSUME", true);
-#endif
-#if PROTEUS_ENABLE_HIP
-#if LLVM_VERSION_MAJOR < 18
-    if (ProteusCodegen != CodegenOption::RTC) {
-      Logger::outs("proteus")
-          << "Warning: Proteus with LLVM < 18 supports only RTC compilation, "
-             "setting Codegen to RTC\n";
-      ProteusCodegen = CodegenOption::RTC;
-    }
-#endif
-#endif
     ProteusDisable = getEnvOrDefaultBool("PROTEUS_DISABLE", false);
     ProteusDumpLLVMIR = getEnvOrDefaultBool("PROTEUS_DUMP_LLVM_IR", false);
     ProteusRelinkGlobalsByCopy =
