@@ -93,7 +93,16 @@ public:
         SpecializeLaunchBounds(CGConfig.specializeLaunchBounds()),
         OptLevel(CGConfig.optLevel()),
         CodegenOptLevel(CGConfig.codeGenOptLevel()),
-        PassPipeline(CGConfig.optPipeline()) {}
+        PassPipeline(CGConfig.optPipeline()) {
+    if (Config::get().ProteusTraceOutput >= 1) {
+      llvm::SmallString<128> S;
+      llvm::raw_svector_ostream OS(S);
+      OS << "[KernelConfig] ID:" << KernelName << " ";
+      CGConfig.dump(OS);
+      OS << "\n";
+      Logger::trace(OS.str());
+    }
+  }
 
   // Delete copy operations.
   CompilationTask(const CompilationTask &) = delete;

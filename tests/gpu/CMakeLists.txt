@@ -214,6 +214,14 @@ elseif(PROTEUS_ENABLE_CUDA)
     endif()
 endif()
 
+if(PROTEUS_ENABLE_HIP)
+SET(lang HIP)
+else()
+SET(lang CUDA)
+endif()
+
+
+
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/lit.cfg.py "
 import lit.formats
 import os
@@ -237,6 +245,7 @@ FILECHECK = lit_config.params['FILECHECK']
 config.substitutions.append(('%ext', ext))
 config.substitutions.append(('%FILECHECK', FILECHECK))
 config.substitutions.append(('%build', '${CMAKE_CURRENT_BINARY_DIR}'))
+config.substitutions.append(('%device_lang', '${lang}'))
 "
 )
 
@@ -298,6 +307,7 @@ CREATE_GPU_TEST(mix_attr_api mix_attr_api.cpp)
 CREATE_GPU_TEST(types_jit_array types_jit_array.cpp)
 CREATE_GPU_TEST(dynamic_jit_array dynamic_jit_array.cpp)
 CREATE_GPU_TEST(jit_struct jit_struct.cpp)
+CREATE_GPU_TEST(kernel_tuning kernel_tuning.cpp)
 
 CREATE_GPU_TEST_RDC(kernel kernel.cpp)
 CREATE_GPU_TEST_RDC(kernel_pass_pipeline kernel_pass_pipeline.cpp)
@@ -358,6 +368,7 @@ CREATE_GPU_TEST_RDC(mix_attr_api mix_attr_api.cpp)
 CREATE_GPU_TEST_RDC(types_jit_array types_jit_array.cpp)
 CREATE_GPU_TEST_RDC(dynamic_jit_array dynamic_jit_array.cpp)
 CREATE_GPU_TEST_RDC(jit_struct jit_struct.cpp)
+CREATE_GPU_TEST_RDC(kernel_tuning kernel_tuning.cpp)
 
 if(PROTEUS_ENABLE_HIP)
     if(LLVM_VERSION_MAJOR GREATER_EQUAL 18)
