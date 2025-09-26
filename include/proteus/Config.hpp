@@ -120,8 +120,6 @@ class CodeGenerationConfig {
     constexpr bool SupportOnlyRTC =
 #if defined(PROTEUS_ENABLE_CUDA)
         true;
-#elif defined(PROTEUS_ENABLE_HIP) && (LLVM_VERSION_MAJOR < 18)
-        true;
 #else
         false;
 #endif
@@ -175,7 +173,7 @@ public:
         getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS_ASSUME",
                             DefaultSpecializeDimsAssume),
         getEnvOrDefaultChar("PROTEUS_OPT_LEVEL", '3'),
-        getEnvOrDefaultInt("PROTEUS_CODE_GEN_OPT_LEVEL", 3));
+        getEnvOrDefaultInt("PROTEUS_CODEGEN_OPT_LEVEL", 3));
   }
 
   CodegenOption codeGenOption() const { return ProteusCodegen; }
