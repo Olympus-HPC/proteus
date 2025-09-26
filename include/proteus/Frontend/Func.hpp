@@ -49,7 +49,7 @@ protected:
 
   std::string Name;
 
-  enum class ScopeKind { FUNCTION, IF, FOR };
+  enum class ScopeKind { FUNCTION, IF, FOR, WHILE };
   struct Scope {
     std::string File;
     int Line;
@@ -70,6 +70,8 @@ protected:
       return "IF";
     case ScopeKind::FOR:
       return "FOR";
+    case ScopeKind::WHILE:
+      return "WHILE";
     default:
       PROTEUS_FATAL_ERROR("Unsupported Kind " +
                           std::to_string(static_cast<int>(Kind)));
@@ -191,6 +193,10 @@ public:
                 const char *File = __builtin_FILE(),
                 int Line = __builtin_LINE());
   void endFor();
+
+  void beginWhile(Var &CondVar, const char *File = __builtin_FILE(),
+                  int Line = __builtin_LINE());
+  void endWhile();
 
   template <typename Sig>
   std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, Var &>
