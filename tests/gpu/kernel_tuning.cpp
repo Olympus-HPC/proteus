@@ -39,7 +39,8 @@ int main() {
 }
 
 // clang-format off
-// CHECK: [KernelConfig] ID:foo Pipeline:default<O3>,globaldce CG:Serial SA:1 LB:0 SD:0 SDA:0 OL:3 CGL:2
+// CHECK-CUDA: [KernelConfig] ID:foo Pipeline:default<O3>,globaldce CG:RTC SA:1 LB:0 SD:0 SDA:0 OL:3 CGL:2
+// CHECK-HIP: [KernelConfig] ID:foo Pipeline:default<O3>,globaldce CG:Serial SA:1 LB:0 SD:0 SDA:0 OL:3 CGL:2
 // CHECK: [CustomPipeline] default<O3>,globaldce
 // CHECK: Hello from foo
 // CHECK: [KernelConfig] ID:bar CG:RTC SA:1 LB:1 SD:1 SDA:1 OL:3 CGL:2
