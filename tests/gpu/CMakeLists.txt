@@ -214,6 +214,14 @@ elseif(PROTEUS_ENABLE_CUDA)
     endif()
 endif()
 
+if(PROTEUS_ENABLE_HIP)
+SET(lang HIP)
+else()
+SET(lang CUDA)
+endif()
+
+
+
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/lit.cfg.py "
 import lit.formats
 import os
@@ -237,6 +245,7 @@ FILECHECK = lit_config.params['FILECHECK']
 config.substitutions.append(('%ext', ext))
 config.substitutions.append(('%FILECHECK', FILECHECK))
 config.substitutions.append(('%build', '${CMAKE_CURRENT_BINARY_DIR}'))
+config.substitutions.append(('%device_lang', '${lang}'))
 "
 )
 
