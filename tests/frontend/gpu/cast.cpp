@@ -25,8 +25,9 @@ int main() {
   proteus::init();
 
   auto J = proteus::JitModule(TARGET);
-  auto KernelHandle = J.addKernel<void(double *, int *, float *, double *,
-                                       int *, float *)>("cast");
+  auto KernelHandle =
+      J.addKernel<void(double *, int *, float *, double *, int *, float *)>(
+          "cast");
   auto &F = KernelHandle.F;
   auto &DOut = F.getArg(0);
   auto &IOut = F.getArg(1);
@@ -76,20 +77,19 @@ int main() {
   gpuErrCheck(gpuMallocManaged(&OutDoubleFromInt, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&OutIntFromFloat, sizeof(int)));
   gpuErrCheck(gpuMallocManaged(&OutFloatFromDouble, sizeof(float)));
-  
-  gpuErrCheck(KernelHandle.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr,
-                                  OutDoubleFromFloat, OutIntFromDouble,
-                                  OutFloatFromInt, OutDoubleFromInt,
-                                  OutIntFromFloat, OutFloatFromDouble));
+
+  gpuErrCheck(KernelHandle.launch(
+      {1, 1, 1}, {1, 1, 1}, 0, nullptr, OutDoubleFromFloat, OutIntFromDouble,
+      OutFloatFromInt, OutDoubleFromInt, OutIntFromFloat, OutFloatFromDouble));
   gpuErrCheck(gpuDeviceSynchronize());
-  
+
   std::cout << "DoubleFromFloat = " << *OutDoubleFromFloat << "\n";
   std::cout << "IntFromDouble = " << *OutIntFromDouble << "\n";
   std::cout << "FloatFromInt = " << *OutFloatFromInt << "\n";
   std::cout << "DoubleFromInt = " << *OutDoubleFromInt << "\n";
   std::cout << "IntFromFloat = " << *OutIntFromFloat << "\n";
   std::cout << "FloatFromDouble = " << *OutFloatFromDouble << "\n";
-  
+
   gpuErrCheck(gpuFree(OutDoubleFromFloat));
   gpuErrCheck(gpuFree(OutIntFromDouble));
   gpuErrCheck(gpuFree(OutFloatFromInt));

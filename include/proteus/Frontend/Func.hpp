@@ -109,8 +109,7 @@ public:
     auto *BasePointer =
         emitArrayCreate(TypeMap<T>::get(F->getContext(), NElem), AS, Name);
 
-    auto *ArrTy =
-        cast<ArrayType>(TypeMap<T>::get(F->getContext(), NElem));
+    auto *ArrTy = cast<ArrayType>(TypeMap<T>::get(F->getContext(), NElem));
     auto &Ref = *Variables.emplace_back(
         std::make_unique<ArrayVar>(BasePointer, *this, ArrTy));
     return Ref;

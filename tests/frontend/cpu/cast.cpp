@@ -15,8 +15,9 @@ int main() {
   proteus::init();
 
   auto J = proteus::JitModule();
-  auto &F = J.addFunction<void(double *, int *, float *, double *, int *,
-                               float *)>("cast");
+  auto &F =
+      J.addFunction<void(double *, int *, float *, double *, int *, float *)>(
+          "cast");
   auto &DOut = F.getArg(0);
   auto &IOut = F.getArg(1);
   auto &FOut = F.getArg(2);
@@ -59,8 +60,8 @@ int main() {
   double DoubleFromFloat, DoubleFromInt;
   int IntFromDouble, IntFromFloat;
   float FloatFromInt, FloatFromDouble;
-  F(&DoubleFromFloat, &IntFromDouble, &FloatFromInt,
-    &DoubleFromInt, &IntFromFloat, &FloatFromDouble);
+  F(&DoubleFromFloat, &IntFromDouble, &FloatFromInt, &DoubleFromInt,
+    &IntFromFloat, &FloatFromDouble);
 
   std::cout << "DoubleFromFloat = " << DoubleFromFloat << "\n";
   std::cout << "IntFromDouble = " << IntFromDouble << "\n";
