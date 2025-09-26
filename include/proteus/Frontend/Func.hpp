@@ -110,7 +110,7 @@ public:
         emitArrayCreate(TypeMap<T>::get(F->getContext(), NElem), AS, Name);
 
     auto *ArrTy =
-        llvm::cast<ArrayType>(TypeMap<T>::get(F->getContext(), NElem));
+        cast<ArrayType>(TypeMap<T>::get(F->getContext(), NElem));
     auto &Ref = *Variables.emplace_back(
         std::make_unique<ArrayVar>(BasePointer, *this, ArrTy));
     return Ref;
@@ -239,15 +239,15 @@ public:
     F->setName(Name);
   }
 
-  // Cast the given Var's value to type T and return a new Var holding
+  // Convert the given Var's value to type T and return a new Var holding
   // the converted value.
   template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var &> cast(Var &V) {
+  std::enable_if_t<std::is_arithmetic_v<T>, Var &> convert(Var &V) {
     auto &Ctx = getFunction()->getContext();
     auto &IRBRef = getIRBuilder();
     Type *TargetTy = TypeMap<T>::get(Ctx);
-    Var &Res = declVarInternal("cast.", TargetTy);
-    Value *Converted = convert(IRBRef, V.getValue(), TargetTy);
+    Var &Res = declVarInternal("convert.", TargetTy);
+    Value *Converted = proteus::convert(IRBRef, V.getValue(), TargetTy);
     Res.storeValue(Converted);
     return Res;
   }

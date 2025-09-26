@@ -4,7 +4,7 @@ namespace proteus {
 
 FuncBase::FuncBase(JitModule &J, FunctionCallee FC)
     : J(J), FC(FC), IRB{FC.getCallee()->getContext()} {
-  Function *F = llvm::cast<Function>(FC.getCallee());
+  Function *F = cast<Function>(FC.getCallee());
   BasicBlock::Create(F->getContext(), "entry", F);
   Name = F->getName();
 
@@ -40,7 +40,7 @@ Var &FuncBase::declVarInternal(StringRef Name, Type *Ty,
 }
 
 void FuncBase::beginFunction(const char *File, int Line) {
-  Function *F = llvm::cast<Function>(FC.getCallee());
+  Function *F = cast<Function>(FC.getCallee());
   BasicBlock *BodyBB = BasicBlock::Create(F->getContext(), "body", F);
   BasicBlock *ExitBB = BasicBlock::Create(F->getContext(), "exit", F);
   IP =
@@ -100,7 +100,7 @@ Value *FuncBase::emitArrayCreate(Type *Ty, AddressSpace AT, StringRef Name) {
   if (!Ty || !Ty->isArrayTy())
     PROTEUS_FATAL_ERROR("Expected LLVM ArrayType for emitArrayCreate");
 
-  auto *ArrTy = llvm::cast<ArrayType>(Ty);
+  auto *ArrTy = cast<ArrayType>(Ty);
 
   switch (AT) {
   case AddressSpace::SHARED:
