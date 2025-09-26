@@ -262,7 +262,7 @@ parseJSONConfig(std::optional<std::string> JSONFn) {
                        "Cannot convert buffer to json value");
 
     if (auto *Obj = JsonInfo.getAsObject())
-      return *Obj; // copies the object, safe after return
+      return *Obj;
     return std::nullopt;
   }();
 
