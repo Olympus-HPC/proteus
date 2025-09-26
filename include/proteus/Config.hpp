@@ -76,7 +76,7 @@ inline int getEnvOrDefaultInt(const char *VarName, int Default) {
   return EnvValue ? std::stoi(EnvValue) : Default;
 }
 
-inline CodegenOption StrToCG(std::string CGstr) {
+inline CodegenOption strToCG(std::string CGstr) {
   std::transform(CGstr.begin(), CGstr.end(), CGstr.begin(), ::tolower);
   if (CGstr == "rtc")
     return CodegenOption::RTC;
@@ -95,7 +95,7 @@ inline CodegenOption getEnvOrDefaultCG(const char *VarName,
   if (!EnvValue)
     return Default;
 
-  return StrToCG(EnvValue);
+  return strToCG(EnvValue);
 }
 
 template <typename T>
@@ -204,7 +204,7 @@ public:
     return CodeGenerationConfig(
         ProteusPipeline,
         getCodeGen(
-            StrToCG(getDefaultValueFromOptional(Config.getString("CodeGen"),
+            strToCG(getDefaultValueFromOptional(Config.getString("CodeGen"),
                                                 llvm::StringRef("rtc"))
                         .str())),
         getDefaultValueFromOptional(Config.getBoolean("SpecializeArgs"), true),
