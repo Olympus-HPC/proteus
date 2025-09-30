@@ -27,7 +27,8 @@ int main() {
   auto J = proteus::JitModule(TARGET);
   auto KernelHandle =
       J.addKernel<void(double *, double *, double *, double *, double *,
-                       double *, double *, double *, double *, double *)>(
+                       double *, double *, double *, double *, double *,
+                       double *, double *, int *, int *, int *, int *)>(
           "operators");
   auto &F = KernelHandle.F;
   auto &Arg0 = F.getArg(0);
@@ -40,6 +41,12 @@ int main() {
   auto &Arg7 = F.getArg(7);
   auto &Arg8 = F.getArg(8);
   auto &Arg9 = F.getArg(9);
+  auto &Arg10 = F.getArg(10);
+  auto &Arg11 = F.getArg(11);
+  auto &Arg12 = F.getArg(12);
+  auto &Arg13 = F.getArg(13);
+  auto &Arg14 = F.getArg(14);
+  auto &Arg15 = F.getArg(15);
   F.beginFunction();
   {
     Arg0[0] = 2;
@@ -57,13 +64,47 @@ int main() {
     Arg8[0] *= Arg0[0];
     Arg9[0] /= Arg0[0];
 
+    auto &I0 = F.declVar<int>();
+    I0 = 0;
+    auto &I1 = F.declVar<int>();
+    I1 = 1;
+
+    auto &B0 = !I0;
+    auto &B1 = !I1;
+
+    Arg14[0] = B0;
+    Arg15[0] = B1;
+
+    auto &I2 = F.declVar<int>();
+    I2 = 10;
+    auto &I3 = F.declVar<int>();
+    I3 = -7;
+
+    auto &I4 = -I2; // -10
+    auto &I5 = -I3; // 7
+
+    Arg10[0] = I4;
+    Arg11[0] = I5;
+
+    auto &D0 = F.declVar<double>();
+    D0 = 3.14;
+    auto &D1 = F.declVar<double>();
+    D1 = -5.5;
+
+    auto &D2 = -D0; // -3.14
+    auto &D3 = -D1; // 5.5
+
+    Arg12[0] = D2;
+    Arg13[0] = D3;
+
     F.ret();
   }
   F.endFunction();
 
   J.compile();
 
-  double *R0, *R1, *R2, *R3, *R4, *R5, *R6, *R7, *R8, *R9;
+  double *R0, *R1, *R2, *R3, *R4, *R5, *R6, *R7, *R8, *R9, *R10, *R11;
+  int *R12, *R13, *R14, *R15;
   gpuErrCheck(gpuMallocManaged(&R0, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R1, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R2, sizeof(double)));
@@ -74,9 +115,16 @@ int main() {
   gpuErrCheck(gpuMallocManaged(&R7, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R8, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R9, sizeof(double)));
+  gpuErrCheck(gpuMallocManaged(&R10, sizeof(double)));
+  gpuErrCheck(gpuMallocManaged(&R11, sizeof(double)));
+  gpuErrCheck(gpuMallocManaged(&R12, sizeof(int)));
+  gpuErrCheck(gpuMallocManaged(&R13, sizeof(int)));
+  gpuErrCheck(gpuMallocManaged(&R14, sizeof(int)));
+  gpuErrCheck(gpuMallocManaged(&R15, sizeof(int)));
 
   gpuErrCheck(KernelHandle.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, R0, R1, R2,
-                                  R3, R4, R5, R6, R7, R8, R9));
+                                  R3, R4, R5, R6, R7, R8, R9, R10, R11, R12,
+                                  R13, R14, R15));
   gpuErrCheck(gpuDeviceSynchronize());
 
   std::cout << "R0 = " << *R0 << "\n";
@@ -89,6 +137,12 @@ int main() {
   std::cout << "R7 = " << *R7 << "\n";
   std::cout << "R8 = " << *R8 << "\n";
   std::cout << "R9 = " << *R9 << "\n";
+  std::cout << "R10 = " << *R10 << "\n";
+  std::cout << "R11 = " << *R11 << "\n";
+  std::cout << "R12 = " << *R12 << "\n";
+  std::cout << "R13 = " << *R13 << "\n";
+  std::cout << "R14 = " << *R14 << "\n";
+  std::cout << "R15 = " << *R15 << "\n";
 
   gpuErrCheck(gpuFree(R0));
   gpuErrCheck(gpuFree(R1));
@@ -100,6 +154,12 @@ int main() {
   gpuErrCheck(gpuFree(R7));
   gpuErrCheck(gpuFree(R8));
   gpuErrCheck(gpuFree(R9));
+  gpuErrCheck(gpuFree(R10));
+  gpuErrCheck(gpuFree(R11));
+  gpuErrCheck(gpuFree(R12));
+  gpuErrCheck(gpuFree(R13));
+  gpuErrCheck(gpuFree(R14));
+  gpuErrCheck(gpuFree(R15));
 
   proteus::finalize();
   return 0;
@@ -116,6 +176,12 @@ int main() {
 // CHECK-NEXT: R7 = 3
 // CHECK-NEXT: R8 = 10
 // CHECK-NEXT: R9 = 2.5
+// CHECK-NEXT: R10 = -10
+// CHECK-NEXT: R11 = 7
+// CHECK-NEXT: R12 = -3
+// CHECK-NEXT: R13 = 5
+// CHECK-NEXT: R14 = 1
+// CHECK-NEXT: R15 = 0
 // CHECK-NEXT: JitCache hits 0 total 1
 // CHECK-NEXT: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: JitStorageCache hits 0 total 1

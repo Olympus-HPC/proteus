@@ -17,7 +17,8 @@ int main() {
   auto J = proteus::JitModule();
   auto &F = J.addFunction<void(double *, double *, double *, double *, double *,
                                double *, double *, double *, double *, double *,
-                               double *, double *)>("operators");
+                               double *, double *, double *, double *, int *,
+                               int *, int *, int *)>("operators");
   auto &Arg0 = F.getArg(0);
   auto &Arg1 = F.getArg(1);
   auto &Arg2 = F.getArg(2);
@@ -30,6 +31,12 @@ int main() {
   auto &Arg9 = F.getArg(9);
   auto &Arg10 = F.getArg(10);
   auto &Arg11 = F.getArg(11);
+  auto &Arg12 = F.getArg(12);
+  auto &Arg13 = F.getArg(13);
+  auto &Arg14 = F.getArg(14);
+  auto &Arg15 = F.getArg(15);
+  auto &Arg16 = F.getArg(16);
+  auto &Arg17 = F.getArg(17);
   F.beginFunction();
   {
     Arg0[0] = 2;
@@ -50,14 +57,48 @@ int main() {
     Arg10[0] = Arg0 % Arg1;
     Arg11[0] %= Arg0[0];
 
+    auto &I0 = F.declVar<bool>();
+    I0 = 1;
+    auto &I1 = F.declVar<bool>();
+    I1 = 0;
+
+    auto &B0 = !I0; // true
+    auto &B1 = !I1; // false
+
+    Arg14[0] = B0;
+    Arg15[0] = B1;
+
+    auto &I2 = F.declVar<int>();
+    I2 = 10;
+    auto &I3 = F.declVar<int>();
+    I3 = -7;
+
+    auto &I4 = -I2; // -10
+    auto &I5 = -I3; // 7
+
+    Arg12[0] = I4;
+    Arg13[0] = I5;
+
+    auto &D0 = F.declVar<double>();
+    D0 = 3.14;
+    auto &D1 = F.declVar<double>();
+    D1 = -5.5;
+
+    auto &D2 = -D0; // -3.14
+    auto &D3 = -D1; // 5.5
+
+    Arg16[0] = D2;
+    Arg17[0] = D3;
     F.ret();
   }
   F.endFunction();
 
   J.compile();
 
-  double R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11;
-  F(&R0, &R1, &R2, &R3, &R4, &R5, &R6, &R7, &R8, &R9, &R10, &R11);
+  double R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13;
+  int R14, R15, R16, R17;
+  F(&R0, &R1, &R2, &R3, &R4, &R5, &R6, &R7, &R8, &R9, &R10, &R11, &R12, &R13,
+    &R14, &R15, &R16, &R17);
 
   std::cout << "R0 = " << R0 << "\n";
   std::cout << "R1 = " << R1 << "\n";
@@ -71,6 +112,12 @@ int main() {
   std::cout << "R9 = " << R9 << "\n";
   std::cout << "R10 = " << R10 << "\n";
   std::cout << "R11 = " << R11 << "\n";
+  std::cout << "R12 = " << R12 << "\n";
+  std::cout << "R13 = " << R13 << "\n";
+  std::cout << "R14 = " << R14 << "\n";
+  std::cout << "R15 = " << R15 << "\n";
+  std::cout << "R16 = " << R16 << "\n";
+  std::cout << "R17 = " << R17 << "\n";
 
   proteus::finalize();
   return 0;
@@ -89,5 +136,11 @@ int main() {
 // CHECK-NEXT: R9 = 2.5
 // CHECK-NEXT: R10 = 2
 // CHECK-NEXT: R11 = 1
+// CHECK-NEXT: R12 = -10
+// CHECK-NEXT: R13 = 7
+// CHECK-NEXT: R14 = 0
+// CHECK-NEXT: R15 = 1
+// CHECK-NEXT: R16 = -3
+// CHECK-NEXT: R17 = 5
 // CHECK-FIRST: JitStorageCache hits 0 total 1
 // CHECK-SECOND: JitStorageCache hits 1 total 1
