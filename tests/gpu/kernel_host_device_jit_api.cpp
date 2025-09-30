@@ -36,10 +36,10 @@ int main() {
 
 // clang-format off
 // CHECK: [ArgSpec] Replaced Function _Z6kerneli ArgNo 0 with value i32 42
-// CHECK: BlockSize 1
+// CHECK: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
 // CHECK: Kernel 42
 // CHECK: [ArgSpec] Replaced Function _Z6kerneli ArgNo 0 with value i32 23
-// CHECK: [LaunchBoundSpec] BlockSize 1
+// CHECK: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
 // CHECK: Kernel 23
 // CHECK: JitCache hits 0 total 1
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
