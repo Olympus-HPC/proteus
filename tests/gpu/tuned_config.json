@@ -1,0 +1,19 @@
+{
+	"bar" : {
+		"CodeGen" : "RTC",
+		"LaunchBounds" : true,
+		"SpecializeDims" : true,
+		"SpecializeDimsAssume" : true,
+		"OptLevel" : 1,
+		"CodeGenOptLevel" : 2
+	},
+	"foo" : {
+		"CodeGen" : "serial",
+		"LaunchBounds" : false,
+		"SpecializeDims" : false,
+		"SpecializeDimsAssume" : false,
+		"OptLevel" : 1,
+		"CodeGenOptLevel" : 2,
+		"Pipeline" : "default<O3>,globaldce"
+	}
+}
