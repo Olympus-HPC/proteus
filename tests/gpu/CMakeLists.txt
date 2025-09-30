@@ -1,13 +1,15 @@
+if(PROTEUS_ENABLE_HIP)
+    SET(lang HIP)
+elseif(PROTEUS_ENABLE_CUDA)
+    SET(lang CUDA)
+else()
+    message(FATAL_ERROR "PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA must be defined for GPU tests")
+endif()
+
 # The first argument is the executable to generate, the second arguments is the
 # source file with checks. Any following arguments are other source files
 # (without checks) to compile for generating the executable.
 function(CREATE_GPU_TEST exe check_source)
-    if(PROTEUS_ENABLE_HIP)
-        SET(lang HIP)
-    else()
-        SET(lang CUDA)
-    endif()
-
     add_executable(${exe}.${lang} ${check_source} ${ARGN})
     get_target_property(PROTEUS_PASS_SOURCES ProteusPass SOURCES)
     set_source_files_properties(${check_source} ${ARGN} PROPERTIES
@@ -30,14 +32,6 @@ function(CREATE_GPU_TEST exe check_source)
 endfunction()
 
 function(CREATE_GPU_TEST_RDC exe check_source)
-    if(PROTEUS_ENABLE_HIP)
-        SET(lang HIP)
-    elseif(PROTEUS_ENABLE_CUDA)
-        SET(lang CUDA)
-    else()
-        message(FATAL_ERROR "PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA must be defined for GPU tests")
-    endif()
-
     add_executable(${exe}.${lang}.rdc ${check_source} ${ARGN})
     get_target_property(PROTEUS_PASS_SOURCES ProteusPass SOURCES)
     set_source_files_properties(${check_source} ${ARGN} PROPERTIES
@@ -95,14 +89,6 @@ function(CREATE_GPU_TEST_RDC exe check_source)
 endfunction()
 
 function(CREATE_GPU_TEST_RDC_LIBS exe libs check_source)
-    if(PROTEUS_ENABLE_HIP)
-        SET(lang HIP)
-    elseif(PROTEUS_ENABLE_CUDA)
-        SET(lang CUDA)
-    else()
-        message(FATAL_ERROR "PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA must be defined for GPU tests")
-    endif()
-
     #message(FATAL_ERROR "libs ${libs} check_source ${check_source} ARGN ${ARGN}")
 
     CREATE_GPU_TEST_RDC(${exe} ${check_source} ${ARGN})
@@ -125,14 +111,6 @@ endfunction()
 # Creates a device library, which can be linked with another test. The library does not
 # apply the pass
 function(CREATE_GPU_LIBRARY lib source)
-    if(PROTEUS_ENABLE_HIP)
-        SET(lang HIP)
-    elseif(PROTEUS_ENABLE_CUDA)
-        SET(lang CUDA)
-    else()
-        message(FATAL_ERROR "PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA must be defined for GPU tests")
-    endif()
-
     add_library(${lib} ${source})
 
     set_source_files_properties(${source} PROPERTIES LANGUAGE ${lang})
@@ -156,14 +134,6 @@ function(CREATE_GPU_LIBRARY lib source)
 endfunction()
 
 function(CREATE_PROTEUS_GPU_LIBRARY lib source)
-    if(PROTEUS_ENABLE_HIP)
-        SET(lang HIP)
-    elseif(PROTEUS_ENABLE_CUDA)
-        SET(lang CUDA)
-    else()
-        message(FATAL_ERROR "PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA must be defined for GPU tests")
-    endif()
-
     add_library(${lib} ${source} ${ARGN})
 
     set_source_files_properties(${source} ${ARGN} PROPERTIES LANGUAGE ${lang})
@@ -213,14 +183,6 @@ elseif(PROTEUS_ENABLE_CUDA)
         message(FATAL_ERROR "JIT is compatible only with Clang CUDA compilation")
     endif()
 endif()
-
-if(PROTEUS_ENABLE_HIP)
-SET(lang HIP)
-else()
-SET(lang CUDA)
-endif()
-
-
 
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/lit.cfg.py "
 import lit.formats
