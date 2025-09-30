@@ -237,6 +237,19 @@ public:
     Function *F = getFunction();
     F->setName(Name);
   }
+
+  // Convert the given Var's value to type T and return a new Var holding
+  // the converted value.
+  template <typename T>
+  std::enable_if_t<std::is_arithmetic_v<T>, Var &> convert(Var &V) {
+    auto &Ctx = getFunction()->getContext();
+    auto &IRBRef = getIRBuilder();
+    Type *TargetTy = TypeMap<T>::get(Ctx);
+    Var &Res = declVarInternal("convert.", TargetTy);
+    Value *Converted = proteus::convert(IRBRef, V.getValue(), TargetTy);
+    Res.storeValue(Converted);
+    return Res;
+  }
 };
 
 template <typename RetT, typename... ArgT> class Func final : public FuncBase {
