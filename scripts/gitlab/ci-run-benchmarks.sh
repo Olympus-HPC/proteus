@@ -54,36 +54,7 @@ conda create -y -q -n proteus -c conda-forge \
     python=${PYTHON_VERSION} pandas==2.2.3 matplotlib==3.10.0
 conda activate proteus
 
-if [ "${CI_MACHINE}" == "lassen" ]; then
-  if [ "${BENCHMARKS_TOML}" == "rajaperf.toml" ]; then
-    echo "RAJAPerf benchmarks can only run on tioga.  Exiting."
-    exit 0
-  fi
-  if [ "${BENCHMARKS_TOML}" == "lbann.toml" ]; then
-    echo "LBANN benchmarks can only run on tioga.  Exiting."
-    exit 0
-  fi
-
-  ml load cmake/3.23.1
-  ml load cuda/12.2.2
-
-  PROTEUS_CI_LLVM_VERSION=18.1.8
-  conda install -y -q -c conda-forge \
-    python=${PYTHON_VERSION} clang=${PROTEUS_CI_LLVM_VERSION} clangxx=${PROTEUS_CI_LLVM_VERSION} \
-    clangdev=${PROTEUS_CI_LLVM_VERSION} llvmdev=${PROTEUS_CI_LLVM_VERSION} lit=${PROTEUS_CI_LLVM_VERSION}
-
-  LLVM_INSTALL_DIR=$(llvm-config --prefix)
-
-  CMAKE_MACHINE_OPTIONS="\
-    -DCMAKE_PREFIX_PATH=$CONDA_PREFIX;$CONDA_PREFIX/lib/cmake \
-    -DPROTEUS_LINK_SHARED_LLVM=on \
-    -DPROTEUS_ENABLE_CUDA=on \
-    -DCMAKE_CUDA_ARCHITECTURES=70 \
-    -DCMAKE_CUDA_COMPILER=${LLVM_INSTALL_DIR}/bin/clang++ \
-  "
-  PROTEUS_CC=${CONDA_PREFIX}/bin/clang++
-  MACHINE=nvidia
-elif [ "${CI_MACHINE}" == "tioga" ]; then
+if [ "${CI_MACHINE}" == "tioga" ]; then
   ml load rocm/${PROTEUS_CI_ROCM_VERSION}
 
   LLVM_INSTALL_DIR=${ROCM_PATH}/llvm
