@@ -7,29 +7,7 @@ echo "### Start ci-build-test $(date)"
 mkdir -p /tmp/proteus-ci-${CI_JOB_ID}
 cd /tmp/proteus-ci-${CI_JOB_ID}
 
-if [ "${CI_MACHINE}" == "lassen" ]; then
-  ml load cmake/3.23.1
-  ml load cuda/12.2.2
-  PYTHON_VERSION=3.12
-
-  # Install Clang/LLVM through conda.
-  MINICONDA_DIR=miniconda3
-  mkdir -p ${MINICONDA_DIR}
-  wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -m).sh -O ./${MINICONDA_DIR}/miniconda.sh
-  bash ./${MINICONDA_DIR}/miniconda.sh -b -u -p ./${MINICONDA_DIR}
-  rm ./${MINICONDA_DIR}/miniconda.sh
-  source ./${MINICONDA_DIR}/bin/activate
-  conda create -y -n proteus -c conda-forge \
-      python=${PYTHON_VERSION} clang=${PROTEUS_CI_LLVM_VERSION} clangxx=${PROTEUS_CI_LLVM_VERSION} \
-      clangdev=${PROTEUS_CI_LLVM_VERSION} llvmdev=${PROTEUS_CI_LLVM_VERSION} lit=${PROTEUS_CI_LLVM_VERSION}
-  conda activate proteus
-
-  LLVM_INSTALL_DIR=$(llvm-config --prefix)
-  CMAKE_OPTIONS_MACHINE=" -DCMAKE_PREFIX_PATH=$CONDA_PREFIX;$CONDA_PREFIX/lib/cmake"
-  CMAKE_OPTIONS_MACHINE+=" -DPROTEUS_LINK_SHARED_LLVM=on"
-  CMAKE_OPTIONS_MACHINE+=" -DPROTEUS_ENABLE_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=70"
-  CMAKE_OPTIONS_MACHINE+=" -DCMAKE_CUDA_COMPILER=$LLVM_INSTALL_DIR/bin/clang++"
-elif [ "${CI_MACHINE}" == "tioga" ]; then
+if [ "${CI_MACHINE}" == "tioga" ]; then
   ml load rocm/${PROTEUS_CI_ROCM_VERSION}
 
   if [ -n "$ROCM_PATH" ]; then
