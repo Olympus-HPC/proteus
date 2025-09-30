@@ -68,7 +68,8 @@ private:
     Func<void, ArgT...> &F;
     JitModule &M;
 
-    void setLaunchBounds(int MaxThreadsPerBlock, int MinBlocksPerSM = 0) {
+    void setLaunchBounds([[maybe_unused]] int MaxThreadsPerBlock,
+                         [[maybe_unused]] int MinBlocksPerSM = 0) {
       if (!M.isDeviceModule())
         PROTEUS_FATAL_ERROR("Expected a device module for setLaunchBounds");
 
@@ -82,9 +83,6 @@ private:
 
       setLaunchBoundsForKernel(*Fn, MaxThreadsPerBlock, MinBlocksPerSM);
 #else
-      // Suppress unused warnings.
-      (void)MaxThreadsPerBlock;
-      (void)MinBlocksPerSM;
       PROTEUS_FATAL_ERROR("Unsupported target for setLaunchBounds");
 #endif
     }
