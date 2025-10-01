@@ -128,20 +128,10 @@ inline KernelCloneOption getEnvOrDefaultKC(const char *VarName,
 }
 
 class CodeGenerationConfig {
-  static constexpr bool DefaultSpecializeDimsAssume =
-#if PROTEUS_ENABLE_CUDA
-      false;
-#else
-      true;
-#endif
+  static constexpr bool DefaultSpecializeDimsAssume = PROTEUS_ENABLE_HIP;
 
   static CodegenOption getCodeGen(CodegenOption ProteusCodegen) {
-    constexpr bool SupportOnlyRTC =
-#if defined(PROTEUS_ENABLE_CUDA)
-        true;
-#else
-        false;
-#endif
+    constexpr bool SupportOnlyRTC = PROTEUS_ENABLE_CUDA;
     if (SupportOnlyRTC && ProteusCodegen != CodegenOption::RTC) {
       Logger::outs("proteus") << "Warning: Proteus supports only RTC in the "
                                  "current build system configuration, "
@@ -176,12 +166,7 @@ class CodeGenerationConfig {
 
 public:
   static CodeGenerationConfig createFromEnv() {
-    constexpr bool DefaultSpecializeDimsAssume =
-#if PROTEUS_ENABLE_CUDA
-        false;
-#else
-        true;
-#endif
+    constexpr bool DefaultSpecializeDimsAssume = PROTEUS_ENABLE_HIP;
     return CodeGenerationConfig(
         getEnvOrDefaultString("PROTEUS_OPT_PIPELINE"),
         getCodeGen(getEnvOrDefaultCG("PROTEUS_CODEGEN", CodegenOption::RTC)),
