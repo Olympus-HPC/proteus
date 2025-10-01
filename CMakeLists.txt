@@ -29,12 +29,18 @@ endif()
 
 message(STATUS "Using LLVM installation: ${LLVM_INSTALL_DIR}")
 
+# Always define GPU feature macros to numeric 0/1 for all targets
+add_compile_definitions(
+  PROTEUS_ENABLE_HIP=$<IF:$<BOOL:${PROTEUS_ENABLE_HIP}>,1,0>
+  PROTEUS_ENABLE_CUDA=$<IF:$<BOOL:${PROTEUS_ENABLE_CUDA}>,1,0>
+)
+
 if (ENABLE_DEVELOPER_COMPILER_FLAGS)
   add_compile_options(-Wall -Wextra -Werror "-Wno-error=\#warnings" -Wno-error=unknown-cuda-version)
 endif()
 
 if(PROTEUS_ENABLE_HIP)
-  add_definitions("-DPROTEUS_ENABLE_HIP")
+  
   find_package(hip REQUIRED CONFIG)
   message(STATUS "HIP Version: ${hip_VERSION}")
   if(hip_VERSION VERSION_LESS "6.2.0")
@@ -43,7 +49,7 @@ if(PROTEUS_ENABLE_HIP)
 endif()
 
 if(PROTEUS_ENABLE_CUDA)
-  add_definitions("-DPROTEUS_ENABLE_CUDA")
+  
 
   find_package(CUDAToolkit 12 REQUIRED)
   find_file(LIBDEVICE_BC_FILE
