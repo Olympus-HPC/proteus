@@ -74,8 +74,8 @@ private:
       if (M.isCompiled())
         PROTEUS_FATAL_ERROR("setLaunchBounds must be called before compile()");
 
-// We keep this as preprocessor 'if' because
-// setLaunchBoundsForKernel is not defined in HOST builds.
+      // We keep this as preprocessor 'if' because
+      // setLaunchBoundsForKernel is not defined in HOST builds.
 #if (PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP)
       Function *Fn = F.getFunction();
       if (!Fn)
