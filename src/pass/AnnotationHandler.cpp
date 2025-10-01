@@ -259,33 +259,35 @@ createVectorRuntimeConstantInfo(RuntimeConstantType RCType,
 }
 
 static bool isDeviceKernel(Module &M, const Function *F) {
-  auto GetDeviceKernels = []([[maybe_unused]] Module &M) {
+  auto GetDeviceKernels = [](Module &M) {
     SmallPtrSet<Function *, 16> Kernels;
-#if PROTEUS_ENABLE_CUDA
-    NamedMDNode *MD = M.getOrInsertNamedMetadata("nvvm.annotations");
+    if constexpr (PROTEUS_ENABLE_CUDA) {
+      NamedMDNode *MD = M.getOrInsertNamedMetadata("nvvm.annotations");
 
-    if (!MD)
-      return Kernels;
+      if (!MD)
+        return Kernels;
 
-    for (auto *Op : MD->operands()) {
-      if (Op->getNumOperands() < 2)
-        continue;
-      MDString *KindID = dyn_cast<MDString>(Op->getOperand(1));
-      if (!KindID || KindID->getString() != "kernel")
-        continue;
+      for (auto *Op : MD->operands()) {
+        if (Op->getNumOperands() < 2)
+          continue;
+        MDString *KindID = dyn_cast<MDString>(Op->getOperand(1));
+        if (!KindID || KindID->getString() != "kernel")
+          continue;
 
-      Function *KernelFn =
-          mdconst::dyn_extract_or_null<Function>(Op->getOperand(0));
-      if (!KernelFn)
-        continue;
+        Function *KernelFn =
+            mdconst::dyn_extract_or_null<Function>(Op->getOperand(0));
+        if (!KernelFn)
+          continue;
 
-      Kernels.insert(KernelFn);
+        Kernels.insert(KernelFn);
+      }
+    } else if constexpr (PROTEUS_ENABLE_HIP) {
+      for (Function &F : M)
+        if (F.getCallingConv() == CallingConv::AMDGPU_KERNEL)
+          Kernels.insert(&F);
+    } else {
+      (void)M;
     }
-#elif PROTEUS_ENABLE_HIP
-    for (Function &F : M)
-      if (F.getCallingConv() == CallingConv::AMDGPU_KERNEL)
-        Kernels.insert(&F);
-#endif
 
     return Kernels;
   };

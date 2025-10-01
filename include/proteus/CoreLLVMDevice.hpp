@@ -9,7 +9,7 @@
 #include "proteus/CoreLLVMCUDA.hpp"
 #endif
 
-#if defined(PROTEUS_ENABLE_HIP) || defined(PROTEUS_ENABLE_CUDA)
+#if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
 
 #include <llvm/Analysis/CallGraph.h>
 #include <llvm/Bitcode/BitcodeReader.h>

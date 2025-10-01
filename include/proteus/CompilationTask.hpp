@@ -49,26 +49,28 @@ private:
   }
 
   void invokeOptimizeIR(Module &M) {
-#if PROTEUS_ENABLE_CUDA
-    // For CUDA we always run the optimization pipeline.
-    if (!PassPipeline)
-      optimizeIR(M, DeviceArch, OptLevel, CodegenOptLevel);
-    else
-      optimizeIR(M, DeviceArch, PassPipeline.value(), CodegenOptLevel);
-#elif PROTEUS_ENABLE_HIP
-    // For HIP we run the optimization pipeline only for Serial codegen. HIP RTC
-    // and Parallel codegen, which uses LTO, invoke optimization internally.
-    // TODO: Move optimizeIR inside the codegen routines?
-    if (CGOption == CodegenOption::Serial) {
-      if (!PassPipeline) {
+    if constexpr (PROTEUS_ENABLE_CUDA) {
+      // For CUDA we always run the optimization pipeline.
+      if (!PassPipeline)
         optimizeIR(M, DeviceArch, OptLevel, CodegenOptLevel);
-      } else {
+      else
         optimizeIR(M, DeviceArch, PassPipeline.value(), CodegenOptLevel);
+    } else if constexpr (PROTEUS_ENABLE_HIP) {
+      // For HIP we run the optimization pipeline only for Serial codegen. HIP
+      // RTC and Parallel codegen, which uses LTO, invoke optimization
+      // internally.
+      // TODO: Move optimizeIR inside the codegen routines?
+      if (CGOption == CodegenOption::Serial) {
+        if (!PassPipeline) {
+          optimizeIR(M, DeviceArch, OptLevel, CodegenOptLevel);
+        } else {
+          optimizeIR(M, DeviceArch, PassPipeline.value(), CodegenOptLevel);
+        }
       }
+    } else {
+      PROTEUS_FATAL_ERROR(
+          "JitEngineDevice requires PROTEUS_ENABLE_CUDA or PROTEUS_ENABLE_HIP");
     }
-#else
-#error "JitEngineDevice requires PROTEUS_ENABLE_CUDA or PROTEUS_ENABLE_HIP"
-#endif
   }
 
 public:

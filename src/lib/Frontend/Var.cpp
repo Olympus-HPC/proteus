@@ -533,11 +533,10 @@ Var &powf(const Var &L, const Var &R) {
   auto *ResultType = IRB.getFloatTy();
   Var &ResultVar = Fn.declVarInternal("res.", ResultType);
 
-#if PROTEUS_ENABLE_CUDA
-  std::string IntrinsicName = "__nv_powf";
-#else
   std::string IntrinsicName = "llvm.pow.f32";
-#endif
+  if constexpr (PROTEUS_ENABLE_CUDA) {
+    IntrinsicName = "__nv_powf";
+  }
 
   FunctionCallee Callee =
       M.getOrInsertFunction(IntrinsicName, ResultType, ResultType, ResultType);
@@ -556,11 +555,10 @@ Var &sqrtf(const Var &R) {
   auto *ResultType = IRB.getFloatTy();
   Var &ResultVar = Fn.declVarInternal("res.", ResultType);
 
-#if PROTEUS_ENABLE_CUDA
-  std::string IntrinsicName = "__nv_sqrtf";
-#else
   std::string IntrinsicName = "llvm.sqrt.f32";
-#endif
+  if constexpr (PROTEUS_ENABLE_CUDA) {
+    IntrinsicName = "__nv_sqrtf";
+  }
 
   FunctionCallee Callee =
       M.getOrInsertFunction(IntrinsicName, ResultType, ResultType);

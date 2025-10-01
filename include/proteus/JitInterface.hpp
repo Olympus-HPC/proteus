@@ -140,16 +140,16 @@ inline void disable() {
 
 inline void init() {
   __jit_init_host();
-#if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
-  __jit_init_device();
-#endif
+  if constexpr (PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA) {
+    __jit_init_device();
+  }
 }
 
 inline void finalize() {
   __jit_finalize_host();
-#if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
-  __jit_finalize_device();
-#endif
+  if constexpr (PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA) {
+    __jit_finalize_device();
+  }
 }
 
 } // namespace proteus

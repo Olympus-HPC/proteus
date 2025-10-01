@@ -821,21 +821,21 @@ private:
       Builder.CreateRet(CI);
   }
 
-  Value *getStubGV([[maybe_unused]] Value *Operand) {
+  Value *getStubGV(Value *Operand) {
     // NOTE: when called by isDeviceKernelHostStub, Operand may not be a global
     // variable point to the stub, so we check and return null in that case.
     Value *V = nullptr;
-#if PROTEUS_ENABLE_HIP
-    // NOTE: Hip creates a global named after the device kernel function that
-    // points to the host kernel stub. Because of this, we need to unpeel this
-    // indirection to use the host kernel stub for finding the device kernel
-    // function name global.
-    GlobalVariable *IndirectGV = dyn_cast<GlobalVariable>(Operand);
-    V = IndirectGV ? IndirectGV->getInitializer() : nullptr;
-#elif PROTEUS_ENABLE_CUDA
-    GlobalValue *DirectGV = dyn_cast<GlobalValue>(Operand);
-    V = DirectGV ? DirectGV : nullptr;
-#endif
+    if constexpr (PROTEUS_ENABLE_HIP) {
+      // NOTE: Hip creates a global named after the device kernel function that
+      // points to the host kernel stub. Because of this, we need to unpeel this
+      // indirection to use the host kernel stub for finding the device kernel
+      // function name global.
+      GlobalVariable *IndirectGV = dyn_cast<GlobalVariable>(Operand);
+      V = IndirectGV ? IndirectGV->getInitializer() : nullptr;
+    } else if constexpr (PROTEUS_ENABLE_CUDA) {
+      GlobalValue *DirectGV = dyn_cast<GlobalValue>(Operand);
+      V = DirectGV ? DirectGV : nullptr;
+    } 
 
     return V;
   }
@@ -1025,9 +1025,9 @@ private:
 
   void instrumentRegisterFatBinaryEnd(Module &M) {
 // This is CUDA specific.
-#if !PROTEUS_ENABLE_CUDA
-    return;
-#endif
+    if constexpr (!PROTEUS_ENABLE_CUDA) {
+      return;
+    }
 
     Function *F = M.getFunction("__cudaRegisterFatBinaryEnd");
     if (!F)
@@ -1058,9 +1058,9 @@ private:
 
   void instrumentRegisterLinkedBinary(Module &M) {
 // This is CUDA specific.
-#if !PROTEUS_ENABLE_CUDA
-    return;
-#endif
+    if constexpr (!PROTEUS_ENABLE_CUDA) {
+      return;
+    }
 
     // Note: we check for __cuda_fatibn_wrapper to avoid emitting for the
     // link.stub. It's not strictly necessary since this module will not have a
