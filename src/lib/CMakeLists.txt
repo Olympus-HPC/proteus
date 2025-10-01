@@ -44,19 +44,25 @@ endif()
 add_library(proteusCore INTERFACE)
 add_library(proteusFrontend INTERFACE)
 
+target_compile_definitions(proteusCore INTERFACE
+  PROTEUS_ENABLE_HIP=$<IF:$<BOOL:${PROTEUS_ENABLE_HIP}>,1,0>
+  PROTEUS_ENABLE_CUDA=$<IF:$<BOOL:${PROTEUS_ENABLE_CUDA}>,1,0>
+)
+
 target_compile_definitions(proteus PUBLIC ${LLVM_DEFINITIONS})
-target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
+
+target_compile_definitions(proteus PUBLIC
+  PROTEUS_ENABLE_HIP=$<IF:$<BOOL:${PROTEUS_ENABLE_HIP}>,1,0>
+  PROTEUS_ENABLE_CUDA=$<IF:$<BOOL:${PROTEUS_ENABLE_CUDA}>,1,0>
+)
 
 target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
 
-if(PROTEUS_ENABLE_HIP)
-  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_HIP)
-  target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_HIP)
-elseif(PROTEUS_ENABLE_CUDA)
-  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_CUDA)
+target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
+
+if(PROTEUS_ENABLE_CUDA)
   target_compile_definitions(proteus PRIVATE LIBDEVICE_BC_PATH="${LIBDEVICE_BC_FILE}")
   target_compile_definitions(proteus PRIVATE PROTEUS_CUDA_LIBDIR="${CUDAToolkit_LIBRARY_DIR}")
-  target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_CUDA)
 endif()
 
 if(PROTEUS_ENABLE_TIME_TRACING)
