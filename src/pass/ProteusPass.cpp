@@ -833,7 +833,7 @@ private:
     } else if constexpr (PROTEUS_ENABLE_CUDA) {
       GlobalValue *DirectGV = dyn_cast<GlobalValue>(Operand);
       V = DirectGV ? DirectGV : nullptr;
-    } 
+    }
 
     return V;
   }
@@ -1022,7 +1022,7 @@ private:
   }
 
   void instrumentRegisterFatBinaryEnd(Module &M) {
-// This is CUDA specific.
+    // This is CUDA specific.
     if constexpr (!PROTEUS_ENABLE_CUDA) {
       return;
     }
@@ -1055,7 +1055,7 @@ private:
   }
 
   void instrumentRegisterLinkedBinary(Module &M) {
-// This is CUDA specific.
+    // This is CUDA specific.
     if constexpr (!PROTEUS_ENABLE_CUDA) {
       return;
     }
