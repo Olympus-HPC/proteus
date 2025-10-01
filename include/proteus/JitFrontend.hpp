@@ -13,6 +13,7 @@
 
 #include <deque>
 
+#include "proteus/CoreLLVMDevice.hpp"
 #include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/Frontend/Func.hpp"
@@ -66,6 +67,25 @@ private:
   template <typename... ArgT> struct KernelHandle {
     Func<void, ArgT...> &F;
     JitModule &M;
+
+    void setLaunchBounds([[maybe_unused]] int MaxThreadsPerBlock,
+                         [[maybe_unused]] int MinBlocksPerSM = 0) {
+      if (!M.isDeviceModule())
+        PROTEUS_FATAL_ERROR("Expected a device module for setLaunchBounds");
+
+      if (M.isCompiled())
+        PROTEUS_FATAL_ERROR("setLaunchBounds must be called before compile()");
+
+#if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
+      Function *Fn = F.getFunction();
+      if (!Fn)
+        PROTEUS_FATAL_ERROR("Expected non-null Function");
+
+      setLaunchBoundsForKernel(*Fn, MaxThreadsPerBlock, MinBlocksPerSM);
+#else
+      PROTEUS_FATAL_ERROR("Unsupported target for setLaunchBounds");
+#endif
+    }
 
     // Launch with type-safety.
     [[nodiscard]] auto launch(LaunchDims Grid, LaunchDims Block,
