@@ -53,9 +53,7 @@ void FuncBase::beginFunction(const char *File, int Line) {
   IRB.CreateBr(ExitBB);
 
   IRB.SetInsertPoint(ExitBB);
-  {
-    IRB.CreateUnreachable();
-  }
+  { IRB.CreateUnreachable(); }
 
   IP = IRBuilderBase::InsertPoint(BodyBB, BodyBB->begin());
   IRB.restoreIP(IP);
@@ -170,14 +168,10 @@ void FuncBase::beginIf(Var &CondVar, const char *File, int Line) {
   }
 
   IRB.SetInsertPoint(ThenBlock);
-  {
-    IRB.CreateBr(ExitBlock);
-  }
+  { IRB.CreateBr(ExitBlock); }
 
   IRB.SetInsertPoint(ExitBlock);
-  {
-    IRB.CreateBr(NextBlock);
-  }
+  { IRB.CreateBr(NextBlock); }
 
   IP = IRBuilderBase::InsertPoint(ThenBlock, ThenBlock->begin());
   IRB.restoreIP(IP);
@@ -225,9 +219,7 @@ void FuncBase::beginFor(Var &IterVar, Var &Init, Var &UpperBound, Var &Inc,
   // Erase the old terminator and branch to the header.
   CurBlock->getTerminator()->eraseFromParent();
   IRB.SetInsertPoint(CurBlock);
-  {
-    IRB.CreateBr(Header);
-  }
+  { IRB.CreateBr(Header); }
 
   IRB.SetInsertPoint(Header);
   {
@@ -253,9 +245,7 @@ void FuncBase::beginFor(Var &IterVar, Var &Init, Var &UpperBound, Var &Inc,
   }
 
   IRB.SetInsertPoint(LoopExit);
-  {
-    IRB.CreateBr(NextBlock);
-  }
+  { IRB.CreateBr(NextBlock); }
 
   IP = IRBuilderBase::InsertPoint(Body, Body->begin());
   IRB.restoreIP(IP);
