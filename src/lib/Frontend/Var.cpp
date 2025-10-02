@@ -145,7 +145,7 @@ Var::operator-=(const T &ConstValue) {
   Var &Tmp = Fn.declVarInternal("tmp.", TypeMap<T>::get(Ctx));
   Tmp = ConstValue;
 
-  *this += Tmp;
+  *this -= Tmp;
 
   return *this;
 }
@@ -390,7 +390,7 @@ Var::operator<=(const T &ConstValue) const {
   Var &Tmp = Fn.declVarInternal("cmp.", TypeMap<T>::get(Ctx));
   Tmp = ConstValue;
 
-  return ((*this) < Tmp);
+  return ((*this) <= Tmp);
 }
 
 template <typename T>
