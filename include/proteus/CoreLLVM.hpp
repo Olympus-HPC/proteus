@@ -8,6 +8,7 @@ static_assert(__cplusplus >= 201703L,
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/PassManager.h>
+#include <llvm/IR/Metadata.h>
 #include <llvm/Linker/Linker.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Passes/PassBuilder.h>
@@ -83,6 +84,25 @@ createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3) {
   return TM;
 }
 
+inline llvm::OptimizationLevel charToOptimizationLevel(char OptChar) {
+  switch (OptChar) {
+  case '0':
+    return llvm::OptimizationLevel::O0;
+  case '1':
+    return llvm::OptimizationLevel::O1;
+  case '2':
+    return llvm::OptimizationLevel::O2;
+  case '3':
+    return llvm::OptimizationLevel::O3;
+  case 's':
+    return llvm::OptimizationLevel::Os;
+  case 'z':
+    return llvm::OptimizationLevel::Oz;
+  default:
+    PROTEUS_FATAL_ERROR("Unsupported optimization level " + OptChar);
+  }
+}
+
 inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
                                         const std::string &PassPipeline,
                                         unsigned CodegenOptLevel = 3) {
@@ -139,33 +159,12 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-  OptimizationLevel OptSetting;
-  switch (OptLevel) {
-  case '0':
-    OptSetting = OptimizationLevel::O0;
-    break;
-  case '1':
-    OptSetting = OptimizationLevel::O1;
-    break;
-  case '2':
-    OptSetting = OptimizationLevel::O2;
-    break;
-  case '3':
-    OptSetting = OptimizationLevel::O3;
-    break;
-  case 's':
-    OptSetting = OptimizationLevel::Os;
-    break;
-  case 'z':
-    OptSetting = OptimizationLevel::Oz;
-    break;
-  default:
-    PROTEUS_FATAL_ERROR("Unsupported optimization level " + OptLevel);
-  };
+  OptimizationLevel OptSetting = charToOptimizationLevel(OptLevel);
 
   ModulePassManager Passes = PB.buildPerModuleDefaultPipeline(OptSetting);
   Passes.run(M, MAM);
 }
+
 
 } // namespace detail
 
@@ -182,6 +181,22 @@ struct InitLLVMTargets {
 inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
                        unsigned CodegenOptLevel) {
   Timer T;
+
+  // Skip redundant default O3 pipeline when CppJitModule already emitted O3 IR.
+  // We only skip when 'OptLevel' is 'O3'; otherwise,
+  // assume the user wants to run the pipeline.
+  if (OptLevel == '3') {
+    if (auto *MD = llvm::dyn_cast_or_null<llvm::MDString>(
+            M.getModuleFlag("proteus.frontend.opt-level"))) {
+      auto FrontendOpt = detail::charToOptimizationLevel(MD->getString().back());
+      if (FrontendOpt == llvm::OptimizationLevel::O3) {
+        if (Config::get().ProteusTraceOutput >= 1)
+          Logger::trace("[SkipReopt] Frontend O3 detected; skipping default<O3>\n");
+        return;
+      }
+    }
+  }
+
   detail::runOptimizationPassPipeline(M, Arch, OptLevel, CodegenOptLevel);
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                        << "optimizeIR optlevel " << OptLevel << " codegenopt "
