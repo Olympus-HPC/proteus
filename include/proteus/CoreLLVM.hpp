@@ -6,9 +6,9 @@ static_assert(__cplusplus >= 201703L,
 
 #include <llvm/CodeGen/CommandFlags.h>
 #include <llvm/IR/DebugInfo.h>
+#include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/PassManager.h>
-#include <llvm/IR/Metadata.h>
 #include <llvm/Linker/Linker.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Passes/PassBuilder.h>
@@ -165,7 +165,6 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
   Passes.run(M, MAM);
 }
 
-
 } // namespace detail
 
 struct InitLLVMTargets {
@@ -188,10 +187,12 @@ inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
   if (OptLevel == '3') {
     if (auto *MD = llvm::dyn_cast_or_null<llvm::MDString>(
             M.getModuleFlag("proteus.frontend.opt-level"))) {
-      auto FrontendOpt = detail::charToOptimizationLevel(MD->getString().back());
+      auto FrontendOpt =
+          detail::charToOptimizationLevel(MD->getString().back());
       if (FrontendOpt == llvm::OptimizationLevel::O3) {
         if (Config::get().ProteusTraceOutput >= 1)
-          Logger::trace("[SkipReopt] Frontend O3 detected; skipping default<O3>\n");
+          Logger::trace(
+              "[SkipReopt] Frontend O3 detected; skipping default<O3>\n");
         return;
       }
     }
