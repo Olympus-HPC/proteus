@@ -221,10 +221,9 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
   // Stamp the frontend optimization level onto the module for downstream
   // decisions.
   {
-    auto &MCtx = Module->getContext();
     std::string OptString = getOptArg();
     Module->addModuleFlag(llvm::Module::Warning, "proteus.frontend.opt-level",
-                          llvm::MDString::get(MCtx, OptString));
+                          llvm::MDString::get(*Ctx, OptString));
   }
 
   return CppJitModule::CompilationResult{std::move(Ctx), std::move(Module)};
