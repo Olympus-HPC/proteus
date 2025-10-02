@@ -251,6 +251,51 @@ void FuncBase::beginFor(Var &IterVar, Var &Init, Var &UpperBound, Var &Inc,
   IRB.restoreIP(IP);
 }
 
+Var &FuncBase::emitAtomic(AtomicRMWInst::BinOp Op, Var &Addr, Var &Val) {
+  if (Addr.kind() != VarKind::Pointer)
+    PROTEUS_FATAL_ERROR("Atomic ops require a pointer variable");
+
+  if (Addr.getValueType() != Val.getValueType())
+    PROTEUS_FATAL_ERROR("Atomic op require values of same type");
+
+  auto &IRB = getIRBuilder();
+  Type *ValueType = Val.getValueType();
+  auto *Result = IRB.CreateAtomicRMW(
+      Op, Addr.getPointerValue(), Val.getValue(), MaybeAlign(),
+      AtomicOrdering::SequentiallyConsistent, SyncScope::SingleThread);
+  Var &Ret = declVarInternal("res.", ValueType);
+  Ret.storeValue(Result);
+  return Ret;
+}
+
+Var &FuncBase::atomicAdd(Var &Addr, Var &Val) {
+  Type *ValueType = Val.getValueType();
+  auto Op =
+      ValueType->isFloatingPointTy() ? AtomicRMWInst::FAdd : AtomicRMWInst::Add;
+  return emitAtomic(Op, Addr, Val);
+}
+
+Var &FuncBase::atomicSub(Var &Addr, Var &Val) {
+  Type *ValueType = Val.getValueType();
+  auto Op =
+      ValueType->isFloatingPointTy() ? AtomicRMWInst::FSub : AtomicRMWInst::Sub;
+  return emitAtomic(Op, Addr, Val);
+}
+
+Var &FuncBase::atomicMax(Var &Addr, Var &Val) {
+  Type *ValueType = Val.getValueType();
+  auto Op =
+      ValueType->isFloatingPointTy() ? AtomicRMWInst::FMax : AtomicRMWInst::Max;
+  return emitAtomic(Op, Addr, Val);
+}
+
+Var &FuncBase::atomicMin(Var &Addr, Var &Val) {
+  Type *ValueType = Val.getValueType();
+  auto Op =
+      ValueType->isFloatingPointTy() ? AtomicRMWInst::FMin : AtomicRMWInst::Min;
+  return emitAtomic(Op, Addr, Val);
+}
+
 void FuncBase::endFor() {
   if (Scopes.empty())
     PROTEUS_FATAL_ERROR("Expected FOR scope");

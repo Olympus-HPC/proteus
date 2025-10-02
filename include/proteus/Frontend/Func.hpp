@@ -76,6 +76,8 @@ protected:
     }
   }
 
+  Var &emitAtomic(AtomicRMWInst::BinOp Op, Var &Addr, Var &Val);
+
 public:
   FuncBase(JitModule &J, FunctionCallee FC);
 
@@ -217,6 +219,11 @@ public:
       return std::invoke(std::forward<BuiltinFuncT>(BuiltinFunc), *this);
     }
   }
+
+  Var &atomicAdd(Var &Addr, Var &Val);
+  Var &atomicSub(Var &Addr, Var &Val);
+  Var &atomicMax(Var &Addr, Var &Val);
+  Var &atomicMin(Var &Addr, Var &Val);
 
   template <typename BodyLambda = EmptyLambda>
   auto forLoop(const LoopBoundInfo &Bounds, BodyLambda &&Body = {}) {
