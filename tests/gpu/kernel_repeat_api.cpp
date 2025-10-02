@@ -29,7 +29,7 @@ int main() {
 
 // clang-format off
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kerneli ArgNo 0 with value i32 42
-// CHECK-FIRST: [LaunchBoundSpec] BlockSize 1
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
 // CHECK-COUNT-1000: Kernel i 42
 // CHECK: JitCache hits 999 total 1000
 // CHECK: HashValue {{[0-9]+}} NumExecs 1000 NumHits 999

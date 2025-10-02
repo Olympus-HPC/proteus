@@ -31,7 +31,7 @@ int main() {
 
 // clang-format off
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z14kernelFunctioni ArgNo 0 with value i32 1
-// CHECK-FIRST: [LaunchBoundSpec] BlockSize 1
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
 // CHECK: device_func 1
 // CHECK: Kernel with lib 1
 // CHECK: JitCache hits 0 total 1
