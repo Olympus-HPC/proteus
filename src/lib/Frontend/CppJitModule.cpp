@@ -39,6 +39,10 @@ CppJitModule::CppJitModule(StringRef Target, StringRef Code,
     : TargetModel(parseTargetModel(Target)), Code(Code), ModuleHash(hash(Code)),
       ExtraArgs(ExtraArgs), Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
 
+std::string CppJitModule::getOptArg() const {
+  return std::string("-O") + FrontendOptLevel;
+}
+
 void CppJitModule::compileCppToDynamicLibrary() {
   // Create compiler instance.
   CompilerInstance Compiler;
@@ -73,7 +77,7 @@ void CppJitModule::compileCppToDynamicLibrary() {
       PROTEUS_CLANGXX_BIN,
       "-shared",
       "-std=c++17",
-      "-O3",
+      getOptArg(),
       "-x",
       (TargetModel == TargetModelType::HOST_HIP ? "hip" : "cuda"),
       "-fPIC",
@@ -140,7 +144,7 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
                   "-emit-llvm",
                   "-S",
                   "-std=c++17",
-                  "-O1",
+                  getOptArg(),
                   "-x",
                   "c++",
                   "-fPIC",
@@ -152,7 +156,7 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
                   "-emit-llvm",
                   "-S",
                   "-std=c++17",
-                  "-O1",
+                  getOptArg(),
                   "-x",
                   (TargetModel == TargetModelType::HIP ? "hip" : "cuda"),
                   "--offload-device-only",
@@ -219,6 +223,14 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
     PROTEUS_FATAL_ERROR("Failed to take LLVM module");
 
   std::unique_ptr<LLVMContext> Ctx{Action.takeLLVMContext()};
+
+  // Stamp the frontend optimization level onto the module for downstream decisions.
+  {
+    auto &MCtx = Module->getContext();
+    std::string OptString = getOptArg();
+    Module->addModuleFlag(llvm::Module::Warning, "proteus.frontend.opt-level",
+                          llvm::MDString::get(MCtx, OptString));
+  }
 
   return CppJitModule::CompilationResult{std::move(Ctx), std::move(Module)};
 }

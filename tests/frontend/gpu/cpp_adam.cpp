@@ -187,6 +187,7 @@ int main(int argc, char *argv[]) {
 // CHECK-NEXT: init p[9] = 0.559506
 // CHECK-NEXT: Creating JIT module
 // CHECK-NEXT: Compiling JIT module
+// CHECK-FIRST: [SkipReopt] Frontend O3 detected; skipping default<O3>
 // CHECK-NEXT: Average kernel execution time {{.*}} (ms)
 // CHECK-NEXT: p[0] = -0.572924
 // CHECK-NEXT: p[1] = -0.596034

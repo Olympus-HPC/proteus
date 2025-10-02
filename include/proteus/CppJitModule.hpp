@@ -14,10 +14,14 @@ private:
   std::string Code;
   HashT ModuleHash;
   std::vector<std::string> ExtraArgs;
+  // Optimization level used when emitting IR.
+  char FrontendOptLevel = '3';
 
   Dispatcher &Dispatch;
   std::unique_ptr<CompiledLibrary> Library = nullptr;
   bool IsCompiled = false;
+
+  std::string getOptArg() const;
 
   // TODO: We don't cache CodeInstances so if a user re-creates the exact same
   // instantiation it will create a new CodeInstance. This creation cost is
