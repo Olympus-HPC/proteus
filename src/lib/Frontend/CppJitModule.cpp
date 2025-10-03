@@ -39,6 +39,10 @@ CppJitModule::CppJitModule(StringRef Target, StringRef Code,
     : TargetModel(parseTargetModel(Target)), Code(Code), ModuleHash(hash(Code)),
       ExtraArgs(ExtraArgs), Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
 
+std::string CppJitModule::getOptArg() const {
+  return std::string("-O") + FrontendOptLevel;
+}
+
 void CppJitModule::compileCppToDynamicLibrary() {
   // Create compiler instance.
   CompilerInstance Compiler;
@@ -73,7 +77,7 @@ void CppJitModule::compileCppToDynamicLibrary() {
       PROTEUS_CLANGXX_BIN,
       "-shared",
       "-std=c++17",
-      "-O3",
+      getOptArg(),
       "-x",
       (TargetModel == TargetModelType::HOST_HIP ? "hip" : "cuda"),
       "-fPIC",
@@ -136,14 +140,8 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
   // discovers and other options that are needed for source lowering.
   std::vector<std::string> ArgStorage;
   if (TargetModel == TargetModelType::HOST) {
-    ArgStorage = {PROTEUS_CLANGXX_BIN,
-                  "-emit-llvm",
-                  "-S",
-                  "-std=c++17",
-                  "-O1",
-                  "-x",
-                  "c++",
-                  "-fPIC",
+    ArgStorage = {PROTEUS_CLANGXX_BIN, "-emit-llvm", "-S",  "-std=c++17",
+                  getOptArg(),         "-x",         "c++", "-fPIC",
                   SourceName};
   } else {
     std::string OffloadArch =
@@ -152,7 +150,7 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
                   "-emit-llvm",
                   "-S",
                   "-std=c++17",
-                  "-O1",
+                  getOptArg(),
                   "-x",
                   (TargetModel == TargetModelType::HIP ? "hip" : "cuda"),
                   "--offload-device-only",
@@ -219,6 +217,14 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
     PROTEUS_FATAL_ERROR("Failed to take LLVM module");
 
   std::unique_ptr<LLVMContext> Ctx{Action.takeLLVMContext()};
+
+  // Stamp the frontend optimization level onto the module for downstream
+  // decisions.
+  {
+    std::string OptString = getOptArg();
+    Module->addModuleFlag(llvm::Module::Warning, "proteus.frontend.opt-level",
+                          llvm::MDString::get(*Ctx, OptString));
+  }
 
   return CppJitModule::CompilationResult{std::move(Ctx), std::move(Module)};
 }
