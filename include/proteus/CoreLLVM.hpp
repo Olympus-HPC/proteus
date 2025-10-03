@@ -84,20 +84,20 @@ createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3) {
   return TM;
 }
 
-inline llvm::OptimizationLevel charToOptimizationLevel(char OptChar) {
+inline OptimizationLevel charToOptimizationLevel(char OptChar) {
   switch (OptChar) {
   case '0':
-    return llvm::OptimizationLevel::O0;
+    return OptimizationLevel::O0;
   case '1':
-    return llvm::OptimizationLevel::O1;
+    return OptimizationLevel::O1;
   case '2':
-    return llvm::OptimizationLevel::O2;
+    return OptimizationLevel::O2;
   case '3':
-    return llvm::OptimizationLevel::O3;
+    return OptimizationLevel::O3;
   case 's':
-    return llvm::OptimizationLevel::Os;
+    return OptimizationLevel::Os;
   case 'z':
-    return llvm::OptimizationLevel::Oz;
+    return OptimizationLevel::Oz;
   default:
     PROTEUS_FATAL_ERROR("Unsupported optimization level " + OptChar);
   }
@@ -185,11 +185,11 @@ inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
   // We only skip when 'OptLevel' is 'O3'; otherwise,
   // assume the user wants to run the pipeline.
   if (OptLevel == '3') {
-    if (auto *MD = llvm::dyn_cast_or_null<llvm::MDString>(
+    if (auto *MD = dyn_cast_or_null<MDString>(
             M.getModuleFlag("proteus.frontend.opt-level"))) {
       auto FrontendOpt =
           detail::charToOptimizationLevel(MD->getString().back());
-      if (FrontendOpt == llvm::OptimizationLevel::O3) {
+      if (FrontendOpt == OptimizationLevel::O3) {
         if (Config::get().ProteusTraceOutput >= 1)
           Logger::trace(
               "[SkipReopt] Frontend O3 detected; skipping default<O3>\n");
@@ -231,7 +231,7 @@ linkModules(LLVMContext &Ctx,
   if (LinkedModules.empty())
     PROTEUS_FATAL_ERROR("Expected jit module");
 
-  auto LinkedModule = std::make_unique<llvm::Module>("JitModule", Ctx);
+  auto LinkedModule = std::make_unique<Module>("JitModule", Ctx);
   Linker IRLinker(*LinkedModule);
   // Link in all the proteus-enabled extracted modules.
   for (auto &LinkedM : LinkedModules) {
