@@ -120,11 +120,12 @@ register_lambda(T &&t, const char *Symbol = "") noexcept {
 }
 
 #if defined(__CUDACC__) || defined(__HIP__)
-template <typename T>
+template <typename T, size_t MAXN, int UniqueID = 0>
 __device__ __attribute__((noinline)) T *
 shared_array([[maybe_unused]] size_t N,
              [[maybe_unused]] size_t ElemSize = sizeof(T)) {
-  __builtin_trap();
+  alignas(T) static __shared__ char shmem[sizeof(T) * MAXN];
+  return reinterpret_cast<T *>(shmem);
 }
 #endif
 
