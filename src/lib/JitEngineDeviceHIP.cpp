@@ -386,10 +386,16 @@ JitEngineDeviceHIP::JitEngineDeviceHIP() {
   DeviceArch = DeviceArch.substr(0, DeviceArch.find_first_of(":"));
 }
 
-std::unique_ptr<MemoryBuffer> JitEngineDeviceHIP::compileOnly(Module &M) {
+std::unique_ptr<MemoryBuffer> JitEngineDeviceHIP::compileOnly(Module &M, bool DisableIROpt) {
+  if (!DisableIROpt) {
+    const auto &CGConfig = Config::get().getCGConfig();
+    proteus::optimizeIR(M, DeviceArch, CGConfig.optLevel(),
+                        CGConfig.codeGenOptLevel());
+  } else {
+    if (Config::get().ProteusTraceOutput >= 1)
+      Logger::trace("[SkipOpt] Skipping default<O3> IR optimization\n");
+  }
   const auto &CGConfig = Config::get().getCGConfig();
-  proteus::optimizeIR(M, DeviceArch, CGConfig.optLevel(),
-                      CGConfig.codeGenOptLevel());
   auto DeviceObject = proteus::codegenObject(
       M, DeviceArch, GlobalLinkedBinaries, CGConfig.codeGenOption());
   return DeviceObject;

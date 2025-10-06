@@ -60,7 +60,7 @@ public:
 
   virtual std::unique_ptr<MemoryBuffer>
   compile(std::unique_ptr<LLVMContext> Ctx, std::unique_ptr<Module> M,
-          HashT ModuleHash) = 0;
+          HashT ModuleHash, bool DisableIROpt = false) = 0;
 
   virtual std::unique_ptr<CompiledLibrary>
   lookupCompiledLibrary(HashT ModuleHash) = 0;

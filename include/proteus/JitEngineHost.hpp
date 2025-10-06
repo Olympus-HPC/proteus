@@ -52,7 +52,7 @@ public:
   void *compileAndLink(StringRef FnName, char *IR, int IRSize, void **Args,
                        ArrayRef<RuntimeConstantInfo *> RCInfoArray);
 
-  std::unique_ptr<MemoryBuffer> compileOnly(Module &M);
+  std::unique_ptr<MemoryBuffer> compileOnly(Module &M, bool DisableIROpt = false);
 
   void loadCompiledLibrary(CompiledLibrary &Library);
 

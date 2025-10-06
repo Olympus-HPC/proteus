@@ -179,10 +179,15 @@ JitEngineDeviceCUDA::JitEngineDeviceCUDA() {
   PROTEUS_DBG(Logger::logs("proteus") << "CUDA Arch " << DeviceArch << "\n");
 }
 
-std::unique_ptr<MemoryBuffer> JitEngineDeviceCUDA::compileOnly(Module &M) {
-  const auto &CGConfig = Config::get().getCGConfig();
-  proteus::optimizeIR(M, DeviceArch, CGConfig.optLevel(),
-                      CGConfig.codeGenOptLevel());
+std::unique_ptr<MemoryBuffer> JitEngineDeviceCUDA::compileOnly(Module &M, bool DisableIROpt) {
+  if (!DisableIROpt) {
+    const auto &CGConfig = Config::get().getCGConfig();
+    proteus::optimizeIR(M, DeviceArch, CGConfig.optLevel(),
+                        CGConfig.codeGenOptLevel());
+  } else {
+    if (Config::get().ProteusTraceOutput >= 1)
+      Logger::trace("[SkipOpt] Skipping default<O3> IR optimization\n");
+  }
   auto DeviceObject =
       proteus::codegenObject(M, DeviceArch, GlobalLinkedBinaries);
   return DeviceObject;

@@ -272,7 +272,7 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   return JitFnPtr;
 }
 
-std::unique_ptr<MemoryBuffer> JitEngineHost::compileOnly(Module &M) {
+std::unique_ptr<MemoryBuffer> JitEngineHost::compileOnly(Module &M, bool DisableIROpt) {
   // Create the target machine using JITTargetMachineBuilder to match ORC JIT
   // loading.
   auto ExpectedTM =
@@ -288,13 +288,18 @@ std::unique_ptr<MemoryBuffer> JitEngineHost::compileOnly(Module &M) {
   // Set up the pass manager.
   legacy::PassManager PM;
   // Add optimization passes.
-  const auto &CGConfig = Config::get().getCGConfig();
-  if (CGConfig.optPipeline()) {
-    optimizeIR(M, sys::getHostCPUName(), CGConfig.optPipeline().value(),
-               CGConfig.codeGenOptLevel());
-  } else
-    optimizeIR(M, sys::getHostCPUName(), CGConfig.optLevel(),
-               CGConfig.codeGenOptLevel());
+  if (!DisableIROpt) {
+    const auto &CGConfig = Config::get().getCGConfig();
+    if (CGConfig.optPipeline()) {
+      optimizeIR(M, sys::getHostCPUName(), CGConfig.optPipeline().value(),
+                 CGConfig.codeGenOptLevel());
+    } else
+      optimizeIR(M, sys::getHostCPUName(), CGConfig.optLevel(),
+                 CGConfig.codeGenOptLevel());
+  } else {
+    if (Config::get().ProteusTraceOutput >= 1)
+      Logger::trace("[SkipOpt] Skipping default<O3> IR optimization\n");
+  }
 
   // Add the target passes to emit object code.
   if (TM->addPassesToEmitFile(PM, ObjStream, nullptr,

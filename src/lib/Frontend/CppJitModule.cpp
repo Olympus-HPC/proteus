@@ -214,12 +214,6 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
 
   std::unique_ptr<LLVMContext> Ctx{Action.takeLLVMContext()};
 
-  // Stamp the frontend optimization level onto the module for downstream
-  // decisions.
-  {
-    Module->addModuleFlag(llvm::Module::Warning, "proteus.frontend.opt-level",
-                          llvm::MDString::get(*Ctx, FrontendOptLevel));
-  }
 
   return CppJitModule::CompilationResult{std::move(Ctx), std::move(Module)};
 }
@@ -245,7 +239,8 @@ void CppJitModule::compile() {
   default:
     auto CRes = compileCppToIR();
     auto ObjectModule =
-        Dispatch.compile(std::move(CRes.Ctx), std::move(CRes.Mod), ModuleHash);
+        Dispatch.compile(std::move(CRes.Ctx), std::move(CRes.Mod), ModuleHash,
+                         /*DisableIROpt=*/true);
     Library = std::make_unique<CompiledLibrary>(std::move(ObjectModule));
   }
 

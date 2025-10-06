@@ -181,22 +181,6 @@ inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
                        unsigned CodegenOptLevel) {
   Timer T;
 
-  // Skip redundant default O3 pipeline when CppJitModule already emitted O3 IR.
-  // We only skip when 'OptLevel' is 'O3'; otherwise,
-  // assume the user wants to run the pipeline.
-  if (OptLevel == '3') {
-    if (auto *MD = dyn_cast_or_null<MDString>(
-            M.getModuleFlag("proteus.frontend.opt-level"))) {
-      auto FrontendOpt =
-          detail::charToOptimizationLevel(MD->getString().back());
-      if (FrontendOpt == OptimizationLevel::O3) {
-        if (Config::get().ProteusTraceOutput >= 1)
-          Logger::trace(
-              "[SkipReopt] Frontend O3 detected; skipping default<O3>\n");
-        return;
-      }
-    }
-  }
 
   detail::runOptimizationPassPipeline(M, Arch, OptLevel, CodegenOptLevel);
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
