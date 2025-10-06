@@ -1,5 +1,5 @@
 ###############################################################################
-# Copyright (c) 2022-23, Lawrence Livermore National Security, LLC and RADIUSS
+# Copyright (c) 2022-25, Lawrence Livermore National Security, LLC and RADIUSS
 # project contributors. See the COPYRIGHT file for details.
 #
 # SPDX-License-Identifier: (MIT)
@@ -14,14 +14,74 @@
     GIT_STRATEGY: none
   script:
     - |
-      if [[ $(jq '.[env.CI_MACHINE].total_nodes_up' /usr/global/tools/lorenz/data/loginnodeStatus) == 0 ]]
-      then
-        echo -e "\e[31mNo node available on ${CI_MACHINE}\e[0m"
-        curl --url "https://api.github.com/repos/${GITHUB_PROJECT_ORG}/${GITHUB_PROJECT_NAME}/statuses/${CI_COMMIT_SHA}" \
-             --header 'Content-Type: application/json' \
-             --header "authorization: Bearer ${GITHUB_TOKEN}" \
-             --data "{ \"state\": \"failure\", \"target_url\": \"${CI_PIPELINE_URL}\", \"description\": \"GitLab ${CI_MACHINE} down\", \"context\": \"ci/gitlab/${CI_MACHINE}\" }"
+      # Check if required variables are set for machine checking
+      if [ -z "$CI_MACHINE" ]; then
+        echo -e "\e[31mError: CI_MACHINE variable not set\e[0m"
         exit 1
+      fi
+
+      # Check if lorenz status file exists
+      LORENZ_STATUS_FILE="/usr/global/tools/lorenz/data/loginnodeStatus"
+      if [ ! -f "$LORENZ_STATUS_FILE" ]; then
+        echo -e "\e[31mError: Lorenz status file not found: $LORENZ_STATUS_FILE\e[0m"
+        exit 1
+      fi
+
+      echo "Checking availability of machine: ${CI_MACHINE}"
+
+      # Query machine status with error handling
+      NODES_UP=$(jq -r ".[\"${CI_MACHINE}\"].total_nodes_up // \"null\"" "$LORENZ_STATUS_FILE" 2>/dev/null)
+      JQ_EXIT_CODE=$?
+
+      if [ $JQ_EXIT_CODE -ne 0 ]; then
+        echo -e "\e[31mError: Failed to parse lorenz status file\e[0m"
+        echo "File content sample:"
+        head -n 5 "$LORENZ_STATUS_FILE" 2>/dev/null || echo "Cannot read file"
+        exit 1
+      fi
+
+      if [ "$NODES_UP" = "null" ]; then
+        echo -e "\e[31mError: Machine ${CI_MACHINE} not found in status file\e[0m"
+        echo "Available machines in status file:"
+        jq -r 'keys[]' "$LORENZ_STATUS_FILE" 2>/dev/null | head -10 || echo "Cannot list machines"
+        exit 1
+      fi
+
+      # Check if machine is available - THIS is the only case we report to GitHub
+      if [ "$NODES_UP" -eq 0 ]; then
+        echo -e "\e[31mMachine ${CI_MACHINE} is down (${NODES_UP} nodes up)\e[0m"
+
+        # Only report machine unavailability to GitHub
+        if [ -n "$GITHUB_TOKEN" ] && [ -n "$GITHUB_PROJECT_ORG" ] && [ -n "$GITHUB_PROJECT_NAME" ]; then
+          STATUS_RESPONSE=$(mktemp)
+          STATUS_HTTP_CODE=$(curl --retry 3 --retry-delay 5 --max-time 30 \
+              --url "https://api.github.com/repos/${GITHUB_PROJECT_ORG}/${GITHUB_PROJECT_NAME}/statuses/${CI_COMMIT_SHA}" \
+              --header 'Content-Type: application/json' \
+              --header "authorization: Bearer ${GITHUB_TOKEN}" \
+              --data "{ \"state\": \"failure\", \"target_url\": \"${CI_PIPELINE_URL}\", \"description\": \"GitLab: ${CI_MACHINE} down (0 nodes)\", \"context\": \"ci/gitlab/${CI_MACHINE}\" }" \
+              --output "$STATUS_RESPONSE" \
+              --write-out "%{http_code}" \
+              --silent \
+              --show-error)
+
+          echo "GitHub Status API response code: $STATUS_HTTP_CODE"
+
+          if [ "$STATUS_HTTP_CODE" -eq 201 ]; then
+            echo "Successfully reported machine down status to GitHub"
+          else
+            echo "Warning: Failed to report status to GitHub. HTTP status: $STATUS_HTTP_CODE"
+            echo "Response body:"
+            cat "$STATUS_RESPONSE"
+          fi
+
+          rm -f "$STATUS_RESPONSE"
+        else
+          echo "Warning: GitHub reporting variables not set, skipping GitHub status update"
+        fi
+
+        exit 1
+      else
+        echo -e "\e[32m${CI_MACHINE} is available (${NODES_UP} nodes up)\e[0m"
       fi
 
 ###
@@ -29,42 +89,27 @@
 # Comment the jobs for machines you don’t need.
 ###
 
-# RUBY
-#ruby-up-check:
-#  variables:
-#    CI_MACHINE: "ruby"
-#  extends: [.machine-check]
-#
-#ruby-build-and-test:
-#  variables:
-#    CI_MACHINE: "ruby"
-#  needs: [ruby-up-check]
-#  extends: [.build-and-test]
+# MATRIX
+matrix-up-check:
+  variables:
+    CI_MACHINE: "matrix"
+  extends: [.machine-check]
 
-## POODLE
-#poodle-up-check:
-#  variables:
-#    CI_MACHINE: "poodle"
-#  extends: [.machine-check]
-#
-#poodle-build-and-test:
-#  variables:
-#    CI_MACHINE: "poodle"
-#  needs: [poodle-up-check]
-#  extends: [.build-and-test]
-#
-## CORONA
-#corona-up-check:
-#  variables:
-#    CI_MACHINE: "corona"
-#  extends: [.machine-check]
-#
-#corona-build-and-test:
-#  variables:
-#    CI_MACHINE: "corona"
-#  needs: [corona-up-check]
-#  extends: [.build-and-test]
-#
+matrix-build-and-test:
+  variables:
+    CI_MACHINE: "matrix"
+  needs: [matrix-up-check]
+  extends: [.build-and-test]
+
+matrix-proteus-benchmarks:
+  variables:
+    CI_MACHINE: "matrix"
+    JOB_CMD:
+      value: "scripts/gitlab/ci-run-benchmarks.sh"
+      expand: false
+  needs: [matrix-up-check]
+  extends: [.run-benchmarks]
+
 # TIOGA
 tioga-up-check:
   variables:
@@ -95,23 +140,32 @@ tioga-proteus-benchmarks:
   needs: [tioga-up-check]
   extends: [.run-benchmarks]
 
-# LASSEN
-# lassen-up-check:
-#   variables:
-#     CI_MACHINE: "lassen"
-#   extends: [.machine-check]
-# 
-# lassen-build-and-test:
-#   variables:
-#     CI_MACHINE: "lassen"
-#   needs: [lassen-up-check]
-#   extends: [.build-and-test]
-# 
-# lassen-proteus-benchmarks:
-#   variables:
-#     CI_MACHINE: "lassen"
-#     JOB_CMD:
-#       value: "scripts/gitlab/ci-run-benchmarks.sh"
-#       expand: false
-#   needs: [lassen-up-check]
-#   extends: [.run-benchmarks]
+# TUOLUMNE
+tuolumne-up-check:
+  variables:
+    CI_MACHINE: "tuolumne"
+  extends: [.machine-check]
+
+tuolumne-build-and-test:
+  variables:
+    CI_MACHINE: "tuolumne"
+  needs: [tuolumne-up-check, generate-job-lists]
+  extends: [.build-and-test]
+
+tuolumne-test-integration:
+  variables:
+    CI_MACHINE: "tuolumne"
+    JOB_CMD:
+      value: "tests/integration/hip/ci-test-integration.sh"
+      expand: false
+  needs: [tuolumne-up-check]
+  extends: [.test-integration]
+
+tuolumne-proteus-benchmarks:
+  variables:
+    CI_MACHINE: "tuolumne"
+    JOB_CMD:
+      value: "scripts/gitlab/ci-run-benchmarks.sh"
+      expand: false
+  needs: [tuolumne-up-check]
+  extends: [.run-benchmarks]

@@ -12,46 +12,41 @@ variables:
 # named so that we are sure to retrieve it and avoid collisions.
   ALLOC_NAME: ${CI_PROJECT_NAME}_ci_${CI_PIPELINE_ID}
 
-# Ruby
+# Matrix
+# Time in minutes.
 # Arguments for top level allocation
-  RUBY_SHARED_ALLOC: "--exclusive --reservation=ci --time=20 --nodes=1"
+# Note: can be set to "OFF" to prevent allocation sharing.
+  MATRIX_SHARED_ALLOC: "--exclusive --time=60 --nodes=1"
 # Arguments for job level allocation
-  RUBY_JOB_ALLOC: "--reservation=ci --nodes=1"
+  MATRIX_JOB_ALLOC: "--nodes=1"
+# Arguments for performance job allocation (dedicated allocation with no overlapping).
+  MATRIX_PERF_ALLOC: "--exclusive --time=60 --nodes=1"
 # Add variables that should apply to all the jobs on a machine:
-#  RUBY_MY_VAR: "..."
-
-# Poodle
-# Arguments for top level allocation
-  POODLE_SHARED_ALLOC: "--exclusive --partition=pdebug --time=10 --nodes=1"
-# Arguments for job level allocation
-  POODLE_JOB_ALLOC: "--nodes=1"
-# Add variables that should apply to all the jobs on a machine:
-#  POODLE_MY_VAR: "..."
-
-# Corona
-# Arguments for top level allocation
-# OPTIONAL: "-o per-resource.count=2" allows to get 2 jobs running on each node.
-  CORONA_SHARED_ALLOC: "--exclusive --time-limit=15m --nodes=1"
-# Arguments for job level allocation
-  CORONA_JOB_ALLOC: "--nodes=1 --begin-time=+5s"
-# Add variables that should apply to all the jobs on a machine:
-#  CORONA_MY_VAR: "..."
+#  MATRIX_MY_VAR: "..."
 
 # Tioga
 # Arguments for top level allocation
+# Note: can be set to "OFF" to prevent allocation sharing.
 # OPTIONAL: "-o per-resource.count=2" allows to get 2 jobs running on each node.
   TIOGA_SHARED_ALLOC: "--queue=pci --exclusive --time-limit=1h --nodes=1 -o per-resource.count=4"
 # Arguments for job level allocation
-  TIOGA_JOB_ALLOC: "--nodes=1 --begin-time=+5s --time-limit=1h"
+  TIOGA_JOB_ALLOC: "--nodes=1 --begin-time=+5s"
+# Arguments for performance job allocation (dedicated allocation with no overlapping).
+  TIOGA_PERF_ALLOC: "--queue=pci --exclusive --time-limit=1h --nodes=1 --begin-time=+5s"
 # Add variables that should apply to all the jobs on a machine:
 #  TIOGA_MY_VAR: "..."
 
-# Lassen uses a different job scheduler (spectrum lsf) that does not allow
-# pre-allocation the same way slurm does. Arguments for job level allocation
-  LASSEN_JOB_ALLOC: "1 -W 60 -q pci"
+# Tuolumne
+# Arguments for top level allocation
+# Note: can be set to "OFF" to prevent allocation sharing.
+# OPTIONAL: "-o per-resource.count=2" allows to get 2 jobs running on each node.
+  TUOLUMNE_SHARED_ALLOC: "--queue=pci --exclusive --time-limit=1h --nodes=1 -o per-resource.count=4"
+# Arguments for job level allocation
+  TUOLUMNE_JOB_ALLOC: "--nodes=1 --begin-time=+5s"
+# Arguments for performance job allocation (dedicated allocation with no overlapping).
+  TUOLUMNE_PERF_ALLOC: "--queue=pci --exclusive --time-limit=1h --nodes=1 --begin-time=+5s"
 # Add variables that should apply to all the jobs on a machine:
-#  LASSEN_MY_VAR: "..."
-
+#  TUOLUMNE_MY_VAR: "..."
 
 # Configuration shared by build and test jobs specific to this project.
 # Not all configuration can be shared. Here projects can fine tune the
