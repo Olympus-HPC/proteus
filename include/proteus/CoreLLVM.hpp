@@ -6,7 +6,6 @@ static_assert(__cplusplus >= 201703L,
 
 #include <llvm/CodeGen/CommandFlags.h>
 #include <llvm/IR/DebugInfo.h>
-#include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/PassManager.h>
 #include <llvm/Linker/Linker.h>
@@ -183,7 +182,6 @@ struct InitLLVMTargets {
 inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
                        unsigned CodegenOptLevel) {
   Timer T;
-
   detail::runOptimizationPassPipeline(M, Arch, OptLevel, CodegenOptLevel);
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                        << "optimizeIR optlevel " << OptLevel << " codegenopt "
@@ -217,7 +215,7 @@ linkModules(LLVMContext &Ctx,
   if (LinkedModules.empty())
     PROTEUS_FATAL_ERROR("Expected jit module");
 
-  auto LinkedModule = std::make_unique<Module>("JitModule", Ctx);
+  auto LinkedModule = std::make_unique<llvm::Module>("JitModule", Ctx);
   Linker IRLinker(*LinkedModule);
   // Link in all the proteus-enabled extracted modules.
   for (auto &LinkedM : LinkedModules) {
