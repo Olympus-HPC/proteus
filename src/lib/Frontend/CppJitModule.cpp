@@ -214,7 +214,6 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
 
   std::unique_ptr<LLVMContext> Ctx{Action.takeLLVMContext()};
 
-
   return CppJitModule::CompilationResult{std::move(Ctx), std::move(Module)};
 }
 

@@ -181,7 +181,6 @@ inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
                        unsigned CodegenOptLevel) {
   Timer T;
 
-
   detail::runOptimizationPassPipeline(M, Arch, OptLevel, CodegenOptLevel);
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                        << "optimizeIR optlevel " << OptLevel << " codegenopt "
