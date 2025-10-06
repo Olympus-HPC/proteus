@@ -14,8 +14,9 @@ private:
   std::string Code;
   HashT ModuleHash;
   std::vector<std::string> ExtraArgs;
+
   // Optimization level used when emitting IR.
-  constexpr const char *FrontendOptLevel = "O3";
+  static constexpr const char *FrontendOptLevel = "O3";
 
   Dispatcher &Dispatch;
   std::unique_ptr<CompiledLibrary> Library = nullptr;
