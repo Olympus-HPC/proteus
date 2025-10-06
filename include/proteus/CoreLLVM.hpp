@@ -162,7 +162,7 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
     break;
   default:
     PROTEUS_FATAL_ERROR("Unsupported optimization level " + OptLevel);
-  }
+  };
 
   ModulePassManager Passes = PB.buildPerModuleDefaultPipeline(OptSetting);
   Passes.run(M, MAM);
