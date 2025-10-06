@@ -50,3 +50,12 @@ extern "C" void __jit_disable_host() {
   JitEngineHost &Jit = JitEngineHost::instance();
   Jit.disable();
 }
+
+// Device function stubs for when GPU support is not enabled
+extern "C" void __jit_init_device() {}
+
+extern "C" void __jit_finalize_device() {}
+
+extern "C" void __jit_enable_device() {}
+
+extern "C" void __jit_disable_device() {}
