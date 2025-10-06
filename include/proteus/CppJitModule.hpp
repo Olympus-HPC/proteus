@@ -16,7 +16,7 @@ private:
   std::vector<std::string> ExtraArgs;
 
   // Optimization level used when emitting IR.
-  static constexpr const char *FrontendOptLevel = "O3";
+  static constexpr const char *FrontendOptLevelFlag = "-O3";
 
   Dispatcher &Dispatch;
   std::unique_ptr<CompiledLibrary> Library = nullptr;

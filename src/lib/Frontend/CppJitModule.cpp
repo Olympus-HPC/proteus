@@ -73,7 +73,7 @@ void CppJitModule::compileCppToDynamicLibrary() {
       PROTEUS_CLANGXX_BIN,
       "-shared",
       "-std=c++17",
-      FrontendOptLevel,
+      FrontendOptLevelFlag,
       "-x",
       (TargetModel == TargetModelType::HOST_HIP ? "hip" : "cuda"),
       "-fPIC",
@@ -137,7 +137,7 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
   std::vector<std::string> ArgStorage;
   if (TargetModel == TargetModelType::HOST) {
     ArgStorage = {PROTEUS_CLANGXX_BIN, "-emit-llvm", "-S",  "-std=c++17",
-                  FrontendOptLevel,    "-x",         "c++", "-fPIC",
+                  FrontendOptLevelFlag,    "-x",         "c++", "-fPIC",
                   SourceName};
   } else {
     std::string OffloadArch =
@@ -146,7 +146,7 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
                   "-emit-llvm",
                   "-S",
                   "-std=c++17",
-                  FrontendOptLevel,
+                  FrontendOptLevelFlag,
                   "-x",
                   (TargetModel == TargetModelType::HIP ? "hip" : "cuda"),
                   "--offload-device-only",
