@@ -149,8 +149,8 @@ tuolumne-up-check:
 tuolumne-build-and-test:
   variables:
     CI_MACHINE: "tuolumne"
-  needs: [tuolumne-up-check, generate-job-lists]
-  extends: [.build-and-test]
+  needs: [tuolumne-up-check]
+  extends: [.build-and-test-rocm]
 
 tuolumne-test-integration:
   variables:
