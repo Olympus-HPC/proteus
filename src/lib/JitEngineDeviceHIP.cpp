@@ -386,7 +386,8 @@ JitEngineDeviceHIP::JitEngineDeviceHIP() {
   DeviceArch = DeviceArch.substr(0, DeviceArch.find_first_of(":"));
 }
 
-std::unique_ptr<MemoryBuffer> JitEngineDeviceHIP::compileOnly(Module &M, bool DisableIROpt) {
+std::unique_ptr<MemoryBuffer>
+JitEngineDeviceHIP::compileOnly(Module &M, bool DisableIROpt) {
   if (!DisableIROpt) {
     const auto &CGConfig = Config::get().getCGConfig();
     proteus::optimizeIR(M, DeviceArch, CGConfig.optLevel(),

@@ -1,6 +1,10 @@
 #include "proteus/Frontend/Builtins.hpp"
 #include "proteus/Frontend/Func.hpp"
 
+#include <llvm/ADT/APInt.h>
+#include <llvm/IR/Attributes.h>
+#include <llvm/IR/ConstantRange.h>
+
 namespace proteus {
 namespace builtins {
 namespace gpu {
@@ -68,6 +72,10 @@ Var &getThreadIdX(FuncBase &Fn) {
   FunctionCallee Callee = M.getOrInsertFunction("llvm.amdgcn.workitem.id.x",
                                                 TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
+  llvm::ConstantRange RangeAttr(llvm::APInt(32, 0), llvm::APInt(32, 1024));
+  Call->addAttributeAtIndex(
+      llvm::AttributeList::ReturnIndex,
+      llvm::Attribute::get(Ctx, llvm::Attribute::Range, RangeAttr));
   Ret.storeValue(Call);
 
   return Ret;
@@ -118,6 +126,10 @@ Var &getThreadIdY(FuncBase &Fn) {
   FunctionCallee Callee = M.getOrInsertFunction("llvm.amdgcn.workitem.id.y",
                                                 TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
+  llvm::ConstantRange RangeAttr(llvm::APInt(32, 0), llvm::APInt(32, 1024));
+  Call->addAttributeAtIndex(
+      llvm::AttributeList::ReturnIndex,
+      llvm::Attribute::get(Ctx, llvm::Attribute::Range, RangeAttr));
   Ret.storeValue(Call);
 
   return Ret;

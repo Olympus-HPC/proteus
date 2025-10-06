@@ -136,8 +136,14 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
   // discovers and other options that are needed for source lowering.
   std::vector<std::string> ArgStorage;
   if (TargetModel == TargetModelType::HOST) {
-    ArgStorage = {PROTEUS_CLANGXX_BIN, "-emit-llvm", "-S",  "-std=c++17",
-                  FrontendOptLevelFlag,    "-x",         "c++", "-fPIC",
+    ArgStorage = {PROTEUS_CLANGXX_BIN,
+                  "-emit-llvm",
+                  "-S",
+                  "-std=c++17",
+                  FrontendOptLevelFlag,
+                  "-x",
+                  "c++",
+                  "-fPIC",
                   SourceName};
   } else {
     std::string OffloadArch =

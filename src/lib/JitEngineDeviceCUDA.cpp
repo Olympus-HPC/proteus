@@ -179,7 +179,8 @@ JitEngineDeviceCUDA::JitEngineDeviceCUDA() {
   PROTEUS_DBG(Logger::logs("proteus") << "CUDA Arch " << DeviceArch << "\n");
 }
 
-std::unique_ptr<MemoryBuffer> JitEngineDeviceCUDA::compileOnly(Module &M, bool DisableIROpt) {
+std::unique_ptr<MemoryBuffer>
+JitEngineDeviceCUDA::compileOnly(Module &M, bool DisableIROpt) {
   if (!DisableIROpt) {
     const auto &CGConfig = Config::get().getCGConfig();
     proteus::optimizeIR(M, DeviceArch, CGConfig.optLevel(),

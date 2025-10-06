@@ -272,7 +272,8 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   return JitFnPtr;
 }
 
-std::unique_ptr<MemoryBuffer> JitEngineHost::compileOnly(Module &M, bool DisableIROpt) {
+std::unique_ptr<MemoryBuffer> JitEngineHost::compileOnly(Module &M,
+                                                         bool DisableIROpt) {
   // Create the target machine using JITTargetMachineBuilder to match ORC JIT
   // loading.
   auto ExpectedTM =
