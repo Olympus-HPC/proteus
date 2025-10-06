@@ -39,10 +39,6 @@ CppJitModule::CppJitModule(StringRef Target, StringRef Code,
     : TargetModel(parseTargetModel(Target)), Code(Code), ModuleHash(hash(Code)),
       ExtraArgs(ExtraArgs), Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
 
-std::string CppJitModule::getOptArg() const {
-  return std::string("-O") + FrontendOptLevel;
-}
-
 void CppJitModule::compileCppToDynamicLibrary() {
   // Create compiler instance.
   CompilerInstance Compiler;
@@ -77,7 +73,7 @@ void CppJitModule::compileCppToDynamicLibrary() {
       PROTEUS_CLANGXX_BIN,
       "-shared",
       "-std=c++17",
-      getOptArg(),
+      FrontendOptLevel,
       "-x",
       (TargetModel == TargetModelType::HOST_HIP ? "hip" : "cuda"),
       "-fPIC",
@@ -141,7 +137,7 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
   std::vector<std::string> ArgStorage;
   if (TargetModel == TargetModelType::HOST) {
     ArgStorage = {PROTEUS_CLANGXX_BIN, "-emit-llvm", "-S",  "-std=c++17",
-                  getOptArg(),         "-x",         "c++", "-fPIC",
+                  FrontendOptLevel,    "-x",         "c++", "-fPIC",
                   SourceName};
   } else {
     std::string OffloadArch =
@@ -150,7 +146,7 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
                   "-emit-llvm",
                   "-S",
                   "-std=c++17",
-                  getOptArg(),
+                  FrontendOptLevel,
                   "-x",
                   (TargetModel == TargetModelType::HIP ? "hip" : "cuda"),
                   "--offload-device-only",
@@ -221,9 +217,8 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
   // Stamp the frontend optimization level onto the module for downstream
   // decisions.
   {
-    std::string OptString = getOptArg();
     Module->addModuleFlag(llvm::Module::Warning, "proteus.frontend.opt-level",
-                          llvm::MDString::get(*Ctx, OptString));
+                          llvm::MDString::get(*Ctx, FrontendOptLevel));
   }
 
   return CppJitModule::CompilationResult{std::move(Ctx), std::move(Module)};
