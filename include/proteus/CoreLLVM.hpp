@@ -84,25 +84,6 @@ createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3) {
   return TM;
 }
 
-inline OptimizationLevel charToOptimizationLevel(char OptChar) {
-  switch (OptChar) {
-  case '0':
-    return OptimizationLevel::O0;
-  case '1':
-    return OptimizationLevel::O1;
-  case '2':
-    return OptimizationLevel::O2;
-  case '3':
-    return OptimizationLevel::O3;
-  case 's':
-    return OptimizationLevel::Os;
-  case 'z':
-    return OptimizationLevel::Oz;
-  default:
-    PROTEUS_FATAL_ERROR("Unsupported optimization level " + OptChar);
-  }
-}
-
 inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
                                         const std::string &PassPipeline,
                                         unsigned CodegenOptLevel = 3) {
@@ -159,7 +140,29 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
   PB.registerLoopAnalyses(LAM);
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-  OptimizationLevel OptSetting = charToOptimizationLevel(OptLevel);
+  OptimizationLevel OptSetting;
+  switch (OptLevel) {
+  case '0':
+    OptSetting = OptimizationLevel::O0;
+    break;
+  case '1':
+    OptSetting = OptimizationLevel::O1;
+    break;
+  case '2':
+    OptSetting = OptimizationLevel::O2;
+    break;
+  case '3':
+    OptSetting = OptimizationLevel::O3;
+    break;
+  case 's':
+    OptSetting = OptimizationLevel::Os;
+    break;
+  case 'z':
+    OptSetting = OptimizationLevel::Oz;
+    break;
+  default:
+    PROTEUS_FATAL_ERROR("Unsupported optimization level " + OptLevel);
+  }
 
   ModulePassManager Passes = PB.buildPerModuleDefaultPipeline(OptSetting);
   Passes.run(M, MAM);
