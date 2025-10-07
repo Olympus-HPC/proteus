@@ -131,25 +131,10 @@ shared_array([[maybe_unused]] size_t N,
 }
 #endif
 
-inline void enable() {
-  __jit_enable_host();
-  __jit_enable_device();
-}
-
-inline void disable() {
-  __jit_disable_host();
-  __jit_disable_device();
-}
-
-inline void init() {
-  __jit_init_host();
-  __jit_init_device();
-}
-
-inline void finalize() {
-  __jit_finalize_host();
-  __jit_finalize_device();
-}
+void enable();
+void disable();
+void init();
+void finalize();
 
 } // namespace proteus
 
