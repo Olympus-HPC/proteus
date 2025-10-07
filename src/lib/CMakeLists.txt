@@ -6,6 +6,7 @@ set(SOURCES
   CompilerInterfaceRuntimeConstantInfo.cpp
   JitEngine.cpp
   JitEngineHost.cpp
+  JitInterface.cpp
   Frontend/Func.cpp
   Frontend/Var.cpp
   Frontend/Dispatcher.cpp
