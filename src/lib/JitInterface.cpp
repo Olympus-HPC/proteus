@@ -13,28 +13,28 @@ namespace proteus {
 void enable() {
   __jit_enable_host();
   if constexpr (PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP) {
-  __jit_enable_device();
+    __jit_enable_device();
   }
 }
 
 void disable() {
   __jit_disable_host();
   if constexpr (PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP) {
-  __jit_disable_device();
+    __jit_disable_device();
   }
 }
 
 void init() {
   __jit_init_host();
   if constexpr (PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP) {
-  __jit_init_device();
+    __jit_init_device();
   }
 }
 
 void finalize() {
   __jit_finalize_host();
   if constexpr (PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP) {
-  __jit_finalize_device();
+    __jit_finalize_device();
   }
 }
 
