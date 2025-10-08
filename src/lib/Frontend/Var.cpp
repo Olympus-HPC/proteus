@@ -883,4 +883,80 @@ Var &ArrayVar::index(const Var &I) {
   return ResultVar;
 }
 
+// Helper for emitting intrinsics with VarTT
+template <typename T, typename... Operands>
+static VarTT<T> emitIntrinsic(StringRef IntrinsicName, Type *ResultType,
+                               const Operands &...Ops) {
+  static_assert(sizeof...(Ops) > 0, "Intrinsic requires at least one operand");
+
+  auto &Fn = std::get<0>(std::tie(Ops...)).Fn;
+  auto CheckFn = [&Fn](const auto &Operand) {
+    if (&Operand.Fn != &Fn)
+      PROTEUS_FATAL_ERROR("Variables should belong to the same function");
+  };
+  (CheckFn(Ops), ...);
+
+  auto &IRB = Fn.getIRBuilder();
+  auto &M = *Fn.getFunction()->getParent();
+
+  auto ConvertOperand = [&](const auto &Operand) {
+    return convert(IRB, Operand.getValue(), ResultType);
+  };
+
+  FunctionCallee Callee = M.getOrInsertFunction(IntrinsicName, ResultType,
+                                                ((void)Ops, ResultType)...);
+  Value *Call = IRB.CreateCall(Callee, {ConvertOperand(Ops)...});
+
+  return Fn.createVarTT<T>(Call);
+}
+
+// Math intrinsics for VarTT
+template <typename T>
+VarTT<T> powf(const VarTT<T> &L, const VarTT<T> &R) {
+  static_assert(std::is_floating_point_v<T>, "powf requires floating-point type");
+  
+  auto &IRB = L.Fn.getIRBuilder();
+  auto *ResultType = IRB.getFloatTy();
+
+#if PROTEUS_ENABLE_CUDA
+  std::string IntrinsicName = "__nv_powf";
+#else
+  std::string IntrinsicName = "llvm.pow.f32";
+#endif
+
+  return emitIntrinsic<T>(IntrinsicName, ResultType, L, R);
+}
+
+template <typename T>
+VarTT<T> sqrtf(const VarTT<T> &R) {
+  static_assert(std::is_floating_point_v<T>, "sqrtf requires floating-point type");
+  
+  auto &IRB = R.Fn.getIRBuilder();
+  auto *ResultType = IRB.getFloatTy();
+
+#if PROTEUS_ENABLE_CUDA
+  std::string IntrinsicName = "__nv_sqrtf";
+#else
+  std::string IntrinsicName = "llvm.sqrt.f32";
+#endif
+
+  return emitIntrinsic<T>(IntrinsicName, ResultType, R);
+}
+
+template <typename T>
+VarTT<T> min(const VarTT<T> &L, const VarTT<T> &R) {
+  static_assert(std::is_arithmetic_v<T>, "min requires arithmetic type");
+  
+  FuncBase &Fn = L.Fn;
+  if (&Fn != &R.Fn)
+    PROTEUS_FATAL_ERROR("Variables should belong to the same function");
+
+  VarTT<T> ResultVar = Fn.declVarTT<T>("min_res");
+  ResultVar = R;
+  Fn.beginIf(L < R);
+  { ResultVar = L; }
+  Fn.endIf();
+  return ResultVar;
+}
+
 } // namespace proteus

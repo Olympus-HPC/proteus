@@ -448,6 +448,15 @@ std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>,
                  VarTT<std::common_type_t<T, U>>>
 operator%(const T &ConstValue, const VarTT<U> &Var);
 
+// Math intrinsics for VarTT
+template <typename T>
+VarTT<T> powf(const VarTT<T> &L, const VarTT<T> &R);
+
+template <typename T>
+VarTT<T> sqrtf(const VarTT<T> &R);
+
+template <typename T>
+VarTT<T> min(const VarTT<T> &L,
 } // namespace proteus
 
 

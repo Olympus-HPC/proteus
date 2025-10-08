@@ -79,6 +79,10 @@ protected:
 
   Var &emitAtomic(AtomicRMWInst::BinOp Op, Var &Addr, Var &Val);
 
+  template <typename T>
+  VarTT<T> emitAtomicTT(AtomicRMWInst::BinOp Op, VarTT<T*> &Addr, 
+                        const VarTT<T> &Val);
+
 public:
   FuncBase(JitModule &J, FunctionCallee FC);
 
@@ -162,6 +166,18 @@ public:
   VarTT<T> declVarTT(StringRef Name = "var") {
     static_assert(!std::is_array_v<T>, "Expected non-array type");
     return declVarTTInternal<T>(Name);
+  }
+
+  template <typename T>
+  VarTT<T> declVarTT(size_t NElem, AddressSpace AS = AddressSpace::DEFAULT,
+                     StringRef Name = "array_var") {
+    static_assert(std::is_array_v<T>, "Expected array type");
+    
+    Function *F = getFunction();
+    auto *BasePointer = emitArrayCreate(TypeMap<T>::get(F->getContext(), NElem), AS, Name);
+    
+    auto *ArrTy = cast<ArrayType>(TypeMap<T>::get(F->getContext(), NElem));
+    return VarTT<T>(std::make_unique<ArrayStorage>(BasePointer, IRB, ArrTy), *this);
   }
 
   template <typename T>
@@ -266,6 +282,15 @@ public:
   Var &atomicMax(Var &Addr, Var &Val);
   Var &atomicMin(Var &Addr, Var &Val);
 
+  template <typename T>
+  VarTT<T> atomicAdd(VarTT<T*> &Addr, const VarTT<T> &Val);
+  template <typename T>
+  VarTT<T> atomicSub(VarTT<T*> &Addr, const VarTT<T> &Val);
+  template <typename T>
+  VarTT<T> atomicMax(VarTT<T*> &Addr, const VarTT<T> &Val);
+  template <typename T>
+  VarTT<T> atomicMin(VarTT<T*> &Addr, const VarTT<T> &Val);
+
   template <typename BodyLambda = EmptyLambda>
   auto forLoop(const LoopBoundInfo &Bounds, BodyLambda &&Body = {}) {
     return ForLoopBuilder(Bounds, *this, std::move(Body));
@@ -277,6 +302,11 @@ public:
   }
 
   void ret(std::optional<std::reference_wrapper<Var>> OptRet = std::nullopt);
+
+  template <typename T>
+  void retTT(const VarTT<T> &RetVal);
+  
+  void retTT();
 
   StringRef getName() const { return Name; }
 
@@ -996,6 +1026,75 @@ std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>,
 operator%(const T &ConstValue, const VarTT<U> &Var) {
   VarTT<T> Tmp = Var.Fn.template defVarTT<T>(ConstValue, "tmp.");
   return Tmp % Var;
+}
+
+// Atomic operations for VarTT
+template <typename T>
+VarTT<T> FuncBase::emitAtomicTT(AtomicRMWInst::BinOp Op, VarTT<T*> &Addr,
+                                const VarTT<T> &Val) {
+  static_assert(std::is_arithmetic_v<T>, "Atomic ops require arithmetic type");
+
+  auto &IRB = getIRBuilder();
+  Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
+  
+  auto *Result = IRB.CreateAtomicRMW(
+      Op, Addr.getPointerValue(), Val.getValue(), MaybeAlign(),
+      AtomicOrdering::SequentiallyConsistent, SyncScope::SingleThread);
+  
+  return createVarTT<T>(Result);
+}
+
+template <typename T>
+VarTT<T> FuncBase::atomicAdd(VarTT<T*> &Addr, const VarTT<T> &Val) {
+  static_assert(std::is_arithmetic_v<T>, "atomicAdd requires arithmetic type");
+  
+  Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
+  auto Op =
+      ValueType->isFloatingPointTy() ? AtomicRMWInst::FAdd : AtomicRMWInst::Add;
+  return emitAtomicTT(Op, Addr, Val);
+}
+
+template <typename T>
+VarTT<T> FuncBase::atomicSub(VarTT<T*> &Addr, const VarTT<T> &Val) {
+  static_assert(std::is_arithmetic_v<T>, "atomicSub requires arithmetic type");
+  
+  Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
+  auto Op =
+      ValueType->isFloatingPointTy() ? AtomicRMWInst::FSub : AtomicRMWInst::Sub;
+  return emitAtomicTT(Op, Addr, Val);
+}
+
+template <typename T>
+VarTT<T> FuncBase::atomicMax(VarTT<T*> &Addr, const VarTT<T> &Val) {
+  static_assert(std::is_arithmetic_v<T>, "atomicMax requires arithmetic type");
+  
+  Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
+  auto Op =
+      ValueType->isFloatingPointTy() ? AtomicRMWInst::FMax : AtomicRMWInst::Max;
+  return emitAtomicTT(Op, Addr, Val);
+}
+
+template <typename T>
+VarTT<T> FuncBase::atomicMin(VarTT<T*> &Addr, const VarTT<T> &Val) {
+  static_assert(std::is_arithmetic_v<T>, "atomicMin requires arithmetic type");
+  
+  Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
+  auto Op =
+      ValueType->isFloatingPointTy() ? AtomicRMWInst::FMin : AtomicRMWInst::Min;
+  return emitAtomicTT(Op, Addr, Val);
+}
+
+// Return implementations for VarTT
+inline void FuncBase::retTT() {
+  auto &IRB = getIRBuilder();
+  IRB.CreateRetVoid();
+}
+
+template <typename T>
+void FuncBase::retTT(const VarTT<T> &RetVal) {
+  auto &IRB = getIRBuilder();
+  Value *RetValue = RetVal.Storage->loadValue();
+  IRB.CreateRet(RetValue);
 }
 
 } // namespace proteus
