@@ -8,20 +8,23 @@ mkdir -p /tmp/proteus-ci-${CI_JOB_ID}
 cd /tmp/proteus-ci-${CI_JOB_ID}
 
 if [ "${CI_MACHINE}" == "matrix" ]; then
-  ml load cmake/3.23.1
+  ml load cmake/3.30
   ml load cuda/12.2.2
   PYTHON_VERSION=3.12
 
   # Install Clang/LLVM through conda.
   MINICONDA_DIR=miniconda3
   mkdir -p ${MINICONDA_DIR}
-  wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -m).sh -O ./${MINICONDA_DIR}/miniconda.sh
+  wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -m).sh -O ./${MINICONDA_DIR}/miniconda.sh
   bash ./${MINICONDA_DIR}/miniconda.sh -b -u -p ./${MINICONDA_DIR}
   rm ./${MINICONDA_DIR}/miniconda.sh
   source ./${MINICONDA_DIR}/bin/activate
-  conda create -y -n proteus -c conda-forge \
+  # Use an older version of gcc to avoid issues with detecting Clang as the CUDA
+  # compiler.
+  conda create -y -q -n proteus -c conda-forge \
       python=${PYTHON_VERSION} clang=${PROTEUS_CI_LLVM_VERSION} clangxx=${PROTEUS_CI_LLVM_VERSION} \
-      clangdev=${PROTEUS_CI_LLVM_VERSION} llvmdev=${PROTEUS_CI_LLVM_VERSION} lit=${PROTEUS_CI_LLVM_VERSION}
+      clangdev=${PROTEUS_CI_LLVM_VERSION} llvmdev=${PROTEUS_CI_LLVM_VERSION} lit=${PROTEUS_CI_LLVM_VERSION} \
+      gcc=12 gxx=12
   conda activate proteus
 
   LLVM_INSTALL_DIR=$(llvm-config --prefix)
@@ -29,6 +32,10 @@ if [ "${CI_MACHINE}" == "matrix" ]; then
   CMAKE_OPTIONS_MACHINE+=" -DPROTEUS_LINK_SHARED_LLVM=on"
   CMAKE_OPTIONS_MACHINE+=" -DPROTEUS_ENABLE_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=90"
   CMAKE_OPTIONS_MACHINE+=" -DCMAKE_CUDA_COMPILER=$LLVM_INSTALL_DIR/bin/clang++"
+  # Clang 18 has a bug with CUDA and the GNU C++ standard library extensions:
+  # https://github.com/llvm/llvm-project/issues/88695.
+  # Fix by explicitly setting CUDA flags.
+  CMAKE_OPTIONS_MACHINE+=" -DCMAKE_CUDA_FLAGS=-std=c++17"
 elif [ "${CI_MACHINE}" == "tioga" ] || [ "${CI_MACHINE}" == "tuolumne" ]; then
   ml load rocm/${PROTEUS_CI_ROCM_VERSION}
 
@@ -91,7 +98,7 @@ PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 ctest -j8 -T test --ou
 echo "### $(date) END TESTING (BLOCKING) ASYNC COMPILATION ###"
 
 # Test also our faster, alternative to HIP RTC codegen.
-if [ "${CI_MACHINE}" == "tioga" ]; then
+if [ "${CI_MACHINE}" == "tioga" ] || [ "${CI_MACHINE}" == "tuolumne" ]; then
   echo "### $(date) START TESTING SYNC COMPILATION WITH PROTEUS CODEGEN SERIAL ###"
   PROTEUS_CODEGEN=serial ctest -j8 -T test --output-on-failure
   echo "### $(date) END TESTING SYNC COMPILATION WITH PROTEUS HIP CODEGEN SERIAL ###"
