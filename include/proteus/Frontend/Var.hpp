@@ -14,6 +14,12 @@ enum class VarKind { Invalid, Scalar, Pointer, Array };
 
 template <typename T> struct VarT {};
 
+
+
+class VarStorage;
+class PointerStorage;
+class ArrayStorage;
+
 struct Var {
   AllocaInst *Alloca;
   FuncBase &Fn;
@@ -225,6 +231,86 @@ struct ArrayVar final : Var {
   Var &index(const Var &I) override;
 };
 
+// Primary template declaration
+template <typename T, typename = void>
+struct VarTT;
+// Specialization for arithmetic types
+template <typename T>
+struct VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> {
+  using ValueType = T;
+  using ElemType = T;
+  FuncBase &Fn;
+  // Use opaque VarStorage to allow array/pointer
+  // operator[] to return a Scalar Var that
+  // points to the correct element.
+  std::unique_ptr<VarStorage> Storage;
+  VarTT(std::unique_ptr<VarStorage> Storage, FuncBase &Fn)
+    : Fn(Fn), Storage(std::move(Storage)) {
+  }
+
+  // Conversion constructor
+  // TODO: Add an is_convertible check.
+  template<typename U>
+  VarTT(VarTT<U> &Var)
+    : Fn(Var.Fn) {
+      *this = Var;
+  }
+  
+  // Assignment operators
+  VarTT &operator=(const VarTT &Var);
+  
+  template<typename U>
+  VarTT &operator=(const VarTT<U> &Var);
+  
+  // Arithmetic operators
+  template <typename U>
+  VarTT<std::common_type_t<T, U>> operator+(const VarTT<U> &Other) const;
+  
+  // Utility functions
+  Value *getValue() const;
+  void storeValue(Value *Val);
+};
+
+// Specialization for array types
+template <typename T>
+struct VarTT<T, std::enable_if_t<std::is_array_v<T>>> {
+  using ValueType = T;
+  using ElemType = std::remove_extent_t<T>;
+  FuncBase &Fn;
+  std::unique_ptr<ArrayStorage> Storage;
+
+  VarTT(std::unique_ptr<ArrayStorage> Storage, FuncBase &Fn)
+    : Fn(Fn), Storage(std::move(Storage)) {}
+  
+  VarTT<ElemType> operator[](size_t Index);
+
+  template <typename IdxT>
+  std::enable_if_t<std::is_arithmetic_v<IdxT>, VarTT<ElemType> >
+  operator[](const VarTT<IdxT> &Index);
+};
+
+// Specialization for pointer types
+template <typename T>
+struct VarTT<T, std::enable_if_t<std::is_pointer_v<T>>> {
+  using ValueType = T;
+  using ElemType = std::remove_pointer_t<T>;
+  FuncBase &Fn;
+  std::unique_ptr<PointerStorage> Storage;
+
+  VarTT(std::unique_ptr<PointerStorage> Storage, FuncBase &Fn)
+    : Fn(Fn), Storage(std::move(Storage)) {}
+  
+  VarTT<ElemType> operator[](size_t Index);
+
+  template <typename IdxT>
+  std::enable_if_t<std::is_arithmetic_v<IdxT>, VarTT<ElemType>>
+  operator[](const VarTT<IdxT> &Index);
+
+  VarTT<ElemType> operator*();
+};
+
 } // namespace proteus
+
+
 
 #endif // PROTEUS_FRONTEND_VAR_HPP

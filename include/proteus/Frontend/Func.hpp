@@ -11,6 +11,7 @@
 #include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/Frontend/TypeMap.hpp"
+#include "proteus/Frontend/VarStorage.hpp"
 #include "proteus/Frontend/Var.hpp"
 
 namespace proteus {
@@ -140,6 +141,13 @@ public:
     return VarRef;
   }
 
+  template <typename T>
+  VarTT<T> defVarTT(T Val, StringRef Name = "var") {
+    auto *Ty = TypeMap<T>::get(getFunction()->getContext());
+    auto *Alloca = emitAlloca(Ty, Name);
+    return VarTT<T>(std::make_unique<ScalarStorage>(Alloca, IRB), *this);
+  }
+
   template <typename... ArgT> auto defRuntimeConsts(ArgT &&...Args) {
     return std::tie(defRuntimeConst(std::forward<ArgT>(Args))...);
   }
@@ -263,10 +271,50 @@ template <typename RetT, typename... ArgT> class Func final : public FuncBase {
 private:
   Dispatcher &Dispatch;
   RetT (*CompiledFunc)(ArgT...) = nullptr;
+  // Optional because ArgTT is not default constructible.
+  std::tuple<std::optional<VarTT<ArgT>>...> ArgumentsTT;
 
 private:
   template <std::size_t... Is> auto getArgsImpl(std::index_sequence<Is...>) {
     return std::tie(getArg(Is)...);
+  }
+
+  template <typename T, std::size_t ArgIdx>
+  VarTT<T> createArgTT() {
+    Function *F = getFunction();
+    auto &Ctx = F->getContext();
+    
+    // Get the LLVM type for this argument
+    Type *ArgTy = TypeMap<T>::get(Ctx);
+    
+    // Create alloca to hold the incoming argument value
+    auto *Alloca = emitAlloca(ArgTy, "arg." + std::to_string(ArgIdx));
+    
+    // Store the function argument into the alloca
+    auto *Arg = F->getArg(ArgIdx);
+    IRB.CreateStore(Arg, Alloca);
+    
+    // Create appropriate storage based on type
+    if constexpr (std::is_pointer_v<T>) {
+      // Pointer type: use PointerStorage
+      Type *PtrElemTy = TypeMap<T>::getPointerElemType(Ctx);
+      return VarTT<T>(std::make_unique<PointerStorage>(Alloca, IRB, PtrElemTy), *this);
+    } else {
+      // Scalar type: use ScalarStorage
+      return VarTT<T>(std::make_unique<ScalarStorage>(Alloca, IRB), *this);
+    }
+  }
+
+  template <std::size_t... Is>
+  void declArgsTTImpl(std::index_sequence<Is...>) {
+    Function *F = getFunction();
+    auto &EntryBB = F->getEntryBlock();
+    IP = IRBuilderBase::InsertPoint(&EntryBB, EntryBB.end());
+    IRB.restoreIP(IP);
+    
+    (std::get<Is>(ArgumentsTT).emplace(createArgTT<ArgT, Is>()), ...);
+    
+    IRB.ClearInsertionPoint();
   }
 
 public:
@@ -276,6 +324,19 @@ public:
   RetT operator()(ArgT... Args);
 
   auto getArgs() { return getArgsImpl(std::index_sequence_for<ArgT...>{}); }
+  
+  void declArgsTT() {
+    declArgsTTImpl(std::index_sequence_for<ArgT...>{});
+  }
+  
+  auto& getArgsTT() {
+    return ArgumentsTT;
+  }
+  
+  template<std::size_t Idx>
+  auto& getArgTT() {
+    return *std::get<Idx>(ArgumentsTT);
+  }
 
   auto getCompiledFunc() const { return CompiledFunc; }
 
@@ -283,6 +344,147 @@ public:
     CompiledFunc = CompiledFuncIn;
   }
 };
+
+// VarTT arithmetic specialization implementations (defined here after FuncBase is complete)
+// so we have it available.
+template <typename T>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(const VarTT &Var) {
+  auto &IRB = Fn.getIRBuilder();
+  auto *Converted = convert(IRB, Var.Storage->loadValue(), Storage->getValueType());
+  Storage->storeValue(Converted);
+  return *this;
+}
+
+template <typename T>
+template <typename U>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(const VarTT<U> &Var) {
+  auto &IRB = Fn.getIRBuilder();
+  auto *Converted = convert(IRB, Var.Storage->loadValue(), Storage->getValueType());
+  Storage->storeValue(Converted);
+  return *this;
+}
+
+template <typename T>
+template <typename U>
+VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+(
+    const VarTT<U> &Other) const {
+  if (&Fn != &Other.Fn)
+    PROTEUS_FATAL_ERROR("Variables should belong to the same function");
+  
+  auto &IRB = Fn.getIRBuilder();
+  
+  VarStorage &OtherStorage = *Other.Storage;
+  Value *LHS = Storage->loadValue();
+  Value *RHS = OtherStorage.loadValue();
+  
+  Value *Result = nullptr;
+  if constexpr (std::is_integral_v<T>) {
+    Result = IRB.CreateAdd(LHS, RHS);
+  } else {
+    Result = IRB.CreateFAdd(LHS, RHS);
+  }
+  
+  auto *ResultSlot = IRB.CreateAlloca(Result->getType());
+  IRB.CreateStore(Result, ResultSlot);
+  
+  std::unique_ptr<VarStorage> ResultStorage = std::make_unique<ScalarStorage>(ResultSlot, IRB);
+  return VarTT<std::common_type_t<T, U>>(std::move(ResultStorage), Fn);
+}
+
+// Array type operator[]
+template<typename T>
+VarTT<std::remove_extent_t<T>> VarTT<T, std::enable_if_t<std::is_array_v<T>>>::operator[](size_t Index) {
+  auto &IRB = Fn.getIRBuilder();
+  auto *ArrayTy = cast<ArrayType>(Storage->getAllocatedType());
+  auto *BasePointer = Storage->getValue();
+  
+  // GEP into the array aggregate: [0, Index]
+  auto *GEP = IRB.CreateConstInBoundsGEP2_64(ArrayTy, BasePointer, 0, Index);
+  Type *ElemTy = Storage->getValueType();
+  auto *BasePtrTy = cast<PointerType>(BasePointer->getType());
+  unsigned AddrSpace = BasePtrTy->getAddressSpace();
+  Type *ElemPtrTy = PointerType::get(ElemTy, AddrSpace);
+  
+  auto *PtrSlot = Fn.emitAlloca(ElemPtrTy, "elem.ptr");
+  IRB.CreateStore(GEP, PtrSlot);
+  
+  std::unique_ptr<VarStorage> ResultStorage = std::make_unique<PointerStorage>(PtrSlot, IRB, ElemTy);
+  return VarTT<std::remove_extent_t<T>>(std::move(ResultStorage), Fn);
+}
+
+template<typename T>
+template <typename IdxT>
+std::enable_if_t<std::is_integral_v<IdxT>, VarTT<std::remove_extent_t<T>>>
+VarTT<T, std::enable_if_t<std::is_array_v<T>>>::operator[](const VarTT<IdxT> &Index) {
+  auto &IRB = Fn.getIRBuilder();
+  auto *ArrayTy = cast<ArrayType>(Storage->getAllocatedType());
+  auto *BasePointer = Storage->getValue();
+  
+  Value *IdxVal = Index.Storage->loadValue();
+  Value *Zero = llvm::ConstantInt::get(IdxVal->getType(), 0);
+  auto *GEP = IRB.CreateInBoundsGEP(ArrayTy, BasePointer, {Zero, IdxVal});
+  Type *ElemTy = Storage->getValueType();
+  auto *BasePtrTy = cast<PointerType>(BasePointer->getType());
+  unsigned AddrSpace = BasePtrTy->getAddressSpace();
+  Type *ElemPtrTy = PointerType::get(ElemTy, AddrSpace);
+  
+  auto *PtrSlot = Fn.emitAlloca(ElemPtrTy, "elem.ptr");
+  IRB.CreateStore(GEP, PtrSlot);
+  
+  std::unique_ptr<VarStorage> ResultStorage = std::make_unique<PointerStorage>(PtrSlot, IRB, ElemTy);
+  return VarTT<std::remove_extent_t<T>>(std::move(ResultStorage), Fn);
+}
+
+// Pointer type operator[]
+template<typename T>
+VarTT<std::remove_pointer_t<T>> VarTT<T, std::enable_if_t<std::is_pointer_v<T>>>::operator[](size_t Index) {
+  auto &IRB = Fn.getIRBuilder();
+
+  auto *AllocatedType = Storage->getAllocatedType();
+  auto *PointerElemTy = Storage->getValueType();
+  auto *Ptr = Storage->getValue();
+  auto *GEP = IRB.CreateConstInBoundsGEP1_64(PointerElemTy, Ptr, Index);
+  unsigned AddrSpace = cast<PointerType>(Ptr->getType())->getAddressSpace();
+  Type *ElemPtrTy = PointerType::get(PointerElemTy, AddrSpace);
+  
+  // Create a pointer storage to hold the LValue for
+  // the Array[Index].
+  auto *PtrSlot = Fn.emitAlloca(ElemPtrTy, "elem.ptr");
+  IRB.CreateStore(GEP, PtrSlot);
+  std::unique_ptr<VarStorage> ResultStorage = std::make_unique<PointerStorage>(PtrSlot, IRB, PointerElemTy);
+
+  return VarTT<std::remove_pointer_t<T>>(std::move(ResultStorage), Fn);
+}
+
+template<typename T>
+template <typename IdxT>
+std::enable_if_t<std::is_arithmetic_v<IdxT>, VarTT<std::remove_pointer_t<T>>>
+VarTT<T, std::enable_if_t<std::is_pointer_v<T>>>::operator[](const VarTT<IdxT> &Index) {
+  auto &IRB = Fn.getIRBuilder();
+
+  auto *PointeeType = Storage->getValueType();
+  auto *Ptr = Storage->getValue();
+  auto *IdxValue = IRB.CreateLoad(Index.Storage->getAllocatedType(), Index.Storage->getValue());
+  auto *GEP = IRB.CreateInBoundsGEP(PointeeType, Ptr, IdxValue);
+  unsigned AddrSpace = cast<PointerType>(Ptr->getType())->getAddressSpace();
+  Type *ElemPtrTy = PointerType::get(PointeeType, AddrSpace);
+  
+  // Create a pointer storage to hold the LValue for
+  // the Array[Index].
+  auto *PtrSlot = Fn.emitAlloca(ElemPtrTy, "elem.ptr");
+  IRB.CreateStore(GEP, PtrSlot);
+  std::unique_ptr<VarStorage> ResultStorage = std::make_unique<PointerStorage>(PtrSlot, IRB, PointeeType);
+
+  return VarTT<std::remove_pointer_t<T>>(std::move(ResultStorage), Fn);
+}
+
+// Pointer type operator*
+template<typename T>
+VarTT<std::remove_pointer_t<T>> VarTT<T, std::enable_if_t<std::is_pointer_v<T>>>::operator*() {
+  return (*this)[0];
+}
 
 } // namespace proteus
 

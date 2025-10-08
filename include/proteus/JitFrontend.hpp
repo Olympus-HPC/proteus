@@ -47,7 +47,7 @@ private:
     auto TypedFn = std::make_unique<Func<RetT, ArgT...>>(*this, FC, Dispatch);
     Func<RetT, ArgT...> &TypedFnRef = *TypedFn;
     std::unique_ptr<FuncBase> &Fn = Functions.emplace_back(std::move(TypedFn));
-    Fn->declArgs<ArgT...>();
+    TypedFnRef.declArgsTT();
     return TypedFnRef;
   }
 
