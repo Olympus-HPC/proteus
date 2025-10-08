@@ -347,6 +347,33 @@ public:
 
 // VarTT arithmetic specialization implementations (defined here after FuncBase is complete)
 // so we have it available.
+
+// Helper function for binary operations on VarTT types
+template <typename T, typename U, typename IntOp, typename FPOp>
+VarTT<std::common_type_t<T, U>> binOpTT(const VarTT<T> &L, const VarTT<U> &R, IntOp IOp, FPOp FOp) {
+  FuncBase &Fn = L.Fn;
+  if (&Fn != &R.Fn)
+    PROTEUS_FATAL_ERROR("Variables should belong to the same function");
+  
+  auto &IRB = Fn.getIRBuilder();
+  
+  Value *LHS = L.Storage->loadValue();
+  Value *RHS = R.Storage->loadValue();
+  
+  Value *Result = nullptr;
+  if constexpr (std::is_integral_v<std::common_type_t<T, U>>) {
+    Result = IOp(IRB, LHS, RHS);
+  } else {
+    Result = FOp(IRB, LHS, RHS);
+  }
+  
+  auto *ResultSlot = IRB.CreateAlloca(Result->getType());
+  IRB.CreateStore(Result, ResultSlot);
+  
+  std::unique_ptr<VarStorage> ResultStorage = std::make_unique<ScalarStorage>(ResultSlot, IRB);
+  return VarTT<std::common_type_t<T, U>>(std::move(ResultStorage), Fn);
+}
+
 template <typename T>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(const VarTT &Var) {
@@ -368,29 +395,71 @@ VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(const VarTT<U> &V
 
 template <typename T>
 template <typename U>
-VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+(
-    const VarTT<U> &Other) const {
-  if (&Fn != &Other.Fn)
-    PROTEUS_FATAL_ERROR("Variables should belong to the same function");
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(const U &ConstValue) {
+  static_assert(std::is_arithmetic_v<U>, "Can only assign arithmetic types to VarTT");
   
-  auto &IRB = Fn.getIRBuilder();
+  Type *LHSType = Storage->getValueType();
   
-  VarStorage &OtherStorage = *Other.Storage;
-  Value *LHS = Storage->loadValue();
-  Value *RHS = OtherStorage.loadValue();
-  
-  Value *Result = nullptr;
-  if constexpr (std::is_integral_v<T>) {
-    Result = IRB.CreateAdd(LHS, RHS);
+  if (LHSType->isIntegerTy()) {
+    Storage->storeValue(ConstantInt::get(LHSType, ConstValue));
+  } else if (LHSType->isFloatingPointTy()) {
+    Storage->storeValue(ConstantFP::get(LHSType, ConstValue));
   } else {
-    Result = IRB.CreateFAdd(LHS, RHS);
+    PROTEUS_FATAL_ERROR("Unsupported type");
   }
   
-  auto *ResultSlot = IRB.CreateAlloca(Result->getType());
-  IRB.CreateStore(Result, ResultSlot);
-  
-  std::unique_ptr<VarStorage> ResultStorage = std::make_unique<ScalarStorage>(ResultSlot, IRB);
-  return VarTT<std::common_type_t<T, U>>(std::move(ResultStorage), Fn);
+  return *this;
+}
+
+template <typename T>
+template <typename U>
+VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+(
+    const VarTT<U> &Other) const {
+  return binOpTT(
+      *this, Other,
+      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateAdd(L, R); },
+      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFAdd(L, R); });
+}
+
+template <typename T>
+template <typename U>
+VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-(
+    const VarTT<U> &Other) const {
+  return binOpTT(
+      *this, Other,
+      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSub(L, R); },
+      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFSub(L, R); });
+}
+
+template <typename T>
+template <typename U>
+VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*(
+    const VarTT<U> &Other) const {
+  return binOpTT(
+      *this, Other,
+      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateMul(L, R); },
+      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFMul(L, R); });
+}
+
+template <typename T>
+template <typename U>
+VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/(
+    const VarTT<U> &Other) const {
+  return binOpTT(
+      *this, Other,
+      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSDiv(L, R); },
+      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFDiv(L, R); });
+}
+
+template <typename T>
+template <typename U>
+VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%(
+    const VarTT<U> &Other) const {
+  return binOpTT(
+      *this, Other,
+      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSRem(L, R); },
+      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFRem(L, R); });
 }
 
 // Array type operator[]

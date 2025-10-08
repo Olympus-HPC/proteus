@@ -262,9 +262,24 @@ struct VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> {
   template<typename U>
   VarTT &operator=(const VarTT<U> &Var);
   
+  template <typename U>
+  VarTT &operator=(const U &ConstValue);
+  
   // Arithmetic operators
   template <typename U>
   VarTT<std::common_type_t<T, U>> operator+(const VarTT<U> &Other) const;
+  
+  template <typename U>
+  VarTT<std::common_type_t<T, U>> operator-(const VarTT<U> &Other) const;
+  
+  template <typename U>
+  VarTT<std::common_type_t<T, U>> operator*(const VarTT<U> &Other) const;
+  
+  template <typename U>
+  VarTT<std::common_type_t<T, U>> operator/(const VarTT<U> &Other) const;
+  
+  template <typename U>
+  VarTT<std::common_type_t<T, U>> operator%(const VarTT<U> &Other) const;
   
   // Utility functions
   Value *getValue() const;
@@ -285,7 +300,7 @@ struct VarTT<T, std::enable_if_t<std::is_array_v<T>>> {
   VarTT<ElemType> operator[](size_t Index);
 
   template <typename IdxT>
-  std::enable_if_t<std::is_arithmetic_v<IdxT>, VarTT<ElemType> >
+  std::enable_if_t<std::is_integral_v<IdxT>, VarTT<ElemType> >
   operator[](const VarTT<IdxT> &Index);
 };
 
