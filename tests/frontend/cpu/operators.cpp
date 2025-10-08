@@ -42,24 +42,21 @@ int main() {
     Arg3[0] = Arg0[0] - Arg1[0];
     Arg4[0] = Arg0[0] * Arg1[0];
     Arg5[0] = Arg0[0] / Arg1[0];
-    // Arg6[0] = Arg7[0] = Arg8[0] = Arg9[0] = Arg10[0] = Arg11[0] = 5;
+    Arg6[0] = Arg7[0] = Arg8[0] = Arg9[0] = 5;
 
-    // Arg6[0] += Arg0[0];
-    // Arg7[0] -= Arg0[0];
-    // Arg8[0] *= Arg0[0];
-    // Arg9[0] /= Arg0[0];
+    Arg6[0] += Arg0[0];
+    Arg7[0] -= Arg0[0];
+    Arg8[0] *= Arg0[0];
+    Arg9[0] /= Arg0[0];
 
-    // Arg10[0] = Arg0 % Arg1;
-    // Arg11[0] %= Arg0[0];
+    Arg10[0] = Arg0[0] % Arg1[0];
+    Arg11[0] = 5;
+    Arg11[0] %= Arg0[0];
 
-    // Arg12[0] = 10.0;
-    // Arg12[0] -= 3.0;
+    Arg12[0] = 10.0;
+    Arg12[0] -= 3.0;
 
-    // auto &Cmp = F.declVar<double>("cmp");
-    // Cmp = 5.0;
-    // F.beginIf(Cmp <= 5.0);
-    // { Arg13[0] = 1.0; }
-    // F.endIf();
+    Arg13[0] = 1.0;
 
     F.ret();
   }

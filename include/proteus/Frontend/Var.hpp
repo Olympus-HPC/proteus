@@ -281,6 +281,37 @@ struct VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> {
   template <typename U>
   VarTT<std::common_type_t<T, U>> operator%(const VarTT<U> &Other) const;
   
+  // Compound assignment operators
+  template <typename U>
+  VarTT &operator+=(const VarTT<U> &Other);
+  
+  template <typename U>
+  VarTT &operator+=(const U &ConstValue);
+  
+  template <typename U>
+  VarTT &operator-=(const VarTT<U> &Other);
+  
+  template <typename U>
+  VarTT &operator-=(const U &ConstValue);
+  
+  template <typename U>
+  VarTT &operator*=(const VarTT<U> &Other);
+  
+  template <typename U>
+  VarTT &operator*=(const U &ConstValue);
+  
+  template <typename U>
+  VarTT &operator/=(const VarTT<U> &Other);
+  
+  template <typename U>
+  VarTT &operator/=(const U &ConstValue);
+  
+  template <typename U>
+  VarTT &operator%=(const VarTT<U> &Other);
+  
+  template <typename U>
+  VarTT &operator%=(const U &ConstValue);
+  
   // Utility functions
   Value *getValue() const;
   void storeValue(Value *Val);
