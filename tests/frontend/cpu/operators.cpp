@@ -58,6 +58,13 @@ int main() {
 
     Arg13[0] = 1.0;
 
+    auto Cmp = F.declVarTT<double>("cmp");
+    Cmp = 5.0;
+    F.beginIfTT(Cmp <= 5.0);
+    { Arg13[0] = 1.0; }
+    F.endIf();
+
+
     F.ret();
   }
   F.endFunction();

@@ -193,6 +193,55 @@ void FuncBase::endIf() {
   IRB.restoreIP(IP);
 }
 
+void FuncBase::beginIfTT(const VarTT<bool> &CondVar, const char *File, int Line) {
+  Function *F = getFunction();
+  // Update the terminator of the current basic block due to the split
+  // control-flow.
+  BasicBlock *CurBlock = IP.getBlock();
+  BasicBlock *NextBlock =
+      CurBlock->splitBasicBlock(IP.getPoint(), CurBlock->getName() + ".split");
+
+  auto ContIP = IRBuilderBase::InsertPoint(NextBlock, NextBlock->begin());
+  Scopes.emplace_back(File, Line, ScopeKind::IF, ContIP);
+
+  BasicBlock *ThenBlock =
+      BasicBlock::Create(F->getContext(), "if.then", F, NextBlock);
+  BasicBlock *ExitBlock =
+      BasicBlock::Create(F->getContext(), "if.cont", F, NextBlock);
+
+  CurBlock->getTerminator()->eraseFromParent();
+  IRB.SetInsertPoint(CurBlock);
+  {
+    Value *Cond = CondVar.Storage->loadValue();
+    IRB.CreateCondBr(Cond, ThenBlock, ExitBlock);
+  }
+
+  IRB.SetInsertPoint(ThenBlock);
+  { IRB.CreateBr(ExitBlock); }
+
+  IRB.SetInsertPoint(ExitBlock);
+  { IRB.CreateBr(NextBlock); }
+
+  IP = IRBuilderBase::InsertPoint(ThenBlock, ThenBlock->begin());
+  IRB.restoreIP(IP);
+}
+
+void FuncBase::endIfTT() {
+  if (Scopes.empty())
+    PROTEUS_FATAL_ERROR("Expected IF scope");
+  Scope S = Scopes.back();
+  if (S.Kind != ScopeKind::IF)
+    PROTEUS_FATAL_ERROR("Syntax error, expected IF end scope but "
+                        "found unterminated scope " +
+                        toString(S.Kind) + " @ " + S.File + ":" +
+                        std::to_string(S.Line));
+
+  IP = S.ContIP;
+  Scopes.pop_back();
+
+  IRB.restoreIP(IP);
+}
+
 void FuncBase::beginFor(Var &IterVar, Var &Init, Var &UpperBound, Var &Inc,
                         const char *File, int Line) {
   Function *F = getFunction();

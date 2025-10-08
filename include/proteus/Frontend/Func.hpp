@@ -220,6 +220,10 @@ public:
                int Line = __builtin_LINE());
   void endIf();
 
+  void beginIfTT(const VarTT<bool> &CondVar, const char *File = __builtin_FILE(),
+                 int Line = __builtin_LINE());
+  void endIfTT();
+
   void beginFor(Var &IterVar, Var &InitVar, Var &UpperBound, Var &IncVar,
                 const char *File = __builtin_FILE(),
                 int Line = __builtin_LINE());
@@ -437,6 +441,32 @@ compoundAssignConstTT(VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
   
   LHS.Storage->storeValue(Result);
   return LHS;
+}
+
+// Helper function for comparison operations on VarTT types
+template <typename T, typename U, typename IntOp, typename FPOp>
+VarTT<bool> cmpOpTT(const VarTT<T> &L, const VarTT<U> &R, IntOp IOp, FPOp FOp) {
+  FuncBase &Fn = L.Fn;
+  if (&Fn != &R.Fn)
+    PROTEUS_FATAL_ERROR("Variables should belong to the same function");
+  
+  auto &IRB = Fn.getIRBuilder();
+  
+  Value *LHS = L.Storage->loadValue();
+  Value *RHS = R.Storage->loadValue();
+  
+  Value *Result = nullptr;
+  if constexpr (std::is_integral_v<std::common_type_t<T, U>>) {
+    Result = IOp(IRB, LHS, RHS);
+  } else {
+    Result = FOp(IRB, LHS, RHS);
+  }
+  
+  auto *ResultSlot = IRB.CreateAlloca(Result->getType());
+  IRB.CreateStore(Result, ResultSlot);
+  
+  std::unique_ptr<VarStorage> ResultStorage = std::make_unique<ScalarStorage>(ResultSlot, IRB);
+  return VarTT<bool>(std::move(ResultStorage), Fn);
 }
 
 template <typename T>
@@ -709,6 +739,109 @@ VarTT<T, std::enable_if_t<std::is_pointer_v<T>>>::operator[](const VarTT<IdxT> &
 template<typename T>
 VarTT<std::remove_pointer_t<T>> VarTT<T, std::enable_if_t<std::is_pointer_v<T>>>::operator*() {
   return (*this)[0];
+}
+
+// Comparison operators for VarTT
+template <typename T>
+template <typename U>
+std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator>(const VarTT<U> &Other) const {
+  return cmpOpTT(*this, Other,
+    [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateICmpSGT(L, R); },
+    [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFCmpOGT(L, R); });
+}
+
+template <typename T>
+template <typename U>
+std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator>=(const VarTT<U> &Other) const {
+  return cmpOpTT(*this, Other,
+    [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateICmpSGE(L, R); },
+    [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFCmpOGE(L, R); });
+}
+
+template <typename T>
+template <typename U>
+std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator<(const VarTT<U> &Other) const {
+  return cmpOpTT(*this, Other,
+    [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateICmpSLT(L, R); },
+    [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFCmpOLT(L, R); });
+}
+
+template <typename T>
+template <typename U>
+std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator<=(const VarTT<U> &Other) const {
+  return cmpOpTT(*this, Other,
+    [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateICmpSLE(L, R); },
+    [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFCmpOLE(L, R); });
+}
+
+template <typename T>
+template <typename U>
+std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator==(const VarTT<U> &Other) const {
+  return cmpOpTT(*this, Other,
+    [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateICmpEQ(L, R); },
+    [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFCmpOEQ(L, R); });
+}
+
+template <typename T>
+template <typename U>
+std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator!=(const VarTT<U> &Other) const {
+  return cmpOpTT(*this, Other,
+    [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateICmpNE(L, R); },
+    [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFCmpONE(L, R); });
+}
+
+template <typename T>
+template <typename U>
+std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator>(const U &ConstValue) const {
+  VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "cmp.");
+  return (*this) > Tmp;
+}
+
+template <typename T>
+template <typename U>
+std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator>=(const U &ConstValue) const {
+  VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "cmp.");
+  return (*this) >= Tmp;
+}
+
+template <typename T>
+template <typename U>
+std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator<(const U &ConstValue) const {
+  VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "cmp.");
+  return (*this) < Tmp;
+}
+
+template <typename T>
+template <typename U>
+std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator<=(const U &ConstValue) const {
+  auto Tmp = Fn.defVarTT<U>(ConstValue, "cmp.");
+  return (*this) <= Tmp;
+}
+
+template <typename T>
+template <typename U>
+std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator==(const U &ConstValue) const {
+  VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "cmp.");
+  return (*this) == Tmp;
+}
+
+template <typename T>
+template <typename U>
+std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator!=(const U &ConstValue) const {
+  auto Tmp = Fn.defVarTT<U>(ConstValue, "cmp.");
+  return (*this) != Tmp;
 }
 
 } // namespace proteus

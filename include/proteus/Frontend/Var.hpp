@@ -256,6 +256,9 @@ struct VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> {
       *this = Var;
   }
   
+  VarTT(VarTT &&) = default;
+  VarTT &operator=(VarTT &&) = default;
+  
   // Assignment operators
   VarTT &operator=(const VarTT &Var);
   
@@ -311,6 +314,55 @@ struct VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> {
   
   template <typename U>
   VarTT &operator%=(const U &ConstValue);
+  
+  // Comparison operators
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+  operator>(const VarTT<U> &Other) const;
+  
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+  operator>=(const VarTT<U> &Other) const;
+  
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+  operator<(const VarTT<U> &Other) const;
+  
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+  operator<=(const VarTT<U> &Other) const;
+  
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+  operator==(const VarTT<U> &Other) const;
+  
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+  operator!=(const VarTT<U> &Other) const;
+  
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+  operator>(const U &ConstValue) const;
+  
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+  operator>=(const U &ConstValue) const;
+  
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+  operator<(const U &ConstValue) const;
+  
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+  operator<=(const U &ConstValue) const;
+  
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+  operator==(const U &ConstValue) const;
+  
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
+  operator!=(const U &ConstValue) const;
   
   // Utility functions
   Value *getValue() const;
