@@ -273,16 +273,31 @@ struct VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> {
   VarTT<std::common_type_t<T, U>> operator+(const VarTT<U> &Other) const;
   
   template <typename U>
+  VarTT<std::common_type_t<T, U>> operator+(const U &ConstValue) const;
+  
+  template <typename U>
   VarTT<std::common_type_t<T, U>> operator-(const VarTT<U> &Other) const;
+  
+  template <typename U>
+  VarTT<std::common_type_t<T, U>> operator-(const U &ConstValue) const;
   
   template <typename U>
   VarTT<std::common_type_t<T, U>> operator*(const VarTT<U> &Other) const;
   
   template <typename U>
+  VarTT<std::common_type_t<T, U>> operator*(const U &ConstValue) const;
+  
+  template <typename U>
   VarTT<std::common_type_t<T, U>> operator/(const VarTT<U> &Other) const;
   
   template <typename U>
+  VarTT<std::common_type_t<T, U>> operator/(const U &ConstValue) const;
+  
+  template <typename U>
   VarTT<std::common_type_t<T, U>> operator%(const VarTT<U> &Other) const;
+  
+  template <typename U>
+  VarTT<std::common_type_t<T, U>> operator%(const U &ConstValue) const;
   
   // Compound assignment operators
   template <typename U>
@@ -406,6 +421,32 @@ struct VarTT<T, std::enable_if_t<std::is_pointer_v<T>>> {
 
   VarTT<ElemType> operator*();
 };
+
+// Non-member arithmetic operators for VarTT
+template <typename T, typename U>
+std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>, 
+                 VarTT<std::common_type_t<T, U>>>
+operator+(const T &ConstValue, const VarTT<U> &Var);
+
+template <typename T, typename U>
+std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>, 
+                 VarTT<std::common_type_t<T, U>>>
+operator-(const T &ConstValue, const VarTT<U> &Var);
+
+template <typename T, typename U>
+std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>, 
+                 VarTT<std::common_type_t<T, U>>>
+operator*(const T &ConstValue, const VarTT<U> &Var);
+
+template <typename T, typename U>
+std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>, 
+                 VarTT<std::common_type_t<T, U>>>
+operator/(const T &ConstValue, const VarTT<U> &Var);
+
+template <typename T, typename U>
+std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>, 
+                 VarTT<std::common_type_t<T, U>>>
+operator%(const T &ConstValue, const VarTT<U> &Var);
 
 } // namespace proteus
 

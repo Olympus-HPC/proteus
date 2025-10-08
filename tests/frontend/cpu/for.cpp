@@ -17,18 +17,17 @@ int main() {
   auto J = proteus::JitModule();
   auto &F = J.addFunction<void(double *)>("for");
 
-  auto &I = F.declVar<int>("i");
-  auto &Inc = F.declVar<int>("inc");
-  auto &UB = F.declVar<int>("ub");
-  auto &Arg = F.getArg(0);
+  F.declArgsTT();
+  auto &Arg = F.getArgTT<0>();
   F.beginFunction();
   {
+    auto I = F.declVarTT<int>("i");
+    auto UB = F.defVarTT<int>(10, "ub");
+    auto Inc = F.defVarTT<int>(1, "inc");
     I = 0;
-    UB = 10;
-    Inc = 1;
-    F.beginFor(I, I, UB, Inc);
+    F.beginForTT(I, I, UB, Inc);
     { Arg[I] = Arg[I] + 1.0; }
-    F.endFor();
+    F.endForTT();
     F.ret();
   }
   F.endFunction();

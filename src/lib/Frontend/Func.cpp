@@ -361,4 +361,21 @@ void FuncBase::endFor() {
 
   IRB.restoreIP(IP);
 }
+
+void FuncBase::endForTT() {
+  if (Scopes.empty())
+    PROTEUS_FATAL_ERROR("Expected FOR scope");
+
+  Scope S = Scopes.back();
+  if (S.Kind != ScopeKind::FOR)
+    PROTEUS_FATAL_ERROR("Syntax error, expected FOR end scope but "
+                        "found unterminated scope " +
+                        toString(S.Kind) + " @ " + S.File + ":" +
+                        std::to_string(S.Line));
+
+  IP = S.ContIP;
+  Scopes.pop_back();
+
+  IRB.restoreIP(IP);
+}
 } // namespace proteus

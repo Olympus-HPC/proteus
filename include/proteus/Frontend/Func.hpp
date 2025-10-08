@@ -229,6 +229,12 @@ public:
                 int Line = __builtin_LINE());
   void endFor();
 
+  template<typename T>
+  void beginForTT(VarTT<T> &IterVar, const VarTT<T> &InitVar, const VarTT<T> &UpperBound, const VarTT<T> &IncVar,
+                  const char *File = __builtin_FILE(),
+                  int Line = __builtin_LINE());
+  void endForTT();
+
   template <typename Sig>
   std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, Var &>
   call(StringRef Name);
@@ -371,6 +377,67 @@ public:
     CompiledFunc = CompiledFuncIn;
   }
 };
+
+// beginForTT implementation
+template<typename T>
+void FuncBase::beginForTT(VarTT<T> &IterVar, const VarTT<T> &Init, const VarTT<T> &UpperBound, const VarTT<T> &Inc,
+                          const char *File, int Line) {
+  static_assert(std::is_integral_v<T>, "Loop iterator must be an integral type");
+  
+  Function *F = getFunction();
+  // Update the terminator of the current basic block due to the split
+  // control-flow.
+  BasicBlock *CurBlock = IP.getBlock();
+  BasicBlock *NextBlock =
+      CurBlock->splitBasicBlock(IP.getPoint(), CurBlock->getName() + ".split");
+
+  auto ContIP = IRBuilderBase::InsertPoint(NextBlock, NextBlock->begin());
+  Scopes.emplace_back(File, Line, ScopeKind::FOR, ContIP);
+
+  BasicBlock *Header =
+      BasicBlock::Create(F->getContext(), "loop.header", F, NextBlock);
+  BasicBlock *LoopCond =
+      BasicBlock::Create(F->getContext(), "loop.cond", F, NextBlock);
+  BasicBlock *Body =
+      BasicBlock::Create(F->getContext(), "loop.body", F, NextBlock);
+  BasicBlock *Latch =
+      BasicBlock::Create(F->getContext(), "loop.inc", F, NextBlock);
+  BasicBlock *LoopExit =
+      BasicBlock::Create(F->getContext(), "loop.end", F, NextBlock);
+
+  // Erase the old terminator and branch to the header.
+  CurBlock->getTerminator()->eraseFromParent();
+  IRB.SetInsertPoint(CurBlock);
+  { IRB.CreateBr(Header); }
+
+  IRB.SetInsertPoint(Header);
+  {
+    IterVar = Init;
+    IRB.CreateBr(LoopCond);
+  }
+
+  IRB.SetInsertPoint(LoopCond);
+  {
+    auto CondVar = IterVar < UpperBound;
+    Value *Cond = CondVar.Storage->loadValue();
+    IRB.CreateCondBr(Cond, Body, LoopExit);
+  }
+
+  IRB.SetInsertPoint(Body);
+  IRB.CreateBr(Latch);
+
+  IRB.SetInsertPoint(Latch);
+  {
+    IterVar = IterVar + Inc;
+    IRB.CreateBr(LoopCond);
+  }
+
+  IRB.SetInsertPoint(LoopExit);
+  { IRB.CreateBr(NextBlock); }
+
+  IP = IRBuilderBase::InsertPoint(Body, Body->begin());
+  IRB.restoreIP(IP);
+}
 
 // VarTT arithmetic specialization implementations (defined here after FuncBase is complete)
 // so we have it available.
@@ -555,6 +622,52 @@ VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T
       *this, Other,
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSRem(L, R); },
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFRem(L, R); });
+}
+
+// Arithmetic operators with ConstValue
+template <typename T>
+template <typename U>
+VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+(
+    const U &ConstValue) const {
+  static_assert(std::is_arithmetic_v<U>, "Can only add arithmetic types to VarTT");
+  VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "tmp.");
+  return (*this) + Tmp;
+}
+
+template <typename T>
+template <typename U>
+VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-(
+    const U &ConstValue) const {
+  static_assert(std::is_arithmetic_v<U>, "Can only subtract arithmetic types from VarTT");
+  VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "tmp.");
+  return (*this) - Tmp;
+}
+
+template <typename T>
+template <typename U>
+VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*(
+    const U &ConstValue) const {
+  static_assert(std::is_arithmetic_v<U>, "Can only multiply VarTT by arithmetic types");
+  VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "tmp.");
+  return (*this) * Tmp;
+}
+
+template <typename T>
+template <typename U>
+VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/(
+    const U &ConstValue) const {
+  static_assert(std::is_arithmetic_v<U>, "Can only divide VarTT by arithmetic types");
+  VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "tmp.");
+  return (*this) / Tmp;
+}
+
+template <typename T>
+template <typename U>
+VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%(
+    const U &ConstValue) const {
+  static_assert(std::is_arithmetic_v<U>, "Can only modulo VarTT by arithmetic types");
+  VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "tmp.");
+  return (*this) % Tmp;
 }
 
 // Compound assignment operators for VarTT
@@ -842,6 +955,47 @@ std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator!=(const U &ConstValue) const {
   auto Tmp = Fn.defVarTT<U>(ConstValue, "cmp.");
   return (*this) != Tmp;
+}
+
+// Non-member arithmetic operators for VarTT
+template <typename T, typename U>
+std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>, 
+                 VarTT<std::common_type_t<T, U>>>
+operator+(const T &ConstValue, const VarTT<U> &Var) {
+  VarTT<T> Tmp = Var.Fn.template defVarTT<T>(ConstValue, "tmp.");
+  return Tmp + Var;
+}
+
+template <typename T, typename U>
+std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>, 
+                 VarTT<std::common_type_t<T, U>>>
+operator-(const T &ConstValue, const VarTT<U> &Var) {
+  VarTT<T> Tmp = Var.Fn.template defVarTT<T>(ConstValue, "tmp.");
+  return Tmp - Var;
+}
+
+template <typename T, typename U>
+std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>, 
+                 VarTT<std::common_type_t<T, U>>>
+operator*(const T &ConstValue, const VarTT<U> &Var) {
+  VarTT<T> Tmp = Var.Fn.template defVarTT<T>(ConstValue, "tmp.");
+  return Tmp * Var;
+}
+
+template <typename T, typename U>
+std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>, 
+                 VarTT<std::common_type_t<T, U>>>
+operator/(const T &ConstValue, const VarTT<U> &Var) {
+  VarTT<T> Tmp = Var.Fn.template defVarTT<T>(ConstValue, "tmp.");
+  return Tmp / Var;
+}
+
+template <typename T, typename U>
+std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>, 
+                 VarTT<std::common_type_t<T, U>>>
+operator%(const T &ConstValue, const VarTT<U> &Var) {
+  VarTT<T> Tmp = Var.Fn.template defVarTT<T>(ConstValue, "tmp.");
+  return Tmp % Var;
 }
 
 } // namespace proteus
