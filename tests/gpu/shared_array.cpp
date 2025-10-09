@@ -4,7 +4,11 @@
 // Second run uses the object cache.
 // RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/shared_array.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf "%t.$$.proteus"
+// Third run runs with proteus disabled to test fallback shared memory allocation.
+// RUN: PROTEUS_DISABLE=1 PROTEUS_CACHE_DIR="%t.$$.proteus" %build/shared_array.%ext | %FILECHECK %s --check-prefixes=CHECK
+// RUN: rm -rf "%t.$$.proteus"
 // clang-format on
+
 #include <climits>
 #include <cstdio>
 
@@ -28,7 +32,7 @@ int main() {
   int Dims = 3;
   launcher(proteus::register_lambda(
       [=, Dims = proteus::jit_variable(Dims)] __device__() {
-        double *Array = proteus::shared_array<double>(Dims);
+        double *Array = proteus::shared_array<double, 10>(Dims);
         Array[0] = 1.0;
         Array[1] = 2.0;
         Array[2] = 3.0;
@@ -42,11 +46,12 @@ int main() {
 
 // clang-format off
 // CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 3
-// CHECK-FIRST: [SharedArray] Replace CB double* proteus::shared_array<double>(unsigned long, unsigned long) with @.proteus.shared = internal addrspace(3) global [24 x i8] undef, align 16
+// CHECK-FIRST: [SharedArray] Replace CB double* proteus::shared_array<double, 10ul, 0>(unsigned long, unsigned long) with @.proteus.shared = internal addrspace(3) global [24 x i8] undef, align 16
 // CHECK-FIRST: [LaunchBoundSpec] BlockSize 1
 // CHECK: Kernel
 // CHECK: Lambda Array[0] 1.000000 Array[1] 2.000000 Array[2] 3.000000
-// CHECK: JitCache hits 0 total 1
-// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: JitCache hits 0 total 1
+// CHECK-FIRST: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-SECOND: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: JitStorageCache hits 0 total 1
 // CHECK-SECOND: JitStorageCache hits 1 total 1
