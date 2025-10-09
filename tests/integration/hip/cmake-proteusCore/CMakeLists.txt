@@ -12,9 +12,17 @@ set(CLANG_EXECUTABLE "${LLVM_INSTALL_DIR}/bin/clang++")
 set(SRC_FILE "${CMAKE_CURRENT_SOURCE_DIR}/test.hip")
 set(BC_FILE "${CMAKE_CURRENT_BINARY_DIR}/test.bc")
 
+# CMAKE_HIP_ARCHITECTURES will contain the detected architecture(s)
+if(NOT DEFINED CMAKE_HIP_ARCHITECTURES)
+    message(FATAL_ERROR "Undefined CMAKE_HIP_ARCHITECTURES")
+endif()
+
+list(REMOVE_DUPLICATES CMAKE_HIP_ARCHITECTURES)
+message(STATUS "HIP architecture: ${CMAKE_HIP_ARCHITECTURES}")
+
 add_custom_command(
     OUTPUT ${BC_FILE}
-    COMMAND ${CLANG_EXECUTABLE} -emit-llvm --offload-arch=gfx90a --offload-device-only -c ${SRC_FILE} -o ${BC_FILE}
+    COMMAND ${CLANG_EXECUTABLE} -emit-llvm --offload-arch=${CMAKE_HIP_ARCHITECTURES} --offload-device-only -c ${SRC_FILE} -o ${BC_FILE}
     DEPENDS ${SRC_FILE}
     COMMENT "Generating LLVM bitcode for ${SRC_FILE}"
     VERBATIM

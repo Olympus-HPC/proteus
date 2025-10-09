@@ -1,0 +1,30 @@
+.base-job:
+  extends: .job_on_tuolumne
+  before_script:
+    - echo "=== Start CI Integration Tests ==="
+  after_script:
+    - rm -rf ${CI_BUILDS_DIR}
+    - echo "=== End CI Integration Tests ==="
+
+.variants:
+  parallel:
+    matrix:
+      - PROTEUS_CI_INTEGRATION_TEST:
+        - cmake-shared_libs-shared_proteus
+        - cmake-shared_proteus
+        - cmake-shared_libs-static_proteus
+        - cmake-static_proteus
+        - make-static_proteus
+        - make-shared_proteus
+        - cmake-proteusCore
+        - cmake-shared_lib_and_exe-static_proteus
+        - cmake-proteusFrontend
+        - cmake-clang_plugin-proteusFrontend
+        - cmake-proteusFrontend-gcc
+        PROTEUS_CI_ROCM_VERSION: ["6.2.1", "6.3.1", "6.4.1"]
+      - PROTEUS_CI_INTEGRATION_TEST:
+        - mneme-install
+        PROTEUS_CI_ROCM_VERSION: ["6.3.1", "6.4.1"]
+
+test-integration-tuolumne:
+  extends: [.base-job, .variants]

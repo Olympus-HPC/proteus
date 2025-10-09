@@ -1,0 +1,19 @@
+.base-job:
+  extends: .job_on_tuolumne
+  before_script:
+    - echo "=== Start CI Benchmarking ==="
+  after_script:
+    #- rm -rf ${CI_BUILDS_DIR}
+    - echo "=== End CI Benchmarking ==="
+
+.build-variants:
+  parallel:
+    matrix:
+      - PROTEUS_CI_ROCM_VERSION: ["6.2.1"]
+
+proteus-benchmarks-tuolumne:
+  extends: [.base-job, .build-variants]
+  artifacts:
+    paths:
+      - proteus-benchmarks/results/*.csv
+      - proteus-benchmarks/plots/*.png
