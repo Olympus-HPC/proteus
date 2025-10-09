@@ -120,8 +120,10 @@ register_lambda(T &&t, const char *Symbol = "") noexcept {
 }
 
 #if defined(__CUDACC__) || defined(__HIP__)
+// The function needs to be static for RDC compilation to resolve the static
+// shared memory fallback.
 template <typename T, size_t MAXN, int UniqueID = 0>
-__device__ __attribute__((noinline)) T *
+static __device__ __attribute__((noinline)) T *
 shared_array([[maybe_unused]] size_t N,
              [[maybe_unused]] size_t ElemSize = sizeof(T)) {
   alignas(T) static __shared__ char shmem[sizeof(T) * MAXN];

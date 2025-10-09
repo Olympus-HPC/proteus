@@ -75,9 +75,11 @@ private:
       SmallPtrSetImpl<Function *> &JitObjectAnnotations,
       DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap);
 
-  void parseAttributeAnnotations(
+  void parseJitGlobalAnnotations(
       GlobalVariable *GlobalAnnotations,
       MapVector<Function *, JitFunctionInfo> &JitFunctionInfoMap);
+
+  void removeJitGlobalAnnotations();
 };
 
 } // namespace proteus
