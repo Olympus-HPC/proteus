@@ -326,19 +326,17 @@ private:
     StringSet KernelSymbols;
 
     auto ExtractKernelSymbols = [&LTOModule, &KernelSymbols]() {
-      auto *GlobalAnnotations =
-          LTOModule.getNamedGlobal("llvm.global.annotations");
-      if (!GlobalAnnotations)
-        return;
+      for (auto &F : LTOModule) {
+        // Skip functions that are not marked for proteus jit.
+        if (!F.getMetadata("proteus.jit"))
+          continue;
 
-      auto *AnnotArray = cast<ConstantArray>(GlobalAnnotations->getOperand(0));
+        // Skip non-kernel device functions, for example, device lambda
+        // functions.
+        if (!isDeviceKernel(&F))
+          continue;
 
-      for (unsigned int I = 0; I < AnnotArray->getNumOperands(); I++) {
-        auto *Entry = cast<ConstantStruct>(AnnotArray->getOperand(I));
-        auto *Fn =
-            dyn_cast<Function>(Entry->getOperand(0)->stripPointerCasts());
-        assert(Fn && "Expected function in entry operands");
-        KernelSymbols.insert(Fn->getName());
+        KernelSymbols.insert(F.getName());
       }
     };
 

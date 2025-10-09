@@ -258,47 +258,6 @@ createVectorRuntimeConstantInfo(RuntimeConstantType RCType,
   return RCI;
 }
 
-static bool isDeviceKernel(Module &M, const Function *F) {
-  auto GetDeviceKernels = [](Module &M) {
-    SmallPtrSet<Function *, 16> Kernels;
-    if constexpr (PROTEUS_ENABLE_CUDA) {
-      NamedMDNode *MD = M.getOrInsertNamedMetadata("nvvm.annotations");
-
-      if (!MD)
-        return Kernels;
-
-      for (auto *Op : MD->operands()) {
-        if (Op->getNumOperands() < 2)
-          continue;
-        MDString *KindID = dyn_cast<MDString>(Op->getOperand(1));
-        if (!KindID || KindID->getString() != "kernel")
-          continue;
-
-        Function *KernelFn =
-            mdconst::dyn_extract_or_null<Function>(Op->getOperand(0));
-        if (!KernelFn)
-          continue;
-
-        Kernels.insert(KernelFn);
-      }
-    } else if constexpr (PROTEUS_ENABLE_HIP) {
-      for (Function &F : M)
-        if (F.getCallingConv() == CallingConv::AMDGPU_KERNEL)
-          Kernels.insert(&F);
-    } else {
-      (void)M;
-    }
-
-    return Kernels;
-  };
-
-  static auto KernelSet = GetDeviceKernels(M);
-
-  if (KernelSet.contains(F))
-    return true;
-
-  return false;
-}
 
 static bool isLambdaFunction(const Function &F) {
   std::string DemangledName = demangle(F.getName().str());
@@ -340,9 +299,8 @@ void AnnotationHandler::parseAnnotations(
   for (auto &[F, RCInfos] : RCInfoMap)
     NewJitAnnotations.push_back(createJitAnnotation(F, RCInfos));
 
-  // We append to global annotations the parsed information. This is to have
-  // and a common place to store information and also needed for HIP LTO
-  // because it uses global annotations to identify kernels.
+  // We append to global annotations the function-based annotation information
+  // to combine that with attribute annotations for final parsing.
   if (!NewJitAnnotations.empty())
     appendToGlobalAnnotations(NewJitAnnotations);
   // If this is device compilation the pass emits a JSON file that stores this
@@ -359,8 +317,10 @@ void AnnotationHandler::parseAnnotations(
     PROTEUS_FATAL_ERROR("Expected llvm.global.annotations global variable "
                         "after proteus::jit_arg annotations are parsed.");
 
-  if (GlobalAnnotations)
-    parseAttributeAnnotations(GlobalAnnotations, JitFunctionInfoMap);
+  if (GlobalAnnotations) {
+    parseJitGlobalAnnotations(GlobalAnnotations, JitFunctionInfoMap);
+    removeJitGlobalAnnotations();
+  }
 }
 
 void AnnotationHandler::parseManifestFileAnnotations(
@@ -1094,7 +1054,7 @@ static RuntimeConstantInfo parseAttributeJsonRuntimeConstantObject(
   return RuntimeConstantInfo{RCType, ArgNo, Size, PassByValue};
 }
 
-void AnnotationHandler::parseAttributeAnnotations(
+void AnnotationHandler::parseJitGlobalAnnotations(
     GlobalVariable *GlobalAnnotations,
     MapVector<Function *, JitFunctionInfo> &JitFunctionInfoMap) {
   auto *Array = cast<ConstantArray>(GlobalAnnotations->getOperand(0));
@@ -1110,7 +1070,7 @@ void AnnotationHandler::parseAttributeAnnotations(
     // Check the annotated function is a kernel function or a device
     // lambda.
     if (isDeviceCompilation(M)) {
-      if (!isDeviceKernel(M, Fn) && !isLambdaFunction(*Fn))
+      if (!isDeviceKernel(Fn) && !isLambdaFunction(*Fn))
         PROTEUS_FATAL_ERROR(
             std::string{} + __FILE__ + ":" + std::to_string(__LINE__) +
             " => Expected the annotated Fn " + Fn->getName() + " (" +
@@ -1133,6 +1093,11 @@ void AnnotationHandler::parseAttributeAnnotations(
 
     // Get or create the JitFunctionInfo for Fn.
     JitFunctionInfo &JFI = JitFunctionInfoMap[Fn];
+    // Add metadata to JIT compiled functions so that they are identifiable by
+    // HIP LTO when assembling JIT modules from the linked LTO module.
+    MDString *MDStr = MDString::get(M.getContext(), "proteus.jit");
+    MDNode *MD = MDNode::get(M.getContext(), MDStr);
+    Fn->setMetadata("proteus.jit", MD);
 
     if (Entry->getOperand(4)->isNullValue()) {
       JFI.ConstantArgs = {};
@@ -1260,6 +1225,54 @@ void AnnotationHandler::parseAttributeAnnotations(
     std::sort(SortedRCInfos.begin(), SortedRCInfos.end());
     JFI.ConstantArgs = {SortedRCInfos.begin(), SortedRCInfos.end()};
   }
+}
+
+void AnnotationHandler::removeJitGlobalAnnotations() {
+  // Remove Proteus JIT global annotations after parsing.
+
+  auto *GlobalAnnotations = M.getNamedGlobal("llvm.global.annotations");
+  if (!GlobalAnnotations)
+    return;
+
+  Constant *Init = GlobalAnnotations->getInitializer();
+  if (!Init)
+    return;
+
+  // Iterate over the annotations and keep only those that are not related to
+  // proteus JIT.
+  SmallVector<Constant *> KeepAnnotations;
+  unsigned N = Init->getNumOperands();
+  for (unsigned I = 0; I != N; ++I) {
+    auto *Entry = dyn_cast<ConstantStruct>(Init->getOperand(I));
+    if (!Entry)
+      PROTEUS_FATAL_ERROR("Expected constant struct in global annotations");
+
+    auto *Annotation =
+        dyn_cast<ConstantDataArray>(Entry->getOperand(1)->getOperand(0));
+    if (!Annotation)
+      PROTEUS_FATAL_ERROR("Expected constant data array as annotation string");
+
+    StringRef AStr = Annotation->getAsCString();
+    if (AStr == "jit")
+      continue;
+
+    KeepAnnotations.push_back(cast<Constant>(Init->getOperand(I)));
+  }
+
+  GlobalAnnotations->eraseFromParent();
+
+  if (KeepAnnotations.empty())
+    return;
+
+  // Create new llvm.global.annotations global variable with the remaining
+  // annotations.
+  ArrayType *AT =
+      ArrayType::get(Types.GlobalAnnotationEltTy, KeepAnnotations.size());
+  Constant *NewInit = ConstantArray::get(AT, KeepAnnotations);
+  auto *AnnotationsGV = new GlobalVariable(M, NewInit->getType(), false,
+                                           GlobalValue::AppendingLinkage,
+                                           NewInit, "llvm.global.annotations");
+  AnnotationsGV->setSection("llvm.metadata");
 }
 
 } // namespace proteus
