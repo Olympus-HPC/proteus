@@ -18,13 +18,15 @@ public:
 
   std::unique_ptr<MemoryBuffer> compile(std::unique_ptr<LLVMContext> Ctx,
                                         std::unique_ptr<Module> Mod,
-                                        HashT ModuleHash) override {
+                                        HashT ModuleHash,
+                                        bool DisableIROpt = false) override {
     // This is necessary to ensure Ctx outlives M. Setting [[maybe_unused]] can
     // trigger a lifetime bug.
     auto CtxOwner = std::move(Ctx);
     auto ModOwner = std::move(Mod);
 
-    std::unique_ptr<MemoryBuffer> ObjectModule = Jit.compileOnly(*ModOwner);
+    std::unique_ptr<MemoryBuffer> ObjectModule =
+        Jit.compileOnly(*ModOwner, DisableIROpt);
     if (!ObjectModule)
       PROTEUS_FATAL_ERROR("Expected non-null object library");
 
