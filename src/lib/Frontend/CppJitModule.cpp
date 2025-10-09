@@ -73,7 +73,7 @@ void CppJitModule::compileCppToDynamicLibrary() {
       PROTEUS_CLANGXX_BIN,
       "-shared",
       "-std=c++17",
-      "-O3",
+      FrontendOptLevelFlag,
       "-x",
       (TargetModel == TargetModelType::HOST_HIP ? "hip" : "cuda"),
       "-fPIC",
@@ -140,7 +140,7 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
                   "-emit-llvm",
                   "-S",
                   "-std=c++17",
-                  "-O1",
+                  FrontendOptLevelFlag,
                   "-x",
                   "c++",
                   "-fPIC",
@@ -152,7 +152,7 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
                   "-emit-llvm",
                   "-S",
                   "-std=c++17",
-                  "-O1",
+                  FrontendOptLevelFlag,
                   "-x",
                   (TargetModel == TargetModelType::HIP ? "hip" : "cuda"),
                   "--offload-device-only",
@@ -244,7 +244,8 @@ void CppJitModule::compile() {
   default:
     auto CRes = compileCppToIR();
     auto ObjectModule =
-        Dispatch.compile(std::move(CRes.Ctx), std::move(CRes.Mod), ModuleHash);
+        Dispatch.compile(std::move(CRes.Ctx), std::move(CRes.Mod), ModuleHash,
+                         /*DisableIROpt=*/true);
     Library = std::make_unique<CompiledLibrary>(std::move(ObjectModule));
   }
 

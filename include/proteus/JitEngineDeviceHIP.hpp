@@ -108,7 +108,8 @@ public:
 
   HashT getModuleHash(BinaryInfo &BinInfo);
 
-  std::unique_ptr<MemoryBuffer> compileOnly(Module &M);
+  std::unique_ptr<MemoryBuffer> compileOnly(Module &M,
+                                            bool DisableIROpt = false);
 
 private:
   JitEngineDeviceHIP();

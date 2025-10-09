@@ -2,7 +2,7 @@
 
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/cpp_adam.%ext 10000 200 100 | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 %build/cpp_adam.%ext 10000 200 100 | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
 // RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/cpp_adam.%ext 10000 200 100 | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf "%t.$$.proteus"
@@ -187,6 +187,7 @@ int main(int argc, char *argv[]) {
 // CHECK-NEXT: init p[9] = 0.559506
 // CHECK-NEXT: Creating JIT module
 // CHECK-NEXT: Compiling JIT module
+// CHECK-FIRST: [SkipOpt] Skipping JitEngine IR optimization
 // CHECK-NEXT: Average kernel execution time {{.*}} (ms)
 // CHECK-NEXT: p[0] = -0.572924
 // CHECK-NEXT: p[1] = -0.596034
