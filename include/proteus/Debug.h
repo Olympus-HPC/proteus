@@ -4,11 +4,14 @@
 #include <llvm/IR/Value.h>
 #include <llvm/Support/raw_ostream.h>
 
-#if PROTEUS_ENABLE_DEBUG
-#define PROTEUS_DBG(x) x;
-#else
-#define PROTEUS_DBG(x)
-#endif
+#include "proteus/Config.hpp"
+
+#define PROTEUS_DBG(x)                                                         \
+  do                                                                           \
+    if (Config::get().ProteusDebugOutput) {                                    \
+      x;                                                                       \
+    }                                                                          \
+  while (0);
 
 namespace proteus {
 

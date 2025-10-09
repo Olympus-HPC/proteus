@@ -11,7 +11,6 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         llvm: [18.1.8, 19.1.7]
-        enable_debug: [on, off]
         enable_time_tracing: [on, off]
         build_shared: [on, off]
     defaults:
@@ -33,7 +32,7 @@ jobs:
             llvmdev=${{ matrix.llvm }} \
             lit=${{ matrix.llvm }} \
             zlib zstd
-      - name: Build enable_debug=${{ matrix.enable_debug }} enable_time_tracing=${{ matrix.enable_time_tracing }} build_shared=${{ matrix.build_shared }}
+      - name: Build  enable_time_tracing=${{ matrix.enable_time_tracing }} build_shared=${{ matrix.build_shared }}
         run: |
           mkdir -p build
           pushd build
@@ -44,7 +43,6 @@ jobs:
             -DENABLE_DEVELOPER_COMPILER_FLAGS=on \
             -DLLVM_INSTALL_DIR=$(llvm-config --prefix) \
             -DPROTEUS_LINK_SHARED_LLVM=on \
-            -DPROTEUS_ENABLE_DEBUG=${{ matrix.enable_debug }} \
             -DPROTEUS_ENABLE_TIME_TRACING=${{ matrix.enable_time_tracing }} \
             -DBUILD_SHARED=${{ matrix.build_shared }} |& tee cmake_output.log
           if grep -q "Manually-specified variables were not used by the project:" cmake_output.log; then

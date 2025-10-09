@@ -167,12 +167,12 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
 
   F->setName(FnName + Suffix);
 
-#if PROTEUS_ENABLE_DEBUG
-  if (verifyModule(M, &errs()))
-    PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
-  else
-    Logger::logs("proteus") << "Module verified!\n";
-#endif
+  if (Config::get().ProteusDebugOutput) {
+    if (verifyModule(M, &errs()))
+      PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
+    else
+      Logger::logs("proteus") << "Module verified!\n";
+  }
 }
 
 void getLambdaJitValues(StringRef FnName,
@@ -219,15 +219,16 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   getLambdaJitValues(FnName, LambdaJitValuesVec);
 
   HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesVec);
-#if PROTEUS_ENABLE_DEBUG
-  Logger::logs("proteus") << "Hashing: " << " FnName " << FnName << " RCVec [ ";
-  for (const auto &RC : RCVec)
-    Logger::logs("proteus") << RC.Value.Int64Val << ",";
-  Logger::logs("proteus") << " ] LambdaVec [ ";
-  for (auto &RC : LambdaJitValuesVec)
-    Logger::logs("proteus") << RC.Value.Int64Val << ",";
-  Logger::logs("proteus") << " ] -> Hash " << HashValue.getValue() << "\n";
-#endif
+  if (Config::get().ProteusDebugOutput) {
+    Logger::logs("proteus")
+        << "Hashing: " << " FnName " << FnName << " RCVec [ ";
+    for (const auto &RC : RCVec)
+      Logger::logs("proteus") << RC.Value.Int64Val << ",";
+    Logger::logs("proteus") << " ] LambdaVec [ ";
+    for (auto &RC : LambdaJitValuesVec)
+      Logger::logs("proteus") << RC.Value.Int64Val << ",";
+    Logger::logs("proteus") << " ] -> Hash " << HashValue.getValue() << "\n";
+  }
 
   // Lookup the function pointer in the code cache.
   void *JitFnPtr = CodeCache.lookup(HashValue);
@@ -388,13 +389,14 @@ JitEngineHost::JitEngineHost() {
                       // Make sure the debug info sections aren't stripped.
                       ObjLinkingLayer->setProcessAllSections(true);
 
-#if PROTEUS_ENABLE_DEBUG
-                      ObjLinkingLayer->setNotifyLoaded(notifyLoaded);
-#endif
+                      if (Config::get().ProteusDebugOutput) {
+                        ObjLinkingLayer->setNotifyLoaded(notifyLoaded);
+                      }
                       return ObjLinkingLayer;
                     })
                     .create());
-  // Use the main JIT dynamic library to add a generate for host proces symbols.
+  // Use the main JIT dynamic library to add a generate for host process
+  // symbols.
   orc::MangleAndInterner Mangle(LLJITPtr->getExecutionSession(),
                                 LLJITPtr->getDataLayout());
   LLJITPtr->getMainJITDylib().addGenerator(
