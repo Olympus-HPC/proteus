@@ -187,7 +187,7 @@ JitEngineDeviceCUDA::compileOnly(Module &M, bool DisableIROpt) {
                         CGConfig.codeGenOptLevel());
   } else {
     if (Config::get().ProteusTraceOutput >= 1)
-      Logger::trace("[SkipOpt] Skipping default<O3> IR optimization\n");
+      Logger::trace("[SkipOpt] Skipping JitEngine IR optimization\n");
   }
   auto DeviceObject =
       proteus::codegenObject(M, DeviceArch, GlobalLinkedBinaries);

@@ -299,7 +299,7 @@ std::unique_ptr<MemoryBuffer> JitEngineHost::compileOnly(Module &M,
                  CGConfig.codeGenOptLevel());
   } else {
     if (Config::get().ProteusTraceOutput >= 1)
-      Logger::trace("[SkipOpt] Skipping default<O3> IR optimization\n");
+      Logger::trace("[SkipOpt] Skipping JitEngine IR optimization\n");
   }
 
   // Add the target passes to emit object code.
