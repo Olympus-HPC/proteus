@@ -71,6 +71,57 @@ inline std::string getUniqueFileID(Module &M) {
   return std::string(Out);
 }
 
+inline bool isDeviceKernel(const Function *F) {
+  if (!F)
+    PROTEUS_FATAL_ERROR("Expected non-null function");
+
+#if PROTEUS_ENABLE_CUDA
+  const Module &M = *F->getParent();
+  auto GetDeviceKernels = [&M]() {
+    SmallPtrSet<Function *, 16> Kernels;
+    NamedMDNode *MD = M.getNamedMetadata("nvvm.annotations");
+
+    if (!MD)
+      return Kernels;
+
+    for (auto *Op : MD->operands()) {
+      if (Op->getNumOperands() < 2)
+        continue;
+      MDString *KindID = dyn_cast<MDString>(Op->getOperand(1));
+      if (!KindID || KindID->getString() != "kernel")
+        continue;
+
+      Function *KernelFn =
+          mdconst::dyn_extract_or_null<Function>(Op->getOperand(0));
+      if (!KernelFn)
+        continue;
+
+      Kernels.insert(KernelFn);
+    }
+
+    return Kernels;
+  };
+
+  // Create a kernel cache per module, assumes we don't insert/remove kernels
+  // after parsing nvvm.annotations.
+  static DenseMap<const Module *, SmallPtrSet<Function *, 16>> KernelCache;
+  auto It = KernelCache.find(&M);
+  if (It == KernelCache.end())
+    It = KernelCache.insert({&M, GetDeviceKernels()}).first;
+  const auto &KernelSet = It->second;
+  if (KernelSet.contains(F))
+    return true;
+
+  return false;
+#endif
+
+#if PROTEUS_ENABLE_HIP
+  return (F->getCallingConv() == CallingConv::AMDGPU_KERNEL);
+#endif
+
+  return false;
+}
+
 } // namespace proteus
 
 namespace llvm {
