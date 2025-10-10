@@ -748,6 +748,17 @@ Var &ScalarVar::index(const Var & /*I*/) {
   PROTEUS_FATAL_ERROR("ScalarVar does not support indexing");
 }
 
+Var &ScalarVar::getAddress() {
+  Type *ScalarTy = Slot->getAllocatedType();
+  auto *BasePtrTy = cast<PointerType>(Slot->getType());
+  unsigned AddrSpace = BasePtrTy->getAddressSpace();
+  Type *PtrTy = PointerType::get(ScalarTy, AddrSpace);
+
+  auto &ResultVar = Fn.declVarInternal("addr.", PtrTy, ScalarTy);
+  ResultVar.storePointer(Slot);
+  return ResultVar;
+}
+
 PointerVar::PointerVar(AllocaInst *PtrSlot, FuncBase &Fn, Type *ElemTy)
     : Var(PtrSlot, Fn), PointerElemTy(ElemTy) {
   Kind = VarKind::Pointer;
@@ -822,6 +833,10 @@ Var &PointerVar::index(const Var &I) {
   return ResultVar;
 }
 
+Var &PointerVar::getAddress() {
+  PROTEUS_FATAL_ERROR("PointerVar does not support getAddress");
+}
+
 ArrayVar::ArrayVar(Value *BasePointer, FuncBase &Fn, ArrayType *ArrayTy)
     : Var(Fn), BasePointer(BasePointer), ArrayTy(ArrayTy) {
   Kind = VarKind::Array;
@@ -881,6 +896,10 @@ Var &ArrayVar::index(const Var &I) {
   auto &ResultVar = Fn.declVarInternal("res.", ElemPtrTy, ElemTy);
   ResultVar.storePointer(GEP);
   return ResultVar;
+}
+
+Var &ArrayVar::getAddress() {
+  PROTEUS_FATAL_ERROR("ArrayVar does not support getAddress");
 }
 
 } // namespace proteus

@@ -46,6 +46,8 @@ struct Var {
 
   virtual VarKind kind() const;
 
+  virtual Var &getAddress() = 0;
+
   virtual Var &index(size_t I) = 0;
   virtual Var &index(const Var &I) = 0;
 
@@ -186,6 +188,7 @@ struct ScalarVar final : Var {
   Var &index(const Var &I) override;
   VarKind kind() const override;
   AllocaInst *getAlloca() const override;
+  Var &getAddress() override;
 };
 struct PointerVar final : Var {
   Type *PointerElemTy = nullptr;
@@ -202,6 +205,8 @@ struct PointerVar final : Var {
 
   VarKind kind() const override;
   AllocaInst *getAlloca() const override;
+
+  Var &getAddress() override;
 
   Var &index(size_t I) override;
   Var &index(const Var &I) override;
@@ -220,6 +225,8 @@ struct ArrayVar final : Var {
   Value *getPointerValue() const override;
   void storePointer(Value *Ptr) override;
   VarKind kind() const override;
+
+  Var &getAddress() override;
 
   Var &index(size_t I) override;
   Var &index(const Var &I) override;

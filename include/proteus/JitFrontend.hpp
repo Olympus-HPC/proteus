@@ -282,11 +282,16 @@ FuncBase::call(StringRef Name) {
   return Ret;
 }
 
+static inline Value *getCallArgValue(Var &V) {
+  if (V.kind() == VarKind::Pointer) {
+    return V.getPointerValue();
+  }
+  return V.getValue();
+}
+
 template <typename Sig>
 std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
 FuncBase::call(StringRef Name) {
-  using RetT = typename FnSig<Sig>::RetT;
-
   using RetT = typename FnSig<Sig>::RetT;
   using ArgT = typename FnSig<Sig>::ArgsTList;
   FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
@@ -302,7 +307,7 @@ FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
   using RetT = typename FnSig<Sig>::RetT;
   using ArgT = typename FnSig<Sig>::ArgsTList;
   FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
-  auto *Call = IRB.CreateCall(Callee, {ArgsVars.getValue()...});
+  auto *Call = IRB.CreateCall(Callee, {getCallArgValue(ArgsVars)...});
 
   Var &Ret = declVarInternal("ret", TypeMap<RetT>::get(Ctx));
   Ret.storeValue(Call);
@@ -316,7 +321,7 @@ FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
   using ArgT = typename FnSig<Sig>::ArgsTList;
 
   FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
-  IRB.CreateCall(Callee, {ArgsVars.getValue()...});
+  IRB.CreateCall(Callee, {getCallArgValue(ArgsVars)...});
 }
 
 template <typename RetT, typename... ArgT>
