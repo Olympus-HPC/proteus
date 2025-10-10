@@ -382,6 +382,11 @@ private:
     IRB.ClearInsertionPoint();
   }
 
+  template<std::size_t... Is>
+  auto getArgsTTImpl(std::index_sequence<Is...>) {
+    return std::tie(*std::get<Is>(ArgumentsTT)...);
+  }
+
 public:
   Func(JitModule &J, FunctionCallee FC, Dispatcher &Dispatch)
       : FuncBase(J, FC), Dispatch(Dispatch) {}
@@ -394,8 +399,8 @@ public:
     declArgsTTImpl(std::index_sequence_for<ArgT...>{});
   }
   
-  auto& getArgsTT() {
-    return ArgumentsTT;
+  auto getArgsTT() {
+    return getArgsTTImpl(std::index_sequence_for<ArgT...>{});
   }
   
   template<std::size_t Idx>
