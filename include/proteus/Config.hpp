@@ -297,6 +297,7 @@ public:
   KernelCloneOption ProteusKernelClone;
   bool ProteusEnableTimers;
   int ProteusTraceOutput;
+  bool ProteusDebugOutput;
   std::optional<const std::string> ProteusCacheDir;
 
   const CodeGenerationConfig &getCGConfig(llvm::StringRef KName = "") const {
@@ -350,6 +351,7 @@ private:
                                            KernelCloneOption::CrossClone);
     ProteusEnableTimers = getEnvOrDefaultBool("PROTEUS_ENABLE_TIMERS", false);
     ProteusTraceOutput = getEnvOrDefaultInt("PROTEUS_TRACE_OUTPUT", 0);
+    ProteusDebugOutput = getEnvOrDefaultBool("PROTEUS_DEBUG_OUTPUT", false);
   }
 };
 } // namespace proteus

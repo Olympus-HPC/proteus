@@ -27,7 +27,6 @@ The top-level `CMakeLists.txt` defines the following build options:
 * `ENABLE_TESTS`: build Proteus tests.
 * `PROTEUS_ENABLE_HIP`: enable HIP support.
 * `PROTEUS_ENABLE_CUDA`: enable CUDA support.
-* `PROTEUS_ENABLE_DEBUG`: enable debug logging (for developers).
 * `PROTEUS_ENABLE_TIME_TRACING`: generate a JSON time-trace file for Proteus operations (for flame graphs visualization).
 
 !!! info "Host, CUDA and HIP support"

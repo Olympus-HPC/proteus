@@ -11,11 +11,12 @@
 #include "proteus/Logger.hpp"
 
 #define DEBUG_TYPE "proteus-pass"
-#ifdef PROTEUS_ENABLE_DEBUG
-#define DEBUG(x) x
-#else
-#define DEBUG(x)
-#endif
+#define DEBUG(x)                                                               \
+  do                                                                           \
+    if (isDebugOutputEnabled()) {                                              \
+      x;                                                                       \
+    }                                                                          \
+  while (0);
 
 #if PROTEUS_ENABLE_HIP
 constexpr char const *RegisterFunctionName = "__hipRegisterFunction";
@@ -47,6 +48,16 @@ struct ModuleInfo {
   const Module &M;
   ModuleInfo(const Module &M) : M(M) {}
 };
+
+inline bool isDebugOutputEnabled() {
+  auto GetEnvVar = []() {
+    const char *EnvValue = std::getenv("PROTEUS_DEBUG_OUTPUT");
+    return EnvValue ? static_cast<bool>(std::stoi(EnvValue)) : false;
+  };
+
+  static bool IsEnabled = GetEnvVar();
+  return IsEnabled;
+}
 
 bool inline isDeviceCompilation(Module &M) {
   Triple TargetTriple(M.getTargetTriple());

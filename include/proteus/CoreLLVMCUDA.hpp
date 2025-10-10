@@ -176,23 +176,27 @@ codegenObject(Module &M, StringRef DeviceArch,
   std::string RDCOption = "";
   if (!GlobalLinkedBinaries.empty())
     RDCOption = "-c";
-#if PROTEUS_ENABLE_DEBUG
-  const char *CompileOptions[] = {ArchOpt.c_str(), "--verbose",
-                                  RDCOption.c_str()};
-  size_t NumCompileOptions = 2 + (RDCOption.empty() ? 0 : 1);
-#else
-  const char *CompileOptions[] = {ArchOpt.c_str(), RDCOption.c_str()};
-  size_t NumCompileOptions = 1 + (RDCOption.empty() ? 0 : 1);
-#endif
-  proteusNvPTXCompilerErrCheck(
-      nvPTXCompilerCompile(PTXCompiler, NumCompileOptions, CompileOptions));
+
+  if (Config::get().ProteusDebugOutput) {
+    const char *CompileOptions[] = {ArchOpt.c_str(), "--verbose",
+                                    RDCOption.c_str()};
+    size_t NumCompileOptions = 2 + (RDCOption.empty() ? 0 : 1);
+    proteusNvPTXCompilerErrCheck(
+        nvPTXCompilerCompile(PTXCompiler, NumCompileOptions, CompileOptions));
+  } else {
+    const char *CompileOptions[] = {ArchOpt.c_str(), RDCOption.c_str()};
+    size_t NumCompileOptions = 1 + (RDCOption.empty() ? 0 : 1);
+    proteusNvPTXCompilerErrCheck(
+        nvPTXCompilerCompile(PTXCompiler, NumCompileOptions, CompileOptions));
+  }
+
   proteusNvPTXCompilerErrCheck(
       nvPTXCompilerGetCompiledProgramSize(PTXCompiler, &BinSize));
   auto ObjBuf = WritableMemoryBuffer::getNewUninitMemBuffer(BinSize);
   proteusNvPTXCompilerErrCheck(
       nvPTXCompilerGetCompiledProgram(PTXCompiler, ObjBuf->getBufferStart()));
-#if PROTEUS_ENABLE_DEBUG
-  {
+
+  if (Config::get().ProteusDebugOutput) {
     size_t LogSize;
     proteusNvPTXCompilerErrCheck(
         nvPTXCompilerGetInfoLogSize(PTXCompiler, &LogSize));
@@ -201,7 +205,7 @@ codegenObject(Module &M, StringRef DeviceArch,
         nvPTXCompilerGetInfoLog(PTXCompiler, Log.get()));
     Logger::logs("proteus") << "=== nvPTXCompiler Log\n" << Log.get() << "\n";
   }
-#endif
+
   proteusNvPTXCompilerErrCheck(nvPTXCompilerDestroy(&PTXCompiler));
 
   std::unique_ptr<MemoryBuffer> FinalObjBuf;

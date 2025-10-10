@@ -24,9 +24,9 @@ TimeTracerRAII TimeTracer;
 using namespace llvm;
 
 JitEngine::JitEngine() {
-#if PROTEUS_ENABLE_DEBUG
-  Config::get().dump(Logger::logs("proteus"));
-#endif
+  if (Config::get().ProteusDebugOutput) {
+    Config::get().dump(Logger::logs("proteus"));
+  }
 }
 
 std::string JitEngine::mangleSuffix(HashT &HashValue) {

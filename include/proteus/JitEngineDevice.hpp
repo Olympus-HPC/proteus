@@ -548,14 +548,14 @@ void JitEngineDevice<ImplT>::replaceGlobalVariablesWithPointers(Module &M) {
 
   proteus::replaceGlobalVariablesWithPointers(M, VarNameToDevPtr);
 
-#if PROTEUS_ENABLE_DEBUG
-  Logger::logs("proteus") << "=== Linked M\n" << M << "=== End of Linked M\n";
-  if (verifyModule(M, &errs()))
-    PROTEUS_FATAL_ERROR(
-        "After linking, broken module found, JIT compilation aborted!");
-  else
-    Logger::logs("proteus") << "Module verified!\n";
-#endif
+  if (Config::get().ProteusDebugOutput) {
+    Logger::logs("proteus") << "=== Linked M\n" << M << "=== End of Linked M\n";
+    if (verifyModule(M, &errs()))
+      PROTEUS_FATAL_ERROR(
+          "After linking, broken module found, JIT compilation aborted!");
+    else
+      Logger::logs("proteus") << "Module verified!\n";
+  }
 }
 
 template <typename ImplT>
