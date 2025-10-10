@@ -834,7 +834,15 @@ Var &PointerVar::index(const Var &I) {
 }
 
 Var &PointerVar::getAddress() {
-  PROTEUS_FATAL_ERROR("PointerVar does not support getAddress");
+  // Alloca->getType() is T*.
+  auto *BasePtrTy = cast<PointerType>(Alloca->getType());
+  unsigned AddrSpace = BasePtrTy->getAddressSpace();
+  // ElemPtrTy represents the type T**.
+  Type *ElemPtrTy = PointerType::get(BasePtrTy, AddrSpace);
+  auto &ResultVar = Fn.declVarInternal("addr.", ElemPtrTy, BasePtrTy);
+  ResultVar.storePointer(Alloca);
+  return ResultVar;
+
 }
 
 ArrayVar::ArrayVar(Value *BasePointer, FuncBase &Fn, ArrayType *ArrayTy)
