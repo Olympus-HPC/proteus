@@ -907,7 +907,7 @@ static VarTT<T> emitIntrinsic(StringRef IntrinsicName, Type *ResultType,
                                                 ((void)Ops, ResultType)...);
   Value *Call = IRB.CreateCall(Callee, {ConvertOperand(Ops)...});
 
-  return Fn.createVarTT<T>(Call);
+  return Fn.template defVarTT<T>(Call);
 }
 
 // Math intrinsics for VarTT

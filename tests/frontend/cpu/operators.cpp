@@ -42,7 +42,8 @@ int main() {
     Arg3[0] = Arg0[0] - Arg1[0];
     Arg4[0] = Arg0[0] * Arg1[0];
     Arg5[0] = Arg0[0] / Arg1[0];
-    Arg6[0] = Arg7[0] = Arg8[0] = Arg9[0] = 5;
+    *Arg6 = *Arg7 = *Arg8 = *Arg9 = 5;
+    // *Arg2[0] = Arg0 + Arg1;
 
     Arg6[0] += Arg0[0];
     Arg7[0] -= Arg0[0];

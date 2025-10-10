@@ -272,31 +272,31 @@ struct VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> {
   template <typename U>
   VarTT<std::common_type_t<T, U>> operator+(const VarTT<U> &Other) const;
   
-  template <typename U>
+  template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
   VarTT<std::common_type_t<T, U>> operator+(const U &ConstValue) const;
   
   template <typename U>
   VarTT<std::common_type_t<T, U>> operator-(const VarTT<U> &Other) const;
   
-  template <typename U>
+  template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
   VarTT<std::common_type_t<T, U>> operator-(const U &ConstValue) const;
   
   template <typename U>
   VarTT<std::common_type_t<T, U>> operator*(const VarTT<U> &Other) const;
   
-  template <typename U>
+  template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
   VarTT<std::common_type_t<T, U>> operator*(const U &ConstValue) const;
   
   template <typename U>
   VarTT<std::common_type_t<T, U>> operator/(const VarTT<U> &Other) const;
   
-  template <typename U>
+  template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
   VarTT<std::common_type_t<T, U>> operator/(const U &ConstValue) const;
   
   template <typename U>
   VarTT<std::common_type_t<T, U>> operator%(const VarTT<U> &Other) const;
   
-  template <typename U>
+  template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
   VarTT<std::common_type_t<T, U>> operator%(const U &ConstValue) const;
   
   // Compound assignment operators
@@ -456,7 +456,7 @@ template <typename T>
 VarTT<T> sqrtf(const VarTT<T> &R);
 
 template <typename T>
-VarTT<T> min(const VarTT<T> &L,
+VarTT<T> min(const VarTT<T> &L, const VarTT<T> &R);
 } // namespace proteus
 
 

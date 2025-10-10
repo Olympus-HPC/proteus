@@ -40,8 +40,8 @@ static auto getTiled2DTransposeFunction(int ROWS, int COLS, int TileSize) {
     auto &Zero = F.declVar<int>("zero");
     Zero = 0;
 
-    F.buildLoopNest(F.forLoop({I, Zero, UBRows, IncOne}),
-                    F.forLoop({J, Zero, UBCols, IncOne},
+    F.buildLoopNest(F.forLoop<int>({I, Zero, UBRows, IncOne}),
+                    F.forLoop<int>({J, Zero, UBCols, IncOne},
                               [&]() {
                                 auto &AIdx = J * ROWS + I;
                                 auto &BIdx = I * COLS + J;

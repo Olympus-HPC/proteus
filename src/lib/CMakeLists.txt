@@ -11,7 +11,6 @@ set(SOURCES
   Frontend/VarStorage.cpp
   Frontend/Dispatcher.cpp
   Frontend/CppJitModule.cpp
-  Frontend/LoopNest.cpp
 )
 
 set(PROTEUS_PROJECT_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")

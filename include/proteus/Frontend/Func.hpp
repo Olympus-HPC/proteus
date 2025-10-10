@@ -18,9 +18,9 @@ namespace proteus {
 
 struct Var;
 class JitModule;
-class LoopBoundInfo;
-template <typename... ForLoopBuilders> class LoopNestBuilder;
-template <typename BodyLambda> class ForLoopBuilder;
+template <typename T> class LoopBoundInfo;
+template <typename T, typename... ForLoopBuilders> class LoopNestBuilder;
+template <typename T, typename BodyLambda> class ForLoopBuilder;
 
 // Helper struct to represent the signature of a function.
 // Useful to partially-specialize function templates.
@@ -291,14 +291,16 @@ public:
   template <typename T>
   VarTT<T> atomicMin(VarTT<T*> &Addr, const VarTT<T> &Val);
 
-  template <typename BodyLambda = EmptyLambda>
-  auto forLoop(const LoopBoundInfo &Bounds, BodyLambda &&Body = {}) {
-    return ForLoopBuilder(Bounds, *this, std::move(Body));
+  template <typename T, typename BodyLambda = EmptyLambda>
+  auto forLoop(const LoopBoundInfo<T> &Bounds, BodyLambda &&Body = {}) {
+    return ForLoopBuilder<T, BodyLambda>(Bounds, *this, std::move(Body));
   }
 
   template <typename... LoopBuilders>
   auto buildLoopNest(LoopBuilders &&...Loops) {
-    return LoopNestBuilder(*this, std::forward<LoopBuilders>(Loops)...);
+    using FirstBuilder = std::tuple_element_t<0, std::tuple<LoopBuilders...>>;
+    using T = typename FirstBuilder::LoopType;
+    return LoopNestBuilder<T, LoopBuilders...>(*this, std::forward<LoopBuilders>(Loops)...);
   }
 
   void ret(std::optional<std::reference_wrapper<Var>> OptRet = std::nullopt);
@@ -656,8 +658,9 @@ VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T
 
 // Arithmetic operators with ConstValue
 template <typename T>
-template <typename U>
-VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+(
+template <typename U, typename>
+VarTT<std::common_type_t<T, U>>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>, "Can only add arithmetic types to VarTT");
   VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "tmp.");
@@ -665,8 +668,9 @@ VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T
 }
 
 template <typename T>
-template <typename U>
-VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-(
+template <typename U, typename>
+VarTT<std::common_type_t<T, U>>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>, "Can only subtract arithmetic types from VarTT");
   VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "tmp.");
@@ -674,8 +678,9 @@ VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T
 }
 
 template <typename T>
-template <typename U>
-VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*(
+template <typename U, typename>
+VarTT<std::common_type_t<T, U>>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>, "Can only multiply VarTT by arithmetic types");
   VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "tmp.");
@@ -683,8 +688,9 @@ VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T
 }
 
 template <typename T>
-template <typename U>
-VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/(
+template <typename U, typename>
+VarTT<std::common_type_t<T, U>>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>, "Can only divide VarTT by arithmetic types");
   VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "tmp.");
@@ -692,8 +698,9 @@ VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T
 }
 
 template <typename T>
-template <typename U>
-VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%(
+template <typename U, typename>
+VarTT<std::common_type_t<T, U>>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>, "Can only modulo VarTT by arithmetic types");
   VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "tmp.");
@@ -1041,7 +1048,7 @@ VarTT<T> FuncBase::emitAtomicTT(AtomicRMWInst::BinOp Op, VarTT<T*> &Addr,
       Op, Addr.getPointerValue(), Val.getValue(), MaybeAlign(),
       AtomicOrdering::SequentiallyConsistent, SyncScope::SingleThread);
   
-  return createVarTT<T>(Result);
+  return defVarTT<T>(Result);
 }
 
 template <typename T>

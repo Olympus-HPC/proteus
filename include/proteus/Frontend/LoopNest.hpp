@@ -9,24 +9,27 @@
 
 namespace proteus {
 
-class LoopBoundInfo {
+template <typename T> class LoopBoundInfo {
 public:
-  Var &IterVar;
-  Var &Init;
-  Var &UpperBound;
-  Var &Inc;
+  VarTT<T> &IterVar;
+  VarTT<T> &Init;
+  VarTT<T> &UpperBound;
+  VarTT<T> &Inc;
 
-  LoopBoundInfo(Var &IterVar, Var &Init, Var &UpperBound, Var &Inc);
+  LoopBoundInfo(VarTT<T> &IterVar, VarTT<T> &Init,
+                VarTT<T> &UpperBound, VarTT<T> &Inc)
+      : IterVar(IterVar), Init(Init), UpperBound(UpperBound), Inc(Inc) {}
 };
 
-template <typename BodyLambda> class ForLoopBuilder {
+template <typename T, typename BodyLambda> class ForLoopBuilder {
 public:
-  LoopBoundInfo Bounds;
+  LoopBoundInfo<T> Bounds;
+  using LoopIndexType = T;
   std::optional<int> TileSize;
   BodyLambda Body;
   FuncBase &Fn;
 
-  ForLoopBuilder(const LoopBoundInfo &Bounds, FuncBase &Fn, BodyLambda &&Body)
+  ForLoopBuilder(const LoopBoundInfo<T> &Bounds, FuncBase &Fn, BodyLambda &&Body)
       : Bounds(Bounds), Body(std::move(Body)), Fn(Fn) {}
   ForLoopBuilder &tile(int Tile) {
     TileSize = Tile;
@@ -34,16 +37,16 @@ public:
   }
 
   void emit() {
-    Fn.beginFor(Bounds.IterVar, Bounds.Init, Bounds.UpperBound, Bounds.Inc);
+    Fn.beginForTT(Bounds.IterVar, Bounds.Init, Bounds.UpperBound, Bounds.Inc);
     Body();
-    Fn.endFor();
+    Fn.endForTT();
   }
 };
 
-template <typename... LoopBuilders> class LoopNestBuilder {
+template <typename T, typename... LoopBuilders> class LoopNestBuilder {
 private:
   std::tuple<LoopBuilders...> Loops;
-  std::array<std::unique_ptr<LoopBoundInfo>, std::tuple_size_v<decltype(Loops)>>
+  std::array<std::unique_ptr<LoopBoundInfo<T>>, std::tuple_size_v<decltype(Loops)>>
       TiledLoopBounds;
   FuncBase &Fn;
 
@@ -58,14 +61,12 @@ private:
             auto &Bounds = std::get<Is>(Loops).Bounds;
 
             auto &TileIter =
-                Fn.declVarInternal("tile_iter_" + std::to_string(Is),
-                                   Bounds.IterVar.getValueType());
+                Fn.declVarTT<T>("tile_iter_" + std::to_string(Is));
             auto &TileStep =
-                Fn.declVarInternal("tile_step_" + std::to_string(Is),
-                                   Bounds.IterVar.getValueType());
+                Fn.declVarTT<T>("tile_step_" + std::to_string(Is));
 
             TileStep = Loop.TileSize.value();
-            TiledLoopBounds[Is] = std::make_unique<LoopBoundInfo>(
+            TiledLoopBounds[Is] = std::make_unique<LoopBoundInfo<T>>(
                 TileIter, Bounds.Init, Bounds.UpperBound, TileStep);
           }
         }(),
@@ -80,8 +81,8 @@ private:
           auto &Loop = std::get<Is>(Loops);
           if (Loop.TileSize.has_value()) {
             auto &Bounds = *TiledLoopBounds[Is];
-            Fn.beginFor(Bounds.IterVar, Bounds.Init, Bounds.UpperBound,
-                        Bounds.Inc);
+            Fn.beginForTT(Bounds.IterVar, Bounds.Init, Bounds.UpperBound,
+                          Bounds.Inc);
           }
         }(),
         ...);
@@ -97,11 +98,11 @@ private:
             auto &EndCandidate = TiledBounds.IterVar + TiledBounds.Inc;
             // Clamp to handle partial tiles.
             EndCandidate = min(EndCandidate, TiledBounds.UpperBound);
-            Fn.beginFor(Loop.Bounds.IterVar, TiledBounds.IterVar, EndCandidate,
-                        Loop.Bounds.Inc);
+            Fn.beginForTT(Loop.Bounds.IterVar, TiledBounds.IterVar, EndCandidate,
+                          Loop.Bounds.Inc);
           } else {
-            Fn.beginFor(Loop.Bounds.IterVar, Loop.Bounds.Init,
-                        Loop.Bounds.UpperBound, Loop.Bounds.Inc);
+            Fn.beginForTT(Loop.Bounds.IterVar, Loop.Bounds.Init,
+                          Loop.Bounds.UpperBound, Loop.Bounds.Inc);
           }
           Loop.Body();
         }(),
@@ -110,7 +111,7 @@ private:
         [&]() {
           // Force unpacking so we emit enough endFors.
           (void)std::get<Is>(Loops);
-          Fn.endFor();
+          Fn.endForTT();
         }(),
         ...);
   }
@@ -121,7 +122,7 @@ private:
           // Close tiled loops in reverse order to properly handle nesting.
           auto &Loop = std::get<sizeof...(Is) - 1U - Is>(Loops);
           if (Loop.TileSize.has_value()) {
-            Fn.endFor();
+            Fn.endForTT();
           }
         }(),
         ...);
