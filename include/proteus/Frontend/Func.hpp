@@ -187,6 +187,15 @@ public:
     return Var;
   }
 
+  template <typename T>
+  VarTT<T> defRuntimeConstTT(T Val, StringRef Name = "run.const.var") {
+    return defVarTT<T>(Val, Name);
+  }
+
+  template <typename... ArgT> auto defRuntimeConstsTT(ArgT &&...Args) {
+    return std::make_tuple(defRuntimeConstTT(std::forward<ArgT>(Args))...);
+  }
+
   template <typename... ArgT> auto defRuntimeConsts(ArgT &&...Args) {
     return std::tie(defRuntimeConst(std::forward<ArgT>(Args))...);
   }

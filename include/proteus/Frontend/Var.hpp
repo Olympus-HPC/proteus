@@ -378,10 +378,6 @@ struct VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> {
   template <typename U>
   std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
   operator!=(const U &ConstValue) const;
-  
-  // Utility functions
-  Value *getValue() const;
-  void storeValue(Value *Val);
 };
 
 // Specialization for array types

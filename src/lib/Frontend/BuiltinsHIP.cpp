@@ -58,152 +58,152 @@ static inline Value *getBlockDim(FuncBase &Fn, unsigned Offset) {
 
 } // namespace detail
 
-Var &getThreadIdX(FuncBase &Fn) {
+VarTT<int> getThreadIdX(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  Var &Ret = Fn.declVarInternal("threadIdx.x", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("threadIdx.x");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.amdgcn.workitem.id.x",
                                                 TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.storeValue(Call);
+  Ret.Storage->storeValue(Call);
 
   return Ret;
 }
 
-Var &getBlockIdX(FuncBase &Fn) {
+VarTT<int> getBlockIdX(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  Var &Ret = Fn.declVarInternal("blockIdx.x", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("blockIdx.x");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.amdgcn.workgroup.id.x",
                                                 TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.storeValue(Call);
+  Ret.Storage->storeValue(Call);
 
   return Ret;
 }
 
-Var &getBlockDimX(FuncBase &Fn) {
+VarTT<int> getBlockDimX(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
-  Var &Ret = Fn.declVarInternal("blockDim.x", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("blockDim.x");
 
   Value *Conv = detail::getBlockDim(Fn, detail::OffsetBlockDimX);
-  Ret.storeValue(Conv);
+  Ret.Storage->storeValue(Conv);
 
   return Ret;
 }
 
-Var &getGridDimX(FuncBase &Fn) {
+VarTT<int> getGridDimX(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
-  Var &Ret = Fn.declVarInternal("gridDim.x", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("gridDim.x");
 
   Value *Conv = detail::getGridDim(Fn, detail::OffsetGridDimX);
-  Ret.storeValue(Conv);
+  Ret.Storage->storeValue(Conv);
 
   return Ret;
 }
 
-Var &getThreadIdY(FuncBase &Fn) {
+VarTT<int> getThreadIdY(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  Var &Ret = Fn.declVarInternal("threadIdx.y", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("threadIdx.y");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.amdgcn.workitem.id.y",
                                                 TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.storeValue(Call);
+  Ret.Storage->storeValue(Call);
 
   return Ret;
 }
 
-Var &getThreadIdZ(FuncBase &Fn) {
+VarTT<int> getThreadIdZ(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  Var &Ret = Fn.declVarInternal("threadIdx.z", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("threadIdx.z");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.amdgcn.workitem.id.z",
                                                 TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.storeValue(Call);
+  Ret.Storage->storeValue(Call);
 
   return Ret;
 }
 
-Var &getBlockIdY(FuncBase &Fn) {
+VarTT<int> getBlockIdY(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  Var &Ret = Fn.declVarInternal("blockIdx.y", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("blockIdx.y");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.amdgcn.workgroup.id.y",
                                                 TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.storeValue(Call);
+  Ret.Storage->storeValue(Call);
 
   return Ret;
 }
 
-Var &getBlockIdZ(FuncBase &Fn) {
+VarTT<int> getBlockIdZ(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  Var &Ret = Fn.declVarInternal("blockIdx.z", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("blockIdx.z");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.amdgcn.workgroup.id.z",
                                                 TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.storeValue(Call);
+  Ret.Storage->storeValue(Call);
 
   return Ret;
 }
 
-Var &getBlockDimY(FuncBase &Fn) {
+VarTT<int> getBlockDimY(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
-  Var &Ret = Fn.declVarInternal("blockDim.y", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("blockDim.y");
 
   Value *Conv = detail::getBlockDim(Fn, detail::OffsetBlockDimY);
-  Ret.storeValue(Conv);
+  Ret.Storage->storeValue(Conv);
 
   return Ret;
 }
 
-Var &getBlockDimZ(FuncBase &Fn) {
+VarTT<int> getBlockDimZ(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
-  Var &Ret = Fn.declVarInternal("blockDim.z", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("blockDim.z");
 
   Value *Conv = detail::getBlockDim(Fn, detail::OffsetBlockDimZ);
-  Ret.storeValue(Conv);
+  Ret.Storage->storeValue(Conv);
 
   return Ret;
 }
 
-Var &getGridDimY(FuncBase &Fn) {
+VarTT<int> getGridDimY(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
-  Var &Ret = Fn.declVarInternal("gridDim.y", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("gridDim.y");
 
   Value *Conv = detail::getGridDim(Fn, detail::OffsetGridDimY);
-  Ret.storeValue(Conv);
+  Ret.Storage->storeValue(Conv);
 
   return Ret;
 }
 
-Var &getGridDimZ(FuncBase &Fn) {
+VarTT<int> getGridDimZ(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
-  Var &Ret = Fn.declVarInternal("gridDim.z", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("gridDim.z");
 
   Value *Conv = detail::getGridDim(Fn, detail::OffsetGridDimZ);
-  Ret.storeValue(Conv);
+  Ret.Storage->storeValue(Conv);
 
   return Ret;
 }

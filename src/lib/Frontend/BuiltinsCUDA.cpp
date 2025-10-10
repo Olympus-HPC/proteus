@@ -5,182 +5,182 @@ namespace proteus {
 namespace builtins {
 namespace gpu {
 
-Var &getThreadIdX(FuncBase &Fn) {
+VarTT<int> getThreadIdX(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  Var &Ret = Fn.declVarInternal("threadIdx.x", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("threadIdx.x");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.nvvm.read.ptx.sreg.tid.x",
                                                 TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.storeValue(Call);
+  Ret.Storage->storeValue(Call);
 
   return Ret;
 }
 
-Var &getBlockIdX(FuncBase &Fn) {
+VarTT<int> getBlockIdX(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  Var &Ret = Fn.declVarInternal("blockIdx.x", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("blockIdx.x");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.ctaid.x", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.storeValue(Call);
+  Ret.Storage->storeValue(Call);
 
   return Ret;
 }
 
-Var &getBlockDimX(FuncBase &Fn) {
+VarTT<int> getBlockDimX(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  Var &Ret = Fn.declVarInternal("blockDim.x", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("blockDim.x");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.ntid.x", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.storeValue(Call);
+  Ret.Storage->storeValue(Call);
 
   return Ret;
 }
 
-Var &getGridDimX(FuncBase &Fn) {
+VarTT<int> getGridDimX(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  Var &Ret = Fn.declVarInternal("gridDim.x", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("gridDim.x");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.nctaid.x", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.storeValue(Call);
+  Ret.Storage->storeValue(Call);
 
   return Ret;
 }
 
-Var &getThreadIdY(FuncBase &Fn) {
+VarTT<int> getThreadIdY(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  Var &Ret = Fn.declVarInternal("threadIdx.y", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("threadIdx.y");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.nvvm.read.ptx.sreg.tid.y",
                                                 TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.storeValue(Call);
+  Ret.Storage->storeValue(Call);
 
   return Ret;
 }
 
-Var &getThreadIdZ(FuncBase &Fn) {
+VarTT<int> getThreadIdZ(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  Var &Ret = Fn.declVarInternal("threadIdx.z", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("threadIdx.z");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.nvvm.read.ptx.sreg.tid.z",
                                                 TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.storeValue(Call);
+  Ret.Storage->storeValue(Call);
 
   return Ret;
 }
 
-Var &getBlockIdY(FuncBase &Fn) {
+VarTT<int> getBlockIdY(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  Var &Ret = Fn.declVarInternal("blockIdx.y", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("blockIdx.y");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.ctaid.y", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.storeValue(Call);
+  Ret.Storage->storeValue(Call);
 
   return Ret;
 }
 
-Var &getBlockIdZ(FuncBase &Fn) {
+VarTT<int> getBlockIdZ(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  Var &Ret = Fn.declVarInternal("blockIdx.z", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("blockIdx.z");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.ctaid.z", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.storeValue(Call);
+  Ret.Storage->storeValue(Call);
 
   return Ret;
 }
 
-Var &getBlockDimY(FuncBase &Fn) {
+VarTT<int> getBlockDimY(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  Var &Ret = Fn.declVarInternal("blockDim.y", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("blockDim.y");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.ntid.y", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.storeValue(Call);
+  Ret.Storage->storeValue(Call);
 
   return Ret;
 }
 
-Var &getBlockDimZ(FuncBase &Fn) {
+VarTT<int> getBlockDimZ(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  Var &Ret = Fn.declVarInternal("blockDim.z", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("blockDim.z");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.ntid.z", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.storeValue(Call);
+  Ret.Storage->storeValue(Call);
 
   return Ret;
 }
 
-Var &getGridDimY(FuncBase &Fn) {
+VarTT<int> getGridDimY(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  Var &Ret = Fn.declVarInternal("gridDim.y", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("gridDim.y");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.nctaid.y", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.storeValue(Call);
+  Ret.Storage->storeValue(Call);
 
   return Ret;
 }
 
-Var &getGridDimZ(FuncBase &Fn) {
+VarTT<int> getGridDimZ(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  Var &Ret = Fn.declVarInternal("gridDim.z", TypeMap<int>::get(Ctx));
+  VarTT<int> Ret = Fn.declVarTTInternal<int>("gridDim.z");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.nctaid.z", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.storeValue(Call);
+  Ret.Storage->storeValue(Call);
 
   return Ret;
 }
