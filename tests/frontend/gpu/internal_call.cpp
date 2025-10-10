@@ -59,8 +59,8 @@ auto createJitModule1() {
     auto &F = J->addFunction<void(double *)>("f4");
     F.beginFunction();
     {
-      auto [X] = F.getArgs();
-      X[0] += 2;
+      auto [C] = F.getArgs();
+      C[0] += 2;
       F.ret();
     }
     F.endFunction();
