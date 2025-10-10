@@ -498,7 +498,7 @@ VarTT<std::common_type_t<T, U>> binOpTT(const VarTT<T> &L, const VarTT<U> &R, In
     Result = FOp(IRB, LHS, RHS);
   }
   
-  auto *ResultSlot = IRB.CreateAlloca(Result->getType());
+  auto *ResultSlot = Fn.emitAlloca(Result->getType(), "res.");
   IRB.CreateStore(Result, ResultSlot);
   
   std::unique_ptr<VarStorage> ResultStorage = std::make_unique<ScalarStorage>(ResultSlot, IRB);
@@ -566,7 +566,7 @@ VarTT<bool> cmpOpTT(const VarTT<T> &L, const VarTT<U> &R, IntOp IOp, FPOp FOp) {
     Result = FOp(IRB, LHS, RHS);
   }
   
-  auto *ResultSlot = IRB.CreateAlloca(Result->getType());
+  auto *ResultSlot = Fn.emitAlloca(Result->getType(), "res.");
   IRB.CreateStore(Result, ResultSlot);
   
   std::unique_ptr<VarStorage> ResultStorage = std::make_unique<ScalarStorage>(ResultSlot, IRB);
