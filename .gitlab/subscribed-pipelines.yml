@@ -51,7 +51,7 @@
       if [ "$NODES_UP" -eq 0 ]; then
         echo -e "\e[31mMachine ${CI_MACHINE} is down (${NODES_UP} nodes up)\e[0m"
 
-        # Only report machine unavailability to GitHub
+        # Report failure to GitHub
         if [ -n "$GITHUB_TOKEN" ] && [ -n "$GITHUB_PROJECT_ORG" ] && [ -n "$GITHUB_PROJECT_NAME" ]; then
           STATUS_RESPONSE=$(mktemp)
           STATUS_HTTP_CODE=$(curl --retry 3 --retry-delay 5 --max-time 30 \
@@ -82,6 +82,18 @@
         exit 1
       else
         echo -e "\e[32m${CI_MACHINE} is available (${NODES_UP} nodes up)\e[0m"
+
+        # Report success to GitHub
+        if [ -n "$GITHUB_TOKEN" ] && [ -n "$GITHUB_PROJECT_ORG" ] && [ -n "$GITHUB_PROJECT_NAME" ]; then
+          curl --retry 3 --retry-delay 5 --max-time 30 \
+              --url "https://api.github.com/repos/${GITHUB_PROJECT_ORG}/${GITHUB_PROJECT_NAME}/statuses/${CI_COMMIT_SHA}" \
+              --header 'Content-Type: application/json' \
+              --header "authorization: Bearer ${GITHUB_TOKEN}" \
+              --data "{ \"state\": \"success\", \"target_url\": \"${CI_PIPELINE_URL}\", \"description\": \"GitLab: ${CI_MACHINE} up (${NODES_UP} nodes)\", \"context\": \"ci/gitlab/${CI_MACHINE}\" }" \
+              --silent --show-error
+        else
+          echo "Warning: GitHub reporting variables not set, skipping GitHub status update"
+        fi
       fi
 
 ###
