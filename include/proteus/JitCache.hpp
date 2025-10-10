@@ -47,19 +47,19 @@ public:
 
   void insert(HashT &HashValue, Function_t FunctionPtr,
               [[maybe_unused]] StringRef FnName) {
-#if PROTEUS_ENABLE_DEBUG
-    if (CacheMap.count(HashValue))
-      PROTEUS_FATAL_ERROR("JitCache collision detected");
-#endif
+    if (Config::get().ProteusDebugOutput) {
+      if (CacheMap.count(HashValue))
+        PROTEUS_FATAL_ERROR("JitCache collision detected");
+    }
 
     auto &CacheEntry = CacheMap[HashValue];
     CacheEntry.FunctionPtr = FunctionPtr;
     CacheEntry.NumExecs = 1;
     CacheEntry.NumHits = 0;
 
-#if PROTEUS_ENABLE_DEBUG
-    CacheEntry.FnName = FnName.str();
-#endif
+    if (Config::get().ProteusDebugOutput) {
+      CacheEntry.FnName = FnName.str();
+    }
   }
 
   void printStats() {
@@ -69,9 +69,9 @@ public:
     for (const auto &[HashValue, JCE] : CacheMap) {
       std::cout << "HashValue " << HashValue.toString() << " NumExecs "
                 << JCE.NumExecs << " NumHits " << JCE.NumHits;
-#if PROTEUS_ENABLE_DEBUG
-      printf(" FnName %s", JCE.FnName.c_str());
-#endif
+      if (Config::get().ProteusDebugOutput) {
+        printf(" FnName %s", JCE.FnName.c_str());
+      }
       printf("\n");
     }
   }
@@ -83,9 +83,7 @@ private:
     Function_t FunctionPtr;
     uint64_t NumExecs;
     uint64_t NumHits;
-#if PROTEUS_ENABLE_DEBUG
     std::string FnName;
-#endif
   };
 
   std::unordered_map<HashT, JitCacheEntry> CacheMap;

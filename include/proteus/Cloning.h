@@ -6,6 +6,7 @@
 #include <llvm/IR/Verifier.h>
 #include <llvm/Transforms/Utils/Cloning.h>
 
+#include "proteus/Config.hpp"
 #include "proteus/Debug.h"
 #include "proteus/Error.h"
 #include "proteus/Logger.hpp"
@@ -170,11 +171,11 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, StringRef Name,
     }
   }
 
-#if PROTEUS_ENABLE_DEBUG
-  Logger::logfile(Name.str() + ".mini.ll", *KernelModuleTmp);
-  if (verifyModule(*KernelModuleTmp, &errs()))
-    PROTEUS_FATAL_ERROR("Broken mini-module found, JIT compilation aborted!");
-#endif
+  if (Config::get().ProteusDebugOutput) {
+    Logger::logfile(Name.str() + ".mini.ll", *KernelModuleTmp);
+    if (verifyModule(*KernelModuleTmp, &errs()))
+      PROTEUS_FATAL_ERROR("Broken mini-module found, JIT compilation aborted!");
+  }
 
   return KernelModuleTmp;
 }
@@ -483,11 +484,11 @@ struct LinkingCloner {
       }
     }
 
-#if PROTEUS_ENABLE_DEBUG
-    if (verifyModule(*ModuleOut, &errs()))
-      PROTEUS_FATAL_ERROR(
-          "Broken cross-module clone found, JIT compilation aborted!");
-#endif
+    if (Config::get().ProteusDebugOutput) {
+      if (verifyModule(*ModuleOut, &errs()))
+        PROTEUS_FATAL_ERROR(
+            "Broken cross-module clone found, JIT compilation aborted!");
+    }
     return ModuleOut;
   }
 };

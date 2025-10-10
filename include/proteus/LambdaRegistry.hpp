@@ -6,6 +6,7 @@
 #include <llvm/Demangle/Demangle.h>
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Config.hpp"
 #include "proteus/Debug.h"
 #include "proteus/Error.h"
 #include "proteus/Logger.hpp"
@@ -34,16 +35,16 @@ public:
     }
 
     StringRef LambdaType = StringRef{Operator}.slice(0, Sep);
-#if PROTEUS_ENABLE_DEBUG
-    Logger::logs("proteus")
-        << "Operator " << Operator << "\n=> LambdaType to match " << LambdaType
-        << "\n";
-    Logger::logs("proteus") << "Available Keys\n";
-    for (auto &[Key, Val] : JitVariableMap) {
-      Logger::logs("proteus") << "\tKey: " << Key << "\n";
+    if (Config::get().ProteusDebugOutput) {
+      Logger::logs("proteus")
+          << "Operator " << Operator << "\n=> LambdaType to match "
+          << LambdaType << "\n";
+      Logger::logs("proteus") << "Available Keys\n";
+      for (auto &[Key, Val] : JitVariableMap) {
+        Logger::logs("proteus") << "\tKey: " << Key << "\n";
+      }
+      Logger::logs("proteus") << "===\n";
     }
-    Logger::logs("proteus") << "===\n";
-#endif
 
     const auto It = JitVariableMap.find(LambdaType);
     if (It == JitVariableMap.end())

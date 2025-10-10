@@ -117,9 +117,28 @@ public:
   HashT getHashValue() const { return HashValue; }
 
   std::unique_ptr<MemoryBuffer> compile() {
-#if PROTEUS_ENABLE_DEBUG
-    auto Start = std::chrono::high_resolution_clock::now();
-#endif
+    struct TimerRAII {
+      std::chrono::high_resolution_clock::time_point Start, End;
+      HashT HashValue;
+      TimerRAII(HashT HashValue) : HashValue(HashValue) {
+        if (Config::get().ProteusDebugOutput) {
+          Start = std::chrono::high_resolution_clock::now();
+        }
+      }
+
+      ~TimerRAII() {
+        if (Config::get().ProteusDebugOutput) {
+          auto End = std::chrono::high_resolution_clock::now();
+          auto Duration = End - Start;
+          auto Milliseconds =
+              std::chrono::duration_cast<std::chrono::milliseconds>(Duration)
+                  .count();
+          Logger::logs("proteus")
+              << "Compiled HashValue " << HashValue.toString() << " for "
+              << Milliseconds << "ms\n";
+        }
+      }
+    } Timer{HashValue};
 
     LLVMContext Ctx;
     std::unique_ptr<Module> M = cloneKernelModule(Ctx);
@@ -158,15 +177,6 @@ public:
 
     if (!RelinkGlobalsByCopy)
       proteus::relinkGlobalsObject(ObjBuf->getMemBufferRef(), VarNameToDevPtr);
-
-#if PROTEUS_ENABLE_DEBUG
-    auto End = std::chrono::high_resolution_clock::now();
-    auto Duration = End - Start;
-    auto Milliseconds =
-        std::chrono::duration_cast<std::chrono::milliseconds>(Duration).count();
-    Logger::logs("proteus") << "Compiled HashValue " << HashValue.toString()
-                            << " for " << Milliseconds << "ms\n";
-#endif
 
     return ObjBuf;
   }
