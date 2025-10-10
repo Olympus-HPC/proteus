@@ -79,10 +79,11 @@ public:
           CB->eraseFromParent();
         }
 
-#if PROTEUS_ENABLE_DEBUG
-        if (verifyModule(M, &errs()))
-          PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
-#endif
+        if (Config::get().ProteusDebugOutput) {
+          if (verifyModule(M, &errs()))
+            PROTEUS_FATAL_ERROR(
+                "Broken module found, JIT compilation aborted!");
+        }
       }
     }
   }

@@ -59,11 +59,6 @@ elseif(PROTEUS_ENABLE_CUDA)
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_CUDA)
 endif()
 
-if(PROTEUS_ENABLE_DEBUG)
-  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_DEBUG)
-  target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_DEBUG)
-endif()
-
 if(PROTEUS_ENABLE_TIME_TRACING)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_TIME_TRACING)
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_TIME_TRACING)

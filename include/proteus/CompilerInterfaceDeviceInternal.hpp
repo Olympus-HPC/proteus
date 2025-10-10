@@ -35,19 +35,19 @@ inline auto __jit_launch_kernel_internal(void *Kernel, dim3 GridDim,
 
   auto &KernelInfo = OptionalKernelInfo.value().get();
 
-#if PROTEUS_ENABLE_DEBUG
-  Logger::logs("proteus") << "JIT Launch Kernel\n";
-  Logger::logs("proteus") << "=== Kernel Info\n";
-  Logger::logs("proteus") << "KernelName " << KernelInfo.getName() << "\n";
-  Logger::logs("proteus") << "Grid " << GridDim.x << ", " << GridDim.y << ", "
-                          << GridDim.z << "\n";
-  Logger::logs("proteus") << "Block " << BlockDim.x << ", " << BlockDim.y
-                          << ", " << BlockDim.z << "\n";
-  Logger::logs("proteus") << "KernelArgs " << KernelArgs << "\n";
-  Logger::logs("proteus") << "ShmemSize " << ShmemSize << "\n";
-  Logger::logs("proteus") << "Stream " << Stream << "\n";
-  Logger::logs("proteus") << "=== End Kernel Info\n";
-#endif
+  if (Config::get().ProteusDebugOutput) {
+    Logger::logs("proteus") << "JIT Launch Kernel\n";
+    Logger::logs("proteus") << "=== Kernel Info\n";
+    Logger::logs("proteus") << "KernelName " << KernelInfo.getName() << "\n";
+    Logger::logs("proteus") << "Grid " << GridDim.x << ", " << GridDim.y << ", "
+                            << GridDim.z << "\n";
+    Logger::logs("proteus") << "Block " << BlockDim.x << ", " << BlockDim.y
+                            << ", " << BlockDim.z << "\n";
+    Logger::logs("proteus") << "KernelArgs " << KernelArgs << "\n";
+    Logger::logs("proteus") << "ShmemSize " << ShmemSize << "\n";
+    Logger::logs("proteus") << "Stream " << Stream << "\n";
+    Logger::logs("proteus") << "=== End Kernel Info\n";
+  }
 
   return Jit.compileAndRun(
       KernelInfo, GridDim, BlockDim, KernelArgs, ShmemSize,

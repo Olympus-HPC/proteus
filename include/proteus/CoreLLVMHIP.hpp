@@ -266,44 +266,46 @@ codegenParallel(Module &M, StringRef DeviceArch, unsigned int OptLevel = 3,
           Sym.getVisibility() != GlobalValue::DefaultVisibility &&
           (!Sym.isUndefined() && !Sym.isCommon());
 
-      // Device linking does not support linker redefined symbols (e.g. --wrap).
+      // Device linking does not support linker redefined symbols (e.g.
+      // --wrap).
       Res.LinkerRedefined = false;
 
-#if PROTEUS_ENABLE_DEBUG
-      auto PrintSymbol = [](const lto::InputFile::Symbol &Sym,
-                            lto::SymbolResolution &Res) {
-        auto &OutStream = Logger::logs("proteus");
-        OutStream << "Vis: ";
-        switch (Sym.getVisibility()) {
-        case GlobalValue::HiddenVisibility:
-          OutStream << 'H';
-          break;
-        case GlobalValue::ProtectedVisibility:
-          OutStream << 'P';
-          break;
-        case GlobalValue::DefaultVisibility:
-          OutStream << 'D';
-          break;
-        }
+      if (Config::get().ProteusDebugOutput) {
+        auto PrintSymbol = [](const lto::InputFile::Symbol &Sym,
+                              lto::SymbolResolution &Res) {
+          auto &OutStream = Logger::logs("proteus");
+          OutStream << "Vis: ";
+          switch (Sym.getVisibility()) {
+          case GlobalValue::HiddenVisibility:
+            OutStream << 'H';
+            break;
+          case GlobalValue::ProtectedVisibility:
+            OutStream << 'P';
+            break;
+          case GlobalValue::DefaultVisibility:
+            OutStream << 'D';
+            break;
+          }
 
-        OutStream << " Sym: ";
-        auto PrintBool = [&](char C, bool B) { OutStream << (B ? C : '-'); };
-        PrintBool('U', Sym.isUndefined());
-        PrintBool('C', Sym.isCommon());
-        PrintBool('W', Sym.isWeak());
-        PrintBool('I', Sym.isIndirect());
-        PrintBool('O', Sym.canBeOmittedFromSymbolTable());
-        PrintBool('T', Sym.isTLS());
-        PrintBool('X', Sym.isExecutable());
-        OutStream << ' ' << Sym.getName();
-        OutStream << "| P " << Res.Prevailing;
-        OutStream << " V " << Res.VisibleToRegularObj;
-        OutStream << " E " << Res.ExportDynamic;
-        OutStream << " F " << Res.FinalDefinitionInLinkageUnit;
-        OutStream << "\n";
-      };
-      PrintSymbol(Sym, Res);
-#endif
+          OutStream << " Sym: ";
+          auto PrintBool = [&](char C, bool B) { OutStream << (B ? C : '-'); };
+          PrintBool('U', Sym.isUndefined());
+          PrintBool('C', Sym.isCommon());
+          PrintBool('W', Sym.isWeak());
+          PrintBool('I', Sym.isIndirect());
+          PrintBool('O', Sym.canBeOmittedFromSymbolTable());
+          PrintBool('T', Sym.isTLS());
+          PrintBool('X', Sym.isExecutable());
+          OutStream << ' ' << Sym.getName();
+          OutStream << "| P " << Res.Prevailing;
+          OutStream << " V " << Res.VisibleToRegularObj;
+          OutStream << " E " << Res.ExportDynamic;
+          OutStream << " F " << Res.FinalDefinitionInLinkageUnit;
+          OutStream << "\n";
+        };
+
+        PrintSymbol(Sym, Res);
+      }
     }
 
     // Add the bitcode file with its resolved symbols to the LTO job.
@@ -457,12 +459,12 @@ codegenObject(Module &M, StringRef DeviceArch,
     Args.push_back(File->TmpName.c_str());
   }
 
-#if PROTEUS_ENABLE_DEBUG
-  for (auto &Arg : Args) {
-    Logger::logs("proteus") << Arg << " ";
+  if (Config::get().ProteusDebugOutput) {
+    for (auto &Arg : Args) {
+      Logger::logs("proteus") << Arg << " ";
+    }
+    Logger::logs("proteus") << "\n";
   }
-  Logger::logs("proteus") << "\n";
-#endif
 
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                        << "Codegen object " << toString(CGOption) << "["
