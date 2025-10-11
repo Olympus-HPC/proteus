@@ -64,6 +64,18 @@ private:
     return KernelHandle<ArgT...>{TypedFnRef, *this};
   }
 
+    template <typename... ArgT>
+    KernelHandle<ArgT...> buildKernelFromArgsListTT(FunctionCallee FC,
+                                                ArgTypeList<ArgT...>) {
+    auto TypedFn = std::make_unique<Func<void, ArgT...>>(*this, FC, Dispatch);
+    Func<void, ArgT...> &TypedFnRef = *TypedFn;
+    TypedFn->declArgsTT();
+    std::unique_ptr<FuncBase> &Fn = Functions.emplace_back(std::move(TypedFn));
+
+    setKernel(*Fn);
+    return KernelHandle<ArgT...>{TypedFnRef, *this};
+  }
+
   template <typename... ArgT> struct KernelHandle {
     Func<void, ArgT...> &F;
     JitModule &M;
@@ -208,6 +220,27 @@ public:
       PROTEUS_FATAL_ERROR("Unexpected");
 
     return buildKernelFromArgsList(FC, ArgT{});
+  }
+
+  template <typename Sig> auto addKernelTT(StringRef Name) {
+    using RetT = typename FnSig<Sig>::RetT;
+    static_assert(std::is_void_v<RetT>, "Kernels must have void return type");
+    using ArgT = typename FnSig<Sig>::ArgsTList;
+
+    if (IsCompiled)
+      PROTEUS_FATAL_ERROR(
+          "The module is compiled, no further code can be added");
+
+    if (!isDeviceModule())
+      PROTEUS_FATAL_ERROR("Expected a device module for addKernel");
+
+    Mod->setTargetTriple(TargetTriple);
+    FunctionCallee FC = getFunctionCallee<void>(Name, ArgT{});
+    Function *F = dyn_cast<Function>(FC.getCallee());
+    if (!F)
+      PROTEUS_FATAL_ERROR("Unexpected");
+
+    return buildKernelFromArgsListTT(FC, ArgT{});
   }
 
   void compile(bool Verify = false) {
