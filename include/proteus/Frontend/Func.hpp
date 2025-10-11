@@ -339,6 +339,19 @@ public:
     Res.storeValue(Converted);
     return Res;
   }
+
+  // Convert the given Var's value to type U and return a new Var holding
+  // the converted value.
+  template <typename U, typename T>
+  std::enable_if_t<std::is_convertible_v<T, U>, VarTT<U>> convertTT(VarTT<T> &V) {
+    auto &Ctx = getFunction()->getContext();
+    auto &IRBRef = getIRBuilder();
+    Type *TargetTy = TypeMap<U>::get(Ctx);
+    VarTT<U> Res = declVarTTInternal<U>("convert.");
+    Value *Converted = proteus::convert(IRBRef, V.Storage->loadValue(), TargetTy);
+    Res.Storage->storeValue(Converted);
+    return Res;
+  }
 };
 
 template <typename RetT, typename... ArgT> class Func final : public FuncBase {
@@ -1021,7 +1034,8 @@ template <typename T, typename U>
 std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>, 
                  VarTT<std::common_type_t<T, U>>>
 operator-(const T &ConstValue, const VarTT<U> &Var) {
-  VarTT<T> Tmp = Var.Fn.template defVarTT<T>(ConstValue, "tmp.");
+  using CommonType = std::common_type_t<T, U>;
+  VarTT<CommonType> Tmp = Var.Fn.template defVarTT<CommonType>(ConstValue, "tmp.");
   return Tmp - Var;
 }
 
