@@ -512,6 +512,13 @@ VarTT<std::common_type_t<T, U>> binOpTT(const VarTT<T> &L, const VarTT<U> &R, In
   
   Value *LHS = L.Storage->loadValue();
   Value *RHS = R.Storage->loadValue();
+
+  Function *Function = Fn.getFunction();
+  auto &DL = Function->getParent()->getDataLayout();
+  Type *CommonType = getCommonType(DL, LHS->getType(), RHS->getType());
+
+  LHS = convert(IRB, LHS, CommonType);
+  RHS = convert(IRB, RHS, CommonType);
   
   Value *Result = nullptr;
   if constexpr (std::is_integral_v<std::common_type_t<T, U>>) {
@@ -547,25 +554,38 @@ compoundAssignConstTT(VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
                       const U &ConstValue,
                       IntOp IOp, FPOp FOp) {
   Type *LHSType = LHS.Storage->getValueType();
-  Value *RHS = nullptr;
-  
-  if constexpr (std::is_integral_v<T>) {
-    RHS = ConstantInt::get(LHSType, ConstValue);
-  } else {
-    RHS = ConstantFP::get(LHSType, ConstValue);
-  }
-  
   auto &IRB = LHS.Fn.getIRBuilder();
+
+  using CleanU = std::remove_cv_t<std::remove_reference_t<U>>;
+
+  Function *Function = LHS.Fn.getFunction();
+  auto &Ctx = Function->getContext();
+  Type *RHSType = TypeMap<CleanU>::get(Ctx);
+
+  Value *RHS = nullptr;
+  if constexpr (std::is_integral_v<CleanU>) {
+    RHS = ConstantInt::get(RHSType, ConstValue);
+  } else {
+    RHS = ConstantFP::get(RHSType, ConstValue);
+  }
+
   Value *LHSVal = LHS.Storage->loadValue();
+
+  auto &DL = Function->getParent()->getDataLayout();
+  Type *CommonType = getCommonType(DL, LHSVal->getType(), RHS->getType());
+
+  LHSVal = convert(IRB, LHSVal, CommonType);
+  RHS = convert(IRB, RHS, CommonType);
   Value *Result = nullptr;
   
-  if constexpr (std::is_integral_v<T>) {
+  if constexpr (std::is_integral_v<std::common_type_t<T, U>>) {
     Result = IOp(IRB, LHSVal, RHS);
   } else {
     Result = FOp(IRB, LHSVal, RHS);
   }
   
-  LHS.Storage->storeValue(Result);
+  Value *ConvertedResult = convert(IRB, Result, LHSType);
+  LHS.Storage->storeValue(ConvertedResult);
   return LHS;
 }
 
@@ -580,6 +600,13 @@ VarTT<bool> cmpOpTT(const VarTT<T> &L, const VarTT<U> &R, IntOp IOp, FPOp FOp) {
   
   Value *LHS = L.Storage->loadValue();
   Value *RHS = R.Storage->loadValue();
+
+  Function *Function = Fn.getFunction();
+  auto &DL = Function->getParent()->getDataLayout();
+  Type *CommonType = getCommonType(DL, LHS->getType(), RHS->getType());
+
+  LHS = convert(IRB, LHS, CommonType);
+  RHS = convert(IRB, RHS, CommonType);
   
   Value *Result = nullptr;
   if constexpr (std::is_integral_v<std::common_type_t<T, U>>) {
