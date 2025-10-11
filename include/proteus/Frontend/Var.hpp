@@ -3,6 +3,7 @@
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
+#include <type_traits>
 
 namespace proteus {
 
@@ -446,13 +447,16 @@ operator%(const T &ConstValue, const VarTT<U> &Var);
 
 // Math intrinsics for VarTT
 template <typename T>
-VarTT<T> powf(const VarTT<T> &L, const VarTT<T> &R);
+std::enable_if_t<std::is_same_v<T, float>, VarTT<T>>
+powf(const VarTT<T> &L, const VarTT<T> &R);
 
 template <typename T>
-VarTT<T> sqrtf(const VarTT<T> &R);
+std::enable_if_t<std::is_same_v<T, float>, VarTT<T>>
+sqrtf(const VarTT<T> &R);
 
 template <typename T>
-VarTT<T> min(const VarTT<T> &L, const VarTT<T> &R);
+std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>>
+min(const VarTT<T> &L, const VarTT<T> &R);
 } // namespace proteus
 
 
