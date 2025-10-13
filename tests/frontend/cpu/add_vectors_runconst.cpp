@@ -22,16 +22,16 @@ auto createJitFunction(size_t N) {
   F.beginFunction();
   {
     // Pointers to vectors A, B in arguments.
-    auto [A, B] = F.getArgs();
+    auto [A, B] = F.getArgsTT();
     // Declare local variables and argument getters.
-    auto &I = F.defVar<size_t>(0, "I");
-    auto &Inc = F.defVar<size_t>(1, "Inc");
+    auto I = F.defVarTT<size_t>(0, "I");
+    auto Inc = F.defVarTT<size_t>(1, "Inc");
     // Runtime constant vector size
-    auto &RunConstN = F.defRuntimeConst(N);
+    auto RunConstN = F.defRuntimeConstTT(N);
     // Element-wise addition over all vector elements.
-    F.beginFor(I, I, RunConstN, Inc);
+    F.beginForTT(I, I, RunConstN, Inc);
     { A[I] = A[I] + B[I]; }
-    F.endFor();
+    F.endForTT();
 
     F.ret();
   }

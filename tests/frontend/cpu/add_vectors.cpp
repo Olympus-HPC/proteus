@@ -22,18 +22,18 @@ int main() {
   F.beginFunction();
   {
     // Declare local variables and argument getters.
-    auto &I = F.declVar<size_t>("I");
-    auto &Inc = F.declVar<size_t>("Inc");
-    auto &A = F.getArg(0); // Pointer to vector A
-    auto &B = F.getArg(1); // Pointer to vector B
-    auto &N = F.getArg(2); // Vector size
+    auto I = F.declVarTT<size_t>("I");
+    auto Inc = F.declVarTT<size_t>("Inc");
+    auto &A = F.getArgTT<0>(); // Pointer to vector A
+    auto &B = F.getArgTT<1>(); // Pointer to vector B
+    auto &N = F.getArgTT<2>(); // Vector size
 
     // Element-wise addition over all vector elements.
     I = 0;
     Inc = 1;
-    F.beginFor(I, I, N, Inc);
+    F.beginForTT(I, I, N, Inc);
     { A[I] = A[I] + B[I]; }
-    F.endFor();
+    F.endForTT();
 
     F.ret();
   }

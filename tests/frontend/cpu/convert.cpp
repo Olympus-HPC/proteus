@@ -18,34 +18,35 @@ int main() {
   auto &F =
       J.addFunction<void(double *, int *, float *, double *, int *, float *)>(
           "cast");
-  auto &DOut = F.getArg(0);
-  auto &IOut = F.getArg(1);
-  auto &FOut = F.getArg(2);
-  auto &DOut2 = F.getArg(3);
-  auto &IOut2 = F.getArg(4);
-  auto &FOut2 = F.getArg(5);
+
+  auto &DOut = F.getArgTT<0>();
+  auto &IOut = F.getArgTT<1>();
+  auto &FOut = F.getArgTT<2>();
+  auto &DOut2 = F.getArgTT<3>();
+  auto &IOut2 = F.getArgTT<4>();
+  auto &FOut2 = F.getArgTT<5>();
 
   F.beginFunction();
   {
-    auto &Di = F.declVar<double>();
-    auto &Ii = F.declVar<int>();
-    auto &Fi = F.declVar<float>();
+    auto Di = F.declVarTT<double>();
+    auto Ii = F.declVarTT<int>();
+    auto Fi = F.declVarTT<float>();
 
     Di = 3.9;
     Ii = -7;
     Fi = 2.5f;
 
-    auto &IfromD = F.convert<int>(Di);
-    auto &FfromI = F.convert<float>(Ii);
-    auto &DfromF = F.convert<double>(Fi);
+    auto IfromD = F.convertTT<int>(Di);
+    auto FfromI = F.convertTT<float>(Ii);
+    auto DfromF = F.convertTT<double>(Fi);
 
     DOut[0] = DfromF;
     IOut[0] = IfromD;
     FOut[0] = FfromI;
 
-    auto &D2 = F.convert<double>(IfromD);
-    auto &I2 = F.convert<int>(FfromI);
-    auto &F2 = F.convert<float>(DfromF);
+    auto D2 = F.convertTT<double>(IfromD);
+    auto I2 = F.convertTT<int>(FfromI);
+    auto F2 = F.convertTT<float>(DfromF);
 
     DOut2[0] = D2;
     IOut2[0] = I2;

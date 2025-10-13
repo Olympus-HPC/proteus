@@ -17,102 +17,102 @@ int main() {
   auto J = proteus::JitModule();
   auto &LT = J.addFunction<double(double, double)>("if.lt");
   {
-    auto &Arg0 = LT.getArg(0);
-    auto &Arg1 = LT.getArg(1);
+    auto &Arg0 = LT.getArgTT<0>();
+    auto &Arg1 = LT.getArgTT<1>();
 
     LT.beginFunction();
     {
-      auto &Ret = LT.declVar<double>("ret");
+      auto Ret = LT.declVarTT<double>("ret");
       Ret = 0;
-      LT.beginIf(Arg0 < Arg1);
+      LT.beginIfTT(Arg0 < Arg1);
       { Ret = 1; }
       LT.endIf();
-      LT.ret(Ret);
+      LT.retTT(Ret);
     }
     LT.endFunction();
   }
 
   auto &LE = J.addFunction<double(double, double)>("if.le");
   {
-    auto &Arg0 = LE.getArg(0);
-    auto &Arg1 = LE.getArg(1);
+    auto &Arg0 = LE.getArgTT<0>();
+    auto &Arg1 = LE.getArgTT<1>();
 
     LE.beginFunction();
     {
-      auto &Ret = LE.declVar<double>("ret");
+      auto Ret = LE.declVarTT<double>("ret");
       Ret = 0;
-      LE.beginIf(Arg0 <= Arg1);
+      LE.beginIfTT(Arg0 <= Arg1);
       { Ret = 1; }
       LE.endIf();
-      LE.ret(Ret);
+      LE.retTT(Ret);
     }
     LE.endFunction();
   }
 
   auto &GT = J.addFunction<double(double, double)>("if.gt");
   {
-    auto &Arg0 = GT.getArg(0);
-    auto &Arg1 = GT.getArg(1);
+    auto &Arg0 = GT.getArgTT<0>();
+    auto &Arg1 = GT.getArgTT<1>();
 
     GT.beginFunction();
     {
-      auto &Ret = GT.declVar<double>("ret");
+      auto Ret = GT.declVarTT<double>("ret");
       Ret = 0;
-      GT.beginIf(Arg0 > Arg1);
+      GT.beginIfTT(Arg0 > Arg1);
       { Ret = 1; }
       GT.endIf();
-      GT.ret(Ret);
+      GT.retTT(Ret);
     }
     GT.endFunction();
   }
 
   auto &GE = J.addFunction<double(double, double)>("if.ge");
   {
-    auto &Arg0 = GE.getArg(0);
-    auto &Arg1 = GE.getArg(1);
+    auto &Arg0 = GE.getArgTT<0>();
+    auto &Arg1 = GE.getArgTT<1>();
 
     GE.beginFunction();
     {
-      auto &Ret = GE.declVar<double>("ret");
+      auto Ret = GE.declVarTT<double>("ret");
       Ret = 0;
-      GE.beginIf(Arg0 >= Arg1);
+      GE.beginIfTT(Arg0 >= Arg1);
       { Ret = 1; }
       GE.endIf();
-      GE.ret(Ret);
+      GE.retTT(Ret);
     }
     GE.endFunction();
   }
 
   auto &EQ = J.addFunction<double(double, double)>("if.eq");
   {
-    auto &Arg0 = EQ.getArg(0);
-    auto &Arg1 = EQ.getArg(1);
+    auto &Arg0 = EQ.getArgTT<0>();
+    auto &Arg1 = EQ.getArgTT<1>();
 
     EQ.beginFunction();
     {
-      auto &Ret = EQ.declVar<double>("ret");
+      auto Ret = EQ.declVarTT<double>("ret");
       Ret = 0;
-      EQ.beginIf(Arg0 == Arg1);
+      EQ.beginIfTT(Arg0 == Arg1);
       { Ret = 1; }
       EQ.endIf();
-      EQ.ret(Ret);
+      EQ.retTT(Ret);
     }
     EQ.endFunction();
   }
 
   auto &NE = J.addFunction<double(double, double)>("if.ne");
   {
-    auto &Arg0 = NE.getArg(0);
-    auto &Arg1 = NE.getArg(1);
+    auto &Arg0 = NE.getArgTT<0>();
+    auto &Arg1 = NE.getArgTT<1>();
 
     NE.beginFunction();
     {
-      auto &Ret = NE.declVar<double>("ret");
+      auto Ret = NE.declVarTT<double>("ret");
       Ret = 0;
-      NE.beginIf(Arg0 != Arg1);
+      NE.beginIfTT(Arg0 != Arg1);
       { Ret = 1; }
       NE.endIf();
-      NE.ret(Ret);
+      NE.retTT(Ret);
     }
     NE.endFunction();
   }

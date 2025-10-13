@@ -352,6 +352,57 @@ FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
   IRB.CreateCall(Callee, {ArgsVars.getValue()...});
 }
 
+// VarTT versions of call
+template <typename Sig>
+std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, VarTT<typename FnSig<Sig>::RetT>>
+FuncBase::callTT(StringRef Name) {
+  using RetT = typename FnSig<Sig>::RetT;
+  auto *F = getFunction();
+  LLVMContext &Ctx = F->getContext();
+
+  using ArgT = typename FnSig<Sig>::ArgsTList;
+  FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
+  auto *Call = IRB.CreateCall(Callee);
+  VarTT<RetT> Ret = declVarTTInternal<RetT>("ret");
+  Ret.Storage->storeValue(Call);
+  return Ret;
+}
+
+template <typename Sig>
+std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
+FuncBase::callTT(StringRef Name) {
+  using RetT = typename FnSig<Sig>::RetT;
+  using ArgT = typename FnSig<Sig>::ArgsTList;
+  FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
+  IRB.CreateCall(Callee);
+}
+
+template <typename Sig, typename... ArgVars>
+std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, VarTT<typename FnSig<Sig>::RetT>>
+FuncBase::callTT(StringRef Name, ArgVars &&...ArgsVars) {
+  auto *F = getFunction();
+  LLVMContext &Ctx = F->getContext();
+
+  using RetT = typename FnSig<Sig>::RetT;
+  using ArgT = typename FnSig<Sig>::ArgsTList;
+  FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
+  auto *Call = IRB.CreateCall(Callee, {ArgsVars.Storage->loadValue()...});
+
+  VarTT<RetT> Ret = declVarTTInternal<RetT>("ret");
+  Ret.Storage->storeValue(Call);
+  return Ret;
+}
+
+template <typename Sig, typename... ArgVars>
+std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
+FuncBase::callTT(StringRef Name, ArgVars &&...ArgsVars) {
+  using RetT = typename FnSig<Sig>::RetT;
+  using ArgT = typename FnSig<Sig>::ArgsTList;
+
+  FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
+  IRB.CreateCall(Callee, {ArgsVars.Storage->loadValue()...});
+}
+
 template <typename RetT, typename... ArgT>
 RetT Func<RetT, ArgT...>::operator()(ArgT... Args) {
   if (!J.isCompiled())

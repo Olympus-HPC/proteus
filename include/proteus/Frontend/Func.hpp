@@ -276,6 +276,23 @@ public:
   std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
   call(StringRef Name, ArgVars &&...ArgsVars);
 
+  // VarTT versions of call
+  template <typename Sig>
+  std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, VarTT<typename FnSig<Sig>::RetT>>
+  callTT(StringRef Name);
+
+  template <typename Sig>
+  std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
+  callTT(StringRef Name);
+
+  template <typename Sig, typename... ArgVars>
+  std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, VarTT<typename FnSig<Sig>::RetT>>
+  callTT(StringRef Name, ArgVars &&...ArgsVars);
+
+  template <typename Sig, typename... ArgVars>
+  std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
+  callTT(StringRef Name, ArgVars &&...ArgsVars);
+
   template <typename BuiltinFuncT>
   decltype(auto) callBuiltin(BuiltinFuncT &&BuiltinFunc) {
     using RetT = std::invoke_result_t<BuiltinFuncT &, FuncBase &>;

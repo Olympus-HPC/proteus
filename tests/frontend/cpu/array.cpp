@@ -15,36 +15,35 @@ int main() {
 
   F.beginFunction();
   {
-    auto &OutLocal = F.getArg(0);
-    auto &OutGlobal = F.getArg(1);
+    auto &OutLocal = F.getArgTT<0>();
+    auto &OutGlobal = F.getArgTT<1>();
 
-    auto &I = F.defVar<size_t>(0, "I");
-    auto &Inc = F.defVar<size_t>(1, "Inc");
+    auto I = F.defVarTT<size_t>(0, "I");
+    auto Inc = F.defVarTT<size_t>(1, "Inc");
 
-    auto &Local = F.declVar<double[]>(16, AddressSpace::DEFAULT, "local_array");
-    auto &Global =
-        F.declVar<double[]>(16, AddressSpace::GLOBAL, "global_array");
+    auto Local = F.declVarTT<double[]>(16, AddressSpace::DEFAULT, "local_array");
+    auto Global = F.declVarTT<double[]>(16, AddressSpace::GLOBAL, "global_array");
 
-    auto &Bound = F.defRuntimeConst<size_t>(16, "Bound");
+    auto Bound = F.defRuntimeConstTT<size_t>(16, "Bound");
 
-    F.beginFor(I, I, Bound, Inc);
+    F.beginForTT(I, I, Bound, Inc);
     { Local[I] = 2.0 * I; }
-    F.endFor();
+    F.endForTT();
 
     I = 0;
-    F.beginFor(I, I, Bound, Inc);
+    F.beginForTT(I, I, Bound, Inc);
     { Global[I] = 1000.0 + I; }
-    F.endFor();
+    F.endForTT();
 
     I = 0;
-    F.beginFor(I, I, Bound, Inc);
+    F.beginForTT(I, I, Bound, Inc);
     { OutLocal[I] = Local[I]; }
-    F.endFor();
+    F.endForTT();
 
     I = 0;
-    F.beginFor(I, I, Bound, Inc);
+    F.beginForTT(I, I, Bound, Inc);
     { OutGlobal[I] = Global[I]; }
-    F.endFor();
+    F.endForTT();
 
     F.ret();
   }
