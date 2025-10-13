@@ -294,11 +294,11 @@ public:
   template <typename T>
   std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>> atomicAdd(const VarTT<T*> &Addr, const VarTT<T>& Val);
   template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>> atomicSub(VarTT<T*> Addr, const VarTT<T>& Val);
+  std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>> atomicSub(const VarTT<T*> &Addr, const VarTT<T>& Val);
   template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>> atomicMax(VarTT<T*> Addr, const VarTT<T>& Val);
+  std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>> atomicMax(const VarTT<T*> &Addr, const VarTT<T>& Val);
   template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>> atomicMin(VarTT<T*> Addr, const VarTT<T>& Val);
+  std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>> atomicMin(const VarTT<T*> &Addr, const VarTT<T>& Val);
 
   template <typename T, typename BodyLambda = EmptyLambda>
   auto forLoop(const LoopBoundInfo<T> &Bounds, BodyLambda &&Body = {}) {
@@ -945,6 +945,52 @@ VarTT<std::remove_pointer_t<T>> VarTT<T, std::enable_if_t<std::is_pointer_v<T>>>
   return (*this)[0];
 }
 
+template<typename T>
+template <typename OffsetT>
+std::enable_if_t<std::is_arithmetic_v<OffsetT>, VarTT<T, std::enable_if_t<std::is_pointer_v<T>>>>
+VarTT<T, std::enable_if_t<std::is_pointer_v<T>>>::operator+(const VarTT<OffsetT> &Offset) const {
+  auto &IRB = Fn.getIRBuilder();
+
+  auto *OffsetVal = Offset.Storage->loadValue();
+  auto *IntTy = IRB.getInt64Ty();
+  auto *IdxVal = convert(IRB, OffsetVal, IntTy);
+
+  auto *BasePtr = Storage->getPointerValue();
+  auto *ElemTy = Storage->getValueType();
+
+  auto *GEP = IRB.CreateInBoundsGEP(ElemTy, BasePtr, IdxVal, "ptr.add");
+
+  unsigned AddrSpace = cast<PointerType>(BasePtr->getType())->getAddressSpace();
+  auto *ElemPtrTy = PointerType::get(ElemTy, AddrSpace);
+  auto *PtrSlot = Fn.emitAlloca(ElemPtrTy, "ptr.add.tmp");
+  IRB.CreateStore(GEP, PtrSlot);
+  std::unique_ptr<PointerStorage> ResultStorage =
+      std::make_unique<PointerStorage>(PtrSlot, IRB, ElemTy);
+  return VarTT<T, std::enable_if_t<std::is_pointer_v<T>>>(std::move(ResultStorage), Fn);
+}
+
+template<typename T>
+template <typename OffsetT>
+std::enable_if_t<std::is_arithmetic_v<OffsetT>, VarTT<T, std::enable_if_t<std::is_pointer_v<T>>>>
+VarTT<T, std::enable_if_t<std::is_pointer_v<T>>>::operator+(OffsetT Offset) const {
+  auto &IRB = Fn.getIRBuilder();
+  auto *IntTy = IRB.getInt64Ty();
+  Value *IdxVal = ConstantInt::get(IntTy, Offset);
+
+  auto *BasePtr = Storage->getPointerValue();
+  auto *ElemTy = Storage->getValueType();
+
+  auto *GEP = IRB.CreateInBoundsGEP(ElemTy, BasePtr, IdxVal, "ptr.add");
+
+  unsigned AddrSpace = cast<PointerType>(BasePtr->getType())->getAddressSpace();
+  auto *ElemPtrTy = PointerType::get(ElemTy, AddrSpace);
+  auto *PtrSlot = Fn.emitAlloca(ElemPtrTy, "ptr.add.tmp");
+  IRB.CreateStore(GEP, PtrSlot);
+  std::unique_ptr<PointerStorage> ResultStorage =
+      std::make_unique<PointerStorage>(PtrSlot, IRB, ElemTy);
+  return VarTT<T, std::enable_if_t<std::is_pointer_v<T>>>(std::move(ResultStorage), Fn);
+}
+
 // Comparison operators for VarTT
 template <typename T>
 template <typename U>
@@ -1121,7 +1167,7 @@ FuncBase::atomicAdd(const VarTT<T*> &Addr, const VarTT<T>& Val) {
 
 template <typename T>
 std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>>
-FuncBase::atomicSub(VarTT<T*> Addr, const VarTT<T>& Val) {
+FuncBase::atomicSub(const VarTT<T*> &Addr, const VarTT<T>& Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicSub requires arithmetic type");
   
   Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
@@ -1132,7 +1178,7 @@ FuncBase::atomicSub(VarTT<T*> Addr, const VarTT<T>& Val) {
 
 template <typename T>
 std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>>
-FuncBase::atomicMax(VarTT<T*> Addr, const VarTT<T>& Val) {
+FuncBase::atomicMax(const VarTT<T*> &Addr, const VarTT<T>& Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicMax requires arithmetic type");
   
   Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
@@ -1143,7 +1189,7 @@ FuncBase::atomicMax(VarTT<T*> Addr, const VarTT<T>& Val) {
 
 template <typename T>
 std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>>
-FuncBase::atomicMin(VarTT<T*> Addr, const VarTT<T>& Val) {
+FuncBase::atomicMin(const VarTT<T*> &Addr, const VarTT<T>& Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicMin requires arithmetic type");
   
   Type *ValueType = TypeMap<T>::get(getFunction()->getContext());

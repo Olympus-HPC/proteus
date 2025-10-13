@@ -417,6 +417,20 @@ struct VarTT<T, std::enable_if_t<std::is_pointer_v<T>>> {
   operator[](const VarTT<IdxT> &Index);
 
   VarTT<ElemType> operator*();
+
+  template <typename OffsetT>
+  std::enable_if_t<std::is_arithmetic_v<OffsetT>, VarTT<T, std::enable_if_t<std::is_pointer_v<T>>>>
+  operator+(const VarTT<OffsetT> &Offset) const;
+
+  template <typename OffsetT>
+  std::enable_if_t<std::is_arithmetic_v<OffsetT>, VarTT<T, std::enable_if_t<std::is_pointer_v<T>>>>
+  operator+(OffsetT Offset) const;
+
+  template <typename OffsetT>
+  friend std::enable_if_t<std::is_arithmetic_v<OffsetT>, VarTT<T, std::enable_if_t<std::is_pointer_v<T>>>>
+  operator+(OffsetT Offset, const VarTT &Ptr) {
+    return Ptr + Offset;
+  }
 };
 
 // Non-member arithmetic operators for VarTT

@@ -26,37 +26,35 @@ int main() {
   auto J = proteus::JitModule(TARGET);
 
   auto KernelHandle =
-      J.addKernel<void(int *, float *, int)>("atomic_ops_kernel");
+      J.addKernelTT<void(int *, float *, int)>("atomic_ops_kernel");
   auto &F = KernelHandle.F;
 
   F.beginFunction();
   {
-    auto &IntCounters = F.getArg(0);
-    auto &FloatCounters = F.getArg(1);
-    auto &N = F.getArg(2);
+    auto [IntCounters, FloatCounters, N] = F.getArgsTT();
 
-    auto &Tid = F.callBuiltin(getThreadIdX);
-    auto &Bid = F.callBuiltin(getBlockIdX);
-    auto &BlockDim = F.callBuiltin(getBlockDimX);
+    auto Tid = F.callBuiltin(getThreadIdX);
+    auto Bid = F.callBuiltin(getBlockIdX);
+    auto BlockDim = F.callBuiltin(getBlockDimX);
 
-    auto &I = F.declVar<int>();
+    auto I = F.declVarTT<int>();
     I = Bid * BlockDim + Tid;
 
-    auto &IntAdd = IntCounters[0];
-    auto &IntSub = IntCounters[1];
-    auto &IntMax = IntCounters[2];
-    auto &IntMin = IntCounters[3];
+    auto IntAdd = IntCounters + 0;
+    auto IntSub = IntCounters + 1;
+    auto IntMax = IntCounters + 2;
+    auto IntMin = IntCounters + 3;
 
-    auto &FloatAdd = FloatCounters[0];
-    auto &FloatSub = FloatCounters[1];
-    auto &FloatMax = FloatCounters[2];
-    auto &FloatMin = FloatCounters[3];
+    auto FloatAdd = FloatCounters + 0;
+    auto FloatSub = FloatCounters + 1;
+    auto FloatMax = FloatCounters + 2;
+    auto FloatMin = FloatCounters + 3;
 
-    auto &IntOne = F.defVar<int>(1);
-    auto &FloatHalf = F.defVar<float>(0.5f);
-    auto &FloatOne = F.defVar<float>(1.0f);
+    auto IntOne = F.defVarTT<int>(1);
+    auto FloatHalf = F.defVarTT<float>(0.5f);
+    auto FloatOne = F.defVarTT<float>(1.0f);
 
-    F.beginIf(I < N);
+    F.beginIfTT(I < N);
     {
       F.atomicAdd(IntAdd, IntOne);
       F.atomicSub(IntSub, IntOne);
@@ -66,11 +64,11 @@ int main() {
       F.atomicAdd(FloatAdd, FloatHalf);
       F.atomicSub(FloatSub, FloatOne);
 
-      auto &IdxAsFloat = F.convert<float>(I);
+      auto IdxAsFloat = F.convertTT<float>(I);
       F.atomicMax(FloatMax, IdxAsFloat);
       F.atomicMin(FloatMin, IdxAsFloat);
     }
-    F.endIf();
+    F.endIfTT();
 
     F.ret();
   }
