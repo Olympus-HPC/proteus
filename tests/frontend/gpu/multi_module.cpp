@@ -36,7 +36,7 @@ auto createJitModule1() {
       auto [V] = F.getArgsTT();
       *V = 42;
 
-      F.retTT();
+      F.ret();
     }
     F.endFunction();
   }
@@ -50,7 +50,7 @@ auto createJitModule1() {
       auto [V] = F.getArgsTT();
       *V = 23;
 
-      F.retTT();
+      F.ret();
     }
     F.endFunction();
   }
@@ -70,7 +70,7 @@ auto createJitModule2() {
       auto [V] = F.getArgsTT();
       *V = 142;
 
-      F.retTT();
+      F.ret();
     }
     F.endFunction();
   }
@@ -84,7 +84,7 @@ auto createJitModule2() {
       auto [V] = F.getArgsTT();
       *V = 123;
 
-      F.retTT();
+      F.ret();
     }
     F.endFunction();
   }

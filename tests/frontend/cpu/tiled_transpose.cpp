@@ -50,7 +50,7 @@ static auto getTiled2DTransposeFunction(int ROWS, int COLS, int TileSize) {
         .tile(TileSize)
         .emit();
 
-    F.retTT();
+    F.ret();
   }
   F.endFunction();
 

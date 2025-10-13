@@ -27,7 +27,7 @@ int main() {
     auto V1 = F.defVarTT<int>(22);
     auto V2 = F.defVarTT<int>(20);
     auto V3 = F.callTT<int(int, int)>("add", V1, V2);
-    F.retTT(V3);
+    F.ret(V3);
   }
   F.endFunction();
 

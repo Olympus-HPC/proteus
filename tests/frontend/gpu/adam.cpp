@@ -118,7 +118,7 @@ auto createJitModule() {
       F.endForTT();
     }
     F.endForTT();
-    F.retTT();
+    F.ret();
   }
   F.endFunction();
 

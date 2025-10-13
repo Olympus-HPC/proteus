@@ -210,9 +210,9 @@ public:
   }
 
   template <typename T>
-  void retTT(const VarTT<T> &RetVal);
+  void ret(const VarTT<T> &RetVal);
   
-  void retTT();
+  void ret();
 
   StringRef getName() const { return Name; }
 
@@ -1098,8 +1098,7 @@ FuncBase::atomicMin(const VarTT<T*> &Addr, const VarTT<T>& Val) {
   return emitAtomicTT(Op, Addr, Val);
 }
 
-// Return implementations for VarTT
-inline void FuncBase::retTT() {
+inline void FuncBase::ret() {
   auto *CurBB = IP.getBlock();
   if (!CurBB->getSingleSuccessor())
     PROTEUS_FATAL_ERROR("Expected single successor for current block");
@@ -1112,7 +1111,7 @@ inline void FuncBase::retTT() {
 }
 
 template <typename T>
-void FuncBase::retTT(const VarTT<T> &RetVal) {
+void FuncBase::ret(const VarTT<T> &RetVal) {
   auto *CurBB = IP.getBlock();
   if (!CurBB->getSingleSuccessor())
     PROTEUS_FATAL_ERROR("Expected single successor for current block");

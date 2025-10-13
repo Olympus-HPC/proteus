@@ -47,7 +47,7 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int Tile) {
         .tile(Tile)
         .emit();
 
-    F.retTT();
+    F.ret();
   }
   F.endFunction();
 

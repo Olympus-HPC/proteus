@@ -52,7 +52,7 @@ auto createJitKernel(size_t N) {
     { A[I] = A[I] + B[I]; }
     F.endForTT();
 
-    F.retTT();
+    F.ret();
   }
   F.endFunction();
 

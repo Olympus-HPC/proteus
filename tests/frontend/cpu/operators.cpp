@@ -53,7 +53,7 @@ int main() {
     F.endIfTT();
 
 
-    F.retTT();
+    F.ret();
   }
   F.endFunction();
 

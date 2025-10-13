@@ -35,7 +35,7 @@ int main() {
     { A[I] = A[I] + B[I]; }
     F.endForTT();
 
-    F.retTT();
+    F.ret();
   }
   F.endFunction();
 

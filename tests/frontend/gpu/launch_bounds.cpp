@@ -26,7 +26,7 @@ int main() {
   auto &F = KernelHandle.F;
 
   F.beginFunction();
-  { F.retTT(); }
+  { F.ret(); }
   F.endFunction();
 
   KernelHandle.setLaunchBounds(MaxThreadsPerBlock, MinBlocksPerSM);

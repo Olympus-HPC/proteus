@@ -27,7 +27,7 @@ int main() {
       LT.beginIfTT(Arg0 < Arg1);
       { Ret = 1; }
       LT.endIfTT();
-      LT.retTT(Ret);
+      LT.ret(Ret);
     }
     LT.endFunction();
   }
@@ -44,7 +44,7 @@ int main() {
       LE.beginIfTT(Arg0 <= Arg1);
       { Ret = 1; }
       LE.endIfTT();
-      LE.retTT(Ret);
+      LE.ret(Ret);
     }
     LE.endFunction();
   }
@@ -61,7 +61,7 @@ int main() {
       GT.beginIfTT(Arg0 > Arg1);
       { Ret = 1; }
       GT.endIfTT();
-      GT.retTT(Ret);
+      GT.ret(Ret);
     }
     GT.endFunction();
   }
@@ -78,7 +78,7 @@ int main() {
       GE.beginIfTT(Arg0 >= Arg1);
       { Ret = 1; }
       GE.endIfTT();
-      GE.retTT(Ret);
+      GE.ret(Ret);
     }
     GE.endFunction();
   }
@@ -95,7 +95,7 @@ int main() {
       EQ.beginIfTT(Arg0 == Arg1);
       { Ret = 1; }
       EQ.endIfTT();
-      EQ.retTT(Ret);
+      EQ.ret(Ret);
     }
     EQ.endFunction();
   }
@@ -112,7 +112,7 @@ int main() {
       NE.beginIfTT(Arg0 != Arg1);
       { Ret = 1; }
       NE.endIfTT();
-      NE.retTT(Ret);
+      NE.ret(Ret);
     }
     NE.endFunction();
   }

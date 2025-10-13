@@ -41,7 +41,7 @@ int main() {
     F.beginForTT(I, I, UB, Inc);
     { Arg[I] = Arg[I] + 1.0; }
     F.endForTT();
-    F.retTT();
+    F.ret();
   }
   F.endFunction();
 

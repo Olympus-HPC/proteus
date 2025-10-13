@@ -62,7 +62,7 @@ int main() {
     IOut2[0] = I2;
     FOut2[0] = F2;
 
-    F.retTT();
+    F.ret();
   }
   F.endFunction();
 
