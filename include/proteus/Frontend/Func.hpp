@@ -1245,15 +1245,29 @@ FuncBase::atomicMin(const VarTT<T*> &Addr, const VarTT<T>& Val) {
 
 // Return implementations for VarTT
 inline void FuncBase::retTT() {
+  auto *CurBB = IP.getBlock();
+  if (!CurBB->getSingleSuccessor())
+    PROTEUS_FATAL_ERROR("Expected single successor for current block");
+  auto *TermI = CurBB->getTerminator();
+
   auto &IRB = getIRBuilder();
   IRB.CreateRetVoid();
+
+  TermI->eraseFromParent();
 }
 
 template <typename T>
 void FuncBase::retTT(const VarTT<T> &RetVal) {
+  auto *CurBB = IP.getBlock();
+  if (!CurBB->getSingleSuccessor())
+    PROTEUS_FATAL_ERROR("Expected single successor for current block");
+  auto *TermI = CurBB->getTerminator();
+
   auto &IRB = getIRBuilder();
   Value *RetValue = RetVal.Storage->loadValue();
   IRB.CreateRet(RetValue);
+
+  TermI->eraseFromParent();
 }
 
 
