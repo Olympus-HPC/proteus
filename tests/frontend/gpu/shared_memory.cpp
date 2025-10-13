@@ -32,7 +32,7 @@ int main() {
 
   F.beginFunction();
   {
-    auto &A = F.getArgTT<0>();
+    auto &A = F.getArg<0>();
 
     auto Tid = F.callBuiltin(getThreadIdX);
     auto Bid = F.callBuiltin(getBlockIdX);

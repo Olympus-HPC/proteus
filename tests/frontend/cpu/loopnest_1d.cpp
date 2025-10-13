@@ -18,8 +18,8 @@ static auto get1DLoopNestFunction(int N, int TileSize) {
   auto IncOne = F.declVarTT<int>("inc");
   auto UB = F.declVarTT<int>("ub");
 
-  auto &A = F.getArgTT<0>();
-  auto &B = F.getArgTT<1>();
+  auto &A = F.getArg<0>();
+  auto &B = F.getArg<1>();
 
   F.beginFunction();
   {
@@ -48,8 +48,8 @@ static auto get1DSimpleLoopNestFunction(int N) {
   auto IncOne = F.declVarTT<int>("inc");
   auto UB = F.declVarTT<int>("ub");
 
-  auto &A = F.getArgTT<0>();
-  auto &B = F.getArgTT<1>();
+  auto &A = F.getArg<0>();
+  auto &B = F.getArg<1>();
 
   F.beginFunction();
   {

@@ -17,7 +17,7 @@ int main() {
   auto J = proteus::JitModule();
   auto &F = J.addFunction<void(double *)>("for");
 
-  auto &Arg = F.getArgTT<0>();
+  auto &Arg = F.getArg<0>();
   F.beginFunction();
   {
     auto I = F.declVarTT<int>("i");

@@ -15,8 +15,8 @@ int main() {
 
   F.beginFunction();
   {
-    auto &OutLocal = F.getArgTT<0>();
-    auto &OutGlobal = F.getArgTT<1>();
+    auto &OutLocal = F.getArg<0>();
+    auto &OutGlobal = F.getArg<1>();
 
     auto I = F.defVarTT<size_t>(0, "I");
     auto Inc = F.defVarTT<size_t>(1, "Inc");

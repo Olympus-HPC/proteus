@@ -35,12 +35,12 @@ int main() {
     auto I = F.declVarTT<size_t>("i");
     auto JVar = F.declVarTT<size_t>("j");
     auto K = F.declVarTT<size_t>("k");
-    auto &A = F.getArgTT<0>();
-    auto &B = F.getArgTT<1>();
-    auto &C = F.getArgTT<2>();
-    auto &X = F.getArgTT<3>();
-    auto &Y = F.getArgTT<4>();
-    auto &Z = F.getArgTT<5>();
+    auto &A = F.getArg<0>();
+    auto &B = F.getArg<1>();
+    auto &C = F.getArg<2>();
+    auto &X = F.getArg<3>();
+    auto &Y = F.getArg<4>();
+    auto &Z = F.getArg<5>();
 
     I = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +
         F.callBuiltin(getThreadIdX);

@@ -23,8 +23,8 @@ static auto get3DLoopNestFunction(int DI, int DJ, int DK, int TileI, int TileJ,
   auto UBJ = F.declVarTT<int>("ubj");
   auto UBK = F.declVarTT<int>("ubk");
 
-  auto &A = F.getArgTT<0>();
-  auto &B = F.getArgTT<1>();
+  auto &A = F.getArg<0>();
+  auto &B = F.getArg<1>();
 
   F.beginFunction();
   {
@@ -70,8 +70,8 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int TileSize) {
   auto UBJ = F.declVarTT<int>("ubj");
   auto UBK = F.declVarTT<int>("ubk");
 
-  auto &A = F.getArgTT<0>();
-  auto &B = F.getArgTT<1>();
+  auto &A = F.getArg<0>();
+  auto &B = F.getArg<1>();
 
   F.beginFunction();
   {

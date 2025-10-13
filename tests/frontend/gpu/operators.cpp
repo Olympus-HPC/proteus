@@ -29,18 +29,18 @@ int main() {
       double *, double *, double *, double *, double *, double *, double *,
       double *, double *, double *, double *, double *)>("operators");
   auto &F = KernelHandle.F;
-    auto &Arg0 = F.getArgTT<0>();
-    auto &Arg1 = F.getArgTT<1>();
-    auto &Arg2 = F.getArgTT<2>();
-    auto &Arg3 = F.getArgTT<3>();
-    auto &Arg4 = F.getArgTT<4>();
-    auto &Arg5 = F.getArgTT<5>();
-    auto &Arg6 = F.getArgTT<6>();
-    auto &Arg7 = F.getArgTT<7>();
-    auto &Arg8 = F.getArgTT<8>();
-    auto &Arg9 = F.getArgTT<9>();
-    auto &Arg10 = F.getArgTT<10>();
-    auto &Arg11 = F.getArgTT<11>();
+    auto &Arg0 = F.getArg<0>();
+    auto &Arg1 = F.getArg<1>();
+    auto &Arg2 = F.getArg<2>();
+    auto &Arg3 = F.getArg<3>();
+    auto &Arg4 = F.getArg<4>();
+    auto &Arg5 = F.getArg<5>();
+    auto &Arg6 = F.getArg<6>();
+    auto &Arg7 = F.getArg<7>();
+    auto &Arg8 = F.getArg<8>();
+    auto &Arg9 = F.getArg<9>();
+    auto &Arg10 = F.getArg<10>();
+    auto &Arg11 = F.getArg<11>();
   F.beginFunction();
   {
     Arg0[0] = 2;

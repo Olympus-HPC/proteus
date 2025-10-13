@@ -20,13 +20,13 @@ int main() {
   auto &F = J.addFunction<void(float *, float *, float *, int *, int *, int *)>(
       "min_test");
 
-  auto &Ff0 = F.getArgTT<0>();
-  auto &Ff1 = F.getArgTT<1>();
-  auto &FfRes = F.getArgTT<2>();
+  auto &Ff0 = F.getArg<0>();
+  auto &Ff1 = F.getArg<1>();
+  auto &FfRes = F.getArg<2>();
 
-  auto &Fi0 = F.getArgTT<3>();
-  auto &Fi1 = F.getArgTT<4>();
-  auto &FiRes = F.getArgTT<5>();
+  auto &Fi0 = F.getArg<3>();
+  auto &Fi1 = F.getArg<4>();
+  auto &FiRes = F.getArg<5>();
 
   F.beginFunction();
   {

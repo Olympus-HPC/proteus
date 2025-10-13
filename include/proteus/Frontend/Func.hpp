@@ -300,7 +300,7 @@ public:
   }
   
   template<std::size_t Idx>
-  auto& getArgTT() {
+  auto& getArg() {
     return *std::get<Idx>(ArgumentsTT);
   }
 

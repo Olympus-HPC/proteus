@@ -29,12 +29,12 @@ int main() {
       J.addKernelTT<void(double *, int *, float *, double *, int *, float *)>(
           "cast");
   auto &F = KernelHandle.F;
-  auto &DOut = F.getArgTT<0>();
-  auto &IOut = F.getArgTT<1>();
-  auto &FOut = F.getArgTT<2>();
-  auto &DOut2 = F.getArgTT<3>();
-  auto &IOut2 = F.getArgTT<4>();
-  auto &FOut2 = F.getArgTT<5>();
+  auto &DOut = F.getArg<0>();
+  auto &IOut = F.getArg<1>();
+  auto &FOut = F.getArg<2>();
+  auto &DOut2 = F.getArg<3>();
+  auto &IOut2 = F.getArg<4>();
+  auto &FOut2 = F.getArg<5>();
 
   F.beginFunction();
   {

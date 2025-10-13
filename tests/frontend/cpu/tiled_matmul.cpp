@@ -18,9 +18,9 @@ static auto getTiledMatmulFunction(int N, int TileI, int TileJ, int TileK) {
       JitMod->addFunction<void(double *, double *, double *)>("tiled_matmul");
   {
 
-    auto &C = F.getArgTT<0>();
-    auto &A = F.getArgTT<1>();
-    auto &B = F.getArgTT<2>();
+    auto &C = F.getArg<0>();
+    auto &A = F.getArg<1>();
+    auto &B = F.getArg<2>();
 
     F.beginFunction();
     {

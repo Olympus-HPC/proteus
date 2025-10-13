@@ -17,8 +17,8 @@ int main() {
   auto J = proteus::JitModule();
   auto &LT = J.addFunction<double(double, double)>("if.lt");
   {
-    auto &Arg0 = LT.getArgTT<0>();
-    auto &Arg1 = LT.getArgTT<1>();
+    auto &Arg0 = LT.getArg<0>();
+    auto &Arg1 = LT.getArg<1>();
 
     LT.beginFunction();
     {
@@ -34,8 +34,8 @@ int main() {
 
   auto &LE = J.addFunction<double(double, double)>("if.le");
   {
-    auto &Arg0 = LE.getArgTT<0>();
-    auto &Arg1 = LE.getArgTT<1>();
+    auto &Arg0 = LE.getArg<0>();
+    auto &Arg1 = LE.getArg<1>();
 
     LE.beginFunction();
     {
@@ -51,8 +51,8 @@ int main() {
 
   auto &GT = J.addFunction<double(double, double)>("if.gt");
   {
-    auto &Arg0 = GT.getArgTT<0>();
-    auto &Arg1 = GT.getArgTT<1>();
+    auto &Arg0 = GT.getArg<0>();
+    auto &Arg1 = GT.getArg<1>();
 
     GT.beginFunction();
     {
@@ -68,8 +68,8 @@ int main() {
 
   auto &GE = J.addFunction<double(double, double)>("if.ge");
   {
-    auto &Arg0 = GE.getArgTT<0>();
-    auto &Arg1 = GE.getArgTT<1>();
+    auto &Arg0 = GE.getArg<0>();
+    auto &Arg1 = GE.getArg<1>();
 
     GE.beginFunction();
     {
@@ -85,8 +85,8 @@ int main() {
 
   auto &EQ = J.addFunction<double(double, double)>("if.eq");
   {
-    auto &Arg0 = EQ.getArgTT<0>();
-    auto &Arg1 = EQ.getArgTT<1>();
+    auto &Arg0 = EQ.getArg<0>();
+    auto &Arg1 = EQ.getArg<1>();
 
     EQ.beginFunction();
     {
@@ -102,8 +102,8 @@ int main() {
 
   auto &NE = J.addFunction<double(double, double)>("if.ne");
   {
-    auto &Arg0 = NE.getArgTT<0>();
-    auto &Arg1 = NE.getArgTT<1>();
+    auto &Arg0 = NE.getArg<0>();
+    auto &Arg1 = NE.getArg<1>();
 
     NE.beginFunction();
     {

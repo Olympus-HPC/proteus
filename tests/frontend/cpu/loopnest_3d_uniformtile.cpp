@@ -25,7 +25,7 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int Tile) {
 
   F.beginFunction();
   {
-    auto &A = F.getArgTT<0>();
+    auto &A = F.getArg<0>();
 
     I = 0;
     J = 0;

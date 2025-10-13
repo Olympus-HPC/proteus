@@ -32,7 +32,7 @@ int main() {
   auto I = F.declVarTT<int>("i");
   auto Inc = F.declVarTT<int>("inc");
   auto UB = F.declVarTT<int>("ub");
-  auto &Arg = F.getArgTT<0>();
+  auto &Arg = F.getArg<0>();
   F.beginFunction();
   {
     I = 0;
