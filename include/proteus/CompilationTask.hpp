@@ -31,7 +31,7 @@ private:
   CodegenOption CGOption;
   bool DumpIR;
   bool RelinkGlobalsByCopy;
-  int BlocksPerExecUnit;
+  int MinBlocksPerSM;
   bool SpecializeArgs;
   bool SpecializeDims;
   bool SpecializeDimsAssume;
@@ -88,8 +88,8 @@ public:
         GlobalLinkedBinaries(GlobalLinkedBinaries), DeviceArch(DeviceArch),
         CGOption(CGConfig.codeGenOption()), DumpIR(DumpIR),
         RelinkGlobalsByCopy(RelinkGlobalsByCopy),
-        BlocksPerExecUnit(
-            CGConfig.blocksPerExecUnit(BlockDim.x * BlockDim.y * BlockDim.z)),
+        MinBlocksPerSM(
+            CGConfig.minBlocksPerSM(BlockDim.x * BlockDim.y * BlockDim.z)),
         SpecializeArgs(CGConfig.specializeArgs()),
         SpecializeDims(CGConfig.specializeDims()),
         SpecializeDimsAssume(CGConfig.specializeDimsAssume()),
@@ -151,7 +151,7 @@ public:
     proteus::specializeIR(*M, KernelName, Suffix, BlockDim, GridDim, RCVec,
                           LambdaCalleeInfo, SpecializeArgs, SpecializeDims,
                           SpecializeDimsAssume, SpecializeLaunchBounds,
-                          BlocksPerExecUnit);
+                          MinBlocksPerSM);
 
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".specialized.ll", *M));
 

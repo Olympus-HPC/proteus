@@ -42,10 +42,10 @@ int main() {
 
 // clang-format off
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kerneli ArgNo 0 with value i32 42
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK: Kernel one; arg = 42
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z9kernelTwoi ArgNo 0 with value i32 24
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK: Kernel two; arg = 24
 // CHECK: JitCache hits 0 total 2
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0

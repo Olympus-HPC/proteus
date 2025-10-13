@@ -57,30 +57,30 @@ int main() {
 
 // clang-format off
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kernelIiEvT_ ArgNo 0 with value i32 1
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kernelIlEvT_ ArgNo 0 with value i64 1
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kernelIjEvT_ ArgNo 0 with value i32 1
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kernelImEvT_ ArgNo 0 with value i64 1
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kernelIxEvT_ ArgNo 0 with value i64 1
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kernelIyEvT_ ArgNo 0 with value i64 1
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kernelIfEvT_ ArgNo 0 with value float 1.000000e+00
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kernelIdEvT_ ArgNo 0 with value double 1.000000e+00
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // HIP sees long double, CUDA sees double, thus the regex.
 // CHECK-FIRST: [ArgSpec] Replaced Function {{_Z6kernelI[ed]EvT_}} ArgNo 0 with value double 2.000000e+00
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kernelIbEvT_ ArgNo 0 with value i1 true
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kernelIcEvT_ ArgNo 0 with value i8 97
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kernelIhEvT_ ArgNo 0 with value i8 97
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK-FIRST: JitCache hits 0 total 12
 // CHECK-COUNT-12: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-SECOND: JitStorageCache hits 12 total 12

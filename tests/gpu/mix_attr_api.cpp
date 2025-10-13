@@ -39,12 +39,12 @@ int main() {
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z10kernelAttrifd ArgNo 0 with value i32 1
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z10kernelAttrifd ArgNo 1 with value float 2.000000e+00
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z10kernelAttrifd ArgNo 2 with value double 3.000000e+00
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK: Kernel Attr 1 2.000000 3.000000
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z9kernelAPIifd ArgNo 0 with value i32 1
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z9kernelAPIifd ArgNo 1 with value float 2.000000e+00
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z9kernelAPIifd ArgNo 2 with value double 3.000000e+00
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK: Kernel API 1 2.000000 3.000000
 // CHECK: JitCache hits 0 total 2
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0

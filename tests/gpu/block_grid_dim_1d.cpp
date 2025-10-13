@@ -51,7 +51,7 @@ int main() {
 // CHECK-FIRST: [DimSpec]
 // CHECK-FIRST: [DimSpec]
 // CHECK-FIRST: [DimSpec]
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 64 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 64 MinBlocksPerSM 0
 // CHECK: ThreadId: (63 0 0) BlockID: (0 0 0) BlockDim: (64 1 1) GridDim: (1 1 1)
 // CHECK-FIRST: [DimSpec] Replace call to {{_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__XcvjEv|_ZL20__hip_get_grid_dim_xv|llvm.nvvm.read.ptx.sreg.nctaid.x}} with constant i32 2
 // CHECK-FIRST: [DimSpec] Replace call to {{_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__YcvjEv|_ZL20__hip_get_grid_dim_yv|llvm.nvvm.read.ptx.sreg.nctaid.y}} with constant i32 1
@@ -65,7 +65,7 @@ int main() {
 // CHECK-FIRST: [DimSpec]
 // CHECK-FIRST: [DimSpec]
 // CHECK-FIRST: [DimSpec]
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 128 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 128 MinBlocksPerSM 0
 // CHECK: ThreadId: (127 0 0) BlockID: (1 0 0) BlockDim: (128 1 1) GridDim: (2 1 1)
 // CHECK-FIRST: [DimSpec] Replace call to {{_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__XcvjEv|_ZL20__hip_get_grid_dim_xv|llvm.nvvm.read.ptx.sreg.nctaid.x}} with constant i32 4
 // CHECK-FIRST: [DimSpec] Replace call to {{_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__YcvjEv|_ZL20__hip_get_grid_dim_yv|llvm.nvvm.read.ptx.sreg.nctaid.y}} with constant i32 1
@@ -79,7 +79,7 @@ int main() {
 // CHECK-FIRST: [DimSpec]
 // CHECK-FIRST: [DimSpec]
 // CHECK-FIRST: [DimSpec]
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 256 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 256 MinBlocksPerSM 0
 // CHECK: ThreadId: (255 0 0) BlockID: (3 0 0) BlockDim: (256 1 1) GridDim: (4 1 1)
 // CHECK-FIRST: [DimSpec] Replace call to {{_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__XcvjEv|_ZL20__hip_get_grid_dim_xv|llvm.nvvm.read.ptx.sreg.nctaid.x}} with constant i32 8
 // CHECK-FIRST: [DimSpec] Replace call to {{_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__YcvjEv|_ZL20__hip_get_grid_dim_yv|llvm.nvvm.read.ptx.sreg.nctaid.y}} with constant i32 1
@@ -93,7 +93,7 @@ int main() {
 // CHECK-FIRST: [DimSpec]
 // CHECK-FIRST: [DimSpec]
 // CHECK-FIRST: [DimSpec]
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 512 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 512 MinBlocksPerSM 0
 // CHECK: ThreadId: (511 0 0) BlockID: (7 0 0) BlockDim: (512 1 1) GridDim: (8 1 1)
 // CHECK-FIRST: [DimSpec] Replace call to {{_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__XcvjEv|_ZL20__hip_get_grid_dim_xv|llvm.nvvm.read.ptx.sreg.nctaid.x}} with constant i32 16
 // CHECK-FIRST: [DimSpec] Replace call to {{_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__YcvjEv|_ZL20__hip_get_grid_dim_yv|llvm.nvvm.read.ptx.sreg.nctaid.y}} with constant i32 1
@@ -107,7 +107,7 @@ int main() {
 // CHECK-FIRST: [DimSpec]
 // CHECK-FIRST: [DimSpec]
 // CHECK-FIRST: [DimSpec]
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1024 BlocksPerEU 0
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1024 MinBlocksPerSM 0
 // CHECK: ThreadId: (1023 0 0) BlockID: (15 0 0) BlockDim: (1024 1 1) GridDim: (16 1 1)
 // CHECK-COUNT-5: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: JitStorageCache hits 0 total 5
