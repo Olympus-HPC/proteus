@@ -28,17 +28,17 @@ auto createJitKernel(size_t N) {
 
   // Add a kernel with the signature: void add_vectors(double *A, double *B)
   // using vector_size N as a runtime constant.
-  auto KernelHandle = J->addKernel<void(double *, double *)>("add_vectors");
+  auto KernelHandle = J->addKernelTT<void(double *, double *)>("add_vectors");
   auto &F = KernelHandle.F;
 
   // Begin the function body.
   F.beginFunction();
   {
     // Declare local variables and argument getters.
-    auto &I = F.declVar<size_t>("I");
-    auto &Inc = F.declVar<size_t>("Inc");
-    auto [A, B] = F.getArgs();
-    auto &RunConstN = F.defRuntimeConst(N);
+    auto I = F.declVarTT<size_t>("I");
+    auto Inc = F.declVarTT<size_t>("Inc");
+    auto [A, B] = F.getArgsTT();
+    auto [RunConstN] = F.defRuntimeConstsTT(N);
 
     // Compute the global thread index.
     I = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +
@@ -48,9 +48,9 @@ auto createJitKernel(size_t N) {
     Inc = F.callBuiltin(getGridDimX) * F.callBuiltin(getBlockDimX);
 
     // Strided loop: each thread processes multiple elements.
-    F.beginFor(I, I, RunConstN, Inc);
+    F.beginForTT(I, I, RunConstN, Inc);
     { A[I] = A[I] + B[I]; }
-    F.endFor();
+    F.endForTT();
 
     F.ret();
   }
