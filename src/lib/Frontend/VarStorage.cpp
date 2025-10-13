@@ -11,6 +11,10 @@ Value *ScalarStorage::getValue() const {
   return Slot;
 }
 
+Value *ScalarStorage::getSlot() const {
+  return Slot;
+}
+
 void ScalarStorage::storeValue(Value *Val) {
   IRB.CreateStore(Val, Slot);
 }
@@ -34,11 +38,20 @@ Value *PointerStorage::getValue() const {
   return IRB.CreateLoad(PtrSlot->getAllocatedType(), PtrSlot);
 }
 
+Value *PointerStorage::getSlot() const {
+  return PtrSlot;
+}
+
 void PointerStorage::storeValue(Value *Val) {
   // Load the pointer, then store the value to that address
   Value *Ptr = IRB.CreateLoad(PtrSlot->getAllocatedType(), PtrSlot);
   IRB.CreateStore(Val, Ptr);
 }
+
+void PointerStorage::storePointer(Value *Ptr) {
+  IRB.CreateStore(Ptr, PtrSlot);
+}
+
 
 Type *PointerStorage::getAllocatedType() const {
   return PtrSlot->getAllocatedType();
@@ -48,7 +61,15 @@ Type *PointerStorage::getValueType() const {
   return PointerElemTy;
 }
 
+Value *PointerStorage::getPointerValue() const {
+  return IRB.CreateLoad(PtrSlot->getAllocatedType(), PtrSlot);
+}
+
 Value *ArrayStorage::getValue() const {
+  return BasePointer;
+}
+
+Value *ArrayStorage::getSlot() const {
   return BasePointer;
 }
 
