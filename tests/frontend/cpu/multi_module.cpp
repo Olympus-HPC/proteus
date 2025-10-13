@@ -18,10 +18,10 @@ auto createJitModule1() {
   {
     F1.beginFunction();
     {
-      auto [V] = F1.getArgs();
-      V = 42;
+      auto [V] = F1.getArgsTT();
+      *V = 42;
 
-      F1.ret();
+      F1.retTT();
     }
     F1.endFunction();
   }
@@ -31,10 +31,10 @@ auto createJitModule1() {
 
     F2.beginFunction();
     {
-      auto [V] = F2.getArgs();
-      V = 23;
+      auto [V] = F2.getArgsTT();
+      *V = 23;
 
-      F2.ret();
+      F2.retTT();
     }
     F2.endFunction();
   }
@@ -49,10 +49,10 @@ auto createJitModule2() {
   {
     F1.beginFunction();
     {
-      auto [V] = F1.getArgs();
-      V = 142;
+      auto [V] = F1.getArgsTT();
+      *V = 142;
 
-      F1.ret();
+      F1.retTT();
     }
     F1.endFunction();
   }
@@ -61,10 +61,10 @@ auto createJitModule2() {
   {
     F2.beginFunction();
     {
-      auto [V] = F2.getArgs();
-      V = 123;
+      auto [V] = F2.getArgsTT();
+      *V = 123;
 
-      F2.ret();
+      F2.retTT();
     }
     F2.endFunction();
   }

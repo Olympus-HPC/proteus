@@ -15,18 +15,17 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int Tile) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
   auto &F = JitMod->addFunction<void(double *)>("loopnest_3d_uniformtile");
 
-  auto &I = F.declVar<int>("i");
-  auto &J = F.declVar<int>("j");
-  auto &K = F.declVar<int>("k");
-  auto &IncOne = F.declVar<int>("inc");
-  auto &UBI = F.declVar<int>("ubi");
-  auto &UBJ = F.declVar<int>("ubj");
-  auto &UBK = F.declVar<int>("ubk");
+  auto I = F.declVarTT<int>("i");
+  auto J = F.declVarTT<int>("j");
+  auto K = F.declVarTT<int>("k");
+  auto IncOne = F.declVarTT<int>("inc");
+  auto UBI = F.declVarTT<int>("ubi");
+  auto UBJ = F.declVarTT<int>("ubj");
+  auto UBK = F.declVarTT<int>("ubk");
 
   F.beginFunction();
   {
-    auto Args = F.getArgs();
-    auto &A = std::get<0>(Args);
+    auto &A = F.getArgTT<0>();
 
     I = 0;
     J = 0;
@@ -35,20 +34,20 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int Tile) {
     UBJ = DJ;
     UBK = DK;
     IncOne = 1;
-    auto &Zero = F.declVar<int>("zero");
+    auto Zero = F.declVarTT<int>("zero");
     Zero = 0;
 
     F.buildLoopNest(F.forLoop<int>({I, Zero, UBI, IncOne}),
                     F.forLoop<int>({J, Zero, UBJ, IncOne}),
                     F.forLoop<int>({K, Zero, UBK, IncOne},
                               [&]() {
-                                auto &Idx = I * DJ * DK + J * DK + K;
+                                auto Idx = I * DJ * DK + J * DK + K;
                                 A[Idx] = I * 10000 + J * 100 + K;
                               }))
         .tile(Tile)
         .emit();
 
-    F.ret();
+    F.retTT();
   }
   F.endFunction();
 

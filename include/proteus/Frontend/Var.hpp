@@ -4,6 +4,7 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
 #include <type_traits>
+#include "proteus/Frontend/VarStorage.hpp"
 
 namespace proteus {
 
@@ -15,11 +16,6 @@ enum class VarKind { Invalid, Scalar, Pointer, Array };
 
 template <typename T> struct VarT {};
 
-
-
-class VarStorage;
-class PointerStorage;
-class ArrayStorage;
 
 struct Var {
   AllocaInst *Alloca;
@@ -244,21 +240,28 @@ struct VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> {
   // Use opaque VarStorage to allow array/pointer
   // operator[] to return a Scalar Var that
   // points to the correct element.
-  std::unique_ptr<VarStorage> Storage;
+  std::unique_ptr<VarStorage> Storage = nullptr;
   VarTT(std::unique_ptr<VarStorage> Storage, FuncBase &Fn)
     : Fn(Fn), Storage(std::move(Storage)) {
   }
 
-  // Conversion constructor
-  // TODO: Add an is_convertible check.
+  // // Conversion constructor
+  // // TODO: Add an is_convertible check.
   template<typename U>
-  VarTT(VarTT<U> &Var)
-    : Fn(Var.Fn) {
-      *this = Var;
+  VarTT(const VarTT<U> &Var);
+
+  VarTT(const VarTT &Var) 
+  : Fn(Var.Fn) { 
+    Storage = Var.Storage->clone();
   }
+
   
-  VarTT(VarTT &&) = default;
-  VarTT &operator=(VarTT &&) = default;
+  VarTT(VarTT &&Var) 
+  : Fn(Var.Fn) {
+    std::swap(Storage, Var.Storage);
+  }
+
+  VarTT &operator=(VarTT &&Var);
   
   // Assignment operators
   VarTT &operator=(const VarTT &Var);
@@ -387,7 +390,7 @@ struct VarTT<T, std::enable_if_t<std::is_array_v<T>>> {
   using ValueType = T;
   using ElemType = std::remove_extent_t<T>;
   FuncBase &Fn;
-  std::unique_ptr<ArrayStorage> Storage;
+  std::unique_ptr<ArrayStorage> Storage = nullptr;
 
   VarTT(std::unique_ptr<ArrayStorage> Storage, FuncBase &Fn)
     : Fn(Fn), Storage(std::move(Storage)) {}
@@ -405,7 +408,7 @@ struct VarTT<T, std::enable_if_t<std::is_pointer_v<T>>> {
   using ValueType = T;
   using ElemType = std::remove_pointer_t<T>;
   FuncBase &Fn;
-  std::unique_ptr<PointerStorage> Storage;
+  std::unique_ptr<PointerStorage> Storage = nullptr;
 
   VarTT(std::unique_ptr<PointerStorage> Storage, FuncBase &Fn)
     : Fn(Fn), Storage(std::move(Storage)) {}

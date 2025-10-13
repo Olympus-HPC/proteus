@@ -29,18 +29,18 @@ int main() {
   // Add a kernel with the signature: void add_vectors(double *A, double *B,
   // size_t N)
   auto KernelHandle =
-      J.addKernel<void(double *, double *, size_t)>("add_vectors");
+      J.addKernelTT<void(double *, double *, size_t)>("add_vectors");
   auto &F = KernelHandle.F;
 
   // Begin the function body.
   F.beginFunction();
   {
     // Declare local variables and argument getters.
-    auto &I = F.declVar<size_t>("I");
-    auto &Inc = F.declVar<size_t>("Inc");
-    auto &A = F.getArg(0); // Pointer to vector A
-    auto &B = F.getArg(1); // Pointer to vector B
-    auto &N = F.getArg(2); // Vector size
+    auto I = F.declVarTT<size_t>("I");
+    auto Inc = F.declVarTT<size_t>("Inc");
+    auto &A = F.getArgTT<0>(); // Pointer to vector A
+    auto &B = F.getArgTT<1>(); // Pointer to vector B
+    auto &N = F.getArgTT<2>(); // Vector size
 
     // Compute the global thread index.
     I = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +
@@ -50,9 +50,9 @@ int main() {
     Inc = F.callBuiltin(getGridDimX) * F.callBuiltin(getBlockDimX);
 
     // Strided loop: each thread processes multiple elements.
-    F.beginFor(I, I, N, Inc);
+    F.beginForTT(I, I, N, Inc);
     { A[I] = A[I] + B[I]; }
-    F.endFor();
+    F.endForTT();
 
     F.ret();
   }

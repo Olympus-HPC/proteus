@@ -22,6 +22,7 @@ public:
   virtual void storeValue(Value *Val) = 0;
   virtual Type *getAllocatedType() const = 0;
   virtual Type *getValueType() const = 0;
+  virtual std::unique_ptr<VarStorage> clone() const = 0;
 
 };
 
@@ -31,6 +32,9 @@ class ScalarStorage : public VarStorage {
 
   public:
   ScalarStorage(AllocaInst *Slot, IRBuilderBase &IRB) : VarStorage(IRB), Slot(Slot) {}
+  std::unique_ptr<VarStorage> clone() const override {
+    return std::make_unique<ScalarStorage>(Slot, IRB);
+  }
 
   Value *getSlot() const override;
   Value *getValue() const override;
@@ -48,6 +52,9 @@ class PointerStorage : public VarStorage {
   public:
   PointerStorage(AllocaInst *PtrSlot, IRBuilderBase &IRB, Type *PointerElemTy) : VarStorage(IRB), PtrSlot(PtrSlot), PointerElemTy(PointerElemTy) {}
   PointerStorage(Value *PtrSlot, IRBuilderBase &IRB, Type *PointerElemTy) : VarStorage(IRB), PtrSlot(dyn_cast<AllocaInst>(PtrSlot)), PointerElemTy(PointerElemTy) {}
+  std::unique_ptr<VarStorage> clone() const override {
+    return std::make_unique<PointerStorage>(PtrSlot, IRB, PointerElemTy);
+  }
 
   Value *getValue() const override;
   Value *getSlot() const override;
@@ -66,7 +73,9 @@ class ArrayStorage : public VarStorage {
 
   public:
   ArrayStorage(Value *BasePointer, IRBuilderBase &IRB, ArrayType *ArrayTy) : VarStorage(IRB), BasePointer(BasePointer), ArrayTy(ArrayTy) {}
-
+  std::unique_ptr<VarStorage> clone() const override {
+    return std::make_unique<ArrayStorage>(BasePointer, IRB, ArrayTy);
+  }
   Value *getValue() const override;
   Value *getSlot() const override;
   Value *loadValue() const override;

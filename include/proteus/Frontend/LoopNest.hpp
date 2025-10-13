@@ -11,13 +11,13 @@ namespace proteus {
 
 template <typename T> class LoopBoundInfo {
 public:
-  VarTT<T> &IterVar;
-  VarTT<T> &Init;
-  VarTT<T> &UpperBound;
-  VarTT<T> &Inc;
+  VarTT<T> IterVar;
+  VarTT<T> Init;
+  VarTT<T> UpperBound;
+  VarTT<T> Inc;
 
-  LoopBoundInfo(VarTT<T> &IterVar, VarTT<T> &Init,
-                VarTT<T> &UpperBound, VarTT<T> &Inc)
+  LoopBoundInfo(const VarTT<T> &IterVar, const VarTT<T> &Init,
+                const VarTT<T> &UpperBound, const VarTT<T> &Inc)
       : IterVar(IterVar), Init(Init), UpperBound(UpperBound), Inc(Inc) {}
 };
 
@@ -60,9 +60,9 @@ private:
           if (Loop.TileSize.has_value()) {
             auto &Bounds = std::get<Is>(Loops).Bounds;
 
-            auto &TileIter =
+            auto TileIter =
                 Fn.declVarTT<T>("tile_iter_" + std::to_string(Is));
-            auto &TileStep =
+            auto TileStep =
                 Fn.declVarTT<T>("tile_step_" + std::to_string(Is));
 
             TileStep = Loop.TileSize.value();
@@ -95,7 +95,7 @@ private:
           auto &Loop = std::get<Is>(Loops);
           if (Loop.TileSize.has_value()) {
             auto &TiledBounds = *TiledLoopBounds[Is];
-            auto &EndCandidate = TiledBounds.IterVar + TiledBounds.Inc;
+            auto EndCandidate = TiledBounds.IterVar + TiledBounds.Inc;
             // Clamp to handle partial tiles.
             EndCandidate = min(EndCandidate, TiledBounds.UpperBound);
             Fn.beginForTT(Loop.Bounds.IterVar, TiledBounds.IterVar, EndCandidate,

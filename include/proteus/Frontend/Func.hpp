@@ -324,9 +324,11 @@ public:
 
   template <typename... LoopBuilders>
   auto buildLoopNest(LoopBuilders &&...Loops) {
-    using FirstBuilder = std::tuple_element_t<0, std::tuple<LoopBuilders...>>;
-    using T = typename FirstBuilder::LoopType;
-    return LoopNestBuilder<T, LoopBuilders...>(*this, std::forward<LoopBuilders>(Loops)...);
+    using FirstBuilder = std::remove_reference_t<
+        std::tuple_element_t<0, std::tuple<LoopBuilders...>>>;
+    using T = typename FirstBuilder::LoopIndexType;
+    return LoopNestBuilder<T, std::decay_t<LoopBuilders>...>(
+        *this, std::forward<LoopBuilders>(Loops)...);
   }
 
   void ret(std::optional<std::reference_wrapper<Var>> OptRet = std::nullopt);
@@ -640,11 +642,37 @@ VarTT<bool> cmpOpTT(const VarTT<T> &L, const VarTT<U> &R, IntOp IOp, FPOp FOp) {
 }
 
 template <typename T>
+template <typename U>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::VarTT(const VarTT<U> &Var)
+  : Fn(Var.Fn) {
+  // Allocate storage for the target type T.
+  Type *TargetTy = TypeMap<T>::get(Fn.getFunction()->getContext());
+  auto *Alloca = Fn.emitAlloca(TargetTy, "conv.var");
+  Storage = std::make_unique<ScalarStorage>(Alloca, Fn.getIRBuilder());
+  *this = Var;
+}
+
+template <typename T>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(const VarTT &Var) {
   auto &IRB = Fn.getIRBuilder();
   auto *Converted = convert(IRB, Var.Storage->loadValue(), Storage->getValueType());
   Storage->storeValue(Converted);
+  return *this;
+}
+
+template <typename T>
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
+VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(VarTT &&Var) {
+  if (this->Storage == nullptr) {
+    // If we don't have storage, steal it from the source.
+    Storage = std::move(Var.Storage);
+  } else {
+    // If we have storage, copy the value.
+    auto &IRB = Fn.getIRBuilder();
+    auto *Converted = convert(IRB, Var.Storage->loadValue(), Storage->getValueType());
+    Storage->storeValue(Converted);
+  }
   return *this;
 }
 
@@ -1306,9 +1334,9 @@ min(const VarTT<T> &L, const VarTT<T> &R) {
 
   VarTT<T> ResultVar = Fn.declVarTT<T>("min_res");
   ResultVar = R;
-  Fn.beginIf(L < R);
+  Fn.beginIfTT(L < R);
   { ResultVar = L; }
-  Fn.endIf();
+  Fn.endIfTT();
   return ResultVar;
 }
 

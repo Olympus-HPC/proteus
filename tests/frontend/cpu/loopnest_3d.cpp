@@ -15,17 +15,16 @@ static auto get3DLoopNestFunction(int DI, int DJ, int DK, int TileI, int TileJ,
   auto JitMod = std::make_unique<proteus::JitModule>("host");
   auto &F = JitMod->addFunction<void(double *, double *)>("loopnest_3d");
 
-  auto &I = F.declVar<int>("i");
-  auto &J = F.declVar<int>("j");
-  auto &K = F.declVar<int>("k");
-  auto &IncOne = F.declVar<int>("inc");
-  auto &UBI = F.declVar<int>("ubi");
-  auto &UBJ = F.declVar<int>("ubj");
-  auto &UBK = F.declVar<int>("ubk");
+  auto I = F.declVarTT<int>("i");
+  auto J = F.declVarTT<int>("j");
+  auto K = F.declVarTT<int>("k");
+  auto IncOne = F.declVarTT<int>("inc");
+  auto UBI = F.declVarTT<int>("ubi");
+  auto UBJ = F.declVarTT<int>("ubj");
+  auto UBK = F.declVarTT<int>("ubk");
 
-  auto Args = F.getArgs();
-  auto &A = std::get<0>(Args);
-  auto &B = std::get<1>(Args);
+  auto &A = F.getArgTT<0>();
+  auto &B = F.getArgTT<1>();
 
   F.beginFunction();
   {
@@ -36,16 +35,16 @@ static auto get3DLoopNestFunction(int DI, int DJ, int DK, int TileI, int TileJ,
     UBJ = DJ;
     UBK = DK;
     IncOne = 1;
-    auto &Zero = F.declVar<int>("zero");
+    auto Zero = F.declVarTT<int>("zero");
     Zero = 0;
-    auto &RowBias = F.defVar<int>(0, "row_bias");
+    auto RowBias = F.defVarTT<int>(0, "row_bias");
 
     F.buildLoopNest(
          F.forLoop<int>({I, Zero, UBI, IncOne}).tile(TileI),
          F.forLoop<int>({J, Zero, UBJ, IncOne}, [&]() { RowBias = J; }).tile(TileJ),
          F.forLoop<int>({K, Zero, UBK, IncOne},
                    [&]() {
-                     auto &Idx = I * DJ * DK + J * DK + K;
+                     auto Idx = I * DJ * DK + J * DK + K;
                      A[Idx] = B[Idx] + I + J + K + RowBias;
                    })
              .tile(TileK))
@@ -63,17 +62,16 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int TileSize) {
   auto &F =
       JitMod->addFunction<void(double *, double *)>("loopnest_3d_uniform");
 
-  auto &I = F.declVar<int>("i");
-  auto &J = F.declVar<int>("j");
-  auto &K = F.declVar<int>("k");
-  auto &IncOne = F.declVar<int>("inc");
-  auto &UBI = F.declVar<int>("ubi");
-  auto &UBJ = F.declVar<int>("ubj");
-  auto &UBK = F.declVar<int>("ubk");
+  auto I = F.declVarTT<int>("i");
+  auto J = F.declVarTT<int>("j");
+  auto K = F.declVarTT<int>("k");
+  auto IncOne = F.declVarTT<int>("inc");
+  auto UBI = F.declVarTT<int>("ubi");
+  auto UBJ = F.declVarTT<int>("ubj");
+  auto UBK = F.declVarTT<int>("ubk");
 
-  auto Args = F.getArgs();
-  auto &A = std::get<0>(Args);
-  auto &B = std::get<1>(Args);
+  auto &A = F.getArgTT<0>();
+  auto &B = F.getArgTT<1>();
 
   F.beginFunction();
   {
@@ -84,16 +82,16 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int TileSize) {
     UBJ = DJ;
     UBK = DK;
     IncOne = 1;
-    auto &Zero = F.declVar<int>("zero");
+    auto Zero = F.declVarTT<int>("zero");
     Zero = 0;
-    auto &RowBias = F.defVar<int>(0, "row_bias");
+    auto RowBias = F.defVarTT<int>(0, "row_bias");
 
     F.buildLoopNest(F.forLoop<int>({I, Zero, UBI, IncOne}).tile(TileSize),
                     F.forLoop<int>({J, Zero, UBJ, IncOne}, [&]() { RowBias = J; })
                         .tile(TileSize),
                     F.forLoop<int>({K, Zero, UBK, IncOne},
                               [&]() {
-                                auto &Idx = I * DJ * DK + J * DK + K;
+                                auto Idx = I * DJ * DK + J * DK + K;
                                 A[Idx] = B[Idx] + I + J + K + RowBias;
                               })
                         .tile(TileSize))
