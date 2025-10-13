@@ -51,19 +51,6 @@ private:
     return TypedFnRef;
   }
 
-  template <typename... ArgT>
-  KernelHandle<ArgT...> buildKernelFromArgsList(FunctionCallee FC,
-                                                ArgTypeList<ArgT...>) {
-    auto TypedFn = std::make_unique<Func<void, ArgT...>>(*this, FC, Dispatch);
-    Func<void, ArgT...> &TypedFnRef = *TypedFn;
-    std::unique_ptr<FuncBase> &Fn = Functions.emplace_back(std::move(TypedFn));
-
-    Fn->declArgs<ArgT...>();
-
-    setKernel(*Fn);
-    return KernelHandle<ArgT...>{TypedFnRef, *this};
-  }
-
     template <typename... ArgT>
     KernelHandle<ArgT...> buildKernelFromArgsListTT(FunctionCallee FC,
                                                 ArgTypeList<ArgT...>) {
@@ -299,60 +286,6 @@ public:
   void print() { Mod->print(outs(), nullptr); }
 };
 
-template <typename Sig>
-std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, Var &>
-FuncBase::call(StringRef Name) {
-  using RetT = typename FnSig<Sig>::RetT;
-  auto *F = getFunction();
-  LLVMContext &Ctx = F->getContext();
-
-  using RetT = typename FnSig<Sig>::RetT;
-  using ArgT = typename FnSig<Sig>::ArgsTList;
-  FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
-  auto *Call = IRB.CreateCall(Callee);
-  Var &Ret = declVarInternal("ret", TypeMap<RetT>::get(Ctx));
-  Ret.storeValue(Call);
-  return Ret;
-}
-
-template <typename Sig>
-std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
-FuncBase::call(StringRef Name) {
-  using RetT = typename FnSig<Sig>::RetT;
-
-  using RetT = typename FnSig<Sig>::RetT;
-  using ArgT = typename FnSig<Sig>::ArgsTList;
-  FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
-  IRB.CreateCall(Callee);
-}
-
-template <typename Sig, typename... ArgVars>
-std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, Var &>
-FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
-  auto *F = getFunction();
-  LLVMContext &Ctx = F->getContext();
-
-  using RetT = typename FnSig<Sig>::RetT;
-  using ArgT = typename FnSig<Sig>::ArgsTList;
-  FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
-  auto *Call = IRB.CreateCall(Callee, {ArgsVars.getValue()...});
-
-  Var &Ret = declVarInternal("ret", TypeMap<RetT>::get(Ctx));
-  Ret.storeValue(Call);
-  return Ret;
-}
-
-template <typename Sig, typename... ArgVars>
-std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
-FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
-  using RetT = typename FnSig<Sig>::RetT;
-  using ArgT = typename FnSig<Sig>::ArgsTList;
-
-  FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
-  IRB.CreateCall(Callee, {ArgsVars.getValue()...});
-}
-
-// VarTT versions of call
 template <typename Sig>
 std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, VarTT<typename FnSig<Sig>::RetT>>
 FuncBase::callTT(StringRef Name) {

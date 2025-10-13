@@ -47,7 +47,7 @@ int main() {
     F.callBuiltin(syncThreads);
     A[I] = S[WarpSize - 1 - Tid];
 
-    F.ret();
+    F.retTT();
   }
   F.endFunction();
 

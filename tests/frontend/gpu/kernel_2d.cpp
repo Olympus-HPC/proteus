@@ -58,7 +58,7 @@ int main() {
     }
     F.endIfTT();
 
-    F.ret();
+    F.retTT();
   }
   F.endFunction();
 

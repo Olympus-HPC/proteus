@@ -50,7 +50,7 @@ static auto get3DLoopNestFunction(int DI, int DJ, int DK, int TileI, int TileJ,
              .tile(TileK))
         .emit();
 
-    F.ret();
+    F.retTT();
   }
   F.endFunction();
 
@@ -97,7 +97,7 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int TileSize) {
                         .tile(TileSize))
         .emit();
 
-    F.ret();
+    F.retTT();
   }
   F.endFunction();
 

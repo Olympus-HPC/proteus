@@ -128,7 +128,7 @@ auto createJitModuleSpecial(unsigned int _numNodes) {
       F.endIfTT();
     }
     F.endIfTT();
-    F.ret();
+    F.retTT();
   }
   F.endFunction();
 

@@ -38,7 +38,7 @@ int main() {
     Fi1[0] = 9;
     FiRes[0] = min(*Fi0, *Fi1);
 
-    F.ret();
+    F.retTT();
   }
   F.endFunction();
 

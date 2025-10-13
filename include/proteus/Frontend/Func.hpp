@@ -44,10 +44,6 @@ protected:
   IRBuilder<> IRB;
   IRBuilderBase::InsertPoint IP;
 
-  std::deque<std::unique_ptr<Var>> Arguments;
-  std::deque<std::unique_ptr<Var>> Variables;
-  std::deque<std::unique_ptr<Var>> RuntimeConstants;
-
   std::string Name;
 
   enum class ScopeKind { FUNCTION, IF, FOR };
@@ -76,8 +72,6 @@ protected:
                           std::to_string(static_cast<int>(Kind)));
     }
   }
-
-  Var &emitAtomic(AtomicRMWInst::BinOp Op, Var &Addr, Var &Val);
 
   template <typename T>
   VarTT<T> emitAtomicTT(AtomicRMWInst::BinOp Op, const VarTT<T*> &Addr, 
@@ -117,51 +111,6 @@ public:
     }
   }
 
-  template <typename T> Var &declVar(StringRef Name = "var") {
-    static_assert(!std::is_array_v<T>, "Expected non-array type");
-
-    Function *F = getFunction();
-    return declVarInternal(Name, TypeMap<T>::get(F->getContext()));
-  }
-
-  template <typename T>
-  Var &declVar(size_t NElem, AddressSpace AS = AddressSpace::DEFAULT,
-               StringRef Name = "array_var") {
-    static_assert(std::is_array_v<T>, "Expected array type");
-
-    Function *F = getFunction();
-    auto *BasePointer =
-        emitArrayCreate(TypeMap<T>::get(F->getContext(), NElem), AS, Name);
-
-    auto *ArrTy = cast<ArrayType>(TypeMap<T>::get(F->getContext(), NElem));
-    auto &Ref = *Variables.emplace_back(
-        std::make_unique<ArrayVar>(BasePointer, *this, ArrTy));
-    return Ref;
-  }
-
-  template <typename T> Var &defVar(T Val, StringRef Name = "var") {
-    Function *F = getFunction();
-    Var &VarRef = declVarInternal(Name, TypeMap<T>::get(F->getContext()));
-    VarRef = Val;
-    return VarRef;
-  }
-
-  Var &defVar(const Var &Val, StringRef Name = "var") {
-    if (&Val.Fn != this)
-      PROTEUS_FATAL_ERROR("Variables should belong to the same function");
-    Var &VarRef = declVarInternal(Name, Val.getValueType());
-    VarRef = Val;
-    return VarRef;
-  }
-
-  template <typename T>
-  Var &defRuntimeConst(T Val, StringRef Name = "run.const.var") {
-    Function *F = getFunction();
-    Var &VarRef = declVarInternal(Name, TypeMap<T>::get(F->getContext()));
-    VarRef = Val;
-    return VarRef;
-  }
-
   template<typename T>
   VarTT<T> declVarTT(StringRef Name = "var") {
     static_assert(!std::is_array_v<T>, "Expected non-array type");
@@ -196,63 +145,14 @@ public:
     return std::make_tuple(defRuntimeConstTT(std::forward<ArgT>(Args))...);
   }
 
-  template <typename... ArgT> auto defRuntimeConsts(ArgT &&...Args) {
-    return std::tie(defRuntimeConst(std::forward<ArgT>(Args))...);
-  }
-
-  template <typename... Ts> void declArgs() {
-    Function *F = getFunction();
-    auto &EntryBB = F->getEntryBlock();
-    IP = IRBuilderBase::InsertPoint(&EntryBB, EntryBB.end());
-    IRB.restoreIP(IP);
-
-    (
-        [&]() {
-          // Determine if this argument is a pointer-like type.
-          auto &Ctx = F->getContext();
-          Type *ArgTy = TypeMap<Ts>::get(Ctx);
-          Type *PtrElemTy = TypeMap<Ts>::getPointerElemType(Ctx);
-
-          // Allocate a slot to hold the incoming argument value (pointer or
-          // scalar).
-          auto *Alloca =
-              emitAlloca(ArgTy, "arg." + std::to_string(Arguments.size()));
-
-          auto *Arg = F->getArg(Arguments.size());
-          IRB.CreateStore(Arg, Alloca);
-
-          if (PtrElemTy) {
-            // Pointer argument: create a PointerVar with the correct element
-            // type.
-            Arguments.emplace_back(
-                std::make_unique<PointerVar>(Alloca, *this, PtrElemTy));
-          } else {
-            // Scalar argument.
-            Arguments.emplace_back(std::make_unique<ScalarVar>(Alloca, *this));
-          }
-        }(),
-        ...);
-    IRB.ClearInsertionPoint();
-  }
-
-  Var &getArg(unsigned int ArgNo);
-
   void beginFunction(const char *File = __builtin_FILE(),
                      int Line = __builtin_LINE());
   void endFunction();
 
-  void beginIf(Var &CondVar, const char *File = __builtin_FILE(),
-               int Line = __builtin_LINE());
-  void endIf();
 
   void beginIfTT(const VarTT<bool> &CondVar, const char *File = __builtin_FILE(),
                  int Line = __builtin_LINE());
   void endIfTT();
-
-  void beginFor(Var &IterVar, Var &InitVar, Var &UpperBound, Var &IncVar,
-                const char *File = __builtin_FILE(),
-                int Line = __builtin_LINE());
-  void endFor();
 
   template<typename T>
   void beginForTT(VarTT<T> &IterVar, const VarTT<T> &InitVar, const VarTT<T> &UpperBound, const VarTT<T> &IncVar,
@@ -260,23 +160,6 @@ public:
                   int Line = __builtin_LINE());
   void endForTT();
 
-  template <typename Sig>
-  std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, Var &>
-  call(StringRef Name);
-
-  template <typename Sig>
-  std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
-  call(StringRef Name);
-
-  template <typename Sig, typename... ArgVars>
-  std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, Var &>
-  call(StringRef Name, ArgVars &&...ArgsVars);
-
-  template <typename Sig, typename... ArgVars>
-  std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
-  call(StringRef Name, ArgVars &&...ArgsVars);
-
-  // VarTT versions of call
   template <typename Sig>
   std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, VarTT<typename FnSig<Sig>::RetT>>
   callTT(StringRef Name);
@@ -303,11 +186,6 @@ public:
     }
   }
 
-  Var &atomicAdd(Var &Addr, Var &Val);
-  Var &atomicSub(Var &Addr, Var &Val);
-  Var &atomicMax(Var &Addr, Var &Val);
-  Var &atomicMin(Var &Addr, Var &Val);
-
   template <typename T>
   std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>> atomicAdd(const VarTT<T*> &Addr, const VarTT<T>& Val);
   template <typename T>
@@ -331,8 +209,6 @@ public:
         *this, std::forward<LoopBuilders>(Loops)...);
   }
 
-  void ret(std::optional<std::reference_wrapper<Var>> OptRet = std::nullopt);
-
   template <typename T>
   void retTT(const VarTT<T> &RetVal);
   
@@ -346,18 +222,7 @@ public:
     F->setName(Name);
   }
 
-  // Convert the given Var's value to type T and return a new Var holding
-  // the converted value.
-  template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var &> convert(Var &V) {
-    auto &Ctx = getFunction()->getContext();
-    auto &IRBRef = getIRBuilder();
-    Type *TargetTy = TypeMap<T>::get(Ctx);
-    Var &Res = declVarInternal("convert.", TargetTy);
-    Value *Converted = proteus::convert(IRBRef, V.getValue(), TargetTy);
-    Res.storeValue(Converted);
-    return Res;
-  }
+
 
   // Convert the given Var's value to type U and return a new Var holding
   // the converted value.
@@ -381,19 +246,13 @@ private:
   std::tuple<std::optional<VarTT<ArgT>>...> ArgumentsTT;
 
 private:
-  template <std::size_t... Is> auto getArgsImpl(std::index_sequence<Is...>) {
-    return std::tie(getArg(Is)...);
-  }
-
   template <typename T, std::size_t ArgIdx>
   VarTT<T> createArgTT() {
     Function *F = getFunction();
     auto &Ctx = F->getContext();
     
-    // Get the LLVM type for this argument
     Type *ArgTy = TypeMap<T>::get(Ctx);
     
-    // Create alloca to hold the incoming argument value
     auto *Alloca = emitAlloca(ArgTy, "arg." + std::to_string(ArgIdx));
     
     // Store the function argument into the alloca
@@ -402,11 +261,9 @@ private:
     
     // Create appropriate storage based on type
     if constexpr (std::is_pointer_v<T>) {
-      // Pointer type: use PointerStorage
       Type *PtrElemTy = TypeMap<T>::getPointerElemType(Ctx);
       return VarTT<T>(std::make_unique<PointerStorage>(Alloca, IRB, PtrElemTy), *this);
     } else {
-      // Scalar type: use ScalarStorage
       return VarTT<T>(std::make_unique<ScalarStorage>(Alloca, IRB), *this);
     }
   }
@@ -434,8 +291,6 @@ public:
 
   RetT operator()(ArgT... Args);
 
-  auto getArgs() { return getArgsImpl(std::index_sequence_for<ArgT...>{}); }
-  
   void declArgsTT() {
     declArgsTTImpl(std::index_sequence_for<ArgT...>{});
   }

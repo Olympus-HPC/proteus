@@ -68,7 +68,7 @@ int main() {
     { Arg11[0] = 1.0; }
     F.endIfTT();
 
-    F.ret();
+    F.retTT();
   }
   F.endFunction();
 

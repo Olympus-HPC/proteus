@@ -45,7 +45,7 @@ int main() {
     { OutGlobal[I] = Global[I]; }
     F.endForTT();
 
-    F.ret();
+    F.retTT();
   }
   F.endFunction();
 

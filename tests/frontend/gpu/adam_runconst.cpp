@@ -123,7 +123,7 @@ auto createJitModuleSpecial(float _b1, float _b2, float _eps, float _grad_scale,
       F.endForTT();
     }
     F.endForTT();
-    F.ret();
+    F.retTT();
   }
   F.endFunction();
 

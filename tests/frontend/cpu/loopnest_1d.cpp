@@ -33,7 +33,7 @@ static auto get1DLoopNestFunction(int N, int TileSize) {
         .tile(TileSize)
         .emit();
 
-    F.ret();
+    F.retTT();
   }
   F.endFunction();
 
@@ -62,7 +62,7 @@ static auto get1DSimpleLoopNestFunction(int N) {
     // Test non-tiled version.
     F.forLoop<int>({I, Zero, UB, IncOne}, [&]() { A[I] = B[I] * 3.0; }).emit();
 
-    F.ret();
+    F.retTT();
   }
   F.endFunction();
 

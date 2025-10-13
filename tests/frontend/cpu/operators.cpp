@@ -50,10 +50,10 @@ int main() {
     Cmp = 5.0;
     F.beginIfTT(Cmp <= 5.0);
     { Arg13[0] = 1.0; }
-    F.endIf();
+    F.endIfTT();
 
 
-    F.ret();
+    F.retTT();
   }
   F.endFunction();
 

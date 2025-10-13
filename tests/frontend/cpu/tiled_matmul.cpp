@@ -45,7 +45,7 @@ static auto getTiledMatmulFunction(int N, int TileI, int TileJ, int TileK) {
                           .tile(TileK))
           .emit();
 
-      F.ret();
+      F.retTT();
     }
     F.endFunction();
   }
