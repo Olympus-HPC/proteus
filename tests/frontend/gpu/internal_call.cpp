@@ -34,7 +34,7 @@ auto createJitModule1() {
     {
       auto [V] = F.getArgsTT();
 
-      auto X = F.defVarTT<double>(21);
+      auto X = F.defVar<double>(21);
       auto C = F.callTT<double(void)>("f2");
       auto Res = F.callTT<double(double, double)>("f3", X, C);
       V[0] = Res;
@@ -48,7 +48,7 @@ auto createJitModule1() {
     auto &F = J->addFunction<double(void)>("f2");
     F.beginFunction();
     {
-      auto C = F.defVarTT<double>(2.0);
+      auto C = F.defVar<double>(2.0);
       F.ret(C);
     }
     F.endFunction();
@@ -59,7 +59,7 @@ auto createJitModule1() {
     F.beginFunction();
     {
       auto [X, C] = F.getArgsTT();
-      auto P = F.declVarTT<double>();
+      auto P = F.declVar<double>();
       P = X * C;
       F.ret(P);
     }

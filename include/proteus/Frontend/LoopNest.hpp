@@ -61,9 +61,9 @@ private:
             auto &Bounds = std::get<Is>(Loops).Bounds;
 
             auto TileIter =
-                Fn.declVarTT<T>("tile_iter_" + std::to_string(Is));
+                Fn.declVar<T>("tile_iter_" + std::to_string(Is));
             auto TileStep =
-                Fn.declVarTT<T>("tile_step_" + std::to_string(Is));
+                Fn.declVar<T>("tile_step_" + std::to_string(Is));
 
             TileStep = Loop.TileSize.value();
             TiledLoopBounds[Is] = std::make_unique<LoopBoundInfo<T>>(

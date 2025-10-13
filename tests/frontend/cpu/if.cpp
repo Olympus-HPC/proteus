@@ -22,7 +22,7 @@ int main() {
 
     LT.beginFunction();
     {
-      auto Ret = LT.declVarTT<double>("ret");
+      auto Ret = LT.declVar<double>("ret");
       Ret = 0;
       LT.beginIfTT(Arg0 < Arg1);
       { Ret = 1; }
@@ -39,7 +39,7 @@ int main() {
 
     LE.beginFunction();
     {
-      auto Ret = LE.declVarTT<double>("ret");
+      auto Ret = LE.declVar<double>("ret");
       Ret = 0;
       LE.beginIfTT(Arg0 <= Arg1);
       { Ret = 1; }
@@ -56,7 +56,7 @@ int main() {
 
     GT.beginFunction();
     {
-      auto Ret = GT.declVarTT<double>("ret");
+      auto Ret = GT.declVar<double>("ret");
       Ret = 0;
       GT.beginIfTT(Arg0 > Arg1);
       { Ret = 1; }
@@ -73,7 +73,7 @@ int main() {
 
     GE.beginFunction();
     {
-      auto Ret = GE.declVarTT<double>("ret");
+      auto Ret = GE.declVar<double>("ret");
       Ret = 0;
       GE.beginIfTT(Arg0 >= Arg1);
       { Ret = 1; }
@@ -90,7 +90,7 @@ int main() {
 
     EQ.beginFunction();
     {
-      auto Ret = EQ.declVarTT<double>("ret");
+      auto Ret = EQ.declVar<double>("ret");
       Ret = 0;
       EQ.beginIfTT(Arg0 == Arg1);
       { Ret = 1; }
@@ -107,7 +107,7 @@ int main() {
 
     NE.beginFunction();
     {
-      auto Ret = NE.declVarTT<double>("ret");
+      auto Ret = NE.declVar<double>("ret");
       Ret = 0;
       NE.beginIfTT(Arg0 != Arg1);
       { Ret = 1; }

@@ -71,11 +71,11 @@ auto createJitModule() {
   auto [p, m, v, g, b1, b2, eps, grad_scale, step_size, time_step, vector_size,
         mode, decay] = F.getArgsTT();
 
-  auto i = F.declVarTT<size_t>("i");
-  auto totThreads = F.declVarTT<size_t>("totThreads");
-  auto j = F.declVarTT<size_t>("j");
-  auto t = F.declVarTT<int>("t");
-  auto inc1 = F.declVarTT<int>("inc1");
+  auto i = F.declVar<size_t>("i");
+  auto totThreads = F.declVar<size_t>("totThreads");
+  auto j = F.declVar<size_t>("j");
+  auto t = F.declVar<int>("t");
+  auto inc1 = F.declVar<int>("inc1");
   F.beginFunction();
   {
     i = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +
@@ -84,24 +84,24 @@ auto createJitModule() {
 
     F.beginForTT(j, i, vector_size, totThreads);
     {
-      auto lim = F.declVarTT<int>("lim");
+      auto lim = F.declVar<int>("lim");
       t = 1;
       inc1 = 1;
       lim = time_step + 1;
       F.beginForTT(t, t, lim, inc1);
       {
-        auto scaled_grad = F.declVarTT<float>("scale_grad");
+        auto scaled_grad = F.declVar<float>("scale_grad");
         scaled_grad = g[j] / grad_scale;
 
         m[j] = b1 * m[j] + (1.f - b1) * scaled_grad;
         v[j] = b2 * v[j] + (1.f - b2) * scaled_grad * scaled_grad;
 
-        auto m_corrected = F.declVarTT<float>("m_corrected");
-        auto v_corrected = F.declVarTT<float>("v_corrected");
+        auto m_corrected = F.declVar<float>("m_corrected");
+        auto v_corrected = F.declVar<float>("v_corrected");
         m_corrected = m[j] / (1.f - powf(b1, F.convertTT<float>(t)));
         v_corrected = v[j] / (1.f - powf(b2, F.convertTT<float>(t)));
 
-        auto denom = F.declVarTT<float>("denom");
+        auto denom = F.declVar<float>("denom");
         F.beginIfTT(mode == 0);
         { denom = sqrtf(v_corrected + eps); }
         F.endIfTT();
@@ -110,7 +110,7 @@ auto createJitModule() {
         { denom = sqrtf(v_corrected) + eps; }
         F.endIfTT();
 
-        auto update = F.declVarTT<float>("update");
+        auto update = F.declVar<float>("update");
         update = (m_corrected / denom) + (decay * p[j]);
 
         p[j] -= (step_size * update);

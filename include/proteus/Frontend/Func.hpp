@@ -95,7 +95,7 @@ public:
                        Type *PointerElemType = nullptr);
 
   template <typename T> 
-  VarTT<T> declVarTTInternal(StringRef Name = "var") {
+  VarTT<T> declVarInternal(StringRef Name = "var") {
     static_assert(!std::is_array_v<T>, "Expected non-array type");
     
     Function *F = getFunction();
@@ -112,13 +112,13 @@ public:
   }
 
   template<typename T>
-  VarTT<T> declVarTT(StringRef Name = "var") {
+  VarTT<T> declVar(StringRef Name = "var") {
     static_assert(!std::is_array_v<T>, "Expected non-array type");
-    return declVarTTInternal<T>(Name);
+    return declVarInternal<T>(Name);
   }
 
   template <typename T>
-  VarTT<T> declVarTT(size_t NElem, AddressSpace AS = AddressSpace::DEFAULT,
+  VarTT<T> declVar(size_t NElem, AddressSpace AS = AddressSpace::DEFAULT,
                      StringRef Name = "array_var") {
     static_assert(std::is_array_v<T>, "Expected array type");
     
@@ -130,15 +130,15 @@ public:
   }
 
   template <typename T>
-  VarTT<T> defVarTT(T Val, StringRef Name = "var") {
-    VarTT<T> Var = declVarTTInternal<T>(Name);
+  VarTT<T> defVar(T Val, StringRef Name = "var") {
+    VarTT<T> Var = declVarInternal<T>(Name);
     Var = Val;
     return Var;
   }
 
   template <typename T>
   VarTT<T> defRuntimeConstTT(T Val, StringRef Name = "run.const.var") {
-    return defVarTT<T>(Val, Name);
+    return defVar<T>(Val, Name);
   }
 
   template <typename... ArgT> auto defRuntimeConstsTT(ArgT &&...Args) {
@@ -231,7 +231,7 @@ public:
     auto &Ctx = getFunction()->getContext();
     auto &IRBRef = getIRBuilder();
     Type *TargetTy = TypeMap<U>::get(Ctx);
-    VarTT<U> Res = declVarTTInternal<U>("convert.");
+    VarTT<U> Res = declVarInternal<U>("convert.");
     Value *Converted = proteus::convert(IRBRef, V.Storage->loadValue(), TargetTy);
     Res.Storage->storeValue(Converted);
     return Res;
@@ -617,7 +617,7 @@ VarTT<std::common_type_t<T, U>>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>, "Can only add arithmetic types to VarTT");
-  VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "tmp.");
+  VarTT<U> Tmp = Fn.defVar<U>(ConstValue, "tmp.");
   return (*this) + Tmp;
 }
 
@@ -627,7 +627,7 @@ VarTT<std::common_type_t<T, U>>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>, "Can only subtract arithmetic types from VarTT");
-  VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "tmp.");
+  VarTT<U> Tmp = Fn.defVar<U>(ConstValue, "tmp.");
   return (*this) - Tmp;
 }
 
@@ -637,7 +637,7 @@ VarTT<std::common_type_t<T, U>>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>, "Can only multiply VarTT by arithmetic types");
-  VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "tmp.");
+  VarTT<U> Tmp = Fn.defVar<U>(ConstValue, "tmp.");
   return (*this) * Tmp;
 }
 
@@ -647,7 +647,7 @@ VarTT<std::common_type_t<T, U>>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>, "Can only divide VarTT by arithmetic types");
-  VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "tmp.");
+  VarTT<U> Tmp = Fn.defVar<U>(ConstValue, "tmp.");
   return (*this) / Tmp;
 }
 
@@ -657,7 +657,7 @@ VarTT<std::common_type_t<T, U>>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>, "Can only modulo VarTT by arithmetic types");
-  VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "tmp.");
+  VarTT<U> Tmp = Fn.defVar<U>(ConstValue, "tmp.");
   return (*this) % Tmp;
 }
 
@@ -950,7 +950,7 @@ template <typename T>
 template <typename U>
 std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator>(const U &ConstValue) const {
-  VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "cmp.");
+  VarTT<U> Tmp = Fn.defVar<U>(ConstValue, "cmp.");
   return (*this) > Tmp;
 }
 
@@ -958,7 +958,7 @@ template <typename T>
 template <typename U>
 std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator>=(const U &ConstValue) const {
-  VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "cmp.");
+  VarTT<U> Tmp = Fn.defVar<U>(ConstValue, "cmp.");
   return (*this) >= Tmp;
 }
 
@@ -966,7 +966,7 @@ template <typename T>
 template <typename U>
 std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator<(const U &ConstValue) const {
-  VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "cmp.");
+  VarTT<U> Tmp = Fn.defVar<U>(ConstValue, "cmp.");
   return (*this) < Tmp;
 }
 
@@ -974,7 +974,7 @@ template <typename T>
 template <typename U>
 std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator<=(const U &ConstValue) const {
-  auto Tmp = Fn.defVarTT<U>(ConstValue, "cmp.");
+  auto Tmp = Fn.defVar<U>(ConstValue, "cmp.");
   return (*this) <= Tmp;
 }
 
@@ -982,7 +982,7 @@ template <typename T>
 template <typename U>
 std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator==(const U &ConstValue) const {
-  VarTT<U> Tmp = Fn.defVarTT<U>(ConstValue, "cmp.");
+  VarTT<U> Tmp = Fn.defVar<U>(ConstValue, "cmp.");
   return (*this) == Tmp;
 }
 
@@ -990,7 +990,7 @@ template <typename T>
 template <typename U>
 std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator!=(const U &ConstValue) const {
-  auto Tmp = Fn.defVarTT<U>(ConstValue, "cmp.");
+  auto Tmp = Fn.defVar<U>(ConstValue, "cmp.");
   return (*this) != Tmp;
 }
 
@@ -999,7 +999,7 @@ template <typename T, typename U>
 std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>, 
                  VarTT<std::common_type_t<T, U>>>
 operator+(const T &ConstValue, const VarTT<U> &Var) {
-  VarTT<T> Tmp = Var.Fn.template defVarTT<T>(ConstValue, "tmp.");
+  VarTT<T> Tmp = Var.Fn.template defVar<T>(ConstValue, "tmp.");
   return Tmp + Var;
 }
 
@@ -1008,7 +1008,7 @@ std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>,
                  VarTT<std::common_type_t<T, U>>>
 operator-(const T &ConstValue, const VarTT<U> &Var) {
   using CommonType = std::common_type_t<T, U>;
-  VarTT<CommonType> Tmp = Var.Fn.template defVarTT<CommonType>(ConstValue, "tmp.");
+  VarTT<CommonType> Tmp = Var.Fn.template defVar<CommonType>(ConstValue, "tmp.");
   return Tmp - Var;
 }
 
@@ -1016,7 +1016,7 @@ template <typename T, typename U>
 std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>, 
                  VarTT<std::common_type_t<T, U>>>
 operator*(const T &ConstValue, const VarTT<U> &Var) {
-  VarTT<T> Tmp = Var.Fn.template defVarTT<T>(ConstValue, "tmp.");
+  VarTT<T> Tmp = Var.Fn.template defVar<T>(ConstValue, "tmp.");
   return Tmp * Var;
 }
 
@@ -1024,7 +1024,7 @@ template <typename T, typename U>
 std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>, 
                  VarTT<std::common_type_t<T, U>>>
 operator/(const T &ConstValue, const VarTT<U> &Var) {
-  VarTT<T> Tmp = Var.Fn.template defVarTT<T>(ConstValue, "tmp.");
+  VarTT<T> Tmp = Var.Fn.template defVar<T>(ConstValue, "tmp.");
   return Tmp / Var;
 }
 
@@ -1032,7 +1032,7 @@ template <typename T, typename U>
 std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>, 
                  VarTT<std::common_type_t<T, U>>>
 operator%(const T &ConstValue, const VarTT<U> &Var) {
-  VarTT<T> Tmp = Var.Fn.template defVarTT<T>(ConstValue, "tmp.");
+  VarTT<T> Tmp = Var.Fn.template defVar<T>(ConstValue, "tmp.");
   return Tmp % Var;
 }
 
@@ -1049,7 +1049,7 @@ VarTT<T> FuncBase::emitAtomicTT(AtomicRMWInst::BinOp Op, const VarTT<T*> &Addr,
       Op, Addr.Storage->getPointerValue(), Val.Storage->loadValue(), MaybeAlign(),
       AtomicOrdering::SequentiallyConsistent, SyncScope::SingleThread);
 
-  auto Ret = declVarTTInternal<T>("atomic.rmw.res.");
+  auto Ret = declVarInternal<T>("atomic.rmw.res.");
   Ret.Storage->storeValue(Result);
   return Ret;
 }
@@ -1149,7 +1149,7 @@ static VarTT<T> emitIntrinsic(StringRef IntrinsicName, Type *ResultType,
                                                 ((void)Ops, ResultType)...);
   Value *Call = IRB.CreateCall(Callee, {ConvertOperand(Ops)...});
 
-  auto ResultVar = Fn.template declVarTT<T>("res.");
+  auto ResultVar = Fn.template declVar<T>("res.");
   ResultVar.Storage->storeValue(Call);
   return ResultVar;
 }
@@ -1200,7 +1200,7 @@ min(const VarTT<T> &L, const VarTT<T> &R) {
   if (&Fn != &R.Fn)
     PROTEUS_FATAL_ERROR("Variables should belong to the same function");
 
-  VarTT<T> ResultVar = Fn.declVarTT<T>("min_res");
+  VarTT<T> ResultVar = Fn.declVar<T>("min_res");
   ResultVar = R;
   Fn.beginIfTT(L < R);
   { ResultVar = L; }

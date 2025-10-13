@@ -24,8 +24,8 @@ auto createJitFunction(size_t N) {
     // Pointers to vectors A, B in arguments.
     auto [A, B] = F.getArgsTT();
     // Declare local variables and argument getters.
-    auto I = F.defVarTT<size_t>(0, "I");
-    auto Inc = F.defVarTT<size_t>(1, "Inc");
+    auto I = F.defVar<size_t>(0, "I");
+    auto Inc = F.defVar<size_t>(1, "Inc");
     // Runtime constant vector size
     auto RunConstN = F.defRuntimeConstTT(N);
     // Element-wise addition over all vector elements.

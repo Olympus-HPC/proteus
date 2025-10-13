@@ -35,8 +35,8 @@ auto createJitKernel(size_t N) {
   F.beginFunction();
   {
     // Declare local variables and argument getters.
-    auto I = F.declVarTT<size_t>("I");
-    auto Inc = F.declVarTT<size_t>("Inc");
+    auto I = F.declVar<size_t>("I");
+    auto Inc = F.declVar<size_t>("Inc");
     auto [A, B] = F.getArgsTT();
     auto [RunConstN] = F.defRuntimeConstsTT(N);
 

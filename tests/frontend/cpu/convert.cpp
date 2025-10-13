@@ -28,9 +28,9 @@ int main() {
 
   F.beginFunction();
   {
-    auto Di = F.declVarTT<double>();
-    auto Ii = F.declVarTT<int>();
-    auto Fi = F.declVarTT<float>();
+    auto Di = F.declVar<double>();
+    auto Ii = F.declVar<int>();
+    auto Fi = F.declVar<float>();
 
     Di = 3.9;
     Ii = -7;

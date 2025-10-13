@@ -296,7 +296,7 @@ FuncBase::callTT(StringRef Name) {
   using ArgT = typename FnSig<Sig>::ArgsTList;
   FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
   auto *Call = IRB.CreateCall(Callee);
-  VarTT<RetT> Ret = declVarTTInternal<RetT>("ret");
+  VarTT<RetT> Ret = declVarInternal<RetT>("ret");
   Ret.Storage->storeValue(Call);
   return Ret;
 }
@@ -321,7 +321,7 @@ FuncBase::callTT(StringRef Name, ArgVars &&...ArgsVars) {
   FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
   auto *Call = IRB.CreateCall(Callee, {ArgsVars.Storage->loadValue()...});
 
-  VarTT<RetT> Ret = declVarTTInternal<RetT>("ret");
+  VarTT<RetT> Ret = declVarInternal<RetT>("ret");
   Ret.Storage->storeValue(Call);
   return Ret;
 }

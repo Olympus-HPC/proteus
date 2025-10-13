@@ -24,8 +24,8 @@ int main() {
   F.beginFunction();
   {
     F.callTT<void(void)>("hello");
-    auto V1 = F.defVarTT<int>(22);
-    auto V2 = F.defVarTT<int>(20);
+    auto V1 = F.defVar<int>(22);
+    auto V2 = F.defVar<int>(20);
     auto V3 = F.callTT<int(int, int)>("add", V1, V2);
     F.ret(V3);
   }

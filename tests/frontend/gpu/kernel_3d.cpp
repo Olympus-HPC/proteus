@@ -32,9 +32,9 @@ int main() {
 
   F.beginFunction();
   {
-    auto I = F.declVarTT<size_t>("i");
-    auto JVar = F.declVarTT<size_t>("j");
-    auto K = F.declVarTT<size_t>("k");
+    auto I = F.declVar<size_t>("i");
+    auto JVar = F.declVar<size_t>("j");
+    auto K = F.declVar<size_t>("k");
     auto &A = F.getArg<0>();
     auto &B = F.getArg<1>();
     auto &C = F.getArg<2>();
@@ -55,10 +55,10 @@ int main() {
       {
         F.beginIfTT(K < Z);
         {
-          auto XY = F.declVarTT<size_t>("xy");
-          auto KXY = F.declVarTT<size_t>("kxy");
-          auto JX = F.declVarTT<size_t>("jx");
-          auto Idx = F.declVarTT<size_t>("idx");
+          auto XY = F.declVar<size_t>("xy");
+          auto KXY = F.declVar<size_t>("kxy");
+          auto JX = F.declVar<size_t>("jx");
+          auto Idx = F.declVar<size_t>("idx");
 
           XY = X * Y;
           KXY = K * XY;

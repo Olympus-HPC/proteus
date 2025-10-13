@@ -33,8 +33,8 @@ int main() {
 
   F.beginFunction();
   {
-    auto Row = F.declVarTT<size_t>("row");
-    auto Col = F.declVarTT<size_t>("col");
+    auto Row = F.declVar<size_t>("row");
+    auto Col = F.declVar<size_t>("col");
     auto &A = F.getArg<0>();
     auto &B = F.getArg<1>();
     auto &C = F.getArg<2>();
@@ -50,7 +50,7 @@ int main() {
     {
       F.beginIfTT(Col < N);
       {
-        auto Idx = F.declVarTT<size_t>("idx");
+        auto Idx = F.declVar<size_t>("idx");
         Idx = Row * N + Col;
         C[Idx] = A[Idx] + B[Idx];
       }

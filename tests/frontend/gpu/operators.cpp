@@ -61,7 +61,7 @@ int main() {
     Arg10[0] = 10.0;
     Arg10[0] -= 3.0;
 
-    auto Cmp = F.declVarTT<double>("cmp");
+    auto Cmp = F.declVar<double>("cmp");
     Cmp = 5.0;
     Arg11[0] = 0.0;
     F.beginIfTT(Cmp <= 5.0);

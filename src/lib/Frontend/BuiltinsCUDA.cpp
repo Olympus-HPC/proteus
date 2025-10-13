@@ -9,7 +9,7 @@ VarTT<int> getThreadIdX(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  VarTT<int> Ret = Fn.declVarTTInternal<int>("threadIdx.x");
+  VarTT<int> Ret = Fn.declVarInternal<int>("threadIdx.x");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.nvvm.read.ptx.sreg.tid.x",
@@ -24,7 +24,7 @@ VarTT<int> getBlockIdX(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  VarTT<int> Ret = Fn.declVarTTInternal<int>("blockIdx.x");
+  VarTT<int> Ret = Fn.declVarInternal<int>("blockIdx.x");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
@@ -39,7 +39,7 @@ VarTT<int> getBlockDimX(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  VarTT<int> Ret = Fn.declVarTTInternal<int>("blockDim.x");
+  VarTT<int> Ret = Fn.declVarInternal<int>("blockDim.x");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
@@ -54,7 +54,7 @@ VarTT<int> getGridDimX(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  VarTT<int> Ret = Fn.declVarTTInternal<int>("gridDim.x");
+  VarTT<int> Ret = Fn.declVarInternal<int>("gridDim.x");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
@@ -69,7 +69,7 @@ VarTT<int> getThreadIdY(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  VarTT<int> Ret = Fn.declVarTTInternal<int>("threadIdx.y");
+  VarTT<int> Ret = Fn.declVarInternal<int>("threadIdx.y");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.nvvm.read.ptx.sreg.tid.y",
@@ -84,7 +84,7 @@ VarTT<int> getThreadIdZ(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  VarTT<int> Ret = Fn.declVarTTInternal<int>("threadIdx.z");
+  VarTT<int> Ret = Fn.declVarInternal<int>("threadIdx.z");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.nvvm.read.ptx.sreg.tid.z",
@@ -99,7 +99,7 @@ VarTT<int> getBlockIdY(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  VarTT<int> Ret = Fn.declVarTTInternal<int>("blockIdx.y");
+  VarTT<int> Ret = Fn.declVarInternal<int>("blockIdx.y");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
@@ -114,7 +114,7 @@ VarTT<int> getBlockIdZ(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  VarTT<int> Ret = Fn.declVarTTInternal<int>("blockIdx.z");
+  VarTT<int> Ret = Fn.declVarInternal<int>("blockIdx.z");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
@@ -129,7 +129,7 @@ VarTT<int> getBlockDimY(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  VarTT<int> Ret = Fn.declVarTTInternal<int>("blockDim.y");
+  VarTT<int> Ret = Fn.declVarInternal<int>("blockDim.y");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
@@ -144,7 +144,7 @@ VarTT<int> getBlockDimZ(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  VarTT<int> Ret = Fn.declVarTTInternal<int>("blockDim.z");
+  VarTT<int> Ret = Fn.declVarInternal<int>("blockDim.z");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
@@ -159,7 +159,7 @@ VarTT<int> getGridDimY(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  VarTT<int> Ret = Fn.declVarTTInternal<int>("gridDim.y");
+  VarTT<int> Ret = Fn.declVarInternal<int>("gridDim.y");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(
@@ -174,7 +174,7 @@ VarTT<int> getGridDimZ(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  VarTT<int> Ret = Fn.declVarTTInternal<int>("gridDim.z");
+  VarTT<int> Ret = Fn.declVarInternal<int>("gridDim.z");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction(

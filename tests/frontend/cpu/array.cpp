@@ -18,11 +18,11 @@ int main() {
     auto &OutLocal = F.getArg<0>();
     auto &OutGlobal = F.getArg<1>();
 
-    auto I = F.defVarTT<size_t>(0, "I");
-    auto Inc = F.defVarTT<size_t>(1, "Inc");
+    auto I = F.defVar<size_t>(0, "I");
+    auto Inc = F.defVar<size_t>(1, "Inc");
 
-    auto Local = F.declVarTT<double[]>(16, AddressSpace::DEFAULT, "local_array");
-    auto Global = F.declVarTT<double[]>(16, AddressSpace::GLOBAL, "global_array");
+    auto Local = F.declVar<double[]>(16, AddressSpace::DEFAULT, "local_array");
+    auto Global = F.declVar<double[]>(16, AddressSpace::GLOBAL, "global_array");
 
     auto Bound = F.defRuntimeConstTT<size_t>(16, "Bound");
 

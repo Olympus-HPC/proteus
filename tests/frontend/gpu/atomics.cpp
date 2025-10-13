@@ -37,7 +37,7 @@ int main() {
     auto Bid = F.callBuiltin(getBlockIdX);
     auto BlockDim = F.callBuiltin(getBlockDimX);
 
-    auto I = F.declVarTT<int>();
+    auto I = F.declVar<int>();
     I = Bid * BlockDim + Tid;
 
     auto IntAdd = IntCounters + 0;
@@ -50,9 +50,9 @@ int main() {
     auto FloatMax = FloatCounters + 2;
     auto FloatMin = FloatCounters + 3;
 
-    auto IntOne = F.defVarTT<int>(1);
-    auto FloatHalf = F.defVarTT<float>(0.5f);
-    auto FloatOne = F.defVarTT<float>(1.0f);
+    auto IntOne = F.defVar<int>(1);
+    auto FloatHalf = F.defVar<float>(0.5f);
+    auto FloatOne = F.defVar<float>(1.0f);
 
     F.beginIfTT(I < N);
     {

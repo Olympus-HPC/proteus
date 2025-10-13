@@ -29,9 +29,9 @@ int main() {
   auto KernelHandle = J.addKernelTT<void(double *)>("for");
   auto &F = KernelHandle.F;
 
-  auto I = F.declVarTT<int>("i");
-  auto Inc = F.declVarTT<int>("inc");
-  auto UB = F.declVarTT<int>("ub");
+  auto I = F.declVar<int>("i");
+  auto Inc = F.declVar<int>("inc");
+  auto UB = F.declVar<int>("ub");
   auto &Arg = F.getArg<0>();
   F.beginFunction();
   {

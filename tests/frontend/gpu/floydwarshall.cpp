@@ -90,13 +90,13 @@ auto createJitModuleSpecial(unsigned int _numNodes) {
     // Bake only numNodes as a runtime constant; pass is a dynamic kernel arg
     auto rcNumNodes = F.defRuntimeConstTT<unsigned int>(_numNodes, "numNodes");
 
-    auto idx = F.declVarTT<unsigned int>("idx");
-    auto totThreads = F.declVarTT<unsigned int>("totThreads");
-    auto xValue = F.declVarTT<unsigned int>("xValue");
-    auto yValue = F.declVarTT<unsigned int>("yValue");
-    auto k = F.declVarTT<unsigned int>("k");
-    auto oldWeight = F.declVarTT<unsigned int>("oldWeight");
-    auto tempWeight = F.declVarTT<unsigned int>("tempWeight");
+    auto idx = F.declVar<unsigned int>("idx");
+    auto totThreads = F.declVar<unsigned int>("totThreads");
+    auto xValue = F.declVar<unsigned int>("xValue");
+    auto yValue = F.declVar<unsigned int>("yValue");
+    auto k = F.declVar<unsigned int>("k");
+    auto oldWeight = F.declVar<unsigned int>("oldWeight");
+    auto tempWeight = F.declVar<unsigned int>("tempWeight");
 
     auto tidx = F.callBuiltin(getThreadIdX);
     auto bidx = F.callBuiltin(getBlockIdX);
@@ -112,7 +112,7 @@ auto createJitModuleSpecial(unsigned int _numNodes) {
     k = pass;
 
     // Guard against overrun when grid > N*N
-    auto n2 = F.declVarTT<unsigned int>("n2");
+    auto n2 = F.declVar<unsigned int>("n2");
     n2 = rcNumNodes * rcNumNodes;
     F.beginIfTT(idx < n2);
     {

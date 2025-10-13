@@ -24,9 +24,9 @@ static auto getTiledMatmulFunction(int N, int TileI, int TileJ, int TileK) {
 
     F.beginFunction();
     {
-      auto I = F.defVarTT<int>(0, "i");
-      auto J = F.defVarTT<int>(0, "j");
-      auto K = F.defVarTT<int>(0, "k");
+      auto I = F.defVar<int>(0, "i");
+      auto J = F.defVar<int>(0, "j");
+      auto K = F.defVar<int>(0, "k");
       auto UbnI = F.defRuntimeConstTT<int>(N, "ubn_i");
       auto UbnJ = F.defRuntimeConstTT<int>(N, "ubn_j");
       auto UbnK = F.defRuntimeConstTT<int>(N, "ubn_k");

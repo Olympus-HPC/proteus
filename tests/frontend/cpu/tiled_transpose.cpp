@@ -20,11 +20,11 @@ static auto getTiled2DTransposeFunction(int ROWS, int COLS, int TileSize) {
   auto &F = JitMod->addFunction<void(double *, double *)>(
       "tiled_transpose_" + std::to_string(Counter++));
 
-  auto I = F.declVarTT<int>("i");
-  auto J = F.declVarTT<int>("j");
-  auto IncOne = F.declVarTT<int>("inc");
-  auto UBRows = F.declVarTT<int>("ub_rows");
-  auto UBCols = F.declVarTT<int>("ub_cols");
+  auto I = F.declVar<int>("i");
+  auto J = F.declVar<int>("j");
+  auto IncOne = F.declVar<int>("inc");
+  auto UBRows = F.declVar<int>("ub_rows");
+  auto UBCols = F.declVar<int>("ub_cols");
 
   auto Args = F.getArgsTT();
   auto &A = std::get<0>(Args);
@@ -37,7 +37,7 @@ static auto getTiled2DTransposeFunction(int ROWS, int COLS, int TileSize) {
     UBRows = ROWS;
     UBCols = COLS;
     IncOne = 1;
-    auto Zero = F.declVarTT<int>("zero");
+    auto Zero = F.declVar<int>("zero");
     Zero = 0;
 
     F.buildLoopNest(F.forLoop<int>({I, Zero, UBRows, IncOne}),
