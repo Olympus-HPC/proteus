@@ -26,21 +26,21 @@ int main() {
   proteus::init();
 
   auto J = proteus::JitModule(TARGET);
-  auto KernelHandle = J.addKernel<void(double *)>("for");
+  auto KernelHandle = J.addKernelTT<void(double *)>("for");
   auto &F = KernelHandle.F;
 
-  auto &I = F.declVar<int>("i");
-  auto &Inc = F.declVar<int>("inc");
-  auto &UB = F.declVar<int>("ub");
-  auto &Arg = F.getArg(0);
+  auto I = F.declVarTT<int>("i");
+  auto Inc = F.declVarTT<int>("inc");
+  auto UB = F.declVarTT<int>("ub");
+  auto &Arg = F.getArgTT<0>();
   F.beginFunction();
   {
     I = 0;
     UB = 10;
     Inc = 1;
-    F.beginFor(I, I, UB, Inc);
+    F.beginForTT(I, I, UB, Inc);
     { Arg[I] = Arg[I] + 1.0; }
-    F.endFor();
+    F.endForTT();
     F.ret();
   }
   F.endFunction();

@@ -27,19 +27,19 @@ using namespace proteus;
 auto createJitModule1() {
   auto J = std::make_unique<JitModule>(TARGET);
 
-  auto KernelHandle = J->addKernel<void(double *)>("kernel");
+  auto KernelHandle = J->addKernelTT<void(double *)>("kernel");
   {
     auto &F = KernelHandle.F;
     F.beginFunction();
     {
-      auto [V] = F.getArgs();
+      auto [V] = F.getArgsTT();
 
-      Var &X = F.defVar<double>(21);
-      Var &C = F.call<double(void)>("f2");
-      Var &Res = F.call<double(double, double)>("f3", X, C);
+      auto X = F.defVarTT<double>(21);
+      auto C = F.callTT<double(void)>("f2");
+      auto Res = F.callTT<double(double, double)>("f3", X, C);
       V[0] = Res;
 
-      F.ret();
+      F.retTT();
     }
     F.endFunction();
   }
@@ -48,8 +48,8 @@ auto createJitModule1() {
     auto &F = J->addFunction<double(void)>("f2");
     F.beginFunction();
     {
-      Var &C = F.defVar<double>(2.0);
-      F.ret(C);
+      auto C = F.defVarTT<double>(2.0);
+      F.retTT(C);
     }
     F.endFunction();
   }
@@ -58,10 +58,10 @@ auto createJitModule1() {
     auto &F = J->addFunction<double(double, double)>("f3");
     F.beginFunction();
     {
-      auto [X, C] = F.getArgs();
-      Var &P = F.declVar<double>();
+      auto [X, C] = F.getArgsTT();
+      auto P = F.declVarTT<double>();
       P = X * C;
-      F.ret(P);
+      F.retTT(P);
     }
     F.endFunction();
   }
