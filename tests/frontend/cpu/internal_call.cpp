@@ -57,7 +57,6 @@ auto createJitModule1() {
 
 int main() {
   auto [J1, F11, F12] = createJitModule1();
-  J1->print();
 
   double V = 0;
 
