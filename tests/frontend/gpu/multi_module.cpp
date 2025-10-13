@@ -27,28 +27,28 @@ using namespace proteus;
 auto createJitModule1() {
   auto J = std::make_unique<JitModule>(TARGET);
 
-  auto KernelHandle1 = J->addKernel<void(double *)>("kernel1");
+  auto KernelHandle1 = J->addKernelTT<void(double *)>("kernel1");
   {
     auto &F = KernelHandle1.F;
 
     F.beginFunction();
     {
-      auto [V] = F.getArgs();
-      V = 42;
+      auto [V] = F.getArgsTT();
+      *V = 42;
 
       F.ret();
     }
     F.endFunction();
   }
 
-  auto KernelHandle2 = J->addKernel<void(double *)>("kernel2");
+  auto KernelHandle2 = J->addKernelTT<void(double *)>("kernel2");
   {
     auto &F = KernelHandle2.F;
 
     F.beginFunction();
     {
-      auto [V] = F.getArgs();
-      V = 23;
+      auto [V] = F.getArgsTT();
+      *V = 23;
 
       F.ret();
     }
@@ -61,28 +61,28 @@ auto createJitModule1() {
 auto createJitModule2() {
   auto J = std::make_unique<JitModule>(TARGET);
 
-  auto KernelHandle1 = J->addKernel<void(double *)>("kernel1");
+  auto KernelHandle1 = J->addKernelTT<void(double *)>("kernel1");
   {
     auto &F = KernelHandle1.F;
 
     F.beginFunction();
     {
-      auto [V] = F.getArgs();
-      V = 142;
+      auto [V] = F.getArgsTT();
+      *V = 142;
 
       F.ret();
     }
     F.endFunction();
   }
 
-  auto KernelHandle2 = J->addKernel<void(double *)>("kernel2");
+  auto KernelHandle2 = J->addKernelTT<void(double *)>("kernel2");
   {
     auto &F = KernelHandle2.F;
 
     F.beginFunction();
     {
-      auto [V] = F.getArgs();
-      V = 123;
+      auto [V] = F.getArgsTT();
+      *V = 123;
 
       F.ret();
     }

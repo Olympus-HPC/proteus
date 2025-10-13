@@ -65,59 +65,59 @@ adam(T *__restrict__ p, T *__restrict__ m, T *__restrict__ v,
 auto createJitModule() {
   auto J = std::make_unique<JitModule>(TARGET);
   auto KernelHandle =
-      J->addKernel<void(float *, float *, float *, float *, float, float, float,
+      J->addKernelTT<void(float *, float *, float *, float *, float, float, float,
                         float, float, int, size_t, int, float)>("adam");
   auto &F = KernelHandle.F;
   auto [p, m, v, g, b1, b2, eps, grad_scale, step_size, time_step, vector_size,
-        mode, decay] = F.getArgs();
+        mode, decay] = F.getArgsTT();
 
-  auto &i = F.declVar<size_t>("i");
-  auto &totThreads = F.declVar<size_t>("totThreads");
-  auto &j = F.declVar<size_t>("j");
-  auto &t = F.declVar<int>("t");
-  auto &inc1 = F.declVar<int>("inc1");
+  auto i = F.declVarTT<size_t>("i");
+  auto totThreads = F.declVarTT<size_t>("totThreads");
+  auto j = F.declVarTT<size_t>("j");
+  auto t = F.declVarTT<int>("t");
+  auto inc1 = F.declVarTT<int>("inc1");
   F.beginFunction();
   {
     i = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +
         F.callBuiltin(getThreadIdX);
     totThreads = F.callBuiltin(getGridDimX) * F.callBuiltin(getBlockDimX);
 
-    F.beginFor(j, i, vector_size, totThreads);
+    F.beginForTT(j, i, vector_size, totThreads);
     {
-      auto &lim = F.declVar<int>("lim");
+      auto lim = F.declVarTT<int>("lim");
       t = 1;
       inc1 = 1;
       lim = time_step + 1;
-      F.beginFor(t, t, lim, inc1);
+      F.beginForTT(t, t, lim, inc1);
       {
-        auto &scaled_grad = F.declVar<float>("scale_grad");
+        auto scaled_grad = F.declVarTT<float>("scale_grad");
         scaled_grad = g[j] / grad_scale;
 
         m[j] = b1 * m[j] + (1.f - b1) * scaled_grad;
         v[j] = b2 * v[j] + (1.f - b2) * scaled_grad * scaled_grad;
 
-        auto &m_corrected = F.declVar<float>("m_corrected");
-        auto &v_corrected = F.declVar<float>("v_corrected");
-        m_corrected = m[j] / (1.f - powf(b1, t));
-        v_corrected = v[j] / (1.f - powf(b2, t));
+        auto m_corrected = F.declVarTT<float>("m_corrected");
+        auto v_corrected = F.declVarTT<float>("v_corrected");
+        m_corrected = m[j] / (1.f - powf(b1, F.convertTT<float>(t)));
+        v_corrected = v[j] / (1.f - powf(b2, F.convertTT<float>(t)));
 
-        auto &denom = F.declVar<float>("denom");
-        F.beginIf(mode == 0);
+        auto denom = F.declVarTT<float>("denom");
+        F.beginIfTT(mode == 0);
         { denom = sqrtf(v_corrected + eps); }
-        F.endIf();
+        F.endIfTT();
 
-        F.beginIf(mode == 1);
+        F.beginIfTT(mode == 1);
         { denom = sqrtf(v_corrected) + eps; }
-        F.endIf();
+        F.endIfTT();
 
-        auto &update = F.declVar<float>("update");
+        auto update = F.declVarTT<float>("update");
         update = (m_corrected / denom) + (decay * p[j]);
 
         p[j] -= (step_size * update);
       }
-      F.endFor();
+      F.endForTT();
     }
-    F.endFor();
+    F.endForTT();
     F.ret();
   }
   F.endFunction();

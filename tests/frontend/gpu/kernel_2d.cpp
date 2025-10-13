@@ -27,36 +27,36 @@ int main() {
   auto J = proteus::JitModule(TARGET);
 
   auto KernelHandle =
-      J.addKernel<void(double *, double *, double *, size_t, size_t)>(
+      J.addKernelTT<void(double *, double *, double *, size_t, size_t)>(
           "matrix_add_2d");
   auto &F = KernelHandle.F;
 
   F.beginFunction();
   {
-    auto &Row = F.declVar<size_t>("row");
-    auto &Col = F.declVar<size_t>("col");
-    auto &A = F.getArg(0);
-    auto &B = F.getArg(1);
-    auto &C = F.getArg(2);
-    auto &M = F.getArg(3);
-    auto &N = F.getArg(4);
+    auto Row = F.declVarTT<size_t>("row");
+    auto Col = F.declVarTT<size_t>("col");
+    auto &A = F.getArgTT<0>();
+    auto &B = F.getArgTT<1>();
+    auto &C = F.getArgTT<2>();
+    auto &M = F.getArgTT<3>();
+    auto &N = F.getArgTT<4>();
 
     Row = F.callBuiltin(getBlockIdY) * F.callBuiltin(getBlockDimY) +
           F.callBuiltin(getThreadIdY);
     Col = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +
           F.callBuiltin(getThreadIdX);
 
-    F.beginIf(Row < M);
+    F.beginIfTT(Row < M);
     {
-      F.beginIf(Col < N);
+      F.beginIfTT(Col < N);
       {
-        auto &Idx = F.declVar<size_t>("idx");
+        auto Idx = F.declVarTT<size_t>("idx");
         Idx = Row * N + Col;
         C[Idx] = A[Idx] + B[Idx];
       }
-      F.endIf();
+      F.endIfTT();
     }
-    F.endIf();
+    F.endIfTT();
 
     F.ret();
   }

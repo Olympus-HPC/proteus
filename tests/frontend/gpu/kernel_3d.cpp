@@ -26,21 +26,21 @@ int main() {
   auto J = proteus::JitModule(TARGET);
 
   auto KernelHandle =
-      J.addKernel<void(double *, double *, double *, size_t, size_t, size_t)>(
+      J.addKernelTT<void(double *, double *, double *, size_t, size_t, size_t)>(
           "volume_add_3d");
   auto &F = KernelHandle.F;
 
   F.beginFunction();
   {
-    auto &I = F.declVar<size_t>("i");
-    auto &JVar = F.declVar<size_t>("j");
-    auto &K = F.declVar<size_t>("k");
-    auto &A = F.getArg(0);
-    auto &B = F.getArg(1);
-    auto &C = F.getArg(2);
-    auto &X = F.getArg(3);
-    auto &Y = F.getArg(4);
-    auto &Z = F.getArg(5);
+    auto I = F.declVarTT<size_t>("i");
+    auto JVar = F.declVarTT<size_t>("j");
+    auto K = F.declVarTT<size_t>("k");
+    auto &A = F.getArgTT<0>();
+    auto &B = F.getArgTT<1>();
+    auto &C = F.getArgTT<2>();
+    auto &X = F.getArgTT<3>();
+    auto &Y = F.getArgTT<4>();
+    auto &Z = F.getArgTT<5>();
 
     I = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +
         F.callBuiltin(getThreadIdX);
@@ -49,16 +49,16 @@ int main() {
     K = F.callBuiltin(getBlockIdZ) * F.callBuiltin(getBlockDimZ) +
         F.callBuiltin(getThreadIdZ);
 
-    F.beginIf(I < X);
+    F.beginIfTT(I < X);
     {
-      F.beginIf(JVar < Y);
+      F.beginIfTT(JVar < Y);
       {
-        F.beginIf(K < Z);
+        F.beginIfTT(K < Z);
         {
-          auto &XY = F.declVar<size_t>("xy");
-          auto &KXY = F.declVar<size_t>("kxy");
-          auto &JX = F.declVar<size_t>("jx");
-          auto &Idx = F.declVar<size_t>("idx");
+          auto XY = F.declVarTT<size_t>("xy");
+          auto KXY = F.declVarTT<size_t>("kxy");
+          auto JX = F.declVarTT<size_t>("jx");
+          auto Idx = F.declVarTT<size_t>("idx");
 
           XY = X * Y;
           KXY = K * XY;
@@ -67,13 +67,13 @@ int main() {
 
           C[Idx] = A[Idx] + B[Idx];
         }
-        F.endIf();
+        F.endIfTT();
       }
-      F.endIf();
+      F.endIfTT();
     }
-    F.endIf();
+    F.endIfTT();
 
-    F.ret();
+    F.retTT();
   }
   F.endFunction();
 

@@ -27,20 +27,20 @@ constexpr unsigned WarpSize = 32;
 int main() {
   auto J = proteus::JitModule(TARGET);
 
-  auto KernelHandle = J.addKernel<void(double *)>("shared_reverse_warp");
+  auto KernelHandle = J.addKernelTT<void(double *)>("shared_reverse_warp");
   auto &F = KernelHandle.F;
 
   F.beginFunction();
   {
-    auto &A = F.getArg(0);
+    auto &A = F.getArgTT<0>();
 
-    auto &Tid = F.callBuiltin(getThreadIdX);
-    auto &Bid = F.callBuiltin(getBlockIdX);
+    auto Tid = F.callBuiltin(getThreadIdX);
+    auto Bid = F.callBuiltin(getBlockIdX);
 
-    auto &I = F.declVar<size_t>("I");
+    auto I = F.declVarTT<size_t>("I");
     I = Bid * WarpSize + Tid;
 
-    auto &S = F.declVar<double[]>(WarpSize, AddressSpace::SHARED, "shared_mem");
+    auto S = F.declVarTT<double[]>(WarpSize, AddressSpace::SHARED, "shared_mem");
 
     // Load from global into shared, then sync, then write reversed index.
     S[Tid] = A[I];
