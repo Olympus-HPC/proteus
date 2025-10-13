@@ -80,7 +80,7 @@ protected:
   Var &emitAtomic(AtomicRMWInst::BinOp Op, Var &Addr, Var &Val);
 
   template <typename T>
-  VarTT<T> emitAtomicTT(AtomicRMWInst::BinOp Op, VarTT<T*> &Addr, 
+  VarTT<T> emitAtomicTT(AtomicRMWInst::BinOp Op, const VarTT<T*> &Addr, 
                         const VarTT<T> &Val);
 
 public:
@@ -292,13 +292,13 @@ public:
   Var &atomicMin(Var &Addr, Var &Val);
 
   template <typename T>
-  VarTT<T> atomicAdd(VarTT<T*> &Addr, const VarTT<T> &Val);
+  std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>> atomicAdd(const VarTT<T*> &Addr, const VarTT<T>& Val);
   template <typename T>
-  VarTT<T> atomicSub(VarTT<T*> &Addr, const VarTT<T> &Val);
+  std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>> atomicSub(VarTT<T*> Addr, const VarTT<T>& Val);
   template <typename T>
-  VarTT<T> atomicMax(VarTT<T*> &Addr, const VarTT<T> &Val);
+  std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>> atomicMax(VarTT<T*> Addr, const VarTT<T>& Val);
   template <typename T>
-  VarTT<T> atomicMin(VarTT<T*> &Addr, const VarTT<T> &Val);
+  std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>> atomicMin(VarTT<T*> Addr, const VarTT<T>& Val);
 
   template <typename T, typename BodyLambda = EmptyLambda>
   auto forLoop(const LoopBoundInfo<T> &Bounds, BodyLambda &&Body = {}) {
@@ -1092,7 +1092,7 @@ operator%(const T &ConstValue, const VarTT<U> &Var) {
 
 // Atomic operations for VarTT
 template <typename T>
-VarTT<T> FuncBase::emitAtomicTT(AtomicRMWInst::BinOp Op, VarTT<T*> &Addr,
+VarTT<T> FuncBase::emitAtomicTT(AtomicRMWInst::BinOp Op, const VarTT<T*> &Addr,
                                 const VarTT<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "Atomic ops require arithmetic type");
 
@@ -1100,14 +1100,17 @@ VarTT<T> FuncBase::emitAtomicTT(AtomicRMWInst::BinOp Op, VarTT<T*> &Addr,
   Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
   
   auto *Result = IRB.CreateAtomicRMW(
-      Op, Addr.getPointerValue(), Val.getValue(), MaybeAlign(),
+      Op, Addr.Storage->getPointerValue(), Val.Storage->loadValue(), MaybeAlign(),
       AtomicOrdering::SequentiallyConsistent, SyncScope::SingleThread);
-  
-  return defVarTT<T>(Result);
+
+  auto Ret = declVarTTInternal<T>("atomic.rmw.res.");
+  Ret.Storage->storeValue(Result);
+  return Ret;
 }
 
 template <typename T>
-VarTT<T> FuncBase::atomicAdd(VarTT<T*> &Addr, const VarTT<T> &Val) {
+std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>> 
+FuncBase::atomicAdd(const VarTT<T*> &Addr, const VarTT<T>& Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicAdd requires arithmetic type");
   
   Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
@@ -1117,7 +1120,8 @@ VarTT<T> FuncBase::atomicAdd(VarTT<T*> &Addr, const VarTT<T> &Val) {
 }
 
 template <typename T>
-VarTT<T> FuncBase::atomicSub(VarTT<T*> &Addr, const VarTT<T> &Val) {
+std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>>
+FuncBase::atomicSub(VarTT<T*> Addr, const VarTT<T>& Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicSub requires arithmetic type");
   
   Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
@@ -1127,7 +1131,8 @@ VarTT<T> FuncBase::atomicSub(VarTT<T*> &Addr, const VarTT<T> &Val) {
 }
 
 template <typename T>
-VarTT<T> FuncBase::atomicMax(VarTT<T*> &Addr, const VarTT<T> &Val) {
+std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>>
+FuncBase::atomicMax(VarTT<T*> Addr, const VarTT<T>& Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicMax requires arithmetic type");
   
   Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
@@ -1137,7 +1142,8 @@ VarTT<T> FuncBase::atomicMax(VarTT<T*> &Addr, const VarTT<T> &Val) {
 }
 
 template <typename T>
-VarTT<T> FuncBase::atomicMin(VarTT<T*> &Addr, const VarTT<T> &Val) {
+std::enable_if_t<std::is_arithmetic_v<T>, VarTT<T>>
+FuncBase::atomicMin(VarTT<T*> Addr, const VarTT<T>& Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicMin requires arithmetic type");
   
   Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
