@@ -15,7 +15,7 @@ Var<int> getThreadIdX(FuncBase &Fn) {
   FunctionCallee Callee = M.getOrInsertFunction("llvm.nvvm.read.ptx.sreg.tid.x",
                                                 TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.Storage->storeValue(Call);
+  Ret.storeValue(Call);
 
   return Ret;
 }
@@ -30,7 +30,7 @@ Var<int> getBlockIdX(FuncBase &Fn) {
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.ctaid.x", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.Storage->storeValue(Call);
+  Ret.storeValue(Call);
 
   return Ret;
 }
@@ -45,7 +45,7 @@ Var<int> getBlockDimX(FuncBase &Fn) {
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.ntid.x", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.Storage->storeValue(Call);
+  Ret.storeValue(Call);
 
   return Ret;
 }
@@ -60,7 +60,7 @@ Var<int> getGridDimX(FuncBase &Fn) {
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.nctaid.x", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.Storage->storeValue(Call);
+  Ret.storeValue(Call);
 
   return Ret;
 }
@@ -75,7 +75,7 @@ Var<int> getThreadIdY(FuncBase &Fn) {
   FunctionCallee Callee = M.getOrInsertFunction("llvm.nvvm.read.ptx.sreg.tid.y",
                                                 TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.Storage->storeValue(Call);
+  Ret.storeValue(Call);
 
   return Ret;
 }
@@ -90,7 +90,7 @@ Var<int> getThreadIdZ(FuncBase &Fn) {
   FunctionCallee Callee = M.getOrInsertFunction("llvm.nvvm.read.ptx.sreg.tid.z",
                                                 TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.Storage->storeValue(Call);
+  Ret.storeValue(Call);
 
   return Ret;
 }
@@ -105,7 +105,7 @@ Var<int> getBlockIdY(FuncBase &Fn) {
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.ctaid.y", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.Storage->storeValue(Call);
+  Ret.storeValue(Call);
 
   return Ret;
 }
@@ -120,7 +120,7 @@ Var<int> getBlockIdZ(FuncBase &Fn) {
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.ctaid.z", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.Storage->storeValue(Call);
+  Ret.storeValue(Call);
 
   return Ret;
 }
@@ -135,7 +135,7 @@ Var<int> getBlockDimY(FuncBase &Fn) {
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.ntid.y", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.Storage->storeValue(Call);
+  Ret.storeValue(Call);
 
   return Ret;
 }
@@ -150,7 +150,7 @@ Var<int> getBlockDimZ(FuncBase &Fn) {
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.ntid.z", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.Storage->storeValue(Call);
+  Ret.storeValue(Call);
 
   return Ret;
 }
@@ -165,7 +165,7 @@ Var<int> getGridDimY(FuncBase &Fn) {
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.nctaid.y", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.Storage->storeValue(Call);
+  Ret.storeValue(Call);
 
   return Ret;
 }
@@ -180,7 +180,7 @@ Var<int> getGridDimZ(FuncBase &Fn) {
   FunctionCallee Callee = M.getOrInsertFunction(
       "llvm.nvvm.read.ptx.sreg.nctaid.z", TypeMap<int>::get(Ctx));
   auto *Call = IRB.CreateCall(Callee);
-  Ret.Storage->storeValue(Call);
+  Ret.storeValue(Call);
 
   return Ret;
 }

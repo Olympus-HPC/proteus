@@ -40,6 +40,21 @@ template <typename T> struct Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> {
 
   Var &operator=(Var &&V);
 
+  // Storage accessor methods
+  Value *loadValue(VarStorage::AccessKind Kind = VarStorage::AccessKind::Resolved) const {
+    return Storage->loadValue(Kind);
+  }
+
+  void storeValue(Value *Val, VarStorage::AccessKind Kind = VarStorage::AccessKind::Resolved) {
+    Storage->storeValue(Val, Kind);
+  }
+
+  Value *getSlot() const { return Storage->getSlot(); }
+
+  Type *getValueType() const { return Storage->getValueType(); }
+
+  Type *getAllocatedType() const { return Storage->getAllocatedType(); }
+
   // Assignment operators
   Var &operator=(const Var &V);
 
@@ -159,6 +174,22 @@ template <typename T> struct Var<T, std::enable_if_t<std::is_array_v<T>>> {
   Var(std::unique_ptr<ArrayStorage> Storage, FuncBase &Fn)
       : Fn(Fn), Storage(std::move(Storage)) {}
 
+  // Storage accessor methods
+  Value *loadValue(VarStorage::AccessKind Kind = VarStorage::AccessKind::Resolved) const {
+    return Storage->loadValue(Kind);
+  }
+
+  void storeValue(Value *Val, VarStorage::AccessKind Kind = VarStorage::AccessKind::Resolved) {
+    Storage->storeValue(Val, Kind);
+  }
+
+  Value *getSlot() const { return Storage->getSlot(); }
+
+  Type *getValueType() const { return Storage->getValueType(); }
+
+  Type *getAllocatedType() const { return Storage->getAllocatedType(); }
+
+
   Var<ElemType> operator[](size_t Index);
 
   template <typename IdxT>
@@ -175,6 +206,21 @@ template <typename T> struct Var<T, std::enable_if_t<std::is_pointer_v<T>>> {
 
   Var(std::unique_ptr<PointerStorage> Storage, FuncBase &Fn)
       : Fn(Fn), Storage(std::move(Storage)) {}
+
+  // Storage accessor methods
+  Value *loadValue(VarStorage::AccessKind Kind = VarStorage::AccessKind::Resolved) const {
+    return Storage->loadValue(Kind);
+  }
+
+  void storeValue(Value *Val, VarStorage::AccessKind Kind = VarStorage::AccessKind::Resolved) {
+    Storage->storeValue(Val, Kind);
+  }
+
+  Value *getSlot() const { return Storage->getSlot(); }
+
+  Type *getValueType() const { return Storage->getValueType(); }
+
+  Type *getAllocatedType() const { return Storage->getAllocatedType(); }
 
   Var<ElemType> operator[](size_t Index);
 

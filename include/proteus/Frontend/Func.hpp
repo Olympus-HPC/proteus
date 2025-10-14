@@ -233,8 +233,8 @@ public:
     Type *TargetTy = TypeMap<U>::get(Ctx);
     Var<U> Res = declVarInternal<U>("convert.");
     Value *Converted =
-        proteus::convert(IRBRef, V.Storage->loadValue(), TargetTy);
-    Res.Storage->storeValue(Converted);
+        proteus::convert(IRBRef, V.loadValue(), TargetTy);
+    Res.storeValue(Converted);
     return Res;
   }
 };
@@ -348,7 +348,7 @@ void FuncBase::beginFor(Var<T> &IterVar, const Var<T> &Init,
   IRB.SetInsertPoint(LoopCond);
   {
     auto CondVar = IterVar < UpperBound;
-    Value *Cond = CondVar.Storage->loadValue();
+    Value *Cond = CondVar.loadValue();
     IRB.CreateCondBr(Cond, Body, LoopExit);
   }
 
@@ -381,8 +381,8 @@ Var<std::common_type_t<T, U>> binOp(const Var<T> &L, const Var<U> &R, IntOp IOp,
 
   auto &IRB = Fn.getIRBuilder();
 
-  Value *LHS = L.Storage->loadValue();
-  Value *RHS = R.Storage->loadValue();
+  Value *LHS = L.loadValue();
+  Value *RHS = R.loadValue();
 
   Function *Function = Fn.getFunction();
   auto &DL = Function->getParent()->getDataLayout();
@@ -414,8 +414,8 @@ compoundAssignVar(Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
   auto Result = Op(LHS, RHS);
   auto &IRB = LHS.Fn.getIRBuilder();
   auto *Converted =
-      convert(IRB, Result.Storage->loadValue(), LHS.Storage->getValueType());
-  LHS.Storage->storeValue(Converted);
+      convert(IRB, Result.loadValue(), LHS.getValueType());
+  LHS.storeValue(Converted);
   return LHS;
 }
 
@@ -424,7 +424,7 @@ template <typename T, typename U, typename IntOp, typename FPOp>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 compoundAssignConst(Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
                     const U &ConstValue, IntOp IOp, FPOp FOp) {
-  Type *LHSType = LHS.Storage->getValueType();
+  Type *LHSType = LHS.getValueType();
   auto &IRB = LHS.Fn.getIRBuilder();
 
   using CleanU = std::remove_cv_t<std::remove_reference_t<U>>;
@@ -440,7 +440,7 @@ compoundAssignConst(Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
     RHS = ConstantFP::get(RHSType, ConstValue);
   }
 
-  Value *LHSVal = LHS.Storage->loadValue();
+  Value *LHSVal = LHS.loadValue();
 
   auto &DL = Function->getParent()->getDataLayout();
   Type *CommonType = getCommonType(DL, LHSVal->getType(), RHS->getType());
@@ -456,7 +456,7 @@ compoundAssignConst(Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
   }
 
   Value *ConvertedResult = convert(IRB, Result, LHSType);
-  LHS.Storage->storeValue(ConvertedResult);
+  LHS.storeValue(ConvertedResult);
   return LHS;
 }
 
@@ -469,8 +469,8 @@ Var<bool> cmpOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
 
   auto &IRB = Fn.getIRBuilder();
 
-  Value *LHS = L.Storage->loadValue();
-  Value *RHS = R.Storage->loadValue();
+  Value *LHS = L.loadValue();
+  Value *RHS = R.loadValue();
 
   Function *Function = Fn.getFunction();
   auto &DL = Function->getParent()->getDataLayout();
@@ -510,8 +510,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(const Var &V) {
   auto &IRB = Fn.getIRBuilder();
   auto *Converted =
-      convert(IRB, V.Storage->loadValue(), Storage->getValueType());
-  Storage->storeValue(Converted);
+      convert(IRB, V.loadValue(), getValueType());
+  storeValue(Converted);
   return *this;
 }
 
@@ -525,8 +525,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(Var &&V) {
     // If we have storage, copy the value.
     auto &IRB = Fn.getIRBuilder();
     auto *Converted =
-        convert(IRB, V.Storage->loadValue(), Storage->getValueType());
-    Storage->storeValue(Converted);
+        convert(IRB, V.loadValue(), getValueType());
+    storeValue(Converted);
   }
   return *this;
 }
@@ -537,8 +537,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(const Var<U> &V) {
   auto &IRB = Fn.getIRBuilder();
   auto *Converted =
-      convert(IRB, V.Storage->loadValue(), Storage->getValueType());
-  Storage->storeValue(Converted);
+      convert(IRB, V.loadValue(), getValueType());
+  storeValue(Converted);
   return *this;
 }
 
@@ -550,12 +550,12 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(
   static_assert(std::is_arithmetic_v<U>,
                 "Can only assign arithmetic types to Var");
 
-  Type *LHSType = Storage->getValueType();
+  Type *LHSType = getValueType();
 
   if (LHSType->isIntegerTy()) {
-    Storage->storeValue(ConstantInt::get(LHSType, ConstValue));
+    storeValue(ConstantInt::get(LHSType, ConstValue));
   } else if (LHSType->isFloatingPointTy()) {
-    Storage->storeValue(ConstantFP::get(LHSType, ConstValue));
+    storeValue(ConstantFP::get(LHSType, ConstValue));
   } else {
     PROTEUS_FATAL_ERROR("Unsupported type");
   }
@@ -790,12 +790,12 @@ template <typename T>
 Var<std::remove_extent_t<T>>
 Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](size_t Index) {
   auto &IRB = Fn.getIRBuilder();
-  auto *ArrayTy = cast<ArrayType>(Storage->getAllocatedType());
-  auto *BasePointer = Storage->getSlot();
+  auto *ArrayTy = cast<ArrayType>(getAllocatedType());
+  auto *BasePointer = getSlot();
 
   // GEP into the array aggregate: [0, Index]
   auto *GEP = IRB.CreateConstInBoundsGEP2_64(ArrayTy, BasePointer, 0, Index);
-  Type *ElemTy = Storage->getValueType();
+  Type *ElemTy = getValueType();
   auto *BasePtrTy = cast<PointerType>(BasePointer->getType());
   unsigned AddrSpace = BasePtrTy->getAddressSpace();
   Type *ElemPtrTy = PointerType::get(ElemTy, AddrSpace);
@@ -814,13 +814,13 @@ std::enable_if_t<std::is_integral_v<IdxT>, Var<std::remove_extent_t<T>>>
 Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](
     const Var<IdxT> &Index) {
   auto &IRB = Fn.getIRBuilder();
-  auto *ArrayTy = cast<ArrayType>(Storage->getAllocatedType());
-  auto *BasePointer = Storage->getSlot();
+  auto *ArrayTy = cast<ArrayType>(getAllocatedType());
+  auto *BasePointer = getSlot();
 
-  Value *IdxVal = Index.Storage->loadValue();
+  Value *IdxVal = Index.loadValue();
   Value *Zero = llvm::ConstantInt::get(IdxVal->getType(), 0);
   auto *GEP = IRB.CreateInBoundsGEP(ArrayTy, BasePointer, {Zero, IdxVal});
-  Type *ElemTy = Storage->getValueType();
+  Type *ElemTy = getValueType();
   auto *BasePtrTy = cast<PointerType>(BasePointer->getType());
   unsigned AddrSpace = BasePtrTy->getAddressSpace();
   Type *ElemPtrTy = PointerType::get(ElemTy, AddrSpace);
@@ -839,8 +839,8 @@ Var<std::remove_pointer_t<T>>
 Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator[](size_t Index) {
   auto &IRB = Fn.getIRBuilder();
 
-  auto *PointerElemTy = Storage->getValueType();
-  auto *Ptr = Storage->loadValue(VarStorage::AccessKind::Direct);
+  auto *PointerElemTy = getValueType();
+  auto *Ptr = loadValue(VarStorage::AccessKind::Direct);
   auto *GEP = IRB.CreateConstInBoundsGEP1_64(PointerElemTy, Ptr, Index);
   unsigned AddrSpace = cast<PointerType>(Ptr->getType())->getAddressSpace();
   Type *ElemPtrTy = PointerType::get(PointerElemTy, AddrSpace);
@@ -862,9 +862,9 @@ Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator[](
     const Var<IdxT> &Index) {
   auto &IRB = Fn.getIRBuilder();
 
-  auto *PointeeType = Storage->getValueType();
-  auto *Ptr = Storage->loadValue(VarStorage::AccessKind::Direct);
-  auto *IdxValue = Index.Storage->loadValue();
+  auto *PointeeType = getValueType();
+  auto *Ptr = loadValue(VarStorage::AccessKind::Direct);
+  auto *IdxValue = Index.loadValue();
   auto *GEP = IRB.CreateInBoundsGEP(PointeeType, Ptr, IdxValue);
   unsigned AddrSpace = cast<PointerType>(Ptr->getType())->getAddressSpace();
   Type *ElemPtrTy = PointerType::get(PointeeType, AddrSpace);
@@ -894,12 +894,12 @@ Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator+(
     const Var<OffsetT> &Offset) const {
   auto &IRB = Fn.getIRBuilder();
 
-  auto *OffsetVal = Offset.Storage->loadValue();
+  auto *OffsetVal = Offset.loadValue();
   auto *IntTy = IRB.getInt64Ty();
   auto *IdxVal = convert(IRB, OffsetVal, IntTy);
 
-  auto *BasePtr = Storage->loadValue(VarStorage::AccessKind::Direct);
-  auto *ElemTy = Storage->getValueType();
+  auto *BasePtr = loadValue(VarStorage::AccessKind::Direct);
+  auto *ElemTy = getValueType();
 
   auto *GEP = IRB.CreateInBoundsGEP(ElemTy, BasePtr, IdxVal, "ptr.add");
 
@@ -923,8 +923,8 @@ Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator+(
   auto *IntTy = IRB.getInt64Ty();
   Value *IdxVal = ConstantInt::get(IntTy, Offset);
 
-  auto *BasePtr = Storage->loadValue(VarStorage::AccessKind::Direct);
-  auto *ElemTy = Storage->getValueType();
+  auto *BasePtr = loadValue(VarStorage::AccessKind::Direct);
+  auto *ElemTy = getValueType();
 
   auto *GEP = IRB.CreateInBoundsGEP(ElemTy, BasePtr, IdxVal, "ptr.add");
 
@@ -1129,12 +1129,12 @@ Var<T> FuncBase::emitAtomic(AtomicRMWInst::BinOp Op, const Var<T *> &Addr,
 
   auto &IRB = getIRBuilder();
   auto *Result = IRB.CreateAtomicRMW(
-      Op, Addr.Storage->loadValue(VarStorage::AccessKind::Direct),
-      Val.Storage->loadValue(), MaybeAlign(),
+      Op, Addr.loadValue(VarStorage::AccessKind::Direct),
+      Val.loadValue(), MaybeAlign(),
       AtomicOrdering::SequentiallyConsistent, SyncScope::SingleThread);
 
   auto Ret = declVarInternal<T>("atomic.rmw.res.");
-  Ret.Storage->storeValue(Result);
+  Ret.storeValue(Result);
   return Ret;
 }
 
@@ -1201,7 +1201,7 @@ template <typename T> void FuncBase::ret(const Var<T> &RetVal) {
   auto *TermI = CurBB->getTerminator();
 
   auto &IRB = getIRBuilder();
-  Value *RetValue = RetVal.Storage->loadValue();
+  Value *RetValue = RetVal.loadValue();
   IRB.CreateRet(RetValue);
 
   TermI->eraseFromParent();
@@ -1224,7 +1224,7 @@ static Var<T> emitIntrinsic(StringRef IntrinsicName, Type *ResultType,
   auto &M = *Fn.getFunction()->getParent();
 
   auto ConvertOperand = [&](const auto &Operand) {
-    return convert(IRB, Operand.Storage->loadValue(), ResultType);
+    return convert(IRB, Operand.loadValue(), ResultType);
   };
 
   FunctionCallee Callee = M.getOrInsertFunction(IntrinsicName, ResultType,
@@ -1232,7 +1232,7 @@ static Var<T> emitIntrinsic(StringRef IntrinsicName, Type *ResultType,
   Value *Call = IRB.CreateCall(Callee, {ConvertOperand(Ops)...});
 
   auto ResultVar = Fn.template declVar<T>("res.");
-  ResultVar.Storage->storeValue(Call);
+  ResultVar.storeValue(Call);
   return ResultVar;
 }
 

@@ -129,7 +129,7 @@ void FuncBase::beginIf(const Var<bool> &CondVar, const char *File, int Line) {
   CurBlock->getTerminator()->eraseFromParent();
   IRB.SetInsertPoint(CurBlock);
   {
-    Value *Cond = CondVar.Storage->loadValue();
+    Value *Cond = CondVar.loadValue();
     IRB.CreateCondBr(Cond, ThenBlock, ExitBlock);
   }
 
