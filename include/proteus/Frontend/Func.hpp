@@ -791,7 +791,7 @@ Var<std::remove_extent_t<T>>
 Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](size_t Index) {
   auto &IRB = Fn.getIRBuilder();
   auto *ArrayTy = cast<ArrayType>(Storage->getAllocatedType());
-  auto *BasePointer = Storage->getValue();
+  auto *BasePointer = Storage->getSlot();
 
   // GEP into the array aggregate: [0, Index]
   auto *GEP = IRB.CreateConstInBoundsGEP2_64(ArrayTy, BasePointer, 0, Index);
@@ -815,7 +815,7 @@ Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](
     const Var<IdxT> &Index) {
   auto &IRB = Fn.getIRBuilder();
   auto *ArrayTy = cast<ArrayType>(Storage->getAllocatedType());
-  auto *BasePointer = Storage->getValue();
+  auto *BasePointer = Storage->getSlot();
 
   Value *IdxVal = Index.Storage->loadValue();
   Value *Zero = llvm::ConstantInt::get(IdxVal->getType(), 0);
@@ -840,7 +840,7 @@ Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator[](size_t Index) {
   auto &IRB = Fn.getIRBuilder();
 
   auto *PointerElemTy = Storage->getValueType();
-  auto *Ptr = Storage->getValue();
+  auto *Ptr = Storage->loadValue(VarStorage::AccessKind::Direct);
   auto *GEP = IRB.CreateConstInBoundsGEP1_64(PointerElemTy, Ptr, Index);
   unsigned AddrSpace = cast<PointerType>(Ptr->getType())->getAddressSpace();
   Type *ElemPtrTy = PointerType::get(PointerElemTy, AddrSpace);
@@ -863,9 +863,8 @@ Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator[](
   auto &IRB = Fn.getIRBuilder();
 
   auto *PointeeType = Storage->getValueType();
-  auto *Ptr = Storage->getValue();
-  auto *IdxValue = IRB.CreateLoad(Index.Storage->getAllocatedType(),
-                                  Index.Storage->getValue());
+  auto *Ptr = Storage->loadValue(VarStorage::AccessKind::Direct);
+  auto *IdxValue = Index.Storage->loadValue();
   auto *GEP = IRB.CreateInBoundsGEP(PointeeType, Ptr, IdxValue);
   unsigned AddrSpace = cast<PointerType>(Ptr->getType())->getAddressSpace();
   Type *ElemPtrTy = PointerType::get(PointeeType, AddrSpace);

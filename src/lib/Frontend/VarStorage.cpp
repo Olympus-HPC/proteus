@@ -3,8 +3,6 @@
 
 namespace proteus {
 
-Value *ScalarStorage::getValue() const { return Slot; }
-
 Value *ScalarStorage::getSlot() const { return Slot; }
 
 Value *ScalarStorage::loadValue(AccessKind Kind) const {
@@ -22,11 +20,6 @@ Type *ScalarStorage::getAllocatedType() const {
 }
 
 Type *ScalarStorage::getValueType() const { return Slot->getAllocatedType(); }
-
-Value *PointerStorage::getValue() const {
-  // Load and return the pointer (the address where the value lives)
-  return IRB.CreateLoad(PtrSlot->getAllocatedType(), PtrSlot);
-}
 
 Value *PointerStorage::getSlot() const { return PtrSlot; }
 
@@ -53,8 +46,6 @@ Type *PointerStorage::getAllocatedType() const {
 }
 
 Type *PointerStorage::getValueType() const { return PointerElemTy; }
-
-Value *ArrayStorage::getValue() const { return BasePointer; }
 
 Value *ArrayStorage::getSlot() const { return BasePointer; }
 

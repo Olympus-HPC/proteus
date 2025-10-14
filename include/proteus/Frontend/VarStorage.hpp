@@ -21,7 +21,6 @@ public:
   // pointer.
   enum class AccessKind { Direct, Resolved };
 
-  virtual Value *getValue() const = 0;
   virtual Value *getSlot() const = 0;
   virtual Value *loadValue(AccessKind Kind = AccessKind::Resolved) const = 0;
   virtual void storeValue(Value *Val,
@@ -43,7 +42,6 @@ public:
   }
 
   Value *getSlot() const override;
-  Value *getValue() const override;
   Value *loadValue(AccessKind Kind = AccessKind::Resolved) const override;
   void storeValue(Value *Val, AccessKind Kind = AccessKind::Resolved) override;
   Type *getAllocatedType() const override;
@@ -65,7 +63,6 @@ public:
     return std::make_unique<PointerStorage>(PtrSlot, IRB, PointerElemTy);
   }
 
-  Value *getValue() const override;
   Value *getSlot() const override;
   Value *loadValue(AccessKind Kind = AccessKind::Resolved) const override;
   void storeValue(Value *Val, AccessKind Kind = AccessKind::Resolved) override;
@@ -84,7 +81,6 @@ public:
   std::unique_ptr<VarStorage> clone() const override {
     return std::make_unique<ArrayStorage>(BasePointer, IRB, ArrayTy);
   }
-  Value *getValue() const override;
   Value *getSlot() const override;
   Value *loadValue(AccessKind Kind = AccessKind::Resolved) const override;
   void storeValue(Value *Val, AccessKind Kind = AccessKind::Resolved) override;
