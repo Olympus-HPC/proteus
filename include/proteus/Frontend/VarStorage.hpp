@@ -16,10 +16,16 @@ public:
   VarStorage(IRBuilderBase &IRB) : IRB(IRB) {}
   virtual ~VarStorage() = default;
 
+  // Direct: access (load or store) the value in the slot.
+  // Resolved: load the pointer from the slot and then access the value from the
+  // pointer.
+  enum class AccessKind { Direct, Resolved };
+
   virtual Value *getValue() const = 0;
   virtual Value *getSlot() const = 0;
-  virtual Value *loadValue() const = 0;
-  virtual void storeValue(Value *Val) = 0;
+  virtual Value *loadValue(AccessKind Kind = AccessKind::Resolved) const = 0;
+  virtual void storeValue(Value *Val,
+                          AccessKind Kind = AccessKind::Resolved) = 0;
   virtual Type *getAllocatedType() const = 0;
   virtual Type *getValueType() const = 0;
   virtual std::unique_ptr<VarStorage> clone() const = 0;
@@ -38,8 +44,8 @@ public:
 
   Value *getSlot() const override;
   Value *getValue() const override;
-  Value *loadValue() const override;
-  void storeValue(Value *Val) override;
+  Value *loadValue(AccessKind Kind = AccessKind::Resolved) const override;
+  void storeValue(Value *Val, AccessKind Kind = AccessKind::Resolved) override;
   Type *getAllocatedType() const override;
   Type *getValueType() const override;
 };
@@ -61,12 +67,10 @@ public:
 
   Value *getValue() const override;
   Value *getSlot() const override;
-  Value *loadValue() const override;
-  void storeValue(Value *Val) override;
+  Value *loadValue(AccessKind Kind = AccessKind::Resolved) const override;
+  void storeValue(Value *Val, AccessKind Kind = AccessKind::Resolved) override;
   Type *getAllocatedType() const override;
   Type *getValueType() const override;
-  void storePointer(Value *Ptr);
-  Value *getPointerValue() const;
 };
 
 class ArrayStorage : public VarStorage {
@@ -82,8 +86,8 @@ public:
   }
   Value *getValue() const override;
   Value *getSlot() const override;
-  Value *loadValue() const override;
-  void storeValue(Value *Val) override;
+  Value *loadValue(AccessKind Kind = AccessKind::Resolved) const override;
+  void storeValue(Value *Val, AccessKind Kind = AccessKind::Resolved) override;
   Type *getAllocatedType() const override;
   Type *getValueType() const override;
 };

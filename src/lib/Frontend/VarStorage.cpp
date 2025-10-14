@@ -3,27 +3,25 @@
 
 namespace proteus {
 
-Value *ScalarStorage::loadValue() const {
-  return IRB.CreateLoad(Slot->getAllocatedType(), Slot);
-}
-
 Value *ScalarStorage::getValue() const { return Slot; }
 
 Value *ScalarStorage::getSlot() const { return Slot; }
 
-void ScalarStorage::storeValue(Value *Val) { IRB.CreateStore(Val, Slot); }
+Value *ScalarStorage::loadValue(AccessKind Kind) const {
+  (void)Kind;
+  return IRB.CreateLoad(Slot->getAllocatedType(), Slot);
+}
+
+void ScalarStorage::storeValue(Value *Val, AccessKind Kind) {
+  (void)Kind;
+  IRB.CreateStore(Val, Slot);
+}
 
 Type *ScalarStorage::getAllocatedType() const {
   return Slot->getAllocatedType();
 }
 
 Type *ScalarStorage::getValueType() const { return Slot->getAllocatedType(); }
-
-Value *PointerStorage::loadValue() const {
-  // Load the pointer from PtrSlot, then load the value from that pointer
-  Value *Ptr = IRB.CreateLoad(PtrSlot->getAllocatedType(), PtrSlot);
-  return IRB.CreateLoad(PointerElemTy, Ptr);
-}
 
 Value *PointerStorage::getValue() const {
   // Load and return the pointer (the address where the value lives)
@@ -32,13 +30,23 @@ Value *PointerStorage::getValue() const {
 
 Value *PointerStorage::getSlot() const { return PtrSlot; }
 
-void PointerStorage::storeValue(Value *Val) {
-  // Load the pointer, then store the value to that address
+Value *PointerStorage::loadValue(AccessKind Kind) const {
+  if (Kind == AccessKind::Direct)
+    return IRB.CreateLoad(PtrSlot->getAllocatedType(), PtrSlot);
+
+  Value *Ptr = IRB.CreateLoad(PtrSlot->getAllocatedType(), PtrSlot);
+  return IRB.CreateLoad(PointerElemTy, Ptr);
+}
+
+void PointerStorage::storeValue(Value *Val, AccessKind Kind) {
+  if (Kind == AccessKind::Direct) {
+    IRB.CreateStore(Val, PtrSlot);
+    return;
+  }
+
   Value *Ptr = IRB.CreateLoad(PtrSlot->getAllocatedType(), PtrSlot);
   IRB.CreateStore(Val, Ptr);
 }
-
-void PointerStorage::storePointer(Value *Ptr) { IRB.CreateStore(Ptr, PtrSlot); }
 
 Type *PointerStorage::getAllocatedType() const {
   return PtrSlot->getAllocatedType();
@@ -46,20 +54,18 @@ Type *PointerStorage::getAllocatedType() const {
 
 Type *PointerStorage::getValueType() const { return PointerElemTy; }
 
-Value *PointerStorage::getPointerValue() const {
-  return IRB.CreateLoad(PtrSlot->getAllocatedType(), PtrSlot);
-}
-
 Value *ArrayStorage::getValue() const { return BasePointer; }
 
 Value *ArrayStorage::getSlot() const { return BasePointer; }
 
-Value *ArrayStorage::loadValue() const {
+Value *ArrayStorage::loadValue(AccessKind Kind) const {
+  (void)Kind;
   PROTEUS_FATAL_ERROR("Cannot load entire array as a value");
 }
 
-void ArrayStorage::storeValue(Value *Val) {
+void ArrayStorage::storeValue(Value *Val, AccessKind Kind) {
   (void)Val;
+  (void)Kind;
   PROTEUS_FATAL_ERROR("Cannot store entire array as a value");
 }
 

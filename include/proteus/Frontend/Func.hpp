@@ -899,7 +899,7 @@ Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator+(
   auto *IntTy = IRB.getInt64Ty();
   auto *IdxVal = convert(IRB, OffsetVal, IntTy);
 
-  auto *BasePtr = Storage->getPointerValue();
+  auto *BasePtr = Storage->loadValue(VarStorage::AccessKind::Direct);
   auto *ElemTy = Storage->getValueType();
 
   auto *GEP = IRB.CreateInBoundsGEP(ElemTy, BasePtr, IdxVal, "ptr.add");
@@ -924,7 +924,7 @@ Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator+(
   auto *IntTy = IRB.getInt64Ty();
   Value *IdxVal = ConstantInt::get(IntTy, Offset);
 
-  auto *BasePtr = Storage->getPointerValue();
+  auto *BasePtr = Storage->loadValue(VarStorage::AccessKind::Direct);
   auto *ElemTy = Storage->getValueType();
 
   auto *GEP = IRB.CreateInBoundsGEP(ElemTy, BasePtr, IdxVal, "ptr.add");
@@ -1129,10 +1129,10 @@ Var<T> FuncBase::emitAtomic(AtomicRMWInst::BinOp Op, const Var<T *> &Addr,
   static_assert(std::is_arithmetic_v<T>, "Atomic ops require arithmetic type");
 
   auto &IRB = getIRBuilder();
-  auto *Result = IRB.CreateAtomicRMW(Op, Addr.Storage->getPointerValue(),
-                                     Val.Storage->loadValue(), MaybeAlign(),
-                                     AtomicOrdering::SequentiallyConsistent,
-                                     SyncScope::SingleThread);
+  auto *Result = IRB.CreateAtomicRMW(
+      Op, Addr.Storage->loadValue(VarStorage::AccessKind::Direct),
+      Val.Storage->loadValue(), MaybeAlign(),
+      AtomicOrdering::SequentiallyConsistent, SyncScope::SingleThread);
 
   auto Ret = declVarInternal<T>("atomic.rmw.res.");
   Ret.Storage->storeValue(Result);
