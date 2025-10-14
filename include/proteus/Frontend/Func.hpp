@@ -245,7 +245,6 @@ private:
 private:
   template <typename T, std::size_t ArgIdx> Var<T> createArg() {
     Function *F = getFunction();
-    auto &Ctx = F->getContext();
     auto Var = declVarInternal<T>("arg." + std::to_string(ArgIdx));
     Var.storeValue(F->getArg(ArgIdx), VarStorage::AccessKind::Direct);
     return Var;

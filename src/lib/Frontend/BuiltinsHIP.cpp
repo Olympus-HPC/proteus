@@ -89,7 +89,6 @@ Var<int> getBlockIdX(FuncBase &Fn) {
 }
 
 Var<int> getBlockDimX(FuncBase &Fn) {
-  auto &Ctx = Fn.getFunction()->getContext();
   Var<int> Ret = Fn.declVarInternal<int>("blockDim.x");
 
   Value *Conv = detail::getBlockDim(Fn, detail::OffsetBlockDimX);
@@ -99,7 +98,6 @@ Var<int> getBlockDimX(FuncBase &Fn) {
 }
 
 Var<int> getGridDimX(FuncBase &Fn) {
-  auto &Ctx = Fn.getFunction()->getContext();
   Var<int> Ret = Fn.declVarInternal<int>("gridDim.x");
 
   Value *Conv = detail::getGridDim(Fn, detail::OffsetGridDimX);
@@ -169,7 +167,6 @@ Var<int> getBlockIdZ(FuncBase &Fn) {
 }
 
 Var<int> getBlockDimY(FuncBase &Fn) {
-  auto &Ctx = Fn.getFunction()->getContext();
   Var<int> Ret = Fn.declVarInternal<int>("blockDim.y");
 
   Value *Conv = detail::getBlockDim(Fn, detail::OffsetBlockDimY);
@@ -179,7 +176,6 @@ Var<int> getBlockDimY(FuncBase &Fn) {
 }
 
 Var<int> getBlockDimZ(FuncBase &Fn) {
-  auto &Ctx = Fn.getFunction()->getContext();
   Var<int> Ret = Fn.declVarInternal<int>("blockDim.z");
 
   Value *Conv = detail::getBlockDim(Fn, detail::OffsetBlockDimZ);
@@ -189,7 +185,6 @@ Var<int> getBlockDimZ(FuncBase &Fn) {
 }
 
 Var<int> getGridDimY(FuncBase &Fn) {
-  auto &Ctx = Fn.getFunction()->getContext();
   Var<int> Ret = Fn.declVarInternal<int>("gridDim.y");
 
   Value *Conv = detail::getGridDim(Fn, detail::OffsetGridDimY);
@@ -199,7 +194,6 @@ Var<int> getGridDimY(FuncBase &Fn) {
 }
 
 Var<int> getGridDimZ(FuncBase &Fn) {
-  auto &Ctx = Fn.getFunction()->getContext();
   Var<int> Ret = Fn.declVarInternal<int>("gridDim.z");
 
   Value *Conv = detail::getGridDim(Fn, detail::OffsetGridDimZ);
