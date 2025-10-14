@@ -58,11 +58,11 @@ static inline Value *getBlockDim(FuncBase &Fn, unsigned Offset) {
 
 } // namespace detail
 
-VarTT<int> getThreadIdX(FuncBase &Fn) {
+Var<int> getThreadIdX(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  VarTT<int> Ret = Fn.declVarInternal<int>("threadIdx.x");
+  Var<int> Ret = Fn.declVarInternal<int>("threadIdx.x");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.amdgcn.workitem.id.x",
@@ -73,11 +73,11 @@ VarTT<int> getThreadIdX(FuncBase &Fn) {
   return Ret;
 }
 
-VarTT<int> getBlockIdX(FuncBase &Fn) {
+Var<int> getBlockIdX(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  VarTT<int> Ret = Fn.declVarInternal<int>("blockIdx.x");
+  Var<int> Ret = Fn.declVarInternal<int>("blockIdx.x");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.amdgcn.workgroup.id.x",
@@ -88,9 +88,9 @@ VarTT<int> getBlockIdX(FuncBase &Fn) {
   return Ret;
 }
 
-VarTT<int> getBlockDimX(FuncBase &Fn) {
+Var<int> getBlockDimX(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
-  VarTT<int> Ret = Fn.declVarInternal<int>("blockDim.x");
+  Var<int> Ret = Fn.declVarInternal<int>("blockDim.x");
 
   Value *Conv = detail::getBlockDim(Fn, detail::OffsetBlockDimX);
   Ret.Storage->storeValue(Conv);
@@ -98,9 +98,9 @@ VarTT<int> getBlockDimX(FuncBase &Fn) {
   return Ret;
 }
 
-VarTT<int> getGridDimX(FuncBase &Fn) {
+Var<int> getGridDimX(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
-  VarTT<int> Ret = Fn.declVarInternal<int>("gridDim.x");
+  Var<int> Ret = Fn.declVarInternal<int>("gridDim.x");
 
   Value *Conv = detail::getGridDim(Fn, detail::OffsetGridDimX);
   Ret.Storage->storeValue(Conv);
@@ -108,11 +108,11 @@ VarTT<int> getGridDimX(FuncBase &Fn) {
   return Ret;
 }
 
-VarTT<int> getThreadIdY(FuncBase &Fn) {
+Var<int> getThreadIdY(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  VarTT<int> Ret = Fn.declVarInternal<int>("threadIdx.y");
+  Var<int> Ret = Fn.declVarInternal<int>("threadIdx.y");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.amdgcn.workitem.id.y",
@@ -123,11 +123,11 @@ VarTT<int> getThreadIdY(FuncBase &Fn) {
   return Ret;
 }
 
-VarTT<int> getThreadIdZ(FuncBase &Fn) {
+Var<int> getThreadIdZ(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  VarTT<int> Ret = Fn.declVarInternal<int>("threadIdx.z");
+  Var<int> Ret = Fn.declVarInternal<int>("threadIdx.z");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.amdgcn.workitem.id.z",
@@ -138,11 +138,11 @@ VarTT<int> getThreadIdZ(FuncBase &Fn) {
   return Ret;
 }
 
-VarTT<int> getBlockIdY(FuncBase &Fn) {
+Var<int> getBlockIdY(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  VarTT<int> Ret = Fn.declVarInternal<int>("blockIdx.y");
+  Var<int> Ret = Fn.declVarInternal<int>("blockIdx.y");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.amdgcn.workgroup.id.y",
@@ -153,11 +153,11 @@ VarTT<int> getBlockIdY(FuncBase &Fn) {
   return Ret;
 }
 
-VarTT<int> getBlockIdZ(FuncBase &Fn) {
+Var<int> getBlockIdZ(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
   auto &M = *Fn.getFunction()->getParent();
 
-  VarTT<int> Ret = Fn.declVarInternal<int>("blockIdx.z");
+  Var<int> Ret = Fn.declVarInternal<int>("blockIdx.z");
 
   auto &IRB = Fn.getIRBuilder();
   FunctionCallee Callee = M.getOrInsertFunction("llvm.amdgcn.workgroup.id.z",
@@ -168,9 +168,9 @@ VarTT<int> getBlockIdZ(FuncBase &Fn) {
   return Ret;
 }
 
-VarTT<int> getBlockDimY(FuncBase &Fn) {
+Var<int> getBlockDimY(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
-  VarTT<int> Ret = Fn.declVarInternal<int>("blockDim.y");
+  Var<int> Ret = Fn.declVarInternal<int>("blockDim.y");
 
   Value *Conv = detail::getBlockDim(Fn, detail::OffsetBlockDimY);
   Ret.Storage->storeValue(Conv);
@@ -178,9 +178,9 @@ VarTT<int> getBlockDimY(FuncBase &Fn) {
   return Ret;
 }
 
-VarTT<int> getBlockDimZ(FuncBase &Fn) {
+Var<int> getBlockDimZ(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
-  VarTT<int> Ret = Fn.declVarInternal<int>("blockDim.z");
+  Var<int> Ret = Fn.declVarInternal<int>("blockDim.z");
 
   Value *Conv = detail::getBlockDim(Fn, detail::OffsetBlockDimZ);
   Ret.Storage->storeValue(Conv);
@@ -188,9 +188,9 @@ VarTT<int> getBlockDimZ(FuncBase &Fn) {
   return Ret;
 }
 
-VarTT<int> getGridDimY(FuncBase &Fn) {
+Var<int> getGridDimY(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
-  VarTT<int> Ret = Fn.declVarInternal<int>("gridDim.y");
+  Var<int> Ret = Fn.declVarInternal<int>("gridDim.y");
 
   Value *Conv = detail::getGridDim(Fn, detail::OffsetGridDimY);
   Ret.Storage->storeValue(Conv);
@@ -198,9 +198,9 @@ VarTT<int> getGridDimY(FuncBase &Fn) {
   return Ret;
 }
 
-VarTT<int> getGridDimZ(FuncBase &Fn) {
+Var<int> getGridDimZ(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
-  VarTT<int> Ret = Fn.declVarInternal<int>("gridDim.z");
+  Var<int> Ret = Fn.declVarInternal<int>("gridDim.z");
 
   Value *Conv = detail::getGridDim(Fn, detail::OffsetGridDimZ);
   Ret.Storage->storeValue(Conv);

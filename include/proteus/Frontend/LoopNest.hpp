@@ -11,13 +11,13 @@ namespace proteus {
 
 template <typename T> class LoopBoundInfo {
 public:
-  VarTT<T> IterVar;
-  VarTT<T> Init;
-  VarTT<T> UpperBound;
-  VarTT<T> Inc;
+  Var<T> IterVar;
+  Var<T> Init;
+  Var<T> UpperBound;
+  Var<T> Inc;
 
-  LoopBoundInfo(const VarTT<T> &IterVar, const VarTT<T> &Init,
-                const VarTT<T> &UpperBound, const VarTT<T> &Inc)
+  LoopBoundInfo(const Var<T> &IterVar, const Var<T> &Init,
+                const Var<T> &UpperBound, const Var<T> &Inc)
       : IterVar(IterVar), Init(Init), UpperBound(UpperBound), Inc(Inc) {}
 };
 

@@ -7,21 +7,21 @@ namespace proteus {
 namespace builtins {
 namespace gpu {
 
-VarTT<int> getThreadIdX(FuncBase &Fn);
-VarTT<int> getThreadIdY(FuncBase &Fn);
-VarTT<int> getThreadIdZ(FuncBase &Fn);
+Var<int> getThreadIdX(FuncBase &Fn);
+Var<int> getThreadIdY(FuncBase &Fn);
+Var<int> getThreadIdZ(FuncBase &Fn);
 
-VarTT<int> getBlockIdX(FuncBase &Fn);
-VarTT<int> getBlockIdY(FuncBase &Fn);
-VarTT<int> getBlockIdZ(FuncBase &Fn);
+Var<int> getBlockIdX(FuncBase &Fn);
+Var<int> getBlockIdY(FuncBase &Fn);
+Var<int> getBlockIdZ(FuncBase &Fn);
 
-VarTT<int> getBlockDimX(FuncBase &Fn);
-VarTT<int> getBlockDimY(FuncBase &Fn);
-VarTT<int> getBlockDimZ(FuncBase &Fn);
+Var<int> getBlockDimX(FuncBase &Fn);
+Var<int> getBlockDimY(FuncBase &Fn);
+Var<int> getBlockDimZ(FuncBase &Fn);
 
-VarTT<int> getGridDimX(FuncBase &Fn);
-VarTT<int> getGridDimY(FuncBase &Fn);
-VarTT<int> getGridDimZ(FuncBase &Fn);
+Var<int> getGridDimX(FuncBase &Fn);
+Var<int> getGridDimY(FuncBase &Fn);
+Var<int> getGridDimZ(FuncBase &Fn);
 
 void syncThreads(FuncBase &Fn);
 

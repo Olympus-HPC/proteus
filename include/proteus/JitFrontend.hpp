@@ -266,7 +266,7 @@ public:
 };
 
 template <typename Sig>
-std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, VarTT<typename FnSig<Sig>::RetT>>
+std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, Var<typename FnSig<Sig>::RetT>>
 FuncBase::call(StringRef Name) {
   using RetT = typename FnSig<Sig>::RetT;
   auto *F = getFunction();
@@ -275,7 +275,7 @@ FuncBase::call(StringRef Name) {
   using ArgT = typename FnSig<Sig>::ArgsTList;
   FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
   auto *Call = IRB.CreateCall(Callee);
-  VarTT<RetT> Ret = declVarInternal<RetT>("ret");
+  Var<RetT> Ret = declVarInternal<RetT>("ret");
   Ret.Storage->storeValue(Call);
   return Ret;
 }
@@ -290,7 +290,7 @@ FuncBase::call(StringRef Name) {
 }
 
 template <typename Sig, typename... ArgVars>
-std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, VarTT<typename FnSig<Sig>::RetT>>
+std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, Var<typename FnSig<Sig>::RetT>>
 FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
   auto *F = getFunction();
   LLVMContext &Ctx = F->getContext();
@@ -300,7 +300,7 @@ FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
   FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
   auto *Call = IRB.CreateCall(Callee, {ArgsVars.Storage->loadValue()...});
 
-  VarTT<RetT> Ret = declVarInternal<RetT>("ret");
+  Var<RetT> Ret = declVarInternal<RetT>("ret");
   Ret.Storage->storeValue(Call);
   return Ret;
 }
