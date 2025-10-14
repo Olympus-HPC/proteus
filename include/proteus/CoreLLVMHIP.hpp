@@ -410,7 +410,7 @@ inline void setLaunchBoundsForKernel(Function &F, int MaxNumWorkGroups,
 
   PROTEUS_DBG(Logger::logs("proteus")
               << " => Set Workgroup size " << MaxNumWorkGroups
-              << " WavesPerEU (unused) " << MinBlocksPerMP << "\n");
+              << " WavesPerEU (unused) " << MinBlocksPerSM << "\n");
 }
 
 inline std::unique_ptr<MemoryBuffer>
