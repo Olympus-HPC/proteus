@@ -57,7 +57,7 @@ Value *ArrayStorage::loadValue(AccessKind Kind) const {
 void ArrayStorage::storeValue(Value *Val, AccessKind Kind) {
   (void)Val;
   (void)Kind;
-  PROTEUS_FATAL_ERROR("Cannot store entire array as a value");
+  PROTEUS_FATAL_ERROR("Cannot store value to entire array");
 }
 
 Type *ArrayStorage::getAllocatedType() const { return ArrayTy; }
