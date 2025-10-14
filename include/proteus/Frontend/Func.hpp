@@ -232,8 +232,7 @@ public:
     auto &IRBRef = getIRBuilder();
     Type *TargetTy = TypeMap<U>::get(Ctx);
     Var<U> Res = declVarInternal<U>("convert.");
-    Value *Converted =
-        proteus::convert(IRBRef, V.loadValue(), TargetTy);
+    Value *Converted = proteus::convert(IRBRef, V.loadValue(), TargetTy);
     Res.storeValue(Converted);
     return Res;
   }
@@ -413,8 +412,7 @@ compoundAssignVar(Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
                   const Var<U> &RHS, BinOp Op) {
   auto Result = Op(LHS, RHS);
   auto &IRB = LHS.Fn.getIRBuilder();
-  auto *Converted =
-      convert(IRB, Result.loadValue(), LHS.getValueType());
+  auto *Converted = convert(IRB, Result.loadValue(), LHS.getValueType());
   LHS.storeValue(Converted);
   return LHS;
 }
@@ -497,7 +495,7 @@ Var<bool> cmpOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
 template <typename T>
 template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::Var(const Var<U> &V)
-    : Fn(V.Fn) {
+    : VarStorageOwner<VarStorage>(V.Fn) {
   // Allocate storage for the target type T.
   Type *TargetTy = TypeMap<T>::get(Fn.getFunction()->getContext());
   auto *Alloca = Fn.emitAlloca(TargetTy, "conv.var");
@@ -509,8 +507,7 @@ template <typename T>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(const Var &V) {
   auto &IRB = Fn.getIRBuilder();
-  auto *Converted =
-      convert(IRB, V.loadValue(), getValueType());
+  auto *Converted = convert(IRB, V.loadValue(), getValueType());
   storeValue(Converted);
   return *this;
 }
@@ -524,8 +521,7 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(Var &&V) {
   } else {
     // If we have storage, copy the value.
     auto &IRB = Fn.getIRBuilder();
-    auto *Converted =
-        convert(IRB, V.loadValue(), getValueType());
+    auto *Converted = convert(IRB, V.loadValue(), getValueType());
     storeValue(Converted);
   }
   return *this;
@@ -536,8 +532,7 @@ template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(const Var<U> &V) {
   auto &IRB = Fn.getIRBuilder();
-  auto *Converted =
-      convert(IRB, V.loadValue(), getValueType());
+  auto *Converted = convert(IRB, V.loadValue(), getValueType());
   storeValue(Converted);
   return *this;
 }
@@ -1129,9 +1124,9 @@ Var<T> FuncBase::emitAtomic(AtomicRMWInst::BinOp Op, const Var<T *> &Addr,
 
   auto &IRB = getIRBuilder();
   auto *Result = IRB.CreateAtomicRMW(
-      Op, Addr.loadValue(VarStorage::AccessKind::Direct),
-      Val.loadValue(), MaybeAlign(),
-      AtomicOrdering::SequentiallyConsistent, SyncScope::SingleThread);
+      Op, Addr.loadValue(VarStorage::AccessKind::Direct), Val.loadValue(),
+      MaybeAlign(), AtomicOrdering::SequentiallyConsistent,
+      SyncScope::SingleThread);
 
   auto Ret = declVarInternal<T>("atomic.rmw.res.");
   Ret.storeValue(Result);

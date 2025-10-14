@@ -16,44 +16,59 @@ using namespace llvm;
 Value *convert(IRBuilderBase IRB, Value *V, Type *TargetType);
 Type *getCommonType(const DataLayout &DL, Type *T1, Type *T2);
 
+// Mixin that owns storage and exposes common helpers for Var specializations
+template <typename StorageT> struct VarStorageOwner {
+  FuncBase &Fn;
+  std::unique_ptr<StorageT> Storage = nullptr;
+
+  VarStorageOwner(std::unique_ptr<StorageT> StorageIn, FuncBase &FnIn)
+      : Fn(FnIn), Storage(std::move(StorageIn)) {}
+
+  VarStorageOwner(FuncBase &FnIn) : Fn(FnIn) {}
+
+  // Storage accessor helpers
+  Value *loadValue(
+      VarStorage::AccessKind Kind = VarStorage::AccessKind::Resolved) const {
+    return Storage->loadValue(Kind);
+  }
+
+  void
+  storeValue(Value *Val,
+             VarStorage::AccessKind Kind = VarStorage::AccessKind::Resolved) {
+    Storage->storeValue(Val, Kind);
+  }
+
+  Value *getSlot() const { return Storage->getSlot(); }
+  Type *getValueType() const { return Storage->getValueType(); }
+  Type *getAllocatedType() const { return Storage->getAllocatedType(); }
+};
+
 // Primary template declaration
 template <typename T, typename = void> struct Var;
+
 // Specialization for arithmetic types
-template <typename T> struct Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> {
+template <typename T>
+struct Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>
+    : public VarStorageOwner<VarStorage> {
   using ValueType = T;
   using ElemType = T;
-  FuncBase &Fn;
-  // Use opaque VarStorage to allow array/pointer
-  // operator[] to return a Scalar Var that
-  // points to the correct element.
-  std::unique_ptr<VarStorage> Storage = nullptr;
+
   Var(std::unique_ptr<VarStorage> Storage, FuncBase &Fn)
-      : Fn(Fn), Storage(std::move(Storage)) {}
+      : VarStorageOwner<VarStorage>(std::move(Storage), Fn) {}
 
   // // Conversion constructor
   // // TODO: Add an is_convertible check.
   template <typename U> Var(const Var<U> &V);
 
-  Var(const Var &V) : Fn(V.Fn) { Storage = V.Storage->clone(); }
+  Var(const Var &V) : VarStorageOwner<VarStorage>(nullptr, V.Fn) {
+    Storage = V.Storage->clone();
+  }
 
-  Var(Var &&V) : Fn(V.Fn) { std::swap(Storage, V.Storage); }
+  Var(Var &&V) : VarStorageOwner<VarStorage>(nullptr, V.Fn) {
+    std::swap(Storage, V.Storage);
+  }
 
   Var &operator=(Var &&V);
-
-  // Storage accessor methods
-  Value *loadValue(VarStorage::AccessKind Kind = VarStorage::AccessKind::Resolved) const {
-    return Storage->loadValue(Kind);
-  }
-
-  void storeValue(Value *Val, VarStorage::AccessKind Kind = VarStorage::AccessKind::Resolved) {
-    Storage->storeValue(Val, Kind);
-  }
-
-  Value *getSlot() const { return Storage->getSlot(); }
-
-  Type *getValueType() const { return Storage->getValueType(); }
-
-  Type *getAllocatedType() const { return Storage->getAllocatedType(); }
 
   // Assignment operators
   Var &operator=(const Var &V);
@@ -165,30 +180,14 @@ template <typename T> struct Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> {
 };
 
 // Specialization for array types
-template <typename T> struct Var<T, std::enable_if_t<std::is_array_v<T>>> {
+template <typename T>
+struct Var<T, std::enable_if_t<std::is_array_v<T>>>
+    : public VarStorageOwner<ArrayStorage> {
   using ValueType = T;
   using ElemType = std::remove_extent_t<T>;
-  FuncBase &Fn;
-  std::unique_ptr<ArrayStorage> Storage = nullptr;
 
   Var(std::unique_ptr<ArrayStorage> Storage, FuncBase &Fn)
-      : Fn(Fn), Storage(std::move(Storage)) {}
-
-  // Storage accessor methods
-  Value *loadValue(VarStorage::AccessKind Kind = VarStorage::AccessKind::Resolved) const {
-    return Storage->loadValue(Kind);
-  }
-
-  void storeValue(Value *Val, VarStorage::AccessKind Kind = VarStorage::AccessKind::Resolved) {
-    Storage->storeValue(Val, Kind);
-  }
-
-  Value *getSlot() const { return Storage->getSlot(); }
-
-  Type *getValueType() const { return Storage->getValueType(); }
-
-  Type *getAllocatedType() const { return Storage->getAllocatedType(); }
-
+      : VarStorageOwner<ArrayStorage>(std::move(Storage), Fn) {}
 
   Var<ElemType> operator[](size_t Index);
 
@@ -198,29 +197,14 @@ template <typename T> struct Var<T, std::enable_if_t<std::is_array_v<T>>> {
 };
 
 // Specialization for pointer types
-template <typename T> struct Var<T, std::enable_if_t<std::is_pointer_v<T>>> {
+template <typename T>
+struct Var<T, std::enable_if_t<std::is_pointer_v<T>>>
+    : public VarStorageOwner<PointerStorage> {
   using ValueType = T;
   using ElemType = std::remove_pointer_t<T>;
-  FuncBase &Fn;
-  std::unique_ptr<PointerStorage> Storage = nullptr;
 
   Var(std::unique_ptr<PointerStorage> Storage, FuncBase &Fn)
-      : Fn(Fn), Storage(std::move(Storage)) {}
-
-  // Storage accessor methods
-  Value *loadValue(VarStorage::AccessKind Kind = VarStorage::AccessKind::Resolved) const {
-    return Storage->loadValue(Kind);
-  }
-
-  void storeValue(Value *Val, VarStorage::AccessKind Kind = VarStorage::AccessKind::Resolved) {
-    Storage->storeValue(Val, Kind);
-  }
-
-  Value *getSlot() const { return Storage->getSlot(); }
-
-  Type *getValueType() const { return Storage->getValueType(); }
-
-  Type *getAllocatedType() const { return Storage->getAllocatedType(); }
+      : VarStorageOwner<PointerStorage>(std::move(Storage), Fn) {}
 
   Var<ElemType> operator[](size_t Index);
 
