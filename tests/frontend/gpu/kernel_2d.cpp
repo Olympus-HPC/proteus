@@ -46,17 +46,17 @@ int main() {
     Col = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +
           F.callBuiltin(getThreadIdX);
 
-    F.beginIfTT(Row < M);
+    F.beginIf(Row < M);
     {
-      F.beginIfTT(Col < N);
+      F.beginIf(Col < N);
       {
         auto Idx = F.declVar<size_t>("idx");
         Idx = Row * N + Col;
         C[Idx] = A[Idx] + B[Idx];
       }
-      F.endIfTT();
+      F.endIf();
     }
-    F.endIfTT();
+    F.endIf();
 
     F.ret();
   }

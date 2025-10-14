@@ -111,7 +111,7 @@ Value *FuncBase::emitArrayCreate(Type *Ty, AddressSpace AT, StringRef Name) {
 }
 
 
-void FuncBase::beginIfTT(const VarTT<bool> &CondVar, const char *File, int Line) {
+void FuncBase::beginIf(const VarTT<bool> &CondVar, const char *File, int Line) {
   Function *F = getFunction();
   // Update the terminator of the current basic block due to the split
   // control-flow.
@@ -144,7 +144,7 @@ void FuncBase::beginIfTT(const VarTT<bool> &CondVar, const char *File, int Line)
   IRB.restoreIP(IP);
 }
 
-void FuncBase::endIfTT() {
+void FuncBase::endIf() {
   if (Scopes.empty())
     PROTEUS_FATAL_ERROR("Expected IF scope");
   Scope S = Scopes.back();
@@ -160,7 +160,7 @@ void FuncBase::endIfTT() {
   IRB.restoreIP(IP);
 }
 
-void FuncBase::endForTT() {
+void FuncBase::endFor() {
   if (Scopes.empty())
     PROTEUS_FATAL_ERROR("Expected FOR scope");
 

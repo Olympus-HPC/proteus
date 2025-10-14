@@ -64,9 +64,9 @@ int main() {
     auto Cmp = F.declVar<double>("cmp");
     Cmp = 5.0;
     Arg11[0] = 0.0;
-    F.beginIfTT(Cmp <= 5.0);
+    F.beginIf(Cmp <= 5.0);
     { Arg11[0] = 1.0; }
-    F.endIfTT();
+    F.endIf();
 
     F.ret();
   }

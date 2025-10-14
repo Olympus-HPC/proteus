@@ -24,9 +24,9 @@ int main() {
     auto UB = F.defVar<int>(10, "ub");
     auto Inc = F.defVar<int>(1, "inc");
     I = 0;
-    F.beginForTT(I, I, UB, Inc);
+    F.beginFor(I, I, UB, Inc);
     { Arg[I] = Arg[I] + 1.0; }
-    F.endForTT();
+    F.endFor();
     F.ret();
   }
   F.endFunction();

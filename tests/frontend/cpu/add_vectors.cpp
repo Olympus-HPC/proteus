@@ -31,9 +31,9 @@ int main() {
     // Element-wise addition over all vector elements.
     I = 0;
     Inc = 1;
-    F.beginForTT(I, I, N, Inc);
+    F.beginFor(I, I, N, Inc);
     { A[I] = A[I] + B[I]; }
-    F.endForTT();
+    F.endFor();
 
     F.ret();
   }

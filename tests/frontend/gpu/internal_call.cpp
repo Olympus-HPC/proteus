@@ -35,8 +35,8 @@ auto createJitModule1() {
       auto [V] = F.getArgsTT();
 
       auto X = F.defVar<double>(21);
-      auto C = F.callTT<double(void)>("f2");
-      auto Res = F.callTT<double(double, double)>("f3", X, C);
+      auto C = F.call<double(void)>("f2");
+      auto Res = F.call<double(double, double)>("f3", X, C);
       V[0] = Res;
 
       F.ret();

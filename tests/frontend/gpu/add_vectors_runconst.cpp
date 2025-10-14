@@ -38,7 +38,7 @@ auto createJitKernel(size_t N) {
     auto I = F.declVar<size_t>("I");
     auto Inc = F.declVar<size_t>("Inc");
     auto [A, B] = F.getArgsTT();
-    auto [RunConstN] = F.defRuntimeConstsTT(N);
+    auto [RunConstN] = F.defRuntimeConsts(N);
 
     // Compute the global thread index.
     I = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +
@@ -48,9 +48,9 @@ auto createJitKernel(size_t N) {
     Inc = F.callBuiltin(getGridDimX) * F.callBuiltin(getBlockDimX);
 
     // Strided loop: each thread processes multiple elements.
-    F.beginForTT(I, I, RunConstN, Inc);
+    F.beginFor(I, I, RunConstN, Inc);
     { A[I] = A[I] + B[I]; }
-    F.endForTT();
+    F.endFor();
 
     F.ret();
   }

@@ -35,9 +35,9 @@ int main() {
     LT.beginFunction();
     {
       Ret[0] = 0;
-      LT.beginIfTT(Arg0 < Arg1);
+      LT.beginIf(Arg0 < Arg1);
       { Ret[0] = 1; }
-      LT.endIfTT();
+      LT.endIf();
       LT.ret();
     }
     LT.endFunction();
@@ -53,9 +53,9 @@ int main() {
     LE.beginFunction();
     {
       Ret[0] = 0;
-      LE.beginIfTT(Arg0 <= Arg1);
+      LE.beginIf(Arg0 <= Arg1);
       { Ret[0] = 1; }
-      LE.endIfTT();
+      LE.endIf();
       LE.ret();
     }
     LE.endFunction();
@@ -71,9 +71,9 @@ int main() {
     GT.beginFunction();
     {
       Ret[0] = 0;
-      GT.beginIfTT(Arg0 > Arg1);
+      GT.beginIf(Arg0 > Arg1);
       { Ret[0] = 1; }
-      GT.endIfTT();
+      GT.endIf();
       GT.ret();
     }
     GT.endFunction();
@@ -89,9 +89,9 @@ int main() {
     GE.beginFunction();
     {
       Ret[0] = 0;
-      GE.beginIfTT(Arg0 >= Arg1);
+      GE.beginIf(Arg0 >= Arg1);
       { Ret[0] = 1; }
-      GE.endIfTT();
+      GE.endIf();
       GE.ret();
     }
     GE.endFunction();
@@ -107,9 +107,9 @@ int main() {
     EQ.beginFunction();
     {
       Ret[0] = 0;
-      EQ.beginIfTT(Arg0 == Arg1);
+      EQ.beginIf(Arg0 == Arg1);
       { Ret[0] = 1; }
-      EQ.endIfTT();
+      EQ.endIf();
       EQ.ret();
     }
     EQ.endFunction();
@@ -125,9 +125,9 @@ int main() {
     NE.beginFunction();
     {
       Ret[0] = 0;
-      NE.beginIfTT(Arg0 != Arg1);
+      NE.beginIf(Arg0 != Arg1);
       { Ret[0] = 1; }
-      NE.endIfTT();
+      NE.endIf();
       NE.ret();
     }
     NE.endFunction();

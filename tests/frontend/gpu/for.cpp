@@ -38,9 +38,9 @@ int main() {
     I = 0;
     UB = 10;
     Inc = 1;
-    F.beginForTT(I, I, UB, Inc);
+    F.beginFor(I, I, UB, Inc);
     { Arg[I] = Arg[I] + 1.0; }
-    F.endForTT();
+    F.endFor();
     F.ret();
   }
   F.endFunction();

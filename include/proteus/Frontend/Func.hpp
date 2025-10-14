@@ -74,7 +74,7 @@ protected:
   }
 
   template <typename T>
-  VarTT<T> emitAtomicTT(AtomicRMWInst::BinOp Op, const VarTT<T*> &Addr, 
+  VarTT<T> emitAtomic(AtomicRMWInst::BinOp Op, const VarTT<T*> &Addr, 
                         const VarTT<T> &Val);
 
 public:
@@ -137,12 +137,12 @@ public:
   }
 
   template <typename T>
-  VarTT<T> defRuntimeConstTT(T Val, StringRef Name = "run.const.var") {
+  VarTT<T> defRuntimeConst(T Val, StringRef Name = "run.const.var") {
     return defVar<T>(Val, Name);
   }
 
-  template <typename... ArgT> auto defRuntimeConstsTT(ArgT &&...Args) {
-    return std::make_tuple(defRuntimeConstTT(std::forward<ArgT>(Args))...);
+  template <typename... ArgT> auto defRuntimeConsts(ArgT &&...Args) {
+    return std::make_tuple(defRuntimeConst(std::forward<ArgT>(Args))...);
   }
 
   void beginFunction(const char *File = __builtin_FILE(),
@@ -150,31 +150,31 @@ public:
   void endFunction();
 
 
-  void beginIfTT(const VarTT<bool> &CondVar, const char *File = __builtin_FILE(),
+  void beginIf(const VarTT<bool> &CondVar, const char *File = __builtin_FILE(),
                  int Line = __builtin_LINE());
-  void endIfTT();
+  void endIf();
 
   template<typename T>
-  void beginForTT(VarTT<T> &IterVar, const VarTT<T> &InitVar, const VarTT<T> &UpperBound, const VarTT<T> &IncVar,
+  void beginFor(VarTT<T> &IterVar, const VarTT<T> &InitVar, const VarTT<T> &UpperBound, const VarTT<T> &IncVar,
                   const char *File = __builtin_FILE(),
                   int Line = __builtin_LINE());
-  void endForTT();
+  void endFor();
 
   template <typename Sig>
   std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, VarTT<typename FnSig<Sig>::RetT>>
-  callTT(StringRef Name);
+  call(StringRef Name);
 
   template <typename Sig>
   std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
-  callTT(StringRef Name);
+  call(StringRef Name);
 
   template <typename Sig, typename... ArgVars>
   std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, VarTT<typename FnSig<Sig>::RetT>>
-  callTT(StringRef Name, ArgVars &&...ArgsVars);
+  call(StringRef Name, ArgVars &&...ArgsVars);
 
   template <typename Sig, typename... ArgVars>
   std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
-  callTT(StringRef Name, ArgVars &&...ArgsVars);
+  call(StringRef Name, ArgVars &&...ArgsVars);
 
   template <typename BuiltinFuncT>
   decltype(auto) callBuiltin(BuiltinFuncT &&BuiltinFunc) {
@@ -311,9 +311,9 @@ public:
   }
 };
 
-// beginForTT implementation
+// beginFor implementation
 template<typename T>
-void FuncBase::beginForTT(VarTT<T> &IterVar, const VarTT<T> &Init, const VarTT<T> &UpperBound, const VarTT<T> &Inc,
+void FuncBase::beginFor(VarTT<T> &IterVar, const VarTT<T> &Init, const VarTT<T> &UpperBound, const VarTT<T> &Inc,
                           const char *File, int Line) {
   static_assert(std::is_integral_v<T>, "Loop iterator must be an integral type");
   
@@ -1038,7 +1038,7 @@ operator%(const T &ConstValue, const VarTT<U> &Var) {
 
 // Atomic operations for VarTT
 template <typename T>
-VarTT<T> FuncBase::emitAtomicTT(AtomicRMWInst::BinOp Op, const VarTT<T*> &Addr,
+VarTT<T> FuncBase::emitAtomic(AtomicRMWInst::BinOp Op, const VarTT<T*> &Addr,
                                 const VarTT<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "Atomic ops require arithmetic type");
 
@@ -1062,7 +1062,7 @@ FuncBase::atomicAdd(const VarTT<T*> &Addr, const VarTT<T>& Val) {
   Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
   auto Op =
       ValueType->isFloatingPointTy() ? AtomicRMWInst::FAdd : AtomicRMWInst::Add;
-  return emitAtomicTT(Op, Addr, Val);
+  return emitAtomic(Op, Addr, Val);
 }
 
 template <typename T>
@@ -1073,7 +1073,7 @@ FuncBase::atomicSub(const VarTT<T*> &Addr, const VarTT<T>& Val) {
   Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
   auto Op =
       ValueType->isFloatingPointTy() ? AtomicRMWInst::FSub : AtomicRMWInst::Sub;
-  return emitAtomicTT(Op, Addr, Val);
+  return emitAtomic(Op, Addr, Val);
 }
 
 template <typename T>
@@ -1084,7 +1084,7 @@ FuncBase::atomicMax(const VarTT<T*> &Addr, const VarTT<T>& Val) {
   Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
   auto Op =
       ValueType->isFloatingPointTy() ? AtomicRMWInst::FMax : AtomicRMWInst::Max;
-  return emitAtomicTT(Op, Addr, Val);
+  return emitAtomic(Op, Addr, Val);
 }
 
 template <typename T>
@@ -1095,7 +1095,7 @@ FuncBase::atomicMin(const VarTT<T*> &Addr, const VarTT<T>& Val) {
   Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
   auto Op =
       ValueType->isFloatingPointTy() ? AtomicRMWInst::FMin : AtomicRMWInst::Min;
-  return emitAtomicTT(Op, Addr, Val);
+  return emitAtomic(Op, Addr, Val);
 }
 
 inline void FuncBase::ret() {
@@ -1202,9 +1202,9 @@ min(const VarTT<T> &L, const VarTT<T> &R) {
 
   VarTT<T> ResultVar = Fn.declVar<T>("min_res");
   ResultVar = R;
-  Fn.beginIfTT(L < R);
+  Fn.beginIf(L < R);
   { ResultVar = L; }
-  Fn.endIfTT();
+  Fn.endIf();
   return ResultVar;
 }
 

@@ -27,11 +27,11 @@ static auto getTiledMatmulFunction(int N, int TileI, int TileJ, int TileK) {
       auto I = F.defVar<int>(0, "i");
       auto J = F.defVar<int>(0, "j");
       auto K = F.defVar<int>(0, "k");
-      auto UbnI = F.defRuntimeConstTT<int>(N, "ubn_i");
-      auto UbnJ = F.defRuntimeConstTT<int>(N, "ubn_j");
-      auto UbnK = F.defRuntimeConstTT<int>(N, "ubn_k");
-      auto IncOne = F.defRuntimeConstTT<int>(1, "inc");
-      auto Zero = F.defRuntimeConstTT<int>(0, "zero");
+      auto UbnI = F.defRuntimeConst<int>(N, "ubn_i");
+      auto UbnJ = F.defRuntimeConst<int>(N, "ubn_j");
+      auto UbnK = F.defRuntimeConst<int>(N, "ubn_k");
+      auto IncOne = F.defRuntimeConst<int>(1, "inc");
+      auto Zero = F.defRuntimeConst<int>(0, "zero");
 
       F.buildLoopNest(F.forLoop<int>({I, Zero, UbnI, IncOne}).tile(TileI),
                       F.forLoop<int>({J, Zero, UbnJ, IncOne}).tile(TileJ),

@@ -80,20 +80,20 @@ auto createJitModuleSpecial(float _b1, float _b2, float _eps, float _grad_scale,
   F.beginFunction();
   {
     auto [b1, b2, eps, grad_scale, step_size, time_step, vector_size, mode,
-          decay] = F.defRuntimeConstsTT(_b1, _b2, _eps, _grad_scale, _step_size,
+          decay] = F.defRuntimeConsts(_b1, _b2, _eps, _grad_scale, _step_size,
                                       _time_step, _vector_size, _mode, _decay);
 
     i = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +
         F.callBuiltin(getThreadIdX);
     totThreads = F.callBuiltin(getGridDimX) * F.callBuiltin(getBlockDimX);
 
-    F.beginForTT(j, i, vector_size, totThreads);
+    F.beginFor(j, i, vector_size, totThreads);
     {
       auto lim = F.declVar<int>("lim");
       t = 1;
       inc1 = 1;
       lim = time_step + 1;
-      F.beginForTT(t, t, lim, inc1);
+      F.beginFor(t, t, lim, inc1);
       {
         auto scaled_grad = F.declVar<float>("scale_grad");
         scaled_grad = g[j] / grad_scale;
@@ -107,22 +107,22 @@ auto createJitModuleSpecial(float _b1, float _b2, float _eps, float _grad_scale,
         v_corrected = v[j] / (1.f - powf(b2, F.convertTT<float>(t)));
 
         auto denom = F.declVar<float>("denom");
-        F.beginIfTT(mode == 0);
+        F.beginIf(mode == 0);
         { denom = sqrtf(v_corrected + eps); }
-        F.endIfTT();
+        F.endIf();
 
-        F.beginIfTT(mode == 1);
+        F.beginIf(mode == 1);
         { denom = sqrtf(v_corrected) + eps; }
-        F.endIfTT();
+        F.endIf();
 
         auto update = F.declVar<float>("update");
         update = (m_corrected / denom) + (decay * p[j]);
 
         p[j] -= (step_size * update);
       }
-      F.endForTT();
+      F.endFor();
     }
-    F.endForTT();
+    F.endFor();
     F.ret();
   }
   F.endFunction();

@@ -54,7 +54,7 @@ int main() {
     auto FloatHalf = F.defVar<float>(0.5f);
     auto FloatOne = F.defVar<float>(1.0f);
 
-    F.beginIfTT(I < N);
+    F.beginIf(I < N);
     {
       F.atomicAdd(IntAdd, IntOne);
       F.atomicSub(IntSub, IntOne);
@@ -68,7 +68,7 @@ int main() {
       F.atomicMax(FloatMax, IdxAsFloat);
       F.atomicMin(FloatMin, IdxAsFloat);
     }
-    F.endIfTT();
+    F.endIf();
 
     F.ret();
   }

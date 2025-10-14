@@ -50,9 +50,9 @@ int main() {
     Inc = F.callBuiltin(getGridDimX) * F.callBuiltin(getBlockDimX);
 
     // Strided loop: each thread processes multiple elements.
-    F.beginForTT(I, I, N, Inc);
+    F.beginFor(I, I, N, Inc);
     { A[I] = A[I] + B[I]; }
-    F.endForTT();
+    F.endFor();
 
     F.ret();
   }

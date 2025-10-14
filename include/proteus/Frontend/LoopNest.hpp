@@ -37,9 +37,9 @@ public:
   }
 
   void emit() {
-    Fn.beginForTT(Bounds.IterVar, Bounds.Init, Bounds.UpperBound, Bounds.Inc);
+    Fn.beginFor(Bounds.IterVar, Bounds.Init, Bounds.UpperBound, Bounds.Inc);
     Body();
-    Fn.endForTT();
+    Fn.endFor();
   }
 };
 
@@ -81,7 +81,7 @@ private:
           auto &Loop = std::get<Is>(Loops);
           if (Loop.TileSize.has_value()) {
             auto &Bounds = *TiledLoopBounds[Is];
-            Fn.beginForTT(Bounds.IterVar, Bounds.Init, Bounds.UpperBound,
+            Fn.beginFor(Bounds.IterVar, Bounds.Init, Bounds.UpperBound,
                           Bounds.Inc);
           }
         }(),
@@ -98,10 +98,10 @@ private:
             auto EndCandidate = TiledBounds.IterVar + TiledBounds.Inc;
             // Clamp to handle partial tiles.
             EndCandidate = min(EndCandidate, TiledBounds.UpperBound);
-            Fn.beginForTT(Loop.Bounds.IterVar, TiledBounds.IterVar, EndCandidate,
+            Fn.beginFor(Loop.Bounds.IterVar, TiledBounds.IterVar, EndCandidate,
                           Loop.Bounds.Inc);
           } else {
-            Fn.beginForTT(Loop.Bounds.IterVar, Loop.Bounds.Init,
+            Fn.beginFor(Loop.Bounds.IterVar, Loop.Bounds.Init,
                           Loop.Bounds.UpperBound, Loop.Bounds.Inc);
           }
           Loop.Body();
@@ -111,7 +111,7 @@ private:
         [&]() {
           // Force unpacking so we emit enough endFors.
           (void)std::get<Is>(Loops);
-          Fn.endForTT();
+          Fn.endFor();
         }(),
         ...);
   }
@@ -122,7 +122,7 @@ private:
           // Close tiled loops in reverse order to properly handle nesting.
           auto &Loop = std::get<sizeof...(Is) - 1U - Is>(Loops);
           if (Loop.TileSize.has_value()) {
-            Fn.endForTT();
+            Fn.endFor();
           }
         }(),
         ...);

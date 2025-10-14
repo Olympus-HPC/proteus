@@ -24,9 +24,9 @@ int main() {
     {
       auto Ret = LT.declVar<double>("ret");
       Ret = 0;
-      LT.beginIfTT(Arg0 < Arg1);
+      LT.beginIf(Arg0 < Arg1);
       { Ret = 1; }
-      LT.endIfTT();
+      LT.endIf();
       LT.ret(Ret);
     }
     LT.endFunction();
@@ -41,9 +41,9 @@ int main() {
     {
       auto Ret = LE.declVar<double>("ret");
       Ret = 0;
-      LE.beginIfTT(Arg0 <= Arg1);
+      LE.beginIf(Arg0 <= Arg1);
       { Ret = 1; }
-      LE.endIfTT();
+      LE.endIf();
       LE.ret(Ret);
     }
     LE.endFunction();
@@ -58,9 +58,9 @@ int main() {
     {
       auto Ret = GT.declVar<double>("ret");
       Ret = 0;
-      GT.beginIfTT(Arg0 > Arg1);
+      GT.beginIf(Arg0 > Arg1);
       { Ret = 1; }
-      GT.endIfTT();
+      GT.endIf();
       GT.ret(Ret);
     }
     GT.endFunction();
@@ -75,9 +75,9 @@ int main() {
     {
       auto Ret = GE.declVar<double>("ret");
       Ret = 0;
-      GE.beginIfTT(Arg0 >= Arg1);
+      GE.beginIf(Arg0 >= Arg1);
       { Ret = 1; }
-      GE.endIfTT();
+      GE.endIf();
       GE.ret(Ret);
     }
     GE.endFunction();
@@ -92,9 +92,9 @@ int main() {
     {
       auto Ret = EQ.declVar<double>("ret");
       Ret = 0;
-      EQ.beginIfTT(Arg0 == Arg1);
+      EQ.beginIf(Arg0 == Arg1);
       { Ret = 1; }
-      EQ.endIfTT();
+      EQ.endIf();
       EQ.ret(Ret);
     }
     EQ.endFunction();
@@ -109,9 +109,9 @@ int main() {
     {
       auto Ret = NE.declVar<double>("ret");
       Ret = 0;
-      NE.beginIfTT(Arg0 != Arg1);
+      NE.beginIf(Arg0 != Arg1);
       { Ret = 1; }
-      NE.endIfTT();
+      NE.endIf();
       NE.ret(Ret);
     }
     NE.endFunction();

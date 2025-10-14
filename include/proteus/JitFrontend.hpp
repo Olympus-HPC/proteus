@@ -288,7 +288,7 @@ public:
 
 template <typename Sig>
 std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, VarTT<typename FnSig<Sig>::RetT>>
-FuncBase::callTT(StringRef Name) {
+FuncBase::call(StringRef Name) {
   using RetT = typename FnSig<Sig>::RetT;
   auto *F = getFunction();
   LLVMContext &Ctx = F->getContext();
@@ -303,7 +303,7 @@ FuncBase::callTT(StringRef Name) {
 
 template <typename Sig>
 std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
-FuncBase::callTT(StringRef Name) {
+FuncBase::call(StringRef Name) {
   using RetT = typename FnSig<Sig>::RetT;
   using ArgT = typename FnSig<Sig>::ArgsTList;
   FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
@@ -312,7 +312,7 @@ FuncBase::callTT(StringRef Name) {
 
 template <typename Sig, typename... ArgVars>
 std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>, VarTT<typename FnSig<Sig>::RetT>>
-FuncBase::callTT(StringRef Name, ArgVars &&...ArgsVars) {
+FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
   auto *F = getFunction();
   LLVMContext &Ctx = F->getContext();
 
@@ -328,7 +328,7 @@ FuncBase::callTT(StringRef Name, ArgVars &&...ArgsVars) {
 
 template <typename Sig, typename... ArgVars>
 std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
-FuncBase::callTT(StringRef Name, ArgVars &&...ArgsVars) {
+FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
   using RetT = typename FnSig<Sig>::RetT;
   using ArgT = typename FnSig<Sig>::ArgsTList;
 

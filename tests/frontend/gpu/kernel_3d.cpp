@@ -49,11 +49,11 @@ int main() {
     K = F.callBuiltin(getBlockIdZ) * F.callBuiltin(getBlockDimZ) +
         F.callBuiltin(getThreadIdZ);
 
-    F.beginIfTT(I < X);
+    F.beginIf(I < X);
     {
-      F.beginIfTT(JVar < Y);
+      F.beginIf(JVar < Y);
       {
-        F.beginIfTT(K < Z);
+        F.beginIf(K < Z);
         {
           auto XY = F.declVar<size_t>("xy");
           auto KXY = F.declVar<size_t>("kxy");
@@ -67,11 +67,11 @@ int main() {
 
           C[Idx] = A[Idx] + B[Idx];
         }
-        F.endIfTT();
+        F.endIf();
       }
-      F.endIfTT();
+      F.endIf();
     }
-    F.endIfTT();
+    F.endIf();
 
     F.ret();
   }

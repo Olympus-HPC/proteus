@@ -27,11 +27,11 @@ auto createJitFunction(size_t N) {
     auto I = F.defVar<size_t>(0, "I");
     auto Inc = F.defVar<size_t>(1, "Inc");
     // Runtime constant vector size
-    auto RunConstN = F.defRuntimeConstTT(N);
+    auto RunConstN = F.defRuntimeConst(N);
     // Element-wise addition over all vector elements.
-    F.beginForTT(I, I, RunConstN, Inc);
+    F.beginFor(I, I, RunConstN, Inc);
     { A[I] = A[I] + B[I]; }
-    F.endForTT();
+    F.endFor();
 
     F.ret();
   }

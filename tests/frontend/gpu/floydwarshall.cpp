@@ -88,7 +88,7 @@ auto createJitModuleSpecial(unsigned int _numNodes) {
   F.beginFunction();
   {
     // Bake only numNodes as a runtime constant; pass is a dynamic kernel arg
-    auto rcNumNodes = F.defRuntimeConstTT<unsigned int>(_numNodes, "numNodes");
+    auto rcNumNodes = F.defRuntimeConst<unsigned int>(_numNodes, "numNodes");
 
     auto idx = F.declVar<unsigned int>("idx");
     auto totThreads = F.declVar<unsigned int>("totThreads");
@@ -114,20 +114,20 @@ auto createJitModuleSpecial(unsigned int _numNodes) {
     // Guard against overrun when grid > N*N
     auto n2 = F.declVar<unsigned int>("n2");
     n2 = rcNumNodes * rcNumNodes;
-    F.beginIfTT(idx < n2);
+    F.beginIf(idx < n2);
     {
       oldWeight = pathDistanceBuffer[yValue * rcNumNodes + xValue];
       tempWeight = pathDistanceBuffer[yValue * rcNumNodes + k] +
                    pathDistanceBuffer[k * rcNumNodes + xValue];
 
-      F.beginIfTT(tempWeight < oldWeight);
+      F.beginIf(tempWeight < oldWeight);
       {
         pathDistanceBuffer[yValue * rcNumNodes + xValue] = tempWeight;
         pathBuffer[yValue * rcNumNodes + xValue] = k;
       }
-      F.endIfTT();
+      F.endIf();
     }
-    F.endIfTT();
+    F.endIf();
     F.ret();
   }
   F.endFunction();

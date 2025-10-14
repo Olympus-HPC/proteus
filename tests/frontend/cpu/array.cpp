@@ -24,26 +24,26 @@ int main() {
     auto Local = F.declVar<double[]>(16, AddressSpace::DEFAULT, "local_array");
     auto Global = F.declVar<double[]>(16, AddressSpace::GLOBAL, "global_array");
 
-    auto Bound = F.defRuntimeConstTT<size_t>(16, "Bound");
+    auto Bound = F.defRuntimeConst<size_t>(16, "Bound");
 
-    F.beginForTT(I, I, Bound, Inc);
+    F.beginFor(I, I, Bound, Inc);
     { Local[I] = 2.0 * I; }
-    F.endForTT();
+    F.endFor();
 
     I = 0;
-    F.beginForTT(I, I, Bound, Inc);
+    F.beginFor(I, I, Bound, Inc);
     { Global[I] = 1000.0 + I; }
-    F.endForTT();
+    F.endFor();
 
     I = 0;
-    F.beginForTT(I, I, Bound, Inc);
+    F.beginFor(I, I, Bound, Inc);
     { OutLocal[I] = Local[I]; }
-    F.endForTT();
+    F.endFor();
 
     I = 0;
-    F.beginForTT(I, I, Bound, Inc);
+    F.beginFor(I, I, Bound, Inc);
     { OutGlobal[I] = Global[I]; }
-    F.endForTT();
+    F.endFor();
 
     F.ret();
   }
