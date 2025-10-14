@@ -379,19 +379,6 @@ Var<std::common_type_t<T, U>> binOp(const Var<T> &L, const Var<U> &R, IntOp IOp,
   return ResultVar;
 }
 
-// Helper function for compound assignment with another Var
-template <typename T, typename U, typename BinOp>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
-compoundAssignVar(Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
-                  const Var<U> &RHS, BinOp Op) {
-  static_assert(std::is_convertible_v<U, T>, "U must be convertible to T");
-  auto Result = Op(LHS, RHS);
-  auto &IRB = LHS.Fn.getIRBuilder();
-  auto *Converted = convert<std::common_type_t<T, U>, T>(IRB, Result.loadValue());
-  LHS.storeValue(Converted);
-  return LHS;
-}
-
 // Helper function for compound assignment with a constant
 template <typename T, typename U, typename IntOp, typename FPOp>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
@@ -441,15 +428,13 @@ Var<bool> cmpOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
   Value *LHS = L.loadValue();
   Value *RHS = R.loadValue();
 
-  using CommonT = std::common_type_t<T, U>;
-  LHS = convert<T, CommonT>(IRB, LHS);
-  RHS = convert<U, CommonT>(IRB, RHS);
+  RHS = convert<U, T>(IRB, RHS);
 
   Value *Result = nullptr;
-  if constexpr (std::is_integral_v<CommonT>) {
+  if constexpr (std::is_integral_v<T>) {
     Result = IOp(IRB, LHS, RHS);
   } else {
-    static_assert(std::is_floating_point_v<CommonT>, "Unsupported type");
+    static_assert(std::is_floating_point_v<T>, "Unsupported type");
     Result = FOp(IRB, LHS, RHS);
   }
 
@@ -638,8 +623,9 @@ template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+=(
     const Var<U> &Other) {
-  return compoundAssignVar(*this, Other,
-                           [](auto &L, auto &R) { return L + R; });
+  auto Result = (*this) + Other;
+  *this = Result;
+  return *this;
 }
 
 template <typename T>
@@ -660,8 +646,9 @@ template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-=(
     const Var<U> &Other) {
-  return compoundAssignVar(*this, Other,
-                           [](auto &L, auto &R) { return L - R; });
+  auto Result = (*this) - Other;
+  *this = Result;
+  return *this;
 }
 
 template <typename T>
@@ -682,8 +669,9 @@ template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*=(
     const Var<U> &Other) {
-  return compoundAssignVar(*this, Other,
-                           [](auto &L, auto &R) { return L * R; });
+  auto Result = (*this) * Other;
+  *this = Result;
+  return *this;
 }
 
 template <typename T>
@@ -704,8 +692,9 @@ template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/=(
     const Var<U> &Other) {
-  return compoundAssignVar(*this, Other,
-                           [](auto &L, auto &R) { return L / R; });
+  auto Result = (*this) / Other;
+  *this = Result;
+  return *this;
 }
 
 template <typename T>
@@ -726,8 +715,9 @@ template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%=(
     const Var<U> &Other) {
-  return compoundAssignVar(*this, Other,
-                           [](auto &L, auto &R) { return L % R; });
+  auto Result = (*this) % Other;
+  *this = Result;
+  return *this;
 }
 
 template <typename T>
