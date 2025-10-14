@@ -1,7 +1,6 @@
 #ifndef PROTEUS_FRONTEND_FUNC_HPP
 #define PROTEUS_FRONTEND_FUNC_HPP
 
-#include <deque>
 #include <memory>
 
 #include <llvm/IR/IRBuilder.h>
@@ -225,11 +224,9 @@ public:
   // the converted value.
   template <typename U, typename T>
   std::enable_if_t<std::is_convertible_v<T, U>, Var<U>> convert(Var<T> &V) {
-    auto &Ctx = getFunction()->getContext();
     auto &IRBRef = getIRBuilder();
-    Type *TargetTy = TypeMap<U>::get(Ctx);
     Var<U> Res = declVarInternal<U>("convert.");
-    Value *Converted = proteus::convert(IRBRef, V.loadValue(), TargetTy);
+    Value *Converted = proteus::convert<T, U>(IRBRef, V.loadValue());
     Res.storeValue(Converted);
     return Res;
   }
@@ -365,15 +362,12 @@ Var<std::common_type_t<T, U>> binOp(const Var<T> &L, const Var<U> &R, IntOp IOp,
   Value *LHS = L.loadValue();
   Value *RHS = R.loadValue();
 
-  Function *Function = Fn.getFunction();
-  Type *CommonType =
-      TypeMap<std::common_type_t<T, U>>::get(Function->getContext());
-
-  LHS = convert(IRB, LHS, CommonType);
-  RHS = convert(IRB, RHS, CommonType);
+  using CommonT = std::common_type_t<T, U>;
+  LHS = convert<T, CommonT>(IRB, LHS);
+  RHS = convert<U, CommonT>(IRB, RHS);
 
   Value *Result = nullptr;
-  if constexpr (std::is_integral_v<std::common_type_t<T, U>>) {
+  if constexpr (std::is_integral_v<CommonT>) {
     Result = IOp(IRB, LHS, RHS);
   } else {
     Result = FOp(IRB, LHS, RHS);
@@ -390,9 +384,11 @@ template <typename T, typename U, typename BinOp>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 compoundAssignVar(Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
                   const Var<U> &RHS, BinOp Op) {
+  static_assert(std::is_convertible_v<U, T>, "U must be convertible to T");
   auto Result = Op(LHS, RHS);
   auto &IRB = LHS.Fn.getIRBuilder();
-  auto *Converted = convert(IRB, Result.loadValue(), LHS.getValueType());
+  using CommonT = std::common_type_t<T, U>;
+  auto *Converted = convert<std::common_type_t<T, U>, T>(IRB, Result.loadValue());
   LHS.storeValue(Converted);
   return LHS;
 }
@@ -402,7 +398,7 @@ template <typename T, typename U, typename IntOp, typename FPOp>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 compoundAssignConst(Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
                     const U &ConstValue, IntOp IOp, FPOp FOp) {
-  Type *LHSType = LHS.getValueType();
+  static_assert(std::is_convertible_v<U, T>, "U must be convertible to T");
   auto &IRB = LHS.Fn.getIRBuilder();
 
   using CleanU = std::remove_cv_t<std::remove_reference_t<U>>;
@@ -420,21 +416,17 @@ compoundAssignConst(Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
 
   Value *LHSVal = LHS.loadValue();
 
-  Type *CommonType =
-      TypeMap<std::common_type_t<T, U>>::get(Function->getContext());
-
-  LHSVal = convert(IRB, LHSVal, CommonType);
-  RHS = convert(IRB, RHS, CommonType);
+  RHS = convert<CleanU,T>(IRB, RHS);
   Value *Result = nullptr;
 
-  if constexpr (std::is_integral_v<std::common_type_t<T, U>>) {
+  if constexpr (std::is_integral_v<T>) {
     Result = IOp(IRB, LHSVal, RHS);
   } else {
+    static_assert(std::is_floating_point_v<T>, "Unsupported type");
     Result = FOp(IRB, LHSVal, RHS);
   }
 
-  Value *ConvertedResult = convert(IRB, Result, LHSType);
-  LHS.storeValue(ConvertedResult);
+  LHS.storeValue(Result);
   return LHS;
 }
 
@@ -450,17 +442,15 @@ Var<bool> cmpOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
   Value *LHS = L.loadValue();
   Value *RHS = R.loadValue();
 
-  Function *Function = Fn.getFunction();
-  Type *CommonType =
-      TypeMap<std::common_type_t<T, U>>::get(Function->getContext());
-
-  LHS = convert(IRB, LHS, CommonType);
-  RHS = convert(IRB, RHS, CommonType);
+  using CommonT = std::common_type_t<T, U>;
+  LHS = convert<T, CommonT>(IRB, LHS);
+  RHS = convert<U, CommonT>(IRB, RHS);
 
   Value *Result = nullptr;
-  if constexpr (std::is_integral_v<std::common_type_t<T, U>>) {
+  if constexpr (std::is_integral_v<CommonT>) {
     Result = IOp(IRB, LHS, RHS);
   } else {
+    static_assert(std::is_floating_point_v<CommonT>, "Unsupported type");
     Result = FOp(IRB, LHS, RHS);
   }
 
@@ -484,9 +474,7 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::Var(const Var<U> &V)
 template <typename T>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(const Var &V) {
-  auto &IRB = Fn.getIRBuilder();
-  auto *Converted = convert(IRB, V.loadValue(), getValueType());
-  storeValue(Converted);
+  storeValue(V.loadValue());
   return *this;
 }
 
@@ -498,9 +486,7 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(Var &&V) {
     Storage = std::move(V.Storage);
   } else {
     // If we have storage, copy the value.
-    auto &IRB = Fn.getIRBuilder();
-    auto *Converted = convert(IRB, V.loadValue(), getValueType());
-    storeValue(Converted);
+    storeValue(V.loadValue());
   }
   return *this;
 }
@@ -510,7 +496,7 @@ template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(const Var<U> &V) {
   auto &IRB = Fn.getIRBuilder();
-  auto *Converted = convert(IRB, V.loadValue(), getValueType());
+  auto *Converted = convert<U, T>(IRB, V.loadValue());
   storeValue(Converted);
   return *this;
 }
@@ -868,8 +854,7 @@ Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator+(
   auto &IRB = Fn.getIRBuilder();
 
   auto *OffsetVal = Offset.loadValue();
-  auto *IntTy = IRB.getInt64Ty();
-  auto *IdxVal = convert(IRB, OffsetVal, IntTy);
+  auto *IdxVal = convert<OffsetT, int64_t>(IRB, OffsetVal);
 
   auto *BasePtr = loadValue(VarStorage::AccessKind::Direct);
   auto *ElemTy = getValueType();
@@ -1180,6 +1165,19 @@ template <typename T> void FuncBase::ret(const Var<T> &RetVal) {
   TermI->eraseFromParent();
 }
 
+// Helper struct to convert Var operands to a target type T.
+// Used by emitIntrinsic to convert all operands to the intrinsic's result type.
+// C++17 doesn't support template parameters on lambdas, so we use a struct.
+template <typename T>
+struct IntrinsicOperandConverter {
+  IRBuilderBase &IRB;
+  
+  template <typename U>
+  Value *operator()(const Var<U> &Operand) const {
+    return convert<U, T>(IRB, Operand.loadValue());
+  }
+};
+
 // Helper for emitting intrinsics with Var
 template <typename T, typename... Operands>
 static Var<T> emitIntrinsic(StringRef IntrinsicName, Type *ResultType,
@@ -1196,9 +1194,7 @@ static Var<T> emitIntrinsic(StringRef IntrinsicName, Type *ResultType,
   auto &IRB = Fn.getIRBuilder();
   auto &M = *Fn.getFunction()->getParent();
 
-  auto ConvertOperand = [&](const auto &Operand) {
-    return convert(IRB, Operand.loadValue(), ResultType);
-  };
+  IntrinsicOperandConverter<T> ConvertOperand{IRB};
 
   FunctionCallee Callee = M.getOrInsertFunction(IntrinsicName, ResultType,
                                                 ((void)Ops, ResultType)...);

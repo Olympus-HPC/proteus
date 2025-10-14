@@ -1,6 +1,8 @@
 #ifndef PROTEUS_FRONTEND_VAR_HPP
 #define PROTEUS_FRONTEND_VAR_HPP
 
+#include "proteus/Error.h"
+#include "proteus/Frontend/TypeMap.hpp"
 #include "proteus/Frontend/VarStorage.hpp"
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
@@ -12,8 +14,61 @@ class FuncBase;
 
 using namespace llvm;
 
-// Declare usual arithmetic conversion helper functions.
-Value *convert(IRBuilderBase IRB, Value *V, Type *TargetType);
+template <typename From, typename To>
+Value *convert(IRBuilderBase IRB, Value *V) {
+  static_assert(std::is_arithmetic_v<From>, "From type must be arithmetic");
+  static_assert(std::is_arithmetic_v<To>, "To type must be arithmetic");
+
+  if constexpr (std::is_same_v<From, To>) {
+    return V;
+  }
+  else if constexpr (std::is_integral_v<From> && std::is_floating_point_v<To>) {
+    Type *TargetType = TypeMap<To>::get(V->getContext());
+    if constexpr (std::is_signed_v<From>) {
+      return IRB.CreateSIToFP(V, TargetType);
+    } else {
+      return IRB.CreateUIToFP(V, TargetType);
+    }
+  }
+  else if constexpr (std::is_floating_point_v<From> && std::is_integral_v<To>) {
+    Type *TargetType = TypeMap<To>::get(V->getContext());
+    if constexpr (std::is_signed_v<To>) {
+      return IRB.CreateFPToSI(V, TargetType);
+    } else {
+      return IRB.CreateFPToUI(V, TargetType);
+    }
+  }
+  else if constexpr (std::is_integral_v<From> && std::is_integral_v<To>) {
+    Type *TargetType = TypeMap<To>::get(V->getContext());
+    Type *ValType = V->getType();
+    
+    if (ValType->getIntegerBitWidth() < TargetType->getIntegerBitWidth()) {
+      if constexpr (std::is_signed_v<From>) {
+        return IRB.CreateSExt(V, TargetType);
+      } else {
+        return IRB.CreateZExt(V, TargetType);
+      }
+    } else if (ValType->getIntegerBitWidth() > TargetType->getIntegerBitWidth()) {
+      return IRB.CreateTrunc(V, TargetType);
+    } else {
+      return V;
+    }
+  }
+  else if constexpr (std::is_floating_point_v<From> && std::is_floating_point_v<To>) {
+    Type *TargetType = TypeMap<To>::get(V->getContext());
+    Type *ValType = V->getType();
+    
+    if (ValType->getScalarSizeInBits() < TargetType->getScalarSizeInBits()) {
+      return IRB.CreateFPExt(V, TargetType);
+    }
+    if (ValType->getScalarSizeInBits() > TargetType->getScalarSizeInBits()) {
+      return IRB.CreateFPTrunc(V, TargetType);
+    }
+    return V;
+  }
+  
+  PROTEUS_FATAL_ERROR("Unsupported conversion");
+}
 
 // Mixin that owns storage and exposes common helpers for Var specializations
 template <typename StorageT> struct VarStorageOwner {
