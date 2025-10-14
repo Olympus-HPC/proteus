@@ -65,7 +65,7 @@ adam(T *__restrict__ p, T *__restrict__ m, T *__restrict__ v,
 auto createJitModule() {
   auto J = std::make_unique<JitModule>(TARGET);
   auto KernelHandle =
-      J->addKernelTT<void(float *, float *, float *, float *, float, float, float,
+      J->addKernel<void(float *, float *, float *, float *, float, float, float,
                         float, float, int, size_t, int, float)>("adam");
   auto &F = KernelHandle.F;
   auto [p, m, v, g, b1, b2, eps, grad_scale, step_size, time_step, vector_size,

@@ -26,7 +26,7 @@ int main() {
 
   auto J = proteus::JitModule(TARGET);
   auto KernelHandle =
-      J.addKernelTT<void(double *, int *, float *, double *, int *, float *)>(
+      J.addKernel<void(double *, int *, float *, double *, int *, float *)>(
           "cast");
   auto &F = KernelHandle.F;
   auto &DOut = F.getArg<0>();

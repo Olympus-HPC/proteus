@@ -26,7 +26,7 @@ int main() {
   auto J = proteus::JitModule(TARGET);
 
   auto KernelHandle =
-      J.addKernelTT<void(int *, float *, int)>("atomic_ops_kernel");
+      J.addKernel<void(int *, float *, int)>("atomic_ops_kernel");
   auto &F = KernelHandle.F;
 
   F.beginFunction();

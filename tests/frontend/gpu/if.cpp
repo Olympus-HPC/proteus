@@ -25,7 +25,7 @@ int main() {
   proteus::init();
 
   auto J = proteus::JitModule(TARGET);
-  auto KernelHandleLT = J.addKernelTT<void(double, double, double *)>("if_lt");
+  auto KernelHandleLT = J.addKernel<void(double, double, double *)>("if_lt");
   auto &LT = KernelHandleLT.F;
   {
     auto &Arg0 = LT.getArg<0>();
@@ -43,7 +43,7 @@ int main() {
     LT.endFunction();
   }
 
-  auto KernelHandleLE = J.addKernelTT<void(double, double, double *)>("if_le");
+  auto KernelHandleLE = J.addKernel<void(double, double, double *)>("if_le");
   auto &LE = KernelHandleLE.F;
   {
     auto &Arg0 = LE.getArg<0>();
@@ -61,7 +61,7 @@ int main() {
     LE.endFunction();
   }
 
-  auto KernelHandleGT = J.addKernelTT<void(double, double, double *)>("if_gt");
+  auto KernelHandleGT = J.addKernel<void(double, double, double *)>("if_gt");
   auto &GT = KernelHandleGT.F;
   {
     auto &Arg0 = GT.getArg<0>();
@@ -79,7 +79,7 @@ int main() {
     GT.endFunction();
   }
 
-  auto KernelHandleGE = J.addKernelTT<void(double, double, double *)>("if_ge");
+  auto KernelHandleGE = J.addKernel<void(double, double, double *)>("if_ge");
   auto &GE = KernelHandleGE.F;
   {
     auto &Arg0 = GE.getArg<0>();
@@ -97,7 +97,7 @@ int main() {
     GE.endFunction();
   }
 
-  auto KernelHandleEQ = J.addKernelTT<void(double, double, double *)>("if_eq");
+  auto KernelHandleEQ = J.addKernel<void(double, double, double *)>("if_eq");
   auto &EQ = KernelHandleEQ.F;
   {
     auto &Arg0 = EQ.getArg<0>();
@@ -115,7 +115,7 @@ int main() {
     EQ.endFunction();
   }
 
-  auto KernelHandleNE = J.addKernelTT<void(double, double, double *)>("if_ne");
+  auto KernelHandleNE = J.addKernel<void(double, double, double *)>("if_ne");
   auto &NE = KernelHandleNE.F;
   {
     auto &Arg0 = NE.getArg<0>();

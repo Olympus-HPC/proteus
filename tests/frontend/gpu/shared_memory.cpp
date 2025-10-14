@@ -27,7 +27,7 @@ constexpr unsigned WarpSize = 32;
 int main() {
   auto J = proteus::JitModule(TARGET);
 
-  auto KernelHandle = J.addKernelTT<void(double *)>("shared_reverse_warp");
+  auto KernelHandle = J.addKernel<void(double *)>("shared_reverse_warp");
   auto &F = KernelHandle.F;
 
   F.beginFunction();

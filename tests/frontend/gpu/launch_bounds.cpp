@@ -22,7 +22,7 @@ constexpr int MinBlocksPerSM = 4;
 int main() {
   auto J = proteus::JitModule(TARGET);
 
-  auto KernelHandle = J.addKernelTT<void()>("dsl_static_bounds");
+  auto KernelHandle = J.addKernel<void()>("dsl_static_bounds");
   auto &F = KernelHandle.F;
 
   F.beginFunction();
