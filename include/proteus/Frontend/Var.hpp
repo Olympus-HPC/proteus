@@ -21,43 +21,43 @@ Value *convert(IRBuilderBase IRB, Value *V) {
 
   if constexpr (std::is_same_v<From, To>) {
     return V;
-  }
-  else if constexpr (std::is_integral_v<From> && std::is_floating_point_v<To>) {
+  } else if constexpr (std::is_integral_v<From> &&
+                       std::is_floating_point_v<To>) {
     Type *TargetType = TypeMap<To>::get(V->getContext());
     if constexpr (std::is_signed_v<From>) {
       return IRB.CreateSIToFP(V, TargetType);
     } else {
       return IRB.CreateUIToFP(V, TargetType);
     }
-  }
-  else if constexpr (std::is_floating_point_v<From> && std::is_integral_v<To>) {
+  } else if constexpr (std::is_floating_point_v<From> &&
+                       std::is_integral_v<To>) {
     Type *TargetType = TypeMap<To>::get(V->getContext());
     if constexpr (std::is_signed_v<To>) {
       return IRB.CreateFPToSI(V, TargetType);
     } else {
       return IRB.CreateFPToUI(V, TargetType);
     }
-  }
-  else if constexpr (std::is_integral_v<From> && std::is_integral_v<To>) {
+  } else if constexpr (std::is_integral_v<From> && std::is_integral_v<To>) {
     Type *TargetType = TypeMap<To>::get(V->getContext());
     Type *ValType = V->getType();
-    
+
     if (ValType->getIntegerBitWidth() < TargetType->getIntegerBitWidth()) {
       if constexpr (std::is_signed_v<From>) {
         return IRB.CreateSExt(V, TargetType);
       } else {
         return IRB.CreateZExt(V, TargetType);
       }
-    } else if (ValType->getIntegerBitWidth() > TargetType->getIntegerBitWidth()) {
+    } else if (ValType->getIntegerBitWidth() >
+               TargetType->getIntegerBitWidth()) {
       return IRB.CreateTrunc(V, TargetType);
     } else {
       return V;
     }
-  }
-  else if constexpr (std::is_floating_point_v<From> && std::is_floating_point_v<To>) {
+  } else if constexpr (std::is_floating_point_v<From> &&
+                       std::is_floating_point_v<To>) {
     Type *TargetType = TypeMap<To>::get(V->getContext());
     Type *ValType = V->getType();
-    
+
     if (ValType->getScalarSizeInBits() < TargetType->getScalarSizeInBits()) {
       return IRB.CreateFPExt(V, TargetType);
     }
@@ -66,7 +66,7 @@ Value *convert(IRBuilderBase IRB, Value *V) {
     }
     return V;
   }
-  
+
   PROTEUS_FATAL_ERROR("Unsupported conversion");
 }
 

@@ -402,7 +402,7 @@ compoundAssignConst(Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
 
   Value *LHSVal = LHS.loadValue();
 
-  RHS = convert<CleanU,T>(IRB, RHS);
+  RHS = convert<CleanU, T>(IRB, RHS);
   Value *Result = nullptr;
 
   if constexpr (std::is_integral_v<T>) {
@@ -1157,12 +1157,10 @@ template <typename T> void FuncBase::ret(const Var<T> &RetVal) {
 // Helper struct to convert Var operands to a target type T.
 // Used by emitIntrinsic to convert all operands to the intrinsic's result type.
 // C++17 doesn't support template parameters on lambdas, so we use a struct.
-template <typename T>
-struct IntrinsicOperandConverter {
+template <typename T> struct IntrinsicOperandConverter {
   IRBuilderBase &IRB;
-  
-  template <typename U>
-  Value *operator()(const Var<U> &Operand) const {
+
+  template <typename U> Value *operator()(const Var<U> &Operand) const {
     return convert<U, T>(IRB, Operand.loadValue());
   }
 };
