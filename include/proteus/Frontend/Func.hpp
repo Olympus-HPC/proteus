@@ -346,7 +346,7 @@ void FuncBase::beginFor(Var<T> &IterVar, const Var<T> &Init,
   IRB.restoreIP(IP);
 }
 
-// Var arithmetic specialization implementations (defined here after FuncBase is
+// Var implementations (defined here after FuncBase is
 // complete) so we have it available.
 
 // Helper function for binary operations on Var types
