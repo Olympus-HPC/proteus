@@ -88,9 +88,6 @@ public:
 
   IRBuilderBase &getIRBuilder();
 
-  // Create a variable. If PointerElemType is non-null, a PointerVar is created
-  // with an alloca-backed pointer slot; otherwise a ScalarVar is created.
-  // TODO: Implement this.
   template <typename T> Var<T> declVarInternal(StringRef Name = "var") {
     static_assert(!std::is_array_v<T>, "Expected non-array type");
 
@@ -249,23 +246,9 @@ private:
   template <typename T, std::size_t ArgIdx> Var<T> createArg() {
     Function *F = getFunction();
     auto &Ctx = F->getContext();
-
-    Type *ArgTy = TypeMap<T>::get(Ctx);
-
-    auto *Alloca = emitAlloca(ArgTy, "arg." + std::to_string(ArgIdx));
-
-    // Store the function argument into the alloca
-    auto *Arg = F->getArg(ArgIdx);
-    IRB.CreateStore(Arg, Alloca);
-
-    // Create appropriate storage based on type
-    if constexpr (std::is_pointer_v<T>) {
-      Type *PtrElemTy = TypeMap<T>::getPointerElemType(Ctx);
-      return Var<T>(std::make_unique<PointerStorage>(Alloca, IRB, PtrElemTy),
-                    *this);
-    } else {
-      return Var<T>(std::make_unique<ScalarStorage>(Alloca, IRB), *this);
-    }
+    auto Var = declVarInternal<T>("arg." + std::to_string(ArgIdx));
+    Var.storeValue(F->getArg(ArgIdx), VarStorage::AccessKind::Direct);
+    return Var;
   }
 
   template <std::size_t... Is> void declArgsImpl(std::index_sequence<Is...>) {
@@ -397,12 +380,10 @@ Var<std::common_type_t<T, U>> binOp(const Var<T> &L, const Var<U> &R, IntOp IOp,
     Result = FOp(IRB, LHS, RHS);
   }
 
-  auto *ResultSlot = Fn.emitAlloca(Result->getType(), "res.");
-  IRB.CreateStore(Result, ResultSlot);
+  auto ResultVar = Fn.declVarInternal<std::common_type_t<T, U>>("res.");
+  ResultVar.storeValue(Result);
 
-  std::unique_ptr<VarStorage> ResultStorage =
-      std::make_unique<ScalarStorage>(ResultSlot, IRB);
-  return Var<std::common_type_t<T, U>>(std::move(ResultStorage), Fn);
+  return ResultVar;
 }
 
 // Helper function for compound assignment with another Var
@@ -484,12 +465,10 @@ Var<bool> cmpOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
     Result = FOp(IRB, LHS, RHS);
   }
 
-  auto *ResultSlot = Fn.emitAlloca(Result->getType(), "res.");
-  IRB.CreateStore(Result, ResultSlot);
+  auto ResultVar = Fn.declVarInternal<bool>("res.");
+  ResultVar.storeValue(Result);
 
-  std::unique_ptr<VarStorage> ResultStorage =
-      std::make_unique<ScalarStorage>(ResultSlot, IRB);
-  return Var<bool>(std::move(ResultStorage), Fn);
+  return ResultVar;
 }
 
 template <typename T>
