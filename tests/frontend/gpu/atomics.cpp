@@ -31,7 +31,7 @@ int main() {
 
   F.beginFunction();
   {
-    auto [IntCounters, FloatCounters, N] = F.getArgsTT();
+    auto [IntCounters, FloatCounters, N] = F.getArgs();
 
     auto Tid = F.callBuiltin(getThreadIdX);
     auto Bid = F.callBuiltin(getBlockIdX);
@@ -64,7 +64,7 @@ int main() {
       F.atomicAdd(FloatAdd, FloatHalf);
       F.atomicSub(FloatSub, FloatOne);
 
-      auto IdxAsFloat = F.convertTT<float>(I);
+      auto IdxAsFloat = F.convert<float>(I);
       F.atomicMax(FloatMax, IdxAsFloat);
       F.atomicMin(FloatMin, IdxAsFloat);
     }

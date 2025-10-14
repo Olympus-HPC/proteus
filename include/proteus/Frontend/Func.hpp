@@ -227,7 +227,7 @@ public:
   // Convert the given Var's value to type U and return a new Var holding
   // the converted value.
   template <typename U, typename T>
-  std::enable_if_t<std::is_convertible_v<T, U>, VarTT<U>> convertTT(VarTT<T> &V) {
+  std::enable_if_t<std::is_convertible_v<T, U>, VarTT<U>> convert(VarTT<T> &V) {
     auto &Ctx = getFunction()->getContext();
     auto &IRBRef = getIRBuilder();
     Type *TargetTy = TypeMap<U>::get(Ctx);
@@ -247,7 +247,7 @@ private:
 
 private:
   template <typename T, std::size_t ArgIdx>
-  VarTT<T> createArgTT() {
+  VarTT<T> createArg() {
     Function *F = getFunction();
     auto &Ctx = F->getContext();
     
@@ -269,19 +269,19 @@ private:
   }
 
   template <std::size_t... Is>
-  void declArgsTTImpl(std::index_sequence<Is...>) {
+  void declArgsImpl(std::index_sequence<Is...>) {
     Function *F = getFunction();
     auto &EntryBB = F->getEntryBlock();
     IP = IRBuilderBase::InsertPoint(&EntryBB, EntryBB.end());
     IRB.restoreIP(IP);
     
-    (std::get<Is>(ArgumentsTT).emplace(createArgTT<ArgT, Is>()), ...);
+    (std::get<Is>(ArgumentsTT).emplace(createArg<ArgT, Is>()), ...);
     
     IRB.ClearInsertionPoint();
   }
 
   template<std::size_t... Is>
-  auto getArgsTTImpl(std::index_sequence<Is...>) {
+  auto getArgsImpl(std::index_sequence<Is...>) {
     return std::tie(*std::get<Is>(ArgumentsTT)...);
   }
 
@@ -291,12 +291,12 @@ public:
 
   RetT operator()(ArgT... Args);
 
-  void declArgsTT() {
-    declArgsTTImpl(std::index_sequence_for<ArgT...>{});
+  void declArgs() {
+    declArgsImpl(std::index_sequence_for<ArgT...>{});
   }
   
-  auto getArgsTT() {
-    return getArgsTTImpl(std::index_sequence_for<ArgT...>{});
+  auto getArgs() {
+    return getArgsImpl(std::index_sequence_for<ArgT...>{});
   }
   
   template<std::size_t Idx>
@@ -377,7 +377,7 @@ void FuncBase::beginFor(VarTT<T> &IterVar, const VarTT<T> &Init, const VarTT<T> 
 
 // Helper function for binary operations on VarTT types
 template <typename T, typename U, typename IntOp, typename FPOp>
-VarTT<std::common_type_t<T, U>> binOpTT(const VarTT<T> &L, const VarTT<U> &R, IntOp IOp, FPOp FOp) {
+VarTT<std::common_type_t<T, U>> binOp(const VarTT<T> &L, const VarTT<U> &R, IntOp IOp, FPOp FOp) {
   FuncBase &Fn = L.Fn;
   if (&Fn != &R.Fn)
     PROTEUS_FATAL_ERROR("Variables should belong to the same function");
@@ -411,7 +411,7 @@ VarTT<std::common_type_t<T, U>> binOpTT(const VarTT<T> &L, const VarTT<U> &R, In
 // Helper function for compound assignment with another VarTT
 template <typename T, typename U, typename BinOp>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
-compoundAssignVarTT(VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
+compoundAssignVar(VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
                     const VarTT<U> &RHS,
                     BinOp Op) {
   auto Result = Op(LHS, RHS);
@@ -424,7 +424,7 @@ compoundAssignVarTT(VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
 // Helper function for compound assignment with a constant
 template <typename T, typename U, typename IntOp, typename FPOp>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
-compoundAssignConstTT(VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
+compoundAssignConst(VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
                       const U &ConstValue,
                       IntOp IOp, FPOp FOp) {
   Type *LHSType = LHS.Storage->getValueType();
@@ -465,7 +465,7 @@ compoundAssignConstTT(VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
 
 // Helper function for comparison operations on VarTT types
 template <typename T, typename U, typename IntOp, typename FPOp>
-VarTT<bool> cmpOpTT(const VarTT<T> &L, const VarTT<U> &R, IntOp IOp, FPOp FOp) {
+VarTT<bool> cmpOp(const VarTT<T> &L, const VarTT<U> &R, IntOp IOp, FPOp FOp) {
   FuncBase &Fn = L.Fn;
   if (&Fn != &R.Fn)
     PROTEUS_FATAL_ERROR("Variables should belong to the same function");
@@ -564,7 +564,7 @@ template <typename T>
 template <typename U>
 VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+(
     const VarTT<U> &Other) const {
-  return binOpTT(
+  return binOp(
       *this, Other,
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateAdd(L, R); },
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFAdd(L, R); });
@@ -574,7 +574,7 @@ template <typename T>
 template <typename U>
 VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-(
     const VarTT<U> &Other) const {
-  return binOpTT(
+  return binOp(
       *this, Other,
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSub(L, R); },
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFSub(L, R); });
@@ -584,7 +584,7 @@ template <typename T>
 template <typename U>
 VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*(
     const VarTT<U> &Other) const {
-  return binOpTT(
+  return binOp(
       *this, Other,
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateMul(L, R); },
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFMul(L, R); });
@@ -594,7 +594,7 @@ template <typename T>
 template <typename U>
 VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/(
     const VarTT<U> &Other) const {
-  return binOpTT(
+  return binOp(
       *this, Other,
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSDiv(L, R); },
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFDiv(L, R); });
@@ -604,7 +604,7 @@ template <typename T>
 template <typename U>
 VarTT<std::common_type_t<T, U>> VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%(
     const VarTT<U> &Other) const {
-  return binOpTT(
+  return binOp(
       *this, Other,
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSRem(L, R); },
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFRem(L, R); });
@@ -666,7 +666,7 @@ template <typename T>
 template <typename U>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+=(const VarTT<U> &Other) {
-  return compoundAssignVarTT(*this, Other, 
+  return compoundAssignVar(*this, Other, 
     [](auto &L, auto &R) { return L + R; });
 }
 
@@ -675,7 +675,7 @@ template <typename U>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+=(const U &ConstValue) {
   static_assert(std::is_arithmetic_v<U>, "Can only add arithmetic types to VarTT");
-  return compoundAssignConstTT(*this, ConstValue,
+  return compoundAssignConst(*this, ConstValue,
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateAdd(L, R); },
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFAdd(L, R); });
 }
@@ -684,7 +684,7 @@ template <typename T>
 template <typename U>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-=(const VarTT<U> &Other) {
-  return compoundAssignVarTT(*this, Other, 
+  return compoundAssignVar(*this, Other, 
     [](auto &L, auto &R) { return L - R; });
 }
 
@@ -693,7 +693,7 @@ template <typename U>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-=(const U &ConstValue) {
   static_assert(std::is_arithmetic_v<U>, "Can only subtract arithmetic types from VarTT");
-  return compoundAssignConstTT(*this, ConstValue,
+  return compoundAssignConst(*this, ConstValue,
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSub(L, R); },
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFSub(L, R); });
 }
@@ -702,7 +702,7 @@ template <typename T>
 template <typename U>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*=(const VarTT<U> &Other) {
-  return compoundAssignVarTT(*this, Other, 
+  return compoundAssignVar(*this, Other, 
     [](auto &L, auto &R) { return L * R; });
 }
 
@@ -711,7 +711,7 @@ template <typename U>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*=(const U &ConstValue) {
   static_assert(std::is_arithmetic_v<U>, "Can only multiply VarTT by arithmetic types");
-  return compoundAssignConstTT(*this, ConstValue,
+  return compoundAssignConst(*this, ConstValue,
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateMul(L, R); },
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFMul(L, R); });
 }
@@ -720,7 +720,7 @@ template <typename T>
 template <typename U>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/=(const VarTT<U> &Other) {
-  return compoundAssignVarTT(*this, Other, 
+  return compoundAssignVar(*this, Other, 
     [](auto &L, auto &R) { return L / R; });
 }
 
@@ -729,7 +729,7 @@ template <typename U>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/=(const U &ConstValue) {
   static_assert(std::is_arithmetic_v<U>, "Can only divide VarTT by arithmetic types");
-  return compoundAssignConstTT(*this, ConstValue,
+  return compoundAssignConst(*this, ConstValue,
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSDiv(L, R); },
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFDiv(L, R); });
 }
@@ -738,7 +738,7 @@ template <typename T>
 template <typename U>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%=(const VarTT<U> &Other) {
-  return compoundAssignVarTT(*this, Other, 
+  return compoundAssignVar(*this, Other, 
     [](auto &L, auto &R) { return L % R; });
 }
 
@@ -747,7 +747,7 @@ template <typename U>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%=(const U &ConstValue) {
   static_assert(std::is_arithmetic_v<U>, "Can only modulo VarTT by arithmetic types");
-  return compoundAssignConstTT(*this, ConstValue,
+  return compoundAssignConst(*this, ConstValue,
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSRem(L, R); },
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFRem(L, R); });
 }
@@ -896,7 +896,7 @@ template <typename T>
 template <typename U>
 std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator>(const VarTT<U> &Other) const {
-  return cmpOpTT(*this, Other,
+  return cmpOp(*this, Other,
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateICmpSGT(L, R); },
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFCmpOGT(L, R); });
 }
@@ -905,7 +905,7 @@ template <typename T>
 template <typename U>
 std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator>=(const VarTT<U> &Other) const {
-  return cmpOpTT(*this, Other,
+  return cmpOp(*this, Other,
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateICmpSGE(L, R); },
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFCmpOGE(L, R); });
 }
@@ -914,7 +914,7 @@ template <typename T>
 template <typename U>
 std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator<(const VarTT<U> &Other) const {
-  return cmpOpTT(*this, Other,
+  return cmpOp(*this, Other,
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateICmpSLT(L, R); },
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFCmpOLT(L, R); });
 }
@@ -923,7 +923,7 @@ template <typename T>
 template <typename U>
 std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator<=(const VarTT<U> &Other) const {
-  return cmpOpTT(*this, Other,
+  return cmpOp(*this, Other,
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateICmpSLE(L, R); },
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFCmpOLE(L, R); });
 }
@@ -932,7 +932,7 @@ template <typename T>
 template <typename U>
 std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator==(const VarTT<U> &Other) const {
-  return cmpOpTT(*this, Other,
+  return cmpOp(*this, Other,
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateICmpEQ(L, R); },
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFCmpOEQ(L, R); });
 }
@@ -941,7 +941,7 @@ template <typename T>
 template <typename U>
 std::enable_if_t<std::is_arithmetic_v<U>, VarTT<bool>>
 VarTT<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator!=(const VarTT<U> &Other) const {
-  return cmpOpTT(*this, Other,
+  return cmpOp(*this, Other,
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateICmpNE(L, R); },
     [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFCmpONE(L, R); });
 }

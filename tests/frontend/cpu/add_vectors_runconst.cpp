@@ -22,7 +22,7 @@ auto createJitFunction(size_t N) {
   F.beginFunction();
   {
     // Pointers to vectors A, B in arguments.
-    auto [A, B] = F.getArgsTT();
+    auto [A, B] = F.getArgs();
     // Declare local variables and argument getters.
     auto I = F.defVar<size_t>(0, "I");
     auto Inc = F.defVar<size_t>(1, "Inc");

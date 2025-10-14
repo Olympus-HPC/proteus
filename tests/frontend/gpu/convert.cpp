@@ -46,17 +46,17 @@ int main() {
     Ii = -7;
     Fi = 2.5f;
 
-    auto IfromD = F.convertTT<int>(Di);
-    auto FfromI = F.convertTT<float>(Ii);
-    auto DfromF = F.convertTT<double>(Fi);
+    auto IfromD = F.convert<int>(Di);
+    auto FfromI = F.convert<float>(Ii);
+    auto DfromF = F.convert<double>(Fi);
 
     DOut[0] = DfromF;
     IOut[0] = IfromD;
     FOut[0] = FfromI;
 
-    auto D2 = F.convertTT<double>(IfromD);
-    auto I2 = F.convertTT<int>(FfromI);
-    auto F2 = F.convertTT<float>(DfromF);
+    auto D2 = F.convert<double>(IfromD);
+    auto I2 = F.convert<int>(FfromI);
+    auto F2 = F.convert<float>(DfromF);
 
     DOut2[0] = D2;
     IOut2[0] = I2;

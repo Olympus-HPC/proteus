@@ -32,7 +32,7 @@ auto createJitModule1() {
     auto &F = KernelHandle.F;
     F.beginFunction();
     {
-      auto [V] = F.getArgsTT();
+      auto [V] = F.getArgs();
 
       auto X = F.defVar<double>(21);
       auto C = F.call<double(void)>("f2");
@@ -58,7 +58,7 @@ auto createJitModule1() {
     auto &F = J->addFunction<double(double, double)>("f3");
     F.beginFunction();
     {
-      auto [X, C] = F.getArgsTT();
+      auto [X, C] = F.getArgs();
       auto P = F.declVar<double>();
       P = X * C;
       F.ret(P);

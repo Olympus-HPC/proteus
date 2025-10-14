@@ -37,7 +37,7 @@ auto createJitKernel(size_t N) {
     // Declare local variables and argument getters.
     auto I = F.declVar<size_t>("I");
     auto Inc = F.declVar<size_t>("Inc");
-    auto [A, B] = F.getArgsTT();
+    auto [A, B] = F.getArgs();
     auto [RunConstN] = F.defRuntimeConsts(N);
 
     // Compute the global thread index.

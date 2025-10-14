@@ -47,7 +47,7 @@ private:
     auto TypedFn = std::make_unique<Func<RetT, ArgT...>>(*this, FC, Dispatch);
     Func<RetT, ArgT...> &TypedFnRef = *TypedFn;
     std::unique_ptr<FuncBase> &Fn = Functions.emplace_back(std::move(TypedFn));
-    TypedFnRef.declArgsTT();
+    TypedFnRef.declArgs();
     return TypedFnRef;
   }
 
@@ -56,7 +56,7 @@ private:
                                                 ArgTypeList<ArgT...>) {
     auto TypedFn = std::make_unique<Func<void, ArgT...>>(*this, FC, Dispatch);
     Func<void, ArgT...> &TypedFnRef = *TypedFn;
-    TypedFn->declArgsTT();
+    TypedFn->declArgs();
     std::unique_ptr<FuncBase> &Fn = Functions.emplace_back(std::move(TypedFn));
 
     setKernel(*Fn);

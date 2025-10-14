@@ -26,7 +26,7 @@ static auto getTiled2DTransposeFunction(int ROWS, int COLS, int TileSize) {
   auto UBRows = F.declVar<int>("ub_rows");
   auto UBCols = F.declVar<int>("ub_cols");
 
-  auto Args = F.getArgsTT();
+  auto Args = F.getArgs();
   auto &A = std::get<0>(Args);
   auto &B = std::get<1>(Args);
 

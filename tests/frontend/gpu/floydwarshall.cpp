@@ -83,7 +83,7 @@ auto createJitModuleSpecial(unsigned int _numNodes) {
       J->addKernelTT<void(unsigned int *, unsigned int *, unsigned int,
                           unsigned int)>("floydWarshallPass");
   auto &F = KernelHandle.F;
-  auto [pathDistanceBuffer, pathBuffer, numNodes, pass] = F.getArgsTT();
+  auto [pathDistanceBuffer, pathBuffer, numNodes, pass] = F.getArgs();
 
   F.beginFunction();
   {

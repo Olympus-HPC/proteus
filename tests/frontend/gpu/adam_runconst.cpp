@@ -69,7 +69,7 @@ auto createJitModuleSpecial(float _b1, float _b2, float _eps, float _grad_scale,
   auto KernelHandle =
       J->addKernelTT<void(float *, float *, float *, float *)>("adam");
   auto &F = KernelHandle.F;
-  auto [p, m, v, g] = F.getArgsTT();
+  auto [p, m, v, g] = F.getArgs();
 
   auto i = F.declVar<size_t>("i");
   auto totThreads = F.declVar<size_t>("totThreads");
@@ -103,8 +103,8 @@ auto createJitModuleSpecial(float _b1, float _b2, float _eps, float _grad_scale,
 
         auto m_corrected = F.declVar<float>("m_corrected");
         auto v_corrected = F.declVar<float>("v_corrected");
-        m_corrected = m[j] / (1.f - powf(b1, F.convertTT<float>(t)));
-        v_corrected = v[j] / (1.f - powf(b2, F.convertTT<float>(t)));
+        m_corrected = m[j] / (1.f - powf(b1, F.convert<float>(t)));
+        v_corrected = v[j] / (1.f - powf(b2, F.convert<float>(t)));
 
         auto denom = F.declVar<float>("denom");
         F.beginIf(mode == 0);

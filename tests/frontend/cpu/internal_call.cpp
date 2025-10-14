@@ -18,7 +18,7 @@ auto createJitModule1() {
   {
     F1.beginFunction();
     {
-      auto [V] = F1.getArgsTT();
+      auto [V] = F1.getArgs();
 
       auto X = F1.defVar<double>(21);
       auto C = F1.call<double(void)>("f2");
@@ -44,7 +44,7 @@ auto createJitModule1() {
   {
     F3.beginFunction();
     {
-      auto [X, C] = F3.getArgsTT();
+      auto [X, C] = F3.getArgs();
       auto P = F3.declVar<double>();
       P = X * C;
       F3.ret(P);

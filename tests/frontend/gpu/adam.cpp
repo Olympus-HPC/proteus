@@ -69,7 +69,7 @@ auto createJitModule() {
                         float, float, int, size_t, int, float)>("adam");
   auto &F = KernelHandle.F;
   auto [p, m, v, g, b1, b2, eps, grad_scale, step_size, time_step, vector_size,
-        mode, decay] = F.getArgsTT();
+        mode, decay] = F.getArgs();
 
   auto i = F.declVar<size_t>("i");
   auto totThreads = F.declVar<size_t>("totThreads");
@@ -98,8 +98,8 @@ auto createJitModule() {
 
         auto m_corrected = F.declVar<float>("m_corrected");
         auto v_corrected = F.declVar<float>("v_corrected");
-        m_corrected = m[j] / (1.f - powf(b1, F.convertTT<float>(t)));
-        v_corrected = v[j] / (1.f - powf(b2, F.convertTT<float>(t)));
+        m_corrected = m[j] / (1.f - powf(b1, F.convert<float>(t)));
+        v_corrected = v[j] / (1.f - powf(b2, F.convert<float>(t)));
 
         auto denom = F.declVar<float>("denom");
         F.beginIf(mode == 0);
