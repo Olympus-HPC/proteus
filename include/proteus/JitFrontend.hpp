@@ -46,7 +46,7 @@ private:
                                              ArgTypeList<ArgT...>) {
     auto TypedFn = std::make_unique<Func<RetT, ArgT...>>(*this, FC, Dispatch);
     Func<RetT, ArgT...> &TypedFnRef = *TypedFn;
-    std::unique_ptr<FuncBase> &Fn = Functions.emplace_back(std::move(TypedFn));
+    Functions.emplace_back(std::move(TypedFn));
     TypedFnRef.declArgs();
     return TypedFnRef;
   }
@@ -270,8 +270,6 @@ std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>,
                  Var<typename FnSig<Sig>::RetT>>
 FuncBase::call(StringRef Name) {
   using RetT = typename FnSig<Sig>::RetT;
-  auto *F = getFunction();
-  LLVMContext &Ctx = F->getContext();
 
   using ArgT = typename FnSig<Sig>::ArgsTList;
   FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
@@ -294,8 +292,6 @@ template <typename Sig, typename... ArgVars>
 std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>,
                  Var<typename FnSig<Sig>::RetT>>
 FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
-  auto *F = getFunction();
-  LLVMContext &Ctx = F->getContext();
 
   using RetT = typename FnSig<Sig>::RetT;
   using ArgT = typename FnSig<Sig>::ArgsTList;

@@ -59,6 +59,7 @@ Value *ArrayStorage::loadValue() const {
 }
 
 void ArrayStorage::storeValue(Value *Val) {
+  (void)Val;
   PROTEUS_FATAL_ERROR("Cannot store entire array as a value");
 }
 

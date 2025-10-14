@@ -839,7 +839,6 @@ Var<std::remove_pointer_t<T>>
 Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator[](size_t Index) {
   auto &IRB = Fn.getIRBuilder();
 
-  auto *AllocatedType = Storage->getAllocatedType();
   auto *PointerElemTy = Storage->getValueType();
   auto *Ptr = Storage->getValue();
   auto *GEP = IRB.CreateConstInBoundsGEP1_64(PointerElemTy, Ptr, Index);
@@ -1130,8 +1129,6 @@ Var<T> FuncBase::emitAtomic(AtomicRMWInst::BinOp Op, const Var<T *> &Addr,
   static_assert(std::is_arithmetic_v<T>, "Atomic ops require arithmetic type");
 
   auto &IRB = getIRBuilder();
-  Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
-
   auto *Result = IRB.CreateAtomicRMW(Op, Addr.Storage->getPointerValue(),
                                      Val.Storage->loadValue(), MaybeAlign(),
                                      AtomicOrdering::SequentiallyConsistent,
