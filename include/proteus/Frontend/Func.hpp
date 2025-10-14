@@ -733,7 +733,6 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%=(
       [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFRem(L, R); });
 }
 
-// Array type operator[]
 template <typename T>
 Var<std::remove_extent_t<T>>
 Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](size_t Index) {
@@ -781,7 +780,6 @@ Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](
   return Var<std::remove_extent_t<T>>(std::move(ResultStorage), Fn);
 }
 
-// Pointer type operator[]
 template <typename T>
 Var<std::remove_pointer_t<T>>
 Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator[](size_t Index) {
