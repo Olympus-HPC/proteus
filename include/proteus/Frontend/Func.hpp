@@ -366,8 +366,8 @@ Var<std::common_type_t<T, U>> binOp(const Var<T> &L, const Var<U> &R, IntOp IOp,
   Value *RHS = R.loadValue();
 
   Function *Function = Fn.getFunction();
-  auto &DL = Function->getParent()->getDataLayout();
-  Type *CommonType = getCommonType(DL, LHS->getType(), RHS->getType());
+  Type *CommonType =
+      TypeMap<std::common_type_t<T, U>>::get(Function->getContext());
 
   LHS = convert(IRB, LHS, CommonType);
   RHS = convert(IRB, RHS, CommonType);
@@ -420,8 +420,8 @@ compoundAssignConst(Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
 
   Value *LHSVal = LHS.loadValue();
 
-  auto &DL = Function->getParent()->getDataLayout();
-  Type *CommonType = getCommonType(DL, LHSVal->getType(), RHS->getType());
+  Type *CommonType =
+      TypeMap<std::common_type_t<T, U>>::get(Function->getContext());
 
   LHSVal = convert(IRB, LHSVal, CommonType);
   RHS = convert(IRB, RHS, CommonType);
@@ -451,8 +451,8 @@ Var<bool> cmpOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
   Value *RHS = R.loadValue();
 
   Function *Function = Fn.getFunction();
-  auto &DL = Function->getParent()->getDataLayout();
-  Type *CommonType = getCommonType(DL, LHS->getType(), RHS->getType());
+  Type *CommonType =
+      TypeMap<std::common_type_t<T, U>>::get(Function->getContext());
 
   LHS = convert(IRB, LHS, CommonType);
   RHS = convert(IRB, RHS, CommonType);

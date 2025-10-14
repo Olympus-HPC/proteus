@@ -14,7 +14,6 @@ using namespace llvm;
 
 // Declare usual arithmetic conversion helper functions.
 Value *convert(IRBuilderBase IRB, Value *V, Type *TargetType);
-Type *getCommonType(const DataLayout &DL, Type *T1, Type *T2);
 
 // Mixin that owns storage and exposes common helpers for Var specializations
 template <typename StorageT> struct VarStorageOwner {
