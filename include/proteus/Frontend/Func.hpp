@@ -387,7 +387,6 @@ compoundAssignVar(Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
   static_assert(std::is_convertible_v<U, T>, "U must be convertible to T");
   auto Result = Op(LHS, RHS);
   auto &IRB = LHS.Fn.getIRBuilder();
-  using CommonT = std::common_type_t<T, U>;
   auto *Converted = convert<std::common_type_t<T, U>, T>(IRB, Result.loadValue());
   LHS.storeValue(Converted);
   return LHS;
