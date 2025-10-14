@@ -81,7 +81,7 @@ auto createJitModuleSpecial(unsigned int _numNodes) {
   auto J = std::make_unique<JitModule>(TARGET);
   auto KernelHandle =
       J->addKernel<void(unsigned int *, unsigned int *, unsigned int,
-                          unsigned int)>("floydWarshallPass");
+                        unsigned int)>("floydWarshallPass");
   auto &F = KernelHandle.F;
   auto [pathDistanceBuffer, pathBuffer, numNodes, pass] = F.getArgs();
 

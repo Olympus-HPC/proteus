@@ -7,25 +7,17 @@ Value *ScalarStorage::loadValue() const {
   return IRB.CreateLoad(Slot->getAllocatedType(), Slot);
 }
 
-Value *ScalarStorage::getValue() const {
-  return Slot;
-}
+Value *ScalarStorage::getValue() const { return Slot; }
 
-Value *ScalarStorage::getSlot() const {
-  return Slot;
-}
+Value *ScalarStorage::getSlot() const { return Slot; }
 
-void ScalarStorage::storeValue(Value *Val) {
-  IRB.CreateStore(Val, Slot);
-}
+void ScalarStorage::storeValue(Value *Val) { IRB.CreateStore(Val, Slot); }
 
 Type *ScalarStorage::getAllocatedType() const {
   return Slot->getAllocatedType();
 }
 
-Type *ScalarStorage::getValueType() const {
-  return Slot->getAllocatedType();
-}
+Type *ScalarStorage::getValueType() const { return Slot->getAllocatedType(); }
 
 Value *PointerStorage::loadValue() const {
   // Load the pointer from PtrSlot, then load the value from that pointer
@@ -38,9 +30,7 @@ Value *PointerStorage::getValue() const {
   return IRB.CreateLoad(PtrSlot->getAllocatedType(), PtrSlot);
 }
 
-Value *PointerStorage::getSlot() const {
-  return PtrSlot;
-}
+Value *PointerStorage::getSlot() const { return PtrSlot; }
 
 void PointerStorage::storeValue(Value *Val) {
   // Load the pointer, then store the value to that address
@@ -48,30 +38,21 @@ void PointerStorage::storeValue(Value *Val) {
   IRB.CreateStore(Val, Ptr);
 }
 
-void PointerStorage::storePointer(Value *Ptr) {
-  IRB.CreateStore(Ptr, PtrSlot);
-}
-
+void PointerStorage::storePointer(Value *Ptr) { IRB.CreateStore(Ptr, PtrSlot); }
 
 Type *PointerStorage::getAllocatedType() const {
   return PtrSlot->getAllocatedType();
 }
 
-Type *PointerStorage::getValueType() const {
-  return PointerElemTy;
-}
+Type *PointerStorage::getValueType() const { return PointerElemTy; }
 
 Value *PointerStorage::getPointerValue() const {
   return IRB.CreateLoad(PtrSlot->getAllocatedType(), PtrSlot);
 }
 
-Value *ArrayStorage::getValue() const {
-  return BasePointer;
-}
+Value *ArrayStorage::getValue() const { return BasePointer; }
 
-Value *ArrayStorage::getSlot() const {
-  return BasePointer;
-}
+Value *ArrayStorage::getSlot() const { return BasePointer; }
 
 Value *ArrayStorage::loadValue() const {
   PROTEUS_FATAL_ERROR("Cannot load entire array as a value");
@@ -81,12 +62,8 @@ void ArrayStorage::storeValue(Value *Val) {
   PROTEUS_FATAL_ERROR("Cannot store entire array as a value");
 }
 
-Type *ArrayStorage::getAllocatedType() const {
-  return ArrayTy;
-}
+Type *ArrayStorage::getAllocatedType() const { return ArrayTy; }
 
-Type *ArrayStorage::getValueType() const {
-  return ArrayTy->getElementType();
-}
+Type *ArrayStorage::getValueType() const { return ArrayTy->getElementType(); }
 
-}
+} // namespace proteus

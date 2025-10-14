@@ -29,7 +29,8 @@ public:
   BodyLambda Body;
   FuncBase &Fn;
 
-  ForLoopBuilder(const LoopBoundInfo<T> &Bounds, FuncBase &Fn, BodyLambda &&Body)
+  ForLoopBuilder(const LoopBoundInfo<T> &Bounds, FuncBase &Fn,
+                 BodyLambda &&Body)
       : Bounds(Bounds), Body(std::move(Body)), Fn(Fn) {}
   ForLoopBuilder &tile(int Tile) {
     TileSize = Tile;
@@ -46,7 +47,8 @@ public:
 template <typename T, typename... LoopBuilders> class LoopNestBuilder {
 private:
   std::tuple<LoopBuilders...> Loops;
-  std::array<std::unique_ptr<LoopBoundInfo<T>>, std::tuple_size_v<decltype(Loops)>>
+  std::array<std::unique_ptr<LoopBoundInfo<T>>,
+             std::tuple_size_v<decltype(Loops)>>
       TiledLoopBounds;
   FuncBase &Fn;
 
@@ -60,10 +62,8 @@ private:
           if (Loop.TileSize.has_value()) {
             auto &Bounds = std::get<Is>(Loops).Bounds;
 
-            auto TileIter =
-                Fn.declVar<T>("tile_iter_" + std::to_string(Is));
-            auto TileStep =
-                Fn.declVar<T>("tile_step_" + std::to_string(Is));
+            auto TileIter = Fn.declVar<T>("tile_iter_" + std::to_string(Is));
+            auto TileStep = Fn.declVar<T>("tile_step_" + std::to_string(Is));
 
             TileStep = Loop.TileSize.value();
             TiledLoopBounds[Is] = std::make_unique<LoopBoundInfo<T>>(
@@ -82,7 +82,7 @@ private:
           if (Loop.TileSize.has_value()) {
             auto &Bounds = *TiledLoopBounds[Is];
             Fn.beginFor(Bounds.IterVar, Bounds.Init, Bounds.UpperBound,
-                          Bounds.Inc);
+                        Bounds.Inc);
           }
         }(),
         ...);
@@ -99,10 +99,10 @@ private:
             // Clamp to handle partial tiles.
             EndCandidate = min(EndCandidate, TiledBounds.UpperBound);
             Fn.beginFor(Loop.Bounds.IterVar, TiledBounds.IterVar, EndCandidate,
-                          Loop.Bounds.Inc);
+                        Loop.Bounds.Inc);
           } else {
             Fn.beginFor(Loop.Bounds.IterVar, Loop.Bounds.Init,
-                          Loop.Bounds.UpperBound, Loop.Bounds.Inc);
+                        Loop.Bounds.UpperBound, Loop.Bounds.Inc);
           }
           Loop.Body();
         }(),

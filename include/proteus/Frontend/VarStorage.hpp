@@ -9,7 +9,7 @@ using namespace llvm;
 
 class VarStorage {
 
-  protected:
+protected:
   IRBuilderBase &IRB;
 
 public:
@@ -23,15 +23,15 @@ public:
   virtual Type *getAllocatedType() const = 0;
   virtual Type *getValueType() const = 0;
   virtual std::unique_ptr<VarStorage> clone() const = 0;
-
 };
 
 class ScalarStorage : public VarStorage {
 
   AllocaInst *Slot = nullptr;
 
-  public:
-  ScalarStorage(AllocaInst *Slot, IRBuilderBase &IRB) : VarStorage(IRB), Slot(Slot) {}
+public:
+  ScalarStorage(AllocaInst *Slot, IRBuilderBase &IRB)
+      : VarStorage(IRB), Slot(Slot) {}
   std::unique_ptr<VarStorage> clone() const override {
     return std::make_unique<ScalarStorage>(Slot, IRB);
   }
@@ -49,9 +49,12 @@ class PointerStorage : public VarStorage {
   AllocaInst *PtrSlot = nullptr;
   Type *PointerElemTy = nullptr;
 
-  public:
-  PointerStorage(AllocaInst *PtrSlot, IRBuilderBase &IRB, Type *PointerElemTy) : VarStorage(IRB), PtrSlot(PtrSlot), PointerElemTy(PointerElemTy) {}
-  PointerStorage(Value *PtrSlot, IRBuilderBase &IRB, Type *PointerElemTy) : VarStorage(IRB), PtrSlot(dyn_cast<AllocaInst>(PtrSlot)), PointerElemTy(PointerElemTy) {}
+public:
+  PointerStorage(AllocaInst *PtrSlot, IRBuilderBase &IRB, Type *PointerElemTy)
+      : VarStorage(IRB), PtrSlot(PtrSlot), PointerElemTy(PointerElemTy) {}
+  PointerStorage(Value *PtrSlot, IRBuilderBase &IRB, Type *PointerElemTy)
+      : VarStorage(IRB), PtrSlot(dyn_cast<AllocaInst>(PtrSlot)),
+        PointerElemTy(PointerElemTy) {}
   std::unique_ptr<VarStorage> clone() const override {
     return std::make_unique<PointerStorage>(PtrSlot, IRB, PointerElemTy);
   }
@@ -71,8 +74,9 @@ class ArrayStorage : public VarStorage {
   Value *BasePointer = nullptr;
   ArrayType *ArrayTy = nullptr;
 
-  public:
-  ArrayStorage(Value *BasePointer, IRBuilderBase &IRB, ArrayType *ArrayTy) : VarStorage(IRB), BasePointer(BasePointer), ArrayTy(ArrayTy) {}
+public:
+  ArrayStorage(Value *BasePointer, IRBuilderBase &IRB, ArrayType *ArrayTy)
+      : VarStorage(IRB), BasePointer(BasePointer), ArrayTy(ArrayTy) {}
   std::unique_ptr<VarStorage> clone() const override {
     return std::make_unique<ArrayStorage>(BasePointer, IRB, ArrayTy);
   }
@@ -84,6 +88,6 @@ class ArrayStorage : public VarStorage {
   Type *getValueType() const override;
 };
 
-}
+} // namespace proteus
 
 #endif

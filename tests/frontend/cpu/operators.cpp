@@ -20,7 +20,8 @@ int main() {
                          double *, double *, double *, double *, double *,
                          double *, double *, double *, double *)>("operators");
 
-  auto [Arg0, Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7, Arg8, Arg9, Arg10, Arg11, Arg12, Arg13] = F.getArgs();
+  auto [Arg0, Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7, Arg8, Arg9, Arg10,
+        Arg11, Arg12, Arg13] = F.getArgs();
   F.beginFunction();
   {
     Arg0[0] = 2;
@@ -51,7 +52,6 @@ int main() {
     F.beginIf(Cmp <= 5.0);
     { Arg13[0] = 1.0; }
     F.endIf();
-
 
     F.ret();
   }

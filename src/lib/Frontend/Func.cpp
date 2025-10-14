@@ -110,7 +110,6 @@ Value *FuncBase::emitArrayCreate(Type *Ty, AddressSpace AT, StringRef Name) {
   }
 }
 
-
 void FuncBase::beginIf(const Var<bool> &CondVar, const char *File, int Line) {
   Function *F = getFunction();
   // Update the terminator of the current basic block due to the split

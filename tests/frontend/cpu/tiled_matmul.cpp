@@ -36,12 +36,12 @@ static auto getTiledMatmulFunction(int N, int TileI, int TileJ, int TileK) {
       F.buildLoopNest(F.forLoop<int>({I, Zero, UbnI, IncOne}).tile(TileI),
                       F.forLoop<int>({J, Zero, UbnJ, IncOne}).tile(TileJ),
                       F.forLoop<int>({K, Zero, UbnK, IncOne},
-                                [&]() {
-                                  auto CIdx = I * N + J;
-                                  auto AIdx = I * N + K;
-                                  auto BIdx = K * N + J;
-                                  C[CIdx] += A[AIdx] * B[BIdx];
-                                })
+                                     [&]() {
+                                       auto CIdx = I * N + J;
+                                       auto AIdx = I * N + K;
+                                       auto BIdx = K * N + J;
+                                       C[CIdx] += A[AIdx] * B[BIdx];
+                                     })
                           .tile(TileK))
           .emit();
 
