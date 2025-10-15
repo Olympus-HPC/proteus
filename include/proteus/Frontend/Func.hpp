@@ -129,6 +129,13 @@ public:
     return Var;
   }
 
+  template <typename T, typename U>
+  Var<T> defVar(const Var<U> &Var, StringRef Name = "var") {
+    auto Res = declVarInternal<T>(Name);
+    Res = Var;
+    return Res;
+  }
+
   template <typename T>
   Var<T> defRuntimeConst(T Val, StringRef Name = "run.const.var") {
     return defVar<T>(Val, Name);
