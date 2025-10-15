@@ -312,17 +312,6 @@ std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>,
                  Var<std::common_type_t<T, U>>>
 operator%(const T &ConstValue, const Var<U> &V);
 
-// Math intrinsics for Var
-template <typename T>
-std::enable_if_t<std::is_same_v<T, float>, Var<T>> powf(const Var<T> &L,
-                                                        const Var<T> &R);
-
-template <typename T>
-std::enable_if_t<std::is_same_v<T, float>, Var<T>> sqrtf(const Var<T> &R);
-
-template <typename T>
-std::enable_if_t<std::is_arithmetic_v<T>, Var<T>> min(const Var<T> &L,
-                                                      const Var<T> &R);
 } // namespace proteus
 
 #endif // PROTEUS_FRONTEND_VAR_HPP

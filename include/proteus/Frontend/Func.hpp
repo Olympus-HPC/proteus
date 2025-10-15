@@ -230,7 +230,8 @@ public:
   // Convert the given Var's value to type U and return a new Var holding
   // the converted value.
   template <typename U, typename T>
-  std::enable_if_t<std::is_convertible_v<T, U>, Var<U>> convert(Var<T> &V) {
+  std::enable_if_t<std::is_convertible_v<T, U>, Var<U>>
+  convert(const Var<T> &V) {
     auto &IRBRef = getIRBuilder();
     Var<U> Res = declVarInternal<U>("convert.");
     Value *Converted = proteus::convert<T, U>(IRBRef, V.loadValue());
@@ -1198,14 +1199,12 @@ static Var<T> emitIntrinsic(StringRef IntrinsicName, Type *ResultType,
 }
 
 // Math intrinsics for Var
-template <typename T>
-std::enable_if_t<std::is_same_v<T, float>, Var<T>> powf(const Var<T> &L,
-                                                        const Var<T> &R) {
-  static_assert(std::is_floating_point_v<T>,
+template <typename T> Var<float> powf(const Var<float> &L, const Var<T> &R) {
+  static_assert(std::is_convertible_v<T, float>,
                 "powf requires floating-point type");
-
   auto &IRB = L.Fn.getIRBuilder();
   auto *ResultType = IRB.getFloatTy();
+  auto RFloat = R.Fn.template convert<float>(R);
 
 #if PROTEUS_ENABLE_CUDA
   std::string IntrinsicName = "__nv_powf";
@@ -1213,16 +1212,16 @@ std::enable_if_t<std::is_same_v<T, float>, Var<T>> powf(const Var<T> &L,
   std::string IntrinsicName = "llvm.pow.f32";
 #endif
 
-  return emitIntrinsic<T>(IntrinsicName, ResultType, L, R);
+  return emitIntrinsic<float>(IntrinsicName, ResultType, L, RFloat);
 }
 
-template <typename T>
-std::enable_if_t<std::is_same_v<T, float>, Var<T>> sqrtf(const Var<T> &R) {
-  static_assert(std::is_floating_point_v<T>,
+template <typename T> Var<float> sqrtf(const Var<T> &R) {
+  static_assert(std::is_convertible_v<T, float>,
                 "sqrtf requires floating-point type");
 
   auto &IRB = R.Fn.getIRBuilder();
   auto *ResultType = IRB.getFloatTy();
+  auto RFloat = R.Fn.template convert<float>(R);
 
 #if PROTEUS_ENABLE_CUDA
   std::string IntrinsicName = "__nv_sqrtf";
@@ -1230,7 +1229,7 @@ std::enable_if_t<std::is_same_v<T, float>, Var<T>> sqrtf(const Var<T> &R) {
   std::string IntrinsicName = "llvm.sqrt.f32";
 #endif
 
-  return emitIntrinsic<T>(IntrinsicName, ResultType, R);
+  return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
 }
 
 template <typename T>
