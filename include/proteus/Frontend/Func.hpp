@@ -567,8 +567,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%(
 
 // Arithmetic operators with ConstValue
 template <typename T>
-template <typename U, typename>
-Var<std::common_type_t<T, U>>
+template <typename U>
+std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>,
@@ -578,8 +578,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+(
 }
 
 template <typename T>
-template <typename U, typename>
-Var<std::common_type_t<T, U>>
+template <typename U>
+std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>,
@@ -589,8 +589,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-(
 }
 
 template <typename T>
-template <typename U, typename>
-Var<std::common_type_t<T, U>>
+template <typename U>
+std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>,
@@ -600,8 +600,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*(
 }
 
 template <typename T>
-template <typename U, typename>
-Var<std::common_type_t<T, U>>
+template <typename U>
+std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>,
@@ -611,8 +611,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/(
 }
 
 template <typename T>
-template <typename U, typename>
-Var<std::common_type_t<T, U>>
+template <typename U>
+std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>,

@@ -135,32 +135,37 @@ struct Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>
   template <typename U>
   Var<std::common_type_t<T, U>> operator+(const Var<U> &Other) const;
 
-  template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
-  Var<std::common_type_t<T, U>> operator+(const U &ConstValue) const;
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
+  operator+(const U &ConstValue) const;
 
   template <typename U>
   Var<std::common_type_t<T, U>> operator-(const Var<U> &Other) const;
 
-  template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
-  Var<std::common_type_t<T, U>> operator-(const U &ConstValue) const;
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
+  operator-(const U &ConstValue) const;
 
   template <typename U>
   Var<std::common_type_t<T, U>> operator*(const Var<U> &Other) const;
 
-  template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
-  Var<std::common_type_t<T, U>> operator*(const U &ConstValue) const;
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
+  operator*(const U &ConstValue) const;
 
   template <typename U>
   Var<std::common_type_t<T, U>> operator/(const Var<U> &Other) const;
 
-  template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
-  Var<std::common_type_t<T, U>> operator/(const U &ConstValue) const;
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
+  operator/(const U &ConstValue) const;
 
   template <typename U>
   Var<std::common_type_t<T, U>> operator%(const Var<U> &Other) const;
 
-  template <typename U, typename = std::enable_if_t<std::is_arithmetic_v<U>>>
-  Var<std::common_type_t<T, U>> operator%(const U &ConstValue) const;
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
+  operator%(const U &ConstValue) const;
 
   // Compound assignment operators
   template <typename U> Var &operator+=(const Var<U> &Other);
