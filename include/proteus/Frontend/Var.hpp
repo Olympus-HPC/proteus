@@ -81,16 +81,9 @@ template <typename StorageT> struct VarStorageOwner {
   VarStorageOwner(FuncBase &FnIn) : Fn(FnIn) {}
 
   // Storage accessor helpers
-  Value *loadValue(
-      VarStorage::AccessKind Kind = VarStorage::AccessKind::Resolved) const {
-    return Storage->loadValue(Kind);
-  }
+  Value *loadValue() const { return Storage->loadValue(); }
 
-  void
-  storeValue(Value *Val,
-             VarStorage::AccessKind Kind = VarStorage::AccessKind::Resolved) {
-    Storage->storeValue(Val, Kind);
-  }
+  void storeValue(Value *Val) { Storage->storeValue(Val); }
 
   Value *getSlot() const { return Storage->getSlot(); }
   Type *getValueType() const { return Storage->getValueType(); }
@@ -264,6 +257,10 @@ struct Var<T, std::enable_if_t<std::is_pointer_v<T>>>
 
   Var(std::unique_ptr<PointerStorage> Storage, FuncBase &Fn)
       : VarStorageOwner<PointerStorage>(std::move(Storage), Fn) {}
+
+  // Load/store the pointer value itself from/to the pointer slot.
+  Value *loadPointer() const { return this->Storage->loadPointer(); }
+  void storePointer(Value *Ptr) { this->Storage->storePointer(Ptr); }
 
   Var<ElemType> operator[](size_t Index);
 
