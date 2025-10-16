@@ -123,7 +123,7 @@ public:
                   *this);
   }
 
-  template <typename T> Var<T> defVar(T Val, StringRef Name = "var") {
+  template <typename T> Var<T> defVar(const T &Val, StringRef Name = "var") {
     Var<T> Var = declVarInternal<T>(Name);
     Var = Val;
     return Var;
@@ -137,7 +137,7 @@ public:
   }
 
   template <typename T>
-  Var<T> defRuntimeConst(T Val, StringRef Name = "run.const.var") {
+  Var<T> defRuntimeConst(const T &Val, StringRef Name = "run.const.var") {
     return defVar<T>(Val, Name);
   }
 
@@ -244,8 +244,8 @@ template <typename RetT, typename... ArgT> class Func final : public FuncBase {
 private:
   Dispatcher &Dispatch;
   RetT (*CompiledFunc)(ArgT...) = nullptr;
-  // Optional because ArgTT is not default constructible.
-  std::tuple<std::optional<Var<ArgT>>...> ArgumentsTT;
+  // Optional because Var<ArgT> is not default constructible.
+  std::tuple<std::optional<Var<ArgT>>...> ArgumentsT;
 
 private:
   template <typename T, std::size_t ArgIdx> Var<T> createArg() {
@@ -261,13 +261,13 @@ private:
     IP = IRBuilderBase::InsertPoint(&EntryBB, EntryBB.end());
     IRB.restoreIP(IP);
 
-    (std::get<Is>(ArgumentsTT).emplace(createArg<ArgT, Is>()), ...);
+    (std::get<Is>(ArgumentsT).emplace(createArg<ArgT, Is>()), ...);
 
     IRB.ClearInsertionPoint();
   }
 
   template <std::size_t... Is> auto getArgsImpl(std::index_sequence<Is...>) {
-    return std::tie(*std::get<Is>(ArgumentsTT)...);
+    return std::tie(*std::get<Is>(ArgumentsT)...);
   }
 
 public:
@@ -281,7 +281,7 @@ public:
   auto getArgs() { return getArgsImpl(std::index_sequence_for<ArgT...>{}); }
 
   template <std::size_t Idx> auto &getArg() {
-    return *std::get<Idx>(ArgumentsTT);
+    return *std::get<Idx>(ArgumentsT);
   }
 
   auto getCompiledFunc() const { return CompiledFunc; }
