@@ -87,7 +87,6 @@ public:
 
   IRBuilderBase &getIRBuilder();
 
-
   template <typename T> Var<T> declVar(StringRef Name = "var") {
     static_assert(!std::is_array_v<T>, "Expected non-array type");
 
@@ -850,7 +849,7 @@ Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator+(
 
   auto *OffsetVal = Offset.loadValue();
   auto *IdxVal = convert<OffsetT, int64_t>(IRB, OffsetVal);
-  
+
   auto *BasePtr = loadPointer();
   auto *ElemTy = getValueType();
 
@@ -875,7 +874,7 @@ Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator+(
   auto &IRB = Fn.getIRBuilder();
   auto *IntTy = IRB.getInt64Ty();
   Value *IdxVal = ConstantInt::get(IntTy, Offset);
-  
+
   auto *BasePtr = loadPointer();
   auto *ElemTy = getValueType();
 
@@ -1082,9 +1081,8 @@ Var<T> FuncBase::emitAtomic(AtomicRMWInst::BinOp Op, const Var<T *> &Addr,
 
   auto &IRB = getIRBuilder();
   auto *Result = IRB.CreateAtomicRMW(
-      Op, Addr.loadPointer(), Val.loadValue(),
-      MaybeAlign(), AtomicOrdering::SequentiallyConsistent,
-      SyncScope::SingleThread);
+      Op, Addr.loadPointer(), Val.loadValue(), MaybeAlign(),
+      AtomicOrdering::SequentiallyConsistent, SyncScope::SingleThread);
 
   auto Ret = declVar<T>("atomic.rmw.res.");
   Ret.storeValue(Result);

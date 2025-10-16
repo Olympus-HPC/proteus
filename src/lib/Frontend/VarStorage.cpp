@@ -9,9 +9,7 @@ Value *ScalarStorage::loadValue() const {
   return IRB.CreateLoad(Slot->getAllocatedType(), Slot);
 }
 
-void ScalarStorage::storeValue(Value *Val) {
-  IRB.CreateStore(Val, Slot);
-}
+void ScalarStorage::storeValue(Value *Val) { IRB.CreateStore(Val, Slot); }
 
 Type *ScalarStorage::getAllocatedType() const {
   return Slot->getAllocatedType();
