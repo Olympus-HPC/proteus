@@ -470,8 +470,8 @@ template <typename T>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(Var &&V) {
   if (this->Storage == nullptr) {
-    // If we don't have storage, steal it from the source.
-    Storage = std::move(V.Storage);
+    // If we don't have storage, clone it from the source.
+    Storage = V.Storage->clone();
   } else {
     // If we have storage, copy the value.
     storeValue(V.loadValue());
