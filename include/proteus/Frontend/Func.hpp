@@ -87,7 +87,8 @@ public:
 
   IRBuilderBase &getIRBuilder();
 
-  template <typename T> Var<T> declVarInternal(StringRef Name = "var") {
+
+  template <typename T> Var<T> declVar(StringRef Name = "var") {
     static_assert(!std::is_array_v<T>, "Expected non-array type");
 
     Function *F = getFunction();
@@ -102,11 +103,6 @@ public:
     } else {
       return Var<T>(std::make_unique<ScalarStorage>(Alloca, IRB), *this);
     }
-  }
-
-  template <typename T> Var<T> declVar(StringRef Name = "var") {
-    static_assert(!std::is_array_v<T>, "Expected non-array type");
-    return declVarInternal<T>(Name);
   }
 
   template <typename T>
@@ -124,14 +120,14 @@ public:
   }
 
   template <typename T> Var<T> defVar(const T &Val, StringRef Name = "var") {
-    Var<T> Var = declVarInternal<T>(Name);
+    Var<T> Var = declVar<T>(Name);
     Var = Val;
     return Var;
   }
 
   template <typename T, typename U>
   Var<T> defVar(const Var<U> &Var, StringRef Name = "var") {
-    auto Res = declVarInternal<T>(Name);
+    auto Res = declVar<T>(Name);
     Res = Var;
     return Res;
   }
@@ -233,7 +229,7 @@ public:
   std::enable_if_t<std::is_convertible_v<T, U>, Var<U>>
   convert(const Var<T> &V) {
     auto &IRBRef = getIRBuilder();
-    Var<U> Res = declVarInternal<U>("convert.");
+    Var<U> Res = declVar<U>("convert.");
     Value *Converted = proteus::convert<T, U>(IRBRef, V.loadValue());
     Res.storeValue(Converted);
     return Res;
@@ -250,7 +246,7 @@ private:
 private:
   template <typename T, std::size_t ArgIdx> Var<T> createArg() {
     Function *F = getFunction();
-    auto Var = declVarInternal<T>("arg." + std::to_string(ArgIdx));
+    auto Var = declVar<T>("arg." + std::to_string(ArgIdx));
     Var.storeValue(F->getArg(ArgIdx), VarStorage::AccessKind::Direct);
     return Var;
   }
@@ -381,7 +377,7 @@ Var<std::common_type_t<T, U>> binOp(const Var<T> &L, const Var<U> &R, IntOp IOp,
     Result = FOp(IRB, LHS, RHS);
   }
 
-  auto ResultVar = Fn.declVarInternal<std::common_type_t<T, U>>("res.");
+  auto ResultVar = Fn.declVar<std::common_type_t<T, U>>("res.");
   ResultVar.storeValue(Result);
 
   return ResultVar;
@@ -446,7 +442,7 @@ Var<bool> cmpOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
     Result = FOp(IRB, LHS, RHS);
   }
 
-  auto ResultVar = Fn.declVarInternal<bool>("res.");
+  auto ResultVar = Fn.declVar<bool>("res.");
   ResultVar.storeValue(Result);
 
   return ResultVar;
@@ -1086,7 +1082,7 @@ Var<T> FuncBase::emitAtomic(AtomicRMWInst::BinOp Op, const Var<T *> &Addr,
       MaybeAlign(), AtomicOrdering::SequentiallyConsistent,
       SyncScope::SingleThread);
 
-  auto Ret = declVarInternal<T>("atomic.rmw.res.");
+  auto Ret = declVar<T>("atomic.rmw.res.");
   Ret.storeValue(Result);
   return Ret;
 }

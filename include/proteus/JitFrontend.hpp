@@ -274,7 +274,7 @@ FuncBase::call(StringRef Name) {
   using ArgT = typename FnSig<Sig>::ArgsTList;
   FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
   auto *Call = IRB.CreateCall(Callee);
-  Var<RetT> Ret = declVarInternal<RetT>("ret");
+  Var<RetT> Ret = declVar<RetT>("ret");
   Ret.storeValue(Call);
   return Ret;
 }
@@ -298,7 +298,7 @@ FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
   FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
   auto *Call = IRB.CreateCall(Callee, {ArgsVars.loadValue()...});
 
-  Var<RetT> Ret = declVarInternal<RetT>("ret");
+  Var<RetT> Ret = declVar<RetT>("ret");
   Ret.storeValue(Call);
   return Ret;
 }
