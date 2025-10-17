@@ -391,26 +391,26 @@ inline std::unique_ptr<MemoryBuffer> codegenRTC(Module &M,
 } // namespace detail
 
 inline void setLaunchBoundsForKernel(Function &F, int MaxNumWorkGroups,
-                                     int WavesPerEU = 0) {
+                                     int MinBlocksPerSM = 0) {
   // TODO: fix calculation of launch bounds.
   // TODO: find maximum (hardcoded 1024) from device info.
   // TODO: Setting as 1, BlockSize to replicate launch bounds settings
   F.addFnAttr("amdgpu-flat-work-group-size",
               "1," + std::to_string(std::min(1024, MaxNumWorkGroups)));
   // F->addFnAttr("amdgpu-waves-per-eu", std::to_string(WavesPerEU));
-  if (WavesPerEU != 0) {
+  if (MinBlocksPerSM != 0) {
     // NOTE: We are missing a heuristic to define the `WavesPerEU`, as such we
     // still need to study it. I restrict the waves by setting min equal to max
     // and disallowing any heuristics that HIP will use internally.
     // For more information please check:
     // https://clang.llvm.org/docs/AttributeReference.html#amdgpu-waves-per-eu
-    F.addFnAttr("amdgpu-waves-per-eu",
-                std::to_string(WavesPerEU) + "," + std::to_string(WavesPerEU));
+    F.addFnAttr("amdgpu-waves-per-eu", std::to_string(MinBlocksPerSM) + "," +
+                                           std::to_string(MinBlocksPerSM));
   }
 
   PROTEUS_DBG(Logger::logs("proteus")
               << " => Set Workgroup size " << MaxNumWorkGroups
-              << " WavesPerEU (unused) " << WavesPerEU << "\n");
+              << " WavesPerEU (unused) " << MinBlocksPerSM << "\n");
 }
 
 inline std::unique_ptr<MemoryBuffer>

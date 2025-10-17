@@ -5,7 +5,9 @@
 		"SpecializeDims" : true,
 		"SpecializeDimsAssume" : true,
 		"OptLevel" : 1,
-		"CodeGenOptLevel" : 2
+		"CodeGenOptLevel" : 2,
+		"TunedMaxThreads" : 4,
+		"MinBlocksPerSM": 4
 	},
 	"foo" : {
 		"CodeGen" : "serial",
@@ -14,6 +16,8 @@
 		"SpecializeDimsAssume" : false,
 		"OptLevel" : 1,
 		"CodeGenOptLevel" : 2,
-		"Pipeline" : "default<O3>,globaldce"
+		"Pipeline" : "default<O3>,globaldce",
+		"TunedMaxThreads" : 1,
+		"MinBlocksPerSM": 4
 	}
 }

@@ -149,20 +149,24 @@ class CodeGenerationConfig {
   bool ProteusSpecializeDimsAssume;
   char ProteusOptLevel;
   int ProteusCodeGenOptLevel;
+  int TunedMaxThreads;
+  int MinBlocksPerSM;
 
   CodeGenerationConfig(std::optional<const std::string> ProteusOptPipeline,
                        CodegenOption ProteusCodegen, bool ProteusSpecializeArgs,
                        bool ProteusSpecializeLaunchBounds,
                        bool ProteusSpecializeDims,
                        bool ProteusSpecializeDimsAssume, char ProteusOptLevel,
-                       int ProteusCodeGenOptLevel)
+                       int ProteusCodeGenOptLevel, int TunedMaxThreads = -1,
+                       int MinBlocksPerSM = 0)
       : ProteusOptPipeline(ProteusOptPipeline), ProteusCodegen(ProteusCodegen),
         ProteusSpecializeArgs(ProteusSpecializeArgs),
         ProteusSpecializeLaunchBounds(ProteusSpecializeLaunchBounds),
         ProteusSpecializeDims(ProteusSpecializeDims),
         ProteusSpecializeDimsAssume(ProteusSpecializeDimsAssume),
         ProteusOptLevel(ProteusOptLevel),
-        ProteusCodeGenOptLevel(ProteusCodeGenOptLevel) {}
+        ProteusCodeGenOptLevel(ProteusCodeGenOptLevel),
+        TunedMaxThreads(TunedMaxThreads), MinBlocksPerSM(MinBlocksPerSM) {}
 
 public:
   static CodeGenerationConfig createFromEnv() {
@@ -200,7 +204,11 @@ public:
         getDefaultValueFromOptional(Config.getString("OptLevel"),
                                     llvm::StringRef("3"))[0],
         getDefaultValueFromOptional(Config.getInteger("CodeGenOptLevel"),
-                                    static_cast<int64_t>(3)));
+                                    static_cast<int64_t>(3)),
+        getDefaultValueFromOptional(Config.getInteger("TunedMaxThreads"),
+                                    static_cast<int64_t>(-1L)),
+        getDefaultValueFromOptional(Config.getInteger("MinBlocksPerSM"),
+                                    static_cast<int64_t>(0L)));
   }
 
   CodegenOption codeGenOption() const { return ProteusCodegen; }
@@ -214,6 +222,16 @@ public:
     return ProteusOptPipeline;
   }
 
+  int minBlocksPerSM(int MaxThreads) const {
+    // NOTE: We only return the tuned value when the current LBMaxThreads is
+    // equal to the tuned one. otherwise we return 0. Not doing so, may result
+    // in violating constraints in cases in which LBMaxThreads >
+    // TunedMaxThreads
+    if (TunedMaxThreads != MaxThreads)
+      return 0;
+    return MinBlocksPerSM;
+  }
+
   template <typename T> void dump(T &OS) const {
     if (ProteusOptPipeline)
       OS << "Pipeline:" << ProteusOptPipeline.value() << " ";
@@ -225,6 +243,8 @@ public:
     OS << "SDA:" << ProteusSpecializeDimsAssume << " ";
     OS << "OL:" << ProteusOptLevel << " ";
     OS << "CGL:" << ProteusCodeGenOptLevel << " ";
+    OS << "TMT:" << TunedMaxThreads << " ";
+    OS << "BPSM:" << MinBlocksPerSM << " ";
   }
 };
 
