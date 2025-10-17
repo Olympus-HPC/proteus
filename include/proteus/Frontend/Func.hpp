@@ -159,8 +159,8 @@ public:
 
   template <typename CondLambda>
   void beginWhile(CondLambda &&Cond, const char *File = __builtin_FILE(),
-  int Line = __builtin_LINE());
-void endWhile();
+                  int Line = __builtin_LINE());
+  void endWhile();
 
   template <typename Sig>
   std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>,
