@@ -7,6 +7,8 @@
 namespace proteus {
 using namespace llvm;
 
+enum class StorageKind { Scalar, Pointer, Array };
+
 class VarStorage {
 
 protected:
@@ -15,6 +17,8 @@ protected:
 public:
   VarStorage(IRBuilderBase &IRB) : IRB(IRB) {}
   virtual ~VarStorage() = default;
+
+  virtual StorageKind getKind() const = 0;
 
   virtual Value *getSlot() const = 0;
   // Load/store the logical value represented by this storage.
@@ -36,6 +40,7 @@ public:
     return std::make_unique<ScalarStorage>(Slot, IRB);
   }
 
+  StorageKind getKind() const override;
   Value *getSlot() const override;
   Value *loadValue() const override;
   void storeValue(Value *Val) override;
@@ -58,6 +63,7 @@ public:
     return std::make_unique<PointerStorage>(PtrSlot, IRB, PointerElemTy);
   }
 
+  StorageKind getKind() const override;
   Value *getSlot() const override;
   // Load/store the pointee value through the pointer stored in PtrSlot.
   Value *loadValue() const override;
@@ -80,6 +86,7 @@ public:
   std::unique_ptr<VarStorage> clone() const override {
     return std::make_unique<ArrayStorage>(BasePointer, IRB, ArrayTy);
   }
+  StorageKind getKind() const override;
   Value *getSlot() const override;
   Value *loadValue() const override;
   void storeValue(Value *Val) override;

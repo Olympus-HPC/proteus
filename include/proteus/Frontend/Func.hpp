@@ -436,6 +436,36 @@ Var<std::common_type_t<T, U>> binOp(const Var<T> &L, const Var<U> &R, IntOp IOp,
   return ResultVar;
 }
 
+template <typename T>
+Var<T *>
+Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::getAddress() const {
+  auto &IRB = Fn.getIRBuilder();
+
+  Type *ElemTy = getValueType();
+
+  Value *PtrVal = nullptr;
+  unsigned AddrSpace = 0;
+
+  if (getKind() == StorageKind::Pointer) {
+    // LValue backed by PointerStorage: the slot holds a T*; load the pointer.
+    auto *Alloca = cast<AllocaInst>(getSlot());
+    PtrVal = IRB.CreateLoad(getAllocatedType(), Alloca);
+    AddrSpace = cast<PointerType>(PtrVal->getType())->getAddressSpace();
+  } else {
+    // LValue backed by ScalarStorage: address is the alloca itself.
+    PtrVal = getSlot();
+    AddrSpace = cast<PointerType>(PtrVal->getType())->getAddressSpace();
+  }
+
+  Type *ElemPtrTy = PointerType::get(ElemTy, AddrSpace);
+  auto *PtrSlot = Fn.emitAlloca(ElemPtrTy, "addr.ptr");
+  IRB.CreateStore(PtrVal, PtrSlot);
+
+  std::unique_ptr<PointerStorage> ResultStorage =
+      std::make_unique<PointerStorage>(PtrSlot, IRB, ElemTy);
+  return Var<T *>(std::move(ResultStorage), Fn);
+}
+
 // Helper function for compound assignment with a constant
 template <typename T, typename U, typename IntOp, typename FPOp>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
