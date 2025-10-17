@@ -16,7 +16,9 @@ __global__ __attribute__((annotate("jit"))) void foo() {
 }
 
 __global__ __attribute__((annotate("jit"))) void bar() {
-  printf("Hello from bar\n");
+  unsigned int Idx = threadIdx.x + blockIdx.x * blockDim.x;
+  if (Idx == 0)
+    printf("Hello from bar\n");
 }
 
 __global__ __attribute__((annotate("jit"))) void baz() {
@@ -31,6 +33,8 @@ int main() {
   gpuErrCheck(gpuDeviceSynchronize());
   bar<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
+  bar<<<1, 4>>>();
+  gpuErrCheck(gpuDeviceSynchronize());
   baz<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
 
@@ -39,20 +43,24 @@ int main() {
 }
 
 // clang-format off
-// CHECK-CUDA: [KernelConfig] ID:foo Pipeline:default<O3>,globaldce CG:RTC SA:1 LB:0 SD:0 SDA:0 OL:3 CGL:2
-// CHECK-HIP: [KernelConfig] ID:foo Pipeline:default<O3>,globaldce CG:Serial SA:1 LB:0 SD:0 SDA:0 OL:3 CGL:2
+// CHECK-CUDA: [KernelConfig] ID:foo Pipeline:default<O3>,globaldce CG:RTC SA:1 LB:0 SD:0 SDA:0 OL:3 CGL:2 TMT:1 BPSM:4
+// CHECK-HIP: [KernelConfig] ID:foo Pipeline:default<O3>,globaldce CG:Serial SA:1 LB:0 SD:0 SDA:0 OL:3 CGL:2 TMT:1 BPSM:4 
 // CHECK: [CustomPipeline] default<O3>,globaldce
 // CHECK: Hello from foo
-// CHECK: [KernelConfig] ID:bar CG:RTC SA:1 LB:1 SD:1 SDA:1 OL:3 CGL:2
-// CHECK: [LaunchBoundSpec] BlockSize 1
+// CHECK: [KernelConfig] ID:bar CG:RTC SA:1 LB:1 SD:1 SDA:1 OL:3 CGL:2 TMT:4 BPSM:4
+// CHECK: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK: Hello from bar
-// CHECK-CUDA: [KernelConfig] ID:baz CG:RTC SA:1 LB:1 SD:1 SDA:0 OL:3 CGL:3
-// CHECK-HIP: [KernelConfig] ID:baz CG:{{RTC|Serial|Parallel}} SA:1 LB:1 SD:1 SDA:1 OL:3 CGL:3
-// CHECK: [LaunchBoundSpec] BlockSize 1
+// CHECK: [KernelConfig] ID:bar CG:RTC SA:1 LB:1 SD:1 SDA:1 OL:3 CGL:2 TMT:4 BPSM:4
+// CHECK: [LaunchBoundSpec] MaxThreads 4 MinBlocksPerSM 4
+// CHECK: Hello from bar
+// CHECK-CUDA: [KernelConfig] ID:baz CG:RTC SA:1 LB:1 SD:1 SDA:0 OL:3 CGL:3  TMT:-1 BPSM:0
+// CHECK-HIP: [KernelConfig] ID:baz CG:{{RTC|Serial|Parallel}} SA:1 LB:1 SD:1 SDA:1 OL:3 CGL:3 TMT:-1 BPSM:0
+// CHECK: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK: Hello from baz
-// CHECK: JitCache hits 0 total 3
+// CHECK: JitCache hits 0 total 4
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: JitStorageCache hits 0 total 3
+// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: JitStorageCache hits 0 total 4
 

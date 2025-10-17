@@ -261,7 +261,7 @@ inline void specializeIR(
     dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
     const SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo,
     bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsAssume,
-    bool SpecializeLaunchBounds) {
+    bool SpecializeLaunchBounds, int MinBlocksPerSM) {
   Timer T;
   Function *F = M.getFunction(FnName);
 
@@ -292,16 +292,17 @@ inline void specializeIR(
 
   if (SpecializeLaunchBounds) {
     int BlockSize = BlockDim.x * BlockDim.y * BlockDim.z;
-    auto TraceOut = [](int BlockSize) {
+    auto TraceOut = [](int BlockSize, int MinBlocksPerSM) {
       SmallString<128> S;
       raw_svector_ostream OS(S);
-      OS << "[LaunchBoundSpec] BlockSize " << BlockSize << "\n";
+      OS << "[LaunchBoundSpec] MaxThreads " << BlockSize << " MinBlocksPerSM "
+         << MinBlocksPerSM << "\n";
 
       return S;
     };
     if (Config::get().ProteusTraceOutput >= 1)
-      Logger::trace(TraceOut(BlockSize));
-    setLaunchBoundsForKernel(*F, BlockSize);
+      Logger::trace(TraceOut(BlockSize, MinBlocksPerSM));
+    setLaunchBoundsForKernel(*F, BlockSize, MinBlocksPerSM);
   }
 
   runCleanupPassPipeline(M);

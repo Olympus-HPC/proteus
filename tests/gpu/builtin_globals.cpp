@@ -37,7 +37,7 @@ int main() {
 // CHECK-FIRST: [DimSpec]
 // CHECK-FIRST: [DimSpec]
 // CHECK-FIRST: [DimSpec]
-// CHECK-FIRST: [LaunchBoundSpec] BlockSize 1
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK: Kernel
 // CHECK: JitCache hits 0 total 1
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0

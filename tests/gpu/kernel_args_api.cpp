@@ -31,7 +31,7 @@ int main() {
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kerneliii ArgNo 0 with value i32 3
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kerneliii ArgNo 1 with value i32 2
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kerneliii ArgNo 2 with value i32 1
-// CHECK-FIRST: [LaunchBoundSpec] BlockSize 1
+// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK: Kernel arg 6
 // CHECK: JitCache hits 0 total 1
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
