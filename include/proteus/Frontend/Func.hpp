@@ -152,7 +152,7 @@ public:
 
   template <typename T>
   void beginFor(Var<T> &IterVar, const Var<T> &InitVar,
-                const Var<T> &UpperBoundVar, const Var<T> &IncVar,
+                const Var<T> &UpperBound, const Var<T> &IncVar,
                 const char *File = __builtin_FILE(),
                 int Line = __builtin_LINE());
   void endFor();
