@@ -25,8 +25,7 @@ using namespace builtins::gpu;
 int main() {
   auto J = proteus::JitModule(TARGET);
 
-  auto KernelHandle =
-      J.addKernel<void(int *, double *)>("test_get_address");
+  auto KernelHandle = J.addKernel<void(int *, double *)>("test_get_address");
   auto &F = KernelHandle.F;
 
   F.beginFunction();
@@ -44,9 +43,9 @@ int main() {
     F.beginIf(Idx == 0);
     {
       auto IntVar = F.declVar<int>("int_var");
-      IntVar = 42;
 
       auto IntAddr = IntVar.getAddress();
+      IntAddr[0] = 42;
       IntResult[0] = IntAddr[0];
 
       auto DoubleVar = F.declVar<double>("double_var");
@@ -60,6 +59,14 @@ int main() {
 
       DoubleAddr[0] = 2.71828;
       DoubleResult[1] = DoubleVar;
+
+      auto IntVar2 = F.declVar<int>("int_var2");
+      IntVar2 = 7;
+      auto P = IntVar2.getAddress();
+      auto PP = P.getAddress();
+      IntResult[2] = PP[0][0];
+      PP[0][0] = 123;
+      IntResult[3] = IntVar2;
     }
     F.endIf();
 
@@ -70,7 +77,7 @@ int main() {
   int *IntResults;
   double *DoubleResults;
 
-  gpuErrCheck(gpuMallocManaged(&IntResults, 2 * sizeof(int)));
+  gpuErrCheck(gpuMallocManaged(&IntResults, 4 * sizeof(int)));
   gpuErrCheck(gpuMallocManaged(&DoubleResults, 2 * sizeof(double)));
 
   J.compile();
@@ -89,9 +96,14 @@ int main() {
   std::cout << "  Original value: " << DoubleResults[0] << "\n";
   std::cout << "  Modified value: " << DoubleResults[1] << "\n";
 
+  std::cout << "PointerVar<int*> getAddress test:\n";
+  std::cout << "  Original through **: " << IntResults[2] << "\n";
+  std::cout << "  Modified via **: " << IntResults[3] << "\n";
+
   bool passed = (IntResults[0] == 42) && (IntResults[1] == 100) &&
                 (DoubleResults[0] > 3.14 && DoubleResults[0] < 3.15) &&
-                (DoubleResults[1] > 2.71 && DoubleResults[1] < 2.72);
+                (DoubleResults[1] > 2.71 && DoubleResults[1] < 2.72) &&
+                (IntResults[2] == 7) && (IntResults[3] == 123);
 
   if (passed) {
     std::cout << "All tests passed!\n";
@@ -112,4 +124,7 @@ int main() {
 // CHECK: ScalarVar<double> getAddress test:
 // CHECK-NEXT:   Original value: 3.14159
 // CHECK-NEXT:   Modified value: 2.71828
+// CHECK: PointerVar<int*> getAddress test:
+// CHECK-NEXT:   Original through **: 7
+// CHECK-NEXT:   Modified via **: 123
 // CHECK: All tests passed!
