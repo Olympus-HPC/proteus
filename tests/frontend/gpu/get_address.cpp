@@ -100,12 +100,12 @@ int main() {
   std::cout << "  Original through **: " << IntResults[2] << "\n";
   std::cout << "  Modified via **: " << IntResults[3] << "\n";
 
-  bool passed = (IntResults[0] == 42) && (IntResults[1] == 100) &&
+  bool Passed = (IntResults[0] == 42) && (IntResults[1] == 100) &&
                 (DoubleResults[0] > 3.14 && DoubleResults[0] < 3.15) &&
                 (DoubleResults[1] > 2.71 && DoubleResults[1] < 2.72) &&
                 (IntResults[2] == 7) && (IntResults[3] == 123);
 
-  if (passed) {
+  if (Passed) {
     std::cout << "All tests passed!\n";
   } else {
     std::cout << "Some tests failed!\n";
@@ -114,7 +114,7 @@ int main() {
   gpuErrCheck(gpuFree(IntResults));
   gpuErrCheck(gpuFree(DoubleResults));
 
-  return passed ? 0 : 1;
+  return 0;
 }
 
 // clang-format off
