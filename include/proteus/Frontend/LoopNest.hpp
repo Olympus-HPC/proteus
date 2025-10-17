@@ -9,24 +9,28 @@
 
 namespace proteus {
 
-class LoopBoundInfo {
+template <typename T> class LoopBoundInfo {
 public:
-  Var &IterVar;
-  Var &Init;
-  Var &UpperBound;
-  Var &Inc;
+  Var<T> IterVar;
+  Var<T> Init;
+  Var<T> UpperBound;
+  Var<T> Inc;
 
-  LoopBoundInfo(Var &IterVar, Var &Init, Var &UpperBound, Var &Inc);
+  LoopBoundInfo(const Var<T> &IterVar, const Var<T> &Init,
+                const Var<T> &UpperBound, const Var<T> &Inc)
+      : IterVar(IterVar), Init(Init), UpperBound(UpperBound), Inc(Inc) {}
 };
 
-template <typename BodyLambda> class ForLoopBuilder {
+template <typename T, typename BodyLambda> class ForLoopBuilder {
 public:
-  LoopBoundInfo Bounds;
+  LoopBoundInfo<T> Bounds;
+  using LoopIndexType = T;
   std::optional<int> TileSize;
   BodyLambda Body;
   FuncBase &Fn;
 
-  ForLoopBuilder(const LoopBoundInfo &Bounds, FuncBase &Fn, BodyLambda &&Body)
+  ForLoopBuilder(const LoopBoundInfo<T> &Bounds, FuncBase &Fn,
+                 BodyLambda &&Body)
       : Bounds(Bounds), Body(std::move(Body)), Fn(Fn) {}
   ForLoopBuilder &tile(int Tile) {
     TileSize = Tile;
@@ -40,10 +44,11 @@ public:
   }
 };
 
-template <typename... LoopBuilders> class LoopNestBuilder {
+template <typename T, typename... LoopBuilders> class LoopNestBuilder {
 private:
   std::tuple<LoopBuilders...> Loops;
-  std::array<std::unique_ptr<LoopBoundInfo>, std::tuple_size_v<decltype(Loops)>>
+  std::array<std::unique_ptr<LoopBoundInfo<T>>,
+             std::tuple_size_v<decltype(Loops)>>
       TiledLoopBounds;
   FuncBase &Fn;
 
@@ -57,15 +62,11 @@ private:
           if (Loop.TileSize.has_value()) {
             auto &Bounds = std::get<Is>(Loops).Bounds;
 
-            auto &TileIter =
-                Fn.declVarInternal("tile_iter_" + std::to_string(Is),
-                                   Bounds.IterVar.getValueType());
-            auto &TileStep =
-                Fn.declVarInternal("tile_step_" + std::to_string(Is),
-                                   Bounds.IterVar.getValueType());
+            auto TileIter = Fn.declVar<T>("tile_iter_" + std::to_string(Is));
+            auto TileStep = Fn.declVar<T>("tile_step_" + std::to_string(Is));
 
             TileStep = Loop.TileSize.value();
-            TiledLoopBounds[Is] = std::make_unique<LoopBoundInfo>(
+            TiledLoopBounds[Is] = std::make_unique<LoopBoundInfo<T>>(
                 TileIter, Bounds.Init, Bounds.UpperBound, TileStep);
           }
         }(),
@@ -94,7 +95,7 @@ private:
           auto &Loop = std::get<Is>(Loops);
           if (Loop.TileSize.has_value()) {
             auto &TiledBounds = *TiledLoopBounds[Is];
-            auto &EndCandidate = TiledBounds.IterVar + TiledBounds.Inc;
+            auto EndCandidate = TiledBounds.IterVar + TiledBounds.Inc;
             // Clamp to handle partial tiles.
             EndCandidate = min(EndCandidate, TiledBounds.UpperBound);
             Fn.beginFor(Loop.Bounds.IterVar, TiledBounds.IterVar, EndCandidate,

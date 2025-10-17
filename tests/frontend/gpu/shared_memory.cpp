@@ -32,15 +32,15 @@ int main() {
 
   F.beginFunction();
   {
-    auto &A = F.getArg(0);
+    auto &A = F.getArg<0>();
 
-    auto &Tid = F.callBuiltin(getThreadIdX);
-    auto &Bid = F.callBuiltin(getBlockIdX);
+    auto Tid = F.callBuiltin(getThreadIdX);
+    auto Bid = F.callBuiltin(getBlockIdX);
 
-    auto &I = F.declVar<size_t>("I");
+    auto I = F.declVar<size_t>("I");
     I = Bid * WarpSize + Tid;
 
-    auto &S = F.declVar<double[]>(WarpSize, AddressSpace::SHARED, "shared_mem");
+    auto S = F.declVar<double[]>(WarpSize, AddressSpace::SHARED, "shared_mem");
 
     // Load from global into shared, then sync, then write reversed index.
     S[Tid] = A[I];

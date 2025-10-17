@@ -14,23 +14,22 @@ static auto get1DLoopNestFunction(int N, int TileSize) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
   auto &F = JitMod->addFunction<void(double *, double *)>("loopnest_1d");
 
-  auto &I = F.declVar<int>("i");
-  auto &IncOne = F.declVar<int>("inc");
-  auto &UB = F.declVar<int>("ub");
+  auto I = F.declVar<int>("i");
+  auto IncOne = F.declVar<int>("inc");
+  auto UB = F.declVar<int>("ub");
 
-  auto Args = F.getArgs();
-  auto &A = std::get<0>(Args);
-  auto &B = std::get<1>(Args);
+  auto &A = F.getArg<0>();
+  auto &B = F.getArg<1>();
 
   F.beginFunction();
   {
     I = 0;
     UB = N;
     IncOne = 1;
-    auto &Zero = F.declVar<int>("zero");
+    auto Zero = F.declVar<int>("zero");
     Zero = 0;
 
-    F.forLoop({I, Zero, UB, IncOne}, [&]() { A[I] = B[I] * 3.0; })
+    F.forLoop<int>({I, Zero, UB, IncOne}, [&]() { A[I] = B[I] * 3.0; })
         .tile(TileSize)
         .emit();
 
@@ -45,24 +44,23 @@ static auto get1DSimpleLoopNestFunction(int N) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
   auto &F = JitMod->addFunction<void(double *, double *)>("loopnest_1d_simple");
 
-  auto &I = F.declVar<int>("i");
-  auto &IncOne = F.declVar<int>("inc");
-  auto &UB = F.declVar<int>("ub");
+  auto I = F.declVar<int>("i");
+  auto IncOne = F.declVar<int>("inc");
+  auto UB = F.declVar<int>("ub");
 
-  auto Args = F.getArgs();
-  auto &A = std::get<0>(Args);
-  auto &B = std::get<1>(Args);
+  auto &A = F.getArg<0>();
+  auto &B = F.getArg<1>();
 
   F.beginFunction();
   {
     I = 0;
     UB = N;
     IncOne = 1;
-    auto &Zero = F.declVar<int>("zero");
+    auto Zero = F.declVar<int>("zero");
     Zero = 0;
 
     // Test non-tiled version.
-    F.forLoop({I, Zero, UB, IncOne}, [&]() { A[I] = B[I] * 3.0; }).emit();
+    F.forLoop<int>({I, Zero, UB, IncOne}, [&]() { A[I] = B[I] * 3.0; }).emit();
 
     F.ret();
   }

@@ -36,11 +36,11 @@ int main() {
   F.beginFunction();
   {
     // Declare local variables and argument getters.
-    auto &I = F.declVar<size_t>("I");
-    auto &Inc = F.declVar<size_t>("Inc");
-    auto &A = F.getArg(0); // Pointer to vector A
-    auto &B = F.getArg(1); // Pointer to vector B
-    auto &N = F.getArg(2); // Vector size
+    auto I = F.declVar<size_t>("I");
+    auto Inc = F.declVar<size_t>("Inc");
+    auto &A = F.getArg<0>(); // Pointer to vector A
+    auto &B = F.getArg<1>(); // Pointer to vector B
+    auto &N = F.getArg<2>(); // Vector size
 
     // Compute the global thread index.
     I = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +

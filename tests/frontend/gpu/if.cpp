@@ -28,9 +28,9 @@ int main() {
   auto KernelHandleLT = J.addKernel<void(double, double, double *)>("if_lt");
   auto &LT = KernelHandleLT.F;
   {
-    auto &Arg0 = LT.getArg(0);
-    auto &Arg1 = LT.getArg(1);
-    auto &Ret = LT.getArg(2);
+    auto &Arg0 = LT.getArg<0>();
+    auto &Arg1 = LT.getArg<1>();
+    auto &Ret = LT.getArg<2>();
 
     LT.beginFunction();
     {
@@ -46,9 +46,9 @@ int main() {
   auto KernelHandleLE = J.addKernel<void(double, double, double *)>("if_le");
   auto &LE = KernelHandleLE.F;
   {
-    auto &Arg0 = LE.getArg(0);
-    auto &Arg1 = LE.getArg(1);
-    auto &Ret = LE.getArg(2);
+    auto &Arg0 = LE.getArg<0>();
+    auto &Arg1 = LE.getArg<1>();
+    auto &Ret = LE.getArg<2>();
 
     LE.beginFunction();
     {
@@ -64,9 +64,9 @@ int main() {
   auto KernelHandleGT = J.addKernel<void(double, double, double *)>("if_gt");
   auto &GT = KernelHandleGT.F;
   {
-    auto &Arg0 = GT.getArg(0);
-    auto &Arg1 = GT.getArg(1);
-    auto &Ret = GT.getArg(2);
+    auto &Arg0 = GT.getArg<0>();
+    auto &Arg1 = GT.getArg<1>();
+    auto &Ret = GT.getArg<2>();
 
     GT.beginFunction();
     {
@@ -82,9 +82,9 @@ int main() {
   auto KernelHandleGE = J.addKernel<void(double, double, double *)>("if_ge");
   auto &GE = KernelHandleGE.F;
   {
-    auto &Arg0 = GE.getArg(0);
-    auto &Arg1 = GE.getArg(1);
-    auto &Ret = GE.getArg(2);
+    auto &Arg0 = GE.getArg<0>();
+    auto &Arg1 = GE.getArg<1>();
+    auto &Ret = GE.getArg<2>();
 
     GE.beginFunction();
     {
@@ -100,9 +100,9 @@ int main() {
   auto KernelHandleEQ = J.addKernel<void(double, double, double *)>("if_eq");
   auto &EQ = KernelHandleEQ.F;
   {
-    auto &Arg0 = EQ.getArg(0);
-    auto &Arg1 = EQ.getArg(1);
-    auto &Ret = EQ.getArg(2);
+    auto &Arg0 = EQ.getArg<0>();
+    auto &Arg1 = EQ.getArg<1>();
+    auto &Ret = EQ.getArg<2>();
 
     EQ.beginFunction();
     {
@@ -118,9 +118,9 @@ int main() {
   auto KernelHandleNE = J.addKernel<void(double, double, double *)>("if_ne");
   auto &NE = KernelHandleNE.F;
   {
-    auto &Arg0 = NE.getArg(0);
-    auto &Arg1 = NE.getArg(1);
-    auto &Ret = NE.getArg(2);
+    auto &Arg0 = NE.getArg<0>();
+    auto &Arg1 = NE.getArg<1>();
+    auto &Ret = NE.getArg<2>();
 
     NE.beginFunction();
     {

@@ -29,10 +29,10 @@ int main() {
   auto KernelHandle = J.addKernel<void(double *)>("for");
   auto &F = KernelHandle.F;
 
-  auto &I = F.declVar<int>("i");
-  auto &Inc = F.declVar<int>("inc");
-  auto &UB = F.declVar<int>("ub");
-  auto &Arg = F.getArg(0);
+  auto I = F.declVar<int>("i");
+  auto Inc = F.declVar<int>("inc");
+  auto UB = F.declVar<int>("ub");
+  auto &Arg = F.getArg<0>();
   F.beginFunction();
   {
     I = 0;

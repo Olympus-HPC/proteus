@@ -29,29 +29,29 @@ int main() {
       double *, double *, double *, double *, double *, double *, double *,
       double *, double *, double *, double *, double *)>("operators");
   auto &F = KernelHandle.F;
-  auto &Arg0 = F.getArg(0);
-  auto &Arg1 = F.getArg(1);
-  auto &Arg2 = F.getArg(2);
-  auto &Arg3 = F.getArg(3);
-  auto &Arg4 = F.getArg(4);
-  auto &Arg5 = F.getArg(5);
-  auto &Arg6 = F.getArg(6);
-  auto &Arg7 = F.getArg(7);
-  auto &Arg8 = F.getArg(8);
-  auto &Arg9 = F.getArg(9);
-  auto &Arg10 = F.getArg(10);
-  auto &Arg11 = F.getArg(11);
+  auto &Arg0 = F.getArg<0>();
+  auto &Arg1 = F.getArg<1>();
+  auto &Arg2 = F.getArg<2>();
+  auto &Arg3 = F.getArg<3>();
+  auto &Arg4 = F.getArg<4>();
+  auto &Arg5 = F.getArg<5>();
+  auto &Arg6 = F.getArg<6>();
+  auto &Arg7 = F.getArg<7>();
+  auto &Arg8 = F.getArg<8>();
+  auto &Arg9 = F.getArg<9>();
+  auto &Arg10 = F.getArg<10>();
+  auto &Arg11 = F.getArg<11>();
   F.beginFunction();
   {
     Arg0[0] = 2;
     Arg1[0] = 3;
 
-    Arg2[0] = Arg0 + Arg1;
-    Arg3[0] = Arg0 - Arg1;
-    Arg4[0] = Arg0 * Arg1;
-    Arg5[0] = Arg0 / Arg1;
+    Arg2[0] = Arg0[0] + Arg1[0];
+    Arg3[0] = Arg0[0] - Arg1[0];
+    Arg4[0] = Arg0[0] * Arg1[0];
+    Arg5[0] = Arg0[0] / Arg1[0];
 
-    Arg6[0] = Arg7[0] = Arg8[0] = Arg9[0] = 5;
+    *Arg6 = *Arg7 = *Arg8 = *Arg9 = 5;
 
     Arg6[0] += Arg0[0];
     Arg7[0] -= Arg0[0];
@@ -61,7 +61,7 @@ int main() {
     Arg10[0] = 10.0;
     Arg10[0] -= 3.0;
 
-    auto &Cmp = F.declVar<double>("cmp");
+    auto Cmp = F.declVar<double>("cmp");
     Cmp = 5.0;
     Arg11[0] = 0.0;
     F.beginIf(Cmp <= 5.0);

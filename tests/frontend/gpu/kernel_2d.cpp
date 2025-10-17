@@ -33,13 +33,13 @@ int main() {
 
   F.beginFunction();
   {
-    auto &Row = F.declVar<size_t>("row");
-    auto &Col = F.declVar<size_t>("col");
-    auto &A = F.getArg(0);
-    auto &B = F.getArg(1);
-    auto &C = F.getArg(2);
-    auto &M = F.getArg(3);
-    auto &N = F.getArg(4);
+    auto Row = F.declVar<size_t>("row");
+    auto Col = F.declVar<size_t>("col");
+    auto &A = F.getArg<0>();
+    auto &B = F.getArg<1>();
+    auto &C = F.getArg<2>();
+    auto &M = F.getArg<3>();
+    auto &N = F.getArg<4>();
 
     Row = F.callBuiltin(getBlockIdY) * F.callBuiltin(getBlockDimY) +
           F.callBuiltin(getThreadIdY);
@@ -50,7 +50,7 @@ int main() {
     {
       F.beginIf(Col < N);
       {
-        auto &Idx = F.declVar<size_t>("idx");
+        auto Idx = F.declVar<size_t>("idx");
         Idx = Row * N + Col;
         C[Idx] = A[Idx] + B[Idx];
       }
