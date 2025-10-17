@@ -437,8 +437,7 @@ Var<std::common_type_t<T, U>> binOp(const Var<T> &L, const Var<U> &R, IntOp IOp,
 }
 
 template <typename T>
-Var<T *>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::getAddress() const {
+Var<T *> Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::getAddress() const {
   auto &IRB = Fn.getIRBuilder();
 
   Type *ElemTy = getValueType();
@@ -897,23 +896,58 @@ Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](
 
 template <typename T>
 Var<std::remove_pointer_t<T>>
-Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator[](size_t Index) {
+Var<T, std::enable_if_t<std::is_pointer_v<T>>>::indexImpl(Value *IdxValue) {
   auto &IRB = Fn.getIRBuilder();
 
+  if (!IdxValue->getType()->isIntegerTy())
+    PROTEUS_FATAL_ERROR("Pointer index must be an integer type");
+
+  if (IdxValue->getType()->getIntegerBitWidth() != 64)
+    IdxValue = IRB.CreateSExtOrTrunc(IdxValue, IRB.getInt64Ty());
+
   auto *PointerElemTy = getValueType();
-  auto *Ptr = loadPointer();
-  auto *GEP = IRB.CreateConstInBoundsGEP1_64(PointerElemTy, Ptr, Index);
-  unsigned AddrSpace = cast<PointerType>(Ptr->getType())->getAddressSpace();
-  Type *ElemPtrTy = PointerType::get(PointerElemTy, AddrSpace);
+  auto *AddressBase = loadPointer();
+  unsigned AddrSpaceAddr =
+      cast<PointerType>(AddressBase->getType())->getAddressSpace();
 
-  // Create a pointer storage to hold the LValue for
-  // the Array[Index].
-  auto *PtrSlot = Fn.emitAlloca(ElemPtrTy, "elem.ptr");
-  IRB.CreateStore(GEP, PtrSlot);
-  std::unique_ptr<VarStorage> ResultStorage =
-      std::make_unique<PointerStorage>(PtrSlot, IRB, PointerElemTy);
+  using RetElemT = std::remove_pointer_t<T>;
+  auto &Ctx = IRB.getContext();
+  if constexpr (std::is_pointer_v<RetElemT>) {
+    auto *GEPAddr = IRB.CreateInBoundsGEP(PointerElemTy, AddressBase, IdxValue);
+    Type *SlotTy = PointerType::get(PointerElemTy, AddrSpaceAddr);
+    auto *PtrSlot = Fn.emitAlloca(SlotTy, "elem.ptr");
+    IRB.CreateStore(GEPAddr, PtrSlot);
 
-  return Var<std::remove_pointer_t<T>>(std::move(ResultStorage), Fn);
+    auto Storage =
+        std::make_unique<PointerStorage>(PtrSlot, IRB, PointerElemTy);
+    return Var<RetElemT>(std::move(Storage), Fn);
+  } else {
+    // Indexing to a non-pointer value must return scalar storage; rebuild with
+    // that pointee type.
+    Value *BasePtr =
+        PointerElemTy->isPointerTy() ? this->Storage->loadValue() : AddressBase;
+    unsigned AddrSpaceVal =
+        cast<PointerType>(BasePtr->getType())->getAddressSpace();
+    Type *ResultValueTy = TypeMap<RetElemT>::get(Ctx);
+    auto *GEPVal = IRB.CreateInBoundsGEP(ResultValueTy, BasePtr, IdxValue);
+    Type *ElemPtrTy = PointerType::get(ResultValueTy, AddrSpaceVal);
+
+    auto *PtrSlot = Fn.emitAlloca(ElemPtrTy, "elem.ptr");
+    IRB.CreateStore(GEPVal, PtrSlot);
+
+    auto DerivedStorage =
+        std::make_unique<PointerStorage>(PtrSlot, IRB, ResultValueTy);
+    std::unique_ptr<VarStorage> BaseStorage = std::move(DerivedStorage);
+    return Var<RetElemT>(std::move(BaseStorage), Fn);
+  }
+}
+
+template <typename T>
+Var<std::remove_pointer_t<T>>
+Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator[](size_t Index) {
+  auto &IRB = Fn.getIRBuilder();
+  auto *IdxValue = IRB.getInt64(Index);
+  return indexImpl(IdxValue);
 }
 
 template <typename T>
@@ -922,22 +956,8 @@ std::enable_if_t<std::is_arithmetic_v<IdxT>, Var<std::remove_pointer_t<T>>>
 Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator[](
     const Var<IdxT> &Index) {
   auto &IRB = Fn.getIRBuilder();
-
-  auto *PointeeType = getValueType();
-  auto *Ptr = loadPointer();
-  auto *IdxValue = Index.loadValue();
-  auto *GEP = IRB.CreateInBoundsGEP(PointeeType, Ptr, IdxValue);
-  unsigned AddrSpace = cast<PointerType>(Ptr->getType())->getAddressSpace();
-  Type *ElemPtrTy = PointerType::get(PointeeType, AddrSpace);
-
-  // Create a pointer storage to hold the LValue for
-  // the Array[Index].
-  auto *PtrSlot = Fn.emitAlloca(ElemPtrTy, "elem.ptr");
-  IRB.CreateStore(GEP, PtrSlot);
-  std::unique_ptr<VarStorage> ResultStorage =
-      std::make_unique<PointerStorage>(PtrSlot, IRB, PointeeType);
-
-  return Var<std::remove_pointer_t<T>>(std::move(ResultStorage), Fn);
+  auto *IdxValue = convert<IdxT, size_t>(IRB, Index.loadValue());
+  return indexImpl(IdxValue);
 }
 
 // Pointer type operator*
@@ -945,6 +965,28 @@ template <typename T>
 Var<std::remove_pointer_t<T>>
 Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator*() {
   return (*this)[0];
+}
+
+// getAddress for pointer variables: produce a Var<T**>.
+template <typename T>
+Var<T *> Var<T, std::enable_if_t<std::is_pointer_v<T>>>::getAddress() const {
+  auto &IRB = Fn.getIRBuilder();
+
+  if (getKind() != StorageKind::Pointer)
+    PROTEUS_FATAL_ERROR(
+        "Expected PointerStorage for pointer Var in getAddress()");
+
+  Type *ObjTy = getAllocatedType();
+
+  Value *PtrVal = getSlot();
+  unsigned AddrSpace = cast<PointerType>(PtrVal->getType())->getAddressSpace();
+
+  Type *ObjPtrTy = PointerType::get(ObjTy, AddrSpace);
+  auto *PtrSlot = Fn.emitAlloca(ObjPtrTy, "addr.ptr");
+  IRB.CreateStore(PtrVal, PtrSlot);
+
+  auto ResultStorage = std::make_unique<PointerStorage>(PtrSlot, IRB, ObjTy);
+  return Var<T *>(std::move(ResultStorage), Fn);
 }
 
 template <typename T>

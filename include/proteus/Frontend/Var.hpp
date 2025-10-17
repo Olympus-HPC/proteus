@@ -277,6 +277,9 @@ struct Var<T, std::enable_if_t<std::is_pointer_v<T>>>
 
   Var<ElemType> operator*();
 
+  // Address-of for pointer variables: returns Var<T*> (pointer-to-pointer).
+  Var<T *> getAddress() const;
+
   template <typename OffsetT>
   std::enable_if_t<std::is_arithmetic_v<OffsetT>,
                    Var<T, std::enable_if_t<std::is_pointer_v<T>>>>
@@ -293,6 +296,9 @@ struct Var<T, std::enable_if_t<std::is_pointer_v<T>>>
   operator+(OffsetT Offset, const Var &Ptr) {
     return Ptr + Offset;
   }
+
+private:
+  Var<std::remove_pointer_t<T>> indexImpl(Value *IdxValue);
 };
 
 // Non-member arithmetic operators for Var
