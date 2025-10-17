@@ -44,7 +44,7 @@ protected:
 
   std::string Name;
 
-  enum class ScopeKind { FUNCTION, IF, FOR };
+  enum class ScopeKind { FUNCTION, IF, FOR, WHILE };
   struct Scope {
     std::string File;
     int Line;
@@ -65,6 +65,8 @@ protected:
       return "IF";
     case ScopeKind::FOR:
       return "FOR";
+    case ScopeKind::WHILE:
+      return "WHILE";
     default:
       PROTEUS_FATAL_ERROR("Unsupported Kind " +
                           std::to_string(static_cast<int>(Kind)));
@@ -154,6 +156,11 @@ public:
                 const char *File = __builtin_FILE(),
                 int Line = __builtin_LINE());
   void endFor();
+
+  template <typename CondLambda>
+  void beginWhile(CondLambda &&Cond, const char *File = __builtin_FILE(),
+                  int Line = __builtin_LINE());
+  void endWhile();
 
   template <typename Sig>
   std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>,
@@ -345,6 +352,46 @@ void FuncBase::beginFor(Var<T> &IterVar, const Var<T> &Init,
     IterVar = IterVar + Inc;
     IRB.CreateBr(LoopCond);
   }
+
+  IRB.SetInsertPoint(LoopExit);
+  { IRB.CreateBr(NextBlock); }
+
+  IP = IRBuilderBase::InsertPoint(Body, Body->begin());
+  IRB.restoreIP(IP);
+}
+
+template <typename CondLambda>
+void FuncBase::beginWhile(CondLambda &&Cond, const char *File, int Line) {
+  Function *F = getFunction();
+  // Update the terminator of the current basic block due to the split
+  // control-flow.
+  BasicBlock *CurBlock = IP.getBlock();
+  BasicBlock *NextBlock =
+      CurBlock->splitBasicBlock(IP.getPoint(), CurBlock->getName() + ".split");
+
+  auto ContIP = IRBuilderBase::InsertPoint(NextBlock, NextBlock->begin());
+  Scopes.emplace_back(File, Line, ScopeKind::WHILE, ContIP);
+
+  BasicBlock *LoopCond =
+      BasicBlock::Create(F->getContext(), "while.cond", F, NextBlock);
+  BasicBlock *Body =
+      BasicBlock::Create(F->getContext(), "while.body", F, NextBlock);
+  BasicBlock *LoopExit =
+      BasicBlock::Create(F->getContext(), "while.end", F, NextBlock);
+
+  CurBlock->getTerminator()->eraseFromParent();
+  IRB.SetInsertPoint(CurBlock);
+  { IRB.CreateBr(LoopCond); }
+
+  IRB.SetInsertPoint(LoopCond);
+  {
+    auto CondVar = Cond();
+    Value *CondV = CondVar.loadValue();
+    IRB.CreateCondBr(CondV, Body, LoopExit);
+  }
+
+  IRB.SetInsertPoint(Body);
+  IRB.CreateBr(LoopCond);
 
   IRB.SetInsertPoint(LoopExit);
   { IRB.CreateBr(NextBlock); }
