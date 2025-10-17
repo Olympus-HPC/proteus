@@ -88,6 +88,7 @@ template <typename StorageT> struct VarStorageOwner {
   Value *getSlot() const { return Storage->getSlot(); }
   Type *getValueType() const { return Storage->getValueType(); }
   Type *getAllocatedType() const { return Storage->getAllocatedType(); }
+  StorageKind getKind() const { return Storage->getKind(); }
 };
 
 // Primary template declaration
@@ -123,6 +124,8 @@ struct Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>
   template <typename U> Var &operator=(const Var<U> &V);
 
   template <typename U> Var &operator=(const U &ConstValue);
+
+  Var<T *> getAddress() const;
 
   // Arithmetic operators
   template <typename U>
@@ -270,6 +273,9 @@ struct Var<T, std::enable_if_t<std::is_pointer_v<T>>>
 
   Var<ElemType> operator*();
 
+  // Address-of for pointer variables: returns Var<T*> (pointer-to-pointer).
+  Var<T *> getAddress() const;
+
   template <typename OffsetT>
   std::enable_if_t<std::is_arithmetic_v<OffsetT>,
                    Var<T, std::enable_if_t<std::is_pointer_v<T>>>>
@@ -286,6 +292,9 @@ struct Var<T, std::enable_if_t<std::is_pointer_v<T>>>
   operator+(OffsetT Offset, const Var &Ptr) {
     return Ptr + Offset;
   }
+
+private:
+  Var<std::remove_pointer_t<T>> indexImpl(Value *IdxValue);
 };
 
 // Non-member arithmetic operators for Var
