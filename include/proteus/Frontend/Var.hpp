@@ -1,8 +1,12 @@
 #ifndef PROTEUS_FRONTEND_VAR_HPP
 #define PROTEUS_FRONTEND_VAR_HPP
 
+#include "proteus/Error.h"
+#include "proteus/Frontend/TypeMap.hpp"
+#include "proteus/Frontend/VarStorage.hpp"
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
+#include <type_traits>
 
 namespace proteus {
 
@@ -10,220 +14,305 @@ class FuncBase;
 
 using namespace llvm;
 
-enum class VarKind { Invalid, Scalar, Pointer, Array };
+template <typename From, typename To>
+Value *convert(IRBuilderBase IRB, Value *V) {
+  static_assert(std::is_arithmetic_v<From>, "From type must be arithmetic");
+  static_assert(std::is_arithmetic_v<To>, "To type must be arithmetic");
 
-template <typename T> struct VarT {};
+  if constexpr (std::is_same_v<From, To>) {
+    return V;
+  } else if constexpr (std::is_integral_v<From> &&
+                       std::is_floating_point_v<To>) {
+    Type *TargetType = TypeMap<To>::get(V->getContext());
+    if constexpr (std::is_signed_v<From>) {
+      return IRB.CreateSIToFP(V, TargetType);
+    } else {
+      return IRB.CreateUIToFP(V, TargetType);
+    }
+  } else if constexpr (std::is_floating_point_v<From> &&
+                       std::is_integral_v<To>) {
+    Type *TargetType = TypeMap<To>::get(V->getContext());
+    if constexpr (std::is_signed_v<To>) {
+      return IRB.CreateFPToSI(V, TargetType);
+    } else {
+      return IRB.CreateFPToUI(V, TargetType);
+    }
+  } else if constexpr (std::is_integral_v<From> && std::is_integral_v<To>) {
+    Type *TargetType = TypeMap<To>::get(V->getContext());
+    Type *ValType = V->getType();
 
-struct Var {
-  AllocaInst *Alloca;
+    if (ValType->getIntegerBitWidth() < TargetType->getIntegerBitWidth()) {
+      if constexpr (std::is_signed_v<From>) {
+        return IRB.CreateSExt(V, TargetType);
+      } else {
+        return IRB.CreateZExt(V, TargetType);
+      }
+    } else if (ValType->getIntegerBitWidth() >
+               TargetType->getIntegerBitWidth()) {
+      return IRB.CreateTrunc(V, TargetType);
+    } else {
+      return V;
+    }
+  } else if constexpr (std::is_floating_point_v<From> &&
+                       std::is_floating_point_v<To>) {
+    Type *TargetType = TypeMap<To>::get(V->getContext());
+    Type *ValType = V->getType();
+
+    if (ValType->getScalarSizeInBits() < TargetType->getScalarSizeInBits()) {
+      return IRB.CreateFPExt(V, TargetType);
+    }
+    if (ValType->getScalarSizeInBits() > TargetType->getScalarSizeInBits()) {
+      return IRB.CreateFPTrunc(V, TargetType);
+    }
+    return V;
+  }
+
+  PROTEUS_FATAL_ERROR("Unsupported conversion");
+}
+
+// Mixin that owns storage and exposes common helpers for Var specializations
+template <typename StorageT> struct VarStorageOwner {
   FuncBase &Fn;
+  std::unique_ptr<StorageT> Storage = nullptr;
 
-  VarKind Kind = VarKind::Invalid;
+  VarStorageOwner(std::unique_ptr<StorageT> StorageIn, FuncBase &FnIn)
+      : Fn(FnIn), Storage(std::move(StorageIn)) {}
 
-  virtual ~Var() = default;
+  VarStorageOwner(FuncBase &FnIn) : Fn(FnIn) {}
 
-  Var(AllocaInst *Alloca, FuncBase &Fn);
-  Var(FuncBase &Fn);
+  // Storage accessor helpers
+  Value *loadValue() const { return Storage->loadValue(); }
 
-  // Disable copying/moving to prevent object slicing and enforce reference
-  // semantics.
-  Var(const Var &) = delete;
-  Var(Var &&) = delete;
+  void storeValue(Value *Val) { Storage->storeValue(Val); }
 
-  virtual StringRef getName() const = 0;
-
-  // Value accessors
-  virtual Value *getValue() const = 0;
-  virtual Type *getValueType() const = 0;
-
-  virtual void storeValue(Value *Val) = 0;
-
-  // Pointer-only hooks
-  virtual Value *getPointerValue() const = 0;
-  virtual void storePointer(Value *Ptr) = 0;
-
-  virtual AllocaInst *getAlloca() const;
-
-  virtual VarKind kind() const;
-
-  virtual Var &index(size_t I) = 0;
-  virtual Var &index(const Var &I) = 0;
-
-  // Declare member Operators.
-  Var &operator+(const Var &Other) const;
-  Var &operator-(const Var &Other) const;
-  Var &operator*(const Var &Other) const;
-  Var &operator/(const Var &Other) const;
-  Var &operator%(const Var &Other) const;
-
-  template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var &>
-  operator+(const T &ConstValue) const;
-
-  template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var &>
-  operator-(const T &ConstValue) const;
-
-  template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var &>
-  operator*(const T &ConstValue) const;
-
-  template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var &>
-  operator/(const T &ConstValue) const;
-
-  template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var &>
-  operator%(const T &ConstValue) const;
-
-  Var &operator+=(Var &Other);
-  Var &operator-=(Var &Other);
-  Var &operator*=(Var &Other);
-  Var &operator/=(Var &Other);
-  Var &operator%=(Var &Other);
-
-  template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var &>
-  operator+=(const T &ConstValue);
-
-  template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var &>
-  operator-=(const T &ConstValue);
-
-  template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var &>
-  operator*=(const T &ConstValue);
-
-  template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var &>
-  operator/=(const T &ConstValue);
-
-  template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var &>
-  operator%=(const T &ConstValue);
-
-  Var &operator>(const Var &Other) const;
-  Var &operator<(const Var &Other) const;
-  Var &operator>=(const Var &Other) const;
-  Var &operator<=(const Var &Other) const;
-  Var &operator==(const Var &Other) const;
-  Var &operator!=(const Var &Other) const;
-
-  template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var &>
-  operator>(const T &ConstValue) const;
-
-  template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var &>
-  operator>=(const T &ConstValue) const;
-
-  template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var &>
-  operator<(const T &ConstValue) const;
-
-  template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var &>
-  operator<=(const T &ConstValue) const;
-
-  template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var &>
-  operator==(const T &ConstValue) const;
-
-  template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var &>
-  operator!=(const T &ConstValue) const;
-
-  Var &operator=(const Var &Other);
-
-  template <typename T, typename = std::enable_if<std::is_arithmetic_v<T>>>
-  Var &operator=(const T &ConstValue);
-
-  Var &operator[](size_t I);
-  Var &operator[](const Var &I);
+  Value *getSlot() const { return Storage->getSlot(); }
+  Type *getValueType() const { return Storage->getValueType(); }
+  Type *getAllocatedType() const { return Storage->getAllocatedType(); }
 };
 
-// Declare non-member operators.
-template <typename T>
-std::enable_if_t<std::is_arithmetic_v<T>, Var &> operator+(const T &ConstValue,
-                                                           const Var &Other);
-template <typename T>
-std::enable_if_t<std::is_arithmetic_v<T>, Var &> operator-(const T &ConstValue,
-                                                           const Var &Other);
-template <typename T>
-std::enable_if_t<std::is_arithmetic_v<T>, Var &> operator*(const T &ConstValue,
-                                                           const Var &Other);
-template <typename T>
-std::enable_if_t<std::is_arithmetic_v<T>, Var &> operator/(const T &ConstValue,
-                                                           const Var &Other);
-template <typename T>
-std::enable_if_t<std::is_arithmetic_v<T>, Var &> operator%(const T &ConstValue,
-                                                           const Var &Other);
+// Primary template declaration
+template <typename T, typename = void> struct Var;
 
-// Declare usual arithmetic conversion helper functions.
-Value *convert(IRBuilderBase IRB, Value *V, Type *TargetType);
-Type *getCommonType(const DataLayout &DL, Type *T1, Type *T2);
+// Specialization for arithmetic types
+template <typename T>
+struct Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>
+    : public VarStorageOwner<VarStorage> {
+  using ValueType = T;
+  using ElemType = T;
 
-// Declare intrinsic math functions.
-Var &powf(const Var &L, const Var &R);
-Var &sqrtf(const Var &R);
-Var &min(const Var &L, const Var &R);
+  Var(std::unique_ptr<VarStorage> Storage, FuncBase &Fn)
+      : VarStorageOwner<VarStorage>(std::move(Storage), Fn) {}
 
-struct ScalarVar final : Var {
-  // ScalarVar: wraps an alloca of a scalar value.
-  // Backing slot for the scalar value.
-  AllocaInst *Slot = nullptr;
+  // // Conversion constructor
+  // // TODO: Add an is_convertible check.
+  template <typename U> Var(const Var<U> &V);
 
-  explicit ScalarVar(AllocaInst *Slot, FuncBase &Fn);
+  Var(const Var &V) : VarStorageOwner<VarStorage>(nullptr, V.Fn) {
+    Storage = V.Storage->clone();
+  }
 
-  StringRef getName() const override;
-  Type *getValueType() const override;
-  Value *getValue() const override;
-  void storeValue(Value *Val) override;
-  // Scalar does not support pointer semantics or indexing
-  Value *getPointerValue() const override;
-  void storePointer(Value *Ptr) override;
-  Var &index(size_t I) override;
-  Var &index(const Var &I) override;
-  VarKind kind() const override;
-  AllocaInst *getAlloca() const override;
+  Var(Var &&V) : VarStorageOwner<VarStorage>(nullptr, V.Fn) {
+    std::swap(Storage, V.Storage);
+  }
+
+  Var &operator=(Var &&V);
+
+  // Assignment operators
+  Var &operator=(const Var &V);
+
+  template <typename U> Var &operator=(const Var<U> &V);
+
+  template <typename U> Var &operator=(const U &ConstValue);
+
+  // Arithmetic operators
+  template <typename U>
+  Var<std::common_type_t<T, U>> operator+(const Var<U> &Other) const;
+
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
+  operator+(const U &ConstValue) const;
+
+  template <typename U>
+  Var<std::common_type_t<T, U>> operator-(const Var<U> &Other) const;
+
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
+  operator-(const U &ConstValue) const;
+
+  template <typename U>
+  Var<std::common_type_t<T, U>> operator*(const Var<U> &Other) const;
+
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
+  operator*(const U &ConstValue) const;
+
+  template <typename U>
+  Var<std::common_type_t<T, U>> operator/(const Var<U> &Other) const;
+
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
+  operator/(const U &ConstValue) const;
+
+  template <typename U>
+  Var<std::common_type_t<T, U>> operator%(const Var<U> &Other) const;
+
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
+  operator%(const U &ConstValue) const;
+
+  // Compound assignment operators
+  template <typename U> Var &operator+=(const Var<U> &Other);
+
+  template <typename U> Var &operator+=(const U &ConstValue);
+
+  template <typename U> Var &operator-=(const Var<U> &Other);
+
+  template <typename U> Var &operator-=(const U &ConstValue);
+
+  template <typename U> Var &operator*=(const Var<U> &Other);
+
+  template <typename U> Var &operator*=(const U &ConstValue);
+
+  template <typename U> Var &operator/=(const Var<U> &Other);
+
+  template <typename U> Var &operator/=(const U &ConstValue);
+
+  template <typename U> Var &operator%=(const Var<U> &Other);
+
+  template <typename U> Var &operator%=(const U &ConstValue);
+
+  // Comparison operators
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  operator>(const Var<U> &Other) const;
+
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  operator>=(const Var<U> &Other) const;
+
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  operator<(const Var<U> &Other) const;
+
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  operator<=(const Var<U> &Other) const;
+
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  operator==(const Var<U> &Other) const;
+
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  operator!=(const Var<U> &Other) const;
+
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  operator>(const U &ConstValue) const;
+
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  operator>=(const U &ConstValue) const;
+
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  operator<(const U &ConstValue) const;
+
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  operator<=(const U &ConstValue) const;
+
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  operator==(const U &ConstValue) const;
+
+  template <typename U>
+  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  operator!=(const U &ConstValue) const;
 };
-struct PointerVar final : Var {
-  Type *PointerElemTy = nullptr;
 
-  explicit PointerVar(AllocaInst *PtrSlot, FuncBase &Fn, Type *ElemTy);
+// Specialization for array types
+template <typename T>
+struct Var<T, std::enable_if_t<std::is_array_v<T>>>
+    : public VarStorageOwner<ArrayStorage> {
+  using ValueType = T;
+  using ElemType = std::remove_extent_t<T>;
 
-  StringRef getName() const override;
-  Type *getValueType() const override;
-  Value *getValue() const override;
-  void storeValue(Value *Val) override;
+  Var(std::unique_ptr<ArrayStorage> Storage, FuncBase &Fn)
+      : VarStorageOwner<ArrayStorage>(std::move(Storage), Fn) {}
 
-  Value *getPointerValue() const override;
-  void storePointer(Value *Ptr) override;
+  Var<ElemType> operator[](size_t Index);
 
-  VarKind kind() const override;
-  AllocaInst *getAlloca() const override;
-
-  Var &index(size_t I) override;
-  Var &index(const Var &I) override;
+  template <typename IdxT>
+  std::enable_if_t<std::is_integral_v<IdxT>, Var<ElemType>>
+  operator[](const Var<IdxT> &Index);
 };
-struct ArrayVar final : Var {
-  // Holds a pointer to an array aggregate and its type.
-  Value *BasePointer = nullptr;
-  ArrayType *ArrayTy = nullptr;
 
-  explicit ArrayVar(Value *BasePointer, FuncBase &Fn, ArrayType *ArrayTy);
+// Specialization for pointer types
+template <typename T>
+struct Var<T, std::enable_if_t<std::is_pointer_v<T>>>
+    : public VarStorageOwner<PointerStorage> {
+  using ValueType = T;
+  using ElemType = std::remove_pointer_t<T>;
 
-  StringRef getName() const override;
-  Type *getValueType() const override;
-  Value *getValue() const override;
-  void storeValue(Value *Val) override;
-  Value *getPointerValue() const override;
-  void storePointer(Value *Ptr) override;
-  VarKind kind() const override;
+  Var(std::unique_ptr<PointerStorage> Storage, FuncBase &Fn)
+      : VarStorageOwner<PointerStorage>(std::move(Storage), Fn) {}
 
-  Var &index(size_t I) override;
-  Var &index(const Var &I) override;
+  // Load/store the pointer value itself from/to the pointer slot.
+  Value *loadPointer() const { return this->Storage->loadPointer(); }
+  void storePointer(Value *Ptr) { this->Storage->storePointer(Ptr); }
+
+  Var<ElemType> operator[](size_t Index);
+
+  template <typename IdxT>
+  std::enable_if_t<std::is_arithmetic_v<IdxT>, Var<ElemType>>
+  operator[](const Var<IdxT> &Index);
+
+  Var<ElemType> operator*();
+
+  template <typename OffsetT>
+  std::enable_if_t<std::is_arithmetic_v<OffsetT>,
+                   Var<T, std::enable_if_t<std::is_pointer_v<T>>>>
+  operator+(const Var<OffsetT> &Offset) const;
+
+  template <typename OffsetT>
+  std::enable_if_t<std::is_arithmetic_v<OffsetT>,
+                   Var<T, std::enable_if_t<std::is_pointer_v<T>>>>
+  operator+(OffsetT Offset) const;
+
+  template <typename OffsetT>
+  friend std::enable_if_t<std::is_arithmetic_v<OffsetT>,
+                          Var<T, std::enable_if_t<std::is_pointer_v<T>>>>
+  operator+(OffsetT Offset, const Var &Ptr) {
+    return Ptr + Offset;
+  }
 };
+
+// Non-member arithmetic operators for Var
+template <typename T, typename U>
+std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>,
+                 Var<std::common_type_t<T, U>>>
+operator+(const T &ConstValue, const Var<U> &Var);
+
+template <typename T, typename U>
+std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>,
+                 Var<std::common_type_t<T, U>>>
+operator-(const T &ConstValue, const Var<U> &V);
+
+template <typename T, typename U>
+std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>,
+                 Var<std::common_type_t<T, U>>>
+operator*(const T &ConstValue, const Var<U> &V);
+
+template <typename T, typename U>
+std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>,
+                 Var<std::common_type_t<T, U>>>
+operator/(const T &ConstValue, const Var<U> &V);
+
+template <typename T, typename U>
+std::enable_if_t<std::is_arithmetic_v<T> && std::is_arithmetic_v<U>,
+                 Var<std::common_type_t<T, U>>>
+operator%(const T &ConstValue, const Var<U> &V);
 
 } // namespace proteus
 

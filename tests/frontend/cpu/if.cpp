@@ -17,12 +17,12 @@ int main() {
   auto J = proteus::JitModule();
   auto &LT = J.addFunction<double(double, double)>("if.lt");
   {
-    auto &Arg0 = LT.getArg(0);
-    auto &Arg1 = LT.getArg(1);
+    auto &Arg0 = LT.getArg<0>();
+    auto &Arg1 = LT.getArg<1>();
 
     LT.beginFunction();
     {
-      auto &Ret = LT.declVar<double>("ret");
+      auto Ret = LT.declVar<double>("ret");
       Ret = 0;
       LT.beginIf(Arg0 < Arg1);
       { Ret = 1; }
@@ -34,12 +34,12 @@ int main() {
 
   auto &LE = J.addFunction<double(double, double)>("if.le");
   {
-    auto &Arg0 = LE.getArg(0);
-    auto &Arg1 = LE.getArg(1);
+    auto &Arg0 = LE.getArg<0>();
+    auto &Arg1 = LE.getArg<1>();
 
     LE.beginFunction();
     {
-      auto &Ret = LE.declVar<double>("ret");
+      auto Ret = LE.declVar<double>("ret");
       Ret = 0;
       LE.beginIf(Arg0 <= Arg1);
       { Ret = 1; }
@@ -51,12 +51,12 @@ int main() {
 
   auto &GT = J.addFunction<double(double, double)>("if.gt");
   {
-    auto &Arg0 = GT.getArg(0);
-    auto &Arg1 = GT.getArg(1);
+    auto &Arg0 = GT.getArg<0>();
+    auto &Arg1 = GT.getArg<1>();
 
     GT.beginFunction();
     {
-      auto &Ret = GT.declVar<double>("ret");
+      auto Ret = GT.declVar<double>("ret");
       Ret = 0;
       GT.beginIf(Arg0 > Arg1);
       { Ret = 1; }
@@ -68,12 +68,12 @@ int main() {
 
   auto &GE = J.addFunction<double(double, double)>("if.ge");
   {
-    auto &Arg0 = GE.getArg(0);
-    auto &Arg1 = GE.getArg(1);
+    auto &Arg0 = GE.getArg<0>();
+    auto &Arg1 = GE.getArg<1>();
 
     GE.beginFunction();
     {
-      auto &Ret = GE.declVar<double>("ret");
+      auto Ret = GE.declVar<double>("ret");
       Ret = 0;
       GE.beginIf(Arg0 >= Arg1);
       { Ret = 1; }
@@ -85,12 +85,12 @@ int main() {
 
   auto &EQ = J.addFunction<double(double, double)>("if.eq");
   {
-    auto &Arg0 = EQ.getArg(0);
-    auto &Arg1 = EQ.getArg(1);
+    auto &Arg0 = EQ.getArg<0>();
+    auto &Arg1 = EQ.getArg<1>();
 
     EQ.beginFunction();
     {
-      auto &Ret = EQ.declVar<double>("ret");
+      auto Ret = EQ.declVar<double>("ret");
       Ret = 0;
       EQ.beginIf(Arg0 == Arg1);
       { Ret = 1; }
@@ -102,12 +102,12 @@ int main() {
 
   auto &NE = J.addFunction<double(double, double)>("if.ne");
   {
-    auto &Arg0 = NE.getArg(0);
-    auto &Arg1 = NE.getArg(1);
+    auto &Arg0 = NE.getArg<0>();
+    auto &Arg1 = NE.getArg<1>();
 
     NE.beginFunction();
     {
-      auto &Ret = NE.declVar<double>("ret");
+      auto Ret = NE.declVar<double>("ret");
       Ret = 0;
       NE.beginIf(Arg0 != Arg1);
       { Ret = 1; }

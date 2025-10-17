@@ -20,9 +20,9 @@ auto createJitModule1() {
     {
       auto [V] = F1.getArgs();
 
-      Var &X = F1.defVar<double>(21);
-      Var &C = F1.call<double(void)>("f2");
-      Var &Res = F1.call<double(double, double)>("f3", X, C);
+      auto X = F1.defVar<double>(21);
+      auto C = F1.call<double(void)>("f2");
+      auto Res = F1.call<double(double, double)>("f3", X, C);
       V[0] = Res;
 
       F1.ret();
@@ -34,7 +34,7 @@ auto createJitModule1() {
   {
     F2.beginFunction();
     {
-      Var &C = F2.defVar<double>(2.0);
+      auto C = F2.defVar<double>(2.0);
       F2.ret(C);
     }
     F2.endFunction();
@@ -45,7 +45,7 @@ auto createJitModule1() {
     F3.beginFunction();
     {
       auto [X, C] = F3.getArgs();
-      Var &P = F3.declVar<double>();
+      auto P = F3.declVar<double>();
       P = X * C;
       F3.ret(P);
     }
@@ -57,7 +57,6 @@ auto createJitModule1() {
 
 int main() {
   auto [J1, F11, F12] = createJitModule1();
-  J1->print();
 
   double V = 0;
 

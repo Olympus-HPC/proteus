@@ -18,31 +18,30 @@ static auto getTiledMatmulFunction(int N, int TileI, int TileJ, int TileK) {
       JitMod->addFunction<void(double *, double *, double *)>("tiled_matmul");
   {
 
-    auto Args = F.getArgs();
-    auto &C = std::get<0>(Args);
-    auto &A = std::get<1>(Args);
-    auto &B = std::get<2>(Args);
+    auto &C = F.getArg<0>();
+    auto &A = F.getArg<1>();
+    auto &B = F.getArg<2>();
 
     F.beginFunction();
     {
-      auto &I = F.defVar<int>(0, "i");
-      auto &J = F.defVar<int>(0, "j");
-      auto &K = F.defVar<int>(0, "k");
-      auto &UbnI = F.defRuntimeConst(N, "ubn_i");
-      auto &UbnJ = F.defRuntimeConst(N, "ubn_j");
-      auto &UbnK = F.defRuntimeConst(N, "ubn_k");
-      auto &IncOne = F.defRuntimeConst(1, "inc");
-      auto &Zero = F.defRuntimeConst(0, "zero");
+      auto I = F.defVar<int>(0, "i");
+      auto J = F.defVar<int>(0, "j");
+      auto K = F.defVar<int>(0, "k");
+      auto UbnI = F.defRuntimeConst<int>(N, "ubn_i");
+      auto UbnJ = F.defRuntimeConst<int>(N, "ubn_j");
+      auto UbnK = F.defRuntimeConst<int>(N, "ubn_k");
+      auto IncOne = F.defRuntimeConst<int>(1, "inc");
+      auto Zero = F.defRuntimeConst<int>(0, "zero");
 
-      F.buildLoopNest(F.forLoop({I, Zero, UbnI, IncOne}).tile(TileI),
-                      F.forLoop({J, Zero, UbnJ, IncOne}).tile(TileJ),
-                      F.forLoop({K, Zero, UbnK, IncOne},
-                                [&]() {
-                                  auto &CIdx = I * N + J;
-                                  auto &AIdx = I * N + K;
-                                  auto &BIdx = K * N + J;
-                                  C[CIdx] += A[AIdx] * B[BIdx];
-                                })
+      F.buildLoopNest(F.forLoop<int>({I, Zero, UbnI, IncOne}).tile(TileI),
+                      F.forLoop<int>({J, Zero, UbnJ, IncOne}).tile(TileJ),
+                      F.forLoop<int>({K, Zero, UbnK, IncOne},
+                                     [&]() {
+                                       auto CIdx = I * N + J;
+                                       auto AIdx = I * N + K;
+                                       auto BIdx = K * N + J;
+                                       C[CIdx] += A[AIdx] * B[BIdx];
+                                     })
                           .tile(TileK))
           .emit();
 

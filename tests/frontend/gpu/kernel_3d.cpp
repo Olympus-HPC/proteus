@@ -32,15 +32,15 @@ int main() {
 
   F.beginFunction();
   {
-    auto &I = F.declVar<size_t>("i");
-    auto &JVar = F.declVar<size_t>("j");
-    auto &K = F.declVar<size_t>("k");
-    auto &A = F.getArg(0);
-    auto &B = F.getArg(1);
-    auto &C = F.getArg(2);
-    auto &X = F.getArg(3);
-    auto &Y = F.getArg(4);
-    auto &Z = F.getArg(5);
+    auto I = F.declVar<size_t>("i");
+    auto JVar = F.declVar<size_t>("j");
+    auto K = F.declVar<size_t>("k");
+    auto &A = F.getArg<0>();
+    auto &B = F.getArg<1>();
+    auto &C = F.getArg<2>();
+    auto &X = F.getArg<3>();
+    auto &Y = F.getArg<4>();
+    auto &Z = F.getArg<5>();
 
     I = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +
         F.callBuiltin(getThreadIdX);
@@ -55,10 +55,10 @@ int main() {
       {
         F.beginIf(K < Z);
         {
-          auto &XY = F.declVar<size_t>("xy");
-          auto &KXY = F.declVar<size_t>("kxy");
-          auto &JX = F.declVar<size_t>("jx");
-          auto &Idx = F.declVar<size_t>("idx");
+          auto XY = F.declVar<size_t>("xy");
+          auto KXY = F.declVar<size_t>("kxy");
+          auto JX = F.declVar<size_t>("jx");
+          auto Idx = F.declVar<size_t>("idx");
 
           XY = X * Y;
           KXY = K * XY;

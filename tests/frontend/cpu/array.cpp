@@ -15,17 +15,16 @@ int main() {
 
   F.beginFunction();
   {
-    auto &OutLocal = F.getArg(0);
-    auto &OutGlobal = F.getArg(1);
+    auto &OutLocal = F.getArg<0>();
+    auto &OutGlobal = F.getArg<1>();
 
-    auto &I = F.defVar<size_t>(0, "I");
-    auto &Inc = F.defVar<size_t>(1, "Inc");
+    auto I = F.defVar<size_t>(0, "I");
+    auto Inc = F.defVar<size_t>(1, "Inc");
 
-    auto &Local = F.declVar<double[]>(16, AddressSpace::DEFAULT, "local_array");
-    auto &Global =
-        F.declVar<double[]>(16, AddressSpace::GLOBAL, "global_array");
+    auto Local = F.declVar<double[]>(16, AddressSpace::DEFAULT, "local_array");
+    auto Global = F.declVar<double[]>(16, AddressSpace::GLOBAL, "global_array");
 
-    auto &Bound = F.defRuntimeConst<size_t>(16, "Bound");
+    auto Bound = F.defRuntimeConst<size_t>(16, "Bound");
 
     F.beginFor(I, I, Bound, Inc);
     { Local[I] = 2.0 * I; }

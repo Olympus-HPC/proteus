@@ -24,9 +24,9 @@ int main() {
   F.beginFunction();
   {
     F.call<void(void)>("hello");
-    auto &V1 = F.defVar<int>(22);
-    auto &V2 = F.defVar<int>(20);
-    auto &V3 = F.call<int(int, int)>("add", V1, V2);
+    auto V1 = F.defVar<int>(22);
+    auto V2 = F.defVar<int>(20);
+    auto V3 = F.call<int(int, int)>("add", V1, V2);
     F.ret(V3);
   }
   F.endFunction();

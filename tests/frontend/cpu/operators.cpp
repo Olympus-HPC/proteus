@@ -19,44 +19,35 @@ int main() {
       J.addFunction<void(double *, double *, double *, double *, double *,
                          double *, double *, double *, double *, double *,
                          double *, double *, double *, double *)>("operators");
-  auto &Arg0 = F.getArg(0);
-  auto &Arg1 = F.getArg(1);
-  auto &Arg2 = F.getArg(2);
-  auto &Arg3 = F.getArg(3);
-  auto &Arg4 = F.getArg(4);
-  auto &Arg5 = F.getArg(5);
-  auto &Arg6 = F.getArg(6);
-  auto &Arg7 = F.getArg(7);
-  auto &Arg8 = F.getArg(8);
-  auto &Arg9 = F.getArg(9);
-  auto &Arg10 = F.getArg(10);
-  auto &Arg11 = F.getArg(11);
-  auto &Arg12 = F.getArg(12);
-  auto &Arg13 = F.getArg(13);
+
+  auto [Arg0, Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7, Arg8, Arg9, Arg10,
+        Arg11, Arg12, Arg13] = F.getArgs();
   F.beginFunction();
   {
     Arg0[0] = 2;
     Arg1[0] = 3;
 
-    Arg2[0] = Arg0 + Arg1;
-    Arg3[0] = Arg0 - Arg1;
-    Arg4[0] = Arg0 * Arg1;
-    Arg5[0] = Arg0 / Arg1;
-
-    Arg6[0] = Arg7[0] = Arg8[0] = Arg9[0] = Arg10[0] = Arg11[0] = 5;
+    Arg2[0] = Arg0[0] + Arg1[0];
+    Arg3[0] = Arg0[0] - Arg1[0];
+    Arg4[0] = Arg0[0] * Arg1[0];
+    Arg5[0] = Arg0[0] / Arg1[0];
+    *Arg6 = *Arg7 = *Arg8 = *Arg9 = 5;
 
     Arg6[0] += Arg0[0];
     Arg7[0] -= Arg0[0];
     Arg8[0] *= Arg0[0];
     Arg9[0] /= Arg0[0];
 
-    Arg10[0] = Arg0 % Arg1;
+    Arg10[0] = Arg0[0] % Arg1[0];
+    Arg11[0] = 5;
     Arg11[0] %= Arg0[0];
 
     Arg12[0] = 10.0;
     Arg12[0] -= 3.0;
 
-    auto &Cmp = F.declVar<double>("cmp");
+    Arg13[0] = 1.0;
+
+    auto Cmp = F.declVar<double>("cmp");
     Cmp = 5.0;
     F.beginIf(Cmp <= 5.0);
     { Arg13[0] = 1.0; }
@@ -69,6 +60,8 @@ int main() {
   J.compile();
 
   double R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13 = 0.0;
+  R0 = 5.0;
+  R1 = 3.0;
   F(&R0, &R1, &R2, &R3, &R4, &R5, &R6, &R7, &R8, &R9, &R10, &R11, &R12, &R13);
 
   std::cout << "R0 = " << R0 << "\n";
