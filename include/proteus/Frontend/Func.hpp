@@ -795,8 +795,7 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-() const {
 }
 
 template <typename T>
-Var<bool>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator!() const {
+Var<bool> Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator!() const {
   auto &IRB = Fn.getIRBuilder();
   Value *V = loadValue();
   Value *ResV = nullptr;
@@ -806,7 +805,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator!() const {
     Value *Zero = ConstantInt::get(V->getType(), 0);
     ResV = IRB.CreateICmpEQ(V, Zero);
   } else {
-    static_assert(std::is_floating_point_v<T>, "Unsupported type for operator!");
+    static_assert(std::is_floating_point_v<T>,
+                  "Unsupported type for operator!");
     Value *Zero = ConstantFP::get(V->getType(), 0.0);
     ResV = IRB.CreateFCmpOEQ(V, Zero);
   }

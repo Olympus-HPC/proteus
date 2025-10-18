@@ -18,7 +18,7 @@ int main() {
 
   auto J = JitModule();
   auto &F =
-      J.addFunction<void(float*, float*, float*, float*, float*, float*)>(
+      J.addFunction<void(float *, float *, float *, float *, float *, float *)>(
           "intrinsics");
 
   auto &PowOut = F.getArg<0>();

@@ -15,11 +15,10 @@ int main() {
   proteus::init();
 
   auto J = proteus::JitModule();
-  auto &F =
-      J.addFunction<void(double *, double *, double *, double *, double *,
-                         double *, double *, double *, double *, double *,
-                         double *, double *, double *, double *, double *,
-                         double *)>("operators");
+  auto &F = J.addFunction<void(double *, double *, double *, double *, double *,
+                               double *, double *, double *, double *, double *,
+                               double *, double *, double *, double *, double *,
+                               double *)>("operators");
 
   auto [Arg0, Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7, Arg8, Arg9, Arg10,
         Arg11, Arg12, Arg13, Arg14, Arg15] = F.getArgs();
@@ -51,9 +50,7 @@ int main() {
     auto Cmp = F.declVar<double>("cmp");
     Cmp = 5.0;
     F.beginIf(Cmp <= 5.0);
-    {
-      Arg13[0] = 1.0;
-    }
+    { Arg13[0] = 1.0; }
     F.endIf();
 
     auto NotCond = !(Cmp <= 5.0);
@@ -67,8 +64,8 @@ int main() {
 
   J.compile();
 
-  double R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15 =
-      0.0;
+  double R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14,
+      R15 = 0.0;
   R0 = 5.0;
   R1 = 3.0;
   F(&R0, &R1, &R2, &R3, &R4, &R5, &R6, &R7, &R8, &R9, &R10, &R11, &R12, &R13,

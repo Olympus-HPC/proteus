@@ -27,8 +27,9 @@ int main() {
   proteus::init();
 
   auto J = JitModule(TARGET);
-  auto KernelHandle = J.addKernel<void(float*, float*, float*, float*, float*, float*)>(
-      "intrinsics");
+  auto KernelHandle =
+      J.addKernel<void(float *, float *, float *, float *, float *, float *)>(
+          "intrinsics");
   auto &F = KernelHandle.F;
 
   auto &PowOut = F.getArg<0>();
@@ -82,8 +83,8 @@ int main() {
   gpuErrCheck(gpuMallocManaged(&Cos, sizeof(float)));
   gpuErrCheck(gpuMallocManaged(&Fabs, sizeof(float)));
 
-  gpuErrCheck(KernelHandle.launch({1,1,1},{1,1,1},0,nullptr,
-                                  Pow, Sqrt, Exp, Sin, Cos, Fabs));
+  gpuErrCheck(KernelHandle.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, Pow, Sqrt,
+                                  Exp, Sin, Cos, Fabs));
   gpuErrCheck(gpuDeviceSynchronize());
 
   std::cout << "pow = " << *Pow << "\n";
