@@ -788,6 +788,34 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%=(
 }
 
 template <typename T>
+Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>
+Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-() const {
+  auto MinusOne = Fn.defVar<T>(static_cast<T>(-1), "minus_one.");
+  return MinusOne * (*this);
+}
+
+template <typename T>
+Var<bool>
+Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator!() const {
+  auto &IRB = Fn.getIRBuilder();
+  Value *V = loadValue();
+  Value *ResV = nullptr;
+  if constexpr (std::is_same_v<T, bool>) {
+    ResV = IRB.CreateNot(V);
+  } else if constexpr (std::is_integral_v<T>) {
+    Value *Zero = ConstantInt::get(V->getType(), 0);
+    ResV = IRB.CreateICmpEQ(V, Zero);
+  } else {
+    static_assert(std::is_floating_point_v<T>, "Unsupported type for operator!");
+    Value *Zero = ConstantFP::get(V->getType(), 0.0);
+    ResV = IRB.CreateFCmpOEQ(V, Zero);
+  }
+  auto Ret = Fn.declVar<bool>("not.");
+  Ret.storeValue(ResV);
+  return Ret;
+}
+
+template <typename T>
 Var<std::remove_extent_t<T>>
 Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](size_t Index) {
   auto &IRB = Fn.getIRBuilder();
@@ -1277,6 +1305,125 @@ template <typename T> Var<float> sqrtf(const Var<T> &R) {
   return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
 }
 
+template <typename T> Var<float> expf(const Var<T> &R) {
+  static_assert(std::is_convertible_v<T, float>,
+                "expf requires floating-point type");
+
+  auto &IRB = R.Fn.getIRBuilder();
+  auto *ResultType = IRB.getFloatTy();
+  auto RFloat = R.Fn.template convert<float>(R);
+
+#if PROTEUS_ENABLE_CUDA
+  std::string IntrinsicName = "__nv_expf";
+#else
+  std::string IntrinsicName = "llvm.exp.f32";
+#endif
+
+  return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
+}
+
+template <typename T> Var<float> sinf(const Var<T> &R) {
+  static_assert(std::is_convertible_v<T, float>,
+                "sinf requires floating-point type");
+
+  auto &IRB = R.Fn.getIRBuilder();
+  auto *ResultType = IRB.getFloatTy();
+  auto RFloat = R.Fn.template convert<float>(R);
+
+#if PROTEUS_ENABLE_CUDA
+  std::string IntrinsicName = "__nv_sinf";
+#else
+  std::string IntrinsicName = "llvm.sin.f32";
+#endif
+
+  return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
+}
+
+template <typename T> Var<float> cosf(const Var<T> &R) {
+  static_assert(std::is_convertible_v<T, float>,
+                "cosf requires floating-point type");
+
+  auto &IRB = R.Fn.getIRBuilder();
+  auto *ResultType = IRB.getFloatTy();
+  auto RFloat = R.Fn.template convert<float>(R);
+
+#if PROTEUS_ENABLE_CUDA
+  std::string IntrinsicName = "__nv_cosf";
+#else
+  std::string IntrinsicName = "llvm.cos.f32";
+#endif
+
+  return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
+}
+
+template <typename T> Var<float> fabs(const Var<T> &R) {
+  static_assert(std::is_convertible_v<T, float>,
+                "fabs requires floating-point type");
+
+  auto &IRB = R.Fn.getIRBuilder();
+  auto *ResultType = IRB.getFloatTy();
+  auto RFloat = R.Fn.template convert<float>(R);
+
+#if PROTEUS_ENABLE_CUDA
+  std::string IntrinsicName = "__nv_fabs";
+#else
+  std::string IntrinsicName = "llvm.fabs.f32";
+#endif
+
+  return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
+}
+
+template <typename T> Var<float> truncf(const Var<T> &R) {
+  static_assert(std::is_convertible_v<T, float>,
+                "truncf requires floating-point type");
+
+  auto &IRB = R.Fn.getIRBuilder();
+  auto *ResultType = IRB.getFloatTy();
+  auto RFloat = R.Fn.template convert<float>(R);
+
+#if PROTEUS_ENABLE_CUDA
+  std::string IntrinsicName = "__nv_truncf";
+#else
+  std::string IntrinsicName = "llvm.trunc.f32";
+#endif
+
+  return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
+}
+
+template <typename T> Var<float> logf(const Var<T> &R) {
+  static_assert(std::is_convertible_v<T, float>,
+                "logf requires floating-point type");
+
+  auto &IRB = R.Fn.getIRBuilder();
+  auto *ResultType = IRB.getFloatTy();
+  auto RFloat = R.Fn.template convert<float>(R);
+
+#if PROTEUS_ENABLE_CUDA
+  std::string IntrinsicName = "__nv_logf";
+#else
+  std::string IntrinsicName = "llvm.log.f32";
+#endif
+
+  return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
+}
+
+template <typename T> Var<float> absf(const Var<T> &R) {
+  static_assert(std::is_convertible_v<T, float>,
+                "absf requires floating-point type");
+
+  auto &IRB = R.Fn.getIRBuilder();
+  auto *ResultType = IRB.getFloatTy();
+  auto RFloat = R.Fn.template convert<float>(R);
+
+#if PROTEUS_ENABLE_CUDA
+  std::string IntrinsicName = "__nv_fabsf";
+#else
+  std::string IntrinsicName = "llvm.fabs.f32";
+#endif
+
+  return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
+}
+
 template <typename T>
 std::enable_if_t<std::is_arithmetic_v<T>, Var<T>> min(const Var<T> &L,
                                                       const Var<T> &R) {
@@ -1289,6 +1436,23 @@ std::enable_if_t<std::is_arithmetic_v<T>, Var<T>> min(const Var<T> &L,
   Var<T> ResultVar = Fn.declVar<T>("min_res");
   ResultVar = R;
   Fn.beginIf(L < R);
+  { ResultVar = L; }
+  Fn.endIf();
+  return ResultVar;
+}
+
+template <typename T>
+std::enable_if_t<std::is_arithmetic_v<T>, Var<T>> max(const Var<T> &L,
+                                                      const Var<T> &R) {
+  static_assert(std::is_arithmetic_v<T>, "max requires arithmetic type");
+
+  FuncBase &Fn = L.Fn;
+  if (&Fn != &R.Fn)
+    PROTEUS_FATAL_ERROR("Variables should belong to the same function");
+
+  Var<T> ResultVar = Fn.declVar<T>("max_res");
+  ResultVar = R;
+  Fn.beginIf(L > R);
   { ResultVar = L; }
   Fn.endIf();
   return ResultVar;
