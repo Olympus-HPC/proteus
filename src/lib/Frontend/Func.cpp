@@ -1,3 +1,4 @@
+#include "proteus/CoreLLVMDevice.hpp"
 #include "proteus/JitFrontend.hpp"
 
 namespace proteus {
@@ -68,6 +69,21 @@ Function *FuncBase::getFunction() {
   if (!F)
     PROTEUS_FATAL_ERROR("Expected LLVM Function");
   return F;
+}
+
+void FuncBase::setKernelLaunchBounds(int MaxThreadsPerBlock,
+                                     int MinBlocksPerSM) {
+  if constexpr (PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP) {
+    Function *F = getFunction();
+    if (!F)
+      PROTEUS_FATAL_ERROR("Expected non-null Function");
+
+    setLaunchBoundsForKernel(*F, MaxThreadsPerBlock, MinBlocksPerSM);
+  } else {
+    (void)MaxThreadsPerBlock;
+    (void)MinBlocksPerSM;
+    PROTEUS_FATAL_ERROR("Unsupported target for setLaunchBounds");
+  }
 }
 
 AllocaInst *FuncBase::emitAlloca(Type *Ty, StringRef Name, AddressSpace AS) {

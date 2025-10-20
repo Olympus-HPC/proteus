@@ -86,6 +86,8 @@ public:
 
   Function *getFunction();
 
+  void setKernelLaunchBounds(int MaxThreadsPerBlock, int MinBlocksPerSM = 0);
+
   AllocaInst *emitAlloca(Type *Ty, StringRef Name,
                          AddressSpace AS = AddressSpace::DEFAULT);
 
