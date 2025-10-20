@@ -14,7 +14,6 @@
 #include <deque>
 #include <type_traits>
 
-#include "proteus/CoreLLVMDevice.hpp"
 #include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/Frontend/Func.hpp"
@@ -75,19 +74,7 @@ private:
       if (M.isCompiled())
         PROTEUS_FATAL_ERROR("setLaunchBounds must be called before compile()");
 
-// We keep this as preprocessor 'if' because
-// setLaunchBoundsForKernel is not defined in HOST builds.
-#if (PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP)
-      Function *Fn = F.getFunction();
-      if (!Fn)
-        PROTEUS_FATAL_ERROR("Expected non-null Function");
-
-      setLaunchBoundsForKernel(*Fn, MaxThreadsPerBlock, MinBlocksPerSM);
-#else
-      (void)MaxThreadsPerBlock;
-      (void)MinBlocksPerSM;
-      PROTEUS_FATAL_ERROR("Unsupported target for setLaunchBounds");
-#endif
+      F.setKernelLaunchBounds(MaxThreadsPerBlock, MinBlocksPerSM);
     }
 
     // Launch with type-safety.

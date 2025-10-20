@@ -3,10 +3,13 @@
 
 #if PROTEUS_ENABLE_HIP
 #include "proteus/CoreLLVMHIP.hpp"
-#endif
-
-#if PROTEUS_ENABLE_CUDA
+#elif PROTEUS_ENABLE_CUDA
 #include "proteus/CoreLLVMCUDA.hpp"
+#else
+inline void setLaunchBoundsForKernel(llvm::Function &F, int MaxThreadsPerBlock,
+                                     int MinBlocksPerSM) {
+  PROTEUS_FATAL_ERROR("Unsupported target for setLaunchBounds");
+}
 #endif
 
 #if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
