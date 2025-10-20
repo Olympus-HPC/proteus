@@ -19,6 +19,8 @@ FuncBase::FuncBase(JitModule &J, FunctionCallee FC)
   IRB.setFastMathFlags(FMF);
 }
 
+TargetModelType FuncBase::getTargetModel() const { return J.getTargetModel(); }
+
 IRBuilderBase &FuncBase::getIRBuilder() {
   if (!IRB.GetInsertBlock())
     PROTEUS_FATAL_ERROR("Insert point is not set");
