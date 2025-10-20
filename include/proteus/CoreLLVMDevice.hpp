@@ -8,6 +8,9 @@
 #else
 inline void setLaunchBoundsForKernel(llvm::Function &F, int MaxThreadsPerBlock,
                                      int MinBlocksPerSM) {
+  (void)F;
+  (void)MaxThreadsPerBlock;
+  (void)MinBlocksPerSM;
   PROTEUS_FATAL_ERROR("Unsupported target for setLaunchBounds");
 }
 #endif
