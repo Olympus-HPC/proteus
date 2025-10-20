@@ -318,7 +318,6 @@ inline void specializeIR(
 
 #else
 #include <llvm/IR/Function.h>
-#include "proteus/Error.hpp"
 
 namespace proteus {
 
