@@ -8,6 +8,7 @@ set(SOURCES
   JitEngineHost.cpp
   Caching/StorageCache.cpp
   JitInterface.cpp
+  Config.cpp
   Frontend/Func.cpp
   Frontend/VarStorage.cpp
   Frontend/Dispatcher.cpp
