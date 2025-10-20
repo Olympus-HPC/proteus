@@ -17,46 +17,36 @@ int main() {
   proteus::init();
 
   auto J = JitModule();
-  auto &F =
-      J.addFunction<void(float *, float *, float *, float *, float *, float *)>(
+  auto &F = J.addFunction<void(float *, float *, float *, float *, float *, float *,
+                         float *, int *, float *,
+                         float *, float *, int *)>(
           "intrinsics");
-
   auto &PowOut = F.getArg<0>();
   auto &SqrtOut = F.getArg<1>();
   auto &ExpOut = F.getArg<2>();
   auto &SinOut = F.getArg<3>();
   auto &CosOut = F.getArg<4>();
   auto &FabsOut = F.getArg<5>();
+  auto &PowBase = F.getArg<6>();
+  auto &PowExp = F.getArg<7>();
+  auto &SqrtIn = F.getArg<8>();
+  auto &ExpIn = F.getArg<9>();
+  auto &TrigIn = F.getArg<10>();
+  auto &FabsIn = F.getArg<11>();
 
   F.beginFunction();
   {
-    // powf(float, int)
-    auto B = F.declVar<float>();
-    auto E = F.declVar<int>();
-    B = 2.0f;
-    E = 3;
-    PowOut[0] = powf(B, E);
+    PowOut[0] = powf(PowBase[0], PowExp[0]);
 
-    // sqrtf(int)
-    auto X = F.declVar<int>();
-    X = 9;
-    SqrtOut[0] = sqrtf(X);
+    auto SqrtVal = SqrtIn[0];
+    SqrtOut[0] = sqrtf(SqrtVal);
+    ExpOut[0] = expf(ExpIn[0]);
 
-    // expf(int)
-    auto Y = F.declVar<int>();
-    Y = 1;
-    ExpOut[0] = expf(Y);
+    auto TrigInput = TrigIn[0];
+    SinOut[0] = sinf(TrigInput);
+    CosOut[0] = cosf(TrigInput);
 
-    // sinf(0.0f) and cosf(0.0f)
-    auto Z = F.declVar<float>();
-    Z = 0.0f;
-    SinOut[0] = sinf(Z);
-    CosOut[0] = cosf(Z);
-
-    // fabs(int)
-    auto W = F.declVar<int>();
-    W = -5;
-    FabsOut[0] = fabs(W);
+    FabsOut[0] = fabs(FabsIn[0]);
 
     F.ret();
   }
@@ -65,7 +55,18 @@ int main() {
   J.compile();
 
   float RPow, RSqrt, RExp, RSin, RCos, RFabs;
-  F(&RPow, &RSqrt, &RExp, &RSin, &RCos, &RFabs);
+  float PowBaseBuf, SqrtInVal, ExpInVal, TrigInVal;
+  int PowExponentBuf, FabsInVal;
+
+  PowBaseBuf = 1.5f;
+  PowExponentBuf = 5;
+  SqrtInVal = 50.0f;
+  ExpInVal = 0.7f;
+  TrigInVal = 0.7f;
+  FabsInVal = -12;
+
+  F(&RPow, &RSqrt, &RExp, &RSin, &RCos, &RFabs, &PowBaseBuf, &PowExponentBuf,
+    &SqrtInVal, &ExpInVal, &TrigInVal, &FabsInVal);
 
   std::cout << "pow = " << RPow << "\n";
   std::cout << "sqrt = " << RSqrt << "\n";
@@ -79,12 +80,12 @@ int main() {
 }
 
 // clang-format off
-// CHECK: pow = 8
-// CHECK-NEXT: sqrt = 3
-// CHECK-NEXT: exp = 2.71828
-// CHECK-NEXT: sin = 0
-// CHECK-NEXT: cos = 1
-// CHECK-NEXT: fabs = 5
+// CHECK: pow = 7.59375
+// CHECK-NEXT: sqrt = 7.07107
+// CHECK-NEXT: exp = 2.01375
+// CHECK-NEXT: sin = 0.644218
+// CHECK-NEXT: cos = 0.764842
+// CHECK-NEXT: fabs = 12
 // CHECK-FIRST: JitStorageCache hits 0 total 1
 // CHECK-SECOND: JitStorageCache hits 1 total 1
 // clang-format on

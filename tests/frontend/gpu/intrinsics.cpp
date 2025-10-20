@@ -8,6 +8,7 @@
 
 #include <iostream>
 
+#include <proteus/Frontend/Builtins.hpp>
 #include <proteus/JitFrontend.hpp>
 #include <proteus/JitInterface.hpp>
 
@@ -22,13 +23,16 @@
 #endif
 
 using namespace proteus;
+using namespace builtins::gpu;
 
 int main() {
   proteus::init();
 
   auto J = JitModule(TARGET);
   auto KernelHandle =
-      J.addKernel<void(float *, float *, float *, float *, float *, float *)>(
+      J.addKernel<void(float *, float *, float *, float *, float *, float *,
+                       float *, int *, float *,
+                       float *, float *, int *)>(
           "intrinsics");
   auto &F = KernelHandle.F;
 
@@ -38,36 +42,22 @@ int main() {
   auto &SinOut = F.getArg<3>();
   auto &CosOut = F.getArg<4>();
   auto &FabsOut = F.getArg<5>();
+  auto &PowBase = F.getArg<6>();
+  auto &PowExp = F.getArg<7>();
+  auto &SqrtIn = F.getArg<8>();
+  auto &ExpIn = F.getArg<9>();
+  auto &TrigIn = F.getArg<10>();
+  auto &FabsIn = F.getArg<11>();
 
   F.beginFunction();
   {
-    // powf(float, int)
-    auto B = F.declVar<float>();
-    auto E = F.declVar<int>();
-    B = 2.0f;
-    E = 3;
-    PowOut[0] = powf(B, E);
-
-    // sqrtf(int)
-    auto X = F.declVar<int>();
-    X = 9;
-    SqrtOut[0] = sqrtf(X);
-
-    // expf(int)
-    auto Y = F.declVar<int>();
-    Y = 1;
-    ExpOut[0] = expf(Y);
-
-    // sinf(0.0f) and cosf(0.0f)
-    auto Z = F.declVar<float>();
-    Z = 0.0f;
-    SinOut[0] = sinf(Z);
-    CosOut[0] = cosf(Z);
-
-    // fabs(int)
-    auto W = F.declVar<int>();
-    W = -5;
-    FabsOut[0] = fabs(W);
+    auto Tid = F.callBuiltin(getThreadIdX);
+    PowOut[Tid] = powf(PowBase[Tid], PowExp[Tid]);
+    SqrtOut[Tid] = sqrtf(SqrtIn[Tid]);
+    ExpOut[Tid] = expf(ExpIn[Tid]);
+    SinOut[Tid] = sinf(TrigIn[Tid]);
+    CosOut[Tid] = cosf(TrigIn[Tid]);
+    FabsOut[Tid] = fabs(FabsIn[Tid]);
 
     F.ret();
   }
@@ -76,15 +66,32 @@ int main() {
   J.compile();
 
   float *Pow, *Sqrt, *Exp, *Sin, *Cos, *Fabs;
+  float *PowBaseHost, *ExpInHost, *TrigHost, *SqrtHost;
+  int *PowExpHost, *FabsHost;
   gpuErrCheck(gpuMallocManaged(&Pow, sizeof(float)));
   gpuErrCheck(gpuMallocManaged(&Sqrt, sizeof(float)));
   gpuErrCheck(gpuMallocManaged(&Exp, sizeof(float)));
   gpuErrCheck(gpuMallocManaged(&Sin, sizeof(float)));
   gpuErrCheck(gpuMallocManaged(&Cos, sizeof(float)));
   gpuErrCheck(gpuMallocManaged(&Fabs, sizeof(float)));
+  gpuErrCheck(gpuMallocManaged(&PowBaseHost, sizeof(float)));
+  gpuErrCheck(gpuMallocManaged(&PowExpHost, sizeof(int)));
+  gpuErrCheck(gpuMallocManaged(&SqrtHost, sizeof(float)));
+  gpuErrCheck(gpuMallocManaged(&ExpInHost, sizeof(float)));
+  gpuErrCheck(gpuMallocManaged(&TrigHost, sizeof(float)));
+  gpuErrCheck(gpuMallocManaged(&FabsHost, sizeof(int)));
+
+  *PowBaseHost = 1.5f;
+  *PowExpHost = 5;
+  *SqrtHost = 50.0f;
+  *ExpInHost = 0.7f;
+  *TrigHost = 0.7f;
+  *FabsHost = -12;
 
   gpuErrCheck(KernelHandle.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, Pow, Sqrt,
-                                  Exp, Sin, Cos, Fabs));
+                                  Exp, Sin, Cos, Fabs, PowBaseHost,
+                                  PowExpHost, SqrtHost, ExpInHost, TrigHost,
+                                  FabsHost));
   gpuErrCheck(gpuDeviceSynchronize());
 
   std::cout << "pow = " << *Pow << "\n";
@@ -100,18 +107,24 @@ int main() {
   gpuErrCheck(gpuFree(Sin));
   gpuErrCheck(gpuFree(Cos));
   gpuErrCheck(gpuFree(Fabs));
+  gpuErrCheck(gpuFree(PowBaseHost));
+  gpuErrCheck(gpuFree(PowExpHost));
+  gpuErrCheck(gpuFree(SqrtHost));
+  gpuErrCheck(gpuFree(ExpInHost));
+  gpuErrCheck(gpuFree(TrigHost));
+  gpuErrCheck(gpuFree(FabsHost));
 
   proteus::finalize();
   return 0;
 }
 
 // clang-format off
-// CHECK: pow = 8
-// CHECK-NEXT: sqrt = 3
-// CHECK-NEXT: exp = 2.71828
-// CHECK-NEXT: sin = 0
-// CHECK-NEXT: cos = 1
-// CHECK-NEXT: fabs = 5
+// CHECK: pow = 7.59375
+// CHECK-NEXT: sqrt = 7.07107
+// CHECK-NEXT: exp = 2.01375
+// CHECK-NEXT: sin = 0.644218
+// CHECK-NEXT: cos = 0.764842
+// CHECK-NEXT: fabs = 12
 // CHECK-FIRST: JitCache hits 0 total 1
 // CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: JitStorageCache hits 0 total 1
