@@ -1340,7 +1340,7 @@ template <typename T> Var<float> powf(const Var<float> &L, const Var<T> &R) {
   auto *ResultType = IRB.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.pow.f32";
-  if (PROTEUS_ENABLE_CUDA && L.Fn.getTargetModel() == TargetModelType::CUDA)
+  if (L.Fn.getTargetModel() == TargetModelType::CUDA)
     IntrinsicName = "__nv_powf";
 
   return emitIntrinsic<float>(IntrinsicName, ResultType, L, RFloat);
@@ -1354,7 +1354,7 @@ template <typename T> Var<float> sqrtf(const Var<T> &R) {
   auto *ResultType = IRB.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.sqrt.f32";
-  if (PROTEUS_ENABLE_CUDA && R.Fn.getTargetModel() == TargetModelType::CUDA)
+  if (R.Fn.getTargetModel() == TargetModelType::CUDA)
     IntrinsicName = "__nv_sqrtf";
 
   return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
@@ -1368,7 +1368,7 @@ template <typename T> Var<float> expf(const Var<T> &R) {
   auto *ResultType = IRB.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.exp.f32";
-  if (PROTEUS_ENABLE_CUDA && R.Fn.getTargetModel() == TargetModelType::CUDA)
+  if (R.Fn.getTargetModel() == TargetModelType::CUDA)
     IntrinsicName = "__nv_expf";
 
   return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
@@ -1382,7 +1382,7 @@ template <typename T> Var<float> sinf(const Var<T> &R) {
   auto *ResultType = IRB.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.sin.f32";
-  if (PROTEUS_ENABLE_CUDA && R.Fn.getTargetModel() == TargetModelType::CUDA)
+  if (R.Fn.getTargetModel() == TargetModelType::CUDA)
     IntrinsicName = "__nv_sinf";
 
   return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
@@ -1396,7 +1396,7 @@ template <typename T> Var<float> cosf(const Var<T> &R) {
   auto *ResultType = IRB.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.cos.f32";
-  if (PROTEUS_ENABLE_CUDA && R.Fn.getTargetModel() == TargetModelType::CUDA)
+  if (R.Fn.getTargetModel() == TargetModelType::CUDA)
     IntrinsicName = "__nv_cosf";
 
   return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
@@ -1410,7 +1410,7 @@ template <typename T> Var<float> fabs(const Var<T> &R) {
   auto *ResultType = IRB.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.fabs.f32";
-  if (PROTEUS_ENABLE_CUDA && R.Fn.getTargetModel() == TargetModelType::CUDA)
+  if (R.Fn.getTargetModel() == TargetModelType::CUDA)
     IntrinsicName = "__nv_fabsf";
 
   return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
@@ -1424,7 +1424,7 @@ template <typename T> Var<float> truncf(const Var<T> &R) {
   auto *ResultType = IRB.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.trunc.f32";
-  if (PROTEUS_ENABLE_CUDA && R.Fn.getTargetModel() == TargetModelType::CUDA)
+  if (R.Fn.getTargetModel() == TargetModelType::CUDA)
     IntrinsicName = "__nv_truncf";
 
   return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
@@ -1438,7 +1438,7 @@ template <typename T> Var<float> logf(const Var<T> &R) {
   auto *ResultType = IRB.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.log.f32";
-  if (PROTEUS_ENABLE_CUDA && R.Fn.getTargetModel() == TargetModelType::CUDA)
+  if (R.Fn.getTargetModel() == TargetModelType::CUDA)
     IntrinsicName = "__nv_logf";
 
   return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
@@ -1452,7 +1452,7 @@ template <typename T> Var<float> absf(const Var<T> &R) {
   auto *ResultType = IRB.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.fabs.f32";
-  if (PROTEUS_ENABLE_CUDA && R.Fn.getTargetModel() == TargetModelType::CUDA)
+  if (R.Fn.getTargetModel() == TargetModelType::CUDA)
     IntrinsicName = "__nv_fabsf";
 
   return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
