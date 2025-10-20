@@ -31,8 +31,7 @@ int main() {
   auto J = JitModule(TARGET);
   auto KernelHandle =
       J.addKernel<void(float *, float *, float *, float *, float *, float *,
-                       float *, int *, float *,
-                       float *, float *, int *)>(
+                       float *, int *, float *, float *, float *, int *)>(
           "intrinsics");
   auto &F = KernelHandle.F;
 
@@ -89,9 +88,8 @@ int main() {
   *FabsHost = -12;
 
   gpuErrCheck(KernelHandle.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, Pow, Sqrt,
-                                  Exp, Sin, Cos, Fabs, PowBaseHost,
-                                  PowExpHost, SqrtHost, ExpInHost, TrigHost,
-                                  FabsHost));
+                                  Exp, Sin, Cos, Fabs, PowBaseHost, PowExpHost,
+                                  SqrtHost, ExpInHost, TrigHost, FabsHost));
   gpuErrCheck(gpuDeviceSynchronize());
 
   std::cout << "pow = " << *Pow << "\n";

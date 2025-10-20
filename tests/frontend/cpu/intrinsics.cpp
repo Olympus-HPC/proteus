@@ -17,9 +17,9 @@ int main() {
   proteus::init();
 
   auto J = JitModule();
-  auto &F = J.addFunction<void(float *, float *, float *, float *, float *, float *,
-                         float *, int *, float *,
-                         float *, float *, int *)>(
+  auto &F =
+      J.addFunction<void(float *, float *, float *, float *, float *, float *,
+                         float *, int *, float *, float *, float *, int *)>(
           "intrinsics");
   auto &PowOut = F.getArg<0>();
   auto &SqrtOut = F.getArg<1>();
