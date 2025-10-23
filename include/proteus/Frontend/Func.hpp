@@ -955,8 +955,7 @@ template <typename IdxT>
 std::enable_if_t<std::is_arithmetic_v<IdxT>, Var<std::remove_pointer_t<T>>>
 Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator[](
     const Var<IdxT> &Index) {
-  auto &IRB = Fn.getIRBuilder();
-  auto *IdxValue = convert<IdxT, size_t>(IRB, Index.loadValue());
+  auto *IdxValue = Index.loadValue();
   return indexImpl(IdxValue);
 }
 
