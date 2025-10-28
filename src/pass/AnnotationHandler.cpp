@@ -266,15 +266,20 @@ static bool isLambdaFunction(const Function &F) {
 
 AnnotationHandler::AnnotationHandler(Module &M) : M(M), Types(M) {}
 
-void AnnotationHandler::populateAnnotations() {
+void AnnotationHandler::populateAnnotations(
+    DenseMap<Value *, GlobalVariable *> &StubToKernelMap) {
+
+  auto isDevice = isDeviceCompilation(M);
   for (Function &F : M) {
     if (F.isDeclaration())
       continue;
-    if (!isDeviceKernel(&F))
+    if (!(isDeviceKernel(&F) || StubToKernelMap.contains(&F)))
       continue;
-    if (!hasAnnotateTag(F, "jit")) {
-      addAnnotate(F, "jit");
-    }
+    if (hasAnnotateTag(F, "jit"))
+      continue;
+    llvm::errs() << "Adding annotations to function " << F.getName() << " "
+                 << isDevice << "\n";
+    addAnnotate(F, "jit");
   }
 }
 
@@ -1338,7 +1343,7 @@ GlobalVariable *AnnotationHandler::getOrCreateAnnoGV(Module &M) {
     return GA;
 
   auto *ArrTy = ArrayType::get(Types.GlobalAnnotationEltTy, 0);
-  auto *Init = ConstantArray::get(ArrTy, {}); // empty
+  auto *Init = ConstantAggregateZero::get(ArrTy);
   auto *GA = new GlobalVariable(M, ArrTy, /*isConst=*/false,
                                 GlobalValue::AppendingLinkage, Init,
                                 "llvm.global.annotations");
@@ -1384,27 +1389,25 @@ void AnnotationHandler::addAnnotate(Function &F, StringRef Tag) {
 
   // 5) Get or create @llvm.global.annotations
   GlobalVariable *GA = getOrCreateAnnoGV(M);
-  if (!GA) {
-    // New array with one element
-    auto *ArrTy = ArrayType::get(Types.GlobalAnnotationEltTy, 1);
-    auto *Init = ConstantArray::get(ArrTy, NewElt);
-    GA = new GlobalVariable(M, ArrTy, /*isConstant=*/false,
-                            GlobalValue::AppendingLinkage, Init,
-                            "llvm.global.annotations");
-    GA->setSection("llvm.metadata");
-  } else {
-    // Append to existing array
-    auto *OldArr = cast<ConstantArray>(GA->getInitializer());
-    SmallVector<Constant *, 8> Elts;
-    for (unsigned i = 0, e = OldArr->getNumOperands(); i != e; ++i)
-      Elts.push_back(OldArr->getOperand(i));
-    Elts.push_back(NewElt);
 
-    auto *NewArrTy = ArrayType::get(Types.GlobalAnnotationEltTy, Elts.size());
-    auto *NewArr = ConstantArray::get(NewArrTy, Elts);
-    GA->mutateType(PointerType::getUnqual(NewArrTy));
-    GA->setInitializer(NewArr);
+  SmallVector<Constant *, 8> Elts;
+  if (Value *InitV = GA->getInitializer()) {
+    if (auto *CA = dyn_cast<ConstantArray>(InitV)) {
+      for (unsigned i = 0, e = CA->getNumOperands(); i != e; ++i)
+        Elts.push_back(cast<Constant>(CA->getOperand(i)));
+      // else: zeroinitializer/undef -> no prior elements
+    }
   }
+
+  Elts.push_back(NewElt);
+
+  // Rebuild the array and update GA
+  auto *NewArrTy = ArrayType::get(Types.GlobalAnnotationEltTy, Elts.size());
+  auto *NewArr = ConstantArray::get(NewArrTy, Elts);
+  GA->mutateType(PointerType::get(NewArrTy, GA->getAddressSpace()));
+  GA->setInitializer(NewArr);
+  GA->setLinkage(GlobalValue::AppendingLinkage);
+  GA->setSection("llvm.metadata");
 }
 
 } // namespace proteus

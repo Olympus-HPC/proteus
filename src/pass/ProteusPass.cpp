@@ -96,8 +96,13 @@ public:
 
   bool run(Module &M, bool IsLTO) {
     AnnotationHandler AnnotHandler{M};
+    if (hasDeviceLaunchKernelCalls(M)) {
+      getKernelHostStubs(M);
+    }
+
     if (!IsLTO)
-      AnnotHandler.populateAnnotations();
+      AnnotHandler.populateAnnotations(StubToKernelMap);
+
     if (M.getNamedGlobal("llvm.global.annotations"))
       llvm::errs() << *M.getNamedGlobal("llvm.global.annotations") << "\n";
     AnnotHandler.parseAnnotations(JitFunctionInfoMap);
@@ -130,7 +135,6 @@ public:
     registerLambdaFunctions(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
-      getKernelHostStubs(M);
       AnnotHandler.parseManifestFileAnnotations(StubToKernelMap,
                                                 JitFunctionInfoMap);
       instrumentRegisterFunction(M);

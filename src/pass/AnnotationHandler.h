@@ -41,7 +41,8 @@ class AnnotationHandler {
 public:
   AnnotationHandler(Module &M);
 
-  void populateAnnotations();
+  void
+  populateAnnotations(DenseMap<Value *, GlobalVariable *> &StubToKernelMap);
 
   void
   parseAnnotations(MapVector<Function *, JitFunctionInfo> &JitFunctionInfoMap);
