@@ -266,6 +266,18 @@ static bool isLambdaFunction(const Function &F) {
 
 AnnotationHandler::AnnotationHandler(Module &M) : M(M), Types(M) {}
 
+void AnnotationHandler::populateAnnotations() {
+  for (Function &F : M) {
+    if (F.isDeclaration())
+      continue;
+    if (!isDeviceKernel(&F))
+      continue;
+    if (!hasAnnotateTag(F, "jit")) {
+      addAnnotate(F, "jit");
+    }
+  }
+}
+
 void AnnotationHandler::parseAnnotations(
     MapVector<Function *, JitFunctionInfo> &JitFunctionInfoMap) {
   // First parse any proteus::jit_arg or proteus::jit_array annotations and
@@ -1272,6 +1284,127 @@ void AnnotationHandler::removeJitGlobalAnnotations() {
                                            GlobalValue::AppendingLinkage,
                                            NewInit, "llvm.global.annotations");
   AnnotationsGV->setSection("llvm.metadata");
+}
+
+Constant *AnnotationHandler::getOrCreateString(Module &M, StringRef S,
+                                               PointerType *Ty) {
+  LLVMContext &Ctx = M.getContext();
+  auto *StrConst = ConstantDataArray::getString(Ctx, S, true);
+  // Use private, unnamed_addr so we can dedupe easily and allow merging.
+  auto *GV = new GlobalVariable(M, StrConst->getType(), /*isConstant=*/true,
+                                GlobalValue::PrivateLinkage, StrConst, ".str",
+                                /*Before=*/nullptr, GlobalValue::NotThreadLocal,
+                                Ty->getAddressSpace());
+  GV->setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
+  GV->setSection("llvm.metadata"); // Matches clang’s emission
+  GV->setAlignment(MaybeAlign(1));
+  return ConstantExpr::getPointerBitCastOrAddrSpaceCast(GV, Ty);
+}
+
+bool AnnotationHandler::hasAnnotateTag(const Function &F, StringRef Want) {
+  const Module *M = F.getParent();
+  auto *GA = M->getNamedGlobal("llvm.global.annotations");
+  if (!GA || !GA->hasInitializer())
+    return false;
+  auto *CA = dyn_cast<ConstantArray>(GA->getInitializer());
+  if (!CA)
+    return false;
+
+  for (unsigned i = 0, e = CA->getNumOperands(); i != e; ++i) {
+    auto *CS = dyn_cast<ConstantStruct>(CA->getOperand(i));
+    if (!CS || CS->getNumOperands() < 2)
+      continue;
+
+    const Value *Ent = CS->getOperand(0)->stripPointerCasts();
+    if (Ent != &F)
+      continue;
+
+    // Operand 1 is the tag i8* -> global string
+    if (auto *GV =
+            dyn_cast<GlobalVariable>(CS->getOperand(1)->stripPointerCasts())) {
+      if (GV->hasInitializer()) {
+        if (auto *Arr = dyn_cast<ConstantDataArray>(GV->getInitializer())) {
+          if (Arr->isString() && Arr->getAsString() == Want)
+            return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+GlobalVariable *AnnotationHandler::getOrCreateAnnoGV(Module &M) {
+  if (auto *GA = M.getNamedGlobal("llvm.global.annotations"))
+    return GA;
+
+  auto *ArrTy = ArrayType::get(Types.GlobalAnnotationEltTy, 0);
+  auto *Init = ConstantArray::get(ArrTy, {}); // empty
+  auto *GA = new GlobalVariable(M, ArrTy, /*isConst=*/false,
+                                GlobalValue::AppendingLinkage, Init,
+                                "llvm.global.annotations");
+  GA->setSection("llvm.metadata");
+  return GA;
+}
+
+void AnnotationHandler::addAnnotate(Function &F, StringRef Tag) {
+  Module &M = *F.getParent();
+  LLVMContext &Ctx = M.getContext();
+
+  // 1) Build the element struct type (match existing if present)
+
+  // 2) Figure out file/line (from DISubprogram if available)
+  std::string File = M.getSourceFileName(); // fallback
+  int Line = 0;
+  if (auto *SP = F.getSubprogram()) {
+    if (!SP->getFilename().empty())
+      File = SP->getFilename().str();
+    Line = (int)SP->getLine();
+  }
+
+  StructType *EltTy = Types.GlobalAnnotationEltTy;
+
+  // Field types
+  auto *EntTy = cast<PointerType>(EltTy->getElementType(0));
+  auto *TagTy = cast<PointerType>(EltTy->getElementType(1));
+  auto *FileTy = cast<PointerType>(EltTy->getElementType(2));
+  Type *LineTy = EltTy->getElementType(3);
+  Type *ArgTy = EltTy->getElementType(4);
+
+  // 3) Create constants for fields
+  Constant *Ent = ConstantExpr::getPointerBitCastOrAddrSpaceCast(&F, EntTy);
+  Constant *TagC = getOrCreateString(M, Tag, TagTy);
+  Constant *FileC = getOrCreateString(M, File, FileTy);
+  Constant *LineC = ConstantInt::get(cast<IntegerType>(LineTy), Line);
+  Constant *ArgC = Constant::getNullValue(ArgTy);
+
+  // 4) Pack fields; if the element type has more fields, pad with nulls
+  SmallVector<Constant *, 5> Fields = {Ent, TagC, FileC, LineC, ArgC};
+
+  Constant *NewElt = ConstantStruct::get(Types.GlobalAnnotationEltTy, Fields);
+
+  // 5) Get or create @llvm.global.annotations
+  GlobalVariable *GA = getOrCreateAnnoGV(M);
+  if (!GA) {
+    // New array with one element
+    auto *ArrTy = ArrayType::get(Types.GlobalAnnotationEltTy, 1);
+    auto *Init = ConstantArray::get(ArrTy, NewElt);
+    GA = new GlobalVariable(M, ArrTy, /*isConstant=*/false,
+                            GlobalValue::AppendingLinkage, Init,
+                            "llvm.global.annotations");
+    GA->setSection("llvm.metadata");
+  } else {
+    // Append to existing array
+    auto *OldArr = cast<ConstantArray>(GA->getInitializer());
+    SmallVector<Constant *, 8> Elts;
+    for (unsigned i = 0, e = OldArr->getNumOperands(); i != e; ++i)
+      Elts.push_back(OldArr->getOperand(i));
+    Elts.push_back(NewElt);
+
+    auto *NewArrTy = ArrayType::get(Types.GlobalAnnotationEltTy, Elts.size());
+    auto *NewArr = ConstantArray::get(NewArrTy, Elts);
+    GA->mutateType(PointerType::getUnqual(NewArrTy));
+    GA->setInitializer(NewArr);
+  }
 }
 
 } // namespace proteus

@@ -96,6 +96,10 @@ public:
 
   bool run(Module &M, bool IsLTO) {
     AnnotationHandler AnnotHandler{M};
+    if (!IsLTO)
+      AnnotHandler.populateAnnotations();
+    if (M.getNamedGlobal("llvm.global.annotations"))
+      llvm::errs() << *M.getNamedGlobal("llvm.global.annotations") << "\n";
     AnnotHandler.parseAnnotations(JitFunctionInfoMap);
 
     DEBUG(Logger::logs("proteus-pass")
