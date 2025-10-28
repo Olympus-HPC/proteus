@@ -269,7 +269,6 @@ AnnotationHandler::AnnotationHandler(Module &M) : M(M), Types(M) {}
 void AnnotationHandler::populateAnnotations(
     DenseMap<Value *, GlobalVariable *> &StubToKernelMap) {
 
-  auto isDevice = isDeviceCompilation(M);
   for (Function &F : M) {
     if (F.isDeclaration())
       continue;
@@ -277,8 +276,6 @@ void AnnotationHandler::populateAnnotations(
       continue;
     if (hasAnnotateTag(F, "jit"))
       continue;
-    llvm::errs() << "Adding annotations to function " << F.getName() << " "
-                 << isDevice << "\n";
     addAnnotate(F, "jit");
   }
 }
@@ -1353,7 +1350,6 @@ GlobalVariable *AnnotationHandler::getOrCreateAnnoGV(Module &M) {
 
 void AnnotationHandler::addAnnotate(Function &F, StringRef Tag) {
   Module &M = *F.getParent();
-  LLVMContext &Ctx = M.getContext();
 
   // 1) Build the element struct type (match existing if present)
 

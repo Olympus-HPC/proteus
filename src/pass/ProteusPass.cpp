@@ -110,8 +110,6 @@ public:
     if (!IsLTO && AggressiveProteusAnnotation)
       AnnotHandler.populateAnnotations(StubToKernelMap);
 
-    if (M.getNamedGlobal("llvm.global.annotations"))
-      llvm::errs() << *M.getNamedGlobal("llvm.global.annotations") << "\n";
     AnnotHandler.parseAnnotations(JitFunctionInfoMap);
 
     DEBUG(Logger::logs("proteus-pass")
