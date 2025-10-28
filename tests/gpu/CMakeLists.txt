@@ -19,12 +19,7 @@ function(CREATE_GPU_TEST exe check_source)
     add_dependencies(${exe}.${lang} ProteusPass)
 
     target_link_libraries(${exe}.${lang} PUBLIC proteus)
-
-    target_compile_options(
-        ${exe}.${lang}
-        PUBLIC
-        -fpass-plugin=$<TARGET_FILE:ProteusPass>
-    )
+    add_proteus(${exe}.${lang})
 
     # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
     add_test(NAME ${exe}.${lang} COMMAND ${LIT} -vv -D EXT=${lang} -DFILECHECK=${FILECHECK} ${check_source})
@@ -51,6 +46,7 @@ function(CREATE_GPU_TEST_RDC exe check_source)
     endif()
 
     target_link_libraries(${exe}.${lang}.rdc PUBLIC proteus)
+    add_proteus(${exe}.${lang}.rdc)
 
     if(PROTEUS_ENABLE_HIP)
         # This is unsupported see: https://gitlab.kitware.com/cmake/cmake/-/issues/23210
@@ -61,7 +57,6 @@ function(CREATE_GPU_TEST_RDC exe check_source)
             ${exe}.${lang}.rdc
             PUBLIC
             -fgpu-rdc
-            -fpass-plugin=$<TARGET_FILE:ProteusPass>
         )
 
         target_link_options(
@@ -69,13 +64,11 @@ function(CREATE_GPU_TEST_RDC exe check_source)
             PUBLIC
             -fgpu-rdc
             --hip-link
-            -Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPass>
         )
     elseif(PROTEUS_ENABLE_CUDA)
         target_compile_options(
             ${exe}.${lang}.rdc
             PUBLIC
-            -fpass-plugin=$<TARGET_FILE:ProteusPass>
         )
 
         # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
@@ -144,7 +137,7 @@ function(CREATE_PROTEUS_GPU_LIBRARY lib source)
     )
     add_dependencies(${lib} ProteusPass)
     target_link_libraries(${lib} PUBLIC proteus)
-
+    add_proteus(${lib})
     if(PROTEUS_ENABLE_HIP)
         # This is unsupported see: https://gitlab.kitware.com/cmake/cmake/-/issues/23210
         # set_target_properties(${exe}.rdc PROPERTIES HIP_SEPARABLE_COMPILATION on)
@@ -152,16 +145,10 @@ function(CREATE_PROTEUS_GPU_LIBRARY lib source)
           ${lib}
             PUBLIC
             -fgpu-rdc
-            -fpass-plugin=$<TARGET_FILE:ProteusPass>
         )
 
         target_link_options(${lib} PUBLIC -fgpu-rdc --hip-link)
     elseif(PROTEUS_ENABLE_CUDA)
-        target_compile_options(
-            ${lib}
-            PUBLIC
-            -fpass-plugin=$<TARGET_FILE:ProteusPass>
-        )
         # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
         set_target_properties(${lib} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
     else()
