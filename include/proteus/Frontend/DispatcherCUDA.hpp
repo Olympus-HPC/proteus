@@ -30,7 +30,8 @@ public:
         LibDeviceBuffer->get()->getMemBufferRef(), ModOwner->getContext());
 
     llvm::Linker linker(*ModOwner);
-    linker.linkInModule(std::move(LibDeviceModule.get()));
+    linker.linkInModule(std::move(LibDeviceModule.get()),
+                        llvm::Linker::Flags::LinkOnlyNeeded);
 
     std::unique_ptr<MemoryBuffer> ObjectModule =
         Jit.compileOnly(*ModOwner, DisableIROpt);
