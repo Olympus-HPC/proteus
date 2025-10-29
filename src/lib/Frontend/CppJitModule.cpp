@@ -123,6 +123,7 @@ void CppJitModule::compileCppToDynamicLibrary() {
 }
 
 CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
+  Timer T;
   // Create compiler instance.
   CompilerInstance Compiler;
   // Create diagnostics engine.
@@ -219,6 +220,9 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
     PROTEUS_FATAL_ERROR("Failed to take LLVM module");
 
   std::unique_ptr<LLVMContext> Ctx{Action.takeLLVMContext()};
+
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                       << "Compile C++ to IR " << T.elapsed() << " ms\n");
 
   return CppJitModule::CompilationResult{std::move(Ctx), std::move(Module)};
 }

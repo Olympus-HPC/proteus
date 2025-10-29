@@ -33,6 +33,7 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
     LLVMContext &Ctx, CUmodule &CUMod,
     SmallVector<std::unique_ptr<Module>> &LinkedModules,
     std::string &ModuleId) {
+  Timer T;
   PROTEUS_DBG(Logger::logs("proteus")
               << "extractLinkedBitcode " << ModuleId << "\n");
 
@@ -48,7 +49,6 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
   DeviceBitcode.reserve(Bytes);
   proteusCuErrCheck(cuMemcpyDtoH(DeviceBitcode.data(), DevPtr, Bytes));
 
-  Timer T;
   StringRef Bitcode{DeviceBitcode.data(), Bytes};
   SMDiagnostic Diag;
   // We copy the Bitcode data for lazy parsing.

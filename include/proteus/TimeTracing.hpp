@@ -42,10 +42,10 @@ public:
       Start = Clock::now();
   }
 
-  uint64_t elapsed() {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() -
+  double elapsed() {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now() -
                                                                  Start)
-        .count();
+        .count() / (static_cast<double>(1e6));
   }
 
   void reset() { Start = Clock::now(); }

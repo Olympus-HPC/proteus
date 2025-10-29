@@ -308,7 +308,7 @@ inline void specializeIR(
   runCleanupPassPipeline(M);
 
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
-                       << "specializeIR " << T.elapsed() << " ms\n");
+                       << "Specialized Kernel Construction " << T.elapsed() << " ms\n");
 }
 
 } // namespace proteus
