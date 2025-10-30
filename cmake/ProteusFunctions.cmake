@@ -1,7 +1,23 @@
+include(CMakeParseArguments)
+
+# my_add_pass(<target> [ENABLE_AGGRESSIVE]
 function(add_proteus target)
-    target_compile_options(${target} PRIVATE
-        "-fpass-plugin=\$<TARGET_FILE:ProteusPass>"
-    )
+    set(options       ENABLE_AGGRESSIVE)
+    cmake_parse_arguments(PROTEUS_PASS "${options}" "" "" ${ARGN})
+
+
+    if (PROTEUS_PASS_ENABLE_AGGRESSIVE)
+	# NOTE: LLVM seems to also support fplugin-arg-name-arg option. Documentation is limited and was added recently.
+	#Will re-investigate how do use that one
+	target_compile_options(${target} PRIVATE
+	  "-fplugin=\$<TARGET_FILE:ProteusPass>"
+          "-fpass-plugin=\$<TARGET_FILE:ProteusPass>"
+          "SHELL:-Xclang -mllvm -Xclang -enable-aggressive-proteus-annotations")
+    else()
+        target_compile_options(${target} PRIVATE
+            "-fpass-plugin=\$<TARGET_FILE:ProteusPass>"
+        )
+    endif()
 
     target_link_options(${target} PRIVATE
         "SHELL:\$<\$<LINK_LANGUAGE:HIP>:-Xoffload-linker --load-pass-plugin=\$<TARGET_FILE:ProteusPass>>")

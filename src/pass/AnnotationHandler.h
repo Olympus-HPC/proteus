@@ -42,6 +42,9 @@ public:
   AnnotationHandler(Module &M);
 
   void
+  populateAnnotations(DenseMap<Value *, GlobalVariable *> &StubToKernelMap);
+
+  void
   parseAnnotations(MapVector<Function *, JitFunctionInfo> &JitFunctionInfoMap);
 
   void parseManifestFileAnnotations(
@@ -80,6 +83,13 @@ private:
       MapVector<Function *, JitFunctionInfo> &JitFunctionInfoMap);
 
   void removeJitGlobalAnnotations();
+
+  Constant *getOrCreateString(Module &M, StringRef S, PointerType *Ty);
+  StructType *getAnnoEltTyOrDefault(Module &M);
+  bool hasAnnotateTag(const Function &F, StringRef Want);
+  void addAnnotate(Function &F, StringRef Tag);
+
+  GlobalVariable *getOrCreateAnnoGV(Module &M);
 };
 
 } // namespace proteus

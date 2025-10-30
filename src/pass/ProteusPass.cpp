@@ -88,14 +88,28 @@ using namespace proteus;
 //-----------------------------------------------------------------------------
 // ProteusPass implementation
 //-----------------------------------------------------------------------------
+
 namespace {
+static cl::opt<bool> AggressiveProteusAnnotation(
+    "enable-aggressive-proteus-annotations",
+    cl::desc("Applies the 'jit' annotation across all device GPU kernels"),
+    cl::init(false));
 
 class ProteusPassImpl {
 public:
   ProteusPassImpl(Module &M) : Types(M) {}
 
   bool run(Module &M, bool IsLTO) {
+    // NOTE: We need to collect early our Host Stubs, to allow aggressive
+    // annotations to be applied on all host stubs
     AnnotationHandler AnnotHandler{M};
+    if (hasDeviceLaunchKernelCalls(M)) {
+      getKernelHostStubs(M);
+    }
+
+    if (!IsLTO && AggressiveProteusAnnotation)
+      AnnotHandler.populateAnnotations(StubToKernelMap);
+
     AnnotHandler.parseAnnotations(JitFunctionInfoMap);
 
     DEBUG(Logger::logs("proteus-pass")
@@ -126,7 +140,6 @@ public:
     registerLambdaFunctions(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
-      getKernelHostStubs(M);
       AnnotHandler.parseManifestFileAnnotations(StubToKernelMap,
                                                 JitFunctionInfoMap);
       instrumentRegisterFunction(M);
