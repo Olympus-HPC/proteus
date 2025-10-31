@@ -3,6 +3,8 @@
 
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Bitcode/BitcodeWriter.h>
+#include <llvm/IR/Attributes.h>
+#include <llvm/IR/ConstantRange.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Verifier.h>
@@ -12,6 +14,7 @@
 #include <llvm/TargetParser/Triple.h>
 
 #include <deque>
+#include <initializer_list>
 
 #include "proteus/CoreLLVMDevice.hpp"
 #include "proteus/Error.h"
@@ -86,6 +89,17 @@ private:
 #endif
     }
 
+    void compile(LaunchDims Grid, LaunchDims Block) {
+      if (M.isCompiled())
+        return;
+
+      if (!M.isDeviceModule())
+        PROTEUS_FATAL_ERROR("Expected a device module for compile()");
+
+      annotateIndexIntrinsics(Grid, Block);
+      M.compile();
+    }
+
     // Launch with type-safety.
     [[nodiscard]] auto launch(LaunchDims Grid, LaunchDims Block,
                               uint64_t ShmemBytes, void *Stream, ArgT... Args) {
@@ -93,7 +107,7 @@ private:
       void *Ptrs[sizeof...(ArgT)] = {(void *)&Args...};
 
       if (!M.isCompiled())
-        M.compile();
+        compile(Grid, Block);
 
       auto GetKernelFunc = [&]() {
         // Get the kernel func pointer directly from the Func object if
@@ -119,6 +133,96 @@ private:
     }
 
     FuncBase *operator->() { return &F; }
+
+  private:
+    static void addRangeAttrForCalls(Function &KernelFn,
+                                     std::initializer_list<const char *> Names,
+                                     unsigned UpperBoundExclusive) {
+      if (UpperBoundExclusive == 0)
+        return;
+
+      Module &Mod = *KernelFn.getParent();
+      LLVMContext &Ctx = Mod.getContext();
+
+      for (const char *Name : Names) {
+        Function *IntrinsicFn = Mod.getFunction(Name);
+        if (!IntrinsicFn)
+          continue;
+
+        for (User *U : IntrinsicFn->users()) {
+          auto *Call = dyn_cast<CallInst>(U);
+          if (!Call || Call->getFunction() != &KernelFn)
+            continue;
+
+          auto *RetTy = dyn_cast<IntegerType>(Call->getType());
+          if (!RetTy)
+            continue;
+
+          unsigned BitWidth = RetTy->getBitWidth();
+          ConstantRange Range(APInt(BitWidth, 0),
+                              APInt(BitWidth, UpperBoundExclusive));
+          if (Range.isEmptySet())
+            continue;
+
+          AttrBuilder Builder{Ctx};
+          Builder.addRangeAttr(Range);
+          Call->removeRetAttr(Attribute::Range);
+          Call->setAttributes(
+              Call->getAttributes().addRetAttributes(Ctx, Builder));
+        }
+      }
+    }
+
+    void annotateIndexIntrinsics(LaunchDims Grid, LaunchDims Block) {
+      Function *KernelFn = F.getFunction();
+      if (!KernelFn)
+        PROTEUS_FATAL_ERROR("Expected non-null Function");
+
+      switch (M.getTargetModel()) {
+      case TargetModelType::HIP:
+        addRangeAttrForCalls(
+            *KernelFn,
+            {"llvm.amdgcn.workitem.id.x"},
+            Block.X);
+        addRangeAttrForCalls(
+            *KernelFn,
+            {"llvm.amdgcn.workitem.id.y"},
+            Block.Y);
+        addRangeAttrForCalls(
+            *KernelFn,
+            {"llvm.amdgcn.workitem.id.z"},
+            Block.Z);
+        addRangeAttrForCalls(
+            *KernelFn,
+            {"llvm.amdgcn.workgroup.id.x"},
+            Grid.X);
+        addRangeAttrForCalls(
+            *KernelFn,
+            {"llvm.amdgcn.workgroup.id.y"},
+            Grid.Y);
+        addRangeAttrForCalls(
+            *KernelFn,
+            {"llvm.amdgcn.workgroup.id.z"},
+            Grid.Z);
+        break;
+      case TargetModelType::CUDA:
+        addRangeAttrForCalls(*KernelFn, {"llvm.nvvm.read.ptx.sreg.tid.x"},
+                             Block.X);
+        addRangeAttrForCalls(*KernelFn, {"llvm.nvvm.read.ptx.sreg.tid.y"},
+                             Block.Y);
+        addRangeAttrForCalls(*KernelFn, {"llvm.nvvm.read.ptx.sreg.tid.z"},
+                             Block.Z);
+        addRangeAttrForCalls(*KernelFn, {"llvm.nvvm.read.ptx.sreg.ctaid.x"},
+                             Grid.X);
+        addRangeAttrForCalls(*KernelFn, {"llvm.nvvm.read.ptx.sreg.ctaid.y"},
+                             Grid.Y);
+        addRangeAttrForCalls(*KernelFn, {"llvm.nvvm.read.ptx.sreg.ctaid.z"},
+                             Grid.Z);
+        break;
+      default:
+        break;
+      }
+    }
   };
 
   bool isDeviceModule() {
