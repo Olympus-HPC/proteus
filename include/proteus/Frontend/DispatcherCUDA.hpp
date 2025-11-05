@@ -75,7 +75,7 @@ public:
       auto KernelFunc = proteus::getKernelFunctionFromImage(
           KernelName, Library.ObjectModule->getBufferStart(),
           /*RelinkGlobalsByCopy*/ false,
-          /* VarNameToDevPtr */ {});
+          /* VarNameToGlobalInfo */ {});
 
       CodeCache.insert(HashValue, KernelFunc, KernelName);
 

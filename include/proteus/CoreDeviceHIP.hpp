@@ -5,6 +5,8 @@
 
 #include <llvm/ADT/StringRef.h>
 
+#include "proteus/Error.h"
+#include "proteus/GlobalVarInfo.hpp"
 #include "proteus/UtilsHIP.h"
 
 // NOTE: HIP_SYMBOL is defined only if HIP compilation is enabled (-x hip),
@@ -36,19 +38,23 @@ inline hipError_t launchKernelDirect(void *KernelFunc, dim3 GridDim,
 
 inline hipFunction_t getKernelFunctionFromImage(
     StringRef KernelName, const void *Image, bool RelinkGlobalsByCopy,
-    const std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
+    const std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo) {
   hipModule_t HipModule;
   hipFunction_t KernelFunc;
 
   proteusHipErrCheck(hipModuleLoadData(&HipModule, Image));
   if (RelinkGlobalsByCopy) {
-    for (auto &[GlobalName, DevPtr] : VarNameToDevPtr) {
+    for (auto &[GlobalName, GVI] : VarNameToGlobalInfo) {
+      if (!GVI.DevAddr)
+        PROTEUS_FATAL_ERROR("Cannot copy to Global Var " + GlobalName +
+                            " without a concrete device address");
+
       hipDeviceptr_t Dptr;
       size_t Bytes;
       proteusHipErrCheck(hipModuleGetGlobal(&Dptr, &Bytes, HipModule,
                                             (GlobalName + "$ptr").c_str()));
 
-      uint64_t PtrVal = (uint64_t)DevPtr;
+      uint64_t PtrVal = (uint64_t)GVI.DevAddr;
       proteusHipErrCheck(hipMemcpyHtoD(Dptr, &PtrVal, Bytes));
     }
   }

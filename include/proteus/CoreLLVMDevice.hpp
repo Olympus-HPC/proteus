@@ -20,6 +20,7 @@
 #include <llvm/Transforms/Utils/Cloning.h>
 
 #include "proteus/CoreDevice.hpp"
+#include "proteus/GlobalVarInfo.hpp"
 #include "proteus/LambdaRegistry.hpp"
 #include "proteus/TransformArgumentSpecialization.hpp"
 #include "proteus/TransformLambdaSpecialization.hpp"
@@ -126,10 +127,10 @@ inline void setKernelDimsAssume(Module &M, dim3 &GridDim, dim3 &BlockDim) {
 
 inline void replaceGlobalVariablesWithPointers(
     Module &M,
-    const std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
+    const std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo) {
   // Re-link globals to fixed addresses provided by registered
   // variables.
-  for (auto RegisterVar : VarNameToDevPtr) {
+  for (auto RegisterVar : VarNameToGlobalInfo) {
     auto &VarName = RegisterVar.first;
     auto *GV = M.getNamedGlobal(VarName);
     // Skip linking if the GV does not exist in the module.
@@ -206,7 +207,7 @@ inline void replaceGlobalVariablesWithPointers(
 
 inline void relinkGlobalsObject(
     MemoryBufferRef Object,
-    const std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
+    const std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo) {
   Expected<object::ELF64LEObjectFile> DeviceElfOrErr =
       object::ELF64LEObjectFile::create(Object);
   if (auto E = DeviceElfOrErr.takeError())
@@ -214,7 +215,7 @@ inline void relinkGlobalsObject(
                         toString(std::move(E)));
   auto &DeviceElf = *DeviceElfOrErr;
 
-  for (auto &[GlobalName, DevPtr] : VarNameToDevPtr) {
+  for (auto &[GlobalName, GVI] : VarNameToGlobalInfo) {
     for (auto &Symbol : DeviceElf.symbols()) {
       auto SymbolNameOrErr = Symbol.getName();
       if (!SymbolNameOrErr)
@@ -250,7 +251,11 @@ inline void relinkGlobalsObject(
         PROTEUS_FATAL_ERROR("Expected offset within section size");
 
       uint64_t *Data = (uint64_t *)(SectionData.data() + Offset);
-      *Data = reinterpret_cast<uint64_t>(DevPtr);
+      if (!GVI.DevAddr)
+        PROTEUS_FATAL_ERROR("Cannot set global Var " + GlobalName +
+                            " without a concrete device address");
+
+      *Data = reinterpret_cast<uint64_t>(GVI.DevAddr);
       break;
     }
   }

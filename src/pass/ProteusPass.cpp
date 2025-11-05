@@ -1112,10 +1112,10 @@ private:
   FunctionCallee getJitRegisterVarFn(Module &M) {
     // The prototype is
     // __jit_register_var(void *Handle, const void *HostAddr, const char
-    // *VarName).
-    FunctionType *JitRegisterVarFnTy =
-        FunctionType::get(Types.VoidTy, {Types.PtrTy, Types.PtrTy, Types.PtrTy},
-                          /* isVarArg=*/false);
+    // *VarName, uint64_t VarSize).
+    FunctionType *JitRegisterVarFnTy = FunctionType::get(
+        Types.VoidTy, {Types.PtrTy, Types.PtrTy, Types.PtrTy, Types.Int64Ty},
+        /* isVarArg=*/false);
     FunctionCallee JitRegisterVarFn =
         M.getOrInsertFunction("__jit_register_var", JitRegisterVarFnTy);
 
@@ -1140,7 +1140,9 @@ private:
         Value *Symbol = CB->getArgOperand(1);
         auto *GV = dyn_cast<GlobalVariable>(Symbol);
         Value *SymbolName = CB->getArgOperand(2);
-        Builder.CreateCall(JitRegisterVarFn, {Handle, GV, SymbolName});
+        Value *SymbolSize = CB->getArgOperand(5);
+        Builder.CreateCall(JitRegisterVarFn,
+                           {Handle, GV, SymbolName, SymbolSize});
       }
   }
 

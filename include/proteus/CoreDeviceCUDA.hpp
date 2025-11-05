@@ -5,6 +5,7 @@
 
 #include <llvm/ADT/StringRef.h>
 
+#include "proteus/GlobalVarInfo.hpp"
 #include "proteus/UtilsCUDA.h"
 
 namespace proteus {
@@ -26,19 +27,23 @@ inline cudaError_t launchKernelDirect(void *KernelFunc, dim3 GridDim,
 
 inline CUfunction getKernelFunctionFromImage(
     StringRef KernelName, const void *Image, bool RelinkGlobalsByCopy,
-    const std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
+    const std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo) {
   CUfunction KernelFunc;
   CUmodule Mod;
 
   proteusCuErrCheck(cuModuleLoadData(&Mod, Image));
   if (RelinkGlobalsByCopy) {
-    for (auto &[GlobalName, DevPtr] : VarNameToDevPtr) {
+    for (auto &[GlobalName, GVI] : VarNameToGlobalInfo) {
+      if (!GVI.DevAddr)
+        PROTEUS_FATAL_ERROR("Cannot copy to Global Var " + GlobalName +
+                            " without a concrete device address");
+
       CUdeviceptr Dptr;
       size_t Bytes;
       proteusCuErrCheck(
           cuModuleGetGlobal(&Dptr, &Bytes, Mod, (GlobalName + "$ptr").c_str()));
 
-      uint64_t PtrVal = (uint64_t)DevPtr;
+      uint64_t PtrVal = (uint64_t)GVI.DevAddr;
       proteusCuErrCheck(cuMemcpyHtoD(Dptr, &PtrVal, Bytes));
     }
   }

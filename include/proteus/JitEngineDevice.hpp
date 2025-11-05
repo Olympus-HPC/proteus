@@ -185,16 +185,31 @@ public:
     LinkedModuleIds.push_back(ModuleId);
   }
 
-  void registerGlobalVar(const char *VarName, const void *Addr) {
-    VarNameToDevPtr[VarName] = Addr;
+  void registerGlobalVar(const char *VarName, const void *Addr,
+                         uint64_t VarSize) {
+    VarNameToGlobalInfo.emplace(VarName, GlobalVarInfo(Addr, nullptr, VarSize));
   }
 
   void mapGlobals() {
     std::call_once(Flag, [&]() {
-      for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
-        void *DevPtr = resolveDeviceGlobalAddr(HostAddr);
-        VarNameToDevPtr.at(GlobalName) = DevPtr;
+      for (auto &[GlobalName, GVI] : VarNameToGlobalInfo) {
+        void *DevPtr = resolveDeviceGlobalAddr(GVI.HostAddr);
+        VarNameToGlobalInfo.at(GlobalName).DevAddr = DevPtr;
       }
+      auto TraceOut = [](std::unordered_map<std::string, GlobalVarInfo>
+                             &VarNameToGlobalInfo) {
+        SmallString<128> S;
+        raw_svector_ostream OS(S);
+        for (auto &[GlobalName, GVI] : VarNameToGlobalInfo) {
+          OS << "[GVarInfo]: " << GlobalName << " HAddr:" << GVI.HostAddr
+             << " DevAddr:" << GVI.DevAddr << " VarSize:" << GVI.VarSize
+             << "\n";
+        }
+
+        return S;
+      };
+      if (Config::get().ProteusTraceOutput >= 1)
+        Logger::trace(TraceOut(VarNameToGlobalInfo));
       GlobalsMapped = true;
     });
   }
@@ -436,12 +451,13 @@ public:
     }
   }
 
-  void insertRegisterVar(void *Handle, const char *VarName, const void *Addr) {
+  void insertRegisterVar(void *Handle, const char *VarName, const void *Addr,
+                         uint64_t VarSize) {
     if (!HandleToBinaryInfo.count(Handle))
       PROTEUS_FATAL_ERROR("Expected Handle in map");
     BinaryInfo &BinInfo = HandleToBinaryInfo[Handle];
 
-    BinInfo.registerGlobalVar(VarName, Addr);
+    BinInfo.registerGlobalVar(VarName, Addr, VarSize);
   }
 
   void registerLinkedBinary(FatbinWrapperT *FatbinWrapper,
@@ -524,7 +540,7 @@ private:
       MemoryBufferRef Object,
       const std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
     TIMESCOPE(__FUNCTION__);
-    proteus::relinkGlobalsObject(Object, VarNameToDevPtr);
+    proteus::relinkGlobalsObject(Object, VarNameToGlobalInfo);
   }
 
   KernelFunction_t getKernelFunctionFromImage(
@@ -554,6 +570,7 @@ protected:
   JitCache<KernelFunction_t> CodeCache;
   JitStorageCache StorageCache;
   std::string DeviceArch;
+  std::unordered_map<std::string, GlobalVarInfo> VarNameToGlobalInfo;
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
 };
@@ -566,6 +583,22 @@ template <typename ImplT> void JitEngineDevice<ImplT>::pruneIR(Module &M) {
 template <typename ImplT>
 void JitEngineDevice<ImplT>::internalize(Module &M, StringRef KernelName) {
   proteus::internalize(M, KernelName);
+}
+
+template <typename ImplT>
+void JitEngineDevice<ImplT>::replaceGlobalVariablesWithPointers(Module &M) {
+  TIMESCOPE(__FUNCTION__)
+
+  proteus::replaceGlobalVariablesWithPointers(M, VarNameToGlobalInfo);
+
+  if (Config::get().ProteusDebugOutput) {
+    Logger::logs("proteus") << "=== Linked M\n" << M << "=== End of Linked M\n";
+    if (verifyModule(M, &errs()))
+      PROTEUS_FATAL_ERROR(
+          "After linking, broken module found, JIT compilation aborted!");
+    else
+      Logger::logs("proteus") << "Module verified!\n";
+  }
 }
 
 template <typename ImplT>

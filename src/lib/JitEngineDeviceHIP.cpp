@@ -366,7 +366,7 @@ hipFunction_t JitEngineDeviceHIP::getKernelFunctionFromImage(
     std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
   return proteus::getKernelFunctionFromImage(
       KernelName, Image, Config::get().ProteusRelinkGlobalsByCopy,
-      VarNameToDevPtr);
+      VarNameToGlobalInfo);
 }
 
 hipError_t JitEngineDeviceHIP::launchKernelFunction(hipFunction_t KernelFunc,

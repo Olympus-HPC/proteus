@@ -25,7 +25,7 @@ private:
   dim3 GridDim;
   SmallVector<RuntimeConstant> RCVec;
   SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo;
-  std::unordered_map<std::string, const void *> VarNameToDevPtr;
+  std::unordered_map<std::string, GlobalVarInfo> VarNameToGlobalInfo;
   SmallPtrSet<void *, 8> GlobalLinkedBinaries;
   std::string DeviceArch;
   CodegenOption CGOption;
@@ -78,13 +78,14 @@ public:
       std::string &Suffix, dim3 BlockDim, dim3 GridDim,
       const SmallVector<RuntimeConstant> &RCVec,
       const SmallVector<std::pair<std::string, StringRef>> &LambdaCalleeInfo,
-      const std::unordered_map<std::string, const void *> &VarNameToDevPtr,
+      const std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo,
       const SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
       const std::string &DeviceArch, const CodeGenerationConfig &CGConfig,
       bool DumpIR, bool RelinkGlobalsByCopy)
       : Bitcode(Bitcode), HashValue(HashValue), KernelName(KernelName),
         Suffix(Suffix), BlockDim(BlockDim), GridDim(GridDim), RCVec(RCVec),
-        LambdaCalleeInfo(LambdaCalleeInfo), VarNameToDevPtr(VarNameToDevPtr),
+        LambdaCalleeInfo(LambdaCalleeInfo),
+        VarNameToGlobalInfo(VarNameToGlobalInfo),
         GlobalLinkedBinaries(GlobalLinkedBinaries), DeviceArch(DeviceArch),
         CGOption(CGConfig.codeGenOption()), DumpIR(DumpIR),
         RelinkGlobalsByCopy(RelinkGlobalsByCopy),
@@ -155,7 +156,7 @@ public:
 
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".specialized.ll", *M));
 
-    replaceGlobalVariablesWithPointers(*M, VarNameToDevPtr);
+    replaceGlobalVariablesWithPointers(*M, VarNameToGlobalInfo);
 
     invokeOptimizeIR(*M);
     if (Config::get().ProteusTraceOutput == 2) {
@@ -178,7 +179,8 @@ public:
         proteus::codegenObject(*M, DeviceArch, GlobalLinkedBinaries, CGOption);
 
     if (!RelinkGlobalsByCopy)
-      proteus::relinkGlobalsObject(ObjBuf->getMemBufferRef(), VarNameToDevPtr);
+      proteus::relinkGlobalsObject(ObjBuf->getMemBufferRef(),
+                                   VarNameToGlobalInfo);
 
     return ObjBuf;
   }

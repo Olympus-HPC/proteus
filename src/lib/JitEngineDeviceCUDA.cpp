@@ -141,7 +141,7 @@ CUfunction JitEngineDeviceCUDA::getKernelFunctionFromImage(
     std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
   return proteus::getKernelFunctionFromImage(
       KernelName, Image, Config::get().ProteusRelinkGlobalsByCopy,
-      VarNameToDevPtr);
+      VarNameToGlobalInfo);
 }
 
 cudaError_t
