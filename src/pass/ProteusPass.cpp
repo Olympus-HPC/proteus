@@ -89,6 +89,9 @@ using namespace proteus;
 // ProteusPass implementation
 //-----------------------------------------------------------------------------
 namespace {
+static cl::opt<bool> ForceProteusAnnotateAll(
+    "force-proteus-jit-annotate-all",
+    cl::desc("Apply the 'jit' annotation on all GPU kernels"), cl::init(false));
 
 class ProteusPassImpl {
 public:
@@ -96,7 +99,15 @@ public:
 
   bool run(Module &M, bool IsLTO) {
     AnnotationHandler AnnotHandler{M};
-    AnnotHandler.parseAnnotations(JitFunctionInfoMap);
+    // We need collect any kernel host stubs to pass to parse annotations, used
+    // in forced annotations.
+    const auto StubToKernelMap = getKernelHostStubs(M);
+
+    // We force annotate all kernels if the force annotations flag is set and
+    // this is not HIP LTO compilation, since LTO constituent modules have
+    // already been processed.
+    AnnotHandler.parseAnnotations(JitFunctionInfoMap, StubToKernelMap,
+                                  (!IsLTO && ForceProteusAnnotateAll));
 
     DEBUG(Logger::logs("proteus-pass")
           << "=== Pre Original Host Module\n"
@@ -126,7 +137,6 @@ public:
     registerLambdaFunctions(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
-      getKernelHostStubs(M);
       AnnotHandler.parseManifestFileAnnotations(StubToKernelMap,
                                                 JitFunctionInfoMap);
       instrumentRegisterFunction(M);
@@ -138,7 +148,7 @@ public:
       DEBUG(Logger::logs("proteus-pass")
             << "Processing JIT Function " << JITFn->getName() << "\n");
       // Skip host device stubs coming from kernel annotations.
-      if (isDeviceKernelHostStub(*JITFn))
+      if (isDeviceKernelHostStub(StubToKernelMap, *JITFn))
         continue;
 
       emitJitModuleHost(M, JFI);
@@ -159,7 +169,6 @@ private:
   ProteusTypes Types;
 
   MapVector<Function *, JitFunctionInfo> JitFunctionInfoMap;
-  DenseMap<Value *, GlobalVariable *> StubToKernelMap;
   SmallPtrSet<Function *, 16> ModuleDeviceKernels;
 
   void runCleanupPassPipeline(Module &M) {
@@ -838,17 +847,22 @@ private:
     return V;
   }
 
-  void getKernelHostStubs(Module &M) {
+  DenseMap<Value *, GlobalVariable *> getKernelHostStubs(Module &M) {
+    DenseMap<Value *, GlobalVariable *> StubToKernelMap;
     Function *RegisterFunction = nullptr;
+
+    if (!hasDeviceLaunchKernelCalls(M))
+      return StubToKernelMap;
+
     if (!RegisterFunctionName) {
       PROTEUS_FATAL_ERROR("getKernelHostStubs only callable with `EnableHIP or "
                           "EnableCUDA set.");
-      return;
+      return StubToKernelMap;
     }
     RegisterFunction = M.getFunction(RegisterFunctionName);
 
     if (!RegisterFunction)
-      return;
+      return StubToKernelMap;
 
     constexpr int StubOperand = 1;
     constexpr int KernelOperand = 2;
@@ -864,9 +878,12 @@ private:
               << "StubToKernelMap Key: " << Key->getName() << " -> " << *GV
               << "\n");
       }
+    return StubToKernelMap;
   }
 
-  bool isDeviceKernelHostStub(Function &Fn) {
+  bool isDeviceKernelHostStub(
+      const DenseMap<Value *, GlobalVariable *> &StubToKernelMap,
+      Function &Fn) {
     if (StubToKernelMap.contains(&Fn))
       return true;
 

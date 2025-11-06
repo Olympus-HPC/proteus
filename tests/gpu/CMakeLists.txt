@@ -169,6 +169,28 @@ function(CREATE_PROTEUS_GPU_LIBRARY lib source)
     endif()
 endfunction()
 
+function(CREATE_GPU_TEST_FORCE exe check_source)
+    CREATE_GPU_TEST(${exe} ${check_source} ${ARGN})
+    # Add flags for forced annotations.
+    target_compile_options(
+        ${exe}.${lang}
+        PUBLIC
+            "-fplugin=$<TARGET_FILE:ProteusPass>"
+            "SHELL:-Xclang -mllvm -Xclang -force-proteus-jit-annotate-all"
+    )
+endfunction()
+
+function(CREATE_GPU_TEST_RDC_FORCE exe check_source)
+    CREATE_GPU_TEST_RDC(${exe} ${check_source} ${ARGN})
+    # Add flags for forced annotations.
+    target_compile_options(
+        ${exe}.${lang}.rdc
+        PUBLIC
+            "-fplugin=$<TARGET_FILE:ProteusPass>"
+            "SHELL:-Xclang -mllvm -Xclang -force-proteus-jit-annotate-all"
+    )
+endfunction()
+
 if(PROTEUS_ENABLE_HIP)
     enable_language(HIP)
 elseif(PROTEUS_ENABLE_CUDA)
@@ -271,6 +293,8 @@ CREATE_GPU_TEST(dynamic_jit_array dynamic_jit_array.cpp)
 CREATE_GPU_TEST(jit_struct jit_struct.cpp)
 CREATE_GPU_TEST(kernel_tuning kernel_tuning.cpp)
 
+CREATE_GPU_TEST_FORCE(force_annotations force_annotations.cpp)
+
 CREATE_GPU_TEST_RDC(kernel kernel.cpp)
 CREATE_GPU_TEST_RDC(kernel_pass_pipeline kernel_pass_pipeline.cpp)
 CREATE_GPU_TEST_RDC(kernel_cache kernel_cache.cpp)
@@ -331,6 +355,8 @@ CREATE_GPU_TEST_RDC(types_jit_array types_jit_array.cpp)
 CREATE_GPU_TEST_RDC(dynamic_jit_array dynamic_jit_array.cpp)
 CREATE_GPU_TEST_RDC(jit_struct jit_struct.cpp)
 CREATE_GPU_TEST_RDC(kernel_tuning kernel_tuning.cpp)
+
+CREATE_GPU_TEST_RDC_FORCE(force_annotations force_annotations.cpp)
 
 if(PROTEUS_ENABLE_HIP)
     if(LLVM_VERSION_MAJOR GREATER_EQUAL 18)
