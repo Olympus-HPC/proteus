@@ -42,7 +42,9 @@ public:
   AnnotationHandler(Module &M);
 
   void
-  parseAnnotations(MapVector<Function *, JitFunctionInfo> &JitFunctionInfoMap);
+  parseAnnotations(MapVector<Function *, JitFunctionInfo> &JitFunctionInfoMap,
+                   const DenseMap<Value *, GlobalVariable *> &StubToKernelMap,
+                   bool ForceJitAnnotateAll);
 
   void parseManifestFileAnnotations(
       const DenseMap<Value *, GlobalVariable *> &StubToKernelMap,
@@ -56,9 +58,8 @@ private:
 
   void appendToGlobalAnnotations(SmallVector<Constant *> &NewAnnotations);
 
-  Constant *
-  createJitAnnotation(Function *F,
-                      SmallSetVector<RuntimeConstantInfo, 16> &ConstantArgs);
+  Constant *createJitAnnotation(
+      Function *F, const SmallSetVector<RuntimeConstantInfo, 16> &ConstantArgs);
 
   void createDeviceManifestFile(
       DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap);

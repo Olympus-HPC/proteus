@@ -733,6 +733,10 @@ void JitEngineDevice<ImplT>::registerFunction(
     PROTEUS_FATAL_ERROR("Expected Handle in map");
   BinaryInfo &BinInfo = HandleToBinaryInfo[Handle];
 
+  PROTEUS_DBG(Logger::logs("proteus")
+              << "Register function  " << KernelName << " with binary handle "
+              << Handle << "\n");
+
   JITKernelInfoMap[Kernel] =
       JITKernelInfo{Kernel, BinInfo, KernelName, RCInfoArray};
 }

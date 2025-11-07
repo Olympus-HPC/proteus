@@ -267,7 +267,39 @@ static bool isLambdaFunction(const Function &F) {
 AnnotationHandler::AnnotationHandler(Module &M) : M(M), Types(M) {}
 
 void AnnotationHandler::parseAnnotations(
-    MapVector<Function *, JitFunctionInfo> &JitFunctionInfoMap) {
+    MapVector<Function *, JitFunctionInfo> &JitFunctionInfoMap,
+    const DenseMap<Value *, GlobalVariable *> &StubToKernelMap,
+    bool ForceJitAnnotateAll) {
+  // Forcing annotations overrides any user annotations and makes all kernels
+  // jit annotated without any runtime constant arguments.
+  if (ForceJitAnnotateAll) {
+    SmallVector<Constant *> ForcedJitAnnotations;
+
+    // Remove any previous user annotations.
+    removeJitGlobalAnnotations();
+
+    // Create jit annotations for all kernel functions.
+    for (auto &F : M.getFunctionList()) {
+      if (F.isDeclaration())
+        continue;
+      if (!(isDeviceKernel(&F) || StubToKernelMap.contains(&F)))
+        continue;
+      ForcedJitAnnotations.push_back(createJitAnnotation(&F, {}));
+    }
+
+    // Append the new forced annotations.
+    appendToGlobalAnnotations(ForcedJitAnnotations);
+
+    // Parse to create the function map.
+    auto *GlobalAnnotations = M.getNamedGlobal("llvm.global.annotations");
+    parseJitGlobalAnnotations(GlobalAnnotations, JitFunctionInfoMap);
+
+    // Discard after parsing.
+    removeJitGlobalAnnotations();
+
+    return;
+  }
+
   // First parse any proteus::jit_arg or proteus::jit_array annotations and
   // append them to global annotations.
   SmallPtrSet<Function *, 32> JitArgAnnotations;
@@ -558,7 +590,7 @@ void AnnotationHandler::appendToGlobalAnnotations(
 }
 
 Constant *AnnotationHandler::createJitAnnotation(
-    Function *F, SmallSetVector<RuntimeConstantInfo, 16> &RCInfos) {
+    Function *F, const SmallSetVector<RuntimeConstantInfo, 16> &RCInfos) {
   // llvm.global.annotations entry format:
   //  ptr: (addrspace 1) Function pointer
   //  ptr: (addrspace 4) Annotations string
@@ -586,6 +618,18 @@ Constant *AnnotationHandler::createJitAnnotation(
   }
   // We don't know the line number, hence we store 0.
   AnnotationVals[3] = IRB.getInt32(0);
+
+  // If there aren't any runtime constant arguments set annotation value to the
+  // null value and return early.
+  if (RCInfos.empty()) {
+    AnnotationVals[4] =
+        Constant::getNullValue(Types.GlobalAnnotationEltTy->getElementType(4));
+
+    Constant *NewAnnotation = ConstantStruct::get(
+        Types.GlobalAnnotationEltTy, ArrayRef{AnnotationVals, NumElts});
+
+    return NewAnnotation;
+  }
 
   // Create the JIT argument information in long form to include the argument
   // number and possible size. Each RCInfo will create a global variable string
