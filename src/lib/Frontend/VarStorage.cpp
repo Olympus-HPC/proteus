@@ -3,6 +3,7 @@
 
 namespace proteus {
 
+StorageKind ScalarStorage::getKind() const { return StorageKind::Scalar; }
 Value *ScalarStorage::getSlot() const { return Slot; }
 
 Value *ScalarStorage::loadValue() const {
@@ -17,6 +18,7 @@ Type *ScalarStorage::getAllocatedType() const {
 
 Type *ScalarStorage::getValueType() const { return Slot->getAllocatedType(); }
 
+StorageKind PointerStorage::getKind() const { return StorageKind::Pointer; }
 Value *PointerStorage::getSlot() const { return PtrSlot; }
 
 // Load/store the pointee value through the pointer stored in PtrSlot.
@@ -43,6 +45,7 @@ Type *PointerStorage::getAllocatedType() const {
 
 Type *PointerStorage::getValueType() const { return PointerElemTy; }
 
+StorageKind ArrayStorage::getKind() const { return StorageKind::Array; }
 Value *ArrayStorage::getSlot() const { return BasePointer; }
 
 Value *ArrayStorage::loadValue() const {
