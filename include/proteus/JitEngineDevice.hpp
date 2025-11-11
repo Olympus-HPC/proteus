@@ -574,7 +574,7 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   auto &BinInfo = KernelInfo.getBinaryInfo();
   if (!BinInfo.areGlobalsMapped()) {
-    auto VarNameToDevPtr = BinInfo.getVarNameToDevPtr();
+    auto &VarNameToDevPtr = BinInfo.getVarNameToDevPtr();
     for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
       void *DevPtr = resolveDeviceGlobalAddr(HostAddr);
       VarNameToDevPtr.at(GlobalName) = DevPtr;
