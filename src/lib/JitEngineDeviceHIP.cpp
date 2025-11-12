@@ -361,9 +361,9 @@ void JitEngineDeviceHIP::extractModules(BinaryInfo &BinInfo) {
   BinInfo.setExtractedModules(LinkedModules);
 }
 
-hipFunction_t
-JitEngineDeviceHIP::getKernelFunctionFromImage(StringRef KernelName,
-                                               const void *Image) {
+hipFunction_t JitEngineDeviceHIP::getKernelFunctionFromImage(
+    StringRef KernelName, const void *Image,
+    std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
   return proteus::getKernelFunctionFromImage(
       KernelName, Image, Config::get().ProteusRelinkGlobalsByCopy,
       VarNameToDevPtr);

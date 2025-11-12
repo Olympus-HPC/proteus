@@ -86,6 +86,9 @@ private:
   std::optional<HashT> ExtractedModuleHash;
   std::optional<CallGraph> ModuleCallGraph;
   std::unique_ptr<MemoryBuffer> DeviceBinary;
+  std::unordered_map<std::string, const void *> VarNameToDevPtr;
+  bool GlobalsMapped;
+  std::once_flag Flag;
 
 public:
   BinaryInfo() = default;
@@ -94,7 +97,7 @@ public:
       : FatbinWrapper(FatbinWrapper), Ctx(std::make_unique<LLVMContext>()),
         LinkedModuleIds(LinkedModuleIds), LinkedModule(nullptr),
         ExtractedModules(std::nullopt), ModuleCallGraph(std::nullopt),
-        DeviceBinary(nullptr) {}
+        DeviceBinary(nullptr), GlobalsMapped(false) {}
 
   FatbinWrapperT *getFatbinWrapper() const { return FatbinWrapper; }
 
@@ -137,7 +140,8 @@ public:
   bool hasExtractedModules() const { return ExtractedModules.has_value(); }
   const SmallVector<std::reference_wrapper<Module>>
   getExtractedModules() const {
-    // This should be called only once when cloning the kernel module to cache.
+    // This should be called only once when cloning the kernel module to
+    // cache.
     SmallVector<std::reference_wrapper<Module>> ModulesRef;
     for (auto &M : ExtractedModules.value())
       ModulesRef.emplace_back(*M);
@@ -179,6 +183,24 @@ public:
 
   void addModuleId(const char *ModuleId) {
     LinkedModuleIds.push_back(ModuleId);
+  }
+
+  void registerGlobalVar(const char *VarName, const void *Addr) {
+    VarNameToDevPtr[VarName] = Addr;
+  }
+
+  void mapGlobals() {
+    std::call_once(Flag, [&]() {
+      for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
+        void *DevPtr = resolveDeviceGlobalAddr(HostAddr);
+        VarNameToDevPtr.at(GlobalName) = DevPtr;
+      }
+      GlobalsMapped = true;
+    });
+  }
+
+  std::unordered_map<std::string, const void *> &getVarNameToDevPtr() {
+    return VarNameToDevPtr;
   }
 
   auto &getModuleIds() { return LinkedModuleIds; }
@@ -243,7 +265,6 @@ public:
 template <typename ImplT> struct DeviceTraits;
 
 template <typename ImplT> class JitEngineDevice : public JitEngine {
-
 public:
   using DeviceError_t = typename DeviceTraits<ImplT>::DeviceError_t;
   using DeviceStream_t = typename DeviceTraits<ImplT>::DeviceStream_t;
@@ -302,8 +323,8 @@ public:
     internalize(*KernelModule, KernelName);
     proteus::runCleanupPassPipeline(*KernelModule);
 
-    // If the module is not in the provided context due to cloning, roundtrip it
-    // using bitcode. Re-use the roundtrip bitcode to return it.
+    // If the module is not in the provided context due to cloning, roundtrip
+    // it using bitcode. Re-use the roundtrip bitcode to return it.
     if (&KernelModule->getContext() != &Ctx) {
       SmallVector<char> CloneBuffer;
       raw_svector_ostream OS(CloneBuffer);
@@ -415,9 +436,14 @@ public:
     }
   }
 
-  void insertRegisterVar(const char *VarName, const void *Addr) {
-    VarNameToDevPtr[VarName] = Addr;
+  void insertRegisterVar(void *Handle, const char *VarName, const void *Addr) {
+    if (!HandleToBinaryInfo.count(Handle))
+      PROTEUS_FATAL_ERROR("Expected Handle in map");
+    BinaryInfo &BinInfo = HandleToBinaryInfo[Handle];
+
+    BinInfo.registerGlobalVar(VarName, Addr);
   }
+
   void registerLinkedBinary(FatbinWrapperT *FatbinWrapper,
                             const char *ModuleId);
   void registerFatBinary(void *Handle, FatbinWrapperT *FatbinWrapper,
@@ -494,16 +520,19 @@ private:
         KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
   }
 
-  void relinkGlobalsObject(MemoryBufferRef Object) {
+  void relinkGlobalsObject(
+      MemoryBufferRef Object,
+      const std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
     TIMESCOPE(__FUNCTION__);
     proteus::relinkGlobalsObject(Object, VarNameToDevPtr);
   }
 
-  KernelFunction_t getKernelFunctionFromImage(StringRef KernelName,
-                                              const void *Image) {
+  KernelFunction_t getKernelFunctionFromImage(
+      StringRef KernelName, const void *Image,
+      std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
     TIMESCOPE(__FUNCTION__);
-    return static_cast<ImplT &>(*this).getKernelFunctionFromImage(KernelName,
-                                                                  Image);
+    return static_cast<ImplT &>(*this).getKernelFunctionFromImage(
+        KernelName, Image, VarNameToDevPtr);
   }
 
   //------------------------------------------------------------------
@@ -513,8 +542,6 @@ private:
   void pruneIR(Module &M);
 
   void internalize(Module &M, StringRef KernelName);
-
-  void replaceGlobalVariablesWithPointers(Module &M);
 
 protected:
   JitEngineDevice() {}
@@ -527,7 +554,6 @@ protected:
   JitCache<KernelFunction_t> CodeCache;
   JitStorageCache StorageCache;
   std::string DeviceArch;
-  std::unordered_map<std::string, const void *> VarNameToDevPtr;
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
 };
@@ -543,39 +569,19 @@ void JitEngineDevice<ImplT>::internalize(Module &M, StringRef KernelName) {
 }
 
 template <typename ImplT>
-void JitEngineDevice<ImplT>::replaceGlobalVariablesWithPointers(Module &M) {
-  TIMESCOPE(__FUNCTION__)
-
-  proteus::replaceGlobalVariablesWithPointers(M, VarNameToDevPtr);
-
-  if (Config::get().ProteusDebugOutput) {
-    Logger::logs("proteus") << "=== Linked M\n" << M << "=== End of Linked M\n";
-    if (verifyModule(M, &errs()))
-      PROTEUS_FATAL_ERROR(
-          "After linking, broken module found, JIT compilation aborted!");
-    else
-      Logger::logs("proteus") << "Module verified!\n";
-  }
-}
-
-template <typename ImplT>
 typename DeviceTraits<ImplT>::DeviceError_t
 JitEngineDevice<ImplT>::compileAndRun(
     JITKernelInfo &KernelInfo, dim3 GridDim, dim3 BlockDim, void **KernelArgs,
     uint64_t ShmemSize, typename DeviceTraits<ImplT>::DeviceStream_t Stream) {
   TIMESCOPE("compileAndRun");
 
+  auto &BinInfo = KernelInfo.getBinaryInfo();
+
   // Lazy initialize the map of device global variables to device pointers by
-  // resolving the host address to the device address. For HIP it is fine to do
-  // this earlier (e.g., instertRegisterVar), but CUDA can't. So, we initialize
-  // this here the first time we need to compile a kernel.
-  static std::once_flag Flag;
-  std::call_once(Flag, [&]() {
-    for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
-      void *DevPtr = resolveDeviceGlobalAddr(HostAddr);
-      VarNameToDevPtr.at(GlobalName) = DevPtr;
-    }
-  });
+  // resolving the host address to the device address. For HIP it is fine to
+  // do this earlier (e.g., instertRegisterVar), but CUDA can't. So, we
+  // initialize this here the first time we need to compile a kernel.
+  BinInfo.mapGlobals();
 
   SmallVector<RuntimeConstant> RCVec =
       getRuntimeConstantValues(KernelArgs, KernelInfo.getRCInfoArray());
@@ -593,9 +599,10 @@ JitEngineDevice<ImplT>::compileAndRun(
     return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                                 ShmemSize, Stream);
 
-  // NOTE: we don't need a suffix to differentiate kernels, each specialization
-  // will be in its own module uniquely identify by HashValue. It exists only
-  // for debugging purposes to verify that the jitted kernel executes.
+  // NOTE: we don't need a suffix to differentiate kernels, each
+  // specialization will be in its own module uniquely identify by HashValue.
+  // It exists only for debugging purposes to verify that the jitted kernel
+  // executes.
   std::string Suffix = mangleSuffix(HashValue);
   std::string KernelMangled = (KernelInfo.getName() + Suffix);
 
@@ -603,10 +610,12 @@ JitEngineDevice<ImplT>::compileAndRun(
     auto CompiledLib = StorageCache.lookup(HashValue);
     if (CompiledLib) {
       if (!Config::get().ProteusRelinkGlobalsByCopy)
-        relinkGlobalsObject(CompiledLib->ObjectModule->getMemBufferRef());
+        relinkGlobalsObject(CompiledLib->ObjectModule->getMemBufferRef(),
+                            BinInfo.getVarNameToDevPtr());
 
       auto KernelFunc = getKernelFunctionFromImage(
-          KernelMangled, CompiledLib->ObjectModule->getBufferStart());
+          KernelMangled, CompiledLib->ObjectModule->getBufferStart(),
+          BinInfo.getVarNameToDevPtr());
 
       CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
 
@@ -628,8 +637,8 @@ JitEngineDevice<ImplT>::compileAndRun(
 
       Compiler.compile(CompilationTask{
           KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
-          GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr,
-          GlobalLinkedBinaries, DeviceArch,
+          GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(),
+          BinInfo.getVarNameToDevPtr(), GlobalLinkedBinaries, DeviceArch,
           /*CodeGenConfig */ Config::get().getCGConfig(KernelInfo.getName()),
           /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
           /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy});
@@ -648,8 +657,8 @@ JitEngineDevice<ImplT>::compileAndRun(
     // Process through synchronous compilation.
     ObjBuf = CompilerSync::instance().compile(CompilationTask{
         KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
-        GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(), VarNameToDevPtr,
-        GlobalLinkedBinaries, DeviceArch,
+        GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(),
+        BinInfo.getVarNameToDevPtr(), GlobalLinkedBinaries, DeviceArch,
         /*CodeGenConfig */ Config::get().getCGConfig(KernelInfo.getName()),
         /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
         /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy});
@@ -660,7 +669,7 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   KernelFunc = proteus::getKernelFunctionFromImage(
       KernelMangled, ObjBuf->getBufferStart(),
-      Config::get().ProteusRelinkGlobalsByCopy, VarNameToDevPtr);
+      Config::get().ProteusRelinkGlobalsByCopy, BinInfo.getVarNameToDevPtr());
 
   CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
   if (Config::get().ProteusUseStoredCache) {
@@ -683,7 +692,8 @@ void JitEngineDevice<ImplT>::registerFatBinary(void *Handle,
   if (FatbinWrapper->PrelinkedFatbins) {
     // This is RDC compilation, just insert the FatbinWrapper and ignore the
     // ModuleId coming from the link.stub.
-    HandleToBinaryInfo.emplace(Handle, BinaryInfo{FatbinWrapper, {}});
+    HandleToBinaryInfo.try_emplace(Handle, FatbinWrapper,
+                                   SmallVector<std::string>{});
 
     // Initialize GlobalLinkedBinaries with prelinked fatbins.
     void *Ptr = FatbinWrapper->PrelinkedFatbins[0];
@@ -694,10 +704,11 @@ void JitEngineDevice<ImplT>::registerFatBinary(void *Handle,
       GlobalLinkedBinaries.insert(Ptr);
     }
   } else {
-    // This is non-RDC compilation, associate the ModuleId of the JIT bitcode in
-    // the module with the FatbinWrapper.
+    // This is non-RDC compilation, associate the ModuleId of the JIT bitcode
+    // in the module with the FatbinWrapper.
     ModuleIdToFatBinary[ModuleId] = FatbinWrapper;
-    HandleToBinaryInfo.emplace(Handle, BinaryInfo{FatbinWrapper, {ModuleId}});
+    HandleToBinaryInfo.try_emplace(Handle, FatbinWrapper,
+                                   SmallVector<std::string>{ModuleId});
   }
 }
 

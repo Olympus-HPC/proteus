@@ -16,6 +16,7 @@
 #define gpuMalloc cudaMalloc
 #define gpuMemcpy cudaMemcpy
 #define gpuMemcpyHostToDevice cudaMemcpyHostToDevice
+#define gpuGetSymbolAddress cudaGetSymbolAddress
 #elif PROTEUS_ENABLE_HIP
 #include <hip/hip_runtime.h>
 #define gpuError_t hipError_t
@@ -34,6 +35,7 @@
 #define gpuMalloc hipMalloc
 #define gpuMemcpy hipMemcpy
 #define gpuMemcpyHostToDevice hipMemcpyHostToDevice
+#define gpuGetSymbolAddress hipGetSymbolAddress
 #else
 #error "Must provide PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA"
 #endif

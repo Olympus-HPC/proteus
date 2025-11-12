@@ -99,8 +99,9 @@ public:
                                                  StringRef KernelName,
                                                  LLVMContext &Ctx);
 
-  hipFunction_t getKernelFunctionFromImage(StringRef KernelName,
-                                           const void *Image);
+  hipFunction_t getKernelFunctionFromImage(
+      StringRef KernelName, const void *Image,
+      std::unordered_map<std::string, const void *> &VarNameToDevPtr);
 
   hipError_t launchKernelFunction(hipFunction_t KernelFunc, dim3 GridDim,
                                   dim3 BlockDim, void **KernelArgs,
