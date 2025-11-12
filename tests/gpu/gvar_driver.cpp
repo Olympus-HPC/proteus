@@ -6,7 +6,7 @@
 void print_gval2(int hValue);
 void print_gval1(int hValue);
 
-int main(int argc, char *argv[]) {
+int main() {
   print_gval1(2);
   print_gval2(3);
 }
