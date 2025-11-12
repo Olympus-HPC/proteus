@@ -3,12 +3,12 @@
 // RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/gvar_tracking.%ext | %FILECHECK %s --check-prefixes=CHECK
 // clang-format on
 
-void print_gval2(int hValue);
-void print_gval1(int hValue);
+void printGVal2(int hValue);
+void printGVal1(int hValue);
 
 int main() {
-  print_gval1(2);
-  print_gval2(3);
+  printGVal1(2);
+  printGVal2(3);
 }
 
 // NOTE: On my testing system I am getting this output:

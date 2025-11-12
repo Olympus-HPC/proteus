@@ -108,7 +108,6 @@ function(CREATE_GPU_TEST_LIBS exe libs check_source)
     target_link_libraries(${exe}.${lang} PRIVATE ${libs})
 endfunction()
 
-
 # Creates a device library, which can be linked with another test. The library does not
 # apply the pass
 function(CREATE_GPU_LIBRARY lib source)
@@ -293,7 +292,7 @@ CREATE_GPU_TEST(types_jit_array types_jit_array.cpp)
 CREATE_GPU_TEST(dynamic_jit_array dynamic_jit_array.cpp)
 CREATE_GPU_TEST(jit_struct jit_struct.cpp)
 CREATE_GPU_TEST(kernel_tuning kernel_tuning.cpp)
-CREATE_GPU_TEST(gvar_tracking gvar_driver.cpp gvar1.cpp gvar2.cpp )
+CREATE_GPU_TEST(gvar_tracking gvar_driver.cpp gvar1.cpp gvar2.cpp)
 
 CREATE_GPU_TEST_FORCE(force_annotations force_annotations.cpp)
 

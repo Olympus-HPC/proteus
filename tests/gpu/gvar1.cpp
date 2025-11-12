@@ -2,16 +2,16 @@
 
 #include "gpu_common.h"
 
-__device__ int value;
+__device__ int Value;
 
 __global__ __attribute__((annotate("jit"))) static void kernel1() {
-  printf("Kernel 1 value is %d\n", value);
+  printf("Kernel 1 value is %d\n", Value);
 }
 
-void print_gval1(int hValue) {
-  void *dAddr;
-  gpuErrCheck(gpuGetSymbolAddress(&dAddr, value));
-  gpuErrCheck(gpuMemcpy(dAddr, &hValue, sizeof(int), gpuMemcpyHostToDevice));
+void printGVal1(int HValue) {
+  void *DAddr;
+  gpuErrCheck(gpuGetSymbolAddress(&DAddr, Value));
+  gpuErrCheck(gpuMemcpy(DAddr, &HValue, sizeof(int), gpuMemcpyHostToDevice));
   kernel1<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
 }
