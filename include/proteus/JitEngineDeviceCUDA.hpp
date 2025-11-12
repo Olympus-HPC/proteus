@@ -46,8 +46,9 @@ public:
   void codegenPTX(Module &M, StringRef DeviceArch,
                   SmallVectorImpl<char> &PTXStr);
 
-  CUfunction getKernelFunctionFromImage(StringRef KernelName,
-                                        const void *Image);
+  CUfunction getKernelFunctionFromImage(
+      StringRef KernelName, const void *Image,
+      std::unordered_map<std::string, const void *> &VarNameToDevPtr);
 
   cudaError_t launchKernelFunction(CUfunction KernelFunc, dim3 GridDim,
                                    dim3 BlockDim, void **KernelArgs,
