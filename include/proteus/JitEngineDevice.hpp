@@ -86,7 +86,7 @@ private:
   std::optional<HashT> ExtractedModuleHash;
   std::optional<CallGraph> ModuleCallGraph;
   std::unique_ptr<MemoryBuffer> DeviceBinary;
-  std::unordered_map<std::string, const void *> VarNameToDevPtr;
+  std::unordered_map<std::string, GlobalVarInfo> VarNameToGlobalInfo;
   bool GlobalsMapped;
   std::once_flag Flag;
 
@@ -214,8 +214,8 @@ public:
     });
   }
 
-  std::unordered_map<std::string, const void *> &getVarNameToDevPtr() {
-    return VarNameToDevPtr;
+  std::unordered_map<std::string, GlobalVarInfo> &getVarNameToGlobalInfo() {
+    return VarNameToGlobalInfo;
   }
 
   auto &getModuleIds() { return LinkedModuleIds; }
@@ -536,19 +536,19 @@ private:
         KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
   }
 
-  void relinkGlobalsObject(
-      MemoryBufferRef Object,
-      const std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
+  void relinkGlobalsObject(MemoryBufferRef Object,
+                           const std::unordered_map<std::string, GlobalVarInfo>
+                               &VarNameToGlobalInfo) {
     TIMESCOPE(__FUNCTION__);
     proteus::relinkGlobalsObject(Object, VarNameToGlobalInfo);
   }
 
   KernelFunction_t getKernelFunctionFromImage(
       StringRef KernelName, const void *Image,
-      std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
+      std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo) {
     TIMESCOPE(__FUNCTION__);
     return static_cast<ImplT &>(*this).getKernelFunctionFromImage(
-        KernelName, Image, VarNameToDevPtr);
+        KernelName, Image, VarNameToGlobalInfo);
   }
 
   //------------------------------------------------------------------
@@ -558,6 +558,10 @@ private:
   void pruneIR(Module &M);
 
   void internalize(Module &M, StringRef KernelName);
+
+  void replaceGlobalVariablesWithPointers(
+      Module &M,
+      std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo);
 
 protected:
   JitEngineDevice() {}
@@ -570,7 +574,6 @@ protected:
   JitCache<KernelFunction_t> CodeCache;
   JitStorageCache StorageCache;
   std::string DeviceArch;
-  std::unordered_map<std::string, GlobalVarInfo> VarNameToGlobalInfo;
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
 };
@@ -586,7 +589,9 @@ void JitEngineDevice<ImplT>::internalize(Module &M, StringRef KernelName) {
 }
 
 template <typename ImplT>
-void JitEngineDevice<ImplT>::replaceGlobalVariablesWithPointers(Module &M) {
+void JitEngineDevice<ImplT>::replaceGlobalVariablesWithPointers(
+    Module &M,
+    std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo) {
   TIMESCOPE(__FUNCTION__)
 
   proteus::replaceGlobalVariablesWithPointers(M, VarNameToGlobalInfo);
@@ -644,11 +649,11 @@ JitEngineDevice<ImplT>::compileAndRun(
     if (CompiledLib) {
       if (!Config::get().ProteusRelinkGlobalsByCopy)
         relinkGlobalsObject(CompiledLib->ObjectModule->getMemBufferRef(),
-                            BinInfo.getVarNameToDevPtr());
+                            BinInfo.getVarNameToGlobalInfo());
 
       auto KernelFunc = getKernelFunctionFromImage(
           KernelMangled, CompiledLib->ObjectModule->getBufferStart(),
-          BinInfo.getVarNameToDevPtr());
+          BinInfo.getVarNameToGlobalInfo());
 
       CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
 
@@ -671,7 +676,7 @@ JitEngineDevice<ImplT>::compileAndRun(
       Compiler.compile(CompilationTask{
           KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
           GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(),
-          BinInfo.getVarNameToDevPtr(), GlobalLinkedBinaries, DeviceArch,
+          BinInfo.getVarNameToGlobalInfo(), GlobalLinkedBinaries, DeviceArch,
           /*CodeGenConfig */ Config::get().getCGConfig(KernelInfo.getName()),
           /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
           /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy});
@@ -691,7 +696,7 @@ JitEngineDevice<ImplT>::compileAndRun(
     ObjBuf = CompilerSync::instance().compile(CompilationTask{
         KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
         GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(),
-        BinInfo.getVarNameToDevPtr(), GlobalLinkedBinaries, DeviceArch,
+        BinInfo.getVarNameToGlobalInfo(), GlobalLinkedBinaries, DeviceArch,
         /*CodeGenConfig */ Config::get().getCGConfig(KernelInfo.getName()),
         /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
         /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy});
@@ -702,7 +707,8 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   KernelFunc = proteus::getKernelFunctionFromImage(
       KernelMangled, ObjBuf->getBufferStart(),
-      Config::get().ProteusRelinkGlobalsByCopy, BinInfo.getVarNameToDevPtr());
+      Config::get().ProteusRelinkGlobalsByCopy,
+      BinInfo.getVarNameToGlobalInfo());
 
   CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
   if (Config::get().ProteusUseStoredCache) {

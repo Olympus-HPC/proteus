@@ -138,7 +138,7 @@ void JitEngineDeviceCUDA::extractModules(BinaryInfo &BinInfo) {
 
 CUfunction JitEngineDeviceCUDA::getKernelFunctionFromImage(
     StringRef KernelName, const void *Image,
-    std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
+    std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo) {
   return proteus::getKernelFunctionFromImage(
       KernelName, Image, Config::get().ProteusRelinkGlobalsByCopy,
       VarNameToGlobalInfo);
