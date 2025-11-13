@@ -559,10 +559,6 @@ private:
 
   void internalize(Module &M, StringRef KernelName);
 
-  void replaceGlobalVariablesWithPointers(
-      Module &M,
-      std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo);
-
 protected:
   JitEngineDevice() {}
 
@@ -586,24 +582,6 @@ template <typename ImplT> void JitEngineDevice<ImplT>::pruneIR(Module &M) {
 template <typename ImplT>
 void JitEngineDevice<ImplT>::internalize(Module &M, StringRef KernelName) {
   proteus::internalize(M, KernelName);
-}
-
-template <typename ImplT>
-void JitEngineDevice<ImplT>::replaceGlobalVariablesWithPointers(
-    Module &M,
-    std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo) {
-  TIMESCOPE(__FUNCTION__)
-
-  proteus::replaceGlobalVariablesWithPointers(M, VarNameToGlobalInfo);
-
-  if (Config::get().ProteusDebugOutput) {
-    Logger::logs("proteus") << "=== Linked M\n" << M << "=== End of Linked M\n";
-    if (verifyModule(M, &errs()))
-      PROTEUS_FATAL_ERROR(
-          "After linking, broken module found, JIT compilation aborted!");
-    else
-      Logger::logs("proteus") << "Module verified!\n";
-  }
 }
 
 template <typename ImplT>
