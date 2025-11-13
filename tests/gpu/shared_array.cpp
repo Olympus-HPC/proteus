@@ -50,8 +50,8 @@ int main() {
 // CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK: Kernel
 // CHECK: Lambda Array[0] 1.000000 Array[1] 2.000000 Array[2] 3.000000
-// CHECK-FIRST: JitCache hits 0 total 1
-// CHECK-FIRST: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-SECOND: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: JitStorageCache hits 0 total 1
-// CHECK-SECOND: JitStorageCache hits 1 total 1
+// CHECK-FIRST: [proteus][JitEngineDevice] MemoryCache procuid 0 hits 0 accesses 1
+// CHECK-FIRST: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-SECOND: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache procuid 0 hits 0 accesses 1
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache procuid 0 hits 1 accesses 1

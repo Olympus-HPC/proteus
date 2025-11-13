@@ -44,7 +44,7 @@ int main() {
 
 // clang-format off
 // CHECK-CUDA: [KernelConfig] ID:foo Pipeline:default<O3>,globaldce CG:RTC SA:1 LB:0 SD:0 SDA:0 OL:3 CGL:2 TMT:1 BPSM:4
-// CHECK-HIP: [KernelConfig] ID:foo Pipeline:default<O3>,globaldce CG:Serial SA:1 LB:0 SD:0 SDA:0 OL:3 CGL:2 TMT:1 BPSM:4 
+// CHECK-HIP: [KernelConfig] ID:foo Pipeline:default<O3>,globaldce CG:Serial SA:1 LB:0 SD:0 SDA:0 OL:3 CGL:2 TMT:1 BPSM:4
 // CHECK: [CustomPipeline] default<O3>,globaldce
 // CHECK: Hello from foo
 // CHECK: [KernelConfig] ID:bar CG:RTC SA:1 LB:1 SD:1 SDA:1 OL:3 CGL:2 TMT:4 BPSM:4
@@ -57,10 +57,9 @@ int main() {
 // CHECK-HIP: [KernelConfig] ID:baz CG:{{RTC|Serial|Parallel}} SA:1 LB:1 SD:1 SDA:1 OL:3 CGL:3 TMT:-1 BPSM:0
 // CHECK: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK: Hello from baz
-// CHECK: JitCache hits 0 total 4
-// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: JitStorageCache hits 0 total 4
-
+// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 hits 0 accesses 4
+// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][JitEngineDevice] StorageCache procuid 0 hits 0 accesses 4

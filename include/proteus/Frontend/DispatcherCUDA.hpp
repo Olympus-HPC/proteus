@@ -101,8 +101,8 @@ private:
   DispatcherCUDA() : Jit(JitEngineDeviceCUDA::instance()) {
     TargetModel = TargetModelType::CUDA;
   }
-  JitCache<CUfunction> CodeCache;
-  JitStorageCache StorageCache;
+  MemoryCache<CUfunction> CodeCache{"DispatcherCUDA"};
+  StorageCache StorageCache{"DispatcherCUDA"};
 };
 
 } // namespace proteus

@@ -67,7 +67,7 @@ int main() {
 // CHECK: Arg a
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z4testIPiEvT_ ArgNo 0 with value ptr inttoptr (i64 291 to ptr)
 // CHECK: Arg 0x123
-// CHECK: JitCache hits 0 total 13
-// CHECK-COUNT-12: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: JitStorageCache hits 0 total 13
-// CHECK-SECOND: JitStorageCache hits 13 total 13
+// CHECK: [proteus][JitEngineHost] MemoryCache procuid 0 hits 0 accesses 13
+// CHECK-COUNT-12: [proteus][JitEngineHost] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineHost] StorageCache procuid 0 hits 0 accesses 13
+// CHECK-SECOND: [proteus][JitEngineHost] StorageCache procuid 0 hits 13 accesses 13

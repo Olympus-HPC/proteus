@@ -53,5 +53,5 @@ int main() {
 // CHECK: Ret 24
 // CHECK: bar type d
 // CHECK: bar type f
-// CHECK-FIRST: JitStorageCache hits 0 total 3
-// CHECK-SECOND: JitStorageCache hits 3 total 3
+// CHECK-FIRST: [proteus][DispatcherHost] StorageCache procuid 0 hits 0 accesses 3
+// CHECK-SECOND: [proteus][DispatcherHost] StorageCache procuid 0 hits 3 accesses 3

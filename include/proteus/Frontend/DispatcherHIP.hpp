@@ -92,8 +92,8 @@ private:
   DispatcherHIP() : Jit(JitEngineDeviceHIP::instance()) {
     TargetModel = TargetModelType::HIP;
   }
-  JitCache<hipFunction_t> CodeCache;
-  JitStorageCache StorageCache;
+  MemoryCache<hipFunction_t> CodeCache{"DispatcherHIP"};
+  StorageCache StorageCache{"DispatcherHIP"};
 };
 
 } // namespace proteus

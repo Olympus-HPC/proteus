@@ -51,6 +51,8 @@
 #include <llvm/Transforms/Utils/Cloning.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
+#include "proteus/Caching/MemoryCache.hpp"
+#include "proteus/Caching/StorageCache.hpp"
 #include "proteus/Cloning.h"
 #include "proteus/CompilerAsync.hpp"
 #include "proteus/CompilerInterfaceTypes.h"
@@ -59,9 +61,7 @@
 #include "proteus/CoreLLVM.hpp"
 #include "proteus/Debug.h"
 #include "proteus/Hashing.hpp"
-#include "proteus/JitCache.hpp"
 #include "proteus/JitEngine.hpp"
-#include "proteus/JitStorageCache.hpp"
 #include "proteus/TimeTracing.hpp"
 #include "proteus/Utils.h"
 
@@ -567,8 +567,8 @@ protected:
     StorageCache.printStats();
   }
 
-  JitCache<KernelFunction_t> CodeCache;
-  JitStorageCache StorageCache;
+  MemoryCache<KernelFunction_t> CodeCache{"JitEngineDevice"};
+  StorageCache StorageCache{"JitEngineDevice"};
   std::string DeviceArch;
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;

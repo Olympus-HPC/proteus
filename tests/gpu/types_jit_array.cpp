@@ -108,7 +108,7 @@ int main() {
 // CHECK: A: [0] = 3, [1] = 2, [2] = 1,
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kernelIhEvPT_ ArgNo 0 with value @0 = private {{.*}}constant [3 x i8] c"\03\02\01"
 // CHECK: A: [0] = 3, [1] = 2, [2] = 1,
-// CHECK: JitCache hits 0 total 10
-// CHECK-COUNT-10: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: JitStorageCache hits 0 total 10
-// CHECK-SECOND: JitStorageCache hits 10 total 10
+// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 hits 0 accesses 10
+// CHECK-COUNT-10: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache procuid 0 hits 0 accesses 10
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache procuid 0 hits 10 accesses 10

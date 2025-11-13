@@ -35,5 +35,5 @@ int main() {
 // clang-format off
 // CHECK: Function 42
 // CHECK: Function 42
-// CHECK-FIRST: JitStorageCache hits 0 total 1
-// CHECK-SECOND: JitStorageCache hits 1 total 1
+// CHECK-FIRST: [proteus][DispatcherHost] StorageCache procuid 0 hits 0 accesses 1
+// CHECK-SECOND: [proteus][DispatcherHost] StorageCache procuid 0 hits 1 accesses 1

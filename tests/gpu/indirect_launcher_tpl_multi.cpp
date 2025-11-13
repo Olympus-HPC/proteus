@@ -36,9 +36,10 @@ int main() {
   return 0;
 }
 
+// clang-format off
 // CHECK: Kernel
 // CHECK: Kernel two
-// CHECK: JitCache hits 0 total 2
-// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: JitStorageCache hits 0 total 2
-// CHECK-SECOND: JitStorageCache hits 2 total 2
+// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 hits 0 accesses 2
+// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache procuid 0 hits 0 accesses 2
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache procuid 0 hits 2 accesses 2

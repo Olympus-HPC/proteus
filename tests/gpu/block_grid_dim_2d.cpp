@@ -109,6 +109,6 @@ int main() {
 // CHECK-FIRST: [DimSpec]
 // CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1024 MinBlocksPerSM 0
 // CHECK: ThreadId: (0 1023 0) BlockID: (0 15 0) BlockDim: (1 1024 1) GridDim: (1 16 1)
-// CHECK-COUNT-5: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: JitStorageCache hits 0 total 5
-// CHECK-SECOND: JitStorageCache hits 5 total 5
+// CHECK-COUNT-5: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache procuid 0 hits 0 accesses 5
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache procuid 0 hits 5 accesses 5

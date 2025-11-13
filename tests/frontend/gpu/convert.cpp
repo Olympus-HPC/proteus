@@ -108,7 +108,7 @@ int main() {
 // CHECK-NEXT: DoubleFromInt = 3
 // CHECK-NEXT: IntFromFloat = -7
 // CHECK-NEXT: FloatFromDouble = 2.5
-// CHECK-FIRST: JitCache hits 0 total 1
-// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: JitStorageCache hits 0 total 1
-// CHECK-SECOND: JitStorageCache hits 1 total 1
+// CHECK-FIRST: [proteus][Dispatcher{{CUDA|HIP}}] MemoryCache procuid 0 hits 0 accesses 1
+// CHECK: [proteus][Dispatcher{{CUDA|HIP}}] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][Dispatcher{{CUDA|HIP}}] StorageCache procuid 0 hits 0 accesses 1
+// CHECK-SECOND: [proteus][Dispatcher{{CUDA|HIP}}] StorageCache procuid 0 hits 1 accesses 1

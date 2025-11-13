@@ -36,5 +36,5 @@ int main() {
 // CHECKs: [CustomPipeline] default<Os>
 // CHECKz: [CustomPipeline] default<Oz>
 // CHECK: foo
-// CHECK: JitCache hits 0 total 1
-// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][JitEngineHost] MemoryCache procuid 0 hits 0 accesses 1
+// CHECK: [proteus][JitEngineHost] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0

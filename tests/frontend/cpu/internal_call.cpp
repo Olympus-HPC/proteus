@@ -68,7 +68,7 @@ int main() {
 
 // clang-format off
 // CHECK: V 42
-// CHECK: JitCache hits 0 total 1
-// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: JitStorageCache hits 0 total 1
-// CHECK-SECOND: JitStorageCache hits 1 total 1
+// CHECK: [proteus][DispatcherHost] MemoryCache procuid 0 hits 0 accesses 1
+// CHECK: [proteus][DispatcherHost] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][DispatcherHost] StorageCache procuid 0 hits 0 accesses 1
+// CHECK-SECOND: [proteus][DispatcherHost] StorageCache procuid 0 hits 1 accesses 1

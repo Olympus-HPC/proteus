@@ -1,10 +1,10 @@
 #ifndef PROTEUS_FRONTEND_DISPATCHER_HOST_HPP
 #define PROTEUS_FRONTEND_DISPATCHER_HOST_HPP
 
+#include "proteus/Caching/StorageCache.hpp"
 #include "proteus/CompiledLibrary.hpp"
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/JitEngineHost.hpp"
-#include "proteus/JitStorageCache.hpp"
 
 namespace proteus {
 
@@ -85,8 +85,8 @@ protected:
 
 private:
   JitEngineHost &Jit;
-  JitCache<void *> CodeCache;
-  JitStorageCache StorageCache;
+  MemoryCache<void *> CodeCache{"DispatcherHost"};
+  StorageCache StorageCache{"DispatcherHost"};
 };
 
 } // namespace proteus

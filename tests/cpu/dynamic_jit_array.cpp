@@ -66,8 +66,8 @@ int main() {
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z9testConstIiEvPT_ ArgNo 0 with value @0 = private constant [3 x i32] [i32 3, i32 2, i32 1]
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z12testRunConstIiEvPT_m ArgNo 0 with value @0 = private constant [3 x i32] [i32 3, i32 2, i32 1]
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z12testRunConstIiEvPT_m ArgNo 1 with value i64 3
-// CHECK: JitCache hits 0 total 2
-// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: JitStorageCache hits 0 total 2
-// CHECK-SECOND: JitStorageCache hits 2 total 2
+// CHECK: [proteus][JitEngineHost] MemoryCache procuid 0 hits 0 accesses 2
+// CHECK: [proteus][JitEngineHost] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][JitEngineHost] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineHost] StorageCache procuid 0 hits 0 accesses 2
+// CHECK-SECOND: [proteus][JitEngineHost] StorageCache procuid 0 hits 2 accesses 2
