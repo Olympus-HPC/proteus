@@ -86,7 +86,7 @@ private:
   std::optional<HashT> ExtractedModuleHash;
   std::optional<CallGraph> ModuleCallGraph;
   std::unique_ptr<MemoryBuffer> DeviceBinary;
-  std::unordered_map<std::string, const void *> VarNameToDevPtr;
+  std::unordered_map<std::string, GlobalVarInfo> VarNameToGlobalInfo;
   bool GlobalsMapped;
   std::once_flag Flag;
 
@@ -185,22 +185,37 @@ public:
     LinkedModuleIds.push_back(ModuleId);
   }
 
-  void registerGlobalVar(const char *VarName, const void *Addr) {
-    VarNameToDevPtr[VarName] = Addr;
+  void registerGlobalVar(const char *VarName, const void *Addr,
+                         uint64_t VarSize) {
+    VarNameToGlobalInfo.emplace(VarName, GlobalVarInfo(Addr, nullptr, VarSize));
   }
 
   void mapGlobals() {
     std::call_once(Flag, [&]() {
-      for (auto &[GlobalName, HostAddr] : VarNameToDevPtr) {
-        void *DevPtr = resolveDeviceGlobalAddr(HostAddr);
-        VarNameToDevPtr.at(GlobalName) = DevPtr;
+      for (auto &[GlobalName, GVI] : VarNameToGlobalInfo) {
+        void *DevPtr = resolveDeviceGlobalAddr(GVI.HostAddr);
+        VarNameToGlobalInfo.at(GlobalName).DevAddr = DevPtr;
       }
+      auto TraceOut = [](std::unordered_map<std::string, GlobalVarInfo>
+                             &VarNameToGlobalInfo) {
+        SmallString<128> S;
+        raw_svector_ostream OS(S);
+        for (auto &[GlobalName, GVI] : VarNameToGlobalInfo) {
+          OS << "[GVarInfo]: " << GlobalName << " HAddr:" << GVI.HostAddr
+             << " DevAddr:" << GVI.DevAddr << " VarSize:" << GVI.VarSize
+             << "\n";
+        }
+
+        return S;
+      };
+      if (Config::get().ProteusTraceOutput >= 1)
+        Logger::trace(TraceOut(VarNameToGlobalInfo));
       GlobalsMapped = true;
     });
   }
 
-  std::unordered_map<std::string, const void *> &getVarNameToDevPtr() {
-    return VarNameToDevPtr;
+  std::unordered_map<std::string, GlobalVarInfo> &getVarNameToGlobalInfo() {
+    return VarNameToGlobalInfo;
   }
 
   auto &getModuleIds() { return LinkedModuleIds; }
@@ -436,12 +451,13 @@ public:
     }
   }
 
-  void insertRegisterVar(void *Handle, const char *VarName, const void *Addr) {
+  void insertRegisterVar(void *Handle, const char *VarName, const void *Addr,
+                         uint64_t VarSize) {
     if (!HandleToBinaryInfo.count(Handle))
       PROTEUS_FATAL_ERROR("Expected Handle in map");
     BinaryInfo &BinInfo = HandleToBinaryInfo[Handle];
 
-    BinInfo.registerGlobalVar(VarName, Addr);
+    BinInfo.registerGlobalVar(VarName, Addr, VarSize);
   }
 
   void registerLinkedBinary(FatbinWrapperT *FatbinWrapper,
@@ -520,19 +536,19 @@ private:
         KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
   }
 
-  void relinkGlobalsObject(
-      MemoryBufferRef Object,
-      const std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
+  void relinkGlobalsObject(MemoryBufferRef Object,
+                           const std::unordered_map<std::string, GlobalVarInfo>
+                               &VarNameToGlobalInfo) {
     TIMESCOPE(__FUNCTION__);
-    proteus::relinkGlobalsObject(Object, VarNameToDevPtr);
+    proteus::relinkGlobalsObject(Object, VarNameToGlobalInfo);
   }
 
   KernelFunction_t getKernelFunctionFromImage(
       StringRef KernelName, const void *Image,
-      std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
+      std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo) {
     TIMESCOPE(__FUNCTION__);
     return static_cast<ImplT &>(*this).getKernelFunctionFromImage(
-        KernelName, Image, VarNameToDevPtr);
+        KernelName, Image, VarNameToGlobalInfo);
   }
 
   //------------------------------------------------------------------
@@ -611,11 +627,11 @@ JitEngineDevice<ImplT>::compileAndRun(
     if (CompiledLib) {
       if (!Config::get().ProteusRelinkGlobalsByCopy)
         relinkGlobalsObject(CompiledLib->ObjectModule->getMemBufferRef(),
-                            BinInfo.getVarNameToDevPtr());
+                            BinInfo.getVarNameToGlobalInfo());
 
       auto KernelFunc = getKernelFunctionFromImage(
           KernelMangled, CompiledLib->ObjectModule->getBufferStart(),
-          BinInfo.getVarNameToDevPtr());
+          BinInfo.getVarNameToGlobalInfo());
 
       CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
 
@@ -638,7 +654,7 @@ JitEngineDevice<ImplT>::compileAndRun(
       Compiler.compile(CompilationTask{
           KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
           GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(),
-          BinInfo.getVarNameToDevPtr(), GlobalLinkedBinaries, DeviceArch,
+          BinInfo.getVarNameToGlobalInfo(), GlobalLinkedBinaries, DeviceArch,
           /*CodeGenConfig */ Config::get().getCGConfig(KernelInfo.getName()),
           /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
           /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy});
@@ -658,7 +674,7 @@ JitEngineDevice<ImplT>::compileAndRun(
     ObjBuf = CompilerSync::instance().compile(CompilationTask{
         KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
         GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(),
-        BinInfo.getVarNameToDevPtr(), GlobalLinkedBinaries, DeviceArch,
+        BinInfo.getVarNameToGlobalInfo(), GlobalLinkedBinaries, DeviceArch,
         /*CodeGenConfig */ Config::get().getCGConfig(KernelInfo.getName()),
         /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
         /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy});
@@ -669,7 +685,8 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   KernelFunc = proteus::getKernelFunctionFromImage(
       KernelMangled, ObjBuf->getBufferStart(),
-      Config::get().ProteusRelinkGlobalsByCopy, BinInfo.getVarNameToDevPtr());
+      Config::get().ProteusRelinkGlobalsByCopy,
+      BinInfo.getVarNameToGlobalInfo());
 
   CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
   if (Config::get().ProteusUseStoredCache) {

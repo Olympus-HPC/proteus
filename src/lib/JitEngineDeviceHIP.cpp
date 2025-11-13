@@ -363,10 +363,10 @@ void JitEngineDeviceHIP::extractModules(BinaryInfo &BinInfo) {
 
 hipFunction_t JitEngineDeviceHIP::getKernelFunctionFromImage(
     StringRef KernelName, const void *Image,
-    std::unordered_map<std::string, const void *> &VarNameToDevPtr) {
+    std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo) {
   return proteus::getKernelFunctionFromImage(
       KernelName, Image, Config::get().ProteusRelinkGlobalsByCopy,
-      VarNameToDevPtr);
+      VarNameToGlobalInfo);
 }
 
 hipError_t JitEngineDeviceHIP::launchKernelFunction(hipFunction_t KernelFunc,

@@ -48,7 +48,7 @@ public:
 
   CUfunction getKernelFunctionFromImage(
       StringRef KernelName, const void *Image,
-      std::unordered_map<std::string, const void *> &VarNameToDevPtr);
+      std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo);
 
   cudaError_t launchKernelFunction(CUfunction KernelFunc, dim3 GridDim,
                                    dim3 BlockDim, void **KernelArgs,

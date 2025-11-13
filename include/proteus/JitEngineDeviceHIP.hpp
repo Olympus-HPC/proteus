@@ -101,7 +101,7 @@ public:
 
   hipFunction_t getKernelFunctionFromImage(
       StringRef KernelName, const void *Image,
-      std::unordered_map<std::string, const void *> &VarNameToDevPtr);
+      std::unordered_map<std::string, GlobalVarInfo> &VarNameToDevPtr);
 
   hipError_t launchKernelFunction(hipFunction_t KernelFunc, dim3 GridDim,
                                   dim3 BlockDim, void **KernelArgs,
