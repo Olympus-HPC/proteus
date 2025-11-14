@@ -70,7 +70,7 @@ int main() {
 // CHECK-FIRST: [DimSpec]
 // CHECK: 19944.1
 // CHECK: 39888.2
-// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 hits 1 accesses 2
-// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 2 NumHits 1
-// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache procuid 0 hits 0 accesses 1
-// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache procuid 0 hits 1 accesses 1
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 1 accesses 2
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 2 NumHits 1
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 1
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 1 accesses 1

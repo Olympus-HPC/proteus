@@ -146,7 +146,7 @@ int main() {
 // CHECK: A X 103.000000 Y 102.000000 Z 101.000000
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z9testByValI7DimFillEvT_ ArgNo 0 with value @0 = private {{.*}}constant [52 x i8] c"g\00\00\00f\00\00\00e\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00"
 // CHECK: A X 103.000000 Y 102.000000 Z 101.000000
-// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 hits 0 accesses 27
-// CHECK-COUNT-27: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache procuid 0 hits 0 accesses 27
-// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache procuid 0 hits 27 accesses 27
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 27
+// CHECK-COUNT-27: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 27
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 27 accesses 27

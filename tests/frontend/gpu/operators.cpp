@@ -153,7 +153,7 @@ int main() {
 // CHECK-NEXT: R11 = 1
 // CHECK-NEXT: R12 = -2
 // CHECK-NEXT: R13 = 0
-// CHECK-NEXT: proteus][Dispatcher{{CUDA|HIP}}] MemoryCache procuid 0 hits 0 accesses 1
-// CHECK-NEXT: [proteus][Dispatcher{{CUDA|HIP}}] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: [proteus][Dispatcher{{CUDA|HIP}}] StorageCache procuid 0 hits 0 accesses 1
-// CHECK-SECOND: [proteus][Dispatcher{{CUDA|HIP}}] StorageCache procuid 0 hits 1 accesses 1
+// CHECK-NEXT: proteus][Dispatcher{{CUDA|HIP}}] MemoryCache rank 0 hits 0 accesses 1
+// CHECK-NEXT: [proteus][Dispatcher{{CUDA|HIP}}] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][Dispatcher{{CUDA|HIP}}] StorageCache rank 0 hits 0 accesses 1
+// CHECK-SECOND: [proteus][Dispatcher{{CUDA|HIP}}] StorageCache rank 0 hits 1 accesses 1

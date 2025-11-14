@@ -31,7 +31,7 @@ int main() {
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kerneliii ArgNo 2 with value i32 1
 // CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK: Kernel arg 6
-// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 hits 0 accesses 1
-// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache procuid 0 hits 0 accesses 1
-// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache procuid 0 hits 1 accesses 1
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 1
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 1
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 1 accesses 1

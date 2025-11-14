@@ -59,10 +59,10 @@ public:
   }
 
   void printStats() {
-    printf("[proteus][%s] MemoryCache procuid %s hits %lu accesses %lu\n",
+    printf("[proteus][%s] MemoryCache rank %s hits %lu accesses %lu\n",
            Label.c_str(), DistributedRank.c_str(), Hits, Accesses);
     for (const auto &[HashValue, JCE] : CacheMap) {
-      std::cout << "[proteus][" << Label << "] MemoryCache procuid "
+      std::cout << "[proteus][" << Label << "] MemoryCache rank "
                 << DistributedRank << " HashValue " << HashValue.toString()
                 << " NumExecs " << JCE.NumExecs << " NumHits " << JCE.NumHits;
       if (Config::get().ProteusDebugOutput) {

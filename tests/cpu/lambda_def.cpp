@@ -34,7 +34,7 @@ int main() {
 // clang-format off
 // CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 42
 // CHECK-COUNT-3: Lambda A 42
-// CHECK: [proteus][JitEngineHost] MemoryCache procuid 0 hits 2 accesses 3
-// CHECK: [proteus][JitEngineHost] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 3 NumHits 2
-// CHECK-FIRST: [proteus][JitEngineHost] StorageCache procuid 0 hits 0 accesses 1
-// CHECK-SECOND: [proteus][JitEngineHost] StorageCache procuid 0 hits 1 accesses 1
+// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 hits 2 accesses 3
+// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 3 NumHits 2
+// CHECK-FIRST: [proteus][JitEngineHost] StorageCache rank 0 hits 0 accesses 1
+// CHECK-SECOND: [proteus][JitEngineHost] StorageCache rank 0 hits 1 accesses 1

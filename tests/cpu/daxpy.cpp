@@ -52,8 +52,8 @@ int main() {
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z7myDaxpydPdS_m ArgNo 0 with value double 1.000000e+00
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z7myDaxpydPdS_m ArgNo 3 with value i64 1024
 // CHECK: 22.6181
-// CHECK: [proteus][JitEngineHost] MemoryCache procuid 0 hits 0 accesses 2
-// CHECK: [proteus][JitEngineHost] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: [proteus][JitEngineHost] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: [proteus][JitEngineHost] StorageCache procuid 0 hits 0 accesses 2
-// CHECK-SECOND: [proteus][JitEngineHost] StorageCache procuid 0 hits 2 accesses 2
+// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 hits 0 accesses 2
+// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineHost] StorageCache rank 0 hits 0 accesses 2
+// CHECK-SECOND: [proteus][JitEngineHost] StorageCache rank 0 hits 2 accesses 2

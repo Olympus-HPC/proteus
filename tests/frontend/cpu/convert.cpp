@@ -82,6 +82,6 @@ int main() {
 // CHECK-NEXT: DoubleFromInt = 3
 // CHECK-NEXT: IntFromFloat = -7
 // CHECK-NEXT: FloatFromDouble = 2.5
-// CHECK: [proteus][DispatcherHost] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: [proteus][DispatcherHost] StorageCache procuid 0 hits 0 accesses 1
-// CHECK-SECOND: [proteus][DispatcherHost] StorageCache procuid 0 hits 1 accesses 1
+// CHECK: [proteus][DispatcherHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][DispatcherHost] StorageCache rank 0 hits 0 accesses 1
+// CHECK-SECOND: [proteus][DispatcherHost] StorageCache rank 0 hits 1 accesses 1

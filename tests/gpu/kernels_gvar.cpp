@@ -47,8 +47,8 @@ int main() {
 // CHECK: Kernel gvar 24 addr [[ADDR:[a-z0-9]+]]
 // CHECK: Kernel2 gvar 25 addr [[ADDR]]
 // CHECK: Kernel3 gvar 26 addr [[ADDR]]
-// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 hits 0 accesses 2
-// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache procuid 0 hits 0 accesses 2
-// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache procuid 0 hits 2 accesses 2
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 2
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 2
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 2 accesses 2

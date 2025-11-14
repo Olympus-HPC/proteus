@@ -42,8 +42,8 @@ int main() {
 // clang-format off
 // CHECK: foo 42
 // CHECK: Other foo 42
-// CHECK: [proteus][DispatcherHost] MemoryCache procuid 0 hits 0 accesses 2
-// CHECK: [proteus][DispatcherHost] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: [proteus][DispatcherHost] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: [proteus][DispatcherHost] StorageCache procuid 0 hits 0 accesses 2
-// CHECK-SECOND: [proteus][DispatcherHost] StorageCache procuid 0 hits 2 accesses 2
+// CHECK: [proteus][DispatcherHost] MemoryCache rank 0 hits 0 accesses 2
+// CHECK: [proteus][DispatcherHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][DispatcherHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][DispatcherHost] StorageCache rank 0 hits 0 accesses 2
+// CHECK-SECOND: [proteus][DispatcherHost] StorageCache rank 0 hits 2 accesses 2

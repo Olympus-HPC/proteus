@@ -31,7 +31,7 @@ int main() {
 // clang-format off
 // CHECK: device_func 1
 // CHECK: Kernel 1
-// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 hits 0 accesses 1
-// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache procuid 0 hits 0 accesses 1
-// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache procuid 0 hits 1 accesses 1
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 1
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 1
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 1 accesses 1

@@ -51,7 +51,7 @@ int main() {
 // CHECK: V 1
 // CHECK: foo 42
 // CHECK: V 2
-// CHECK: [proteus][JitEngineHost] MemoryCache procuid 0 hits 3 accesses 6
-// CHECK-COUNT-3: [proteus][JitEngineHost] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 2 NumHits 1
-// CHECK-FIRST: [proteus][JitEngineHost] StorageCache procuid 0 hits 0 accesses 3
-// CHECK-SECOND: [proteus][JitEngineHost] StorageCache procuid 0 hits 3 accesses 3
+// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 hits 3 accesses 6
+// CHECK-COUNT-3: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 2 NumHits 1
+// CHECK-FIRST: [proteus][JitEngineHost] StorageCache rank 0 hits 0 accesses 3
+// CHECK-SECOND: [proteus][JitEngineHost] StorageCache rank 0 hits 3 accesses 3

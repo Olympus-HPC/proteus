@@ -81,6 +81,6 @@ int main() {
 // CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kernelIhEvT_ ArgNo 0 with value i8 97
 // CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
-// CHECK-FIRST: [proteus][JitEngineDevice] MemoryCache procuid 0 hits 0 accesses 12
-// CHECK-COUNT-12: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache procuid 0 hits 12 accesses 12
+// CHECK-FIRST: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 12
+// CHECK-COUNT-12: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 12 accesses 12

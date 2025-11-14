@@ -91,7 +91,7 @@ int main() {
 // CHECK: x[0] = 4.37
 // CHECK-FIRST: [LambdaSpec] Replacing slot 0 with double 4.560000e+00
 // CHECK: x[0] = 6.56
-// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 hits 0 accesses 4
-// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache procuid 0 hits 0 accesses 4
-// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache procuid 0 hits 4 accesses 4
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 4
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 4
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 4 accesses 4

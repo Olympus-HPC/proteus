@@ -120,8 +120,8 @@ int main(int argc, char **argv) {
 // FIRST-NEXT: 1 5 9 13
 // FIRST-NEXT: 2 6 10 14
 // FIRST-NEXT: 3 7 11 15
-// CHECK-FIRST: [proteus][DispatcherHost] StorageCache procuid 0 hits 0 accesses 1
-// CHECK-SECOND: [proteus][DispatcherHost] StorageCache procuid 0 hits 1 accesses 1
+// CHECK-FIRST: [proteus][DispatcherHost] StorageCache rank 0 hits 0 accesses 1
+// CHECK-SECOND: [proteus][DispatcherHost] StorageCache rank 0 hits 1 accesses 1
 // THIRD: Input B:
 // THIRD-NEXT: 0 1 2 3
 // THIRD-NEXT: 4 5 6 7
@@ -133,4 +133,4 @@ int main(int argc, char **argv) {
 // THIRD-NEXT: 1 5 9 13 17
 // THIRD-NEXT: 2 6 10 14 18
 // THIRD-NEXT: 3 7 11 15 19
-// CHECK-THIRD: [proteus][DispatcherHost] StorageCache procuid 0 hits 0 accesses 1
+// CHECK-THIRD: [proteus][DispatcherHost] StorageCache rank 0 hits 0 accesses 1

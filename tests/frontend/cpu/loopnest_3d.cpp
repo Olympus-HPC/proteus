@@ -195,5 +195,5 @@ int main() {
 // CHECK-NEXT: A2[13] = 17
 // CHECK-NEXT: A2[14] = 19
 // CHECK-NEXT: A2[15] = 21
-// CHECK-FIRST: [proteus][DispatcherHost] StorageCache procuid 0 hits 0 accesses 2
-// CHECK-SECOND: [proteus][DispatcherHost] StorageCache procuid 0 hits 2 accesses 2
+// CHECK-FIRST: [proteus][DispatcherHost] StorageCache rank 0 hits 0 accesses 2
+// CHECK-SECOND: [proteus][DispatcherHost] StorageCache rank 0 hits 2 accesses 2

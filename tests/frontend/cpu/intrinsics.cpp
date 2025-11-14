@@ -86,6 +86,6 @@ int main() {
 // CHECK-NEXT: sin = 0.644218
 // CHECK-NEXT: cos = 0.764842
 // CHECK-NEXT: fabs = 12
-// CHECK-FIRST: [proteus][DispatcherHost] StorageCache procuid 0 hits 0 accesses 1
-// CHECK-SECOND: [proteus][DispatcherHost] StorageCache procuid 0 hits 1 accesses 1
+// CHECK-FIRST: [proteus][DispatcherHost] StorageCache rank 0 hits 0 accesses 1
+// CHECK-SECOND: [proteus][DispatcherHost] StorageCache rank 0 hits 1 accesses 1
 // clang-format on

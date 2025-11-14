@@ -84,7 +84,7 @@ void StorageCache::storeDynamicLibrary(HashT &HashValue,
 }
 
 void StorageCache::printStats() {
-  printf("[proteus][%s] StorageCache procuid %s hits %lu accesses %lu\n",
+  printf("[proteus][%s] StorageCache rank %s hits %lu accesses %lu\n",
          Label.c_str(), DistributedRank.c_str(), Hits, Accesses);
 }
 

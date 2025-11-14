@@ -57,9 +57,9 @@ int main() {
 // CHECK-HIP: [KernelConfig] ID:baz CG:{{RTC|Serial|Parallel}} SA:1 LB:1 SD:1 SDA:1 OL:3 CGL:3 TMT:-1 BPSM:0
 // CHECK: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK: Hello from baz
-// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 hits 0 accesses 4
-// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: [proteus][JitEngineDevice] StorageCache procuid 0 hits 0 accesses 4
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 4
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 4

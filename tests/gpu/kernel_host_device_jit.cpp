@@ -41,11 +41,11 @@ int main() {
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kerneli ArgNo 0 with value i32 23
 // CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK: Kernel 23
-// CHECK: [proteus][JitEngineHost] MemoryCache procuid 0 hits 0 accesses 1
-// CHECK: [proteus][JitEngineHost] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: [proteus][JitEngineHost] StorageCache procuid 0 hits 0 accesses 1
-// CHECK-SECOND: [proteus][JitEngineHost] StorageCache procuid 0 hits 1 accesses 1
-// CHECK: [proteus][JitEngineDevice] MemoryCache procuid 0 hits 0 accesses 2
-// CHECK-COUNT-2: [proteus][JitEngineDevice] MemoryCache procuid 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache procuid 0 hits 0 accesses 2
-// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache procuid 0 hits 2 accesses 2
+// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 hits 0 accesses 1
+// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineHost] StorageCache rank 0 hits 0 accesses 1
+// CHECK-SECOND: [proteus][JitEngineHost] StorageCache rank 0 hits 1 accesses 1
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 2
+// CHECK-COUNT-2: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 2
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 2 accesses 2
