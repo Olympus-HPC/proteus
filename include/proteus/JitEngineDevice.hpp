@@ -564,11 +564,11 @@ protected:
 
   ~JitEngineDevice() {
     CodeCache.printStats();
-    StorageCache.printStats();
+    ObjectCache.printStats();
   }
 
   MemoryCache<KernelFunction_t> CodeCache{"JitEngineDevice"};
-  StorageCache StorageCache{"JitEngineDevice"};
+  StorageCache ObjectCache{"JitEngineDevice"};
   std::string DeviceArch;
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
@@ -623,7 +623,7 @@ JitEngineDevice<ImplT>::compileAndRun(
   std::string KernelMangled = (KernelInfo.getName() + Suffix);
 
   if (Config::get().ProteusUseStoredCache) {
-    auto CompiledLib = StorageCache.lookup(HashValue);
+    auto CompiledLib = ObjectCache.lookup(HashValue);
     if (CompiledLib) {
       if (!Config::get().ProteusRelinkGlobalsByCopy)
         relinkGlobalsObject(CompiledLib->ObjectModule->getMemBufferRef(),
@@ -690,7 +690,7 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
   if (Config::get().ProteusUseStoredCache) {
-    StorageCache.store(HashValue, ObjBuf->getMemBufferRef());
+    ObjectCache.store(HashValue, ObjBuf->getMemBufferRef());
   }
 
   return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,

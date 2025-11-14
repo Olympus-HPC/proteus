@@ -28,14 +28,14 @@ public:
     if (!ObjectModule)
       PROTEUS_FATAL_ERROR("Expected non-null object library");
 
-    StorageCache.store(ModuleHash, ObjectModule->getMemBufferRef());
+    ObjectCache.store(ModuleHash, ObjectModule->getMemBufferRef());
 
     return ObjectModule;
   }
 
   std::unique_ptr<CompiledLibrary>
   lookupCompiledLibrary(HashT ModuleHash) override {
-    return StorageCache.lookup(ModuleHash);
+    return ObjectCache.lookup(ModuleHash);
   }
 
   DispatchResult launch(void *, LaunchDims, LaunchDims, ArrayRef<void *>,
@@ -70,7 +70,7 @@ public:
 
   void registerDynamicLibrary(HashT HashValue,
                               const SmallString<128> &Path) override {
-    StorageCache.storeDynamicLibrary(HashValue, Path);
+    ObjectCache.storeDynamicLibrary(HashValue, Path);
   }
 
 protected:
@@ -80,13 +80,13 @@ protected:
 
   ~DispatcherHost() {
     CodeCache.printStats();
-    StorageCache.printStats();
+    ObjectCache.printStats();
   }
 
 private:
   JitEngineHost &Jit;
   MemoryCache<void *> CodeCache{"DispatcherHost"};
-  StorageCache StorageCache{"DispatcherHost"};
+  StorageCache ObjectCache{"DispatcherHost"};
 };
 
 } // namespace proteus

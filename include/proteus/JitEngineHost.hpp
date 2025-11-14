@@ -63,7 +63,7 @@ private:
   JitEngineHost();
   void addStaticLibrarySymbols();
   MemoryCache<void *> CodeCache{"JitEngineHost"};
-  StorageCache StorageCache{"JitEngineHost"};
+  StorageCache ObjectCache{"JitEngineHost"};
 };
 
 } // namespace proteus

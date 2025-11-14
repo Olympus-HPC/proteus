@@ -30,14 +30,14 @@ public:
     if (!ObjectModule)
       PROTEUS_FATAL_ERROR("Expected non-null object library");
 
-    StorageCache.store(ModuleHash, ObjectModule->getMemBufferRef());
+    ObjectCache.store(ModuleHash, ObjectModule->getMemBufferRef());
 
     return ObjectModule;
   }
 
   std::unique_ptr<CompiledLibrary>
   lookupCompiledLibrary(HashT ModuleHash) override {
-    return StorageCache.lookup(ModuleHash);
+    return ObjectCache.lookup(ModuleHash);
   }
 
   DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
@@ -57,7 +57,7 @@ public:
 
   ~DispatcherHIP() {
     CodeCache.printStats();
-    StorageCache.printStats();
+    ObjectCache.printStats();
   }
 
   void *getFunctionAddress(StringRef KernelName, HashT ModuleHash,
@@ -93,7 +93,7 @@ private:
     TargetModel = TargetModelType::HIP;
   }
   MemoryCache<hipFunction_t> CodeCache{"DispatcherHIP"};
-  StorageCache StorageCache{"DispatcherHIP"};
+  StorageCache ObjectCache{"DispatcherHIP"};
 };
 
 } // namespace proteus
