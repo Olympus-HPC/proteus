@@ -12,16 +12,11 @@
 #define PROTEUS_JITSTOREDCACHE_HPP
 
 #include <cstdint>
-#include <filesystem>
-#include <llvm/Support/MemoryBuffer.h>
+
 #include <llvm/Support/MemoryBufferRef.h>
 
-#include <llvm/ADT/StringRef.h>
-
 #include "proteus/CompiledLibrary.hpp"
-#include "proteus/Config.hpp"
 #include "proteus/Hashing.hpp"
-#include "proteus/Utils.h"
 
 namespace proteus {
 

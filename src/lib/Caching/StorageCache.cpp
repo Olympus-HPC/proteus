@@ -10,10 +10,10 @@
 
 #include <cstdint>
 #include <filesystem>
-#include <llvm/Support/MemoryBuffer.h>
-#include <llvm/Support/MemoryBufferRef.h>
 
 #include <llvm/ADT/StringRef.h>
+#include <llvm/Support/MemoryBuffer.h>
+#include <llvm/Support/MemoryBufferRef.h>
 
 #include "proteus/Caching/StorageCache.hpp"
 #include "proteus/CompiledLibrary.hpp"
