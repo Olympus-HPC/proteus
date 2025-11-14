@@ -29,6 +29,37 @@ template <typename T> void saveToFile(llvm::StringRef Filepath, T &&Data) {
   Out.close();
 }
 
+inline std::string getDistributedRank() {
+  // Try commonly used environment variables to get the rank in distributed
+  // runs.
+  const char *Id = nullptr;
+
+  // MPICH, Intel MPI, MVAPICH.
+  if (!Id)
+    Id = std::getenv("PMI_RANK");
+  if (!Id)
+    Id = std::getenv("MPI_RANK");
+
+  // Open MPI.
+  if (!Id)
+    Id = std::getenv("OMPI_COMM_WORLD_RANK");
+
+  // SLURM (if using srun).
+  if (!Id)
+    Id = std::getenv("SLURM_PROCID");
+
+  // PBS/Torque.
+  if (!Id)
+    Id = std::getenv("PBS_TASKNUM");
+
+  if (Id) {
+    return std::string(Id);
+  }
+
+  // Fallback for non-distributed execution.
+  return "0";
+}
+
 #if PROTEUS_ENABLE_HIP
 #include "proteus/UtilsHIP.h"
 #endif

@@ -15,5 +15,6 @@ int main() {
 // Kernel 1 value is 0
 // Kernel 2 value is 3
 
+// clang-format off
 // CHECK: Kernel 1 value is 2
 // CHECK: Kernel 2 value is 3

@@ -46,8 +46,8 @@ int main() {
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z9kernelAPIifd ArgNo 2 with value double 3.000000e+00
 // CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK: Kernel API 1 2.000000 3.000000
-// CHECK: JitCache hits 0 total 2
-// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: JitStorageCache hits 0 total 2
-// CHECK-SECOND: JitStorageCache hits 2 total 2
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 2
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 2
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 2 accesses 2

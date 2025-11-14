@@ -56,8 +56,8 @@ int main() {
 // clang-format off
 // CHECK: Kernel 42
 // CHECK: Other Kernel 42
-// CHECK: JitCache hits 0 total 2
-// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: JitStorageCache hits 0 total 2
-// CHECK-SECOND: JitStorageCache hits 2 total 2
+// CHECK: [proteus][Dispatcher{{CUDA|HIP}}] MemoryCache rank 0 hits 0 accesses 2
+// CHECK: [proteus][Dispatcher{{CUDA|HIP}}] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][Dispatcher{{CUDA|HIP}}] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][Dispatcher{{CUDA|HIP}}] StorageCache rank 0 hits 0 accesses 2
+// CHECK-SECOND: [proteus][Dispatcher{{CUDA|HIP}}] StorageCache rank 0 hits 2 accesses 2

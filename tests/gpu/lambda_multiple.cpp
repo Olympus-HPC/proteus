@@ -58,7 +58,7 @@ int main() {
 // CHECK: V 1
 // CHECK: Kernel simple
 // CHECK: V 2
-// CHECK: JitCache hits 3 total 6
-// CHECK-COUNT-3: HashValue {{[0-9]+}} NumExecs 2 NumHits 1
-// CHECK-FIRST: JitStorageCache hits 0 total 3
-// CHECK-SECOND: JitStorageCache hits 3 total 3
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 3 accesses 6
+// CHECK-COUNT-3: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 2 NumHits 1
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 3
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 3 accesses 3

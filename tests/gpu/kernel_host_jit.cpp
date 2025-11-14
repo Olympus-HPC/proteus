@@ -1,6 +1,8 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/kernel_host_jit.%ext | %FILECHECK %s --check-prefixes=CHECK
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/kernel_host_jit.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// Second run uses the object cache.
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/kernel_host_jit.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
@@ -28,7 +30,12 @@ int main() {
   return 0;
 }
 
+// clang-format off
 // CHECK: Kernel
 // CHECK: Kernel
-// CHECK: JitCache hits 0 total 1
-// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 hits 0 accesses 1
+// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineHost] StorageCache rank 0 hits 0 accesses 1
+// CHECK-SECOND: [proteus][JitEngineHost] StorageCache rank 0 hits 1 accesses 1
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 0
+// CHECK: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 0

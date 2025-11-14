@@ -280,7 +280,7 @@ int main(int argc, char **argv) {
   return 0;
 }
 
-//clang-format off
+// clang-format off
 // CHECK: init pathDistanceMatrix[0] = 0
 // CHECK-NEXT: init pathDistanceMatrix[1] = 14
 // CHECK-NEXT: init pathDistanceMatrix[2] = 74
@@ -310,11 +310,11 @@ int main(int argc, char **argv) {
 // CHECK-NEXT: dist[1048574] = 4
 // CHECK-NEXT: dist[1048575] = 0
 // The KernelHandle stores the kernel function avoiding cache lookup
-// CHECK: JitCache hits 0 total 1
-// CHECK: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: JitStorageCache hits 0 total 1
-// CHECK-SECOND: JitStorageCache hits 1 total 1
-// CHECK: JitCache hits 0 total 0
-// CHECK: JitStorageCache hits 0 total 0
+// CHECK: [proteus][Dispatcher{{CUDA|HIP}}] MemoryCache rank 0 hits 0 accesses 1
+// CHECK: [proteus][Dispatcher{{CUDA|HIP}}] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][Dispatcher{{CUDA|HIP}}] StorageCache rank 0 hits 0 accesses 1
+// CHECK-SECOND: [proteus][Dispatcher{{CUDA|HIP}}] StorageCache rank 0 hits 1 accesses 1
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 0
+// CHECK: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 0
 
 // NOLINTEND

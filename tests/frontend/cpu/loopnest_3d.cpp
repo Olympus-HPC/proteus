@@ -160,6 +160,7 @@ int main() {
   return 0;
 }
 
+// clang-format off
 // CHECK: 3D Variadic Tiling Results:
 // CHECK-NEXT: A1[0] = 0
 // CHECK-NEXT: A1[1] = 2
@@ -194,5 +195,5 @@ int main() {
 // CHECK-NEXT: A2[13] = 17
 // CHECK-NEXT: A2[14] = 19
 // CHECK-NEXT: A2[15] = 21
-// CHECK-FIRST: JitStorageCache hits 0 total 2
-// CHECK-SECOND: JitStorageCache hits 2 total 2
+// CHECK-FIRST: [proteus][DispatcherHost] StorageCache rank 0 hits 0 accesses 2
+// CHECK-SECOND: [proteus][DispatcherHost] StorageCache rank 0 hits 2 accesses 2

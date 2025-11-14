@@ -152,7 +152,7 @@ int main() {
 // CHECK-x86_64: [ArgSpec] Replaced Function _Z9testByValI7DimFillEvT_ ArgNo 0 with value @0 = private constant [76 x i8] c"g\00\00\00f\00\00\00e\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00"
 // CHECK-ppc64le: [ArgSpec] Replaced Function _Z9testByValI7DimFillEvT_ ArgNo 0 with value @0 = private constant [76 x i8] c"g\00\00\00f\00\00\00e\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00\00"
 // CHECK: X 103.000000 Y 102.000000 Z 101.000000
-// CHECK: JitCache hits 0 total 27
-// CHECK-COUNT-27: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: JitStorageCache hits 0 total 27
-// CHECK-SECOND: JitStorageCache hits 27 total 27
+// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 hits 0 accesses 27
+// CHECK-COUNT-27: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineHost] StorageCache rank 0 hits 0 accesses 27
+// CHECK-SECOND: [proteus][JitEngineHost] StorageCache rank 0 hits 27 accesses 27

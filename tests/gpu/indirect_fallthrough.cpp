@@ -26,4 +26,5 @@ int main() {
   return 0;
 }
 
+// clang-format off
 // CHECK: Kernel

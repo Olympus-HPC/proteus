@@ -268,8 +268,8 @@ int main() {
   return 0;
 }
 
+// clang-format off
 // CHECK: Verification successful
-
-// CHECK-COUNT-100: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: JitStorageCache hits 0 total 100
-// CHECK-SECOND: JitStorageCache hits 100 total 100
+// CHECK-COUNT-100: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 100
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 100 accesses 100

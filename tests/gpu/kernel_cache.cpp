@@ -28,9 +28,10 @@ int main() {
   return 0;
 }
 
+// clang-format off
 // CHECK-COUNT-10: Kernel
 // CHECK-NOT: Kernel
-// CHECK: JitCache hits 9 total 10
-// CHECK: HashValue {{[0-9]+}} NumExecs 10 NumHits 9
-// CHECK-FIRST: JitStorageCache hits 0 total 1
-// CHECK-SECOND: JitStorageCache hits 1 total 1
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 9 accesses 10
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 10 NumHits 9
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 1
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 1 accesses 1

@@ -121,6 +121,7 @@ int main() {
   return 0;
 }
 
+// clang-format off
 // CHECK: 1D Tiled Results:
 // CHECK-NEXT: A1[0] = 3
 // CHECK-NEXT: A1[1] = 6
@@ -139,5 +140,5 @@ int main() {
 // CHECK-NEXT: A2[5] = 18
 // CHECK-NEXT: A2[6] = 21
 // CHECK-NEXT: A2[7] = 24
-// CHECK-FIRST: JitStorageCache hits 0 total 2
-// CHECK-SECOND: JitStorageCache hits 2 total 2
+// CHECK-FIRST: [proteus][DispatcherHost] StorageCache rank 0 hits 0 accesses 2
+// CHECK-SECOND: [proteus][DispatcherHost] StorageCache rank 0 hits 2 accesses 2

@@ -98,7 +98,7 @@ int main() {
 // CHECK-NEXT: V 23
 // CHECK-NEXT: V 142
 // CHECK-NEXT: V 123
-// CHECK-NEXT: JitCache hits 0 total 4
-// CHECK-COUNT-4: HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: JitStorageCache hits 0 total 2
-// CHECK-SECOND: JitStorageCache hits 2 total 2
+// CHECK-NEXT: [proteus][DispatcherHost] MemoryCache rank 0 hits 0 accesses 4
+// CHECK-COUNT-4: [proteus][DispatcherHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][DispatcherHost] StorageCache rank 0 hits 0 accesses 2
+// CHECK-SECOND: [proteus][DispatcherHost] StorageCache rank 0 hits 2 accesses 2

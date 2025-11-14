@@ -38,14 +38,14 @@ public:
     if (!ObjectModule)
       PROTEUS_FATAL_ERROR("Expected non-null object library");
 
-    StorageCache.store(ModuleHash, ObjectModule->getMemBufferRef());
+    ObjectCache.store(ModuleHash, ObjectModule->getMemBufferRef());
 
     return ObjectModule;
   }
 
   std::unique_ptr<CompiledLibrary>
   lookupCompiledLibrary(HashT ModuleHash) override {
-    return StorageCache.lookup(ModuleHash);
+    return ObjectCache.lookup(ModuleHash);
   }
 
   DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
@@ -93,7 +93,7 @@ public:
 
   ~DispatcherCUDA() {
     CodeCache.printStats();
-    StorageCache.printStats();
+    ObjectCache.printStats();
   }
 
 private:
@@ -101,8 +101,8 @@ private:
   DispatcherCUDA() : Jit(JitEngineDeviceCUDA::instance()) {
     TargetModel = TargetModelType::CUDA;
   }
-  JitCache<CUfunction> CodeCache;
-  JitStorageCache StorageCache;
+  MemoryCache<CUfunction> CodeCache{"DispatcherCUDA"};
+  StorageCache ObjectCache{"DispatcherCUDA"};
 };
 
 } // namespace proteus
