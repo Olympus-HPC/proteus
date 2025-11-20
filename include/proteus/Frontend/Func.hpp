@@ -899,8 +899,8 @@ Var<std::remove_pointer_t<T>>
 Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator[](size_t Index) {
   auto &IRB = Fn.getIRBuilder();
 
-  auto *PointerElemTy = TypeMap<std::remove_pointer_t<T>>::get(
-      Fn.getFunction()->getContext());
+  auto *PointerElemTy =
+      TypeMap<std::remove_pointer_t<T>>::get(Fn.getFunction()->getContext());
   auto *Ptr = loadPointer();
   auto *GEP = IRB.CreateConstInBoundsGEP1_64(PointerElemTy, Ptr, Index);
   unsigned AddrSpace = cast<PointerType>(Ptr->getType())->getAddressSpace();
@@ -923,8 +923,8 @@ Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator[](
     const Var<IdxT> &Index) {
   auto &IRB = Fn.getIRBuilder();
 
-  auto *PointeeType = TypeMap<std::remove_pointer_t<T>>::get(
-      Fn.getFunction()->getContext());
+  auto *PointeeType =
+      TypeMap<std::remove_pointer_t<T>>::get(Fn.getFunction()->getContext());
   auto *Ptr = loadPointer();
   auto *IdxValue = Index.loadValue();
   auto *GEP = IRB.CreateInBoundsGEP(PointeeType, Ptr, IdxValue);
@@ -958,8 +958,7 @@ Var<T, std::enable_if_t<std::is_pointer_v<T>>>::getAddress() {
   Type *ElemTy = getValueType(); // pointee type of T*
 
   unsigned AddrSpace = PtrTy->getAddressSpace();
-  Type *PointeePtrTy =
-      PointerType::get(ElemTy, AddrSpace);
+  Type *PointeePtrTy = PointerType::get(ElemTy, AddrSpace);
   Type *TargetPtrTy = PointerType::getUnqual(PointeePtrTy);
 
   if (PtrVal->getType() != PointeePtrTy) {

@@ -25,14 +25,14 @@ int main() {
   auto J = proteus::JitModule(TARGET);
 
   {
-  auto &Setter = J.addFunction<void(int *)>("set_via_ptr");
-  Setter.beginFunction();
-  {
-    auto &P = Setter.getArg<0>();
-    P[0] = 111;
-    Setter.ret();
-  }
-  Setter.endFunction();
+    auto &Setter = J.addFunction<void(int *)>("set_via_ptr");
+    Setter.beginFunction();
+    {
+      auto &P = Setter.getArg<0>();
+      P[0] = 111;
+      Setter.ret();
+    }
+    Setter.endFunction();
   }
 
   auto KernelHandle = J.addKernel<void(int *)>("test_get_address");
@@ -85,7 +85,7 @@ int main() {
   std::cout << "  after internal set_via_ptr: " << Results[3] << "\n";
 
   bool ok = (Results[0] == 222) && (Results[1] == 7) && (Results[2] == 222) &&
-             (Results[3] == 111);
+            (Results[3] == 111);
 
   gpuErrCheck(gpuFree(Results));
 
