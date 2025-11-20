@@ -84,12 +84,12 @@ int main() {
   std::cout << "  after store via **: " << Results[2] << "\n";
   std::cout << "  after internal set_via_ptr: " << Results[3] << "\n";
 
-  bool ok = (Results[0] == 222) && (Results[1] == 7) && (Results[2] == 222) &&
+  bool Ok = (Results[0] == 222) && (Results[1] == 7) && (Results[2] == 222) &&
             (Results[3] == 111);
 
   gpuErrCheck(gpuFree(Results));
 
-  return ok ? 0 : 1;
+  return Ok ? 0 : 1;
 }
 
 // clang-format off
