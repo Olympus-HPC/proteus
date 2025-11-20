@@ -536,7 +536,6 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(Var &&V) {
   return *this;
 }
 
-// Var<T>::getAddress for arithmetic types returns a Var<T*>
 template <typename T>
 Var<std::add_pointer_t<T>>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::getAddress() {
@@ -547,12 +546,12 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::getAddress() {
   Type *ElemTy = getAllocatedType();
 
   unsigned AddrSpace = SlotPtrTy->getAddressSpace();
-  Type *PtrTy = PointerType::get(ElemTy, AddrSpace); // pointer value type
+  Type *PtrTy = PointerType::get(ElemTy, AddrSpace);
   Value *PtrVal = Slot;
   if (PtrVal->getType() != PtrTy)
     PtrVal = IRB.CreateBitCast(Slot, PtrTy);
 
-  auto *PtrSlot = Fn.emitAlloca(PtrTy, "addr.tmp"); // stack slot (default AS)
+  auto *PtrSlot = Fn.emitAlloca(PtrTy, "addr.tmp");
   IRB.CreateStore(PtrVal, PtrSlot);
 
   std::unique_ptr<PointerStorage> ResultStorage =
@@ -955,7 +954,7 @@ Var<T, std::enable_if_t<std::is_pointer_v<T>>>::getAddress() {
 
   Value *PtrVal = loadPointer();
   auto *PtrTy = cast<PointerType>(PtrVal->getType());
-  Type *ElemTy = getValueType(); // pointee type of T*
+  Type *ElemTy = getValueType();
 
   unsigned AddrSpace = PtrTy->getAddressSpace();
   Type *PointeePtrTy = PointerType::get(ElemTy, AddrSpace);
