@@ -136,8 +136,12 @@ private:
 
   private:
     static void addRangeAttrForCalls(Function &KernelFn,
+                                     TargetModelType TargetModel,
                                      std::initializer_list<const char *> Names,
                                      unsigned UpperBoundExclusive) {
+      // Range attributes hurt CUDA performance; skip when targeting CUDA.
+      if (TargetModel == TargetModelType::CUDA)
+        return;
       if (UpperBoundExclusive == 0)
         return;
 
@@ -178,46 +182,54 @@ private:
       if (!KernelFn)
         PROTEUS_FATAL_ERROR("Expected non-null Function");
 
-      switch (M.getTargetModel()) {
+      const TargetModelType TargetModel = M.getTargetModel();
+
+      switch (TargetModel) {
       case TargetModelType::HIP:
         addRangeAttrForCalls(
             *KernelFn,
+            TargetModel,
             {"llvm.amdgcn.workitem.id.x"},
             Block.X);
         addRangeAttrForCalls(
             *KernelFn,
+            TargetModel,
             {"llvm.amdgcn.workitem.id.y"},
             Block.Y);
         addRangeAttrForCalls(
             *KernelFn,
+            TargetModel,
             {"llvm.amdgcn.workitem.id.z"},
             Block.Z);
         addRangeAttrForCalls(
             *KernelFn,
+            TargetModel,
             {"llvm.amdgcn.workgroup.id.x"},
             Grid.X);
         addRangeAttrForCalls(
             *KernelFn,
+            TargetModel,
             {"llvm.amdgcn.workgroup.id.y"},
             Grid.Y);
         addRangeAttrForCalls(
             *KernelFn,
+            TargetModel,
             {"llvm.amdgcn.workgroup.id.z"},
             Grid.Z);
         break;
       case TargetModelType::CUDA:
-        addRangeAttrForCalls(*KernelFn, {"llvm.nvvm.read.ptx.sreg.tid.x"},
-                             Block.X);
-        addRangeAttrForCalls(*KernelFn, {"llvm.nvvm.read.ptx.sreg.tid.y"},
-                             Block.Y);
-        addRangeAttrForCalls(*KernelFn, {"llvm.nvvm.read.ptx.sreg.tid.z"},
-                             Block.Z);
-        addRangeAttrForCalls(*KernelFn, {"llvm.nvvm.read.ptx.sreg.ctaid.x"},
-                             Grid.X);
-        addRangeAttrForCalls(*KernelFn, {"llvm.nvvm.read.ptx.sreg.ctaid.y"},
-                             Grid.Y);
-        addRangeAttrForCalls(*KernelFn, {"llvm.nvvm.read.ptx.sreg.ctaid.z"},
-                             Grid.Z);
+        addRangeAttrForCalls(*KernelFn, TargetModel,
+                             {"llvm.nvvm.read.ptx.sreg.tid.x"}, Block.X);
+        addRangeAttrForCalls(*KernelFn, TargetModel,
+                             {"llvm.nvvm.read.ptx.sreg.tid.y"}, Block.Y);
+        addRangeAttrForCalls(*KernelFn, TargetModel,
+                             {"llvm.nvvm.read.ptx.sreg.tid.z"}, Block.Z);
+        addRangeAttrForCalls(*KernelFn, TargetModel,
+                             {"llvm.nvvm.read.ptx.sreg.ctaid.x"}, Grid.X);
+        addRangeAttrForCalls(*KernelFn, TargetModel,
+                             {"llvm.nvvm.read.ptx.sreg.ctaid.y"}, Grid.Y);
+        addRangeAttrForCalls(*KernelFn, TargetModel,
+                             {"llvm.nvvm.read.ptx.sreg.ctaid.z"}, Grid.Z);
         break;
       default:
         break;

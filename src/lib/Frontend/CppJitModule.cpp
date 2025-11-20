@@ -224,6 +224,9 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                        << "Compile C++ to IR " << T.elapsed() << " ms\n");
 
+  // Remove the large '__assert_fail' to reduce
+  // Link/Opt time.
+  // Module->getFunction("__assert_fail")->eraseFromParent();
   return CppJitModule::CompilationResult{std::move(Ctx), std::move(Module)};
 }
 
