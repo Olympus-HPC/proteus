@@ -1,6 +1,7 @@
 #ifndef PROTEUS_FRONTEND_FUNC_HPP
 #define PROTEUS_FRONTEND_FUNC_HPP
 
+#include <initializer_list>
 #include <memory>
 
 #include <llvm/IR/IRBuilder.h>
@@ -207,8 +208,11 @@ public:
   atomicMin(const Var<T *> &Addr, const Var<T> &Val);
 
   template <typename T, typename BodyLambda = EmptyLambda>
-  auto forLoop(const LoopBoundInfo<T> &Bounds, BodyLambda &&Body = {}) {
-    return ForLoopBuilder<T, BodyLambda>(Bounds, *this, std::move(Body));
+  auto forLoop(std::initializer_list<Var<T>> Bounds, BodyLambda &&Body = {}) {
+    auto It = Bounds.begin();
+    LoopBoundInfo<T> BoundsInfo{It[0], It[1], It[2], It[3]};
+    return ForLoopBuilder<T, BodyLambda>(BoundsInfo, *this,
+                                         std::forward<BodyLambda>(Body));
   }
 
   template <typename... LoopBuilders>

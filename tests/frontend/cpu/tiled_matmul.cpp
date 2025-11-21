@@ -33,15 +33,15 @@ static auto getTiledMatmulFunction(int N, int TileI, int TileJ, int TileK) {
       auto IncOne = F.defRuntimeConst<int>(1, "inc");
       auto Zero = F.defRuntimeConst<int>(0, "zero");
 
-      F.buildLoopNest(F.forLoop<int>({I, Zero, UbnI, IncOne}).tile(TileI),
-                      F.forLoop<int>({J, Zero, UbnJ, IncOne}).tile(TileJ),
-                      F.forLoop<int>({K, Zero, UbnK, IncOne},
-                                     [&]() {
-                                       auto CIdx = I * N + J;
-                                       auto AIdx = I * N + K;
-                                       auto BIdx = K * N + J;
-                                       C[CIdx] += A[AIdx] * B[BIdx];
-                                     })
+      F.buildLoopNest(F.forLoop({I, Zero, UbnI, IncOne}).tile(TileI),
+                      F.forLoop({J, Zero, UbnJ, IncOne}).tile(TileJ),
+                      F.forLoop({K, Zero, UbnK, IncOne},
+                                [&]() {
+                                  auto CIdx = I * N + J;
+                                  auto AIdx = I * N + K;
+                                  auto BIdx = K * N + J;
+                                  C[CIdx] += A[AIdx] * B[BIdx];
+                                })
                           .tile(TileK))
           .emit();
 
