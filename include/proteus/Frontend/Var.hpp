@@ -124,6 +124,8 @@ struct Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>
 
   template <typename U> Var &operator=(const U &ConstValue);
 
+  Var<std::add_pointer_t<T>> getAddress();
+
   // Arithmetic operators
   template <typename U>
   Var<std::common_type_t<T, U>> operator+(const Var<U> &Other) const;
@@ -250,6 +252,8 @@ struct Var<T, std::enable_if_t<std::is_array_v<T>>>
   template <typename IdxT>
   std::enable_if_t<std::is_integral_v<IdxT>, Var<ElemType>>
   operator[](const Var<IdxT> &Index);
+
+  Var<std::add_pointer_t<ValueType>> getAddress() const = delete;
 };
 
 // Specialization for pointer types
@@ -273,6 +277,8 @@ struct Var<T, std::enable_if_t<std::is_pointer_v<T>>>
   operator[](const Var<IdxT> &Index);
 
   Var<ElemType> operator*();
+
+  Var<std::add_pointer_t<ValueType>> getAddress();
 
   template <typename OffsetT>
   std::enable_if_t<std::is_arithmetic_v<OffsetT>,

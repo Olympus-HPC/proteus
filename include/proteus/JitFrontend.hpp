@@ -12,6 +12,7 @@
 #include <llvm/TargetParser/Triple.h>
 
 #include <deque>
+#include <type_traits>
 
 #include "proteus/CoreLLVMDevice.hpp"
 #include "proteus/Error.h"
@@ -296,7 +297,15 @@ FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
   using RetT = typename FnSig<Sig>::RetT;
   using ArgT = typename FnSig<Sig>::ArgsTList;
   FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
-  auto *Call = IRB.CreateCall(Callee, {ArgsVars.loadValue()...});
+  auto GetArgVal = [](auto &&Arg) {
+    using ArgVarT = std::decay_t<decltype(Arg)>;
+    if constexpr (std::is_pointer_v<typename ArgVarT::ValueType>)
+      return Arg.loadPointer();
+    else
+      return Arg.loadValue();
+  };
+
+  auto *Call = IRB.CreateCall(Callee, {GetArgVal(ArgsVars)...});
 
   Var<RetT> Ret = declVar<RetT>("ret");
   Ret.storeValue(Call);
@@ -310,7 +319,15 @@ FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
   using ArgT = typename FnSig<Sig>::ArgsTList;
 
   FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
-  IRB.CreateCall(Callee, {ArgsVars.loadValue()...});
+  auto GetArgVal = [](auto &&Arg) {
+    using ArgVarT = std::decay_t<decltype(Arg)>;
+    if constexpr (std::is_pointer_v<typename ArgVarT::ValueType>)
+      return Arg.loadPointer();
+    else
+      return Arg.loadValue();
+  };
+
+  IRB.CreateCall(Callee, {GetArgVal(ArgsVars)...});
 }
 
 template <typename RetT, typename... ArgT>
