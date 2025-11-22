@@ -193,7 +193,7 @@ auto createJitKernel(double A, size_t N) {
     auto &I = F.declVar<size_t>("I");
     auto &Inc = F.declVar<size_t>("Inc");
     auto [X, Y] = F.getArgs();
-    auto &RunConstA = F.defRuntimeConstant(A);
+    auto &RunConstA = F.defRuntimeConst(A);
     auto &RunConstN = F.defRuntimeConst(N);
 
     // Compute the global thread index.
