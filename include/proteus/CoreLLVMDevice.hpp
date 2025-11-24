@@ -112,11 +112,18 @@ inline void setKernelDimsRange(Module &M, dim3 &GridDim, dim3 &BlockDim) {
         unsigned BitWidth = RetTy->getBitWidth();
         ConstantRange Range(APInt(BitWidth, 0), APInt(BitWidth, DimValue));
 
+#if LLVM_VERSION_MAJOR >= 19
         AttrBuilder Builder{M.getContext()};
         Builder.addRangeAttr(Range);
         Call->removeRetAttr(Attribute::Range);
         Call->setAttributes(
             Call->getAttributes().addRetAttributes(M.getContext(), Builder));
+#else
+        // LLVM 18 (ROCm 6.2.x) does not expose the Range attribute; skip
+        // attaching it to remain compatible.
+        (void)Range;
+        (void)Call;
+#endif
 
         if (Config::get().ProteusTraceOutput >= 1)
           Logger::trace(TraceOut(IntrinsicFunction, DimValue));
@@ -321,7 +328,8 @@ inline void specializeIR(
     dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
     const SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo,
     bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsRange,
-    bool SpecializeDimsAssume, bool SpecializeLaunchBounds, int MinBlocksPerSM) {
+    bool SpecializeDimsAssume, bool SpecializeLaunchBounds,
+    int MinBlocksPerSM) {
   Timer T;
   Function *F = M.getFunction(FnName);
 
