@@ -86,6 +86,8 @@ public:
 
   Function *getFunction();
 
+  void setKernelLaunchBounds(int MaxThreadsPerBlock, int MinBlocksPerSM = 0);
+
   AllocaInst *emitAlloca(Type *Ty, StringRef Name,
                          AddressSpace AS = AddressSpace::DEFAULT);
 
@@ -1338,10 +1340,8 @@ template <typename T> Var<float> powf(const Var<float> &L, const Var<T> &R) {
   auto *ResultType = IRB.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.pow.f32";
-#if PROTEUS_ENABLE_CUDA
   if (L.Fn.getTargetModel() == TargetModelType::CUDA)
     IntrinsicName = "__nv_powf";
-#endif
 
   return emitIntrinsic<float>(IntrinsicName, ResultType, L, RFloat);
 }
@@ -1354,10 +1354,8 @@ template <typename T> Var<float> sqrtf(const Var<T> &R) {
   auto *ResultType = IRB.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.sqrt.f32";
-#if PROTEUS_ENABLE_CUDA
   if (R.Fn.getTargetModel() == TargetModelType::CUDA)
     IntrinsicName = "__nv_sqrtf";
-#endif
 
   return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
 }
@@ -1370,10 +1368,8 @@ template <typename T> Var<float> expf(const Var<T> &R) {
   auto *ResultType = IRB.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.exp.f32";
-#if PROTEUS_ENABLE_CUDA
   if (R.Fn.getTargetModel() == TargetModelType::CUDA)
     IntrinsicName = "__nv_expf";
-#endif
 
   return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
 }
@@ -1386,10 +1382,8 @@ template <typename T> Var<float> sinf(const Var<T> &R) {
   auto *ResultType = IRB.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.sin.f32";
-#if PROTEUS_ENABLE_CUDA
   if (R.Fn.getTargetModel() == TargetModelType::CUDA)
     IntrinsicName = "__nv_sinf";
-#endif
 
   return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
 }
@@ -1402,10 +1396,8 @@ template <typename T> Var<float> cosf(const Var<T> &R) {
   auto *ResultType = IRB.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.cos.f32";
-#if PROTEUS_ENABLE_CUDA
   if (R.Fn.getTargetModel() == TargetModelType::CUDA)
     IntrinsicName = "__nv_cosf";
-#endif
 
   return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
 }
@@ -1418,10 +1410,8 @@ template <typename T> Var<float> fabs(const Var<T> &R) {
   auto *ResultType = IRB.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.fabs.f32";
-#if PROTEUS_ENABLE_CUDA
   if (R.Fn.getTargetModel() == TargetModelType::CUDA)
     IntrinsicName = "__nv_fabsf";
-#endif
 
   return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
 }
@@ -1434,10 +1424,8 @@ template <typename T> Var<float> truncf(const Var<T> &R) {
   auto *ResultType = IRB.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.trunc.f32";
-#if PROTEUS_ENABLE_CUDA
   if (R.Fn.getTargetModel() == TargetModelType::CUDA)
     IntrinsicName = "__nv_truncf";
-#endif
 
   return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
 }
@@ -1450,10 +1438,8 @@ template <typename T> Var<float> logf(const Var<T> &R) {
   auto *ResultType = IRB.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.log.f32";
-#if PROTEUS_ENABLE_CUDA
   if (R.Fn.getTargetModel() == TargetModelType::CUDA)
     IntrinsicName = "__nv_logf";
-#endif
 
   return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
 }
@@ -1466,10 +1452,8 @@ template <typename T> Var<float> absf(const Var<T> &R) {
   auto *ResultType = IRB.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.fabs.f32";
-#if PROTEUS_ENABLE_CUDA
   if (R.Fn.getTargetModel() == TargetModelType::CUDA)
     IntrinsicName = "__nv_fabsf";
-#endif
 
   return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
 }
