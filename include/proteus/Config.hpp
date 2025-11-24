@@ -128,12 +128,8 @@ inline KernelCloneOption getEnvOrDefaultKC(const char *VarName,
 }
 
 class CodeGenerationConfig {
-  static constexpr bool DefaultSpecializeDimsAssume =
-#if PROTEUS_ENABLE_CUDA
-      false;
-#else
-      true;
-#endif
+  static constexpr bool DefaultSpecializeDimsAssume = false;
+  static constexpr bool DefaultSpecializeDimsRange = true;
 
   static CodegenOption getCodeGen(CodegenOption ProteusCodegen) {
     constexpr bool SupportOnlyRTC =
@@ -156,6 +152,7 @@ class CodeGenerationConfig {
   bool ProteusSpecializeArgs;
   bool ProteusSpecializeLaunchBounds;
   bool ProteusSpecializeDims;
+  bool ProteusSpecializeDimsRange;
   bool ProteusSpecializeDimsAssume;
   char ProteusOptLevel;
   int ProteusCodeGenOptLevel;
@@ -166,6 +163,7 @@ class CodeGenerationConfig {
                        CodegenOption ProteusCodegen, bool ProteusSpecializeArgs,
                        bool ProteusSpecializeLaunchBounds,
                        bool ProteusSpecializeDims,
+                       bool ProteusSpecializeDimsRange,
                        bool ProteusSpecializeDimsAssume, char ProteusOptLevel,
                        int ProteusCodeGenOptLevel, int TunedMaxThreads = -1,
                        int MinBlocksPerSM = 0)
@@ -173,6 +171,7 @@ class CodeGenerationConfig {
         ProteusSpecializeArgs(ProteusSpecializeArgs),
         ProteusSpecializeLaunchBounds(ProteusSpecializeLaunchBounds),
         ProteusSpecializeDims(ProteusSpecializeDims),
+        ProteusSpecializeDimsRange(ProteusSpecializeDimsRange),
         ProteusSpecializeDimsAssume(ProteusSpecializeDimsAssume),
         ProteusOptLevel(ProteusOptLevel),
         ProteusCodeGenOptLevel(ProteusCodeGenOptLevel),
@@ -180,18 +179,14 @@ class CodeGenerationConfig {
 
 public:
   static CodeGenerationConfig createFromEnv() {
-    constexpr bool DefaultSpecializeDimsAssume =
-#if PROTEUS_ENABLE_CUDA
-        false;
-#else
-        true;
-#endif
     return CodeGenerationConfig(
         getEnvOrDefaultString("PROTEUS_OPT_PIPELINE"),
         getCodeGen(getEnvOrDefaultCG("PROTEUS_CODEGEN", CodegenOption::RTC)),
         getEnvOrDefaultBool("PROTEUS_SPECIALIZE_ARGS", true),
         getEnvOrDefaultBool("PROTEUS_SPECIALIZE_LAUNCH_BOUNDS", true),
         getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS", true),
+        getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS_RANGE",
+                            DefaultSpecializeDimsRange),
         getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS_ASSUME",
                             DefaultSpecializeDimsAssume),
         getEnvOrDefaultChar("PROTEUS_OPT_LEVEL", '3'),
@@ -214,6 +209,8 @@ public:
         getDefaultValueFromOptional(Config.getBoolean("SpecializeArgs"), true),
         getDefaultValueFromOptional(Config.getBoolean("LaunchBounds"), true),
         getDefaultValueFromOptional(Config.getBoolean("SpecializeDims"), true),
+        getDefaultValueFromOptional(Config.getBoolean("SpecializeDimsRange"),
+                                    DefaultSpecializeDimsRange),
         getDefaultValueFromOptional(Config.getBoolean("SpecializeDimsAssume"),
                                     DefaultSpecializeDimsAssume),
         getDefaultValueFromOptional(Config.getString("OptLevel"),
@@ -229,6 +226,7 @@ public:
   CodegenOption codeGenOption() const { return ProteusCodegen; }
   bool specializeArgs() const { return ProteusSpecializeArgs; }
   bool specializeDims() const { return ProteusSpecializeDims; }
+  bool specializeDimsRange() const { return ProteusSpecializeDimsRange; }
   bool specializeDimsAssume() const { return ProteusSpecializeDimsAssume; }
   bool specializeLaunchBounds() const { return ProteusSpecializeLaunchBounds; }
   char optLevel() const { return ProteusOptLevel; }
@@ -255,6 +253,7 @@ public:
     OS << "SA:" << ProteusSpecializeArgs << " ";
     OS << "LB:" << ProteusSpecializeLaunchBounds << " ";
     OS << "SD:" << ProteusSpecializeDims << " ";
+    OS << "SDR:" << ProteusSpecializeDimsRange << " ";
     OS << "SDA:" << ProteusSpecializeDimsAssume << " ";
     OS << "OL:" << ProteusOptLevel << " ";
     OS << "CGL:" << ProteusCodeGenOptLevel << " ";

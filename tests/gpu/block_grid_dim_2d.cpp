@@ -1,8 +1,10 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_SPECIALIZE_DIMS_ASSUME=1 PROTEUS_TRACE_OUTPUT=1 %build/block_grid_dim_2d.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_SPECIALIZE_DIMS_RANGE=0 PROTEUS_SPECIALIZE_DIMS_ASSUME=1 PROTEUS_TRACE_OUTPUT=1 %build/block_grid_dim_2d.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/block_grid_dim_2d.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_SPECIALIZE_DIMS_RANGE=0 %build/block_grid_dim_2d.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: rm -rf "%t.$$.proteus"
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_SPECIALIZE_DIMS=0 PROTEUS_SPECIALIZE_DIMS_RANGE=1 PROTEUS_SPECIALIZE_DIMS_ASSUME=0 PROTEUS_TRACE_OUTPUT=1 %build/block_grid_dim_2d.%ext | %FILECHECK %s --check-prefixes=RANGE
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
@@ -112,3 +114,5 @@ int main() {
 // CHECK-COUNT-5: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 5
 // CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 5 accesses 5
+// RANGE: [DimSpec] Range {{llvm.amdgcn.workitem.id.y|llvm.nvvm.read.ptx.sreg.tid.y}} [0,64)
+// RANGE: [DimSpec] Range {{llvm.amdgcn.workgroup.id.y|llvm.nvvm.read.ptx.sreg.ctaid.y}} [0,1)

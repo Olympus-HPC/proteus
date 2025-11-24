@@ -14,6 +14,8 @@
 #include <llvm/Analysis/CallGraph.h>
 #include <llvm/Bitcode/BitcodeReader.h>
 #include <llvm/Bitcode/BitcodeWriter.h>
+#include <llvm/IR/Attributes.h>
+#include <llvm/IR/ConstantRange.h>
 #include <llvm/IR/ReplaceConstant.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Object/ELFObjectFile.h>
@@ -76,6 +78,59 @@ inline void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
   ReplaceIntrinsicDim(detail::blockDimXFnName(), BlockDim.x);
   ReplaceIntrinsicDim(detail::blockDimYFnName(), BlockDim.y);
   ReplaceIntrinsicDim(detail::blockDimZFnName(), BlockDim.z);
+}
+
+inline void setKernelDimsRange(Module &M, dim3 &GridDim, dim3 &BlockDim) {
+  auto AttachRange = [&](ArrayRef<StringRef> IntrinsicNames,
+                         uint32_t DimValue) {
+    if (DimValue == 0) {
+      PROTEUS_FATAL_ERROR("Dimension value cannot be zero");
+    }
+
+    for (auto IntrinsicName : IntrinsicNames) {
+      Function *IntrinsicFunction = M.getFunction(IntrinsicName);
+      if (!IntrinsicFunction || IntrinsicFunction->use_empty())
+        continue;
+
+      auto TraceOut = [](Function *IntrinsicF, uint32_t DimValue) {
+        SmallString<128> S;
+        raw_svector_ostream OS(S);
+        OS << "[DimSpec] Range " << IntrinsicF->getName() << " [0," << DimValue
+           << ")\n";
+        return S;
+      };
+
+      for (auto *U : IntrinsicFunction->users()) {
+        auto *Call = dyn_cast<CallInst>(U);
+        if (!Call)
+          continue;
+
+        auto *RetTy = dyn_cast<IntegerType>(Call->getType());
+        if (!RetTy)
+          continue;
+
+        unsigned BitWidth = RetTy->getBitWidth();
+        ConstantRange Range(APInt(BitWidth, 0), APInt(BitWidth, DimValue));
+
+        AttrBuilder Builder{M.getContext()};
+        Builder.addRangeAttr(Range);
+        Call->removeRetAttr(Attribute::Range);
+        Call->setAttributes(
+            Call->getAttributes().addRetAttributes(M.getContext(), Builder));
+
+        if (Config::get().ProteusTraceOutput >= 1)
+          Logger::trace(TraceOut(IntrinsicFunction, DimValue));
+      }
+    }
+  };
+
+  AttachRange(detail::threadIdxXFnName(), BlockDim.x);
+  AttachRange(detail::threadIdxYFnName(), BlockDim.y);
+  AttachRange(detail::threadIdxZFnName(), BlockDim.z);
+
+  AttachRange(detail::blockIdxXFnName(), GridDim.x);
+  AttachRange(detail::blockIdxYFnName(), GridDim.y);
+  AttachRange(detail::blockIdxZFnName(), GridDim.z);
 }
 
 inline void setKernelDimsAssume(Module &M, dim3 &GridDim, dim3 &BlockDim) {
@@ -265,8 +320,8 @@ inline void specializeIR(
     Module &M, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
     dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
     const SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo,
-    bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsAssume,
-    bool SpecializeLaunchBounds, int MinBlocksPerSM) {
+    bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsRange,
+    bool SpecializeDimsAssume, bool SpecializeLaunchBounds, int MinBlocksPerSM) {
   Timer T;
   Function *F = M.getFunction(FnName);
 
@@ -291,7 +346,9 @@ inline void specializeIR(
   // Replace uses of blockDim.* and gridDim.* with constants.
   if (SpecializeDims)
     setKernelDims(M, GridDim, BlockDim);
-  if (SpecializeDimsAssume)
+  if (SpecializeDimsRange)
+    setKernelDimsRange(M, GridDim, BlockDim);
+  else if (SpecializeDimsAssume)
     setKernelDimsAssume(M, GridDim, BlockDim);
   F->setName(FnName + Suffix);
 
