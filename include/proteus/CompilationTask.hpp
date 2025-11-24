@@ -35,7 +35,6 @@ private:
   bool SpecializeArgs;
   bool SpecializeDims;
   bool SpecializeDimsRange;
-  bool SpecializeDimsAssume;
   bool SpecializeLaunchBounds;
   char OptLevel;
   unsigned CodegenOptLevel;
@@ -95,7 +94,6 @@ public:
         SpecializeArgs(CGConfig.specializeArgs()),
         SpecializeDims(CGConfig.specializeDims()),
         SpecializeDimsRange(CGConfig.specializeDimsRange()),
-        SpecializeDimsAssume(CGConfig.specializeDimsAssume()),
         SpecializeLaunchBounds(CGConfig.specializeLaunchBounds()),
         OptLevel(CGConfig.optLevel()),
         CodegenOptLevel(CGConfig.codeGenOptLevel()),
@@ -153,8 +151,8 @@ public:
 
     proteus::specializeIR(*M, KernelName, Suffix, BlockDim, GridDim, RCVec,
                           LambdaCalleeInfo, SpecializeArgs, SpecializeDims,
-                          SpecializeDimsRange, SpecializeDimsAssume,
-                          SpecializeLaunchBounds, MinBlocksPerSM);
+                          SpecializeDimsRange, SpecializeLaunchBounds,
+                          MinBlocksPerSM);
 
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".specialized.ll", *M));
 

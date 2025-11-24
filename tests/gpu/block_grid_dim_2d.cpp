@@ -1,10 +1,8 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_SPECIALIZE_DIMS_RANGE=0 PROTEUS_SPECIALIZE_DIMS_ASSUME=1 PROTEUS_TRACE_OUTPUT=1 %build/block_grid_dim_2d.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 %build/block_grid_dim_2d.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_SPECIALIZE_DIMS_RANGE=0 %build/block_grid_dim_2d.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
-// RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_SPECIALIZE_DIMS=0 PROTEUS_SPECIALIZE_DIMS_RANGE=1 PROTEUS_SPECIALIZE_DIMS_ASSUME=0 PROTEUS_TRACE_OUTPUT=1 %build/block_grid_dim_2d.%ext | %FILECHECK %s --check-prefixes=RANGE
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/block_grid_dim_2d.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
@@ -48,10 +46,10 @@ int main() {
 // CHECK-FIRST: [DimSpec] Replace call to {{_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__YcvjEv|_ZL21__hip_get_block_dim_yv|llvm.nvvm.read.ptx.sreg.ntid.y}}  with constant i32 64
 // CHECK-FIRST: [DimSpec] Replace call to {{_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__ZcvjEv|_ZL21__hip_get_block_dim_zv|llvm.nvvm.read.ptx.sreg.ntid.z}}  with constant i32 1
 // CHECK-FIRST: [DimSpec]
+// CHECK-FIRST: [DimSpec] Range {{llvm.amdgcn.workitem.id.y|llvm.nvvm.read.ptx.sreg.tid.y}} [0,64)
 // CHECK-FIRST: [DimSpec]
 // CHECK-FIRST: [DimSpec]
-// CHECK-FIRST: [DimSpec]
-// CHECK-FIRST: [DimSpec]
+// CHECK-FIRST: [DimSpec] Range {{llvm.amdgcn.workgroup.id.y|llvm.nvvm.read.ptx.sreg.ctaid.y}} [0,1)
 // CHECK-FIRST: [DimSpec]
 // CHECK-FIRST: [LaunchBoundSpec] MaxThreads 64 MinBlocksPerSM 0
 // CHECK: ThreadId: (0 63 0) BlockID: (0 0 0) BlockDim: (1 64 1) GridDim: (1 1 1)
@@ -114,5 +112,3 @@ int main() {
 // CHECK-COUNT-5: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 5
 // CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 5 accesses 5
-// RANGE: [DimSpec] Range {{llvm.amdgcn.workitem.id.y|llvm.nvvm.read.ptx.sreg.tid.y}} [0,64)
-// RANGE: [DimSpec] Range {{llvm.amdgcn.workgroup.id.y|llvm.nvvm.read.ptx.sreg.ctaid.y}} [0,1)

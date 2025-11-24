@@ -140,53 +140,6 @@ inline void setKernelDimsRange(Module &M, dim3 &GridDim, dim3 &BlockDim) {
   AttachRange(detail::blockIdxZFnName(), GridDim.z);
 }
 
-inline void setKernelDimsAssume(Module &M, dim3 &GridDim, dim3 &BlockDim) {
-  auto InsertAssume = [&](ArrayRef<StringRef> IntrinsicNames, int DimValue) {
-    for (auto IntrinsicName : IntrinsicNames) {
-      Function *IntrinsicFunction = M.getFunction(IntrinsicName);
-      if (!IntrinsicFunction || IntrinsicFunction->use_empty())
-        continue;
-
-      auto TraceOut = [](Function *IntrinsicF, int DimValue) {
-        SmallString<128> S;
-        raw_svector_ostream OS(S);
-        OS << "[DimSpec] Assume " << IntrinsicF->getName() << " with "
-           << DimValue << "\n";
-
-        return S;
-      };
-
-      // Iterate over all uses of the intrinsic.
-      for (auto *U : IntrinsicFunction->users()) {
-        auto *Call = dyn_cast<CallInst>(U);
-        if (!Call)
-          continue;
-
-        // Insert the llvm.assume intrinsic.
-        IRBuilder<> Builder(Call->getNextNode());
-        Value *Bound = ConstantInt::get(Call->getType(), DimValue);
-        Value *Cmp = Builder.CreateICmpULT(Call, Bound);
-
-        Function *AssumeIntrinsic =
-            Intrinsic::getDeclaration(&M, Intrinsic::assume);
-        Builder.CreateCall(AssumeIntrinsic, Cmp);
-        if (Config::get().ProteusTraceOutput >= 1)
-          Logger::trace(TraceOut(IntrinsicFunction, DimValue));
-      }
-    }
-  };
-
-  // Inform LLVM about the range of possible values of threadIdx.*.
-  InsertAssume(detail::threadIdxXFnName(), BlockDim.x);
-  InsertAssume(detail::threadIdxYFnName(), BlockDim.y);
-  InsertAssume(detail::threadIdxZFnName(), BlockDim.z);
-
-  // Inform LLVdetailut the range of possible values of blockIdx.*.
-  InsertAssume(detail::blockIdxXFnName(), GridDim.x);
-  InsertAssume(detail::blockIdxYFnName(), GridDim.y);
-  InsertAssume(detail::blockIdxZFnName(), GridDim.z);
-}
-
 inline void replaceGlobalVariablesWithPointers(
     Module &M,
     const std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo) {
@@ -328,8 +281,7 @@ inline void specializeIR(
     dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
     const SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo,
     bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsRange,
-    bool SpecializeDimsAssume, bool SpecializeLaunchBounds,
-    int MinBlocksPerSM) {
+    bool SpecializeLaunchBounds, int MinBlocksPerSM) {
   Timer T;
   Function *F = M.getFunction(FnName);
 
@@ -356,8 +308,6 @@ inline void specializeIR(
     setKernelDims(M, GridDim, BlockDim);
   if (SpecializeDimsRange)
     setKernelDimsRange(M, GridDim, BlockDim);
-  else if (SpecializeDimsAssume)
-    setKernelDimsAssume(M, GridDim, BlockDim);
   F->setName(FnName + Suffix);
 
   if (SpecializeLaunchBounds) {

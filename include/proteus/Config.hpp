@@ -128,7 +128,6 @@ inline KernelCloneOption getEnvOrDefaultKC(const char *VarName,
 }
 
 class CodeGenerationConfig {
-  static constexpr bool DefaultSpecializeDimsAssume = false;
   static constexpr bool DefaultSpecializeDimsRange = true;
 
   static CodegenOption getCodeGen(CodegenOption ProteusCodegen) {
@@ -153,7 +152,6 @@ class CodeGenerationConfig {
   bool ProteusSpecializeLaunchBounds;
   bool ProteusSpecializeDims;
   bool ProteusSpecializeDimsRange;
-  bool ProteusSpecializeDimsAssume;
   char ProteusOptLevel;
   int ProteusCodeGenOptLevel;
   int TunedMaxThreads;
@@ -163,8 +161,7 @@ class CodeGenerationConfig {
                        CodegenOption ProteusCodegen, bool ProteusSpecializeArgs,
                        bool ProteusSpecializeLaunchBounds,
                        bool ProteusSpecializeDims,
-                       bool ProteusSpecializeDimsRange,
-                       bool ProteusSpecializeDimsAssume, char ProteusOptLevel,
+                       bool ProteusSpecializeDimsRange, char ProteusOptLevel,
                        int ProteusCodeGenOptLevel, int TunedMaxThreads = -1,
                        int MinBlocksPerSM = 0)
       : ProteusOptPipeline(ProteusOptPipeline), ProteusCodegen(ProteusCodegen),
@@ -172,7 +169,6 @@ class CodeGenerationConfig {
         ProteusSpecializeLaunchBounds(ProteusSpecializeLaunchBounds),
         ProteusSpecializeDims(ProteusSpecializeDims),
         ProteusSpecializeDimsRange(ProteusSpecializeDimsRange),
-        ProteusSpecializeDimsAssume(ProteusSpecializeDimsAssume),
         ProteusOptLevel(ProteusOptLevel),
         ProteusCodeGenOptLevel(ProteusCodeGenOptLevel),
         TunedMaxThreads(TunedMaxThreads), MinBlocksPerSM(MinBlocksPerSM) {}
@@ -187,8 +183,6 @@ public:
         getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS", true),
         getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS_RANGE",
                             DefaultSpecializeDimsRange),
-        getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS_ASSUME",
-                            DefaultSpecializeDimsAssume),
         getEnvOrDefaultChar("PROTEUS_OPT_LEVEL", '3'),
         getEnvOrDefaultInt("PROTEUS_CODEGEN_OPT_LEVEL", 3));
   }
@@ -211,8 +205,6 @@ public:
         getDefaultValueFromOptional(Config.getBoolean("SpecializeDims"), true),
         getDefaultValueFromOptional(Config.getBoolean("SpecializeDimsRange"),
                                     DefaultSpecializeDimsRange),
-        getDefaultValueFromOptional(Config.getBoolean("SpecializeDimsAssume"),
-                                    DefaultSpecializeDimsAssume),
         getDefaultValueFromOptional(Config.getString("OptLevel"),
                                     llvm::StringRef("3"))[0],
         getDefaultValueFromOptional(Config.getInteger("CodeGenOptLevel"),
@@ -227,7 +219,6 @@ public:
   bool specializeArgs() const { return ProteusSpecializeArgs; }
   bool specializeDims() const { return ProteusSpecializeDims; }
   bool specializeDimsRange() const { return ProteusSpecializeDimsRange; }
-  bool specializeDimsAssume() const { return ProteusSpecializeDimsAssume; }
   bool specializeLaunchBounds() const { return ProteusSpecializeLaunchBounds; }
   char optLevel() const { return ProteusOptLevel; }
   int codeGenOptLevel() const { return ProteusCodeGenOptLevel; }
@@ -254,7 +245,6 @@ public:
     OS << "LB:" << ProteusSpecializeLaunchBounds << " ";
     OS << "SD:" << ProteusSpecializeDims << " ";
     OS << "SDR:" << ProteusSpecializeDimsRange << " ";
-    OS << "SDA:" << ProteusSpecializeDimsAssume << " ";
     OS << "OL:" << ProteusOptLevel << " ";
     OS << "CGL:" << ProteusCodeGenOptLevel << " ";
     OS << "TMT:" << TunedMaxThreads << " ";
