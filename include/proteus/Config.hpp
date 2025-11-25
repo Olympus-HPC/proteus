@@ -128,7 +128,12 @@ inline KernelCloneOption getEnvOrDefaultKC(const char *VarName,
 }
 
 class CodeGenerationConfig {
-  static constexpr bool DefaultSpecializeDimsRange = true;
+  static constexpr bool DefaultSpecializeDimsRange =
+#if PROTEUS_ENABLE_CUDA
+      false;
+#else
+      true;
+#endif
 
   static CodegenOption getCodeGen(CodegenOption ProteusCodegen) {
     constexpr bool SupportOnlyRTC =
