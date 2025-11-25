@@ -119,10 +119,14 @@ inline void setKernelDimsRange(Module &M, dim3 &GridDim, dim3 &BlockDim) {
         Call->setAttributes(
             Call->getAttributes().addRetAttributes(M.getContext(), Builder));
 #else
-        // LLVM 18 (ROCm 6.2.x) does not expose the Range attribute; skip
-        // attaching it to remain compatible.
-        (void)Range;
-        (void)Call;
+        // LLVM 18 (ROCm 6.2.x) does not expose the Range attribute; use range
+        // metadata instead.
+        LLVMContext &Ctx = M.getContext();
+        Metadata *RangeMD[] = {
+            ConstantAsMetadata::get(ConstantInt::get(RetTy, 0)),
+            ConstantAsMetadata::get(ConstantInt::get(RetTy, DimValue))};
+        MDNode *RangeNode = MDNode::get(Ctx, RangeMD);
+        Call->setMetadata(LLVMContext::MD_range, RangeNode);
 #endif
 
         if (Config::get().ProteusTraceOutput >= 1)
