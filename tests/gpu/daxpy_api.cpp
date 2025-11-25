@@ -1,7 +1,7 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 %build/daxpy_api.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/daxpy_api.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: PROTEUS_SPECIALIZE_DIMS_RANGE=1 PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 %build/daxpy_api.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_SPECIALIZE_DIMS_RANGE=1 PROTEUS_CACHE_DIR="%t.$$.proteus" %build/daxpy_api.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
