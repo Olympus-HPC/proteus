@@ -34,17 +34,12 @@ public:
 
   static JitEngineHost &instance();
 
-  static void dumpSymbolInfo(const object::ObjectFile &loadedObj,
-                             const RuntimeDyld::LoadedObjectInfo &objInfo);
+  static void dumpSymbolInfo(const object::ObjectFile &LoadedObj,
+                             const RuntimeDyld::LoadedObjectInfo &ObjInfo);
   static void notifyLoaded(orc::MaterializationResponsibility &R,
                            const object::ObjectFile &Obj,
                            const RuntimeDyld::LoadedObjectInfo &LOI);
   ~JitEngineHost();
-
-  Expected<orc::ThreadSafeModule>
-  specializeIR(std::unique_ptr<Module> M, std::unique_ptr<LLVMContext> Ctx,
-               StringRef FnName, StringRef Suffix,
-               ArrayRef<RuntimeConstant> RCArray);
 
   void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
                     ArrayRef<RuntimeConstant> RCArray);

@@ -511,50 +511,6 @@ public:
 
   StringRef getDeviceArch() const { return DeviceArch; }
 
-private:
-  //------------------------------------------------------------------
-  // Begin Methods implemented in the derived device engine class.
-  //------------------------------------------------------------------
-  void *resolveDeviceGlobalAddr(const void *Addr) {
-    return static_cast<ImplT &>(*this).resolveDeviceGlobalAddr(Addr);
-  }
-
-  void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
-    proteus::setKernelDims(M, GridDim, BlockDim);
-  }
-
-  DeviceError_t launchKernelFunction(KernelFunction_t KernelFunc, dim3 GridDim,
-                                     dim3 BlockDim, void **KernelArgs,
-                                     uint64_t ShmemSize,
-                                     DeviceStream_t Stream) {
-    TIMESCOPE(__FUNCTION__);
-    return static_cast<ImplT &>(*this).launchKernelFunction(
-        KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
-  }
-
-  void relinkGlobalsObject(MemoryBufferRef Object,
-                           const std::unordered_map<std::string, GlobalVarInfo>
-                               &VarNameToGlobalInfo) {
-    TIMESCOPE(__FUNCTION__);
-    proteus::relinkGlobalsObject(Object, VarNameToGlobalInfo);
-  }
-
-  KernelFunction_t getKernelFunctionFromImage(
-      StringRef KernelName, const void *Image,
-      std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo) {
-    TIMESCOPE(__FUNCTION__);
-    return static_cast<ImplT &>(*this).getKernelFunctionFromImage(
-        KernelName, Image, VarNameToGlobalInfo);
-  }
-
-  //------------------------------------------------------------------
-  // End Methods implemented in the derived device engine class.
-  //------------------------------------------------------------------
-
-  void pruneIR(Module &M);
-
-  void internalize(Module &M, StringRef KernelName);
-
 protected:
   JitEngineDevice() {}
 
@@ -569,16 +525,6 @@ protected:
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
 };
-
-template <typename ImplT> void JitEngineDevice<ImplT>::pruneIR(Module &M) {
-  TIMESCOPE("pruneIR");
-  proteus::pruneIR(M);
-}
-
-template <typename ImplT>
-void JitEngineDevice<ImplT>::internalize(Module &M, StringRef KernelName) {
-  proteus::internalize(M, KernelName);
-}
 
 template <typename ImplT>
 typename DeviceTraits<ImplT>::DeviceError_t
@@ -625,8 +571,9 @@ JitEngineDevice<ImplT>::compileAndRun(
         relinkGlobalsObject(CompiledLib->ObjectModule->getMemBufferRef(),
                             BinInfo.getVarNameToGlobalInfo());
 
-      auto KernelFunc = getKernelFunctionFromImage(
+      auto KernelFunc = proteus::getKernelFunctionFromImage(
           KernelMangled, CompiledLib->ObjectModule->getBufferStart(),
+          Config::get().ProteusRelinkGlobalsByCopy,
           BinInfo.getVarNameToGlobalInfo());
 
       CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
