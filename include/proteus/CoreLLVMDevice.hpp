@@ -14,6 +14,8 @@
 #include <llvm/Analysis/CallGraph.h>
 #include <llvm/Bitcode/BitcodeReader.h>
 #include <llvm/Bitcode/BitcodeWriter.h>
+#include <llvm/IR/Attributes.h>
+#include <llvm/IR/ConstantRange.h>
 #include <llvm/IR/ReplaceConstant.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Object/ELFObjectFile.h>
@@ -78,51 +80,68 @@ inline void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
   ReplaceIntrinsicDim(detail::blockDimZFnName(), BlockDim.z);
 }
 
-inline void setKernelDimsAssume(Module &M, dim3 &GridDim, dim3 &BlockDim) {
-  auto InsertAssume = [&](ArrayRef<StringRef> IntrinsicNames, int DimValue) {
+inline void setKernelDimsRange(Module &M, dim3 &GridDim, dim3 &BlockDim) {
+  auto AttachRange = [&](ArrayRef<StringRef> IntrinsicNames,
+                         uint32_t DimValue) {
+    if (DimValue == 0) {
+      PROTEUS_FATAL_ERROR("Dimension value cannot be zero");
+    }
+
     for (auto IntrinsicName : IntrinsicNames) {
       Function *IntrinsicFunction = M.getFunction(IntrinsicName);
       if (!IntrinsicFunction || IntrinsicFunction->use_empty())
         continue;
 
-      auto TraceOut = [](Function *IntrinsicF, int DimValue) {
+      auto TraceOut = [](Function *IntrinsicF, uint32_t DimValue) {
         SmallString<128> S;
         raw_svector_ostream OS(S);
-        OS << "[DimSpec] Assume " << IntrinsicF->getName() << " with "
-           << DimValue << "\n";
-
+        OS << "[DimSpec] Range " << IntrinsicF->getName() << " [0," << DimValue
+           << ")\n";
         return S;
       };
 
-      // Iterate over all uses of the intrinsic.
       for (auto *U : IntrinsicFunction->users()) {
         auto *Call = dyn_cast<CallInst>(U);
         if (!Call)
           continue;
 
-        // Insert the llvm.assume intrinsic.
-        IRBuilder<> Builder(Call->getNextNode());
-        Value *Bound = ConstantInt::get(Call->getType(), DimValue);
-        Value *Cmp = Builder.CreateICmpULT(Call, Bound);
+        auto *RetTy = dyn_cast<IntegerType>(Call->getType());
+        if (!RetTy)
+          continue;
 
-        Function *AssumeIntrinsic =
-            Intrinsic::getDeclaration(&M, Intrinsic::assume);
-        Builder.CreateCall(AssumeIntrinsic, Cmp);
+        unsigned BitWidth = RetTy->getBitWidth();
+        ConstantRange Range(APInt(BitWidth, 0), APInt(BitWidth, DimValue));
+
+#if LLVM_VERSION_MAJOR >= 19
+        AttrBuilder Builder{M.getContext()};
+        Builder.addRangeAttr(Range);
+        Call->removeRetAttr(Attribute::Range);
+        Call->setAttributes(
+            Call->getAttributes().addRetAttributes(M.getContext(), Builder));
+#else
+        // LLVM 18 (ROCm 6.2.x) does not expose the Range attribute; use range
+        // metadata instead.
+        LLVMContext &Ctx = M.getContext();
+        Metadata *RangeMD[] = {
+            ConstantAsMetadata::get(ConstantInt::get(RetTy, 0)),
+            ConstantAsMetadata::get(ConstantInt::get(RetTy, DimValue))};
+        MDNode *RangeNode = MDNode::get(Ctx, RangeMD);
+        Call->setMetadata(LLVMContext::MD_range, RangeNode);
+#endif
+
         if (Config::get().ProteusTraceOutput >= 1)
           Logger::trace(TraceOut(IntrinsicFunction, DimValue));
       }
     }
   };
 
-  // Inform LLVM about the range of possible values of threadIdx.*.
-  InsertAssume(detail::threadIdxXFnName(), BlockDim.x);
-  InsertAssume(detail::threadIdxYFnName(), BlockDim.y);
-  InsertAssume(detail::threadIdxZFnName(), BlockDim.z);
+  AttachRange(detail::threadIdxXFnName(), BlockDim.x);
+  AttachRange(detail::threadIdxYFnName(), BlockDim.y);
+  AttachRange(detail::threadIdxZFnName(), BlockDim.z);
 
-  // Inform LLVdetailut the range of possible values of blockIdx.*.
-  InsertAssume(detail::blockIdxXFnName(), GridDim.x);
-  InsertAssume(detail::blockIdxYFnName(), GridDim.y);
-  InsertAssume(detail::blockIdxZFnName(), GridDim.z);
+  AttachRange(detail::blockIdxXFnName(), GridDim.x);
+  AttachRange(detail::blockIdxYFnName(), GridDim.y);
+  AttachRange(detail::blockIdxZFnName(), GridDim.z);
 }
 
 inline void replaceGlobalVariablesWithPointers(
@@ -265,7 +284,7 @@ inline void specializeIR(
     Module &M, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
     dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
     const SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo,
-    bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsAssume,
+    bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsRange,
     bool SpecializeLaunchBounds, int MinBlocksPerSM) {
   Timer T;
   Function *F = M.getFunction(FnName);
@@ -291,8 +310,8 @@ inline void specializeIR(
   // Replace uses of blockDim.* and gridDim.* with constants.
   if (SpecializeDims)
     setKernelDims(M, GridDim, BlockDim);
-  if (SpecializeDimsAssume)
-    setKernelDimsAssume(M, GridDim, BlockDim);
+  if (SpecializeDimsRange)
+    setKernelDimsRange(M, GridDim, BlockDim);
   F->setName(FnName + Suffix);
 
   if (SpecializeLaunchBounds) {
