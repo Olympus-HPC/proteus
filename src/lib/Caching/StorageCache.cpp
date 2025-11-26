@@ -63,24 +63,15 @@ std::unique_ptr<CompiledLibrary> StorageCache::lookup(HashT &HashValue) {
   return nullptr;
 }
 
-void StorageCache::store(HashT &HashValue, MemoryBufferRef ObjBufRef) {
+void StorageCache::store(HashT &HashValue, const CacheEntry &Entry) {
   TIMESCOPE("Store cache");
 
   std::string Filebase = StorageDirectory + "/" + DistributedRank +
                          "-cache-jit-" + HashValue.toString();
+  std::string Extension = Entry.isDynLib() ? ".so" : ".o";
 
-  saveToFile(Filebase + ".o",
-             StringRef{ObjBufRef.getBufferStart(), ObjBufRef.getBufferSize()});
-}
-
-void StorageCache::storeDynamicLibrary(HashT &HashValue,
-                                       const SmallString<128> &Path) {
-  TIMESCOPE("Store cache");
-
-  std::string Filebase = StorageDirectory + "/" + DistributedRank +
-                         "-cache-jit-" + HashValue.toString();
-
-  sys::fs::copy_file(Path, Filebase + ".so");
+  saveToFile(Filebase + Extension, StringRef{Entry.Buffer.getBufferStart(),
+                                             Entry.Buffer.getBufferSize()});
 }
 
 void StorageCache::printStats() {

@@ -251,7 +251,8 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
     auto ObjectModule = compileOnly(*M);
 
     if (Config::get().ProteusUseStoredCache)
-      LibraryCache.store(HashValue, ObjectModule->getMemBufferRef());
+      LibraryCache.store(
+          HashValue, CacheEntry::objectFile(ObjectModule->getMemBufferRef()));
 
     // Create the compiled library and load it.
     Library = std::make_unique<CompiledLibrary>(std::move(ObjectModule));

@@ -36,10 +36,7 @@ public:
 
   std::unique_ptr<CompiledLibrary> lookup(HashT &HashValue) override;
 
-  void store(HashT &HashValue, MemoryBufferRef ObjBufRef) override;
-
-  void storeDynamicLibrary(HashT &HashValue,
-                           const SmallString<128> &Path) override;
+  void store(HashT &HashValue, const CacheEntry &Entry) override;
 
   void printStats() override;
 

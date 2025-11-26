@@ -86,10 +86,11 @@ std::unique_ptr<CompiledLibrary> ObjectCacheChain::lookup(HashT &HashValue) {
   for (size_t I = 0; I < Caches.size(); ++I) {
     if (auto Result = Caches[I]->lookup(HashValue)) {
       if (I > 0 && Result->isObject() && Result->ObjectModule) {
-        MemoryBufferRef ObjRef = Result->ObjectModule->getMemBufferRef();
         // Populate higher-level caches with the found object.
+        CacheEntry Entry =
+            CacheEntry::objectFile(Result->ObjectModule->getMemBufferRef());
         for (size_t J = 0; J < I; ++J) {
-          Caches[J]->store(HashValue, ObjRef);
+          Caches[J]->store(HashValue, Entry);
         }
       }
 
@@ -106,20 +107,11 @@ std::unique_ptr<CompiledLibrary> ObjectCacheChain::lookup(HashT &HashValue) {
   return nullptr;
 }
 
-void ObjectCacheChain::store(HashT &HashValue, MemoryBufferRef ObjBufRef) {
+void ObjectCacheChain::store(HashT &HashValue, const CacheEntry &Entry) {
   TIMESCOPE("ObjectCacheChain::store");
 
   for (auto &Cache : Caches) {
-    Cache->store(HashValue, ObjBufRef);
-  }
-}
-
-void ObjectCacheChain::storeDynamicLibrary(HashT &HashValue,
-                                           const SmallString<128> &Path) {
-  TIMESCOPE("ObjectCacheChain::storeDynamicLibrary");
-
-  for (auto &Cache : Caches) {
-    Cache->storeDynamicLibrary(HashValue, Path);
+    Cache->store(HashValue, Entry);
   }
 }
 

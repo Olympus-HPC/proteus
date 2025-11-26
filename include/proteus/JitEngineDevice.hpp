@@ -633,7 +633,8 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
   if (Config::get().ProteusUseStoredCache) {
-    LibraryCache.store(HashValue, ObjBuf->getMemBufferRef());
+    LibraryCache.store(HashValue,
+                       CacheEntry::objectFile(ObjBuf->getMemBufferRef()));
   }
 
   return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
