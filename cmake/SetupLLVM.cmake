@@ -1,12 +1,22 @@
 # Find LLVM and Clang packages using the specified LLVM installation directory.
 find_package(LLVM REQUIRED CONFIG NO_DEFAULT_PATH
   HINTS "${LLVM_INSTALL_DIR}"
-  PATH_SUFFIXES "lib/cmake/llvm" "lib64/cmake/llvm" "cmake/llvm"
+  PATH_SUFFIXES
+    "lib/cmake/llvm"
+    "lib64/cmake/llvm"
+    "cmake/llvm"
+    "llvm/lib/cmake/llvm"
+    "llvm/lib64/cmake/llvm"
 )
 
 find_package(Clang REQUIRED CONFIG NO_DEFAULT_PATH
   HINTS "${LLVM_INSTALL_DIR}"
-  PATH_SUFFIXES "lib/cmake/clang" "lib64/cmake/clang" "cmake/clang"
+  PATH_SUFFIXES
+    "lib/cmake/clang"
+    "lib64/cmake/clang"
+    "cmake/clang"
+    "llvm/lib/cmake/clang"
+    "llvm/lib64/cmake/clang"
 )
 
 # Canonicalize found paths when LLVM is built with symlinks to have valid error
