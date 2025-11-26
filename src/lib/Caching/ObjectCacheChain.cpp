@@ -85,10 +85,10 @@ std::unique_ptr<CompiledLibrary> ObjectCacheChain::lookup(HashT &HashValue) {
   // Search from fastest (index 0) to slowest.
   for (size_t I = 0; I < Caches.size(); ++I) {
     if (auto Result = Caches[I]->lookup(HashValue)) {
-      if (I > 0 && Result->isObject() && Result->ObjectModule) {
+      if (I > 0 && Result->isStaticObject() && Result->ObjectModule) {
         // Populate higher-level caches with the found object.
         CacheEntry Entry =
-            CacheEntry::objectFile(Result->ObjectModule->getMemBufferRef());
+            CacheEntry::staticObject(Result->ObjectModule->getMemBufferRef());
         for (size_t J = 0; J < I; ++J) {
           Caches[J]->store(HashValue, Entry);
         }

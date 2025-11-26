@@ -68,7 +68,7 @@ void StorageCache::store(HashT &HashValue, const CacheEntry &Entry) {
 
   std::string Filebase = StorageDirectory + "/" + DistributedRank +
                          "-cache-jit-" + HashValue.toString();
-  std::string Extension = Entry.isDynLib() ? ".so" : ".o";
+  std::string Extension = Entry.isSharedObject() ? ".so" : ".o";
 
   saveToFile(Filebase + Extension, StringRef{Entry.Buffer.getBufferStart(),
                                              Entry.Buffer.getBufferSize()});

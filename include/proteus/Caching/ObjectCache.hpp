@@ -29,12 +29,12 @@ struct CacheEntry {
   MemoryBufferRef Buffer;
   bool IsDynLib;
 
-  static CacheEntry objectFile(MemoryBufferRef Buf) { return {Buf, false}; }
+  static CacheEntry staticObject(MemoryBufferRef Buf) { return {Buf, false}; }
 
   static CacheEntry sharedObject(MemoryBufferRef Buf) { return {Buf, true}; }
 
-  bool isDynLib() const { return IsDynLib; }
-  bool isObject() const { return !IsDynLib; }
+  bool isSharedObject() const { return IsDynLib; }
+  bool isStaticObject() const { return !IsDynLib; }
 };
 
 class ObjectCache {
