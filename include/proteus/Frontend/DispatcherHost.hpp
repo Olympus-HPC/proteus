@@ -28,7 +28,8 @@ public:
     if (!ObjectModule)
       PROTEUS_FATAL_ERROR("Expected non-null object library");
 
-    ObjectCache.store(ModuleHash, ObjectModule->getMemBufferRef());
+    ObjectCache.store(ModuleHash,
+                      CacheEntry::objectFile(ObjectModule->getMemBufferRef()));
 
     return ObjectModule;
   }
@@ -70,7 +71,11 @@ public:
 
   void registerDynamicLibrary(HashT HashValue,
                               const SmallString<128> &Path) override {
-    ObjectCache.storeDynamicLibrary(HashValue, Path);
+    auto Buf = MemoryBuffer::getFile(Path);
+    if (!Buf)
+      PROTEUS_FATAL_ERROR("Failed to read dynamic library: " + Path);
+    ObjectCache.store(HashValue,
+                      CacheEntry::sharedObject((*Buf)->getMemBufferRef()));
   }
 
 protected:

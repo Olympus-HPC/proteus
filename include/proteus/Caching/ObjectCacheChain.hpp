@@ -32,8 +32,7 @@ public:
   explicit ObjectCacheChain(const std::string &Label);
 
   std::unique_ptr<CompiledLibrary> lookup(HashT &HashValue);
-  void store(HashT &HashValue, MemoryBufferRef ObjBufRef);
-  void storeDynamicLibrary(HashT &HashValue, const SmallString<128> &Path);
+  void store(HashT &HashValue, const CacheEntry &Entry);
   void printStats();
 
 private:
