@@ -149,9 +149,11 @@ endif()
 
 find_program(CLANGXX
   NAMES clang++
-  PATHS "${LLVM_INSTALL_DIR}/bin"
   NO_DEFAULT_PATH
   REQUIRED
+  PATHS
+    "${LLVM_INSTALL_DIR}/bin"
+    "${LLVM_INSTALL_DIR}/llvm/bin"
 )
 message(STATUS "Found clang++: ${CLANGXX}")
 
