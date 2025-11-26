@@ -52,7 +52,7 @@
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
 #include "proteus/Caching/MemoryCache.hpp"
-#include "proteus/Caching/StorageCache.hpp"
+#include "proteus/Caching/ObjectCacheChain.hpp"
 #include "proteus/Cloning.h"
 #include "proteus/CompilerAsync.hpp"
 #include "proteus/CompilerInterfaceTypes.h"
@@ -516,11 +516,11 @@ protected:
 
   ~JitEngineDevice() {
     CodeCache.printStats();
-    ObjectCache.printStats();
+    LibraryCache.printStats();
   }
 
   MemoryCache<KernelFunction_t> CodeCache{"JitEngineDevice"};
-  StorageCache ObjectCache{"JitEngineDevice"};
+  ObjectCacheChain LibraryCache{"JitEngineDevice"};
   std::string DeviceArch;
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
@@ -565,7 +565,7 @@ JitEngineDevice<ImplT>::compileAndRun(
   std::string KernelMangled = (KernelInfo.getName() + Suffix);
 
   if (Config::get().ProteusUseStoredCache) {
-    auto CompiledLib = ObjectCache.lookup(HashValue);
+    auto CompiledLib = LibraryCache.lookup(HashValue);
     if (CompiledLib) {
       if (!Config::get().ProteusRelinkGlobalsByCopy)
         relinkGlobalsObject(CompiledLib->ObjectModule->getMemBufferRef(),
@@ -633,7 +633,7 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
   if (Config::get().ProteusUseStoredCache) {
-    ObjectCache.store(HashValue, ObjBuf->getMemBufferRef());
+    LibraryCache.store(HashValue, ObjBuf->getMemBufferRef());
   }
 
   return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,

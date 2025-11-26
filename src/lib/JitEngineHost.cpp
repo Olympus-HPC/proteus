@@ -128,7 +128,7 @@ void JitEngineHost::notifyLoaded(MaterializationResponsibility & /*R*/,
 
 JitEngineHost::~JitEngineHost() {
   CodeCache.printStats();
-  ObjectCache.printStats();
+  LibraryCache.printStats();
 }
 
 void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
@@ -236,9 +236,11 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   std::string Suffix = mangleSuffix(HashValue);
   std::string MangledFnName = FnName.str() + Suffix;
   std::unique_ptr<CompiledLibrary> Library;
-  // Lookup the code library in the storage cache to load without compiling, if
-  // found.
-  if ((Library = ObjectCache.lookup(HashValue))) {
+
+  // Lookup the code library in the object cache chain to load without
+  // compiling, if found.
+  if (Config::get().ProteusUseStoredCache &&
+      (Library = LibraryCache.lookup(HashValue))) {
     loadCompiledLibrary(*Library);
   } else {
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".input.ll", *M));
@@ -248,7 +250,8 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
     // Compile the object.
     auto ObjectModule = compileOnly(*M);
 
-    ObjectCache.store(HashValue, ObjectModule->getMemBufferRef());
+    if (Config::get().ProteusUseStoredCache)
+      LibraryCache.store(HashValue, ObjectModule->getMemBufferRef());
 
     // Create the compiled library and load it.
     Library = std::make_unique<CompiledLibrary>(std::move(ObjectModule));

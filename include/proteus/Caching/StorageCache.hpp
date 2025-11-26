@@ -15,6 +15,7 @@
 
 #include <llvm/Support/MemoryBufferRef.h>
 
+#include "proteus/Caching/ObjectCache.hpp"
 #include "proteus/CompiledLibrary.hpp"
 #include "proteus/Hashing.hpp"
 
@@ -27,17 +28,24 @@ using namespace llvm;
 // assembly (PTX) or binary (ELF), then device globals may have different
 // addresses that render it invalid. In this case, store LLVM IR to re-link
 // globals.
-class StorageCache {
+class StorageCache : public ObjectCache {
 public:
   StorageCache(const std::string &Label);
 
-  std::unique_ptr<CompiledLibrary> lookup(HashT &HashValue);
+  std::string getName() const override { return "Storage"; }
 
-  void store(HashT &HashValue, MemoryBufferRef ObjBufRef);
+  std::unique_ptr<CompiledLibrary> lookup(HashT &HashValue) override;
 
-  void storeDynamicLibrary(HashT &HashValue, const SmallString<128> &Path);
+  void store(HashT &HashValue, MemoryBufferRef ObjBufRef) override;
 
-  void printStats();
+  void storeDynamicLibrary(HashT &HashValue,
+                           const SmallString<128> &Path) override;
+
+  void printStats() override;
+
+  uint64_t getHits() const override { return Hits; }
+
+  uint64_t getAccesses() const override { return Accesses; }
 
 private:
   uint64_t Hits = 0;

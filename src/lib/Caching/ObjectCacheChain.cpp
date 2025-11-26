@@ -1,0 +1,134 @@
+//===-- ObjectCacheChain.cpp -- Object cache chain implementation --===//
+//
+// Part of the Proteus Project, under the Apache License v2.0 with LLVM
+// Exceptions. See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+//===----------------------------------------------------------------------===//
+
+#include "proteus/Caching/ObjectCacheChain.hpp"
+#include "proteus/Caching/StorageCache.hpp"
+#include "proteus/Config.hpp"
+#include "proteus/Logger.hpp"
+#include "proteus/TimeTracing.hpp"
+#include "proteus/Utils.h"
+
+#include <algorithm>
+#include <cctype>
+
+#include <llvm/ADT/SmallVector.h>
+#include <llvm/ADT/StringRef.h>
+
+namespace proteus {
+
+ObjectCacheChain::ObjectCacheChain(const std::string &Label)
+    : Label(Label), DistributedRank(getDistributedRank()) {
+  buildFromConfig(Config::get().ProteusObjectCacheChain);
+}
+
+void ObjectCacheChain::buildFromConfig(const std::string &ConfigStr) {
+  // Parse comma-separated list of cache names.
+  llvm::StringRef Config(ConfigStr);
+  llvm::SmallVector<llvm::StringRef, 4> CacheNames;
+  Config.split(CacheNames, ',', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
+
+  for (const auto &Name : CacheNames) {
+    std::string TrimmedName = Name.trim().str();
+    if (auto Cache = createCache(TrimmedName)) {
+      addCache(std::move(Cache));
+      if (Config::get().ProteusTraceOutput >= 1) {
+        Logger::trace("[ObjectCacheChain] Added cache level: " + TrimmedName +
+                      "\n");
+      }
+    }
+  }
+
+  // Log chain configuration
+  if (Config::get().ProteusTraceOutput >= 1) {
+    std::string ChainDesc = "[ObjectCacheChain] Chain for " + Label + ": ";
+    for (size_t I = 0; I < Caches.size(); ++I) {
+      if (I > 0)
+        ChainDesc += " -> ";
+      ChainDesc += Caches[I]->getName();
+    }
+    ChainDesc += "\n";
+    Logger::trace(ChainDesc);
+  }
+}
+
+std::unique_ptr<ObjectCache>
+ObjectCacheChain::createCache(const std::string &Name) {
+  // Normalize name to lowercase.
+  std::string LowerName = Name;
+  std::transform(LowerName.begin(), LowerName.end(), LowerName.begin(),
+                 [](unsigned char C) { return std::tolower(C); });
+
+  if (LowerName == "storage") {
+    return std::make_unique<StorageCache>(Label);
+  }
+
+  PROTEUS_FATAL_ERROR("Unknown cache type: " + Name);
+  return nullptr;
+}
+
+void ObjectCacheChain::addCache(std::unique_ptr<ObjectCache> Cache) {
+  if (Cache) {
+    Caches.push_back(std::move(Cache));
+  }
+}
+
+std::unique_ptr<CompiledLibrary> ObjectCacheChain::lookup(HashT &HashValue) {
+  TIMESCOPE("ObjectCacheChain::lookup");
+
+  // Search from fastest (index 0) to slowest.
+  for (size_t I = 0; I < Caches.size(); ++I) {
+    if (auto Result = Caches[I]->lookup(HashValue)) {
+      if (I > 0 && Result->isObject() && Result->ObjectModule) {
+        MemoryBufferRef ObjRef = Result->ObjectModule->getMemBufferRef();
+        // Populate higher-level caches with the found object.
+        for (size_t J = 0; J < I; ++J) {
+          Caches[J]->store(HashValue, ObjRef);
+        }
+      }
+
+      if (Config::get().ProteusTraceOutput >= 1) {
+        Logger::trace("[ObjectCacheChain] Hit at level " + std::to_string(I) +
+                      " (" + Caches[I]->getName() + ") for hash " +
+                      HashValue.toString() + "\n");
+      }
+
+      return Result;
+    }
+  }
+
+  return nullptr;
+}
+
+void ObjectCacheChain::store(HashT &HashValue, MemoryBufferRef ObjBufRef) {
+  TIMESCOPE("ObjectCacheChain::store");
+
+  for (auto &Cache : Caches) {
+    Cache->store(HashValue, ObjBufRef);
+  }
+}
+
+void ObjectCacheChain::storeDynamicLibrary(HashT &HashValue,
+                                           const SmallString<128> &Path) {
+  TIMESCOPE("ObjectCacheChain::storeDynamicLibrary");
+
+  for (auto &Cache : Caches) {
+    Cache->storeDynamicLibrary(HashValue, Path);
+  }
+}
+
+void ObjectCacheChain::printStats() {
+  printf("[proteus][%s] ObjectCacheChain rank %s with %zu level(s):\n",
+         Label.c_str(), DistributedRank.c_str(), Caches.size());
+  for (auto &Cache : Caches) {
+    Cache->printStats();
+  }
+}
+
+} // namespace proteus
