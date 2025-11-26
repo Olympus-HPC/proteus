@@ -20,6 +20,7 @@
 
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
+#include <llvm/Support/MemoryBuffer.h>
 
 namespace proteus {
 
@@ -30,9 +31,9 @@ ObjectCacheChain::ObjectCacheChain(const std::string &Label)
 
 void ObjectCacheChain::buildFromConfig(const std::string &ConfigStr) {
   // Parse comma-separated list of cache names.
-  llvm::StringRef Config(ConfigStr);
-  llvm::SmallVector<llvm::StringRef, 4> CacheNames;
-  Config.split(CacheNames, ',', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
+  StringRef ConfigRef(ConfigStr);
+  SmallVector<StringRef, 4> CacheNames;
+  ConfigRef.split(CacheNames, ',', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
 
   for (const auto &Name : CacheNames) {
     std::string TrimmedName = Name.trim().str();
@@ -79,18 +80,34 @@ void ObjectCacheChain::addCache(std::unique_ptr<ObjectCache> Cache) {
   }
 }
 
+void ObjectCacheChain::promoteToLevel(HashT &HashValue, const CacheEntry &Entry,
+                                      size_t Level) {
+  for (size_t J = 0; J < Level; ++J) {
+    Caches[J]->store(HashValue, Entry);
+  }
+}
+
 std::unique_ptr<CompiledLibrary> ObjectCacheChain::lookup(HashT &HashValue) {
   TIMESCOPE("ObjectCacheChain::lookup");
 
   // Search from fastest (index 0) to slowest.
   for (size_t I = 0; I < Caches.size(); ++I) {
     if (auto Result = Caches[I]->lookup(HashValue)) {
-      if (I > 0 && Result->isStaticObject() && Result->ObjectModule) {
-        // Populate higher-level caches with the found object.
-        CacheEntry Entry =
-            CacheEntry::staticObject(Result->ObjectModule->getMemBufferRef());
-        for (size_t J = 0; J < I; ++J) {
-          Caches[J]->store(HashValue, Entry);
+      // Populate higher-level caches with the found entry.
+      if (I > 0) {
+        if (Result->isStaticObject()) {
+          promoteToLevel(
+              HashValue,
+              CacheEntry::staticObject(Result->ObjectModule->getMemBufferRef()),
+              I);
+        } else if (Result->isSharedObject()) {
+          // Read the .so file and promote to higher-level caches.
+          auto Buf = MemoryBuffer::getFile(Result->DynLibPath);
+          if (Buf) {
+            promoteToLevel(HashValue,
+                           CacheEntry::sharedObject((*Buf)->getMemBufferRef()),
+                           I);
+          }
         }
       }
 
