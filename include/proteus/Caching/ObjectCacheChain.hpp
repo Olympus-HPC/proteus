@@ -39,6 +39,7 @@ private:
   void addCache(std::unique_ptr<ObjectCache> Cache);
   void buildFromConfig(const std::string &ConfigStr);
   std::unique_ptr<ObjectCache> createCache(const std::string &Name);
+  void promoteToLevel(HashT &HashValue, const CacheEntry &Entry, size_t Level);
 
   std::vector<std::unique_ptr<ObjectCache>> Caches;
   const std::string Label;
