@@ -1,16 +1,19 @@
-# Add the location of LLVMConfig.cmake to CMake search paths (so that
-# find_package can locate it)
-list(APPEND CMAKE_PREFIX_PATH "${LLVM_INSTALL_DIR}/lib/cmake/llvm/")
-list(APPEND CMAKE_PREFIX_PATH "${LLVM_INSTALL_DIR}/lib/cmake/clang/")
-set(LLVM_DIR "${LLVM_INSTALL_DIR}/lib/cmake/llvm")
-file(REAL_PATH "${LLVM_DIR}" LLVM_DIR)
-set(Clang_DIR "${LLVM_INSTALL_DIR}/lib/cmake/clang")
-file(REAL_PATH "${Clang_DIR}" Clang_DIR)
+# Find LLVM and Clang packages using the specified LLVM installation directory.
+find_package(LLVM REQUIRED CONFIG NO_DEFAULT_PATH
+  HINTS "${LLVM_INSTALL_DIR}"
+  PATH_SUFFIXES "lib/cmake/llvm" "lib64/cmake/llvm" "cmake/llvm"
+)
 
-find_package(LLVM REQUIRED CONFIG NO_DEFAULT_PATH)
+find_package(Clang REQUIRED CONFIG NO_DEFAULT_PATH
+  HINTS "${LLVM_INSTALL_DIR}"
+  PATH_SUFFIXES "lib/cmake/clang" "lib64/cmake/clang" "cmake/clang"
+)
+
+# Canonicalize found paths when LLVM is built with symlinks to have valid error
+# checking string comparisons.
+file(REAL_PATH "${LLVM_DIR}" LLVM_DIR)
+file(REAL_PATH "${Clang_DIR}" Clang_DIR)
 
 if(NOT LLVM_ENABLE_RTTI)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
 endif()
-
-find_package(Clang REQUIRED CONFIG NO_DEFAULT_PATH)
