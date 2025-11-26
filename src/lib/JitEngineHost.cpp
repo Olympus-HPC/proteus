@@ -252,7 +252,7 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 
     if (Config::get().ProteusUseStoredCache)
       LibraryCache.store(
-          HashValue, CacheEntry::objectFile(ObjectModule->getMemBufferRef()));
+          HashValue, CacheEntry::staticObject(ObjectModule->getMemBufferRef()));
 
     // Create the compiled library and load it.
     Library = std::make_unique<CompiledLibrary>(std::move(ObjectModule));
@@ -332,7 +332,7 @@ void JitEngineHost::loadCompiledLibrary(CompiledLibrary &Library) {
   JITDylib &CreatedDylib = *ExpectedJitDyLib;
   Library.JitDyLib = &CreatedDylib;
 
-  if (Library.isDynLib()) {
+  if (Library.isSharedObject()) {
     // Load the dynamic library through a generator using the dynamic library
     // file.
     auto Gen = ExitOnErr(llvm::orc::DynamicLibrarySearchGenerator::Load(

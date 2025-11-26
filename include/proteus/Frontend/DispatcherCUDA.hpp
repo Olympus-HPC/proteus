@@ -38,8 +38,8 @@ public:
     if (!ObjectModule)
       PROTEUS_FATAL_ERROR("Expected non-null object library");
 
-    ObjectCache.store(ModuleHash,
-                      CacheEntry::objectFile(ObjectModule->getMemBufferRef()));
+    ObjectCache.store(
+        ModuleHash, CacheEntry::staticObject(ObjectModule->getMemBufferRef()));
 
     return ObjectModule;
   }
