@@ -46,7 +46,6 @@ void ObjectCacheChain::buildFromConfig(const std::string &ConfigStr) {
     }
   }
 
-  // Log chain configuration
   if (Config::get().ProteusTraceOutput >= 1) {
     std::string ChainDesc = "[ObjectCacheChain] Chain for " + Label + ": ";
     for (size_t I = 0; I < Caches.size(); ++I) {
