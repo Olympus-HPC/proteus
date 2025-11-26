@@ -11,6 +11,7 @@
 #ifndef PROTEUS_OBJECTCACHECHAIN_HPP
 #define PROTEUS_OBJECTCACHECHAIN_HPP
 
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
