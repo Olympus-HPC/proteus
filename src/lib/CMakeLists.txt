@@ -79,41 +79,15 @@ target_include_directories(proteusCore
   $<BUILD_INTERFACE:${PROTEUS_PROJECT_INCLUDE_DIR}>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
-if(PROTEUS_LINK_SHARED_LLVM)
-  if(LLVM_LINK_LLVM_DYLIB)
-    llvm_config(proteus USE_SHARED)
-    set(libs LLVM)
-  else()
-    find_library(LLVM_SHARED_LIB
-      NAMES LLVM
-      PATHS "${LLVM_LIBRARY_DIR}"
-      NO_DEFAULT_PATH
-    )
-
-    if(LLVM_SHARED_LIB)
-      message(STATUS "Found libLLVM.so: ${LLVM_SHARED_LIB}")
-      set(libs ${LLVM_SHARED_LIB})
-    else()
-      message(FATAL_ERROR "The LLVM installation at ${LLVM_DIR} does not provide libLLVM.so, required due to "
-        "PROTEUS_LINK_SHARED_LLVM=ON.
-      Change PROTEUS_LINK_SHARED_LLVM to OFF.
-      ")
-    endif()
+# Link with LLVM libraries dynamically or statically based on the
+# LLVM_LINK_LLVM_DYLIB option provided by the LLVM cmake setup.
+if(LLVM_LINK_LLVM_DYLIB)
+  if(NOT TARGET LLVM)
+    message(FATAL_ERROR "Missing LLVM target. Check LLVM cmake targets")
   endif()
+  set(libs LLVM)
 else()
-  if(LLVM_LINK_LLVM_DYLIB)
-    message(FATAL_ERROR "The LLVM installation at ${LLVM_DIR} requires to link with "
-      "the LLVM shared library, but PROTEUS_LINK_SHARED_LLVM=OFF.
-    Change PROTEUS_LINK_SHARED_LLVM to ON.")
-  endif()
-
   set(libs ${LLVM_AVAILABLE_LIBS})
-
-  # Some LLVM installations include in the LLVM_AVAILABLE_LIBS both an LLVM
-  # shared library AND static libraries. The LLVM shared library bundles those
-  # static libraries and we have to remove it to avoid static initialization
-  # errors from linking with both.
-  list(REMOVE_ITEM libs "LLVM")
 endif()
 
 if(NOT LLVM_ENABLE_RTTI)
@@ -131,9 +105,24 @@ if(PROTEUS_ENABLE_HIP)
   # target_compile_options(proteusCore INTERFACE -x hip)
   list(APPEND libs hip::host)
 
-  # Link with LLD libraries for non-RTC codegen. Use explicit location to avoid
-  # importing from system directories.
-  list(APPEND libs ${LLVM_INSTALL_DIR}/lib/liblldCommon.a ${LLVM_INSTALL_DIR}/lib/liblldELF.a)
+  find_package(LLD REQUIRED CONFIG NO_DEFAULT_PATH
+  HINTS "${LLVM_INSTALL_DIR}"
+  PATH_SUFFIXES
+    "lib/cmake/lld"
+    "lib64/cmake/lld"
+    "cmake/lld"
+    "llvm/lib/cmake/lld"
+    "llvm/lib64/cmake/lld"
+  )
+
+  if(NOT TARGET lldCommon)
+    message(FATAL_ERROR "Missing lldCommon target. Check LLD cmake targets")
+  endif()
+  if(NOT TARGET lldELF)
+    message(FATAL_ERROR "Missing lldELF target. Check LLD cmake targets")
+  endif()
+
+  list(APPEND libs lldCommon lldELF)
 endif()
 
 if(PROTEUS_ENABLE_CUDA)
@@ -141,10 +130,17 @@ if(PROTEUS_ENABLE_CUDA)
   target_include_directories(proteusCore SYSTEM INTERFACE ${CUDAToolkit_INCLUDE_DIRS})
 
   # list(APPEND libs CUDA::cuda_driver CUDA::cudart)
+  list(APPEND libs CUDA::cuda_driver CUDA::cudart_static)
   # TODO: update cmake requirement to > 3.26 to supports the nvPTXCompiler target.
   # list(APPEND libs CUDA::cuda_driver CUDA::cudart_static CUDA::nvptxcompiler_static)
-  list(APPEND libs CUDA::cuda_driver CUDA::cudart_static
-    ${CUDAToolkit_LIBRARY_DIR}/libnvptxcompiler_static.a)
+  find_library(LIBNVPTXCOMPILER
+    NAMES nvptxcompiler nvptxcompiler_static libnvptxcompiler_static
+    REQUIRED
+    NO_DEFAULT_PATH
+    PATHS ${CUDAToolkit_LIBRARY_DIR}
+  )
+  list(APPEND libs "${LIBNVPTXCOMPILER}")
+  message(STATUS "Found libnvptxcompiler: ${LIBNVPTXCOMPILER}")
 endif()
 
 find_program(CLANGXX
@@ -152,13 +148,24 @@ find_program(CLANGXX
   NO_DEFAULT_PATH
   REQUIRED
   PATHS
-    "${LLVM_INSTALL_DIR}/bin"
-    "${LLVM_INSTALL_DIR}/llvm/bin"
+    "${LLVM_BINARY_DIR}/bin"
 )
 message(STATUS "Found clang++: ${CLANGXX}")
 
-# Find all libclang*.a libraries in the LLVM installation
-file(GLOB clang_libs "${LLVM_INSTALL_DIR}/lib/libclang*.a")
+# Find required clang libraries in the LLVM installation.
+if(CLANG_LINK_CLANG_DYLIB)
+    list(APPEND clang_libs clang-cpp)
+else()
+  if(NOT TARGET clangFrontend)
+    message(FATAL_ERROR "Missing clangCodeGen target. Check Clang cmake targets")
+  endif()
+
+  if(NOT TARGET clangCodeGen)
+    message(FATAL_ERROR "Missing clangCodeGen target. Check Clang cmake targets")
+  endif()
+
+  list(APPEND clang_libs clangFrontend clangCodeGen)
+endif()
 
 # Print what we found for debugging
 message(STATUS "Found LLVM libraries: ${libs}")
