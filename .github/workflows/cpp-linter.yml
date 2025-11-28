@@ -37,7 +37,6 @@ jobs:
             -DLLVM_INSTALL_DIR=$(llvm-config --prefix) \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
-            -DPROTEUS_LINK_SHARED_LLVM=on \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=on
       - uses: cpp-linter/cpp-linter-action@v2
         id: linter
