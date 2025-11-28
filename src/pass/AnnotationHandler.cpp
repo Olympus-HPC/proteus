@@ -287,6 +287,11 @@ void AnnotationHandler::parseAnnotations(
       ForcedJitAnnotations.push_back(createJitAnnotation(&F, {}));
     }
 
+    // Return early if there are no forced annotations and avoid creating empty
+    // global annotations which can trip an assertion when parsing.
+    if (ForcedJitAnnotations.empty())
+      return;
+
     // Append the new forced annotations.
     appendToGlobalAnnotations(ForcedJitAnnotations);
 
