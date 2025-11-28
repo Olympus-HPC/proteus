@@ -20,10 +20,6 @@
 using namespace proteus;
 using namespace llvm;
 
-void *JitEngineDeviceCUDA::resolveDeviceGlobalAddr(const void *Addr) {
-  return proteus::resolveDeviceGlobalAddr(Addr);
-}
-
 JitEngineDeviceCUDA &JitEngineDeviceCUDA::instance() {
   static JitEngineDeviceCUDA Jit{};
   return Jit;
@@ -134,22 +130,6 @@ void JitEngineDeviceCUDA::extractModules(BinaryInfo &BinInfo) {
   proteusCuErrCheck(cuModuleUnload(CUMod));
 
   BinInfo.setExtractedModules(LinkedModules);
-}
-
-CUfunction JitEngineDeviceCUDA::getKernelFunctionFromImage(
-    StringRef KernelName, const void *Image,
-    std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo) {
-  return proteus::getKernelFunctionFromImage(
-      KernelName, Image, Config::get().ProteusRelinkGlobalsByCopy,
-      VarNameToGlobalInfo);
-}
-
-cudaError_t
-JitEngineDeviceCUDA::launchKernelFunction(CUfunction KernelFunc, dim3 GridDim,
-                                          dim3 BlockDim, void **KernelArgs,
-                                          uint64_t ShmemSize, CUstream Stream) {
-  return proteus::launchKernelFunction(KernelFunc, GridDim, BlockDim,
-                                       KernelArgs, ShmemSize, Stream);
 }
 
 JitEngineDeviceCUDA::JitEngineDeviceCUDA() {

@@ -28,12 +28,10 @@
 #include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/CoreLLVM.hpp"
-#include "proteus/JitEngine.hpp"
 #include "proteus/JitEngineHost.hpp"
 #include "proteus/LambdaRegistry.hpp"
 #include "proteus/TransformArgumentSpecialization.hpp"
 #include "proteus/TransformLambdaSpecialization.hpp"
-#include "proteus/Utils.h"
 
 using namespace proteus;
 using namespace llvm;
@@ -395,7 +393,7 @@ JitEngineHost::JitEngineHost() {
                       return ObjLinkingLayer;
                     })
                     .create());
-  // Use the main JIT dynamic library to add a generate for host process
+  // Use the main JIT dynamic library to add a generator for host process
   // symbols.
   orc::MangleAndInterner Mangle(LLJITPtr->getExecutionSession(),
                                 LLJITPtr->getDataLayout());

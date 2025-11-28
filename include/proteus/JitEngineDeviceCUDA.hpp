@@ -32,8 +32,6 @@ class JitEngineDeviceCUDA : public JitEngineDevice<JitEngineDeviceCUDA> {
 public:
   static JitEngineDeviceCUDA &instance();
 
-  void *resolveDeviceGlobalAddr(const void *Addr);
-
   void setLaunchBoundsForKernel(Module &M, Function &F, size_t GridSize,
                                 int BlockSize);
 
@@ -45,14 +43,6 @@ public:
 
   void codegenPTX(Module &M, StringRef DeviceArch,
                   SmallVectorImpl<char> &PTXStr);
-
-  CUfunction getKernelFunctionFromImage(
-      StringRef KernelName, const void *Image,
-      std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo);
-
-  cudaError_t launchKernelFunction(CUfunction KernelFunc, dim3 GridDim,
-                                   dim3 BlockDim, void **KernelArgs,
-                                   uint64_t ShmemSize, CUstream Stream);
 
   HashT getModuleHash(BinaryInfo &BinInfo);
 

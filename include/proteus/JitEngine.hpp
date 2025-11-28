@@ -12,7 +12,6 @@
 #define PROTEUS_JITENGINE_HPP
 
 #include <cstdlib>
-#include <optional>
 #include <string>
 
 #include <llvm/ADT/DenseMap.h>
@@ -23,9 +22,7 @@
 #include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/Config.hpp"
 #include "proteus/CoreLLVM.hpp"
-#include "proteus/Debug.h"
 #include "proteus/Hashing.hpp"
-#include "proteus/Logger.hpp"
 
 namespace proteus {
 

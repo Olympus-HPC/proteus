@@ -26,10 +26,6 @@ LLD_HAS_DRIVER(elf)
 using namespace proteus;
 using namespace llvm;
 
-void *JitEngineDeviceHIP::resolveDeviceGlobalAddr(const void *Addr) {
-  return proteus::resolveDeviceGlobalAddr(Addr);
-}
-
 JitEngineDeviceHIP &JitEngineDeviceHIP::instance() {
   static JitEngineDeviceHIP Jit{};
   return Jit;
@@ -359,23 +355,6 @@ void JitEngineDeviceHIP::extractModules(BinaryInfo &BinInfo) {
   }
 
   BinInfo.setExtractedModules(LinkedModules);
-}
-
-hipFunction_t JitEngineDeviceHIP::getKernelFunctionFromImage(
-    StringRef KernelName, const void *Image,
-    std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo) {
-  return proteus::getKernelFunctionFromImage(
-      KernelName, Image, Config::get().ProteusRelinkGlobalsByCopy,
-      VarNameToGlobalInfo);
-}
-
-hipError_t JitEngineDeviceHIP::launchKernelFunction(hipFunction_t KernelFunc,
-                                                    dim3 GridDim, dim3 BlockDim,
-                                                    void **KernelArgs,
-                                                    uint64_t ShmemSize,
-                                                    hipStream_t Stream) {
-  return proteus::launchKernelFunction(KernelFunc, GridDim, BlockDim,
-                                       KernelArgs, ShmemSize, Stream);
 }
 
 JitEngineDeviceHIP::JitEngineDeviceHIP() {
