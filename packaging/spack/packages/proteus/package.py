@@ -65,8 +65,6 @@ class Proteus(CMakePackage):
     # Require the Clang compiler since tests using the Proteus LLVM plugin.
     requires("%clang@18:19", when="+tests")
 
-    # requires("%clang", when="+tests", msg="Building tests requires the Clang compiler")
-
     # Build Dependencies.
     depends_on("c", type="build")
     depends_on("cxx", type="build")
