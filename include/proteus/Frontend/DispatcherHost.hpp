@@ -71,7 +71,7 @@ public:
 
   void registerDynamicLibrary(HashT HashValue,
                               const SmallString<128> &Path) override {
-    auto Buf = MemoryBuffer::getFile(Path);
+    auto Buf = MemoryBuffer::getFileAsStream(Path);
     if (!Buf)
       PROTEUS_FATAL_ERROR("Failed to read dynamic library: " + Path);
     ObjectCache.store(HashValue,

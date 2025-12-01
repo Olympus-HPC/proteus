@@ -101,7 +101,7 @@ std::unique_ptr<CompiledLibrary> ObjectCacheChain::lookup(HashT &HashValue) {
               I);
         } else if (Result->isSharedObject()) {
           // Read the .so file and promote to higher-level caches.
-          auto Buf = MemoryBuffer::getFile(Result->DynLibPath);
+          auto Buf = MemoryBuffer::getFileAsStream(Result->DynLibPath);
           if (Buf) {
             promoteToLevel(HashValue,
                            CacheEntry::sharedObject((*Buf)->getMemBufferRef()),
