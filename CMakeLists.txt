@@ -40,7 +40,6 @@ if (ENABLE_DEVELOPER_COMPILER_FLAGS)
 endif()
 
 if(PROTEUS_ENABLE_HIP)
-  
   find_package(hip REQUIRED CONFIG)
   message(STATUS "HIP Version: ${hip_VERSION}")
   if(hip_VERSION VERSION_LESS "6.2.0")
@@ -49,8 +48,6 @@ if(PROTEUS_ENABLE_HIP)
 endif()
 
 if(PROTEUS_ENABLE_CUDA)
-  
-
   find_package(CUDAToolkit 12 REQUIRED)
   find_file(LIBDEVICE_BC_FILE
     NAMES libdevice.10.bc
