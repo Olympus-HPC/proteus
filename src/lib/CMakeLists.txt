@@ -7,6 +7,8 @@ set(SOURCES
   JitEngine.cpp
   JitEngineHost.cpp
   Caching/StorageCache.cpp
+  JitInterface.cpp
+  Config.cpp
   Frontend/Func.cpp
   Frontend/VarStorage.cpp
   Frontend/Dispatcher.cpp
@@ -47,16 +49,9 @@ add_library(proteusFrontend INTERFACE)
 target_compile_definitions(proteus PUBLIC ${LLVM_DEFINITIONS})
 target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
 
-target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
-
-if(PROTEUS_ENABLE_HIP)
-  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_HIP)
-  target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_HIP)
-elseif(PROTEUS_ENABLE_CUDA)
-  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_CUDA)
+if(PROTEUS_ENABLE_CUDA)
   target_compile_definitions(proteus PRIVATE LIBDEVICE_BC_PATH="${LIBDEVICE_BC_FILE}")
   target_compile_definitions(proteus PRIVATE PROTEUS_CUDA_LIBDIR="${CUDAToolkit_LIBRARY_DIR}")
-  target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_CUDA)
 endif()
 
 if(PROTEUS_ENABLE_TIME_TRACING)
@@ -182,7 +177,7 @@ target_compile_definitions(proteus PRIVATE PROTEUS_CLANGXX_BIN="${CLANGXX}")
 
 target_link_libraries(proteusFrontend INTERFACE proteus "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 
-target_link_libraries(proteusCore INTERFACE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+target_link_libraries(proteusCore INTERFACE proteus ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 
 set_target_properties(proteus PROPERTIES
   INSTALL_RPATH_USE_LINK_PATH TRUE

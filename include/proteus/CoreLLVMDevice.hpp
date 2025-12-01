@@ -3,13 +3,11 @@
 
 #if PROTEUS_ENABLE_HIP
 #include "proteus/CoreLLVMHIP.hpp"
-#endif
-
-#if PROTEUS_ENABLE_CUDA
+#elif PROTEUS_ENABLE_CUDA
 #include "proteus/CoreLLVMCUDA.hpp"
 #endif
 
-#if defined(PROTEUS_ENABLE_HIP) || defined(PROTEUS_ENABLE_CUDA)
+#if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
 
 #include <llvm/Analysis/CallGraph.h>
 #include <llvm/Bitcode/BitcodeReader.h>
@@ -337,6 +335,21 @@ inline void specializeIR(
 
 } // namespace proteus
 
+#else
+#include "proteus/Error.h"
+#include <llvm/IR/Function.h>
+
+namespace proteus {
+
+inline void setLaunchBoundsForKernel(llvm::Function &F, int MaxThreadsPerBlock,
+                                     int MinBlocksPerSM) {
+  (void)F;
+  (void)MaxThreadsPerBlock;
+  (void)MinBlocksPerSM;
+  PROTEUS_FATAL_ERROR("Unsupported target for setLaunchBounds");
+}
+
+} // namespace proteus
 #endif
 
 #endif
