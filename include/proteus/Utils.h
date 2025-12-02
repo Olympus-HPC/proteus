@@ -11,6 +11,7 @@
 #ifndef PROTEUS_UTILS_H
 #define PROTEUS_UTILS_H
 
+#include <filesystem>
 #include <string>
 
 #include <llvm/ADT/Twine.h>
@@ -21,12 +22,18 @@
 #include "proteus/TimeTracing.hpp"
 
 template <typename T> void saveToFile(llvm::StringRef Filepath, T &&Data) {
+  // Write to temp file first, then rename
+  // so readers never see a partial file.
+  std::string TempPath = Filepath.str() + ".tmp";
+
   std::error_code EC;
-  llvm::raw_fd_ostream Out(Filepath, EC);
+  llvm::raw_fd_ostream Out(TempPath, EC);
   if (EC)
-    PROTEUS_FATAL_ERROR("Cannot open file" + Filepath);
+    PROTEUS_FATAL_ERROR("Cannot open file " + TempPath);
   Out << Data;
   Out.close();
+
+  std::filesystem::rename(TempPath, Filepath.str());
 }
 
 inline std::string getDistributedRank() {
