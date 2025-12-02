@@ -3,10 +3,13 @@
 #
 # SPDX-License-Identifier: (Apache-2.0 WITH LLVM-exception)
 
+from spack_repo.builtin.build_systems.cuda import CudaPackage
+from spack_repo.builtin.build_systems.rocm import ROCmPackage
+
 from spack.package import *
 
 
-class Proteus(CMakePackage):
+class Proteus(CMakePackage, CudaPackage, ROCmPackage):
     """
     Proteus: A Programmable Just-In-Time (JIT) Compiler based on LLVM.
     It embeds seamlessly into existing C++ codebases and accelerates
@@ -32,14 +35,6 @@ class Proteus(CMakePackage):
         "tests", default=False, description="Enable building of tests (ENABLE_TESTS)"
     )
     variant(
-        "cuda",
-        default=False,
-        description="Enable CUDA JIT support (PROTEUS_ENABLE_CUDA)",
-    )
-    variant(
-        "hip", default=False, description="Enable HIP JIT support (PROTEUS_ENABLE_HIP)"
-    )
-    variant(
         "time_tracing",
         default=False,
         description="Enable time-trace JSON output (PROTEUS_ENABLE_TIME_TRACING)",
@@ -52,8 +47,8 @@ class Proteus(CMakePackage):
 
     # Disallow enabling both CUDA and HIP at the same time.
     conflicts(
-        "+cuda +hip",
-        msg="Proteus cannot be built with both +cuda and +hip simultaneously",
+        "+cuda +rocm",
+        msg="Proteus cannot be built with both +cuda and +rocm simultaneously",
     )
     # Disallow building proteus as shared library with CUDA due to issue with
     # JIT compilation and device globals.
@@ -62,7 +57,7 @@ class Proteus(CMakePackage):
         msg="Proteus cannot be built as a shared library with +cuda enabled "
         "due to JIT compilation issues with device globals",
     )
-    # Require the Clang compiler since tests using the Proteus LLVM plugin.
+    # Require the Clang compiler since tests use the Proteus LLVM plugin.
     requires("%clang@18:19", when="+tests")
 
     # Build Dependencies.
@@ -72,29 +67,17 @@ class Proteus(CMakePackage):
 
     # Proteus LLVM and Clang dependencies.
     # CUDA enabled.
-    depends_on(
-        "llvm@18:19 +clang targets=all",
-        when="+cuda",
-        type=("build", "link", "run"),
-    )
+    depends_on("llvm@18:19 +clang targets=all", when="+cuda")
 
-    # HIP enabled, use the AMDGPU LLVM build.
-    depends_on(
-        "llvm-amdgpu@6.2:6.4",
-        when="+hip",
-        type=("build", "link", "run"),
-    )
+    # ROCm enabled, use the AMDGPU LLVM build.
+    depends_on("llvm-amdgpu@6.2:6.4", when="+rocm")
 
     # Host-only (no CUDA or HIP).
-    depends_on(
-        "llvm@18:19 +clang",
-        when="~hip ~cuda",
-        type=("build", "link", "run"),
-    )
+    depends_on("llvm@18:19 +clang", when="~rocm ~cuda")
 
     # CUDA and HIP dependencies.
     depends_on("cuda@12:", when="+cuda")
-    depends_on("hip@6.2:6.4", when="+hip")
+    depends_on("hip@6.2:6.4", when="+rocm")
 
     def cmake_args(self):
         # Enforce clang when building tests
@@ -125,15 +108,12 @@ class Proteus(CMakePackage):
         args.append(self.define_from_variant("ENABLE_TESTS", "tests"))
 
         # PROTEUS_ENABLE_HIP / PROTEUS_ENABLE_CUDA.
-        args.append(self.define_from_variant("PROTEUS_ENABLE_HIP", "hip"))
+        args.append(self.define_from_variant("PROTEUS_ENABLE_HIP", "rocm"))
         args.append(self.define_from_variant("PROTEUS_ENABLE_CUDA", "cuda"))
 
         # PROTEUS_ENABLE_TIME_TRACING.
         args.append(
-            self.define_from_variant(
-                "PROTEUS_ENABLE_TIME_TRACING",
-                "time_tracing",
-            )
+            self.define_from_variant("PROTEUS_ENABLE_TIME_TRACING", "time_tracing")
         )
 
         # ENABLE_DEVELOPER_COMPILER_FLAGS.
@@ -144,11 +124,3 @@ class Proteus(CMakePackage):
         )
 
         return args
-
-    def setup_run_environment(self, env):
-        # This ensures downstream projects can find Proteus via CMake
-        env.prepend_path("CMAKE_PREFIX_PATH", self.prefix)
-
-    def setup_dependent_build_environment(self, env, dependent_spec):
-        # Helps dependent packages find Proteus during their build
-        env.prepend_path("CMAKE_PREFIX_PATH", self.prefix)
