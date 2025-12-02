@@ -18,16 +18,22 @@
 #include <llvm/ADT/Twine.h>
 #include <llvm/Support/SourceMgr.h>
 
+#include <filesystem>
 #include <string>
 
 template <typename T>
 inline void saveToFile(llvm::StringRef Filepath, T &&Data) {
+  // Write to temp file first, then rename so readers never see a partial file.
+  std::string TempPath = Filepath.str() + ".tmp";
+
   std::error_code EC;
-  llvm::raw_fd_ostream Out(Filepath, EC);
+  llvm::raw_fd_ostream Out(TempPath, EC);
   if (EC)
-    proteus::reportFatalError("Cannot open file" + Filepath);
+    proteus::reportFatalError("Cannot open file " + Filepath);
   Out << Data;
   Out.close();
+
+  std::filesystem::rename(TempPath, Filepath.str());
 }
 
 inline std::string getDistributedRank() {

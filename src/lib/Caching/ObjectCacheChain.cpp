@@ -10,6 +10,9 @@
 
 #include "proteus/Caching/ObjectCacheChain.h"
 
+#ifdef PROTEUS_ENABLE_MPI
+#include "proteus/Caching/MPISharedStorageCache.h"
+#endif
 #include "proteus/Caching/StorageCache.h"
 #include "proteus/Config.h"
 #include "proteus/Logger.h"
@@ -69,6 +72,13 @@ ObjectCacheChain::createCache(const std::string &Name) {
   if (LowerName == "storage") {
     return std::make_unique<StorageCache>(Label);
   }
+
+#ifdef PROTEUS_ENABLE_MPI
+  if (LowerName == "mpi-storage") {
+    MPI_Comm Comm = MPISharedStorageCache::getDefaultCommunicator();
+    return std::make_unique<MPISharedStorageCache>(Label, Comm);
+  }
+#endif
 
   reportFatalError("Unknown cache type: " + Name);
   return nullptr;
@@ -138,6 +148,12 @@ void ObjectCacheChain::printStats() {
          Label.c_str(), DistributedRank.c_str(), Caches.size());
   for (auto &Cache : Caches) {
     Cache->printStats();
+  }
+}
+
+void ObjectCacheChain::flush() {
+  for (auto &Cache : Caches) {
+    Cache->flush();
   }
 }
 

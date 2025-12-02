@@ -39,6 +39,12 @@ if(PROTEUS_ENABLE_HIP)
   )
 endif()
 
+if(PROTEUS_ENABLE_MPI)
+  list(APPEND SOURCES
+    Caching/MPISharedStorageCache.cpp
+  )
+endif()
+
 add_library(proteus STATIC ${SOURCES})
 set(PROTEUS_TARGETS proteus)
 
@@ -61,6 +67,11 @@ endforeach()
 target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
 
 target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
+
+if(PROTEUS_ENABLE_MPI)
+  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_MPI)
+  target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_MPI)
+endif()
 
 if(PROTEUS_ENABLE_HIP)
   foreach(proteus_target ${PROTEUS_TARGETS})
@@ -168,6 +179,12 @@ if(PROTEUS_ENABLE_CUDA)
   )
   list(APPEND libs "${LIBNVPTXCOMPILER}")
   message(STATUS "Found libnvptxcompiler: ${LIBNVPTXCOMPILER}")
+endif()
+
+if(PROTEUS_ENABLE_MPI)
+  target_include_directories(proteus SYSTEM PRIVATE ${MPI_CXX_INCLUDE_DIRS})
+  target_include_directories(proteusCore SYSTEM INTERFACE ${MPI_CXX_INCLUDE_DIRS})
+  list(APPEND libs MPI::MPI_CXX)
 endif()
 
 find_program(CLANGXX

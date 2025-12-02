@@ -30,6 +30,12 @@ extern "C" void __jit_enable_device();
 extern "C" void __jit_disable_host();
 extern "C" void __jit_disable_device();
 
+#ifdef PROTEUS_ENABLE_MPI
+#include <mpi.h>
+extern "C" void __jit_set_mpi_comm(MPI_Comm Comm);
+extern "C" void __jit_free_mpi_comm();
+#endif
+
 namespace proteus {
 
 template <typename T> __attribute__((noinline)) void jit_arg(T V) noexcept;
@@ -148,7 +154,17 @@ inline void init() {
 #endif
 }
 
+#ifdef PROTEUS_ENABLE_MPI
+inline void init(MPI_Comm Comm) {
+  __jit_set_mpi_comm(Comm);
+  init();
+}
+#endif
+
 inline void finalize() {
+#ifdef PROTEUS_ENABLE_MPI
+  __jit_free_mpi_comm();
+#endif
   __jit_finalize_host();
 #if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
   __jit_finalize_device();
