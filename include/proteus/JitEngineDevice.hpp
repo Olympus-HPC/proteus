@@ -512,6 +512,8 @@ public:
     if (Config::get().ProteusAsyncCompilation)
       CompilerAsync::instance(Config::get().ProteusAsyncThreads)
           .joinAllThreads();
+
+    LibraryCache.flush();
   }
 
   StringRef getDeviceArch() const { return DeviceArch; }
