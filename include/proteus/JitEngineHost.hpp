@@ -18,7 +18,7 @@
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
 
 #include "proteus/Caching/MemoryCache.hpp"
-#include "proteus/Caching/StorageCache.hpp"
+#include "proteus/Caching/ObjectCacheChain.hpp"
 #include "proteus/CompiledLibrary.hpp"
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/JitEngine.hpp"
@@ -58,7 +58,7 @@ private:
   JitEngineHost();
   void addStaticLibrarySymbols();
   MemoryCache<void *> CodeCache{"JitEngineHost"};
-  StorageCache ObjectCache{"JitEngineHost"};
+  ObjectCacheChain LibraryCache{"JitEngineHost"};
 };
 
 } // namespace proteus

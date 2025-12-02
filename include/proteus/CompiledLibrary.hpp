@@ -26,9 +26,9 @@ struct CompiledLibrary {
   CompiledLibrary(const SmallString<128> &Path)
       : DynLibPath{Path}, IsDynLib(true) {}
 
-  bool isDynLib() const { return IsDynLib; }
+  bool isSharedObject() const { return IsDynLib; }
 
-  bool isObject() const { return !IsDynLib; }
+  bool isStaticObject() const { return !IsDynLib; }
 };
 
 } // namespace proteus

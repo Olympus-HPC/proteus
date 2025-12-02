@@ -313,6 +313,7 @@ public:
   int ProteusTraceOutput;
   bool ProteusDebugOutput;
   std::optional<const std::string> ProteusCacheDir;
+  std::string ProteusObjectCacheChain;
 
   const CodeGenerationConfig &getCGConfig(llvm::StringRef KName = "") const {
 
@@ -366,6 +367,8 @@ private:
     ProteusEnableTimers = getEnvOrDefaultBool("PROTEUS_ENABLE_TIMERS", false);
     ProteusTraceOutput = getEnvOrDefaultInt("PROTEUS_TRACE_OUTPUT", 0);
     ProteusDebugOutput = getEnvOrDefaultBool("PROTEUS_DEBUG_OUTPUT", false);
+    ProteusObjectCacheChain =
+        getEnvOrDefaultString("PROTEUS_OBJECT_CACHE_CHAIN").value_or("storage");
   }
 };
 } // namespace proteus
