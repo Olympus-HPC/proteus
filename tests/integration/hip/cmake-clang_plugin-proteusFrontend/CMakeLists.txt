@@ -19,7 +19,10 @@ target_link_options(main PRIVATE
 set_target_properties(main PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 # Build the clang plugin library.
+find_package(LLVM REQUIRED CONFIG)
+find_package(Clang REQUIRED CONFIG)
 add_library(ClangPlugin SHARED ClangPlugin.cpp)
+target_include_directories(ClangPlugin PRIVATE "${LLVM_INCLUDE_DIRS};${CLANG_INCLUDE_DIRS}")
 
 # LLVM is normally built without RTTI. Be consistent with that.
 if(NOT LLVM_ENABLE_RTTI)
