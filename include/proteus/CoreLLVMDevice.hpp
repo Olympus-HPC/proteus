@@ -162,11 +162,12 @@ inline void replaceGlobalVariablesWithPointers(
 
     Constant *Addr =
         ConstantInt::get(Type::getInt64Ty(M.getContext()), 0xDEADBEEFDEADBEEF);
-    auto *CE = ConstantExpr::getIntToPtr(Addr, GV->getType()->getPointerTo());
+    auto *CE = ConstantExpr::getIntToPtr(
+        Addr, PointerType::get(GV->getType(), GV->getAddressSpace()));
     auto *GVarPtr = new GlobalVariable(
-        M, GV->getType()->getPointerTo(), false, GlobalValue::ExternalLinkage,
-        CE, GV->getName() + "$ptr", nullptr, GV->getThreadLocalMode(),
-        GV->getAddressSpace(), true);
+        M, PointerType::get(GV->getType(), GV->getAddressSpace()), false,
+        GlobalValue::ExternalLinkage, CE, GV->getName() + "$ptr", nullptr,
+        GV->getThreadLocalMode(), GV->getAddressSpace(), true);
 
     // Find all Constant users that refer to the global variable.
     SmallPtrSet<Value *, 16> ValuesToReplace;

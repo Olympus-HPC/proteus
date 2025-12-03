@@ -104,7 +104,7 @@ if(PROTEUS_ENABLE_HIP)
   # macro for HIP compilation in our headers to avoid forcing HIP compilation.
   # target_compile_options(proteus PRIVATE -x hip)
   # target_compile_options(proteusCore INTERFACE -x hip)
-  list(APPEND libs hip::host)
+  list(APPEND libs hip::host hiprtc::hiprtc)
 
   find_package(LLD REQUIRED CONFIG NO_DEFAULT_PATH
   HINTS "${LLVM_INSTALL_DIR}"

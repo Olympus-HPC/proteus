@@ -151,8 +151,13 @@ codegenSerial(Module &M, StringRef DeviceArch,
 
   legacy::PassManager PM;
   PM.add(new TargetLibraryInfoWrapperPass(TLII));
-  MachineModuleInfoWrapperPass *MMIWP = new MachineModuleInfoWrapperPass(
-      reinterpret_cast<LLVMTargetMachine *>(TM.get()));
+  MachineModuleInfoWrapperPass *MMIWP =
+#if LLVM_VERSION_MAJOR >= 20
+      new MachineModuleInfoWrapperPass(TM.get());
+#else
+      new MachineModuleInfoWrapperPass(
+          reinterpret_cast<LLVMTargetMachine *>(TM.get()));
+#endif
 
   SmallVector<char, 4096> ObjectCode;
   raw_svector_ostream OS(ObjectCode);
@@ -219,7 +224,7 @@ codegenParallel(Module &M, StringRef DeviceArch, unsigned int OptLevel = 3,
 
   unsigned ParallelCodeGenParallelismLevel =
       std::max(1u, std::thread::hardware_concurrency());
-  lto::LTO L(std::move(Conf), nullptr, ParallelCodeGenParallelismLevel);
+  lto::LTO L(std::move(Conf), {}, ParallelCodeGenParallelismLevel);
 
   // Ensure module has the correct DataLayout prior to emitting bitcode.
   auto ExpectedTM =
