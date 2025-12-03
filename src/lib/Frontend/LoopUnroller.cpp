@@ -21,8 +21,7 @@ void LoopUnroller::attachMetadata(llvm::BasicBlock *LatchBB) const {
   if (!Enabled)
     return;
 
-  auto *BackEdgeBr =
-      llvm::dyn_cast<llvm::BranchInst>(LatchBB->getTerminator());
+  auto *BackEdgeBr = llvm::dyn_cast<llvm::BranchInst>(LatchBB->getTerminator());
   if (!BackEdgeBr)
     PROTEUS_FATAL_ERROR("Expected back-edge branch in latch block");
 
@@ -37,10 +36,9 @@ void LoopUnroller::attachMetadata(llvm::BasicBlock *LatchBB) const {
   LoopMDOperands.push_back(UnrollEnableMD);
 
   if (Count.has_value()) {
-    Metadata *CountOperands[] = {
-        MDString::get(Ctx, "llvm.loop.unroll.count"),
-        ConstantAsMetadata::get(
-            ConstantInt::get(Type::getInt32Ty(Ctx), *Count))};
+    Metadata *CountOperands[] = {MDString::get(Ctx, "llvm.loop.unroll.count"),
+                                 ConstantAsMetadata::get(ConstantInt::get(
+                                     Type::getInt32Ty(Ctx), *Count))};
     MDNode *UnrollCountMD = MDNode::get(Ctx, CountOperands);
     LoopMDOperands.push_back(UnrollCountMD);
   }
