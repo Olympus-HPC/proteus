@@ -51,19 +51,19 @@ int main() {
   J.print();
   J.compile();
 
-  constexpr int N_ELEMS = 16;
+  constexpr int NElems = 16;
   double *X;
-  gpuErrCheck(gpuMallocManaged(&X, sizeof(double) * N_ELEMS));
-  for (int I = 0; I < N_ELEMS; I++) {
+  gpuErrCheck(gpuMallocManaged(&X, sizeof(double) * NElems));
+  for (int I = 0; I < NElems; I++) {
     X[I] = 1.0;
   }
 
   gpuErrCheck(
-      KernelHandle.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, X, N_ELEMS));
+      KernelHandle.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, X, NElems));
   gpuErrCheck(gpuDeviceSynchronize());
 
   std::cout << "For Unroll Results:\n";
-  for (int I = 0; I < N_ELEMS; I++)
+  for (int I = 0; I < NElems; I++)
     std::cout << "X[" << I << "] = " << X[I] << "\n";
 
   gpuErrCheck(gpuFree(X));
