@@ -92,7 +92,7 @@ stages:
   stage: build-and-test
   parallel:
     matrix:
-      - PROTEUS_CI_ROCM_VERSION: ["6.2.1", "6.3.1", "6.4.1"]
+      - PROTEUS_CI_ROCM_VERSION: ["6.3.1", "6.4.1", "7.1.0"]
   trigger:
     include:
       - local: '.gitlab/custom-jobs-and-variables.yml'

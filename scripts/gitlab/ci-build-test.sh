@@ -106,13 +106,16 @@ if [ "${CI_MACHINE}" == "tioga" ] || [ "${CI_MACHINE}" == "tuolumne" ]; then
   PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 PROTEUS_CODEGEN=serial ctest -j8 -T test --output-on-failure
   echo "### $(date) END TESTING (BLOCKING) ASYNC COMPILATION WITH PROTEUS CODEGEN SERIAL ###"
 
-  if [ "${PROTEUS_CI_ROCM_VERSION}" == "6.2.1" ] || [ "${PROTEUS_CI_ROCM_VERSION}" == "6.3.1" ];  then
+  if [ "${PROTEUS_CI_ROCM_VERSION}" == "6.3.1" ] \
+     || [ "${PROTEUS_CI_ROCM_VERSION}" == "6.4.1" ] \
+     || [ "${PROTEUS_CI_ROCM_VERSION}" == "7.1.0" ]; then
     echo "### $(date) START TESTING SYNC COMPILATION WITH PROTEUS CODEGEN PARALLEL ###"
     PROTEUS_CODEGEN=parallel ctest -j8 -T test --output-on-failure
     echo "### $(date) END TESTING SYNC COMPILATION WITH PROTEUS HIP CODEGEN PARALLEL ###"
 
     echo "### $(date) START TESTING (BLOCKING) ASYNC COMPILATION WITH PROTEUS CODEGEN PARALLEL ###"
-    PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 PROTEUS_CODEGEN=parallel ctest -j8 -T test --output-on-failure
+    PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 PROTEUS_CODEGEN=parallel \
+      ctest -j8 -T test --output-on-failure
     echo "### $(date) END TESTING (BLOCKING) ASYNC COMPILATION WITH PROTEUS CODEGEN PARALLEL ###"
   fi
 fi
