@@ -58,8 +58,7 @@ int main() {
     X[I] = 1.0;
   }
 
-  gpuErrCheck(
-      KernelHandle.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, X, NElems));
+  gpuErrCheck(KernelHandle.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, X, NElems));
   gpuErrCheck(gpuDeviceSynchronize());
 
   std::cout << "For Unroll Results:\n";
