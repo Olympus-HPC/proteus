@@ -37,16 +37,25 @@ public:
       : Bounds(Bounds), Body(std::move(Body)), Fn(Fn) {}
 
   ForLoopBuilder &tile(int Tile) {
+    if (Unroller.isEnabled())
+      PROTEUS_FATAL_ERROR(
+          "Cannot tile a loop that is already marked for unrolling");
     TileSize = Tile;
     return *this;
   }
 
   ForLoopBuilder &unroll() {
+    if (TileSize.has_value())
+      PROTEUS_FATAL_ERROR(
+          "Cannot unroll a loop that is already marked for tiling");
     Unroller.enable();
     return *this;
   }
 
   ForLoopBuilder &unroll(int Count) {
+    if (TileSize.has_value())
+      PROTEUS_FATAL_ERROR(
+          "Cannot unroll a loop that is already marked for tiling");
     Unroller.enable(Count);
     return *this;
   }
@@ -159,12 +168,21 @@ private:
     (std::get<Is>(Loops).tile(Tile), ...);
   }
 
+  template <std::size_t... Is>
+  void validateNoUnroll(std::index_sequence<Is...>) const {
+    bool AnyUnrolled = (std::get<Is>(Loops).Unroller.isEnabled() || ...);
+    if (AnyUnrolled)
+      PROTEUS_FATAL_ERROR(
+          "Cannot tile a loop nest containing loops marked for unrolling");
+  }
+
 public:
   LoopNestBuilder(FuncBase &Fn, LoopBuilders... Loops)
       : Loops(std::move(Loops)...), Fn(Fn) {}
 
   LoopNestBuilder &tile(int Tile) {
     auto IdxSeq = std::index_sequence_for<LoopBuilders...>{};
+    validateNoUnroll(IdxSeq);
     tileImpl(Tile, IdxSeq);
     return *this;
   }
