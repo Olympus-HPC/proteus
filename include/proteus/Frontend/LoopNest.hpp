@@ -4,7 +4,9 @@
 #include <memory>
 #include <optional>
 
+#include "proteus/Error.h"
 #include "proteus/Frontend/Func.hpp"
+#include "proteus/Frontend/LoopUnroller.hpp"
 #include "proteus/Frontend/Var.hpp"
 
 namespace proteus {
@@ -26,21 +28,45 @@ public:
   LoopBoundInfo<T> Bounds;
   using LoopIndexType = T;
   std::optional<int> TileSize;
+  LoopUnroller Unroller;
   BodyLambda Body;
   FuncBase &Fn;
 
   ForLoopBuilder(const LoopBoundInfo<T> &Bounds, FuncBase &Fn,
                  BodyLambda &&Body)
       : Bounds(Bounds), Body(std::move(Body)), Fn(Fn) {}
+
   ForLoopBuilder &tile(int Tile) {
     TileSize = Tile;
     return *this;
   }
 
+  ForLoopBuilder &unroll() {
+    Unroller.enable();
+    return *this;
+  }
+
+  ForLoopBuilder &unroll(int Count) {
+    Unroller.enable(Count);
+    return *this;
+  }
+
   void emit() {
     Fn.beginFor(Bounds.IterVar, Bounds.Init, Bounds.UpperBound, Bounds.Inc);
+
+    // Capture the latch block before body execution may change IR structure.
+    llvm::BasicBlock *BodyBB = Fn.getIRBuilder().GetInsertBlock();
+    auto *BodyToLatchBr =
+        llvm::dyn_cast<llvm::BranchInst>(BodyBB->getTerminator());
+    if (!BodyToLatchBr)
+      PROTEUS_FATAL_ERROR("Expected branch from body to latch block");
+    llvm::BasicBlock *LatchBB = BodyToLatchBr->getSuccessor(0);
+
     Body();
     Fn.endFor();
+
+    if (Unroller.isEnabled())
+      Unroller.attachMetadata(LatchBB);
   }
 };
 
