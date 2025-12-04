@@ -26,7 +26,7 @@ struct TimeTracerRAII {
 
   ~TimeTracerRAII() {
     auto &OutputFile = Config::get().ProteusTimeTraceFile;
-    if (auto E = timeTraceProfilerWrite(OutputFile.value_or(""), "-")) {
+    if (auto E = timeTraceProfilerWrite(OutputFile, "-")) {
       handleAllErrors(std::move(E));
       return;
     }
