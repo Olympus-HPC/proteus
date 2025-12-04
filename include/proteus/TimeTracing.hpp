@@ -25,7 +25,8 @@ struct TimeTracerRAII {
   TimeTracerRAII() { timeTraceProfilerInitialize(500 /* us */, "jit"); }
 
   ~TimeTracerRAII() {
-    if (auto E = timeTraceProfilerWrite("", "-")) {
+    auto &OutputFile = Config::get().ProteusTimeTraceFile;
+    if (auto E = timeTraceProfilerWrite(OutputFile.value_or(""), "-")) {
       handleAllErrors(std::move(E));
       return;
     }
