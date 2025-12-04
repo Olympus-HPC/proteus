@@ -87,6 +87,9 @@ inline bool isDeviceKernel(const Function *F) {
     PROTEUS_FATAL_ERROR("Expected non-null function");
 
 #if PROTEUS_ENABLE_CUDA
+#if LLVM_VERSION_MAJOR >= 20
+  return (F->getCallingConv() == CallingConv::PTX_Kernel);
+#else
   const Module &M = *F->getParent();
   auto GetDeviceKernels = [&M]() {
     SmallPtrSet<Function *, 16> Kernels;
@@ -124,6 +127,7 @@ inline bool isDeviceKernel(const Function *F) {
     return true;
 
   return false;
+#endif
 #endif
 
 #if PROTEUS_ENABLE_HIP
