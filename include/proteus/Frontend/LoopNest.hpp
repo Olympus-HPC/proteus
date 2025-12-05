@@ -4,7 +4,9 @@
 #include <memory>
 #include <optional>
 
+#include "proteus/Error.h"
 #include "proteus/Frontend/Func.hpp"
+#include "proteus/Frontend/LoopUnroller.hpp"
 #include "proteus/Frontend/Var.hpp"
 
 namespace proteus {
@@ -26,21 +28,52 @@ public:
   LoopBoundInfo<T> Bounds;
   using LoopIndexType = T;
   std::optional<int> TileSize;
+  LoopUnroller Unroller;
   BodyLambda Body;
   FuncBase &Fn;
 
   ForLoopBuilder(const LoopBoundInfo<T> &Bounds, FuncBase &Fn,
                  BodyLambda &&Body)
       : Bounds(Bounds), Body(std::move(Body)), Fn(Fn) {}
+
   ForLoopBuilder &tile(int Tile) {
+    if (Unroller.isEnabled())
+      PROTEUS_FATAL_ERROR(
+          "Cannot tile a loop that is already marked for unrolling");
     TileSize = Tile;
+    return *this;
+  }
+
+  ForLoopBuilder &unroll() {
+    if (TileSize.has_value())
+      PROTEUS_FATAL_ERROR(
+          "Cannot unroll a loop that is already marked for tiling");
+    Unroller.enable();
+    return *this;
+  }
+
+  ForLoopBuilder &unroll(int Count) {
+    if (TileSize.has_value())
+      PROTEUS_FATAL_ERROR(
+          "Cannot unroll a loop that is already marked for tiling");
+    Unroller.enable(Count);
     return *this;
   }
 
   void emit() {
     Fn.beginFor(Bounds.IterVar, Bounds.Init, Bounds.UpperBound, Bounds.Inc);
+
+    // Capture the latch block before body execution may change IR structure.
+    llvm::BasicBlock *BodyBB = Fn.getIRBuilder().GetInsertBlock();
+    auto *LatchBB = BodyBB->getUniqueSuccessor();
+    if (!LatchBB)
+      PROTEUS_FATAL_ERROR("Expected unique successor for loop latch block");
+
     Body();
     Fn.endFor();
+
+    if (Unroller.isEnabled())
+      Unroller.attachMetadata(LatchBB);
   }
 };
 
@@ -133,12 +166,21 @@ private:
     (std::get<Is>(Loops).tile(Tile), ...);
   }
 
+  template <std::size_t... Is>
+  void validateNoUnroll(std::index_sequence<Is...>) const {
+    bool AnyUnrolled = (std::get<Is>(Loops).Unroller.isEnabled() || ...);
+    if (AnyUnrolled)
+      PROTEUS_FATAL_ERROR(
+          "Cannot tile a loop nest containing loops marked for unrolling");
+  }
+
 public:
   LoopNestBuilder(FuncBase &Fn, LoopBuilders... Loops)
       : Loops(std::move(Loops)...), Fn(Fn) {}
 
   LoopNestBuilder &tile(int Tile) {
     auto IdxSeq = std::index_sequence_for<LoopBuilders...>{};
+    validateNoUnroll(IdxSeq);
     tileImpl(Tile, IdxSeq);
     return *this;
   }
