@@ -11,9 +11,10 @@
 #ifndef PROTEUS_TIME_TRACING_HPP
 #define PROTEUS_TIME_TRACING_HPP
 
-#include <llvm/Support/TimeProfiler.h>
-
 #include <chrono>
+#include <optional>
+
+#include <llvm/Support/TimeProfiler.h>
 
 #include "proteus/Config.hpp"
 
@@ -21,16 +22,24 @@ namespace proteus {
 
 using namespace llvm;
 
+using TimeTraceOptional = std::optional<TimeTraceScope>;
+
 struct TimeTracerRAII {
-  TimeTracerRAII() { timeTraceProfilerInitialize(500 /* us */, "jit"); }
+  TimeTracerRAII() {
+    if (Config::get().ProteusEnableTimeTrace) {
+      timeTraceProfilerInitialize(500 /* us */, "proteus");
+    }
+  }
 
   ~TimeTracerRAII() {
-    auto &OutputFile = Config::get().ProteusTimeTraceFile;
-    if (auto E = timeTraceProfilerWrite(OutputFile, "-")) {
-      handleAllErrors(std::move(E));
-      return;
+    if (Config::get().ProteusEnableTimeTrace) {
+      auto &OutputFile = Config::get().ProteusTimeTraceFile;
+      if (auto E = timeTraceProfilerWrite(OutputFile, "-")) {
+        handleAllErrors(std::move(E));
+        return;
+      }
+      timeTraceProfilerCleanup();
     }
-    timeTraceProfilerCleanup();
   }
 };
 
@@ -59,11 +68,11 @@ private:
   if (Config::get().ProteusEnableTimers)                                       \
     x;
 
-#if PROTEUS_ENABLE_TIME_TRACING
-#define TIMESCOPE(x) TimeTraceScope TTS(x);
-#else
-#define TIMESCOPE(x)
-#endif
+#define TIMESCOPE(x)                                                           \
+  TimeTraceOptional TTS;                                                       \
+  if (Config::get().ProteusEnableTimeTrace) {                                  \
+    TTS.emplace(x);                                                            \
+  }
 
 } // namespace proteus
 

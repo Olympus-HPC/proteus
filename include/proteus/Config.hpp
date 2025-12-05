@@ -314,6 +314,7 @@ public:
   bool ProteusDebugOutput;
   std::optional<const std::string> ProteusCacheDir;
   std::string ProteusObjectCacheChain;
+  bool ProteusEnableTimeTrace;
   std::string ProteusTimeTraceFile;
 
   const CodeGenerationConfig &getCGConfig(llvm::StringRef KName = "") const {
@@ -370,6 +371,8 @@ private:
     ProteusDebugOutput = getEnvOrDefaultBool("PROTEUS_DEBUG_OUTPUT", false);
     ProteusObjectCacheChain =
         getEnvOrDefaultString("PROTEUS_OBJECT_CACHE_CHAIN").value_or("storage");
+    ProteusEnableTimeTrace =
+        getEnvOrDefaultBool("PROTEUS_ENABLE_TIME_TRACE", false);
     ProteusTimeTraceFile =
         getEnvOrDefaultString("PROTEUS_TIME_TRACE_FILE").value_or("");
   }
