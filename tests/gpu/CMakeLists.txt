@@ -77,6 +77,7 @@ function(CREATE_GPU_TEST_RDC exe check_source)
             PUBLIC
             -fpass-plugin=$<TARGET_FILE:ProteusPass>
         )
+        target_compile_options(${exe}.${lang}.rdc PRIVATE --no-offload-new-driver)
 
         # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
         set_target_properties(${exe}.${lang}.rdc PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
@@ -127,6 +128,7 @@ function(CREATE_GPU_LIBRARY lib source)
         target_link_options(${lib} PUBLIC -fgpu-rdc --hip-link)
     elseif(PROTEUS_ENABLE_CUDA)
         # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
+        target_compile_options(${lib} PRIVATE --no-offload-new-driver)
         set_target_properties(${lib} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
     else()
         message(FATAL_ERROR "PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA must be defined for GPU tests")
@@ -162,6 +164,7 @@ function(CREATE_PROTEUS_GPU_LIBRARY lib source)
             PUBLIC
             -fpass-plugin=$<TARGET_FILE:ProteusPass>
         )
+        target_compile_options(${lib} PRIVATE --no-offload-new-driver)
         # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
         set_target_properties(${lib} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
     else()

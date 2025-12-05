@@ -677,8 +677,10 @@ Constant *AnnotationHandler::createJitAnnotation(
 
     if (isDeviceCompilation(M)) {
       constexpr unsigned ConstAddressSpace = 4;
-      RCInfoConsts.push_back(
-          IRB.CreateGlobalString(RCInfoStr, ".str", ConstAddressSpace, &M));
+      Constant *StrConst =
+          IRB.CreateGlobalString(RCInfoStr, ".str", ConstAddressSpace, &M);
+      RCInfoConsts.push_back(ConstantExpr::getPointerBitCastOrAddrSpaceCast(
+          StrConst, Types.PtrTy));
     } else
       RCInfoConsts.push_back(IRB.CreateGlobalString(RCInfoStr, ".str", 0, &M));
   }

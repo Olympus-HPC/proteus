@@ -55,7 +55,7 @@ variables:
   parallel:
     matrix:
       - PROTEUS_CI_ENABLE_TIME_TRACING: ["on", "off"]
-        PROTEUS_CI_LLVM_VERSION: ["18.1.8", "19.1.7"]
+        PROTEUS_CI_LLVM_VERSION: ["18.1.8", "19.1.7", "20.1.8"]
 
 build-and-test-matrix:
   extends: [.base-job, .build-variants]

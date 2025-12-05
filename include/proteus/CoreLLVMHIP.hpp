@@ -9,6 +9,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/LTO/LTO.h>
+#include <llvm/MC/MCSubtargetInfo.h>
 #include <llvm/Support/CodeGen.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/MemoryBuffer.h>
@@ -151,8 +152,13 @@ codegenSerial(Module &M, StringRef DeviceArch,
 
   legacy::PassManager PM;
   PM.add(new TargetLibraryInfoWrapperPass(TLII));
-  MachineModuleInfoWrapperPass *MMIWP = new MachineModuleInfoWrapperPass(
-      reinterpret_cast<LLVMTargetMachine *>(TM.get()));
+  MachineModuleInfoWrapperPass *MMIWP =
+#if LLVM_VERSION_MAJOR >= 20
+      new MachineModuleInfoWrapperPass(TM.get());
+#else
+      new MachineModuleInfoWrapperPass(
+          reinterpret_cast<LLVMTargetMachine *>(TM.get()));
+#endif
 
   SmallVector<char, 4096> ObjectCode;
   raw_svector_ostream OS(ObjectCode);
@@ -205,10 +211,30 @@ codegenParallel(Module &M, StringRef DeviceArch, unsigned int OptLevel = 3,
     }
   };
 
+  // Create TargetMachine and extract options/features.
+  auto ExpectedTM =
+      proteus::detail::createTargetMachine(M, DeviceArch, CodegenOptLevel);
+  if (!ExpectedTM)
+    PROTEUS_FATAL_ERROR(toString(ExpectedTM.takeError()));
+  std::unique_ptr<TargetMachine> TM = std::move(*ExpectedTM);
+
   lto::Config Conf;
   Conf.CPU = DeviceArch;
-  // Use default machine attributes.
-  Conf.MAttrs = {};
+
+  // Propagate attributes from TargetMachine to LTO Config.
+  std::string FeatureStr = TM->getMCSubtargetInfo()->getFeatureString().str();
+  if (!FeatureStr.empty()) {
+    SmallVector<StringRef> Features;
+    StringRef(FeatureStr).split(Features, ',');
+    for (auto &F : Features)
+      Conf.MAttrs.push_back(F.str());
+  } else {
+    Conf.MAttrs = {};
+  }
+
+  // FIX: Propagate TargetOptions (e.g. UnsafeFPMath, etc.)
+  Conf.Options = TM->Options;
+
   Conf.DisableVerify = true;
   Conf.TimeTraceEnabled = false;
   Conf.DebugPassManager = false;
@@ -219,14 +245,9 @@ codegenParallel(Module &M, StringRef DeviceArch, unsigned int OptLevel = 3,
 
   unsigned ParallelCodeGenParallelismLevel =
       std::max(1u, std::thread::hardware_concurrency());
-  lto::LTO L(std::move(Conf), nullptr, ParallelCodeGenParallelismLevel);
+  lto::LTO L(std::move(Conf), {}, ParallelCodeGenParallelismLevel);
 
   // Ensure module has the correct DataLayout prior to emitting bitcode.
-  auto ExpectedTM =
-      proteus::detail::createTargetMachine(M, DeviceArch, CodegenOptLevel);
-  if (!ExpectedTM)
-    PROTEUS_FATAL_ERROR(toString(ExpectedTM.takeError()));
-  std::unique_ptr<TargetMachine> TM = std::move(*ExpectedTM);
   M.setDataLayout(TM->createDataLayout());
 
   SmallString<0> BitcodeBuf;

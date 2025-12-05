@@ -29,6 +29,13 @@ endif()
 # We want to link with LLD with HIP.
 set(PROTEUS_ENABLE_HIP "@PROTEUS_ENABLE_HIP@")
 if(PROTEUS_ENABLE_HIP)
+    # Store HIP/HIPRTC versions.
+    set(PROTEUS_HIP_VERSION "@hip_VERSION@")
+    set(PROTEUS_HIPRTC_VERSION "@hiprtc_VERSION@")
+
+    find_dependency(hip ${PROTEUS_HIP_VERSION} EXACT REQUIRED CONFIG)
+    find_dependency(hiprtc ${PROTEUS_HIPRTC_VERSION} EXACT REQUIRED CONFIG)
+
     set(PROTEUS_LLD_DIR "@LLD_DIR@")
 
     if(DEFINED LLD_DIR)

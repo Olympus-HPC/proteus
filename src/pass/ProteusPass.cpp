@@ -801,8 +801,9 @@ private:
           Builder.CreateStore(ArgPtrAllocas[ArgI], GEP);
         }
       }
-    } else
-      ArgPtrs = Constant::getNullValue(ArgPtrsTy->getPointerTo());
+    } else {
+      ArgPtrs = Constant::getNullValue(PointerType::getUnqual(ArgPtrsTy));
+    }
 
     auto *JitFnPtr =
         Builder.CreateCall(JitEntryFn, {FnNameGlobal, StrIRGlobal,
@@ -1421,21 +1422,30 @@ struct LegacyProteusPass : public ModulePass {
 //-----------------------------------------------------------------------------
 llvm::PassPluginLibraryInfo getProteusPassPluginInfo() {
   const auto Callback = [](PassBuilder &PB) {
-    // TODO: decide where to insert it in the pipeline. Early avoids
-    // inlining jit function (which disables jit'ing) but may require more
-    // optimization, hence overhead, at runtime. We choose after early
-    // simplifications which should avoid inlining and present a reasonably
-    // analyzable IR module.
+  // TODO: decide where to insert it in the pipeline. Early avoids
+  // inlining jit function (which disables jit'ing) but may require more
+  // optimization, hence overhead, at runtime. We choose after early
+  // simplifications which should avoid inlining and present a reasonably
+  // analyzable IR module.
 
-    // NOTE: For device jitting it should be possible to register the pass late
-    // to reduce compilation time and does lose the kernel due to inlining.
-    // However, there are linking errors, working assumption is that the hiprtc
-    // linker cannot re-link already linked device libraries and aborts.
+  // NOTE: For device jitting it should be possible to register the pass late
+  // to reduce compilation time and does lose the kernel due to inlining.
+  // However, there are linking errors, working assumption is that the hiprtc
+  // linker cannot re-link already linked device libraries and aborts.
 
-    // PB.registerPipelineStartEPCallback(
-    // PB.registerOptimizerLastEPCallback(
+  // PB.registerPipelineStartEPCallback(
+  // PB.registerOptimizerLastEPCallback(
+#if LLVM_VERSION_MAJOR >= 20
     PB.registerPipelineEarlySimplificationEPCallback(
-        [&](ModulePassManager &MPM, auto) {
+        [&](ModulePassManager &MPM, OptimizationLevel,
+            ThinOrFullLTOPhase LTOPhase) {
+          if (LTOPhase != ThinOrFullLTOPhase::None) {
+            PROTEUS_FATAL_ERROR("Expected registration only for non-LTO");
+          }
+#else
+    PB.registerPipelineEarlySimplificationEPCallback(
+        [&](ModulePassManager &MPM, OptimizationLevel) {
+#endif
           MPM.addPass(ProteusPass{false});
           return true;
         });

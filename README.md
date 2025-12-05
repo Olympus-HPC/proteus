@@ -40,8 +40,8 @@ In all cases, you link your application against the Proteus runtime library—de
 
 ## Building
 The project uses `cmake` for building and requires an LLVM installation
-(CI tests currently cover LLVM 18, 19 with CUDA versions 12.2, and AMD ROCm versions
-6.2.1, 6.3.1, 6.4.1).
+(CI tests currently cover LLVM 18, 19, 20 with CUDA versions 12.2, and AMD ROCm versions
+6.3.1, 6.4.1, 7.1.0).
 
 See the top-level `CMakeLists.txt` for the available build options.
 A typical build looks like this:

@@ -97,8 +97,8 @@ inline void setLaunchBoundsForKernel(Function &F, int MaxThreadsPerSM,
         ConstantInt::get(Type::getInt32Ty(M->getContext()), MDValue));
 
     for (auto *MetadataNode : NvvmAnnotations->operands()) {
-      // Expecting 3 operands ptr, desc, i32 value.
-      assert(MetadataNode->getNumOperands() == 3);
+      if (MetadataNode->getNumOperands() != 3)
+        continue;
 
       auto *PtrMetadata = MetadataNode->getOperand(0).get();
       auto *DescMetadata = MetadataNode->getOperand(1).get();
@@ -138,8 +138,13 @@ inline void codegenPTX(Module &M, StringRef DeviceArch,
 
   legacy::PassManager PM;
   PM.add(new TargetLibraryInfoWrapperPass(TLII));
-  MachineModuleInfoWrapperPass *MMIWP = new MachineModuleInfoWrapperPass(
-      reinterpret_cast<LLVMTargetMachine *>(TM.get()));
+  MachineModuleInfoWrapperPass *MMIWP =
+#if LLVM_VERSION_MAJOR >= 20
+      new MachineModuleInfoWrapperPass(TM.get());
+#else
+      new MachineModuleInfoWrapperPass(
+          reinterpret_cast<LLVMTargetMachine *>(TM.get()));
+#endif
 
   raw_svector_ostream PTXOS(PTXStr);
 #if LLVM_VERSION_MAJOR >= 18

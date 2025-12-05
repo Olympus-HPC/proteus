@@ -43,7 +43,11 @@ void CppJitModule::compileCppToDynamicLibrary() {
   // Create compiler instance.
   CompilerInstance Compiler;
   // Create diagnostics engine.
+#if LLVM_VERSION_MAJOR >= 20
+  Compiler.createDiagnostics(*vfs::getRealFileSystem());
+#else
   Compiler.createDiagnostics();
+#endif
 
   // We build a driver to compile to a dynamic library object.
   // Create temp source file
@@ -126,7 +130,11 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
   // Create compiler instance.
   CompilerInstance Compiler;
   // Create diagnostics engine.
+#if LLVM_VERSION_MAJOR >= 20
+  Compiler.createDiagnostics(*vfs::getRealFileSystem());
+#else
   Compiler.createDiagnostics();
+#endif
 
   // Hashing should treat Code as a pointer and size to hash all bytes.
   std::string SourceName = ModuleHash.toString() + ".cpp";

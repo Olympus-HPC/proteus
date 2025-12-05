@@ -9,7 +9,7 @@
 .build-variants:
   parallel:
     matrix:
-      - PROTEUS_CI_ROCM_VERSION: ["6.2.1"]
+      - PROTEUS_CI_ROCM_VERSION: ["6.4.1"]
 
 proteus-benchmarks-tioga:
   extends: [.base-job, .build-variants]

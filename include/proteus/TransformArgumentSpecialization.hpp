@@ -160,6 +160,8 @@ public:
         // Create a global variable to hold the array.
         GlobalVariable *GV = new GlobalVariable(
             M, CDA->getType(), true, GlobalValue::PrivateLinkage, CDA);
+        // Set alignment (16 bytes) to safely load int/float/double.
+        GV->setAlignment(Align(16));
 
         // Cast to the expected pointer type.
         C = ConstantExpr::getPointerBitCastOrAddrSpaceCast(GV, ArgType);

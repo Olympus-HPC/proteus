@@ -35,18 +35,24 @@ public:
   }
 };
 
-inline HashT hashValue(HashT &H) { return H; }
+inline HashT hashValue(const HashT &H) { return H; }
 
-inline HashT hashValue(StringRef &S) { return stable_hash_combine_string(S); }
-
-inline HashT hashValue(const std::string &S) {
+// Function that abstracts interface differences in stable hashing across LLVM.
+inline HashT hashValue(const StringRef &S) {
+#if LLVM_VERSION_MAJOR >= 20
+  ArrayRef<uint8_t> Bytes(reinterpret_cast<const uint8_t *>(S.data()),
+                          S.size());
+  return xxh3_64bits(Bytes);
+#else
   return stable_hash_combine_string(S);
+#endif
 }
+
+inline HashT hashValue(const std::string &S) { return hashValue(StringRef{S}); }
 
 template <typename T>
 inline std::enable_if_t<std::is_scalar<T>::value, HashT> hashValue(const T &V) {
-  return stable_hash_combine_string(
-      StringRef{reinterpret_cast<const char *>(&V), sizeof(T)});
+  return hashValue(StringRef{reinterpret_cast<const char *>(&V), sizeof(T)});
 }
 
 template <typename T>
@@ -58,7 +64,7 @@ inline HashT hashRuntimeConstantArray(const RuntimeConstant &RC) {
   if (!RC.ArrInfo.Blob)
     PROTEUS_FATAL_ERROR("Expected non-null Blob");
 
-  return stable_hash_combine_string(
+  return hashValue(
       StringRef{reinterpret_cast<const char *>(RC.ArrInfo.Blob.get()),
                 sizeof(T) * RC.ArrInfo.NumElts});
 }
@@ -70,7 +76,7 @@ inline HashT hashRuntimeConstantObject(const RuntimeConstant &RC) {
   if (!RC.ObjInfo.Blob)
     PROTEUS_FATAL_ERROR("Expected non-null Blob");
 
-  return stable_hash_combine_string(
+  return hashValue(
       StringRef{reinterpret_cast<const char *>(RC.ObjInfo.Blob.get()),
                 static_cast<size_t>(RC.ObjInfo.Size)});
 }
@@ -99,7 +105,7 @@ inline HashT hashArrayRefElement(const RuntimeConstant &RC) {
   } else if (RC.Type == RuntimeConstantType::OBJECT) {
     return hashRuntimeConstantObject(RC);
   } else if (isScalarRuntimeConstantType(RC.Type)) {
-    return stable_hash_combine_string(
+    return hashValue(
         StringRef{reinterpret_cast<const char *>(&RC.Value), sizeof(RC.Value)});
   }
 
