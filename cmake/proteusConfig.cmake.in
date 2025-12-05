@@ -1,56 +1,31 @@
 @PACKAGE_INIT@
 
 include(CMakeFindDependencyMacro)
-set(PROTEUS_LLVM_DIR "@LLVM_DIR@")
-set(PROTEUS_CLANG_DIR "@Clang_DIR@")
 
-if(DEFINED LLVM_DIR)
-    file(REAL_PATH "${LLVM_DIR}" LLVM_DIR)
-    if (NOT "${LLVM_DIR}" STREQUAL "${PROTEUS_LLVM_DIR}")
-        message(FATAL_ERROR "Mismatch between target LLVM_DIR = ${LLVM_DIR} "
-        "and Proteus LLVM_DIR = ${PROTEUS_LLVM_DIR}. "
-        "Use the same LLVM installation when compiling.")
-    endif()
-else()
-    find_dependency(LLVM REQUIRED CONFIG HINTS "${PROTEUS_LLVM_DIR}" NO_DEFAULT_PATH)
-endif()
+string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" PROTEUS_LLVM_VERSION "@LLVM_VERSION@")
+find_dependency(LLVM ${PROTEUS_LLVM_VERSION} EXACT REQUIRED CONFIG)
+message(STATUS "LLVM DIR = ${LLVM_DIR}")
 
-if(DEFINED Clang_DIR)
-    file(REAL_PATH "${Clang_DIR}" Clang_DIR)
-    if (NOT "${Clang_DIR}" STREQUAL "${PROTEUS_CLANG_DIR}")
-        message(FATAL_ERROR "Mismatch between target Clang_DIR = ${Clang_DIR} "
-        "and Proteus Clang_DIR = ${PROTEUS_CLANG_DIR}. "
-        "Use the same LLVM installation when compiling.")
-    endif()
-else()
-    find_dependency(Clang REQUIRED CONFIG HINTS "${PROTEUS_CLANG_DIR}" NO_DEFAULT_PATH)
-endif()
+string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" PROTEUS_CLANG_VERSION "@Clang_VERSION@")
+find_dependency(Clang ${PROTEUS_CLANG_VERSION} EXACT REQUIRED CONFIG HINTS "${LLVM_INSTALL_PREFIX}")
+message(STATUS "Clang DIR = ${Clang_DIR}")
 
 # We want to link with LLD with HIP.
 set(PROTEUS_ENABLE_HIP "@PROTEUS_ENABLE_HIP@")
 if(PROTEUS_ENABLE_HIP)
     # Store HIP/HIPRTC versions.
     set(PROTEUS_HIP_VERSION "@hip_VERSION@")
+    find_dependency(hip ${PROTEUS_HIP_VERSION} EXACT REQUIRED CONFIG HINTS)
+    message(STATUS "hip DIR = ${hip_DIR}")
+
     set(PROTEUS_HIPRTC_VERSION "@hiprtc_VERSION@")
-
-    find_dependency(hip ${PROTEUS_HIP_VERSION} EXACT REQUIRED CONFIG)
     find_dependency(hiprtc ${PROTEUS_HIPRTC_VERSION} EXACT REQUIRED CONFIG)
+    message(STATUS "hiprtc DIR = ${hiprtc_DIR}")
 
-    set(PROTEUS_LLD_DIR "@LLD_DIR@")
-
-    if(DEFINED LLD_DIR)
-        file(REAL_PATH "${LLD_DIR}" LLD_DIR)
-        if (NOT "${LLD_DIR}" STREQUAL "${PROTEUS_LLD_DIR}")
-            message(FATAL_ERROR "Mismatch between target LLD_DIR = ${LLD_DIR} "
-            "and Proteus LLD_DIR = ${PROTEUS_LLD_DIR}. "
-            "Use the same LLVM installation when compiling.")
-        endif()
-    else()
-        find_dependency(LLD REQUIRED CONFIG HINTS "${PROTEUS_LLD_DIR}" NO_DEFAULT_PATH)
-    endif()
+    string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" PROTEUS_LLD_VERSION "@LLD_VERSION@")
+    find_dependency(LLD ${PROTEUS_LLD_VERSION} EXACT REQUIRED CONFIG HINTS "${LLVM_INSTALL_PREFIX}")
+    message(STATUS "LLD DIR = ${LLD_DIR}")
 endif()
-
-message(STATUS "LLVM DIR = ${LLVM_DIR}")
 
 include("${CMAKE_CURRENT_LIST_DIR}/ProteusFunctions.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/proteusTargets.cmake")

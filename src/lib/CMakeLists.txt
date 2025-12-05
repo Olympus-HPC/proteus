@@ -102,15 +102,6 @@ if(PROTEUS_ENABLE_HIP)
   # target_compile_options(proteusCore INTERFACE -x hip)
   list(APPEND libs hip::host hiprtc::hiprtc)
 
-  find_package(LLD REQUIRED CONFIG NO_DEFAULT_PATH
-  HINTS "${LLVM_INSTALL_DIR}"
-  PATH_SUFFIXES
-    "lib/cmake/lld"
-    "lib64/cmake/lld"
-    "cmake/lld"
-    "llvm/lib/cmake/lld"
-    "llvm/lib64/cmake/lld"
-  )
 
   if(NOT TARGET lldCommon)
     message(FATAL_ERROR "Missing lldCommon target. Check LLD cmake targets")
