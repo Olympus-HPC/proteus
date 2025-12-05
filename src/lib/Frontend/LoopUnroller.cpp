@@ -20,16 +20,15 @@ bool LoopUnroller::isEnabled() const { return Enabled; }
 void LoopUnroller::attachMetadata(llvm::BasicBlock *LatchBB) const {
   if (!Enabled)
     return;
-
-  auto *BackEdgeBr = llvm::dyn_cast<llvm::BranchInst>(LatchBB->getTerminator());
-  if (!BackEdgeBr)
-    PROTEUS_FATAL_ERROR("Expected back-edge branch in latch block");
-
   using namespace llvm;
+  auto *BackEdgeBr = dyn_cast<BranchInst>(LatchBB->getTerminator());
+
   LLVMContext &Ctx = BackEdgeBr->getContext();
 
+  // From LanguageRef: "For legacy reasons, the first item
+  // of a loop metadata node must be a reference to itself."
   SmallVector<Metadata *, 4> LoopMDOperands;
-  LoopMDOperands.push_back(nullptr); // Self-reference placeholder.
+  LoopMDOperands.push_back(nullptr);
 
   MDNode *UnrollEnableMD =
       MDNode::get(Ctx, MDString::get(Ctx, "llvm.loop.unroll.enable"));
@@ -44,7 +43,7 @@ void LoopUnroller::attachMetadata(llvm::BasicBlock *LatchBB) const {
   }
 
   MDNode *LoopMD = MDNode::getDistinct(Ctx, LoopMDOperands);
-  LoopMD->replaceOperandWith(0, LoopMD); // Loop metadata self-reference.
+  LoopMD->replaceOperandWith(0, LoopMD);
   BackEdgeBr->setMetadata(LLVMContext::MD_loop, LoopMD);
 }
 

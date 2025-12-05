@@ -65,11 +65,9 @@ public:
 
     // Capture the latch block before body execution may change IR structure.
     llvm::BasicBlock *BodyBB = Fn.getIRBuilder().GetInsertBlock();
-    auto *BodyToLatchBr =
-        llvm::dyn_cast<llvm::BranchInst>(BodyBB->getTerminator());
-    if (!BodyToLatchBr)
-      PROTEUS_FATAL_ERROR("Expected branch from body to latch block");
-    llvm::BasicBlock *LatchBB = BodyToLatchBr->getSuccessor(0);
+    auto *LatchBB = BodyBB->getUniqueSuccessor();
+    if (!LatchBB)
+      PROTEUS_FATAL_ERROR("Expected unique successor for loop latch block");
 
     Body();
     Fn.endFor();
