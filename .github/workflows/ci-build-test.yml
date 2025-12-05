@@ -41,6 +41,7 @@ jobs:
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DENABLE_DEVELOPER_COMPILER_FLAGS=on \
+            -DENABLE_TESTS=on \
             -DLLVM_INSTALL_DIR=$(llvm-config --prefix) \
             -DBUILD_SHARED=${{ matrix.build_shared }} |& tee cmake_output.log
           if grep -q "Manually-specified variables were not used by the project:" cmake_output.log; then
