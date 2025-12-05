@@ -17,9 +17,7 @@
 
 namespace proteus {
 
-#if PROTEUS_ENABLE_TIME_TRACING
 TimeTracerRAII TimeTracer;
-#endif
 
 using namespace llvm;
 

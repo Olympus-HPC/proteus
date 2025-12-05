@@ -58,7 +58,6 @@ CMAKE_OPTIONS+=" -DCMAKE_BUILD_TYPE=Release"
 CMAKE_OPTIONS+=" -DCMAKE_C_COMPILER=$LLVM_INSTALL_DIR/bin/clang -DCMAKE_CXX_COMPILER=$LLVM_INSTALL_DIR/bin/clang++"
 CMAKE_OPTIONS+=" -DENABLE_DEVELOPER_COMPILER_FLAGS=on"
 CMAKE_OPTIONS+=${CMAKE_OPTIONS_MACHINE}
-CMAKE_OPTIONS+=" -DPROTEUS_ENABLE_TIME_TRACING=${PROTEUS_CI_ENABLE_TIME_TRACING}"
 if [ -n "${PROTEUS_CI_BUILD_SHARED}" ]; then
   CMAKE_OPTIONS+=" -DBUILD_SHARED=${PROTEUS_CI_BUILD_SHARED}"
 fi
@@ -72,11 +71,6 @@ if grep -q "Manually-specified variables were not used by the project:" cmake_ou
     exit 1
 fi
 make -j
-
-if  [ "$PROTEUS_CI_ENABLE_DEBUG" == "on" ] || [ "$PROTEUS_CI_ENABLE_TIME_TRACING" == "on" ]; then
-  echo "Skipping tests for debug output or time tracing builds."
-  exit 0
-fi
 
 # Test synchronous compilation (default) and kernel clone options.
 echo "### $(date) START TESTING SYNC COMPILATION KERNEL_CLONE cross-clone ###"

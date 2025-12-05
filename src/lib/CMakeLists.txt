@@ -60,11 +60,6 @@ elseif(PROTEUS_ENABLE_CUDA)
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_CUDA)
 endif()
 
-if(PROTEUS_ENABLE_TIME_TRACING)
-  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_TIME_TRACING)
-  target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_TIME_TRACING)
-endif()
-
 target_include_directories(proteus
   SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS})
 target_include_directories(proteusCore

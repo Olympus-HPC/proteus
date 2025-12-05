@@ -35,11 +35,6 @@ class Proteus(CMakePackage, CudaPackage, ROCmPackage):
         "tests", default=False, description="Enable building of tests (ENABLE_TESTS)"
     )
     variant(
-        "time_tracing",
-        default=False,
-        description="Enable time-trace JSON output (PROTEUS_ENABLE_TIME_TRACING)",
-    )
-    variant(
         "developer_flags",
         default=False,
         description="Enable developer flags (ENABLE_DEVELOPER_COMPILER_FLAGS)",
@@ -110,11 +105,6 @@ class Proteus(CMakePackage, CudaPackage, ROCmPackage):
         # PROTEUS_ENABLE_HIP / PROTEUS_ENABLE_CUDA.
         args.append(self.define_from_variant("PROTEUS_ENABLE_HIP", "rocm"))
         args.append(self.define_from_variant("PROTEUS_ENABLE_CUDA", "cuda"))
-
-        # PROTEUS_ENABLE_TIME_TRACING.
-        args.append(
-            self.define_from_variant("PROTEUS_ENABLE_TIME_TRACING", "time_tracing")
-        )
 
         # ENABLE_DEVELOPER_COMPILER_FLAGS.
         args.append(
