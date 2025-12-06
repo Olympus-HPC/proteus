@@ -15,7 +15,7 @@ set(PROTEUS_ENABLE_HIP "@PROTEUS_ENABLE_HIP@")
 if(PROTEUS_ENABLE_HIP)
     # Store HIP/HIPRTC versions.
     set(PROTEUS_HIP_VERSION "@hip_VERSION@")
-    find_dependency(hip ${PROTEUS_HIP_VERSION} EXACT REQUIRED CONFIG HINTS)
+    find_dependency(hip ${PROTEUS_HIP_VERSION} EXACT REQUIRED CONFIG)
     message(STATUS "hip DIR = ${hip_DIR}")
 
     set(PROTEUS_HIPRTC_VERSION "@hiprtc_VERSION@")
