@@ -46,7 +46,7 @@ echo "Install miniconda..."
 PYTHON_VERSION=3.12
 MINICONDA_DIR=/tmp/proteus-ci-${CI_JOB_ID}/miniconda3
 mkdir -p ${MINICONDA_DIR}
-wget --tries=5 --wait=5 https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -m).sh -O ${MINICONDA_DIR}/miniconda.sh
+wget --tries=5 --retry-connrefused --wait=5 https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -m).sh -O ${MINICONDA_DIR}/miniconda.sh
 bash ${MINICONDA_DIR}/miniconda.sh -b -u -p ${MINICONDA_DIR}
 rm ${MINICONDA_DIR}/miniconda.sh
 source ${MINICONDA_DIR}/bin/activate
