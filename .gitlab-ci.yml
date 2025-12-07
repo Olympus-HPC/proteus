@@ -69,8 +69,11 @@ stages:
   - run-benchmarks
 
 # Template for jobs triggering a build-and-test sub-pipeline:
-.build-and-test:
+.build-and-test-llvm:
   stage: build-and-test
+  parallel:
+    matrix:
+      - PROTEUS_CI_LLVM_VERSION: ["18.1.8", "19.1.7", "20.1.8"]
   trigger:
     include:
       - local: '.gitlab/custom-jobs-and-variables.yml'

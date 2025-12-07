@@ -111,7 +111,7 @@ matrix-build-and-test:
   variables:
     CI_MACHINE: "matrix"
   needs: [matrix-up-check]
-  extends: [.build-and-test]
+  extends: [.build-and-test-llvm]
 
 matrix-proteus-benchmarks:
   variables:
