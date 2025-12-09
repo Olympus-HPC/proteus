@@ -165,6 +165,14 @@ template <> struct DenseMapInfo<RuntimeConstantInfo> {
   }
 };
 
+inline bool isDeviceKernelHostStub(
+    const DenseMap<Value *, GlobalVariable *> &StubToKernelMap, Function &Fn) {
+  if (StubToKernelMap.contains(&Fn))
+    return true;
+
+  return false;
+}
+
 } // namespace llvm
 
 #endif

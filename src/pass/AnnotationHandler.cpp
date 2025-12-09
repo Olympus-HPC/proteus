@@ -270,12 +270,17 @@ void AnnotationHandler::parseAnnotations(
     MapVector<Function *, JitFunctionInfo> &JitFunctionInfoMap,
     const DenseMap<Value *, GlobalVariable *> &StubToKernelMap,
     bool ForceJitAnnotateAll) {
+  auto AttachMetadata = [](Function &F) {
+    // Add metadata to JIT compiled functions so that they are identifiable
+    // by HIP LTO when assembling JIT modules from the linked LTO module.
+    MDString *MDStr = MDString::get(F.getContext(), "proteus.jit");
+    MDNode *MD = MDNode::get(F.getContext(), MDStr);
+    F.setMetadata("proteus.jit", MD);
+  };
   // Forcing annotations overrides any user annotations and makes all kernels
   // jit annotated without any runtime constant arguments.
   if (ForceJitAnnotateAll) {
-    SmallVector<Constant *> ForcedJitAnnotations;
-
-    // Remove any previous user annotations.
+    // Remove any pre-existing global annotations.
     removeJitGlobalAnnotations();
 
     // Create jit annotations for all kernel functions.
@@ -284,29 +289,17 @@ void AnnotationHandler::parseAnnotations(
         continue;
       if (!(isDeviceKernel(&F) || StubToKernelMap.contains(&F)))
         continue;
-      ForcedJitAnnotations.push_back(createJitAnnotation(&F, {}));
+
+      // Communicate back in the JitFunctionInfoMap.
+      JitFunctionInfoMap.insert({&F, JitFunctionInfo{{}, ""}});
+      AttachMetadata(F);
     }
-
-    // Return early if there are no forced annotations and avoid creating empty
-    // global annotations which can trip an assertion when parsing.
-    if (ForcedJitAnnotations.empty())
-      return;
-
-    // Append the new forced annotations.
-    appendToGlobalAnnotations(ForcedJitAnnotations);
-
-    // Parse to create the function map.
-    auto *GlobalAnnotations = M.getNamedGlobal("llvm.global.annotations");
-    parseJitGlobalAnnotations(GlobalAnnotations, JitFunctionInfoMap);
-
-    // Discard after parsing.
-    removeJitGlobalAnnotations();
 
     return;
   }
 
-  // First parse any proteus::jit_arg or proteus::jit_array annotations and
-  // append them to global annotations.
+  // Parse any proteus::jit_arg, proteus::jit_array, proteus::jit_object
+  // annotations.
   SmallPtrSet<Function *, 32> JitArgAnnotations;
   SmallPtrSet<Function *, 32> JitArrayAnnotations;
   SmallPtrSet<Function *, 32> JitObjectAnnotations;
@@ -321,7 +314,7 @@ void AnnotationHandler::parseAnnotations(
     }
   }
 
-  DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> RCInfoMap;
+  MapVector<Function *, SmallSetVector<RuntimeConstantInfo, 16>> RCInfoMap;
   if (!JitArgAnnotations.empty())
     parseJitArgAnnotations(JitArgAnnotations, RCInfoMap);
 
@@ -331,37 +324,39 @@ void AnnotationHandler::parseAnnotations(
   if (!JitObjectAnnotations.empty())
     parseJitObjectAnnotations(JitObjectAnnotations, RCInfoMap);
 
-  SmallVector<Constant *> NewJitAnnotations;
-  for (auto &[F, RCInfos] : RCInfoMap)
-    NewJitAnnotations.push_back(createJitAnnotation(F, RCInfos));
+  // Lastly, parse global annotations and remove them after parsing.
+  parseJitGlobalAnnotations(StubToKernelMap, RCInfoMap);
+  removeJitGlobalAnnotations();
 
-  // We append to global annotations the function-based annotation information
-  // to combine that with attribute annotations for final parsing.
-  if (!NewJitAnnotations.empty())
-    appendToGlobalAnnotations(NewJitAnnotations);
   // If this is device compilation the pass emits a JSON file that stores this
   // information for the host compilation pass to parse for instrumentation.
-  // The JSON file is uniquely named using the TU unique file ID.
-  if (isDeviceCompilation(M))
+  // Otherwise, it is host compilation and attempts to parse the JSON manifest
+  // file.  The JSON file is uniquely named using the TU unique file ID.
+  if (isDeviceCompilation(M)) {
     if (!RCInfoMap.empty())
       createDeviceManifestFile(RCInfoMap);
+  } else {
+    parseManifestFileAnnotations(StubToKernelMap, RCInfoMap);
+  }
 
-  // Last, parse global annotations, either created throught attributes or the
-  // parsed proteus::jit_arg, proteus::jit_array interfaces.
-  auto *GlobalAnnotations = M.getNamedGlobal("llvm.global.annotations");
-  if (!JitArgAnnotations.empty() && !GlobalAnnotations)
-    PROTEUS_FATAL_ERROR("Expected llvm.global.annotations global variable "
-                        "after proteus::jit_arg annotations are parsed.");
+  // Populate the JitFunctionInfoMap using the runtime constant info map, which
+  // gathers all annotations parsed and from the manifest file.
+  for (auto &[F, RCInfos] : RCInfoMap) {
+    // Sort the runtime constant infos by argument position for determinism.
+    auto RCInfoVec = RCInfos.takeVector();
+    std::sort(RCInfoVec.begin(), RCInfoVec.end());
 
-  if (GlobalAnnotations) {
-    parseJitGlobalAnnotations(GlobalAnnotations, JitFunctionInfoMap);
-    removeJitGlobalAnnotations();
+    JitFunctionInfoMap.insert(
+        {F, JitFunctionInfo{SmallSetVector<RuntimeConstantInfo, 16>{
+                                RCInfoVec.begin(), RCInfoVec.end()},
+                            ""}});
+    AttachMetadata(*F);
   }
 }
 
 void AnnotationHandler::parseManifestFileAnnotations(
     const DenseMap<Value *, GlobalVariable *> &StubToKernelMap,
-    MapVector<Function *, JitFunctionInfo> &JitFunctionInfoMap) {
+    MapVector<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap) {
   // Parse the JSON manifest from device compilation, if there exists one, and
   // update JitFunctionInfoMap.
   SmallString<64> UniqueFilename = getUniqueManifestFilename();
@@ -427,11 +422,10 @@ void AnnotationHandler::parseManifestFileAnnotations(
     json::Array *JsonRCInfoArray = KernelObject->getArray("rc");
     if (!JsonRCInfoArray)
       PROTEUS_FATAL_ERROR("Failed parsing json: jit args");
-    // Update the JitFunctionInfoMap for the stub function proxying the
-    // kernel.
-    auto &JFI = JitFunctionInfoMap[F];
+    // Update the RCInfoMap for the stub function proxying the kernel.
+    auto &RCInfos = RCInfoMap[F];
     for (auto J : *JsonRCInfoArray) {
-      auto CreateRuntimeConstantInfo = [&F](json::Object *JsonRCDict) {
+      auto CreateRuntimeConstantInfo = [](json::Object *JsonRCDict) {
         json::Value *ArgV = JsonRCDict->get("arg");
         if (!ArgV)
           PROTEUS_FATAL_ERROR("Expected arg in runtime constant info");
@@ -444,39 +438,6 @@ void AnnotationHandler::parseManifestFileAnnotations(
         auto OptRCType = TypeV->getAsInteger();
         RuntimeConstantType RCType =
             static_cast<RuntimeConstantType>(*OptRCType);
-
-        Type *ArgType = F->getArg(ArgNo)->getType();
-        RuntimeConstantType ExpectedRCType =
-            convertTypeToRuntimeConstantType(ArgType);
-        if (ExpectedRCType != RCType) {
-          // For GPU code, long double decays to double but the host code still
-          // pushes a long double to kernel args. Update the RCType to avoid
-          // data marshaling errors.
-          if (ExpectedRCType == RuntimeConstantType::LONG_DOUBLE &&
-              RCType == RuntimeConstantType::DOUBLE)
-            RCType = RuntimeConstantType::LONG_DOUBLE;
-          else if (ExpectedRCType == RuntimeConstantType::PTR &&
-                   (RCType == RuntimeConstantType::ARRAY ||
-                    RCType == RuntimeConstantType::OBJECT)) {
-            // This is a valid check since there is no way we can distinguish a
-            // PTR from an ARRAY or OBJECT just by looking at the function
-            // argument type, so no-op.
-            ;
-          } else if ((isScalarRuntimeConstantType(ExpectedRCType) ||
-                      ExpectedRCType == RuntimeConstantType::STATIC_ARRAY ||
-                      ExpectedRCType == RuntimeConstantType::VECTOR) &&
-                     (RCType == RuntimeConstantType::OBJECT)) {
-            // This is a valid since device stubs may have coerced scalar or
-            // static array arguments.
-            ;
-          } else {
-            PROTEUS_FATAL_ERROR("Type mismatch, function " + F->getName() +
-                                " for argument (0-index) " +
-                                std::to_string(ArgNo) + " expected " +
-                                toString(ExpectedRCType) + " but found " +
-                                toString(RCType));
-          }
-        }
 
         if (RCType == RuntimeConstantType::ARRAY) {
           json::Value *EltTypeV = JsonRCDict->get("elt-type");
@@ -542,17 +503,11 @@ void AnnotationHandler::parseManifestFileAnnotations(
       };
 
       RuntimeConstantInfo RCI = CreateRuntimeConstantInfo(J.getAsObject());
-      // RuntimeConstantInfo RCI{RuntimeConstantType::NONE, 0};
-      if (!JFI.ConstantArgs.insert(RCI))
+      if (!RCInfos.insert(RCI))
         PROTEUS_FATAL_ERROR(
             "Duplicate JIT annotation for argument (0-index): " +
             std::to_string(RCI.ArgInfo.Pos));
     }
-
-    SmallVector<RuntimeConstantInfo> SortedRCInfos{JFI.ConstantArgs.begin(),
-                                                   JFI.ConstantArgs.end()};
-    std::sort(SortedRCInfos.begin(), SortedRCInfos.end());
-    JFI.ConstantArgs = {SortedRCInfos.begin(), SortedRCInfos.end()};
   }
 
   std::remove(UniqueFilename.c_str());
@@ -624,8 +579,8 @@ Constant *AnnotationHandler::createJitAnnotation(
   // We don't know the line number, hence we store 0.
   AnnotationVals[3] = IRB.getInt32(0);
 
-  // If there aren't any runtime constant arguments set annotation value to the
-  // null value and return early.
+  // If there aren't any runtime constant arguments set annotation value to
+  // the null value and return early.
   if (RCInfos.empty()) {
     AnnotationVals[4] =
         Constant::getNullValue(Types.GlobalAnnotationEltTy->getElementType(4));
@@ -637,8 +592,8 @@ Constant *AnnotationHandler::createJitAnnotation(
   }
 
   // Create the JIT argument information in long form to include the argument
-  // number and possible size. Each RCInfo will create a global variable string
-  // with key-value pairs to store the information.
+  // number and possible size. Each RCInfo will create a global variable
+  // string with key-value pairs to store the information.
   SmallVector<Type *> RCInfoTypes{RCInfos.size(), Types.PtrTy};
   StructType *RCInfoStructTy = StructType::get(M.getContext(), RCInfoTypes);
   SmallVector<Constant *> RCInfoConsts;
@@ -707,19 +662,34 @@ Constant *AnnotationHandler::createJitAnnotation(
 }
 
 void AnnotationHandler::createDeviceManifestFile(
-    DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap) {
+    MapVector<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap) {
   // Emit JSON file manifest which contains the kernel symbol and
   // JIT-annotated arguments.
   SmallString<64> UniqueFilename = getUniqueManifestFilename();
-  std::error_code EC;
-  raw_fd_ostream OS(UniqueFilename, EC, sys::fs::OF_Text);
-  if (EC)
-    PROTEUS_FATAL_ERROR("Error opening device manifest file " + EC.message());
+  // Create a temporary file for the manifest at UniqueFilename.
+  // Use sys::fs::TempFile::create so the file is created atomically and the
+  // temporary file is tracked for automatic removal on error/exit (including
+  // removal on signals).
+  Expected<sys::fs::TempFile> ManifestFile = sys::fs::TempFile::create(
+      UniqueFilename, sys::fs::all_read | sys::fs::all_write, sys::fs::OF_Text);
+  if (auto E = ManifestFile.takeError())
+    PROTEUS_FATAL_ERROR("Error creating device manifest file: " +
+                        UniqueFilename + ", error: " + toString(std::move(E)));
+
+  raw_fd_ostream OS(ManifestFile->FD, /*shouldClose=*/false);
+  if (OS.has_error())
+    PROTEUS_FATAL_ERROR("Error opening device manifest file " +
+                        OS.error().message());
 
   json::Object ManifestInfo;
   json::Array KernelArray;
 
   for (auto &[F, RCInfos] : RCInfoMap) {
+    // Skip non-kernel device functions that were JIT annotated (e.g., a lambda)
+    // as their argument handling is independent of the manifest.
+    if (!isDeviceKernel(F))
+      continue;
+
     json::Object KernelObject;
     KernelObject["symbol"] = F->getName();
 
@@ -763,7 +733,7 @@ void AnnotationHandler::createDeviceManifestFile(
 
 void AnnotationHandler::parseJitArgAnnotations(
     SmallPtrSetImpl<Function *> &JitArgAnnotations,
-    DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap) {
+    MapVector<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap) {
   // Iterate over all proteus::jit_arg annotations and store the information
   // in RCInfoMap.
   SmallVector<CallBase *> CallsToDelete;
@@ -818,7 +788,7 @@ void AnnotationHandler::parseJitArgAnnotations(
 
 void AnnotationHandler::parseJitArrayAnnotations(
     SmallPtrSetImpl<Function *> &JitArrayAnnotations,
-    DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap) {
+    MapVector<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap) {
   // Iterate over all proteus::jit_array annotations and store the information
   // in RCInfoMap.
   SmallVector<CallBase *> CallsToDelete;
@@ -880,10 +850,10 @@ void AnnotationHandler::parseJitArrayAnnotations(
     }
   }
 
-  // Remove JitArray annotations and their calls as they are not needed anymore.
-  // Also removing them avoids errors with LTO and O0 compilation: LTO will
-  // find those annotations and attempt to create a manifest which will cause
-  // an error since it is not backed by a source filename.
+  // Remove JitArray annotations and their calls as they are not needed
+  // anymore. Also removing them avoids errors with LTO and O0 compilation:
+  // LTO will find those annotations and attempt to create a manifest which
+  // will cause an error since it is not backed by a source filename.
   for (CallBase *CB : CallsToDelete)
     CB->eraseFromParent();
 
@@ -896,7 +866,7 @@ void AnnotationHandler::parseJitArrayAnnotations(
 
 void AnnotationHandler::parseJitObjectAnnotations(
     SmallPtrSetImpl<Function *> &JitObjectAnnotations,
-    DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap) {
+    MapVector<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap) {
   // Iterate over all proteus::jit_object annotations and store the
   // information in the JitArgs map.
   SmallVector<CallBase *> CallsToDelete;
@@ -925,13 +895,13 @@ void AnnotationHandler::parseJitObjectAnnotations(
 
         ConstantInt *SizeCI = dyn_cast<ConstantInt>(SizeV);
         if (!SizeCI)
-          PROTEUS_FATAL_ERROR(
-              "Expected constant for the size argument of proteus::jit_object");
+          PROTEUS_FATAL_ERROR("Expected constant for the size argument of "
+                              "proteus::jit_object");
         int32_t Size = SizeCI->getZExtValue();
 
-        // If the object argument is passed byref or byval then the argument is
-        // a pointer to the object, otherwise it is a pointer to a pointer of
-        // the object.
+        // If the object argument is passed byref or byval then the argument
+        // is a pointer to the object, otherwise it is a pointer to a pointer
+        // of the object.
         bool PassByValue =
             (Arg->hasByRefAttr() || Arg->hasByValAttr()) ? true : false;
 
@@ -950,7 +920,8 @@ void AnnotationHandler::parseJitObjectAnnotations(
 
         if (CoercedArgs.empty())
           PROTEUS_FATAL_ERROR(
-              "Expected non-null argument. Possible cause: proteus::jit_object "
+              "Expected non-null argument. Possible cause: "
+              "proteus::jit_object "
               "argument is not an argument of the enclosing function and "
               "coercion could not be detected.");
 
@@ -1105,8 +1076,12 @@ static RuntimeConstantInfo parseAttributeJsonRuntimeConstantObject(
 }
 
 void AnnotationHandler::parseJitGlobalAnnotations(
-    GlobalVariable *GlobalAnnotations,
-    MapVector<Function *, JitFunctionInfo> &JitFunctionInfoMap) {
+    const DenseMap<Value *, GlobalVariable *> &StubToKernelMap,
+    MapVector<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap) {
+  auto *GlobalAnnotations = M.getNamedGlobal("llvm.global.annotations");
+  if (!GlobalAnnotations)
+    return;
+
   auto *Array = cast<ConstantArray>(GlobalAnnotations->getOperand(0));
   DEBUG(Logger::logs("proteus-pass") << "Annotation Array " << *Array << "\n");
   for (unsigned int I = 0; I < Array->getNumOperands(); I++) {
@@ -1117,15 +1092,26 @@ void AnnotationHandler::parseJitGlobalAnnotations(
 
     assert(Fn && "Expected function in entry operands");
 
-    // Check the annotated function is a kernel function or a device
-    // lambda.
     if (isDeviceCompilation(M)) {
+      // Check the annotated function is a kernel function or a device
+      // lambda for device compilation.
       if (!isDeviceKernel(Fn) && !isLambdaFunction(*Fn))
         PROTEUS_FATAL_ERROR(
             std::string{} + __FILE__ + ":" + std::to_string(__LINE__) +
             " => Expected the annotated Fn " + Fn->getName() + " (" +
             demangle(Fn->getName().str()) +
             ") to be a kernel function or device lambda function!");
+    } else {
+      // Skip device kernel host stub functions for host compilation, to be
+      // handled by device compilation and manifest generation.
+      if (isDeviceKernelHostStub(StubToKernelMap, *Fn)) {
+        DEBUG(Logger::logs("proteus-pass")
+              << "Skip annotation for device kernel host stub function: "
+              << Fn->getName()
+              << " , this is handled separately through device compilation and "
+                 "manifest generation.\n");
+        continue;
+      }
     }
 
     DEBUG(Logger::logs("proteus-pass")
@@ -1142,16 +1128,10 @@ void AnnotationHandler::parseJitGlobalAnnotations(
       continue;
 
     // Get or create the JitFunctionInfo for Fn.
-    JitFunctionInfo &JFI = JitFunctionInfoMap[Fn];
-    // Add metadata to JIT compiled functions so that they are identifiable by
-    // HIP LTO when assembling JIT modules from the linked LTO module.
-    MDString *MDStr = MDString::get(M.getContext(), "proteus.jit");
-    MDNode *MD = MDNode::get(M.getContext(), MDStr);
-    Fn->setMetadata("proteus.jit", MD);
+    auto &RCInfos = RCInfoMap[Fn];
 
     if (Entry->getOperand(4)->isNullValue()) {
-      JFI.ConstantArgs = {};
-      JitFunctionInfoMap[Fn] = JFI;
+      RCInfos = {};
       continue;
     }
 
@@ -1173,8 +1153,8 @@ void AnnotationHandler::parseJitGlobalAnnotations(
 
     for (unsigned int J = 0; J < AnnotArgs->getNumOperands(); ++J) {
       Constant *C = AnnotArgs->getOperand(J)->stripPointerCasts();
-      // We parse either numeric arguments in short form or the key-value pairs
-      // in long form.
+      // We parse either numeric arguments in short form or the key-value
+      // pairs in long form.
       if (isa<ConstantInt>(C)) {
         auto *Index = cast<ConstantInt>(AnnotArgs->getOperand(J));
         // We subtract 1 to convert to 0-start index.
@@ -1265,15 +1245,11 @@ void AnnotationHandler::parseJitGlobalAnnotations(
 
     // Insert RC infos and sort JFI.ConstantArgs for determinism.
     for (auto &RCInfo : ParsedRuntimeConstantInfo) {
-      if (!JFI.ConstantArgs.insert(RCInfo)) {
+      if (!RCInfos.insert(RCInfo)) {
         PROTEUS_FATAL_ERROR("Duplicate entry found for arg no " +
                             std::to_string(RCInfo.ArgInfo.Pos));
       }
     }
-    SmallVector<RuntimeConstantInfo> SortedRCInfos{JFI.ConstantArgs.begin(),
-                                                   JFI.ConstantArgs.end()};
-    std::sort(SortedRCInfos.begin(), SortedRCInfos.end());
-    JFI.ConstantArgs = {SortedRCInfos.begin(), SortedRCInfos.end()};
   }
 }
 

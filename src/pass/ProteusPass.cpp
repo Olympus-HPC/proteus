@@ -137,8 +137,6 @@ public:
     registerLambdaFunctions(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
-      AnnotHandler.parseManifestFileAnnotations(StubToKernelMap,
-                                                JitFunctionInfoMap);
       instrumentRegisterFunction(M);
       emitJitLaunchKernelCall(M);
     }
@@ -880,15 +878,6 @@ private:
               << "\n");
       }
     return StubToKernelMap;
-  }
-
-  bool isDeviceKernelHostStub(
-      const DenseMap<Value *, GlobalVariable *> &StubToKernelMap,
-      Function &Fn) {
-    if (StubToKernelMap.contains(&Fn))
-      return true;
-
-    return false;
   }
 
   bool hasDeviceLaunchKernelCalls(Module &M) {

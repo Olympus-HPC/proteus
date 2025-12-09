@@ -130,6 +130,8 @@ inline KernelCloneOption getEnvOrDefaultKC(const char *VarName,
 class CodeGenerationConfig {
   static constexpr bool DefaultSpecializeDimsRange =
 #if PROTEUS_ENABLE_CUDA
+      // Disable SpecializeDimsRange on CUDA builds: empirically causes worse
+      // optimization, so default to false.
       false;
 #else
       true;

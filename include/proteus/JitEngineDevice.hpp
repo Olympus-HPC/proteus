@@ -153,7 +153,12 @@ public:
   }
 
   bool hasModuleHash() const { return ExtractedModuleHash.has_value(); }
-  HashT getModuleHash() const { return ExtractedModuleHash.value(); }
+  HashT getModuleHash() const {
+    if (!hasModuleHash())
+      PROTEUS_FATAL_ERROR("Expected module hash to be set");
+
+    return ExtractedModuleHash.value();
+  }
   void setModuleHash(HashT HashValue) { ExtractedModuleHash = HashValue; }
   void updateModuleHash(HashT HashValue) {
     if (ExtractedModuleHash)
