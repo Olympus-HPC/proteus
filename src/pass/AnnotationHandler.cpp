@@ -561,10 +561,13 @@ SmallString<64> AnnotationHandler::getUniqueManifestFilename() {
   // Use the parent process id and the unique file id to uniquely identify the
   // manifest file for a specific compilation, assuming the parent process is
   // the same for both device and host compilation.
-  return {
-      TmpPath.string(),           "/",
-      "proteus-device-manifest-", std::to_string(helpers::getParentProcessId()),
-      getUniqueFileID(M),         ".json"};
+  return {TmpPath.string(),
+          "/",
+          "proteus-device-manifest-",
+          std::to_string(helpers::getParentProcessId()),
+          "-",
+          getUniqueFileID(M),
+          ".json"};
 }
 
 void AnnotationHandler::appendToGlobalAnnotations(
