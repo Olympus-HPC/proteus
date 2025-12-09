@@ -666,20 +666,16 @@ void AnnotationHandler::createDeviceManifestFile(
   // Emit JSON file manifest which contains the kernel symbol and
   // JIT-annotated arguments.
   SmallString<64> UniqueFilename = getUniqueManifestFilename();
-  // Create a temporary file for the manifest at UniqueFilename.
-  // Use sys::fs::TempFile::create so the file is created atomically and the
-  // temporary file is tracked for automatic removal on error/exit (including
-  // removal on signals).
-  Expected<sys::fs::TempFile> ManifestFile = sys::fs::TempFile::create(
-      UniqueFilename, sys::fs::all_read | sys::fs::all_write, sys::fs::OF_Text);
-  if (auto E = ManifestFile.takeError())
-    PROTEUS_FATAL_ERROR("Error creating device manifest file: " +
-                        UniqueFilename + ", error: " + toString(std::move(E)));
 
-  raw_fd_ostream OS(ManifestFile->FD, /*shouldClose=*/false);
+  int FD = -1;
+  std::error_code EC = sys::fs::openFileForWrite(UniqueFilename, FD);
+  if (EC)
+    PROTEUS_FATAL_ERROR("Error creating device manifest file: " +
+                        UniqueFilename + ", error: " + EC.message());
+  raw_fd_ostream OS(FD, /*shouldClose=*/true);
   if (OS.has_error())
-    PROTEUS_FATAL_ERROR("Error opening device manifest file " +
-                        OS.error().message());
+    PROTEUS_FATAL_ERROR("Error opening device manifest file: " +
+                        UniqueFilename + ", error: " + OS.error().message());
 
   json::Object ManifestInfo;
   json::Array KernelArray;
