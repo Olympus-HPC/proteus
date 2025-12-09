@@ -85,8 +85,6 @@ private:
   void forwardToWriter(HashT &HashValue, const CacheEntry &Entry);
   void waitForPendingSends();
   std::vector<char> packMessage(const HashT &HashValue, const CacheEntry &Entry);
-  std::tuple<HashT, std::vector<char>, bool>
-  unpackMessage(const std::vector<char> &Buffer);
   void saveToDisk(const HashT &HashValue, const char *Data, size_t Size,
                   bool IsDynLib);
   static int computeTag(const std::string &Label);
