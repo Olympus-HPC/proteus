@@ -10,7 +10,6 @@
 
 #include <cstring>
 #include <filesystem>
-#include <functional>
 #include <limits>
 
 #include <mpi.h>
@@ -28,6 +27,38 @@
 namespace proteus {
 
 using namespace llvm;
+
+/// Unpacked MPI message containing cache entry data.
+struct UnpackedMessage {
+  HashT Hash;
+  std::vector<char> Data;
+  bool IsDynLib;
+};
+
+static UnpackedMessage unpackMessage(const std::vector<char> &Buffer) {
+  const char *Ptr = Buffer.data();
+
+  uint32_t HashSize = 0;
+  std::memcpy(&HashSize, Ptr, sizeof(HashSize));
+  Ptr += sizeof(HashSize);
+
+  std::string HashStr(Ptr, HashSize);
+  Ptr += HashSize;
+
+  uint8_t IsDynLib = 0;
+  std::memcpy(&IsDynLib, Ptr, sizeof(IsDynLib));
+  Ptr += sizeof(IsDynLib);
+
+  uint64_t BufferSize = 0;
+  std::memcpy(&BufferSize, Ptr, sizeof(BufferSize));
+  Ptr += sizeof(BufferSize);
+
+  std::vector<char> Data(BufferSize);
+  std::memcpy(Data.data(), Ptr, BufferSize);
+
+  return UnpackedMessage{HashT(StringRef(HashStr)), std::move(Data),
+                         IsDynLib != 0};
+}
 
 //===----------------------------------------------------------------------===//
 // MPICommHandle implementation
@@ -105,13 +136,11 @@ void MPISharedStorageCache::clearDefaultCommunicator() {
 }
 
 int MPISharedStorageCache::computeTag(const std::string &Label) {
-  // Use hash of label to generate a unique tag. MPI tags must be non-negative
-  // and less than MPI_TAG_UB. We use a range starting at 1000 to avoid
-  // collision with common user tags.
-  std::hash<std::string> Hasher;
-  size_t Hash = Hasher(Label);
-  // Map to range [1000, 32767] (safe for all MPI implementations).
-  return 1000 + static_cast<int>(Hash % 31768);
+  if (Label == "JitEngineDevice")
+    return 0;
+  if (Label == "JitEngineHost")
+    return 1;
+  PROTEUS_FATAL_ERROR("Unknown cache label: " + Label);
 }
 
 MPISharedStorageCache::MPISharedStorageCache(const std::string &Label,
@@ -127,7 +156,7 @@ MPISharedStorageCache::MPISharedStorageCache(const std::string &Label,
   MPI_Comm_size(DupComm, &Size);
   IsWriter = (Rank == 0);
 
-  std::filesystem::create_directories(StorageDirectory);
+  std::filesystem::create_directory(StorageDirectory);
 
   if (Config::get().ProteusTraceOutput >= 1) {
     Logger::trace("[MPISharedStorageCache:" + Label + "] Rank " +
@@ -296,31 +325,6 @@ MPISharedStorageCache::packMessage(const HashT &HashValue,
   std::memcpy(Ptr, Entry.Buffer.getBufferStart(), BufferSize);
 
   return Packed;
-}
-
-std::tuple<HashT, std::vector<char>, bool>
-MPISharedStorageCache::unpackMessage(const std::vector<char> &Buffer) {
-  const char *Ptr = Buffer.data();
-
-  uint32_t HashSize = 0;
-  std::memcpy(&HashSize, Ptr, sizeof(HashSize));
-  Ptr += sizeof(HashSize);
-
-  std::string HashStr(Ptr, HashSize);
-  Ptr += HashSize;
-
-  uint8_t IsDynLib = 0;
-  std::memcpy(&IsDynLib, Ptr, sizeof(IsDynLib));
-  Ptr += sizeof(IsDynLib);
-
-  uint64_t BufferSize = 0;
-  std::memcpy(&BufferSize, Ptr, sizeof(BufferSize));
-  Ptr += sizeof(BufferSize);
-
-  std::vector<char> Data(BufferSize);
-  std::memcpy(Data.data(), Ptr, BufferSize);
-
-  return {HashT(StringRef(HashStr)), std::move(Data), IsDynLib != 0};
 }
 
 void MPISharedStorageCache::saveToDisk(const HashT &HashValue, const char *Data,
