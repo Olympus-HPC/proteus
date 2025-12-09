@@ -27,7 +27,9 @@
 namespace proteus {
 
 using namespace llvm;
+namespace {
 constexpr int MaxRequestsPerCall = 5;
+}
 
 struct UnpackedMessage {
   HashT Hash;
@@ -118,7 +120,7 @@ void MPICommHandle::reset() {
 
 namespace {
 MPI_Comm DefaultComm = MPI_COMM_NULL;
-} // namespace
+}
 
 void MPISharedStorageCache::setDefaultCommunicator(MPI_Comm Comm) {
   DefaultComm = Comm;
