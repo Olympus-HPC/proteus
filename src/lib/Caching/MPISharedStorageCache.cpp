@@ -270,7 +270,8 @@ void MPISharedStorageCache::forwardToWriter(HashT &HashValue,
   auto Pending = std::make_unique<PendingSend>();
   Pending->Buffer = packMessage(HashValue, Entry);
 
-  if (Pending->Buffer.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
+  if (Pending->Buffer.size() >
+      static_cast<size_t>(std::numeric_limits<int>::max())) {
     PROTEUS_FATAL_ERROR("MPI message size exceeds INT_MAX: " +
                         std::to_string(Pending->Buffer.size()) + " bytes");
   }
@@ -294,9 +295,8 @@ void MPISharedStorageCache::waitForPendingSends() {
   PendingSends.clear();
 }
 
-std::vector<char>
-MPISharedStorageCache::packMessage(const HashT &HashValue,
-                                   const CacheEntry &Entry) {
+std::vector<char> MPISharedStorageCache::packMessage(const HashT &HashValue,
+                                                     const CacheEntry &Entry) {
   // Format: [hash_size (4 bytes), hash_bytes, is_dynlib (1 byte),
   //          buffer_size (8 bytes), buffer_bytes]
   std::string HashStr = HashValue.toString();
