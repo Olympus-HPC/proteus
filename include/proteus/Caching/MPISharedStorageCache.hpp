@@ -39,7 +39,6 @@ public:
 
 private:
   MPI_Comm Comm = MPI_COMM_NULL;
-  bool Owned = false;
 };
 
 struct PendingSend {
