@@ -310,8 +310,13 @@ void MPISharedStorageCache::saveToDisk(const HashT &HashValue, const char *Data,
   std::string Filebase =
       StorageDirectory + "/cache-jit-" + HashValue.toString();
   std::string Extension = IsDynLib ? ".so" : ".o";
+  std::string Filepath = Filebase + Extension;
 
-  saveToFile(Filebase + Extension, StringRef{Data, Size});
+  // Skip writing if this hash is already cached.
+  if (std::filesystem::exists(Filepath))
+    return;
+
+  saveToFile(Filepath, StringRef{Data, Size});
 
   if (Config::get().ProteusTraceOutput >= 1) {
     Logger::trace("[MPISharedStorageCache] Saved " + Filebase + Extension +
