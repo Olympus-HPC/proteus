@@ -28,7 +28,6 @@ namespace proteus {
 
 using namespace llvm;
 
-/// Unpacked MPI message containing cache entry data.
 struct UnpackedMessage {
   HashT Hash;
   std::vector<char> Data;
