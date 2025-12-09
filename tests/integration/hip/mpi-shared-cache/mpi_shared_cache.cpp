@@ -44,8 +44,6 @@ int main(int argc, char **argv) {
   testKernel<<<1, 1>>>(Rank);
   gpuErrCheck(hipDeviceSynchronize());
 
-  proteus::finalize();
-
   MPI_Barrier(MPI_COMM_WORLD);
 
   int ExitCode = 0;
