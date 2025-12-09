@@ -29,7 +29,7 @@ namespace proteus {
 using namespace llvm;
 namespace {
 constexpr int MaxRequestsPerCall = 5;
-}
+} // namespace
 
 struct UnpackedMessage {
   HashT Hash;
