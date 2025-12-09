@@ -79,7 +79,6 @@ void MPICommHandle::set(MPI_Comm UserComm) {
   }
 
   MPI_Comm_dup(UserComm, &Comm);
-  Owned = true;
 
   if (Config::get().ProteusTraceOutput >= 1) {
     int Rank = 0;
@@ -98,20 +97,18 @@ MPI_Comm MPICommHandle::get() const {
 }
 
 void MPICommHandle::reset() {
-  if (!Owned || Comm == MPI_COMM_NULL)
+  if (Comm == MPI_COMM_NULL)
     return;
 
   int MPIFinalized = 0;
   MPI_Finalized(&MPIFinalized);
   if (MPIFinalized) {
     Comm = MPI_COMM_NULL;
-    Owned = false;
     return;
   }
 
   MPI_Comm_free(&Comm);
   Comm = MPI_COMM_NULL;
-  Owned = false;
 }
 
 //===----------------------------------------------------------------------===//
