@@ -76,7 +76,8 @@ private:
   void receiveIncoming(int MaxMessages);
   void forwardToWriter(HashT &HashValue, const CacheEntry &Entry);
   void waitForPendingSends();
-  std::vector<char> packMessage(const HashT &HashValue, const CacheEntry &Entry);
+  std::vector<char> packMessage(const HashT &HashValue,
+                                const CacheEntry &Entry);
   void saveToDisk(const HashT &HashValue, const char *Data, size_t Size,
                   bool IsDynLib);
   static int computeTag(const std::string &Label);
