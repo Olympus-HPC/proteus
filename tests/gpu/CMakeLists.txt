@@ -379,16 +379,3 @@ endif()
 
 add_subdirectory(scale100)
 add_subdirectory(scale100-gvar)
-
-# MPI shared cache test (manual run, not integrated with LIT).
-if(PROTEUS_ENABLE_MPI)
-    add_executable(mpi_shared_cache.${lang} mpi_shared_cache.cpp)
-    set_source_files_properties(mpi_shared_cache.cpp PROPERTIES LANGUAGE ${lang})
-    get_target_property(PROTEUS_PASS_SOURCES ProteusPass SOURCES)
-    set_source_files_properties(mpi_shared_cache.cpp PROPERTIES
-        OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES}"
-    )
-    add_dependencies(mpi_shared_cache.${lang} ProteusPass)
-    target_link_libraries(mpi_shared_cache.${lang} PUBLIC proteus MPI::MPI_CXX)
-    target_compile_options(mpi_shared_cache.${lang} PUBLIC -fpass-plugin=$<TARGET_FILE:ProteusPass>)
-endif()

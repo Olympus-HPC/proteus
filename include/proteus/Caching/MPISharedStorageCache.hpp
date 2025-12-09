@@ -6,9 +6,6 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// A storage cache that uses MPI to coordinate writes. Only rank 0 writes to
-// disk, while other ranks forward their compiled objects via MPI_Send.
-//
 //===----------------------------------------------------------------------===//
 
 #ifndef PROTEUS_MPISHAREDSTORAGECACHE_HPP
@@ -27,13 +24,8 @@
 
 namespace proteus {
 
-// Maximum number of incoming requests rank 0 processes per call.
 static constexpr int MaxRequestsPerCall = 5;
 
-/// Manages an MPI communicator with ownership semantics.
-/// When set() is called, the provided communicator is duplicated to avoid
-/// interfering with the application's MPI usage. The duplicated communicator
-/// is freed when reset() is called or when the handle is destroyed.
 class MPICommHandle {
 public:
   MPICommHandle() = default;
