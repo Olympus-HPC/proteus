@@ -30,6 +30,13 @@ namespace proteus {
 
 ObjectCacheChain::ObjectCacheChain(const std::string &Label)
     : Label(Label), DistributedRank(getDistributedRank()) {
+  // Defer cache initialization to first use to allow MPI to be initialized.
+}
+
+void ObjectCacheChain::ensureInitialized() {
+  if (Initialized)
+    return;
+  Initialized = true;
   buildFromConfig(Config::get().ProteusObjectCacheChain);
 }
 
@@ -100,6 +107,7 @@ void ObjectCacheChain::promoteToLevel(const HashT &HashValue,
 std::unique_ptr<CompiledLibrary>
 ObjectCacheChain::lookup(const HashT &HashValue) {
   TIMESCOPE("ObjectCacheChain::lookup");
+  ensureInitialized();
 
   // Search from fastest (index 0) to slowest.
   for (size_t I = 0; I < Caches.size(); ++I) {
@@ -137,6 +145,7 @@ ObjectCacheChain::lookup(const HashT &HashValue) {
 
 void ObjectCacheChain::store(const HashT &HashValue, const CacheEntry &Entry) {
   TIMESCOPE("ObjectCacheChain::store");
+  ensureInitialized();
 
   for (auto &Cache : Caches) {
     Cache->store(HashValue, Entry);
@@ -144,6 +153,7 @@ void ObjectCacheChain::store(const HashT &HashValue, const CacheEntry &Entry) {
 }
 
 void ObjectCacheChain::printStats() {
+  ensureInitialized();
   printf("[proteus][%s] ObjectCacheChain rank %s with %zu level(s):\n",
          Label.c_str(), DistributedRank.c_str(), Caches.size());
   for (auto &Cache : Caches) {
@@ -152,6 +162,7 @@ void ObjectCacheChain::printStats() {
 }
 
 void ObjectCacheChain::flush() {
+  ensureInitialized();
   for (auto &Cache : Caches) {
     Cache->flush();
   }
