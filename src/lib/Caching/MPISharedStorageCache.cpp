@@ -27,6 +27,7 @@
 namespace proteus {
 
 using namespace llvm;
+constexpr int MaxRequestsPerCall = 5;
 
 struct UnpackedMessage {
   HashT Hash;

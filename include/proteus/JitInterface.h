@@ -162,12 +162,12 @@ inline void init(MPI_Comm Comm) {
 #endif
 
 inline void finalize() {
-#ifdef PROTEUS_ENABLE_MPI
-  __jit_free_mpi_comm();
-#endif
   __jit_finalize_host();
 #if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
   __jit_finalize_device();
+#endif
+#ifdef PROTEUS_ENABLE_MPI
+  __jit_free_mpi_comm();
 #endif
 }
 
