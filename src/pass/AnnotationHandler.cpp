@@ -19,6 +19,48 @@
 
 namespace proteus {
 
+namespace helpers {
+#if defined(_WIN32)
+#include <tlhelp32.h>
+#include <windows.h>
+#else
+#include <sys/types.h>
+#include <unistd.h>
+#endif
+
+static uint32_t getParentProcessId() {
+#if defined(_WIN32)
+  DWORD pid = GetCurrentProcessId();
+  uint32_t ppid = 0;
+  HANDLE h = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+  if (h == INVALID_HANDLE_VALUE)
+    return 0;
+  PROCESSENTRY32 pe;
+  pe.dwSize = sizeof(pe);
+  if (Process32First(h, &pe)) {
+    do {
+      if (pe.th32ProcessID == pid) {
+        ppid = pe.th32ParentProcessID;
+        break;
+      }
+    } while (Process32Next(h, &pe));
+  }
+  CloseHandle(h);
+  return ppid;
+#else
+  return static_cast<uint32_t>(getppid());
+#endif
+}
+
+[[maybe_unused]] static uint32_t getProcessId() {
+#if defined(_WIN32)
+  return static_cast<uint32_t>(GetCurrentProcessId());
+#else
+  return static_cast<uint32_t>(getpid());
+#endif
+}
+} // namespace helpers
+
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
@@ -417,7 +459,7 @@ void AnnotationHandler::parseManifestFileAnnotations(
 
     if (!F)
       PROTEUS_FATAL_ERROR("Expected device stub Function for kernel sym " +
-                          KernelSym);
+                          KernelSym + " in manifest file: " + UniqueFilename);
 
     json::Array *JsonRCInfoArray = KernelObject->getArray("rc");
     if (!JsonRCInfoArray)
@@ -516,8 +558,13 @@ void AnnotationHandler::parseManifestFileAnnotations(
 SmallString<64> AnnotationHandler::getUniqueManifestFilename() {
   auto TmpPath = std::filesystem::temp_directory_path();
 
-  return {TmpPath.string(), "/", "proteus-device-manifest-", getUniqueFileID(M),
-          ".json"};
+  // Use the parent process id and the unique file id to uniquely identify the
+  // manifest file for a specific compilation, assuming the parent process is
+  // the same for both device and host compilation.
+  return {
+      TmpPath.string(),           "/",
+      "proteus-device-manifest-", std::to_string(helpers::getParentProcessId()),
+      getUniqueFileID(M),         ".json"};
 }
 
 void AnnotationHandler::appendToGlobalAnnotations(
