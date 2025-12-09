@@ -3,6 +3,7 @@
 
 #if PROTEUS_ENABLE_HIP
 
+#include "proteus/Caching/ObjectCacheChain.hpp"
 #include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/JitEngineDeviceHIP.hpp"
@@ -94,7 +95,7 @@ private:
     TargetModel = TargetModelType::HIP;
   }
   MemoryCache<hipFunction_t> CodeCache{"DispatcherHIP"};
-  StorageCache ObjectCache{"DispatcherHIP"};
+  ObjectCacheChain ObjectCache{"DispatcherHIP"};
 };
 
 } // namespace proteus

@@ -1,7 +1,7 @@
 #ifndef PROTEUS_FRONTEND_DISPATCHER_HOST_HPP
 #define PROTEUS_FRONTEND_DISPATCHER_HOST_HPP
 
-#include "proteus/Caching/StorageCache.hpp"
+#include "proteus/Caching/ObjectCacheChain.hpp"
 #include "proteus/CompiledLibrary.hpp"
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/JitEngineHost.hpp"
@@ -91,7 +91,7 @@ protected:
 private:
   JitEngineHost &Jit;
   MemoryCache<void *> CodeCache{"DispatcherHost"};
-  StorageCache ObjectCache{"DispatcherHost"};
+  ObjectCacheChain ObjectCache{"DispatcherHost"};
 };
 
 } // namespace proteus
