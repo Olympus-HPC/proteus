@@ -41,8 +41,6 @@ int main(int argc, char **argv) {
   }
   MPI_Barrier(MPI_COMM_WORLD);
 
-  proteus::init(MPI_COMM_WORLD);
-
   testKernel<<<1, 1>>>(Rank);
   gpuErrCheck(hipDeviceSynchronize());
 
