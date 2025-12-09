@@ -138,11 +138,10 @@ void MPISharedStorageCache::clearDefaultCommunicator() {
 }
 
 int MPISharedStorageCache::computeTag(const std::string &Label) {
-  if (Label == "JitEngineDevice")
-    return 0;
-  if (Label == "JitEngineHost")
-    return 1;
-  PROTEUS_FATAL_ERROR("Unknown cache label: " + Label);
+  // Hash the label to produce a valid MPI tag. MPI guarantees tags up to at
+  // least 32767 (MPI_TAG_UB minimum).
+  stable_hash Hash = hashValue(Label).getValue();
+  return static_cast<int>(Hash % 32767);
 }
 
 MPISharedStorageCache::MPISharedStorageCache(const std::string &Label,
