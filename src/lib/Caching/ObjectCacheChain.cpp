@@ -82,8 +82,7 @@ ObjectCacheChain::createCache(const std::string &Name) {
 
 #ifdef PROTEUS_ENABLE_MPI
   if (LowerName == "mpi-storage") {
-    MPI_Comm Comm = MPISharedStorageCache::getDefaultCommunicator();
-    return std::make_unique<MPISharedStorageCache>(Label, Comm);
+    return std::make_unique<MPISharedStorageCache>(Label);
   }
 #endif
 

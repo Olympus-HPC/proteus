@@ -118,25 +118,6 @@ void MPICommHandle::reset() {
 // MPISharedStorageCache implementation
 //===----------------------------------------------------------------------===//
 
-namespace {
-MPI_Comm DefaultComm = MPI_COMM_NULL;
-}
-
-void MPISharedStorageCache::setDefaultCommunicator(MPI_Comm Comm) {
-  DefaultComm = Comm;
-}
-
-MPI_Comm MPISharedStorageCache::getDefaultCommunicator() {
-  if (DefaultComm != MPI_COMM_NULL) {
-    return DefaultComm;
-  }
-  return MPI_COMM_WORLD;
-}
-
-void MPISharedStorageCache::clearDefaultCommunicator() {
-  DefaultComm = MPI_COMM_NULL;
-}
-
 int MPISharedStorageCache::computeTag(const std::string &Label) {
   // Hash the label to produce a valid MPI tag. MPI guarantees tags up to at
   // least 32767 (MPI_TAG_UB minimum).
@@ -144,13 +125,12 @@ int MPISharedStorageCache::computeTag(const std::string &Label) {
   return static_cast<int>(Hash % 32767);
 }
 
-MPISharedStorageCache::MPISharedStorageCache(const std::string &Label,
-                                             MPI_Comm Comm)
+MPISharedStorageCache::MPISharedStorageCache(const std::string &Label)
     : StorageDirectory(Config::get().ProteusCacheDir
                            ? Config::get().ProteusCacheDir.value()
                            : ".proteus"),
       Label(Label), Tag(computeTag(Label)) {
-  CommHandle.set(Comm);
+  CommHandle.set(MPI_COMM_WORLD);
 
   MPI_Comm DupComm = CommHandle.get();
   MPI_Comm_rank(DupComm, &Rank);
@@ -349,11 +329,3 @@ void MPISharedStorageCache::printStats() {
 }
 
 } // namespace proteus
-
-extern "C" void __jit_set_mpi_comm(MPI_Comm Comm) {
-  proteus::MPISharedStorageCache::setDefaultCommunicator(Comm);
-}
-
-extern "C" void __jit_free_mpi_comm() {
-  proteus::MPISharedStorageCache::clearDefaultCommunicator();
-}

@@ -49,7 +49,7 @@ struct PendingSend {
 
 class MPISharedStorageCache : public ObjectCache {
 public:
-  MPISharedStorageCache(const std::string &Label, MPI_Comm Comm);
+  MPISharedStorageCache(const std::string &Label);
   ~MPISharedStorageCache() override;
 
   std::string getName() const override { return "MPISharedStorage"; }
@@ -65,10 +65,6 @@ public:
   uint64_t getHits() const override { return Hits; }
 
   uint64_t getAccesses() const override { return Accesses; }
-
-  static void setDefaultCommunicator(MPI_Comm Comm);
-  static MPI_Comm getDefaultCommunicator();
-  static void clearDefaultCommunicator();
 
 private:
   void receiveIncoming(int MaxMessages);
