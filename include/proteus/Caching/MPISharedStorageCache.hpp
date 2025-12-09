@@ -24,8 +24,6 @@
 
 namespace proteus {
 
-static constexpr int MaxRequestsPerCall = 5;
-
 class MPICommHandle {
 public:
   MPICommHandle() = default;
