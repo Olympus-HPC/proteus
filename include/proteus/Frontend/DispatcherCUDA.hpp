@@ -3,6 +3,7 @@
 
 #if PROTEUS_ENABLE_CUDA
 
+#include "proteus/Caching/ObjectCacheChain.hpp"
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/JitEngineDeviceCUDA.hpp"
 
@@ -103,7 +104,7 @@ private:
     TargetModel = TargetModelType::CUDA;
   }
   MemoryCache<CUfunction> CodeCache{"DispatcherCUDA"};
-  StorageCache ObjectCache{"DispatcherCUDA"};
+  ObjectCacheChain ObjectCache{"DispatcherCUDA"};
 };
 
 } // namespace proteus
