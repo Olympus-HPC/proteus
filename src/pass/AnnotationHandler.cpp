@@ -457,9 +457,14 @@ void AnnotationHandler::parseManifestFileAnnotations(
       }
     }
 
-    if (!F)
-      PROTEUS_FATAL_ERROR("Expected device stub Function for kernel sym " +
-                          KernelSym + " in manifest file: " + UniqueFilename);
+    if (!F) {
+      DEBUG(Logger::logs("proteus-pass")
+            << "Warning: missing device stub Function for kernel sym "
+            << KernelSym << " in manifest file: "
+            << UniqueFilename + ", for source file: " << M.getSourceFileName()
+            << ", kernel may be unused" << "\n");
+      continue;
+    }
 
     json::Array *JsonRCInfoArray = KernelObject->getArray("rc");
     if (!JsonRCInfoArray)
