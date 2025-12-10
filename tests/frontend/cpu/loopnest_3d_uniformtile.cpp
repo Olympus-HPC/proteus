@@ -37,9 +37,9 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int Tile) {
     auto Zero = F.declVar<int>("zero");
     Zero = 0;
 
-    F.buildLoopNest(F.forLoop({I, Zero, UBI, IncOne}),
-                    F.forLoop({J, Zero, UBJ, IncOne}),
-                    F.forLoop({K, Zero, UBK, IncOne},
+    F.buildLoopNest(F.forLoop(I, Zero, UBI, IncOne),
+                    F.forLoop(J, Zero, UBJ, IncOne),
+                    F.forLoop(K, Zero, UBK, IncOne,
                               [&]() {
                                 auto Idx = I * DJ * DK + J * DK + K;
                                 A[Idx] = I * 10000 + J * 100 + K;

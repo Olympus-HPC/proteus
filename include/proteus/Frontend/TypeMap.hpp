@@ -156,6 +156,11 @@ template <> struct TypeMap<float *> {
   }
 };
 
+// Forward const types to their non-const equivalent.
+template <typename T> struct TypeMap<const T> : TypeMap<T> {};
+
+template <typename T> struct TypeMap<const T *> : TypeMap<T *> {};
+
 } // namespace proteus
 
 #endif // PROTEUS_FRONTEND_TYPEMAP_HPP

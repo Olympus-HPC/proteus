@@ -39,7 +39,7 @@ int main() {
     auto Zero = F.declVar<int>("zero");
     Zero = 0;
 
-    F.forLoop({I, Zero, N, Inc}, [&]() { Arr[I] = Arr[I] + 1.0; })
+    F.forLoop(I, Zero, N, Inc, [&]() { Arr[I] = Arr[I] + 1.0; })
         .unroll(4)
         .emit();
 

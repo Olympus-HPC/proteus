@@ -1,7 +1,6 @@
 #ifndef PROTEUS_FRONTEND_FUNC_HPP
 #define PROTEUS_FRONTEND_FUNC_HPP
 
-#include <initializer_list>
 #include <memory>
 
 #include <llvm/IR/IRBuilder.h>
@@ -16,6 +15,12 @@
 #include "proteus/Frontend/VarStorage.hpp"
 
 namespace proteus {
+
+// NOLINTBEGIN(readability-identifier-naming)
+template <typename T>
+inline constexpr bool is_mutable_v =
+    !std::is_const_v<std::remove_reference_t<T>>;
+// NOLINTEND(readability-identifier-naming)
 
 class JitModule;
 template <typename T> class LoopBoundInfo;
@@ -125,9 +130,10 @@ public:
   }
 
   template <typename T> Var<T> defVar(const T &Val, StringRef Name = "var") {
-    Var<T> Var = declVar<T>(Name);
-    Var = Val;
-    return Var;
+    using RawT = std::remove_const_t<T>;
+    Var<RawT> V = declVar<RawT>(Name);
+    V = Val;
+    return Var<T>(V);
   }
 
   template <typename T, typename U>
@@ -138,8 +144,8 @@ public:
   }
 
   template <typename T>
-  Var<T> defRuntimeConst(const T &Val, StringRef Name = "run.const.var") {
-    return defVar<T>(Val, Name);
+  Var<const T> defRuntimeConst(const T &Val, StringRef Name = "run.const.var") {
+    return Var<const T>(defVar<T>(Val, Name));
   }
 
   template <typename... ArgT> auto defRuntimeConsts(ArgT &&...Args) {
@@ -154,9 +160,9 @@ public:
                int Line = __builtin_LINE());
   void endIf();
 
-  template <typename T>
-  void beginFor(Var<T> &IterVar, const Var<T> &InitVar,
-                const Var<T> &UpperBound, const Var<T> &IncVar,
+  template <typename IterT, typename InitT, typename UpperT, typename IncT>
+  void beginFor(Var<IterT> &IterVar, const Var<InitT> &InitVar,
+                const Var<UpperT> &UpperBound, const Var<IncT> &IncVar,
                 const char *File = __builtin_FILE(),
                 int Line = __builtin_LINE());
   void endFor();
@@ -207,12 +213,15 @@ public:
   std::enable_if_t<std::is_arithmetic_v<T>, Var<T>>
   atomicMin(const Var<T *> &Addr, const Var<T> &Val);
 
-  template <typename T, typename BodyLambda = EmptyLambda>
-  auto forLoop(std::initializer_list<Var<T>> Bounds, BodyLambda &&Body = {}) {
-    auto It = Bounds.begin();
-    LoopBoundInfo<T> BoundsInfo{It[0], It[1], It[2], It[3]};
-    return ForLoopBuilder<T, BodyLambda>(BoundsInfo, *this,
-                                         std::forward<BodyLambda>(Body));
+  template <typename IterT, typename InitT, typename UpperT, typename IncT,
+            typename BodyLambda = EmptyLambda>
+  auto forLoop(Var<IterT> &Iter, const Var<InitT> &Init,
+               const Var<UpperT> &Upper, const Var<IncT> &Inc,
+               BodyLambda &&Body = {}) {
+    using RawT = std::remove_const_t<IterT>;
+    LoopBoundInfo<RawT> BoundsInfo{Iter, Init, Upper, Inc};
+    return ForLoopBuilder<RawT, BodyLambda>(BoundsInfo, *this,
+                                            std::forward<BodyLambda>(Body));
   }
 
   template <typename... LoopBuilders>
@@ -305,12 +314,13 @@ public:
 };
 
 // beginFor implementation
-template <typename T>
-void FuncBase::beginFor(Var<T> &IterVar, const Var<T> &Init,
-                        const Var<T> &UpperBound, const Var<T> &Inc,
+template <typename IterT, typename InitT, typename UpperT, typename IncT>
+void FuncBase::beginFor(Var<IterT> &IterVar, const Var<InitT> &Init,
+                        const Var<UpperT> &UpperBound, const Var<IncT> &Inc,
                         const char *File, int Line) {
-  static_assert(std::is_integral_v<T>,
+  static_assert(std::is_integral_v<std::remove_const_t<IterT>>,
                 "Loop iterator must be an integral type");
+  static_assert(is_mutable_v<IterT>, "Loop iterator must be mutable");
 
   Function *F = getFunction();
   // Update the terminator of the current basic block due to the split
@@ -506,19 +516,24 @@ Var<bool> cmpOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
 }
 
 template <typename T>
-template <typename U>
+template <typename U, typename>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::Var(const Var<U> &V)
     : VarStorageOwner<VarStorage>(V.Fn) {
   // Allocate storage for the target type T.
-  Type *TargetTy = TypeMap<T>::get(Fn.getFunction()->getContext());
+  using RawT = std::remove_const_t<T>;
+  Type *TargetTy = TypeMap<RawT>::get(Fn.getFunction()->getContext());
   auto *Alloca = Fn.emitAlloca(TargetTy, "conv.var");
   Storage = std::make_unique<ScalarStorage>(Alloca, Fn.getIRBuilder());
-  *this = V;
+  auto &IRB = Fn.getIRBuilder();
+  using RawU = std::remove_const_t<U>;
+  auto *Converted = convert<RawU, RawT>(IRB, V.loadValue());
+  storeValue(Converted);
 }
 
 template <typename T>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(const Var &V) {
+  static_assert(is_mutable_v<T>, "Cannot assign to Var<const T>");
   storeValue(V.loadValue());
   return *this;
 }
@@ -526,6 +541,7 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(const Var &V) {
 template <typename T>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(Var &&V) {
+  static_assert(is_mutable_v<T>, "Cannot assign to Var<const T>");
   if (this->Storage == nullptr) {
     // If we don't have storage, clone it from the source.
     Storage = V.Storage->clone();
@@ -564,8 +580,10 @@ template <typename T>
 template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(const Var<U> &V) {
+  static_assert(is_mutable_v<T>, "Cannot assign to Var<const T>");
   auto &IRB = Fn.getIRBuilder();
-  auto *Converted = convert<U, T>(IRB, V.loadValue());
+  auto *Converted = convert<std::remove_const_t<U>, std::remove_const_t<T>>(
+      IRB, V.loadValue());
   storeValue(Converted);
   return *this;
 }
@@ -575,6 +593,7 @@ template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(
     const U &ConstValue) {
+  static_assert(is_mutable_v<T>, "Cannot assign to Var<const T>");
   static_assert(std::is_arithmetic_v<U>,
                 "Can only assign arithmetic types to Var");
 
@@ -708,6 +727,7 @@ template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+=(
     const Var<U> &Other) {
+  static_assert(is_mutable_v<T>, "Cannot use += on Var<const T>");
   auto Result = (*this) + Other;
   *this = Result;
   return *this;
@@ -718,6 +738,7 @@ template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+=(
     const U &ConstValue) {
+  static_assert(is_mutable_v<T>, "Cannot use += on Var<const T>");
   static_assert(std::is_arithmetic_v<U>,
                 "Can only add arithmetic types to Var");
   return compoundAssignConst(
@@ -731,6 +752,7 @@ template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-=(
     const Var<U> &Other) {
+  static_assert(is_mutable_v<T>, "Cannot use -= on Var<const T>");
   auto Result = (*this) - Other;
   *this = Result;
   return *this;
@@ -741,6 +763,7 @@ template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-=(
     const U &ConstValue) {
+  static_assert(is_mutable_v<T>, "Cannot use -= on Var<const T>");
   static_assert(std::is_arithmetic_v<U>,
                 "Can only subtract arithmetic types from Var");
   return compoundAssignConst(
@@ -754,6 +777,7 @@ template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*=(
     const Var<U> &Other) {
+  static_assert(is_mutable_v<T>, "Cannot use *= on Var<const T>");
   auto Result = (*this) * Other;
   *this = Result;
   return *this;
@@ -764,6 +788,7 @@ template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*=(
     const U &ConstValue) {
+  static_assert(is_mutable_v<T>, "Cannot use *= on Var<const T>");
   static_assert(std::is_arithmetic_v<U>,
                 "Can only multiply Var by arithmetic types");
   return compoundAssignConst(
@@ -777,6 +802,7 @@ template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/=(
     const Var<U> &Other) {
+  static_assert(is_mutable_v<T>, "Cannot use /= on Var<const T>");
   auto Result = (*this) / Other;
   *this = Result;
   return *this;
@@ -787,6 +813,7 @@ template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/=(
     const U &ConstValue) {
+  static_assert(is_mutable_v<T>, "Cannot use /= on Var<const T>");
   static_assert(std::is_arithmetic_v<U>,
                 "Can only divide Var by arithmetic types");
   return compoundAssignConst(
@@ -800,6 +827,7 @@ template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%=(
     const Var<U> &Other) {
+  static_assert(is_mutable_v<T>, "Cannot use %= on Var<const T>");
   auto Result = (*this) % Other;
   *this = Result;
   return *this;
@@ -810,6 +838,7 @@ template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%=(
     const U &ConstValue) {
+  static_assert(is_mutable_v<T>, "Cannot use %= on Var<const T>");
   static_assert(std::is_arithmetic_v<U>,
                 "Can only modulo Var by arithmetic types");
   return compoundAssignConst(
