@@ -32,13 +32,16 @@ public:
   MPICommHandle(const MPICommHandle &) = delete;
   MPICommHandle &operator=(const MPICommHandle &) = delete;
 
-  void set(MPI_Comm Comm);
-  MPI_Comm get() const;
-  void reset();
-  bool isSet() const { return Comm != MPI_COMM_NULL; }
+  MPI_Comm get();
+  int getRank();
+  int getSize();
 
 private:
+  void ensureInitialized();
+
   MPI_Comm Comm = MPI_COMM_NULL;
+  int Rank = -1;
+  int Size = -1;
 };
 
 struct PendingSend {
@@ -81,9 +84,6 @@ private:
   const std::string Label;
   const int Tag;
   MPICommHandle CommHandle;
-  int Rank = 0;
-  int Size = 1;
-  bool IsWriter = true;
   bool Finalized = false;
   std::vector<std::unique_ptr<PendingSend>> PendingSends;
 };
