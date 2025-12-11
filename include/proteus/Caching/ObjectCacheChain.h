@@ -47,7 +47,6 @@ private:
   std::vector<std::unique_ptr<ObjectCache>> Caches;
   const std::string Label;
   const std::string DistributedRank;
-  bool Initialized = false;
 };
 
 } // namespace proteus

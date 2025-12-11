@@ -17,11 +17,11 @@
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/MemoryBuffer.h>
 
-#include "proteus/Caching/MPISharedStorageCache.hpp"
-#include "proteus/Config.hpp"
+#include "proteus/Caching/MPISharedStorageCache.h"
+#include "proteus/Config.h"
 #include "proteus/Error.h"
-#include "proteus/Logger.hpp"
-#include "proteus/TimeTracing.hpp"
+#include "proteus/Logger.h"
+#include "proteus/TimeTracing.h"
 #include "proteus/Utils.h"
 
 namespace proteus {
@@ -66,49 +66,49 @@ static UnpackedMessage unpackMessage(const std::vector<char> &Buffer) {
 // MPICommHandle implementation
 //===----------------------------------------------------------------------===//
 
-MPICommHandle::~MPICommHandle() { reset(); }
-
-void MPICommHandle::set(MPI_Comm UserComm) {
-  reset();
-
-  int MPIInitialized = 0;
-  MPI_Initialized(&MPIInitialized);
-  if (!MPIInitialized) {
-    PROTEUS_FATAL_ERROR(
-        "MPICommHandle::set requires MPI to be initialized first");
-  }
-
-  MPI_Comm_dup(UserComm, &Comm);
-
-  if (Config::get().ProteusTraceOutput >= 1) {
-    int Rank = 0;
-    int Size = 0;
-    MPI_Comm_rank(Comm, &Rank);
-    MPI_Comm_size(Comm, &Size);
-    Logger::trace("[MPICommHandle] Duplicated communicator for rank " +
-                  std::to_string(Rank) + "/" + std::to_string(Size) + "\n");
-  }
-}
-
-MPI_Comm MPICommHandle::get() const {
-  if (Comm != MPI_COMM_NULL)
-    return Comm;
-  return MPI_COMM_WORLD;
-}
-
-void MPICommHandle::reset() {
+MPICommHandle::~MPICommHandle() {
   if (Comm == MPI_COMM_NULL)
     return;
 
   int MPIFinalized = 0;
   MPI_Finalized(&MPIFinalized);
-  if (MPIFinalized) {
-    Comm = MPI_COMM_NULL;
+  if (!MPIFinalized)
+    MPI_Comm_free(&Comm);
+}
+
+void MPICommHandle::ensureInitialized() {
+  if (Comm != MPI_COMM_NULL)
     return;
+
+  int MPIInitialized = 0;
+  MPI_Initialized(&MPIInitialized);
+  if (!MPIInitialized) {
+    reportFatalError("MPICommHandle requires MPI to be initialized");
   }
 
-  MPI_Comm_free(&Comm);
-  Comm = MPI_COMM_NULL;
+  MPI_Comm_dup(MPI_COMM_WORLD, &Comm);
+  MPI_Comm_rank(Comm, &Rank);
+  MPI_Comm_size(Comm, &Size);
+
+  if (Config::get().ProteusTraceOutput >= 1) {
+    Logger::trace("[MPICommHandle] Initialized communicator for rank " +
+                  std::to_string(Rank) + "/" + std::to_string(Size) + "\n");
+  }
+}
+
+MPI_Comm MPICommHandle::get() {
+  ensureInitialized();
+    return Comm;
+}
+
+int MPICommHandle::getRank() {
+  ensureInitialized();
+  return Rank;
+}
+
+int MPICommHandle::getSize() {
+  ensureInitialized();
+  return Size;
 }
 
 //===----------------------------------------------------------------------===//
@@ -124,21 +124,7 @@ MPISharedStorageCache::MPISharedStorageCache(const std::string &Label)
                            ? Config::get().ProteusCacheDir.value()
                            : ".proteus"),
       Label(Label), Tag(computeTag(Label)) {
-  CommHandle.set(MPI_COMM_WORLD);
-
-  MPI_Comm DupComm = CommHandle.get();
-  MPI_Comm_rank(DupComm, &Rank);
-  MPI_Comm_size(DupComm, &Size);
-  IsWriter = (Rank == 0);
-
   std::filesystem::create_directory(StorageDirectory);
-
-  if (Config::get().ProteusTraceOutput >= 1) {
-    Logger::trace("[MPISharedStorageCache:" + Label + "] Rank " +
-                  std::to_string(Rank) + "/" + std::to_string(Size) +
-                  " tag=" + std::to_string(Tag) +
-                  (IsWriter ? " (writer)" : " (forwarder)") + "\n");
-  }
 }
 
 MPISharedStorageCache::~MPISharedStorageCache() { flush(); }
@@ -161,14 +147,15 @@ void MPISharedStorageCache::flush() {
 
   if (Config::get().ProteusTraceOutput >= 1) {
     Logger::trace("[MPISharedStorageCache:" + Label + "] Rank " +
-                  std::to_string(Rank) + " flushing, PendingSends=" +
+                  std::to_string(CommHandle.getRank()) +
+                  " flushing, PendingSends=" +
                   std::to_string(PendingSends.size()) + "\n");
   }
 
   MPI_Comm Comm = CommHandle.get();
   MPI_Barrier(Comm);
 
-  if (IsWriter)
+  if (CommHandle.getRank() == 0)
     receiveIncoming(std::numeric_limits<int>::max());
   else
     waitForPendingSends();
@@ -179,11 +166,11 @@ void MPISharedStorageCache::flush() {
 }
 
 std::unique_ptr<CompiledLibrary>
-MPISharedStorageCache::lookup(HashT &HashValue) {
+MPISharedStorageCache::lookup(const HashT &HashValue) {
   TIMESCOPE("MPISharedStorageCache::lookup");
   Accesses++;
 
-  if (IsWriter)
+  if (CommHandle.getRank() == 0)
     receiveIncoming(MaxRequestsPerCall);
 
   std::string Filebase =
@@ -204,10 +191,10 @@ MPISharedStorageCache::lookup(HashT &HashValue) {
   return nullptr;
 }
 
-void MPISharedStorageCache::store(HashT &HashValue, const CacheEntry &Entry) {
+void MPISharedStorageCache::store(const HashT &HashValue, const CacheEntry &Entry) {
   TIMESCOPE("MPISharedStorageCache::store");
 
-  if (IsWriter) {
+  if (CommHandle.getRank() == 0) {
     receiveIncoming(MaxRequestsPerCall);
     saveToDisk(HashValue, Entry.Buffer.getBufferStart(),
                Entry.Buffer.getBufferSize(), Entry.isSharedObject());
@@ -241,14 +228,14 @@ void MPISharedStorageCache::receiveIncoming(int MaxMessages) {
   }
 }
 
-void MPISharedStorageCache::forwardToWriter(HashT &HashValue,
+void MPISharedStorageCache::forwardToWriter(const HashT &HashValue,
                                             const CacheEntry &Entry) {
   auto Pending = std::make_unique<PendingSend>();
   Pending->Buffer = packMessage(HashValue, Entry);
 
   if (Pending->Buffer.size() >
       static_cast<size_t>(std::numeric_limits<int>::max())) {
-    PROTEUS_FATAL_ERROR("MPI message size exceeds INT_MAX: " +
+    reportFatalError("MPI message size exceeds INT_MAX: " +
                         std::to_string(Pending->Buffer.size()) + " bytes");
   }
 
@@ -257,7 +244,7 @@ void MPISharedStorageCache::forwardToWriter(HashT &HashValue,
                       static_cast<int>(Pending->Buffer.size()), MPI_BYTE,
                       /*dest=*/0, Tag, Comm, &Pending->Request);
   if (Err != MPI_SUCCESS) {
-    PROTEUS_FATAL_ERROR("MPI_Isend failed with error code " +
+    reportFatalError("MPI_Isend failed with error code " +
                         std::to_string(Err));
   }
 
@@ -324,7 +311,8 @@ void MPISharedStorageCache::saveToDisk(const HashT &HashValue, const char *Data,
 void MPISharedStorageCache::printStats() {
   printf("[proteus][%s] MPISharedStorageCache rank %d/%d hits %lu accesses "
          "%lu\n",
-         Label.c_str(), Rank, Size, Hits, Accesses);
+         Label.c_str(), CommHandle.getRank(), CommHandle.getSize(), Hits,
+         Accesses);
 }
 
 } // namespace proteus

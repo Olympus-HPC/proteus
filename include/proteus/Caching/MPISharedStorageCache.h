@@ -1,4 +1,4 @@
-//===-- MPISharedStorageCache.hpp -- MPI shared storage cache header --===//
+//===-- MPISharedStorageCache.h -- MPI shared storage cache header --===//
 //
 // Part of the Proteus Project, under the Apache License v2.0 with LLVM
 // Exceptions. See https://llvm.org/LICENSE.txt for license information.
@@ -8,8 +8,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef PROTEUS_MPISHAREDSTORAGECACHE_HPP
-#define PROTEUS_MPISHAREDSTORAGECACHE_HPP
+#ifndef PROTEUS_MPISHAREDSTORAGECACHE_H
+#define PROTEUS_MPISHAREDSTORAGECACHE_H
 
 #include <cstdint>
 #include <memory>
@@ -18,9 +18,9 @@
 
 #include <mpi.h>
 
-#include "proteus/Caching/ObjectCache.hpp"
-#include "proteus/CompiledLibrary.hpp"
-#include "proteus/Hashing.hpp"
+#include "proteus/Caching/ObjectCache.h"
+#include "proteus/CompiledLibrary.h"
+#include "proteus/Hashing.h"
 
 namespace proteus {
 
@@ -32,13 +32,16 @@ public:
   MPICommHandle(const MPICommHandle &) = delete;
   MPICommHandle &operator=(const MPICommHandle &) = delete;
 
-  void set(MPI_Comm Comm);
-  MPI_Comm get() const;
-  void reset();
-  bool isSet() const { return Comm != MPI_COMM_NULL; }
+  MPI_Comm get();
+  int getRank();
+  int getSize();
 
 private:
+  void ensureInitialized();
+
   MPI_Comm Comm = MPI_COMM_NULL;
+  int Rank = -1;
+  int Size = -1;
 };
 
 struct PendingSend {
@@ -53,9 +56,9 @@ public:
 
   std::string getName() const override { return "MPISharedStorage"; }
 
-  std::unique_ptr<CompiledLibrary> lookup(HashT &HashValue) override;
+  std::unique_ptr<CompiledLibrary> lookup(const HashT &HashValue) override;
 
-  void store(HashT &HashValue, const CacheEntry &Entry) override;
+  void store(const HashT &HashValue, const CacheEntry &Entry) override;
 
   void flush() override;
 
@@ -67,7 +70,7 @@ public:
 
 private:
   void receiveIncoming(int MaxMessages);
-  void forwardToWriter(HashT &HashValue, const CacheEntry &Entry);
+  void forwardToWriter(const HashT &HashValue, const CacheEntry &Entry);
   void waitForPendingSends();
   std::vector<char> packMessage(const HashT &HashValue,
                                 const CacheEntry &Entry);
@@ -81,9 +84,6 @@ private:
   const std::string Label;
   const int Tag;
   MPICommHandle CommHandle;
-  int Rank = 0;
-  int Size = 1;
-  bool IsWriter = true;
   bool Finalized = false;
   std::vector<std::unique_ptr<PendingSend>> PendingSends;
 };
