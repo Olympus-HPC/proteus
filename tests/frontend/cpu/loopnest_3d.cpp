@@ -40,9 +40,9 @@ static auto get3DLoopNestFunction(int DI, int DJ, int DK, int TileI, int TileJ,
     auto RowBias = F.defVar<int>(0, "row_bias");
 
     F.buildLoopNest(
-         F.forLoop({I, Zero, UBI, IncOne}).tile(TileI),
-         F.forLoop({J, Zero, UBJ, IncOne}, [&]() { RowBias = J; }).tile(TileJ),
-         F.forLoop({K, Zero, UBK, IncOne},
+         F.forLoop(I, Zero, UBI, IncOne).tile(TileI),
+         F.forLoop(J, Zero, UBJ, IncOne, [&]() { RowBias = J; }).tile(TileJ),
+         F.forLoop(K, Zero, UBK, IncOne,
                    [&]() {
                      auto Idx = I * DJ * DK + J * DK + K;
                      A[Idx] = B[Idx] + I + J + K + RowBias;
@@ -86,15 +86,15 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int TileSize) {
     Zero = 0;
     auto RowBias = F.defVar<int>(0, "row_bias");
 
-    F.buildLoopNest(F.forLoop({I, Zero, UBI, IncOne}).tile(TileSize),
-                    F.forLoop({J, Zero, UBJ, IncOne}, [&]() { RowBias = J; })
-                        .tile(TileSize),
-                    F.forLoop({K, Zero, UBK, IncOne},
-                              [&]() {
-                                auto Idx = I * DJ * DK + J * DK + K;
-                                A[Idx] = B[Idx] + I + J + K + RowBias;
-                              })
-                        .tile(TileSize))
+    F.buildLoopNest(
+         F.forLoop(I, Zero, UBI, IncOne).tile(TileSize),
+         F.forLoop(J, Zero, UBJ, IncOne, [&]() { RowBias = J; }).tile(TileSize),
+         F.forLoop(K, Zero, UBK, IncOne,
+                   [&]() {
+                     auto Idx = I * DJ * DK + J * DK + K;
+                     A[Idx] = B[Idx] + I + J + K + RowBias;
+                   })
+             .tile(TileSize))
         .emit();
 
     F.ret();

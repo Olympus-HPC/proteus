@@ -15,18 +15,15 @@ int main() {
   proteus::init();
 
   auto J = proteus::JitModule();
-  auto &F = J.addFunction<void(double *, double *, double *, double *, double *,
+  auto &F = J.addFunction<void(const double *, const double *, double *,
                                double *, double *, double *, double *, double *,
                                double *, double *, double *, double *, double *,
-                               double *)>("operators");
+                               double *, double *, double *)>("operators");
 
   auto [Arg0, Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7, Arg8, Arg9, Arg10,
         Arg11, Arg12, Arg13, Arg14, Arg15] = F.getArgs();
   F.beginFunction();
   {
-    Arg0[0] = 2;
-    Arg1[0] = 3;
-
     Arg2[0] = Arg0[0] + Arg1[0];
     Arg3[0] = Arg0[0] - Arg1[0];
     Arg4[0] = Arg0[0] * Arg1[0];
@@ -53,6 +50,12 @@ int main() {
     { Arg13[0] = 1.0; }
     F.endIf();
 
+    auto ConstVal = F.defVar<const int>(Cmp, "const_val");
+    Arg12[0] = Arg12[0] + ConstVal;
+
+    auto ConstValScalar = F.defVar<const int>(1, "const_val_scalar");
+    Arg12[0] = Arg12[0] + ConstValScalar;
+
     auto NotCond = !(Cmp <= 5.0);
     Arg15[0] = NotCond;
 
@@ -66,7 +69,7 @@ int main() {
 
   double R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14,
       R15 = 0.0;
-  R0 = 5.0;
+  R0 = 2.0;
   R1 = 3.0;
   F(&R0, &R1, &R2, &R3, &R4, &R5, &R6, &R7, &R8, &R9, &R10, &R11, &R12, &R13,
     &R14, &R15);
@@ -105,7 +108,7 @@ int main() {
 // CHECK-NEXT: R9 = 2.5
 // CHECK-NEXT: R10 = 2
 // CHECK-NEXT: R11 = 1
-// CHECK-NEXT: R12 = 7
+// CHECK-NEXT: R12 = 13
 // CHECK-NEXT: R13 = 1
 // CHECK-NEXT: R14 = -2
 // CHECK-NEXT: R15 = 0

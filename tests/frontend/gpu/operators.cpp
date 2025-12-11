@@ -26,9 +26,10 @@ int main() {
 
   auto J = proteus::JitModule(TARGET);
   auto KernelHandle =
-      J.addKernel<void(double *, double *, double *, double *, double *,
+      J.addKernel<void(const double *, const double *, double *, double *,
                        double *, double *, double *, double *, double *,
-                       double *, double *, double *, double *)>("operators");
+                       double *, double *, double *, double *, double *)>(
+          "operators");
   auto &F = KernelHandle.F;
   auto &Arg0 = F.getArg<0>();
   auto &Arg1 = F.getArg<1>();
@@ -46,9 +47,6 @@ int main() {
   auto &Arg13 = F.getArg<13>();
   F.beginFunction();
   {
-    Arg0[0] = 2;
-    Arg1[0] = 3;
-
     Arg2[0] = Arg0[0] + Arg1[0];
     Arg3[0] = Arg0[0] - Arg1[0];
     Arg4[0] = Arg0[0] * Arg1[0];
@@ -70,6 +68,12 @@ int main() {
     F.beginIf(Cmp <= 5.0);
     { Arg11[0] = 1.0; }
     F.endIf();
+
+    auto ConstVal = F.defVar<const int>(Cmp, "const_val");
+    Arg10[0] = Arg10[0] + ConstVal;
+
+    auto ConstValScalar = F.defVar<const int>(1, "const_val_scalar");
+    Arg10[0] = Arg10[0] + ConstValScalar;
 
     Arg12[0] = -Arg0[0];
 
@@ -98,6 +102,9 @@ int main() {
   gpuErrCheck(gpuMallocManaged(&R11, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R12, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R13, sizeof(double)));
+
+  *R0 = 2.0;
+  *R1 = 3.0;
 
   gpuErrCheck(KernelHandle.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, R0, R1, R2,
                                   R3, R4, R5, R6, R7, R8, R9, R10, R11, R12,
@@ -149,7 +156,7 @@ int main() {
 // CHECK-NEXT: R7 = 3
 // CHECK-NEXT: R8 = 10
 // CHECK-NEXT: R9 = 2.5
-// CHECK-NEXT: R10 = 7
+// CHECK-NEXT: R10 = 13
 // CHECK-NEXT: R11 = 1
 // CHECK-NEXT: R12 = -2
 // CHECK-NEXT: R13 = 0
