@@ -31,37 +31,6 @@ namespace {
 constexpr int MaxRequestsPerCall = 5;
 } // namespace
 
-struct UnpackedMessage {
-  HashT Hash;
-  std::vector<char> Data;
-  bool IsDynLib;
-};
-
-static UnpackedMessage unpackMessage(const std::vector<char> &Buffer) {
-  const char *Ptr = Buffer.data();
-
-  uint32_t HashSize = 0;
-  std::memcpy(&HashSize, Ptr, sizeof(HashSize));
-  Ptr += sizeof(HashSize);
-
-  std::string HashStr(Ptr, HashSize);
-  Ptr += HashSize;
-
-  uint8_t IsDynLib = 0;
-  std::memcpy(&IsDynLib, Ptr, sizeof(IsDynLib));
-  Ptr += sizeof(IsDynLib);
-
-  uint64_t BufferSize = 0;
-  std::memcpy(&BufferSize, Ptr, sizeof(BufferSize));
-  Ptr += sizeof(BufferSize);
-
-  std::vector<char> Data(BufferSize);
-  std::memcpy(Data.data(), Ptr, BufferSize);
-
-  return UnpackedMessage{HashT(StringRef(HashStr)), std::move(Data),
-                         IsDynLib != 0};
-}
-
 //===----------------------------------------------------------------------===//
 // MPICommHandle implementation
 //===----------------------------------------------------------------------===//
@@ -98,7 +67,7 @@ void MPICommHandle::ensureInitialized() {
 
 MPI_Comm MPICommHandle::get() {
   ensureInitialized();
-    return Comm;
+  return Comm;
 }
 
 int MPICommHandle::getRank() {
@@ -115,9 +84,7 @@ int MPICommHandle::getSize() {
 // MPISharedStorageCache implementation
 //===----------------------------------------------------------------------===//
 
-int MPISharedStorageCache::computeTag(const std::string &Label) {
-  return 0;
-}
+int MPISharedStorageCache::computeTag(const std::string &Label) { return 0; }
 
 MPISharedStorageCache::MPISharedStorageCache(const std::string &Label)
     : StorageDirectory(Config::get().ProteusCacheDir
@@ -260,33 +227,75 @@ void MPISharedStorageCache::waitForPendingSends() {
 
 std::vector<char> MPISharedStorageCache::packMessage(const HashT &HashValue,
                                                      const CacheEntry &Entry) {
-  // Format: [hash_size (4 bytes), hash_bytes, is_dynlib (1 byte),
-  //          buffer_size (8 bytes), buffer_bytes]
+  MPI_Comm Comm = CommHandle.get();
   std::string HashStr = HashValue.toString();
   uint32_t HashSize = static_cast<uint32_t>(HashStr.size());
   uint8_t IsDynLib = Entry.isSharedObject() ? 1 : 0;
   uint64_t BufferSize = Entry.Buffer.getBufferSize();
 
-  size_t TotalSize = sizeof(HashSize) + HashSize + sizeof(IsDynLib) +
-                     sizeof(BufferSize) + BufferSize;
+  if (BufferSize > static_cast<size_t>(std::numeric_limits<int>::max())) {
+    PROTEUS_FATAL_ERROR("Buffer size exceeds MPI int limit: " +
+                        std::to_string(BufferSize) + " bytes");
+  }
+
+  int HashSizeBytes, HashStrBytes, FlagBytes, BufSizeBytes, DataBytes;
+  MPI_Pack_size(1, MPI_UINT32_T, Comm, &HashSizeBytes);
+  MPI_Pack_size(static_cast<int>(HashSize), MPI_CHAR, Comm, &HashStrBytes);
+  MPI_Pack_size(1, MPI_BYTE, Comm, &FlagBytes);
+  MPI_Pack_size(1, MPI_UINT64_T, Comm, &BufSizeBytes);
+  MPI_Pack_size(static_cast<int>(BufferSize), MPI_BYTE, Comm, &DataBytes);
+
+  int TotalSize =
+      HashSizeBytes + HashStrBytes + FlagBytes + BufSizeBytes + DataBytes;
   std::vector<char> Packed(TotalSize);
-  char *Ptr = Packed.data();
+  int Position = 0;
 
-  std::memcpy(Ptr, &HashSize, sizeof(HashSize));
-  Ptr += sizeof(HashSize);
+  MPI_Pack(&HashSize, 1, MPI_UINT32_T, Packed.data(), TotalSize, &Position,
+           Comm);
 
-  std::memcpy(Ptr, HashStr.data(), HashSize);
-  Ptr += HashSize;
+  MPI_Pack(HashStr.data(), static_cast<int>(HashSize), MPI_CHAR, Packed.data(),
+           TotalSize, &Position, Comm);
 
-  std::memcpy(Ptr, &IsDynLib, sizeof(IsDynLib));
-  Ptr += sizeof(IsDynLib);
+  MPI_Pack(&IsDynLib, 1, MPI_BYTE, Packed.data(), TotalSize, &Position, Comm);
 
-  std::memcpy(Ptr, &BufferSize, sizeof(BufferSize));
-  Ptr += sizeof(BufferSize);
+  MPI_Pack(&BufferSize, 1, MPI_UINT64_T, Packed.data(), TotalSize, &Position,
+           Comm);
 
-  std::memcpy(Ptr, Entry.Buffer.getBufferStart(), BufferSize);
+  MPI_Pack(const_cast<char *>(Entry.Buffer.getBufferStart()),
+           static_cast<int>(BufferSize), MPI_BYTE, Packed.data(), TotalSize,
+           &Position, Comm);
 
+  Packed.resize(Position);
   return Packed;
+}
+
+UnpackedMessage
+MPISharedStorageCache::unpackMessage(const std::vector<char> &Buffer) {
+  MPI_Comm Comm = CommHandle.get();
+  int Position = 0;
+  int TotalSize = static_cast<int>(Buffer.size());
+
+  uint32_t HashSize = 0;
+  MPI_Unpack(Buffer.data(), TotalSize, &Position, &HashSize, 1, MPI_UINT32_T,
+             Comm);
+
+  std::string HashStr(HashSize, '\0');
+  MPI_Unpack(Buffer.data(), TotalSize, &Position, HashStr.data(),
+             static_cast<int>(HashSize), MPI_CHAR, Comm);
+
+  uint8_t IsDynLib = 0;
+  MPI_Unpack(Buffer.data(), TotalSize, &Position, &IsDynLib, 1, MPI_BYTE, Comm);
+
+  uint64_t DataSize = 0;
+  MPI_Unpack(Buffer.data(), TotalSize, &Position, &DataSize, 1, MPI_UINT64_T,
+             Comm);
+
+  std::vector<char> Data(DataSize);
+  MPI_Unpack(Buffer.data(), TotalSize, &Position, Data.data(),
+             static_cast<int>(DataSize), MPI_BYTE, Comm);
+
+  return UnpackedMessage{HashT(StringRef(HashStr)), std::move(Data),
+                         IsDynLib != 0};
 }
 
 void MPISharedStorageCache::saveToDisk(const HashT &HashValue, const char *Data,

@@ -49,6 +49,12 @@ struct PendingSend {
   MPI_Request Request;
 };
 
+struct UnpackedMessage {
+  HashT Hash;
+  std::vector<char> Data;
+  bool IsDynLib;
+};
+
 class MPISharedStorageCache : public ObjectCache {
 public:
   MPISharedStorageCache(const std::string &Label);
@@ -74,6 +80,7 @@ private:
   void waitForPendingSends();
   std::vector<char> packMessage(const HashT &HashValue,
                                 const CacheEntry &Entry);
+  UnpackedMessage unpackMessage(const std::vector<char> &Buffer);
   void saveToDisk(const HashT &HashValue, const char *Data, size_t Size,
                   bool IsDynLib);
   static int computeTag(const std::string &Label);
