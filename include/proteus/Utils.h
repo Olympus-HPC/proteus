@@ -22,8 +22,17 @@
 #include "proteus/TimeTracing.hpp"
 
 template <typename T> void saveToFile(llvm::StringRef Filepath, T &&Data) {
-  // Write to temp file first, then rename
-  // so readers never see a partial file.
+  std::error_code EC;
+  llvm::raw_fd_ostream Out(Filepath, EC);
+  if (EC)
+    PROTEUS_FATAL_ERROR("Cannot open file " + Filepath);
+  Out << Data;
+  Out.close();
+}
+
+// Write to temp file first, then rename so readers never see a partial file.
+template <typename T>
+void saveToFileAtomic(llvm::StringRef Filepath, T &&Data) {
   std::string TempPath = Filepath.str() + ".tmp";
 
   std::error_code EC;
