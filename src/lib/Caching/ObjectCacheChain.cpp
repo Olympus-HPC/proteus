@@ -10,6 +10,9 @@
 
 #include "proteus/Caching/ObjectCacheChain.hpp"
 #include "proteus/Caching/StorageCache.hpp"
+#ifdef PROTEUS_ENABLE_MPI
+#include "proteus/Caching/MPISharedStorageCache.hpp"
+#endif
 #include "proteus/Config.hpp"
 #include "proteus/Logger.hpp"
 #include "proteus/TimeTracing.hpp"
@@ -26,6 +29,13 @@ namespace proteus {
 
 ObjectCacheChain::ObjectCacheChain(const std::string &Label)
     : Label(Label), DistributedRank(getDistributedRank()) {
+  // Defer cache initialization to first use to allow MPI to be initialized.
+}
+
+void ObjectCacheChain::ensureInitialized() {
+  if (Initialized)
+    return;
+  Initialized = true;
   buildFromConfig(Config::get().ProteusObjectCacheChain);
 }
 
@@ -69,6 +79,12 @@ ObjectCacheChain::createCache(const std::string &Name) {
     return std::make_unique<StorageCache>(Label);
   }
 
+#ifdef PROTEUS_ENABLE_MPI
+  if (LowerName == "mpi-storage") {
+    return std::make_unique<MPISharedStorageCache>(Label);
+  }
+#endif
+
   PROTEUS_FATAL_ERROR("Unknown cache type: " + Name);
   return nullptr;
 }
@@ -88,6 +104,7 @@ void ObjectCacheChain::promoteToLevel(HashT &HashValue, const CacheEntry &Entry,
 
 std::unique_ptr<CompiledLibrary> ObjectCacheChain::lookup(HashT &HashValue) {
   TIMESCOPE("ObjectCacheChain::lookup");
+  ensureInitialized();
 
   // Search from fastest (index 0) to slowest.
   for (size_t I = 0; I < Caches.size(); ++I) {
@@ -125,6 +142,7 @@ std::unique_ptr<CompiledLibrary> ObjectCacheChain::lookup(HashT &HashValue) {
 
 void ObjectCacheChain::store(HashT &HashValue, const CacheEntry &Entry) {
   TIMESCOPE("ObjectCacheChain::store");
+  ensureInitialized();
 
   for (auto &Cache : Caches) {
     Cache->store(HashValue, Entry);
@@ -132,10 +150,18 @@ void ObjectCacheChain::store(HashT &HashValue, const CacheEntry &Entry) {
 }
 
 void ObjectCacheChain::printStats() {
+  ensureInitialized();
   printf("[proteus][%s] ObjectCacheChain rank %s with %zu level(s):\n",
          Label.c_str(), DistributedRank.c_str(), Caches.size());
   for (auto &Cache : Caches) {
     Cache->printStats();
+  }
+}
+
+void ObjectCacheChain::flush() {
+  ensureInitialized();
+  for (auto &Cache : Caches) {
+    Cache->flush();
   }
 }
 

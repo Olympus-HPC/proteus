@@ -34,16 +34,19 @@ public:
   std::unique_ptr<CompiledLibrary> lookup(HashT &HashValue);
   void store(HashT &HashValue, const CacheEntry &Entry);
   void printStats();
+  void flush();
 
 private:
   void addCache(std::unique_ptr<ObjectCache> Cache);
   void buildFromConfig(const std::string &ConfigStr);
   std::unique_ptr<ObjectCache> createCache(const std::string &Name);
   void promoteToLevel(HashT &HashValue, const CacheEntry &Entry, size_t Level);
+  void ensureInitialized();
 
   std::vector<std::unique_ptr<ObjectCache>> Caches;
   const std::string Label;
   const std::string DistributedRank;
+  bool Initialized = false;
 };
 
 } // namespace proteus
