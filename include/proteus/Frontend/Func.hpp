@@ -218,10 +218,10 @@ public:
   auto forLoop(Var<IterT> &Iter, const Var<InitT> &Init,
                const Var<UpperT> &Upper, const Var<IncT> &Inc,
                BodyLambda &&Body = {}) {
-    using RawT = std::remove_const_t<IterT>;
-    LoopBoundInfo<RawT> BoundsInfo{Iter, Init, Upper, Inc};
-    return ForLoopBuilder<RawT, BodyLambda>(BoundsInfo, *this,
-                                            std::forward<BodyLambda>(Body));
+    static_assert(is_mutable_v<IterT>, "Loop iterator must be mutable");
+    LoopBoundInfo<IterT> BoundsInfo{Iter, Init, Upper, Inc};
+    return ForLoopBuilder<IterT, BodyLambda>(BoundsInfo, *this,
+                                             std::forward<BodyLambda>(Body));
   }
 
   template <typename... LoopBuilders>
