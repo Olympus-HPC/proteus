@@ -32,6 +32,9 @@
 // in the LLVM IR. For split device compilation, the handler also emits a
 // JSON manifest file for the host compilation to parse, since there is no other
 // direct channel between the split device and host compilation.
+//
+// The source of truth is the device manifest file, which the host compilation
+// pass parses to reconstruct the runtime constant info for instrumentation.
 
 namespace proteus {
 
@@ -46,10 +49,6 @@ public:
                    const DenseMap<Value *, GlobalVariable *> &StubToKernelMap,
                    bool ForceJitAnnotateAll);
 
-  void parseManifestFileAnnotations(
-      const DenseMap<Value *, GlobalVariable *> &StubToKernelMap,
-      MapVector<Function *, JitFunctionInfo> &JitFunctionInfoMap);
-
 private:
   Module &M;
   ProteusTypes Types;
@@ -62,23 +61,33 @@ private:
       Function *F, const SmallSetVector<RuntimeConstantInfo, 16> &ConstantArgs);
 
   void createDeviceManifestFile(
-      DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap);
+      MapVector<Function *, SmallSetVector<RuntimeConstantInfo, 16>>
+          &RCInfoMap);
 
   void parseJitArgAnnotations(
       SmallPtrSetImpl<Function *> &JitArgAnnotations,
-      DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap);
+      MapVector<Function *, SmallSetVector<RuntimeConstantInfo, 16>>
+          &RCInfoMap);
 
   void parseJitArrayAnnotations(
       SmallPtrSetImpl<Function *> &JitArrayAnnotations,
-      DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap);
+      MapVector<Function *, SmallSetVector<RuntimeConstantInfo, 16>>
+          &RCInfoMap);
 
   void parseJitObjectAnnotations(
       SmallPtrSetImpl<Function *> &JitObjectAnnotations,
-      DenseMap<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap);
+      MapVector<Function *, SmallSetVector<RuntimeConstantInfo, 16>>
+          &RCInfoMap);
 
   void parseJitGlobalAnnotations(
-      GlobalVariable *GlobalAnnotations,
-      MapVector<Function *, JitFunctionInfo> &JitFunctionInfoMap);
+      const DenseMap<Value *, GlobalVariable *> &StubToKernelMap,
+      MapVector<Function *, SmallSetVector<RuntimeConstantInfo, 16>>
+          &RCInfoMap);
+
+  void parseManifestFileAnnotations(
+      const DenseMap<Value *, GlobalVariable *> &StubToKernelMap,
+      MapVector<Function *, SmallSetVector<RuntimeConstantInfo, 16>>
+          &RCInfoMap);
 
   void removeJitGlobalAnnotations();
 };

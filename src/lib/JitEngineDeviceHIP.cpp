@@ -237,8 +237,8 @@ HashT JitEngineDeviceHIP::getModuleHash(BinaryInfo &BinInfo) {
         SectionName->slice(SectionName->find_last_of(".") + 1, StringRef::npos);
     HashT SectionHashValue{SectionHashStr};
 
-    // NOTE: We include the hash value of the LTO section, which encodes changes
-    // to non-proteus compiled external modules.
+    // NOTE: We include the hash value of the LTO section, which
+    // encodes changes to non-proteus compiled external modules.
     BinInfo.updateModuleHash(SectionHashValue);
   }
 

@@ -39,16 +39,6 @@ function(CREATE_GPU_TEST_RDC exe check_source)
         OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES}"
     )
     add_dependencies(${exe}.${lang}.rdc ProteusPass)
-    # We introduce a build dependency between the same non-RDC and RDC tests to
-    # avoid collisions with parallel builds, in case the test uses the
-    # project::jit_arg API. Both tests will create the same manifest JSON file
-    # because its uniqueness depends on the source file, which is common for
-    # both instances of the test.  The ProteusPass deletes the manifest file
-    # after parsing it and if builds collide the compilation of one of the tests
-    # may miss its manifest and mis-compile.
-    if(TARGET ${exe}.${lang})
-        add_dependencies(${exe}.${lang}.rdc ${exe}.${lang})
-    endif()
 
     target_link_libraries(${exe}.${lang}.rdc PUBLIC proteus)
 
@@ -297,6 +287,8 @@ CREATE_GPU_TEST(dynamic_jit_array dynamic_jit_array.cpp)
 CREATE_GPU_TEST(jit_struct jit_struct.cpp)
 CREATE_GPU_TEST(kernel_tuning kernel_tuning.cpp)
 CREATE_GPU_TEST(gvar_tracking gvar_driver.cpp gvar1.cpp gvar2.cpp)
+CREATE_GPU_TEST(kernel_lambda kernel_lambda.cpp)
+CREATE_GPU_TEST(kernel_lambda_api kernel_lambda_api.cpp)
 
 CREATE_GPU_TEST_FORCE(force_annotations force_annotations.cpp)
 
@@ -361,6 +353,8 @@ CREATE_GPU_TEST_RDC(types_jit_array types_jit_array.cpp)
 CREATE_GPU_TEST_RDC(dynamic_jit_array dynamic_jit_array.cpp)
 CREATE_GPU_TEST_RDC(jit_struct jit_struct.cpp)
 CREATE_GPU_TEST_RDC(kernel_tuning kernel_tuning.cpp)
+CREATE_GPU_TEST_RDC(kernel_lambda kernel_lambda.cpp)
+CREATE_GPU_TEST_RDC(kernel_lambda_api kernel_lambda_api.cpp)
 
 CREATE_GPU_TEST_RDC_FORCE(force_annotations force_annotations.cpp)
 
