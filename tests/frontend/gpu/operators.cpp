@@ -69,8 +69,11 @@ int main() {
     { Arg11[0] = 1.0; }
     F.endIf();
 
-    auto ConstVal = F.defVar<const int>(42, "const_val");
+    auto ConstVal = F.defVar<const int>(Cmp, "const_val");
     Arg10[0] = Arg10[0] + ConstVal;
+
+    auto ConstValScalar = F.defVar<const int>(1, "const_val_scalar");
+    Arg10[0] = Arg10[0] + ConstValScalar;
 
     Arg12[0] = -Arg0[0];
 
@@ -153,7 +156,7 @@ int main() {
 // CHECK-NEXT: R7 = 3
 // CHECK-NEXT: R8 = 10
 // CHECK-NEXT: R9 = 2.5
-// CHECK-NEXT: R10 = 49
+// CHECK-NEXT: R10 = 13
 // CHECK-NEXT: R11 = 1
 // CHECK-NEXT: R12 = -2
 // CHECK-NEXT: R13 = 0

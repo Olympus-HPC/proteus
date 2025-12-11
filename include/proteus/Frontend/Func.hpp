@@ -5,6 +5,7 @@
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
+#include <type_traits>
 
 #include "proteus/AddressSpace.hpp"
 #include "proteus/Error.h"
@@ -137,10 +138,11 @@ public:
   }
 
   template <typename T, typename U>
-  Var<T> defVar(const Var<U> &Var, StringRef Name = "var") {
-    auto Res = declVar<T>(Name);
-    Res = Var;
-    return Res;
+  Var<T> defVar(const Var<U> &Val, StringRef Name = "var") {
+    using RawT = std::remove_const_t<T>;
+    Var<RawT> Res = declVar<RawT>(Name);
+    Res = Val;
+    return Var<T>(Res);
   }
 
   template <typename T>
