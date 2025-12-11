@@ -104,9 +104,9 @@ struct Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>
       : VarStorageOwner<VarStorage>(std::move(Storage), Fn) {}
 
   // Conversion constructor from Var<U> where U can convert to T.
-  template <typename U, typename = std::enable_if_t<
-                            std::is_convertible_v<U, std::remove_const_t<T>> &&
-                            (!std::is_same_v<U, T>)>>
+  template <typename U,
+            typename = std::enable_if_t<std::is_convertible_v<U, T> &&
+                                        (!std::is_same_v<U, T>)>>
   Var(const Var<U> &V);
 
   Var(const Var &V) : VarStorageOwner<VarStorage>(nullptr, V.Fn) {
