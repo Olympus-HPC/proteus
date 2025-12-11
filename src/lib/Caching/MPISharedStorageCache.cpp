@@ -116,10 +116,7 @@ void MPICommHandle::reset() {
 //===----------------------------------------------------------------------===//
 
 int MPISharedStorageCache::computeTag(const std::string &Label) {
-  // Hash the label to produce a valid MPI tag. MPI guarantees tags up to at
-  // least 32767 (MPI_TAG_UB minimum).
-  stable_hash Hash = hashValue(Label).getValue();
-  return static_cast<int>(Hash % 32767);
+  return 0;
 }
 
 MPISharedStorageCache::MPISharedStorageCache(const std::string &Label)
