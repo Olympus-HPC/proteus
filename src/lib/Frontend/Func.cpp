@@ -64,6 +64,7 @@ Value *FuncBase::getArg(size_t Idx) {
   return F->getArg(Idx);
 }
 
+#if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
 void FuncBase::setKernel() {
   LLVMContext &Ctx = J.getModule().getContext();
   switch (getTargetModel()) {
@@ -97,6 +98,7 @@ void FuncBase::setLaunchBoundsForKernel(int MaxThreadsPerBlock,
   proteus::setLaunchBoundsForKernel(*getFunction(), MaxThreadsPerBlock,
                                     MinBlocksPerSM);
 }
+#endif
 
 std::unique_ptr<ScalarStorage>
 FuncBase::createScalarStorage(const std::string &Name, Type *AllocaTy) {

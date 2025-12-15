@@ -48,9 +48,13 @@ private:
         std::make_unique<Func<void, ArgT...>>(*this, *Ctx, Name, Dispatch);
     Func<void, ArgT...> &TypedFnRef = *TypedFn;
     TypedFn->declArgs();
-    std::unique_ptr<FuncBase> &Fn = Functions.emplace_back(std::move(TypedFn));
 
+#if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
+    std::unique_ptr<FuncBase> &Fn = Functions.emplace_back(std::move(TypedFn));
     Fn->setKernel();
+#else
+    reportFatalError("setKernel() is only supported for CUDA/HIP");
+#endif
     return KernelHandle<ArgT...>{TypedFnRef, *this};
   }
 

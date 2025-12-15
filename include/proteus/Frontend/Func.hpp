@@ -265,9 +265,11 @@ public:
   Function *getFunction();
   Value *getArg(size_t Idx);
 
+#if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
   // Kernel management.
   void setKernel();
   void setLaunchBoundsForKernel(int MaxThreadsPerBlock, int MinBlocksPerSM);
+#endif
 
   AllocaInst *emitAlloca(Type *Ty, const std::string &Name,
                          AddressSpace AS = AddressSpace::DEFAULT);
