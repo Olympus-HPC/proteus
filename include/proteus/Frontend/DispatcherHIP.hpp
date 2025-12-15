@@ -19,7 +19,7 @@ public:
 
   std::unique_ptr<MemoryBuffer> compile(std::unique_ptr<LLVMContext> Ctx,
                                         std::unique_ptr<Module> Mod,
-                                        HashT ModuleHash,
+                                        const HashT &ModuleHash,
                                         bool DisableIROpt = false) override {
     // This is necessary to ensure Ctx outlives M. Setting [[maybe_unused]] can
     // trigger a lifetime bug.
@@ -29,7 +29,7 @@ public:
     std::unique_ptr<MemoryBuffer> ObjectModule =
         Jit.compileOnly(*ModOwner, DisableIROpt);
     if (!ObjectModule)
-      PROTEUS_FATAL_ERROR("Expected non-null object library");
+      reportFatalError("Expected non-null object library");
 
     ObjectCache.store(
         ModuleHash, CacheEntry::staticObject(ObjectModule->getMemBufferRef()));
@@ -38,21 +38,20 @@ public:
   }
 
   std::unique_ptr<CompiledLibrary>
-  lookupCompiledLibrary(HashT ModuleHash) override {
+  lookupCompiledLibrary(const HashT &ModuleHash) override {
     return ObjectCache.lookup(ModuleHash);
   }
 
   DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
-                        LaunchDims BlockDim, ArrayRef<void *> KernelArgs,
+                        LaunchDims BlockDim, void *KernelArgs[],
                         uint64_t ShmemSize, void *Stream) override {
     dim3 HipGridDim = {GridDim.X, GridDim.Y, GridDim.Z};
     dim3 HipBlockDim = {BlockDim.X, BlockDim.Y, BlockDim.Z};
     hipStream_t HipStream = reinterpret_cast<hipStream_t>(Stream);
 
-    void **KernelArgsPtrs = const_cast<void **>(KernelArgs.data());
     return proteus::launchKernelFunction(
         reinterpret_cast<hipFunction_t>(KernelFunc), HipGridDim, HipBlockDim,
-        KernelArgsPtrs, ShmemSize, HipStream);
+        KernelArgs, ShmemSize, HipStream);
   }
 
   StringRef getDeviceArch() const override { return Jit.getDeviceArch(); }
@@ -62,7 +61,8 @@ public:
     ObjectCache.printStats();
   }
 
-  void *getFunctionAddress(StringRef KernelName, HashT ModuleHash,
+  void *getFunctionAddress(const std::string &KernelName,
+                           const HashT &ModuleHash,
                            CompiledLibrary &Library) override {
     auto GetKernelFunc = [&]() {
       // Hash the kernel name to get a unique id.
@@ -85,8 +85,8 @@ public:
     return KernelFunc;
   }
 
-  void registerDynamicLibrary(HashT, const SmallString<128> &) override {
-    PROTEUS_FATAL_ERROR("Dispatch HIP does not support registerDynamicLibrary");
+  void registerDynamicLibrary(const HashT &, const std::string &) override {
+    reportFatalError("Dispatch HIP does not support registerDynamicLibrary");
   }
 
 private:

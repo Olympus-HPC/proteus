@@ -8,20 +8,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <cstddef>
-#include <memory>
-#include <string>
-
+#include "proteus/JitEngineDeviceHIP.hpp"
 #include "proteus/CoreDevice.hpp"
 #include "proteus/CoreLLVM.hpp"
 #include "proteus/CoreLLVMHIP.hpp"
-#include "proteus/JitEngineDeviceHIP.hpp"
 #include "proteus/TimeTracing.hpp"
 
 #if LLVM_VERSION_MAJOR == 18
 #include <lld/Common/Driver.h>
 LLD_HAS_DRIVER(elf)
 #endif
+
+#include <cstddef>
+#include <memory>
+#include <string>
 
 using namespace proteus;
 using namespace llvm;
@@ -57,7 +57,7 @@ static Expected<std::unique_ptr<MemoryBuffer>> decompress(StringRef Blob) {
 
   uint32_t TotalFileSize;
   if (ThisVersion < 2)
-    PROTEUS_FATAL_ERROR("V1 compressed offload bundle format is unsupported");
+    reportFatalError("V1 compressed offload bundle format is unsupported");
 
   memcpy(&TotalFileSize, Blob.data() + CurrentOffset, sizeof(uint32_t));
   CurrentOffset += FileSizeFieldSize;
@@ -111,13 +111,13 @@ static std::unique_ptr<MemoryBuffer> getDeviceBinary(BinaryInfo &BinInfo,
   case file_magic::offload_bundle_compressed: {
     auto ExpectedDecompressed = decompress(StringRef{FatbinWrapper->Binary});
     if (auto E = ExpectedDecompressed.takeError())
-      PROTEUS_FATAL_ERROR("Error decompressing compressed offload bundle: " +
-                          toString(std::move(E)));
+      reportFatalError("Error decompressing compressed offload bundle: " +
+                       toString(std::move(E)));
     FatbinBuffer = std::move(*ExpectedDecompressed);
     break;
   }
   default:
-    PROTEUS_FATAL_ERROR("Failed to read device binary bundle");
+    reportFatalError("Failed to read device binary bundle");
   }
 #else
   std::unique_ptr<MemoryBuffer> FatbinBuffer =
@@ -130,7 +130,7 @@ static std::unique_ptr<MemoryBuffer> getDeviceBinary(BinaryInfo &BinInfo,
   StringRef Magic(FatbinBuffer->getBufferStart(),
                   sizeof(OffloadBundlerMagicStr) - 1);
   if (!(Magic == OffloadBundlerMagicStr))
-    PROTEUS_FATAL_ERROR("Error missing magic string");
+    reportFatalError("Error missing magic string");
   Pos += sizeof(OffloadBundlerMagicStr) - 1;
 
   auto Read8ByteIntLE = [](const char *S, size_t Pos) {
@@ -174,7 +174,7 @@ static std::unique_ptr<MemoryBuffer> getDeviceBinary(BinaryInfo &BinInfo,
   }
 
   if (!DeviceBinary)
-    PROTEUS_FATAL_ERROR("Expected non-null device binary");
+    reportFatalError("Expected non-null device binary");
 
   return MemoryBuffer::getMemBufferCopy(DeviceBinary->getBuffer());
 }
@@ -196,11 +196,11 @@ HashT JitEngineDeviceHIP::getModuleHash(BinaryInfo &BinInfo) {
 
   Expected<object::ELF64LEFile> DeviceElf = getDeviceElf(BinInfo, DeviceArch);
   if (DeviceElf.takeError())
-    PROTEUS_FATAL_ERROR("Cannot create the device elf");
+    reportFatalError("Cannot create the device elf");
 
   auto Sections = DeviceElf->sections();
   if (Sections.takeError())
-    PROTEUS_FATAL_ERROR("Error reading sections");
+    reportFatalError("Error reading sections");
 
   // NOTE: This code hashes the bitcode of the section. Leaving it here in case
   // there is a reason to revert to computing the hash at runtime instead of
@@ -211,7 +211,7 @@ HashT JitEngineDeviceHIP::getModuleHash(BinaryInfo &BinInfo) {
     ArrayRef<uint8_t> BitcodeData;
     auto SectionContents = DeviceElf->getSectionContents(Section);
     if (SectionContents.takeError())
-      PROTEUS_FATAL_ERROR("Error reading section contents");
+      reportFatalError("Error reading section contents");
     BitcodeData = *SectionContents;
     auto Bitcode = StringRef{reinterpret_cast<const char
     *>(BitcodeData.data()),
@@ -226,7 +226,7 @@ HashT JitEngineDeviceHIP::getModuleHash(BinaryInfo &BinInfo) {
   for (auto Section : *Sections) {
     auto SectionName = DeviceElf->getSectionName(Section);
     if (SectionName.takeError())
-      PROTEUS_FATAL_ERROR("Error reading section name");
+      reportFatalError("Error reading section name");
     PROTEUS_DBG(Logger::logs("proteus")
                 << "SectionName " << *SectionName << "\n");
 
@@ -249,18 +249,18 @@ std::unique_ptr<Module> JitEngineDeviceHIP::tryExtractKernelModule(
     BinaryInfo &BinInfo, StringRef KernelName, LLVMContext &Ctx) {
   Expected<object::ELF64LEFile> DeviceElf = getDeviceElf(BinInfo, DeviceArch);
   if (DeviceElf.takeError())
-    PROTEUS_FATAL_ERROR("Cannot create the device elf");
+    reportFatalError("Cannot create the device elf");
 
   auto Sections = DeviceElf->sections();
   if (Sections.takeError())
-    PROTEUS_FATAL_ERROR("Error reading sections");
+    reportFatalError("Error reading sections");
 
   auto ExtractModuleFromSection = [&Ctx, &DeviceElf](auto &Section,
                                                      StringRef SectionName) {
     ArrayRef<uint8_t> BitcodeData;
     auto SectionContents = DeviceElf->getSectionContents(Section);
     if (SectionContents.takeError())
-      PROTEUS_FATAL_ERROR("Error reading section contents");
+      reportFatalError("Error reading section contents");
     BitcodeData = *SectionContents;
     auto Bitcode = StringRef{reinterpret_cast<const char *>(BitcodeData.data()),
                              BitcodeData.size()};
@@ -270,7 +270,7 @@ std::unique_ptr<Module> JitEngineDeviceHIP::tryExtractKernelModule(
     // Parse the IR module eagerly as it will be immediately used for codegen.
     auto M = parseIR(MemoryBufferRef(Bitcode, SectionName), Diag, Ctx);
     if (!M)
-      PROTEUS_FATAL_ERROR("Error parsing IR: " + Diag.getMessage());
+      reportFatalError("Error parsing IR: " + Diag.getMessage());
     PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                          << "Parse IR " << SectionName << " " << T.elapsed()
                          << " ms\n");
@@ -284,7 +284,7 @@ std::unique_ptr<Module> JitEngineDeviceHIP::tryExtractKernelModule(
   for (auto Section : *Sections) {
     auto SectionName = DeviceElf->getSectionName(Section);
     if (SectionName.takeError())
-      PROTEUS_FATAL_ERROR("Error reading section name");
+      reportFatalError("Error reading section name");
     PROTEUS_DBG(Logger::logs("proteus")
                 << "SectionName " << *SectionName << "\n");
 
@@ -304,11 +304,11 @@ std::unique_ptr<Module> JitEngineDeviceHIP::tryExtractKernelModule(
 void JitEngineDeviceHIP::extractModules(BinaryInfo &BinInfo) {
   Expected<object::ELF64LEFile> DeviceElf = getDeviceElf(BinInfo, DeviceArch);
   if (DeviceElf.takeError())
-    PROTEUS_FATAL_ERROR("Cannot create the device elf");
+    reportFatalError("Cannot create the device elf");
 
   auto Sections = DeviceElf->sections();
   if (Sections.takeError())
-    PROTEUS_FATAL_ERROR("Error reading sections");
+    reportFatalError("Error reading sections");
 
   SmallVector<std::unique_ptr<Module>> LinkedModules;
 
@@ -317,7 +317,7 @@ void JitEngineDeviceHIP::extractModules(BinaryInfo &BinInfo) {
     ArrayRef<uint8_t> BitcodeData;
     auto SectionContents = DeviceElf->getSectionContents(Section);
     if (SectionContents.takeError())
-      PROTEUS_FATAL_ERROR("Error reading section contents");
+      reportFatalError("Error reading section contents");
     BitcodeData = *SectionContents;
     auto Bitcode = StringRef{reinterpret_cast<const char *>(BitcodeData.data()),
                              BitcodeData.size()};
@@ -328,7 +328,7 @@ void JitEngineDeviceHIP::extractModules(BinaryInfo &BinInfo) {
         getLazyIRModule(MemoryBuffer::getMemBufferCopy(Bitcode, SectionName),
                         Diag, *BinInfo.getLLVMContext(), true);
     if (!M)
-      PROTEUS_FATAL_ERROR("Error parsing IR: " + Diag.getMessage());
+      reportFatalError("Error parsing IR: " + Diag.getMessage());
     PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                          << "Parse IR " << SectionName << " " << T.elapsed()
                          << " ms\n");
@@ -342,7 +342,7 @@ void JitEngineDeviceHIP::extractModules(BinaryInfo &BinInfo) {
   for (auto Section : *Sections) {
     auto SectionName = DeviceElf->getSectionName(Section);
     if (SectionName.takeError())
-      PROTEUS_FATAL_ERROR("Error reading section name");
+      reportFatalError("Error reading section name");
     PROTEUS_DBG(Logger::logs("proteus")
                 << "SectionName " << *SectionName << "\n");
 

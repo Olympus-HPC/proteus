@@ -4,15 +4,20 @@
 set(SOURCES
   CompilerInterfaceHost.cpp
   CompilerInterfaceRuntimeConstantInfo.cpp
+  CompiledLibrary.cpp
+  Error.cpp
   JitEngine.cpp
   JitEngineHost.cpp
-  Caching/StorageCache.cpp
+  TimeTracing.cpp
   Caching/ObjectCacheChain.cpp
-  Frontend/Func.cpp
-  Frontend/VarStorage.cpp
-  Frontend/Dispatcher.cpp
+  Caching/StorageCache.cpp
   Frontend/CppJitModule.cpp
+  Frontend/Dispatcher.cpp
+  Frontend/Func.cpp
+  Frontend/JitFrontend.cpp
   Frontend/LoopUnroller.cpp
+  Frontend/TypeMap.cpp
+  Frontend/VarStorage.cpp
 )
 
 set(PROTEUS_PROJECT_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")

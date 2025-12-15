@@ -1,14 +1,14 @@
 #ifndef PROTEUS_CONFIG_HPP
 #define PROTEUS_CONFIG_HPP
 
-#include <string>
-
 #include "proteus/Error.h"
 #include "proteus/Logger.hpp"
+
 #include "llvm/ADT/StringMap.h"
 #include <llvm/Support/JSON.h>
 #include <llvm/Support/MemoryBuffer.h>
 
+#include <string>
 namespace proteus {
 
 enum class CodegenOption {
@@ -85,7 +85,7 @@ inline CodegenOption strToCG(std::string CGstr) {
   if (CGstr == "parallel")
     return CodegenOption::Parallel;
 
-  PROTEUS_FATAL_ERROR("Unknown codegen option: " + CGstr);
+  reportFatalError("Unknown codegen option: " + CGstr);
 }
 
 inline CodegenOption getEnvOrDefaultCG(const char *VarName,
@@ -270,8 +270,8 @@ parseJSONConfig(std::optional<std::string> JSONFn) {
         llvm::MemoryBuffer::getFile(JSONFn.value(), /* isText */ true,
                                     /* RequiresNullTerminator */ true);
     if (!JSONBuf)
-      PROTEUS_FATAL_ERROR("Error when opening json file: " +
-                          JSONBuf.getError().message() + "\n");
+      reportFatalError("Error when opening json file: " +
+                       JSONBuf.getError().message() + "\n");
 
     llvm::json::Value JsonInfo =
         llvm::cantFail(llvm::json::parse(JSONBuf.get()->getBuffer()),
@@ -283,7 +283,7 @@ parseJSONConfig(std::optional<std::string> JSONFn) {
   }();
 
   if (!JSONRoot)
-    PROTEUS_FATAL_ERROR("Top-level JSON is not an object.\n");
+    reportFatalError("Top-level JSON is not an object.\n");
 
   for (auto &KV : JSONRoot.value()) {
     auto KernelName = KV.first;

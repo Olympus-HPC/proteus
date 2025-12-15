@@ -6,6 +6,8 @@
 
 #include <proteus/JitFrontend.hpp>
 
+#include <iostream>
+
 using namespace proteus;
 
 int main() {

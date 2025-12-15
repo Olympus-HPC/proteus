@@ -11,15 +11,16 @@
 #ifndef PROTEUS_TRANSFORM_LAMBDA_SPECIALIZATION_HPP
 #define PROTEUS_TRANSFORM_LAMBDA_SPECIALIZATION_HPP
 
-#include <llvm/Demangle/Demangle.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/Instructions.h>
-#include <llvm/Support/Casting.h>
-#include <llvm/Support/Debug.h>
-
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Debug.h"
 #include "proteus/Utils.h"
+
+#include <llvm/Demangle/Demangle.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/Module.h>
+#include <llvm/Support/Casting.h>
+#include <llvm/Support/Debug.h>
 
 namespace proteus {
 
@@ -50,8 +51,8 @@ inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
     std::string TypeString;
     raw_string_ostream TypeOstream(TypeString);
     ArgType->print(TypeOstream);
-    PROTEUS_FATAL_ERROR("JIT Incompatible type in runtime constant: " +
-                        TypeOstream.str());
+    reportFatalError("JIT Incompatible type in runtime constant: " +
+                     TypeOstream.str());
   }
 }
 
@@ -111,7 +112,7 @@ private:
     for (auto *GEPUser : GEP->users()) {
       auto *LI = dyn_cast<LoadInst>(GEPUser);
       if (!LI)
-        PROTEUS_FATAL_ERROR("Expected load instruction");
+        reportFatalError("Expected load instruction");
       Type *LoadType = LI->getType();
       Constant *C = getConstant(M.getContext(), LoadType, *Arg);
       LI->replaceAllUsesWith(C);

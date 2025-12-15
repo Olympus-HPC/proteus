@@ -12,53 +12,40 @@
 #define PROTEUS_TIME_TRACING_HPP
 
 #include <chrono>
-#include <optional>
-
-#include <llvm/Support/TimeProfiler.h>
-
-#include "proteus/Config.hpp"
+#include <memory>
 
 namespace proteus {
 
-using namespace llvm;
+// RAII wrapper that handles the optional logic internally
+struct TimeTraceScopeWrapper;
+class ScopedTimeTrace {
+public:
+  explicit ScopedTimeTrace(const std::string &Name);
+  ~ScopedTimeTrace();
 
-using TimeTraceOptional = std::optional<TimeTraceScope>;
+  // Move-only
+  ScopedTimeTrace(ScopedTimeTrace &&) = default;
+  ScopedTimeTrace &operator=(ScopedTimeTrace &&) = default;
+
+private:
+  std::unique_ptr<TimeTraceScopeWrapper> Pimpl;
+};
 
 struct TimeTracerRAII {
-  TimeTracerRAII() {
-    if (Config::get().ProteusEnableTimeTrace) {
-      timeTraceProfilerInitialize(500 /* us */, "proteus");
-    }
-  }
+  TimeTracerRAII();
 
-  ~TimeTracerRAII() {
-    if (Config::get().ProteusEnableTimeTrace) {
-      auto &OutputFile = Config::get().ProteusTimeTraceFile;
-      if (auto E = timeTraceProfilerWrite(OutputFile, "-")) {
-        handleAllErrors(std::move(E));
-        return;
-      }
-      timeTraceProfilerCleanup();
-    }
-  }
+  ~TimeTracerRAII();
 };
 
 class Timer {
   using Clock = std::chrono::steady_clock;
 
 public:
-  Timer() {
-    if (Config::get().ProteusEnableTimers)
-      Start = Clock::now();
-  }
+  Timer();
 
-  uint64_t elapsed() {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() -
-                                                                 Start)
-        .count();
-  }
+  uint64_t elapsed();
 
-  void reset() { Start = Clock::now(); }
+  void reset();
 
 private:
   Clock::time_point Start;
@@ -68,11 +55,8 @@ private:
   if (Config::get().ProteusEnableTimers)                                       \
     x;
 
-#define TIMESCOPE(x)                                                           \
-  TimeTraceOptional TTS;                                                       \
-  if (Config::get().ProteusEnableTimeTrace) {                                  \
-    TTS.emplace(x);                                                            \
-  }
+// Macro now creates the wrapper, which is lightweight in the header
+#define TIMESCOPE(x) proteus::ScopedTimeTrace STT_##__LINE__(x);
 
 } // namespace proteus
 

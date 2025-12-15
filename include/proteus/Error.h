@@ -1,11 +1,31 @@
 #ifndef PROTEUS_ERROR_H
 #define PROTEUS_ERROR_H
 
-#include <cstdint>
-#include <llvm/ADT/Twine.h>
+#include <string>
 
-#define PROTEUS_FATAL_ERROR(x)                                                 \
-  report_fatal_error(llvm::Twine(std::string{} + __FILE__ + ":" +              \
-                                 std::to_string(__LINE__) + " => " + x))
+namespace llvm {
+class StringRef;
+class Twine;
+} // namespace llvm
+
+namespace proteus {
+
+[[noreturn]] void reportFatalError(const char *Reason,
+                                   const char *FILE = __builtin_FILE(),
+                                   unsigned Line = __builtin_LINE());
+
+[[noreturn]] void reportFatalError(const std::string &Reason,
+                                   const char *FILE = __builtin_FILE(),
+                                   unsigned Line = __builtin_LINE());
+
+[[noreturn]] void reportFatalError(const llvm::StringRef &Reason,
+                                   const char *FILE = __builtin_FILE(),
+                                   unsigned Line = __builtin_LINE());
+
+[[noreturn]] void reportFatalError(const llvm::Twine &Reason,
+                                   const char *FILE = __builtin_FILE(),
+                                   unsigned Line = __builtin_LINE());
+
+} // namespace proteus
 
 #endif

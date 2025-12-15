@@ -1,14 +1,13 @@
 #ifndef PROTEUS_FRONTEND_LOOP_NEST_HPP
 #define PROTEUS_FRONTEND_LOOP_NEST_HPP
 
-#include <memory>
-#include <optional>
-
 #include "proteus/Error.h"
 #include "proteus/Frontend/Func.hpp"
 #include "proteus/Frontend/LoopUnroller.hpp"
 #include "proteus/Frontend/Var.hpp"
 
+#include <memory>
+#include <optional>
 namespace proteus {
 
 template <typename T> class LoopBoundInfo {
@@ -38,7 +37,7 @@ public:
 
   ForLoopBuilder &tile(int Tile) {
     if (Unroller.isEnabled())
-      PROTEUS_FATAL_ERROR(
+      reportFatalError(
           "Cannot tile a loop that is already marked for unrolling");
     TileSize = Tile;
     return *this;
@@ -46,7 +45,7 @@ public:
 
   ForLoopBuilder &unroll() {
     if (TileSize.has_value())
-      PROTEUS_FATAL_ERROR(
+      reportFatalError(
           "Cannot unroll a loop that is already marked for tiling");
     Unroller.enable();
     return *this;
@@ -54,7 +53,7 @@ public:
 
   ForLoopBuilder &unroll(int Count) {
     if (TileSize.has_value())
-      PROTEUS_FATAL_ERROR(
+      reportFatalError(
           "Cannot unroll a loop that is already marked for tiling");
     Unroller.enable(Count);
     return *this;
@@ -64,10 +63,10 @@ public:
     Fn.beginFor(Bounds.IterVar, Bounds.Init, Bounds.UpperBound, Bounds.Inc);
 
     // Capture the latch block before body execution may change IR structure.
-    llvm::BasicBlock *BodyBB = Fn.getIRBuilder().GetInsertBlock();
-    auto *LatchBB = BodyBB->getUniqueSuccessor();
+    llvm::BasicBlock *BodyBB = Fn.getInsertBlock();
+    auto *LatchBB = Fn.getUniqueSuccessor(BodyBB);
     if (!LatchBB)
-      PROTEUS_FATAL_ERROR("Expected unique successor for loop latch block");
+      reportFatalError("Expected unique successor for loop latch block");
 
     Body();
     Fn.endFor();
@@ -170,7 +169,7 @@ private:
   void validateNoUnroll(std::index_sequence<Is...>) const {
     bool AnyUnrolled = (std::get<Is>(Loops).Unroller.isEnabled() || ...);
     if (AnyUnrolled)
-      PROTEUS_FATAL_ERROR(
+      reportFatalError(
           "Cannot tile a loop nest containing loops marked for unrolling");
   }
 

@@ -10,7 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <memory>
+#include "proteus/JitEngineHost.hpp"
+#include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
+#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/CoreLLVM.hpp"
+#include "proteus/LambdaRegistry.hpp"
+#include "proteus/TransformArgumentSpecialization.hpp"
+#include "proteus/TransformLambdaSpecialization.hpp"
+#if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
+#include "proteus/CompilerInterfaceDevice.h"
+#endif
 
 #include <llvm/ExecutionEngine/JITEventListener.h>
 #include <llvm/ExecutionEngine/Orc/Core.h>
@@ -25,21 +34,11 @@
 #include <llvm/Object/SymbolSize.h>
 #include <llvm/TargetParser/Host.h>
 
-#include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
-#include "proteus/CompilerInterfaceTypes.h"
-#include "proteus/CoreLLVM.hpp"
-#include "proteus/JitEngineHost.hpp"
-#include "proteus/LambdaRegistry.hpp"
-#include "proteus/TransformArgumentSpecialization.hpp"
-#include "proteus/TransformLambdaSpecialization.hpp"
+#include <memory>
 
 using namespace proteus;
 using namespace llvm;
 using namespace llvm::orc;
-
-#if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
-#include "proteus/CompilerInterfaceDevice.h"
-#endif
 
 JitEngineHost &JitEngineHost::instance() {
   static JitEngineHost Jit;
@@ -87,7 +86,7 @@ void JitEngineHost::dumpSymbolInfo(
   raw_fd_ostream OFD("/tmp/perf-" + std::to_string(Pid) + ".map", EC,
                      sys::fs::OF_Append);
   if (EC)
-    PROTEUS_FATAL_ERROR("Cannot open perf map file");
+    reportFatalError("Cannot open perf map file");
   for (auto SymSizePair : object::computeSymbolSizes(LoadedObj)) {
     auto Sym = SymSizePair.first;
     auto Size = SymSizePair.second;
@@ -167,7 +166,7 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
 
   if (Config::get().ProteusDebugOutput) {
     if (verifyModule(M, &errs()))
-      PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
+      reportFatalError("Broken module found, JIT compilation aborted!");
     else
       Logger::logs("proteus") << "Module verified!\n";
   }
@@ -206,7 +205,7 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   SMDiagnostic Diag;
   auto M = parseIR(MemoryBufferRef(StrIR, "JitModule"), Diag, *Ctx);
   if (!M)
-    PROTEUS_FATAL_ERROR("Error parsing IR: " + Diag.getMessage());
+    reportFatalError("Error parsing IR: " + Diag.getMessage());
 
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus") << "Parse IR " << FnName << " "
                                                << T.elapsed() << " ms\n");
@@ -282,7 +281,7 @@ std::unique_ptr<MemoryBuffer> JitEngineHost::compileOnly(Module &M,
   auto ExpectedTM =
       JITTargetMachineBuilder::detectHost()->createTargetMachine();
   if (auto E = ExpectedTM.takeError())
-    PROTEUS_FATAL_ERROR("Expected target machine: " + toString(std::move(E)));
+    reportFatalError("Expected target machine: " + toString(std::move(E)));
   std::unique_ptr<TargetMachine> TM = std::move(*ExpectedTM);
 
   // Set up the output stream.
@@ -308,7 +307,7 @@ std::unique_ptr<MemoryBuffer> JitEngineHost::compileOnly(Module &M,
   // Add the target passes to emit object code.
   if (TM->addPassesToEmitFile(PM, ObjStream, nullptr,
                               CodeGenFileType::ObjectFile)) {
-    PROTEUS_FATAL_ERROR("Target machine cannot emit object file");
+    reportFatalError("Target machine cannot emit object file");
   }
 
   // Run the passes.
@@ -325,8 +324,8 @@ void JitEngineHost::loadCompiledLibrary(CompiledLibrary &Library) {
   auto ExpectedJitDyLib = ES.createJITDylib(
       "JitDyLib_" + std::to_string(reinterpret_cast<uintptr_t>(&Library)));
   if (auto E = ExpectedJitDyLib.takeError()) {
-    PROTEUS_FATAL_ERROR("Error creating library jit dylib: " +
-                        toString(std::move(E)));
+    reportFatalError("Error creating library jit dylib: " +
+                     toString(std::move(E)));
   }
 
   JITDylib &CreatedDylib = *ExpectedJitDyLib;
@@ -349,8 +348,7 @@ void JitEngineHost::loadCompiledLibrary(CompiledLibrary &Library) {
     // Add the object from the compiled library.
     if (auto E = LLJITPtr->addObjectFile(*Library.JitDyLib,
                                          std::move(Library.ObjectModule)))
-      PROTEUS_FATAL_ERROR("Error loading object file: " +
-                          toString(std::move(E)));
+      reportFatalError("Error loading object file: " + toString(std::move(E)));
   }
 }
 

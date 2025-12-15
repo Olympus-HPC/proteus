@@ -11,13 +11,19 @@
 #ifndef PROTEUS_JITENGINEDEVICE_HPP
 #define PROTEUS_JITENGINEDEVICE_HPP
 
-#include <cstdint>
-#include <functional>
-#include <llvm/ADT/SmallPtrSet.h>
-#include <llvm/Analysis/CallGraph.h>
-#include <memory>
-#include <optional>
-#include <string>
+#include "proteus/Caching/MemoryCache.hpp"
+#include "proteus/Caching/ObjectCacheChain.hpp"
+#include "proteus/Cloning.h"
+#include "proteus/CompilerAsync.hpp"
+#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/CompilerSync.hpp"
+#include "proteus/CoreDevice.hpp"
+#include "proteus/CoreLLVM.hpp"
+#include "proteus/Debug.h"
+#include "proteus/Hashing.hpp"
+#include "proteus/JitEngine.hpp"
+#include "proteus/TimeTracing.hpp"
+#include "proteus/Utils.h"
 
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
@@ -51,19 +57,13 @@
 #include <llvm/Transforms/Utils/Cloning.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
-#include "proteus/Caching/MemoryCache.hpp"
-#include "proteus/Caching/ObjectCacheChain.hpp"
-#include "proteus/Cloning.h"
-#include "proteus/CompilerAsync.hpp"
-#include "proteus/CompilerInterfaceTypes.h"
-#include "proteus/CompilerSync.hpp"
-#include "proteus/CoreDevice.hpp"
-#include "proteus/CoreLLVM.hpp"
-#include "proteus/Debug.h"
-#include "proteus/Hashing.hpp"
-#include "proteus/JitEngine.hpp"
-#include "proteus/TimeTracing.hpp"
-#include "proteus/Utils.h"
+#include <cstdint>
+#include <functional>
+#include <llvm/ADT/SmallPtrSet.h>
+#include <llvm/Analysis/CallGraph.h>
+#include <memory>
+#include <optional>
+#include <string>
 
 namespace proteus {
 
@@ -107,7 +107,7 @@ public:
   Module &getLinkedModule() {
     if (!LinkedModule) {
       if (!hasExtractedModules())
-        PROTEUS_FATAL_ERROR("Expected extracted modules");
+        reportFatalError("Expected extracted modules");
 
       Timer T;
       // Avoid linking when there's a single module by moving it instead and
@@ -115,7 +115,7 @@ public:
       if (ExtractedModules->size() == 1) {
         LinkedModule = ExtractedModules->front().get();
         if (auto E = LinkedModule->materializeAll())
-          PROTEUS_FATAL_ERROR("Error materializing " + toString(std::move(E)));
+          reportFatalError("Error materializing " + toString(std::move(E)));
       } else {
         // By the LLVM API, linkModules takes ownership of module pointers in
         // ExtractedModules and returns a new unique ptr to the linked module.
@@ -155,7 +155,7 @@ public:
   bool hasModuleHash() const { return ExtractedModuleHash.has_value(); }
   HashT getModuleHash() const {
     if (!hasModuleHash())
-      PROTEUS_FATAL_ERROR("Expected module hash to be set");
+      reportFatalError("Expected module hash to be set");
 
     return ExtractedModuleHash.value();
   }
@@ -170,7 +170,7 @@ public:
   CallGraph &getCallGraph() {
     if (!ModuleCallGraph.has_value()) {
       if (!LinkedModule)
-        PROTEUS_FATAL_ERROR("Expected non-null linked module");
+        reportFatalError("Expected non-null linked module");
       ModuleCallGraph.emplace(CallGraph(*LinkedModule));
     }
     return ModuleCallGraph.value();
@@ -179,7 +179,7 @@ public:
   bool hasDeviceBinary() { return (DeviceBinary != nullptr); }
   MemoryBufferRef getDeviceBinary() {
     if (!hasDeviceBinary())
-      PROTEUS_FATAL_ERROR("Expeced non-null device binary");
+      reportFatalError("Expeced non-null device binary");
     return DeviceBinary->getMemBufferRef();
   }
   void setDeviceBinary(std::unique_ptr<MemoryBuffer> DeviceBinaryBuffer) {
@@ -329,7 +329,7 @@ public:
         break;
       }
       default:
-        PROTEUS_FATAL_ERROR("Unsupported kernel cloning option");
+        reportFatalError("Unsupported kernel cloning option");
       }
 
       PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
@@ -353,7 +353,7 @@ public:
       auto ExpectedKernelModule =
           parseBitcodeFile(MemoryBufferRef{CloneStr, KernelName}, Ctx);
       if (auto E = ExpectedKernelModule.takeError())
-        PROTEUS_FATAL_ERROR("Error parsing bitcode: " + toString(std::move(E)));
+        reportFatalError("Error parsing bitcode: " + toString(std::move(E)));
 
       KernelModule = std::move(*ExpectedKernelModule);
       Bitcode = MemoryBuffer::getMemBufferCopy(CloneStr);
@@ -377,10 +377,10 @@ public:
       return;
 
     if (KernelInfo.hasModule())
-      PROTEUS_FATAL_ERROR("Unexpected KernelInfo has module but not bitcode");
+      reportFatalError("Unexpected KernelInfo has module but not bitcode");
 
     if (KernelInfo.hasBitcode())
-      PROTEUS_FATAL_ERROR("Unexpected KernelInfo has bitcode but not module");
+      reportFatalError("Unexpected KernelInfo has bitcode but not module");
 
     BinaryInfo &BinInfo = KernelInfo.getBinaryInfo();
 
@@ -389,9 +389,9 @@ public:
         BinInfo, KernelInfo.getName(), *KernelInfo.getLLVMContext());
 
     if (!KernelModule)
-      PROTEUS_FATAL_ERROR("Expected non-null kernel module");
+      reportFatalError("Expected non-null kernel module");
     if (!BitcodeBuffer)
-      PROTEUS_FATAL_ERROR("Expected non-null kernel bitcode");
+      reportFatalError("Expected non-null kernel bitcode");
 
     KernelInfo.setModule(std::move(KernelModule));
     KernelInfo.setBitcode(std::move(BitcodeBuffer));
@@ -404,7 +404,7 @@ public:
       extractModuleAndBitcode(KernelInfo);
 
     if (!KernelInfo.hasModule())
-      PROTEUS_FATAL_ERROR("Expected module in KernelInfo");
+      reportFatalError("Expected module in KernelInfo");
 
     return KernelInfo.getModule();
   }
@@ -414,7 +414,7 @@ public:
       extractModuleAndBitcode(KernelInfo);
 
     if (!KernelInfo.hasBitcode())
-      PROTEUS_FATAL_ERROR("Expected bitcode in KernelInfo");
+      reportFatalError("Expected bitcode in KernelInfo");
 
     return KernelInfo.getBitcode();
   }
@@ -459,7 +459,7 @@ public:
   void insertRegisterVar(void *Handle, const char *VarName, const void *Addr,
                          uint64_t VarSize) {
     if (!HandleToBinaryInfo.count(Handle))
-      PROTEUS_FATAL_ERROR("Expected Handle in map");
+      reportFatalError("Expected Handle in map");
     BinaryInfo &BinInfo = HandleToBinaryInfo[Handle];
 
     BinInfo.registerGlobalVar(VarName, Addr, VarSize);
@@ -629,7 +629,7 @@ JitEngineDevice<ImplT>::compileAndRun(
   }
 
   if (!ObjBuf)
-    PROTEUS_FATAL_ERROR("Expected non-null object");
+    reportFatalError("Expected non-null object");
 
   KernelFunc = proteus::getKernelFunctionFromImage(
       KernelMangled, ObjBuf->getBufferStart(),
@@ -707,7 +707,7 @@ void JitEngineDevice<ImplT>::registerFunction(
   }
 
   if (!HandleToBinaryInfo.count(Handle))
-    PROTEUS_FATAL_ERROR("Expected Handle in map");
+    reportFatalError("Expected Handle in map");
   BinaryInfo &BinInfo = HandleToBinaryInfo[Handle];
 
   PROTEUS_DBG(Logger::logs("proteus")
@@ -727,7 +727,7 @@ void JitEngineDevice<ImplT>::registerLinkedBinary(FatbinWrapperT *FatbinWrapper,
               << ModuleId << "\n");
   if (CurHandle) {
     if (!HandleToBinaryInfo.count(CurHandle))
-      PROTEUS_FATAL_ERROR("Expected CurHandle in map");
+      reportFatalError("Expected CurHandle in map");
 
     HandleToBinaryInfo[CurHandle].addModuleId(ModuleId);
   } else

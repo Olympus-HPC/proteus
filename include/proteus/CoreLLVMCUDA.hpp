@@ -130,7 +130,7 @@ inline void codegenPTX(Module &M, StringRef DeviceArch,
   Timer T;
   auto TMExpected = proteus::detail::createTargetMachine(M, DeviceArch);
   if (!TMExpected)
-    PROTEUS_FATAL_ERROR(toString(TMExpected.takeError()));
+    reportFatalError(toString(TMExpected.takeError()));
 
   std::unique_ptr<TargetMachine> TM = std::move(*TMExpected);
   TargetLibraryInfoImpl TLII(Triple(M.getTargetTriple()));
@@ -166,7 +166,7 @@ codegenObject(Module &M, StringRef DeviceArch,
               SmallPtrSetImpl<void *> &GlobalLinkedBinaries,
               CodegenOption CGOption = CodegenOption::RTC) {
   if (CGOption != CodegenOption::RTC)
-    PROTEUS_FATAL_ERROR("Only RTC compilation is supported for CUDA");
+    reportFatalError("Only RTC compilation is supported for CUDA");
   SmallVector<char, 4096> PTXStr;
   size_t BinSize;
 

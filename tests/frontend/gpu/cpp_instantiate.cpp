@@ -21,6 +21,8 @@
 #error "Expected PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA defined"
 #endif
 
+#include <iostream>
+
 using namespace proteus;
 
 int main() {

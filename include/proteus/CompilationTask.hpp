@@ -1,15 +1,16 @@
 #ifndef PROTEUS_COMPILATION_TASK_HPP
 #define PROTEUS_COMPILATION_TASK_HPP
 
-#include <llvm/Bitcode/BitcodeReader.h>
-#include <llvm/Bitcode/BitcodeWriter.h>
-
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Config.hpp"
 #include "proteus/CoreLLVM.hpp"
+#include "proteus/CoreLLVMDevice.hpp"
 #include "proteus/Debug.h"
 #include "proteus/Hashing.hpp"
 #include "proteus/Utils.h"
+
+#include <llvm/Bitcode/BitcodeReader.h>
+#include <llvm/Bitcode/BitcodeWriter.h>
 
 namespace proteus {
 
@@ -43,7 +44,7 @@ private:
   std::unique_ptr<Module> cloneKernelModule(LLVMContext &Ctx) {
     auto ClonedModule = parseBitcodeFile(Bitcode, Ctx);
     if (auto E = ClonedModule.takeError()) {
-      PROTEUS_FATAL_ERROR("Failed to parse bitcode" + toString(std::move(E)));
+      reportFatalError("Failed to parse bitcode" + toString(std::move(E)));
     }
 
     return std::move(*ClonedModule);
