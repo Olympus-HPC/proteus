@@ -9,8 +9,8 @@
 #include "proteus/Frontend/Var.hpp"
 #include "proteus/Frontend/VarStorage.hpp"
 
+#include <cstdint>
 #include <functional>
-#include <initializer_list>
 #include <memory>
 #include <optional>
 #include <vector>

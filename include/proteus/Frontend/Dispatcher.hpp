@@ -7,6 +7,7 @@
 #include <hip/hip_runtime.h>
 #endif
 
+#include <cstdint>
 #include <memory>
 
 namespace llvm {
