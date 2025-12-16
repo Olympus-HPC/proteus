@@ -25,8 +25,10 @@
 #include "proteus/TimeTracing.hpp"
 #include "proteus/Utils.h"
 
+#include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
+#include <llvm/Analysis/CallGraph.h>
 #include <llvm/Analysis/TargetTransformInfo.h>
 #include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/CodeGen/CommandFlags.h>
@@ -59,8 +61,6 @@
 
 #include <cstdint>
 #include <functional>
-#include <llvm/ADT/SmallPtrSet.h>
-#include <llvm/Analysis/CallGraph.h>
 #include <memory>
 #include <optional>
 #include <string>
