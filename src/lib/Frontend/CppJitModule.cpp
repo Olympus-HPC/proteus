@@ -276,4 +276,6 @@ void CppJitModule::launch(void *KernelFunc, LaunchDims GridDim,
   Dispatch.launch(KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
 }
 
+CppJitModule::CompilationResult::~CompilationResult() = default;
+
 } // namespace proteus

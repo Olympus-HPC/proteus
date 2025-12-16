@@ -23,7 +23,7 @@ private:
   static constexpr const char *FrontendOptLevelFlag = "-O3";
 
   Dispatcher &Dispatch;
-  std::unique_ptr<CompiledLibrary> Library = nullptr;
+  std::unique_ptr<CompiledLibrary> Library;
   bool IsCompiled = false;
 
   // TODO: We don't cache CodeInstances so if a user re-creates the exact same
@@ -174,8 +174,10 @@ private:
 
   struct CompilationResult {
     // Declare Ctx first to ensure it is destroyed after Mod.
-    std::unique_ptr<LLVMContext> Ctx = nullptr;
-    std::unique_ptr<Module> Mod = nullptr;
+    std::unique_ptr<LLVMContext> Ctx;
+    std::unique_ptr<Module> Mod;
+
+    ~CompilationResult();
   };
 
   void *getFunctionAddress(const std::string &Name);
