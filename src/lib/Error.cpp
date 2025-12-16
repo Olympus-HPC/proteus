@@ -1,5 +1,8 @@
 #include "proteus/Error.h"
 
+// Include cstdint for LLVM headers missing it see
+// https://bugzilla.redhat.com/show_bug.cgi?id=2338982.
+#include <cstdint>
 #include <llvm/ADT/Twine.h>
 
 #include <sstream>
