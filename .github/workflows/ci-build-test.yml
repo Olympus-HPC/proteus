@@ -1,17 +1,16 @@
-name: Build and test
+name: CI
 
 on:
   pull_request:
 
 jobs:
   build-and-test:
-    name: proteus ${{ matrix.os }} LLVM ${{ matrix.llvm }}
+    name: proteus ${{ matrix.os }} LLVM ${{ matrix.llvm }} shared {{ matrix.build_shared }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest]
         llvm: [18.1.8, 19.1.7, 20.1.8]
-        enable_time_tracing: [on, off]
         build_shared: [on, off]
     defaults:
       run:
@@ -32,7 +31,7 @@ jobs:
             llvmdev=${{ matrix.llvm }} \
             lit=${{ matrix.llvm }} \
             zlib zstd
-      - name: Build  enable_time_tracing=${{ matrix.enable_time_tracing }} build_shared=${{ matrix.build_shared }}
+      - name: Build build_shared=${{ matrix.build_shared }}
         run: |
           mkdir -p build
           pushd build
