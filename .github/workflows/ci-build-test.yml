@@ -5,7 +5,7 @@ on:
 
 jobs:
   build-and-test:
-    name: proteus ${{ matrix.os }} LLVM ${{ matrix.llvm }} shared {{ matrix.build_shared }}
+    name: proteus ${{ matrix.os }} LLVM ${{ matrix.llvm }} shared ${{ matrix.build_shared }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
