@@ -23,7 +23,7 @@ public:
   explicit ScopedTimeTrace(const std::string &Name);
   ~ScopedTimeTrace();
 
-  // Move-only
+  // Support only move-only construction.
   ScopedTimeTrace(ScopedTimeTrace &&) = default;
   ScopedTimeTrace &operator=(ScopedTimeTrace &&) = default;
 
@@ -55,7 +55,7 @@ private:
   if (Config::get().ProteusEnableTimers)                                       \
     x;
 
-// Macro now creates the wrapper, which is lightweight in the header
+// Macro now creates the wrapper, which is lightweight in the header.
 #define TIMESCOPE(x) proteus::ScopedTimeTrace STT_##__LINE__(x);
 
 } // namespace proteus

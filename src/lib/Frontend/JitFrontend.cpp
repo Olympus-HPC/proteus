@@ -53,13 +53,6 @@ void JitModule::compile(bool Verify) {
 
 void JitModule::print() { Mod->print(outs(), nullptr); }
 
-// FunctionCallee JitModule::getFunctionCallee(StringRef Name, Type *RetTy,
-//                                             const std::vector<Type *>
-//                                             &ArgsTy) {
-//   FunctionType *FT = FunctionType::get(RetTy, ArgsTy, false);
-//   return Mod->getOrInsertFunction(Name, FT);
-// }
-
 JitModule::~JitModule() = default;
 
 const HashT &JitModule::getModuleHash() const { return *ModuleHash; }

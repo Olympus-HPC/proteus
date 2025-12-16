@@ -135,12 +135,6 @@ public:
     if (IsCompiled)
       reportFatalError("The module is compiled, no further code can be added");
 
-    // FunctionCallee FC = getFunctionCallee<RetT>(Name, ArgT{});
-
-    // Function *F = dyn_cast<Function>(FC.getCallee());
-    // if (!F)
-    //   reportFatalError("Unexpected");
-
     return buildFuncFromArgsList<RetT>(Name, ArgT{});
   }
 
@@ -159,11 +153,6 @@ public:
 
     if (!isDeviceModule())
       reportFatalError("Expected a device module for addKernel");
-
-    // FunctionCallee FC = getFunctionCallee<void>(Name, ArgT{});
-    // Function *F = dyn_cast<Function>(FC.getCallee());
-    // if (!F)
-    //   reportFatalError("Unexpected");
 
     return buildKernelFromArgsList(Name, ArgT{});
   }
@@ -188,16 +177,6 @@ public:
     return *Library;
   }
 
-  // template <typename RetT, typename... ArgT>
-  // FunctionCallee getFunctionCallee(const std::string & Name,
-  // ArgTypeList<ArgT...>) {
-  //   std::vector<Type *> ArgsTy = {TypeMap<ArgT>::get(*Ctx)...};
-  //   return getFunctionCallee(Name, TypeMap<RetT>::get(*Ctx), ArgsTy);
-  // }
-
-  // FunctionCallee getFunctionCallee(const std::string & Name, Type *RetTy,
-  //                                  const std::vector<Type *> &ArgTy);
-
   void print();
 };
 
@@ -207,8 +186,7 @@ std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>,
 FuncBase::call(const std::string &Name) {
   using RetT = typename FnSig<Sig>::RetT;
 
-  // using ArgT = typename FnSig<Sig>::ArgsTList;
-  auto *Call = createCall(Name, TypeMap<RetT>::get(getContext()), {}, {});
+  auto *Call = createCall(Name, TypeMap<RetT>::get(getContext()));
   Var<RetT> Ret = declVar<RetT>("ret");
   Ret.storeValue(Call);
   return Ret;
@@ -218,8 +196,7 @@ template <typename Sig>
 std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
 FuncBase::call(const std::string &Name) {
   using RetT = typename FnSig<Sig>::RetT;
-  // using ArgT = typename FnSig<Sig>::ArgsTList;
-  createCall(Name, TypeMap<RetT>::get(getContext()), {}, {});
+  createCall(Name, TypeMap<RetT>::get(getContext()));
 }
 
 template <typename... Ts>
@@ -259,7 +236,6 @@ FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
   using RetT = typename FnSig<Sig>::RetT;
   using ArgT = typename FnSig<Sig>::ArgsTList;
 
-  // FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
   auto GetArgVal = [](auto &&Arg) {
     using ArgVarT = std::decay_t<decltype(Arg)>;
     if constexpr (std::is_pointer_v<typename ArgVarT::ValueType>)

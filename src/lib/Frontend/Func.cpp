@@ -116,8 +116,8 @@ FuncBase::createPointerStorage(const std::string &Name, Type *AllocaTy,
 }
 
 std::unique_ptr<ArrayStorage>
-FuncBase::createArrrayStorage(const std::string &Name, AddressSpace AS,
-                              Type *Ty) {
+FuncBase::createArrayStorage(const std::string &Name, AddressSpace AS,
+                             Type *Ty) {
   ArrayType *ArrTy = cast<ArrayType>(Ty);
   Value *BasePointer = emitArrayCreate(ArrTy, AS, Name);
 
@@ -443,6 +443,12 @@ Value *FuncBase::createCall(const std::string &FName, Type *RetTy,
   FunctionType *FnTy = FunctionType::get(RetTy, ArgTys, false);
   FunctionCallee Callee = M->getOrInsertFunction(FName, FnTy);
   return PImpl->IRB.CreateCall(Callee, Args);
+}
+Value *FuncBase::createCall(const std::string &FName, Type *RetTy) {
+  Module *M = getFunction()->getParent();
+  FunctionType *FnTy = FunctionType::get(RetTy, {}, false);
+  FunctionCallee Callee = M->getOrInsertFunction(FName, FnTy);
+  return PImpl->IRB.CreateCall(Callee);
 }
 
 void FuncBase::beginFunction(const char *File, int Line) {

@@ -11,7 +11,7 @@ Var<unsigned int> getThreadIdX(FuncBase &Fn) {
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("threadIdx.x");
 
   auto *Call = Fn.createCall("llvm.nvvm.read.ptx.sreg.tid.x",
-                             TypeMap<unsigned int>::get(Ctx), {}, {});
+                             TypeMap<unsigned int>::get(Ctx));
   Ret.storeValue(Call);
 
   return Ret;
@@ -23,7 +23,7 @@ Var<unsigned int> getBlockIdX(FuncBase &Fn) {
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("blockIdx.x");
 
   auto *Call = Fn.createCall("llvm.nvvm.read.ptx.sreg.ctaid.x",
-                             TypeMap<unsigned int>::get(Ctx), {}, {});
+                             TypeMap<unsigned int>::get(Ctx));
   Ret.storeValue(Call);
 
   return Ret;
@@ -35,7 +35,7 @@ Var<unsigned int> getBlockDimX(FuncBase &Fn) {
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("blockDim.x");
 
   auto *Call = Fn.createCall("llvm.nvvm.read.ptx.sreg.ntid.x",
-                             TypeMap<unsigned int>::get(Ctx), {}, {});
+                             TypeMap<unsigned int>::get(Ctx));
   Ret.storeValue(Call);
 
   return Ret;
@@ -46,7 +46,7 @@ Var<unsigned int> getGridDimX(FuncBase &Fn) {
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("gridDim.x");
 
   auto *Call = Fn.createCall("llvm.nvvm.read.ptx.sreg.nctaid.x",
-                             TypeMap<unsigned int>::get(Ctx), {}, {});
+                             TypeMap<unsigned int>::get(Ctx));
   Ret.storeValue(Call);
 
   return Ret;
@@ -58,7 +58,7 @@ Var<unsigned int> getThreadIdY(FuncBase &Fn) {
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("threadIdx.y");
 
   auto *Call = Fn.createCall("llvm.nvvm.read.ptx.sreg.tid.y",
-                             TypeMap<unsigned int>::get(Ctx), {}, {});
+                             TypeMap<unsigned int>::get(Ctx));
   Ret.storeValue(Call);
 
   return Ret;
@@ -70,7 +70,7 @@ Var<unsigned int> getThreadIdZ(FuncBase &Fn) {
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("threadIdx.z");
 
   auto *Call = Fn.createCall("llvm.nvvm.read.ptx.sreg.tid.z",
-                             TypeMap<unsigned int>::get(Ctx), {}, {});
+                             TypeMap<unsigned int>::get(Ctx));
   Ret.storeValue(Call);
 
   return Ret;
@@ -82,7 +82,7 @@ Var<unsigned int> getBlockIdY(FuncBase &Fn) {
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("blockIdx.y");
 
   auto *Call = Fn.createCall("llvm.nvvm.read.ptx.sreg.ctaid.y",
-                             TypeMap<unsigned int>::get(Ctx), {}, {});
+                             TypeMap<unsigned int>::get(Ctx));
   Ret.storeValue(Call);
 
   return Ret;
@@ -94,7 +94,7 @@ Var<unsigned int> getBlockIdZ(FuncBase &Fn) {
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("blockIdx.z");
 
   auto *Call = Fn.createCall("llvm.nvvm.read.ptx.sreg.ctaid.z",
-                             TypeMap<unsigned int>::get(Ctx), {}, {});
+                             TypeMap<unsigned int>::get(Ctx));
   Ret.storeValue(Call);
 
   return Ret;
@@ -106,7 +106,7 @@ Var<unsigned int> getBlockDimY(FuncBase &Fn) {
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("blockDim.y");
 
   auto *Call = Fn.createCall("llvm.nvvm.read.ptx.sreg.ntid.y",
-                             TypeMap<unsigned int>::get(Ctx), {}, {});
+                             TypeMap<unsigned int>::get(Ctx));
   Ret.storeValue(Call);
 
   return Ret;
@@ -118,7 +118,7 @@ Var<unsigned int> getBlockDimZ(FuncBase &Fn) {
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("blockDim.z");
 
   auto *Call = Fn.createCall("llvm.nvvm.read.ptx.sreg.ntid.z",
-                             TypeMap<unsigned int>::get(Ctx), {}, {});
+                             TypeMap<unsigned int>::get(Ctx));
   Ret.storeValue(Call);
 
   return Ret;
@@ -130,7 +130,7 @@ Var<unsigned int> getGridDimY(FuncBase &Fn) {
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("gridDim.y");
 
   auto *Call = Fn.createCall("llvm.nvvm.read.ptx.sreg.nctaid.y",
-                             TypeMap<unsigned int>::get(Ctx), {}, {});
+                             TypeMap<unsigned int>::get(Ctx));
   Ret.storeValue(Call);
 
   return Ret;
@@ -142,7 +142,7 @@ Var<unsigned int> getGridDimZ(FuncBase &Fn) {
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("gridDim.z");
 
   auto *Call = Fn.createCall("llvm.nvvm.read.ptx.sreg.nctaid.z",
-                             TypeMap<unsigned int>::get(Ctx), {}, {});
+                             TypeMap<unsigned int>::get(Ctx));
   Ret.storeValue(Call);
 
   return Ret;
@@ -150,7 +150,7 @@ Var<unsigned int> getGridDimZ(FuncBase &Fn) {
 
 void syncThreads(FuncBase &Fn) {
   auto &Ctx = Fn.getContext();
-  Fn.createCall("llvm.nvvm.barrier0", TypeMap<void>::get(Ctx), {}, {});
+  Fn.createCall("llvm.nvvm.barrier0", TypeMap<void>::get(Ctx));
 }
 
 } // namespace gpu

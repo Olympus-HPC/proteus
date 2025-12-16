@@ -68,7 +68,7 @@ public:
   std::unique_ptr<PointerStorage>
   createPointerStorage(const std::string &Name, Type *AllocaTy, Type *ElemTy);
   std::unique_ptr<ArrayStorage>
-  createArrrayStorage(const std::string &Name, AddressSpace AS, Type *ArrTy);
+  createArrayStorage(const std::string &Name, AddressSpace AS, Type *ArrTy);
 
   // Insertion point management.
   void setInsertPoint(BasicBlock *BB);
@@ -138,6 +138,7 @@ public:
   Value *createCall(const std::string &FName, Type *RetTy,
                     const std::vector<Type *> &ArgTys,
                     const std::vector<Value *> &Args);
+  Value *createCall(const std::string &FName, Type *RetTy);
 
   // GEP operations.
   Value *createInBoundsGEP(Type *Ty, Value *Ptr,
@@ -297,7 +298,7 @@ public:
 
     auto *ArrTy = TypeMap<T>::get(getContext(), NElem);
 
-    return Var<T>{createArrrayStorage(Name, AS, ArrTy), *this};
+    return Var<T>{createArrayStorage(Name, AS, ArrTy), *this};
   }
 
   template <typename T>

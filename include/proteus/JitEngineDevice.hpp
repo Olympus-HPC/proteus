@@ -179,7 +179,7 @@ public:
   bool hasDeviceBinary() { return (DeviceBinary != nullptr); }
   MemoryBufferRef getDeviceBinary() {
     if (!hasDeviceBinary())
-      reportFatalError("Expeced non-null device binary");
+      reportFatalError("Expected non-null device binary");
     return DeviceBinary->getMemBufferRef();
   }
   void setDeviceBinary(std::unique_ptr<MemoryBuffer> DeviceBinaryBuffer) {
