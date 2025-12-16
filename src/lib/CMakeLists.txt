@@ -175,7 +175,7 @@ target_compile_definitions(proteus PRIVATE PROTEUS_CLANGXX_BIN="${CLANGXX}")
 
 target_link_libraries(proteusFrontend INTERFACE proteus "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 
-target_link_libraries(proteusCore INTERFACE ${libs} "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+target_link_libraries(proteusCore INTERFACE proteus "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 
 set_target_properties(proteus PROPERTIES
   INSTALL_RPATH_USE_LINK_PATH TRUE
