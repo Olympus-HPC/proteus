@@ -497,15 +497,10 @@ void FuncBase::beginFor(Var<IterT> &IterVar, const Var<InitT> &Init,
   pushScope(File, Line, ScopeKind::FOR, NextBlock);
 
   BasicBlock *Header = createBasicBlock("loop.header", NextBlock);
-  // BasicBlock::Create(getContext(), "loop.header", F, NextBlock);
   BasicBlock *LoopCond = createBasicBlock("loop.cond", NextBlock);
-  // BasicBlock::Create(getContext(), "loop.cond", F, NextBlock);
   BasicBlock *Body = createBasicBlock("loop.body", NextBlock);
-  // BasicBlock::Create(getContext(), "loop.body", F, NextBlock);
   BasicBlock *Latch = createBasicBlock("loop.inc", NextBlock);
-  // BasicBlock::Create(getContext(), "loop.inc", F, NextBlock);
   BasicBlock *LoopExit = createBasicBlock("loop.end", NextBlock);
-  // BasicBlock::Create(getContext(), "loop.end", F, NextBlock);
 
   // Erase the old terminator and branch to the header.
   eraseTerminator(CurBlock);
