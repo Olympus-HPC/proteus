@@ -12,6 +12,8 @@
 
 #include "../../gpu/gpu_common.h"
 
+#include <iostream>
+
 using namespace proteus;
 using namespace builtins::gpu;
 

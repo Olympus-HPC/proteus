@@ -4,6 +4,11 @@
 static_assert(__cplusplus >= 201703L,
               "This header requires C++17 or later due to LLVM.");
 
+#include "proteus/Debug.h"
+#include "proteus/Error.h"
+#include "proteus/Logger.hpp"
+#include "proteus/TimeTracing.hpp"
+
 #include <llvm/CodeGen/CommandFlags.h>
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/Module.h>
@@ -38,11 +43,6 @@ static_assert(__cplusplus >= 201703L,
 #include <llvm/Transforms/IPO/StripSymbols.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
-#include "proteus/Debug.h"
-#include "proteus/Error.h"
-#include "proteus/Logger.hpp"
-#include "proteus/TimeTracing.hpp"
-
 namespace proteus {
 using namespace llvm;
 
@@ -53,7 +53,7 @@ createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3) {
   Triple TT(M.getTargetTriple());
   auto CGOptLevel = CodeGenOpt::getLevel(OptLevel);
   if (CGOptLevel == std::nullopt)
-    PROTEUS_FATAL_ERROR("Invalid opt level");
+    reportFatalError("Invalid opt level");
 
   std::string Msg;
   const Target *T = TargetRegistry::lookupTarget(M.getTargetTriple(), Msg);
@@ -109,7 +109,7 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
   ModulePassManager Passes;
   if (auto E = PB.parsePassPipeline(Passes, PassPipeline))
-    PROTEUS_FATAL_ERROR("Error: " + toString(std::move(E)));
+    reportFatalError("Error: " + toString(std::move(E)));
 
   Passes.run(M, MAM);
 }
@@ -160,7 +160,7 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
     OptSetting = OptimizationLevel::Oz;
     break;
   default:
-    PROTEUS_FATAL_ERROR("Unsupported optimization level " + OptLevel);
+    reportFatalError(std::string("Unsupported optimization level ") + OptLevel);
   };
 
   ModulePassManager Passes = PB.buildPerModuleDefaultPipeline(OptSetting);
@@ -213,7 +213,7 @@ inline std::unique_ptr<Module>
 linkModules(LLVMContext &Ctx,
             SmallVector<std::unique_ptr<Module>> LinkedModules) {
   if (LinkedModules.empty())
-    PROTEUS_FATAL_ERROR("Expected jit module");
+    reportFatalError("Expected jit module");
 
   auto LinkedModule = std::make_unique<llvm::Module>("JitModule", Ctx);
   Linker IRLinker(*LinkedModule);
@@ -221,7 +221,7 @@ linkModules(LLVMContext &Ctx,
   for (auto &LinkedM : LinkedModules) {
     // Returns true if linking failed.
     if (IRLinker.linkInModule(std::move(LinkedM)))
-      PROTEUS_FATAL_ERROR("Linking failed");
+      reportFatalError("Linking failed");
   }
 
   return LinkedModule;
@@ -299,7 +299,5 @@ inline void internalize(Module &M, StringRef PreserveFunctionName) {
 }
 
 } // namespace proteus
-
-#include "proteus/CoreLLVMDevice.hpp"
 
 #endif

@@ -1,23 +1,29 @@
 #ifndef PROTEUS_FRONTEND_DISPATCHER_HPP
 #define PROTEUS_FRONTEND_DISPATCHER_HPP
 
-#include <llvm/IR/Module.h>
-#include <llvm/Support/MemoryBuffer.h>
-#include <memory>
-
-#include "proteus/CompiledLibrary.hpp"
 #include "proteus/Frontend/TargetModel.hpp"
-#include "proteus/Hashing.hpp"
 
 #if PROTEUS_ENABLE_HIP && __HIP__
 #include <hip/hip_runtime.h>
 #endif
+
+#include <cstdint>
+#include <memory>
+
+namespace llvm {
+class LLVMContext;
+class Module;
+class MemoryBuffer;
+} // namespace llvm
 
 struct LaunchDims {
   unsigned X = 1, Y = 1, Z = 1;
 };
 
 namespace proteus {
+
+struct CompiledLibrary;
+class HashT;
 
 template <typename T> struct sig_traits;
 
@@ -57,25 +63,25 @@ protected:
 
 public:
   static Dispatcher &getDispatcher(TargetModelType TargetModel);
+  ~Dispatcher();
 
   virtual std::unique_ptr<MemoryBuffer>
   compile(std::unique_ptr<LLVMContext> Ctx, std::unique_ptr<Module> M,
-          HashT ModuleHash, bool DisableIROpt = false) = 0;
+          const HashT &ModuleHash, bool DisableIROpt = false) = 0;
 
   virtual std::unique_ptr<CompiledLibrary>
-  lookupCompiledLibrary(HashT ModuleHash) = 0;
+  lookupCompiledLibrary(const HashT &ModuleHash) = 0;
 
   virtual DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
-                                LaunchDims BlockDim,
-                                ArrayRef<void *> KernelArgs, uint64_t ShmemSize,
-                                void *Stream) = 0;
+                                LaunchDims BlockDim, void *KernelArgs[],
+                                uint64_t ShmemSize, void *Stream) = 0;
 
   virtual StringRef getDeviceArch() const = 0;
 
   template <typename Sig, typename... ArgT>
   typename sig_traits<Sig>::return_type run(void *FuncPtr, ArgT &&...Args) {
     if (!isHostTargetModel(TargetModel))
-      PROTEUS_FATAL_ERROR(
+      reportFatalError(
           "Dispatcher run interface is only supported for host derived models");
 
     auto Fn = reinterpret_cast<Sig *>(FuncPtr);
@@ -88,11 +94,12 @@ public:
       return Fn(std::forward<ArgT>(Args)...);
   }
 
-  virtual void *getFunctionAddress(StringRef FunctionName, HashT ModuleHash,
+  virtual void *getFunctionAddress(const std::string &FunctionName,
+                                   const HashT &ModuleHash,
                                    CompiledLibrary &Library) = 0;
 
-  virtual void registerDynamicLibrary(HashT HashValue,
-                                      const SmallString<128> &Path) = 0;
+  virtual void registerDynamicLibrary(const HashT &HashValue,
+                                      const std::string &Path) = 0;
 };
 
 } // namespace proteus

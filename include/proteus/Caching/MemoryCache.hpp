@@ -11,14 +11,15 @@
 #ifndef PROTEUS_JITCACHE_HPP
 #define PROTEUS_JITCACHE_HPP
 
-#include <cstdint>
-#include <iostream>
-
-#include <llvm/ADT/StringRef.h>
-
+#include "proteus/Config.hpp"
 #include "proteus/Hashing.hpp"
 #include "proteus/TimeTracing.hpp"
 #include "proteus/Utils.h"
+
+#include <llvm/ADT/StringRef.h>
+
+#include <cstdint>
+#include <iostream>
 
 namespace proteus {
 
@@ -45,7 +46,7 @@ public:
   void insert(HashT &HashValue, Function_t FunctionPtr, StringRef FnName) {
     if (Config::get().ProteusDebugOutput) {
       if (CacheMap.count(HashValue))
-        PROTEUS_FATAL_ERROR("MemoryCache collision detected");
+        reportFatalError("MemoryCache collision detected");
     }
 
     auto &CacheEntry = CacheMap[HashValue];

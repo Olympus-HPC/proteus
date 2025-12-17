@@ -9,18 +9,19 @@
 //===----------------------------------------------------------------------===//
 
 #include "proteus/Caching/ObjectCacheChain.hpp"
+
 #include "proteus/Caching/StorageCache.hpp"
 #include "proteus/Config.hpp"
 #include "proteus/Logger.hpp"
 #include "proteus/TimeTracing.hpp"
 #include "proteus/Utils.h"
 
-#include <algorithm>
-#include <cctype>
-
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/MemoryBuffer.h>
+
+#include <algorithm>
+#include <cctype>
 
 namespace proteus {
 
@@ -69,7 +70,7 @@ ObjectCacheChain::createCache(const std::string &Name) {
     return std::make_unique<StorageCache>(Label);
   }
 
-  PROTEUS_FATAL_ERROR("Unknown cache type: " + Name);
+  reportFatalError("Unknown cache type: " + Name);
   return nullptr;
 }
 
@@ -79,14 +80,15 @@ void ObjectCacheChain::addCache(std::unique_ptr<ObjectCache> Cache) {
   }
 }
 
-void ObjectCacheChain::promoteToLevel(HashT &HashValue, const CacheEntry &Entry,
-                                      size_t Level) {
+void ObjectCacheChain::promoteToLevel(const HashT &HashValue,
+                                      const CacheEntry &Entry, size_t Level) {
   for (size_t J = 0; J < Level; ++J) {
     Caches[J]->store(HashValue, Entry);
   }
 }
 
-std::unique_ptr<CompiledLibrary> ObjectCacheChain::lookup(HashT &HashValue) {
+std::unique_ptr<CompiledLibrary>
+ObjectCacheChain::lookup(const HashT &HashValue) {
   TIMESCOPE("ObjectCacheChain::lookup");
 
   // Search from fastest (index 0) to slowest.
@@ -123,7 +125,7 @@ std::unique_ptr<CompiledLibrary> ObjectCacheChain::lookup(HashT &HashValue) {
   return nullptr;
 }
 
-void ObjectCacheChain::store(HashT &HashValue, const CacheEntry &Entry) {
+void ObjectCacheChain::store(const HashT &HashValue, const CacheEntry &Entry) {
   TIMESCOPE("ObjectCacheChain::store");
 
   for (auto &Cache : Caches) {

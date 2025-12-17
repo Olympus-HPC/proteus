@@ -1,12 +1,12 @@
 #ifndef PROTEUS_CORE_CUDA_HPP
 #define PROTEUS_CORE_CUDA_HPP
 
-#include <unordered_map>
+#include "proteus/GlobalVarInfo.hpp"
+#include "proteus/UtilsCUDA.h"
 
 #include <llvm/ADT/StringRef.h>
 
-#include "proteus/GlobalVarInfo.hpp"
-#include "proteus/UtilsCUDA.h"
+#include <unordered_map>
 
 namespace proteus {
 
@@ -35,8 +35,8 @@ inline CUfunction getKernelFunctionFromImage(
   if (RelinkGlobalsByCopy) {
     for (auto &[GlobalName, GVI] : VarNameToGlobalInfo) {
       if (!GVI.DevAddr)
-        PROTEUS_FATAL_ERROR("Cannot copy to Global Var " + GlobalName +
-                            " without a concrete device address");
+        reportFatalError("Cannot copy to Global Var " + GlobalName +
+                         " without a concrete device address");
 
       CUdeviceptr Dptr;
       size_t Bytes;

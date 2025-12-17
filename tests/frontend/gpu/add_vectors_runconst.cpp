@@ -8,9 +8,10 @@
 
 #include <proteus/Frontend/Builtins.hpp>
 #include <proteus/JitFrontend.hpp>
-#include <proteus/JitInterface.hpp>
 
 #include "../../gpu/gpu_common.h"
+
+#include <iostream>
 
 using namespace proteus;
 using namespace builtins::gpu;
@@ -83,7 +84,6 @@ int main() {
   // stream (nullptr), kernel arguments (A, B).
   std::cout << "Launching with NumBlocks " << NumBlocks << " each with "
             << ThreadsPerBlock << " threads...\n";
-  Timer T;
 
   gpuErrCheck(KernelHandle.launch({NumBlocks, 1, 1}, {ThreadsPerBlock, 1, 1}, 0,
                                   nullptr, A, B));

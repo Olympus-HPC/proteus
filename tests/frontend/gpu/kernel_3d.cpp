@@ -7,9 +7,10 @@
 
 #include <proteus/Frontend/Builtins.hpp>
 #include <proteus/JitFrontend.hpp>
-#include <proteus/JitInterface.hpp>
 
 #include "../../gpu/gpu_common.h"
+
+#include <iostream>
 
 using namespace proteus;
 using namespace builtins::gpu;
