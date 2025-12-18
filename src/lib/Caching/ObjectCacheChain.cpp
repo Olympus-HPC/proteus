@@ -148,9 +148,9 @@ void ObjectCacheChain::printStats() {
   }
 }
 
-void ObjectCacheChain::flush() {
+void ObjectCacheChain::finalize() {
   for (auto &Cache : Caches) {
-    Cache->flush();
+    Cache->finalize();
   }
 }
 

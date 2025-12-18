@@ -34,7 +34,7 @@ public:
   std::unique_ptr<CompiledLibrary> lookup(HashT &HashValue);
   void store(HashT &HashValue, const CacheEntry &Entry);
   void printStats();
-  void flush();
+  void finalize();
 
 private:
   void addCache(std::unique_ptr<ObjectCache> Cache);
