@@ -27,9 +27,6 @@
 namespace proteus {
 
 using namespace llvm;
-namespace {
-constexpr int MaxRequestsPerCall = 5;
-} // namespace
 
 //===----------------------------------------------------------------------===//
 // MPICommHandle implementation
@@ -53,6 +50,16 @@ void MPICommHandle::ensureInitialized() {
   MPI_Initialized(&MPIInitialized);
   if (!MPIInitialized) {
     reportFatalError("MPICommHandle requires MPI to be initialized");
+  }
+
+  // Check MPI thread level (MPI_THREAD_MULTIPLE required).
+  int Provided = 0;
+  MPI_Query_thread(&Provided);
+  if (Provided != MPI_THREAD_MULTIPLE) {
+    reportFatalError("MPISharedStorageCache requires MPI_THREAD_MULTIPLE "
+                        "(provided level: " +
+                        std::to_string(Provided) +
+                        "). Initialize MPI with MPI_Init_thread()");
   }
 
   MPI_Comm_dup(MPI_COMM_WORLD, &Comm);
@@ -81,6 +88,42 @@ int MPICommHandle::getSize() {
 }
 
 //===----------------------------------------------------------------------===//
+// CommThreadHandle implementation
+//===----------------------------------------------------------------------===//
+
+CommThreadHandle::~CommThreadHandle() { stop(); }
+
+void CommThreadHandle::stop() {
+  if (!Thread)
+    return;
+
+  {
+    std::lock_guard<std::mutex> Lock(Mutex);
+    ShutdownFlag.store(true, std::memory_order_release);
+  }
+  CondVar.notify_all();
+
+  if (Thread->joinable())
+    Thread->join();
+  Thread.reset();
+  Running.store(false, std::memory_order_release);
+}
+
+bool CommThreadHandle::isRunning() const {
+  return Running.load(std::memory_order_acquire);
+}
+
+bool CommThreadHandle::shutdownRequested() const {
+  return ShutdownFlag.load(std::memory_order_acquire);
+}
+
+bool CommThreadHandle::waitOrShutdown(std::chrono::milliseconds Timeout) {
+  std::unique_lock<std::mutex> Lock(Mutex);
+  return CondVar.wait_for(Lock, Timeout,
+                          [this] { return ShutdownFlag.load(); });
+}
+
+//===----------------------------------------------------------------------===//
 // MPISharedStorageCache implementation
 //===----------------------------------------------------------------------===//
 
@@ -91,12 +134,12 @@ MPISharedStorageCache::MPISharedStorageCache(const std::string &Label)
                            ? Config::get().ProteusCacheDir.value()
                            : ".proteus"),
       Label(Label), Tag(computeTag(Label)) {
-  std::filesystem::create_directory(StorageDirectory);
+  std::filesystem::create_directories(StorageDirectory);
 }
 
-MPISharedStorageCache::~MPISharedStorageCache() { flush(); }
+MPISharedStorageCache::~MPISharedStorageCache() { finalize(); }
 
-void MPISharedStorageCache::flush() {
+void MPISharedStorageCache::finalize() {
   if (Finalized)
     return;
 
@@ -108,6 +151,7 @@ void MPISharedStorageCache::flush() {
                     "cannot complete " +
                     std::to_string(PendingSends.size()) + " pending sends\n");
     }
+    CommThread.stop();
     Finalized = true;
     return;
   }
@@ -120,12 +164,16 @@ void MPISharedStorageCache::flush() {
   }
 
   MPI_Comm Comm = CommHandle.get();
+
+  // Phase 1: Non-rank-0 complete their sends.
+  if (CommHandle.getRank() != 0)
+    waitForPendingSends();
+
   MPI_Barrier(Comm);
 
-  if (CommHandle.getRank() == 0)
-    receiveIncoming(std::numeric_limits<int>::max());
-  else
-    waitForPendingSends();
+  // Phase 2: Stop the communication thread (rank 0).
+  // Thread drains remaining messages before exiting.
+  CommThread.stop();
 
   MPI_Barrier(Comm);
 
@@ -137,8 +185,7 @@ MPISharedStorageCache::lookup(const HashT &HashValue) {
   TIMESCOPE("MPISharedStorageCache::lookup");
   Accesses++;
 
-  if (CommHandle.getRank() == 0)
-    receiveIncoming(MaxRequestsPerCall);
+  ensureCommThreadStarted();
 
   std::string Filebase =
       StorageDirectory + "/cache-jit-" + HashValue.toString();
@@ -161,38 +208,57 @@ MPISharedStorageCache::lookup(const HashT &HashValue) {
 void MPISharedStorageCache::store(const HashT &HashValue, const CacheEntry &Entry) {
   TIMESCOPE("MPISharedStorageCache::store");
 
-  if (CommHandle.getRank() == 0) {
-    receiveIncoming(MaxRequestsPerCall);
-    saveToDisk(HashValue, Entry.Buffer.getBufferStart(),
-               Entry.Buffer.getBufferSize(), Entry.isSharedObject());
-  } else {
-    forwardToWriter(HashValue, Entry);
+  ensureCommThreadStarted();
+  forwardToWriter(HashValue, Entry);
+}
+
+void MPISharedStorageCache::communicationThreadMain() {
+  if (Config::get().ProteusTraceOutput >= 1) {
+    Logger::trace("[MPISharedStorageCache:" + Label +
+                  "] Communication thread started\n");
+  }
+
+  MPI_Comm Comm = CommHandle.get();
+
+  while (true) {
+    int Flag = 0;
+    MPI_Status Status;
+    MPI_Iprobe(MPI_ANY_SOURCE, Tag, Comm, &Flag, &Status);
+
+    if (Flag) {
+      int MsgSize = 0;
+      MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
+
+      std::vector<char> Buffer(MsgSize);
+      MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE, Tag, Comm,
+               MPI_STATUS_IGNORE);
+
+      auto Msg = unpackMessage(Buffer);
+      saveToDisk(Msg.Hash, Msg.Data.data(), Msg.Data.size(), Msg.IsDynLib);
+    } else {
+      if (CommThread.shutdownRequested()) {
+        // Final drain: one more probe to ensure queue is empty.
+        MPI_Iprobe(MPI_ANY_SOURCE, Tag, Comm, &Flag, &Status);
+        if (!Flag)
+          break;
+      } else {
+        CommThread.waitOrShutdown(std::chrono::milliseconds(1));
+      }
+    }
+  }
+
+  if (Config::get().ProteusTraceOutput >= 1) {
+    Logger::trace("[MPISharedStorageCache:" + Label +
+                  "] Communication thread exiting\n");
   }
 }
 
-void MPISharedStorageCache::receiveIncoming(int MaxMessages) {
-  int Flag = 0;
-  MPI_Status Status;
-  int Received = 0;
-  MPI_Comm Comm = CommHandle.get();
-
-  while (Received < MaxMessages) {
-    MPI_Iprobe(MPI_ANY_SOURCE, Tag, Comm, &Flag, &Status);
-    if (!Flag)
-      break;
-
-    int MsgSize = 0;
-    MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
-
-    std::vector<char> Buffer(MsgSize);
-    MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE, Tag, Comm,
-             MPI_STATUS_IGNORE);
-
-    auto [Hash, Data, IsDynLib] = unpackMessage(Buffer);
-    saveToDisk(Hash, Data.data(), Data.size(), IsDynLib);
-
-    ++Received;
-  }
+void MPISharedStorageCache::ensureCommThreadStarted() {
+  // We use 'ensureCommThreadStarted' to avoid problems where
+  // proteus is initialized before MPI.
+  if (CommHandle.getRank() != 0 || CommThread.isRunning())
+    return;
+  CommThread.start([this] { communicationThreadMain(); });
 }
 
 void MPISharedStorageCache::forwardToWriter(const HashT &HashValue,
@@ -234,7 +300,7 @@ std::vector<char> MPISharedStorageCache::packMessage(const HashT &HashValue,
   uint64_t BufferSize = Entry.Buffer.getBufferSize();
 
   if (BufferSize > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    PROTEUS_FATAL_ERROR("Buffer size exceeds MPI int limit: " +
+    reportFatalError("Buffer size exceeds MPI int limit: " +
                         std::to_string(BufferSize) + " bytes");
   }
 
@@ -305,7 +371,6 @@ void MPISharedStorageCache::saveToDisk(const HashT &HashValue, const char *Data,
   std::string Extension = IsDynLib ? ".so" : ".o";
   std::string Filepath = Filebase + Extension;
 
-  // Skip writing if this hash is already cached.
   if (std::filesystem::exists(Filepath))
     return;
 

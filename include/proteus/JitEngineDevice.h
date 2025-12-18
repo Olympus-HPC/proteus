@@ -513,7 +513,7 @@ public:
       CompilerAsync::instance(Config::get().ProteusAsyncThreads)
           .joinAllThreads();
 
-    LibraryCache.flush();
+    LibraryCache.finalize();
   }
 
   StringRef getDeviceArch() const { return DeviceArch; }

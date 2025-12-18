@@ -11,9 +11,14 @@
 #ifndef PROTEUS_MPISHAREDSTORAGECACHE_H
 #define PROTEUS_MPISHAREDSTORAGECACHE_H
 
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <mpi.h>
@@ -23,6 +28,39 @@
 #include "proteus/Hashing.h"
 
 namespace proteus {
+
+class CommThreadHandle {
+public:
+  CommThreadHandle() = default;
+  ~CommThreadHandle();
+
+  CommThreadHandle(const CommThreadHandle &) = delete;
+  CommThreadHandle &operator=(const CommThreadHandle &) = delete;
+
+  template <typename Callable> void start(Callable &&ThreadFunc) {
+    if (Running.load())
+      return;
+
+    ShutdownFlag.store(false, std::memory_order_release);
+    Thread = std::make_unique<std::thread>(std::forward<Callable>(ThreadFunc));
+    Running.store(true, std::memory_order_release);
+  }
+
+  void stop();
+
+  bool isRunning() const;
+
+  bool shutdownRequested() const;
+
+  bool waitOrShutdown(std::chrono::milliseconds Timeout);
+
+private:
+  std::unique_ptr<std::thread> Thread;
+  mutable std::mutex Mutex;
+  std::condition_variable CondVar;
+  std::atomic<bool> ShutdownFlag{false};
+  std::atomic<bool> Running{false};
+};
 
 class MPICommHandle {
 public:
@@ -66,7 +104,7 @@ public:
 
   void store(const HashT &HashValue, const CacheEntry &Entry) override;
 
-  void flush() override;
+  void finalize() override;
 
   void printStats() override;
 
@@ -75,7 +113,6 @@ public:
   uint64_t getAccesses() const override { return Accesses; }
 
 private:
-  void receiveIncoming(int MaxMessages);
   void forwardToWriter(const HashT &HashValue, const CacheEntry &Entry);
   void waitForPendingSends();
   std::vector<char> packMessage(const HashT &HashValue,
@@ -85,12 +122,16 @@ private:
                   bool IsDynLib);
   static int computeTag(const std::string &Label);
 
+  void communicationThreadMain();
+  void ensureCommThreadStarted();
+
   uint64_t Hits = 0;
   uint64_t Accesses = 0;
   const std::string StorageDirectory;
   const std::string Label;
   const int Tag;
   MPICommHandle CommHandle;
+  CommThreadHandle CommThread;
   bool Finalized = false;
   std::vector<std::unique_ptr<PendingSend>> PendingSends;
 };

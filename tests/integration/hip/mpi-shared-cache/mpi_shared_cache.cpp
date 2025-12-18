@@ -1,6 +1,8 @@
-// Test for MPI shared storage cache.
+// Stress test for MPI shared storage cache.
 // Verifies that when using PROTEUS_OBJECT_CACHE_CHAIN="mpi-storage",
 // only rank 0 writes cache files (no rank prefix in filenames).
+// Creates many specializations: 5 from testKernel + 6*NumRanks from
+// configKernel.
 
 #include <cstdio>
 #include <cstdlib>
@@ -22,12 +24,28 @@
     }                                                                          \
   }
 
-__global__ __attribute__((annotate("jit"))) void testKernel(int RankValue) {
-  printf("Kernel from rank %d\n", RankValue);
+__global__ void testKernel(int Mode) {
+  proteus::jit_arg(Mode);
+  printf("Kernel mode=%d\n", Mode);
+}
+
+__global__ void configKernel(int A, int B, int C) {
+  proteus::jit_arg(A);
+  proteus::jit_arg(B);
+  proteus::jit_arg(C);
+  printf("Config: A=%d B=%d C=%d sum=%d\n", A, B, C, A + B + C);
 }
 
 int main(int argc, char **argv) {
-  MPI_Init(&argc, &argv);
+  int Provided;
+  MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &Provided);
+  if (Provided != MPI_THREAD_MULTIPLE) {
+    fprintf(stderr, "MPI_THREAD_MULTIPLE not supported\n");
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+  // Init proteus AFTER MPI.
+  proteus::init();
+
   int Rank, Size;
   MPI_Comm_rank(MPI_COMM_WORLD, &Rank);
   MPI_Comm_size(MPI_COMM_WORLD, &Size);
@@ -36,13 +54,21 @@ int main(int argc, char **argv) {
   std::string CacheDir = CacheDirEnv ? CacheDirEnv : ".proteus";
 
   if (Rank == 0) {
-    std::filesystem::remove_all(CacheDir);
     std::cout << "Using cache directory: " << CacheDir << std::endl;
   }
   MPI_Barrier(MPI_COMM_WORLD);
 
-  testKernel<<<1, 1>>>(Rank);
-  gpuErrCheck(hipDeviceSynchronize());
+  for (int Mode = 0; Mode < 5; ++Mode) {
+    testKernel<<<1, 1>>>(Mode);
+    gpuErrCheck(hipDeviceSynchronize());
+  }
+
+  for (int A = 0; A < 3; ++A) {
+    for (int B = 0; B < 2; ++B) {
+      configKernel<<<1, 1>>>(A, B, Rank);
+      gpuErrCheck(hipDeviceSynchronize());
+    }
+  }
 
   MPI_Barrier(MPI_COMM_WORLD);
 
@@ -73,22 +99,24 @@ int main(int argc, char **argv) {
         }
       }
 
+      int ExpectedMin = 5 + 6 * Size;
       std::cout << "Cache files found: " << NumCacheFiles << std::endl;
+      std::cout << "Expected minimum: " << ExpectedMin << std::endl;
       std::cout << "Rank-prefixed files: " << NumRankPrefixedFiles << std::endl;
 
-      if (NumCacheFiles >= 1 && NumRankPrefixedFiles == 0) {
+      if (NumCacheFiles >= ExpectedMin && NumRankPrefixedFiles == 0) {
         std::cout << "PASS: MPI shared cache test succeeded" << std::endl;
       } else {
-        std::cerr << "FAIL: Expected at least 1 cache file with no rank "
-                  << "prefix, got " << NumCacheFiles << " files with "
-                  << NumRankPrefixedFiles << " rank-prefixed" << std::endl;
+        std::cerr << "FAIL: Expected at least " << ExpectedMin
+                  << " cache files with no rank prefix, got " << NumCacheFiles
+                  << " files with " << NumRankPrefixedFiles << " rank-prefixed"
+                  << std::endl;
         ExitCode = 1;
       }
-
-      std::filesystem::remove_all(CacheDir);
     }
   }
 
+  proteus::finalize();
   MPI_Finalize();
   return ExitCode;
 }

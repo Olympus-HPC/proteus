@@ -47,7 +47,7 @@ public:
   virtual uint64_t getHits() const = 0;
   virtual uint64_t getAccesses() const = 0;
 
-  virtual void flush() {}
+  virtual void finalize() {}
 
 protected:
   ObjectCache() = default;
