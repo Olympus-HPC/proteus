@@ -73,11 +73,14 @@ ObjectCacheChain::createCache(const std::string &Name) {
     return std::make_unique<StorageCache>(Label);
   }
 
-#ifdef PROTEUS_ENABLE_MPI
   if (LowerName == "mpi-storage") {
+#ifdef PROTEUS_ENABLE_MPI
     return std::make_unique<MPISharedStorageCache>(Label);
-  }
+#else
+    reportFatalError(
+        "MPISharedStorageCache requested but Proteus built without MPI");
 #endif
+  }
 
   reportFatalError("Unknown cache type: " + Name);
   return nullptr;
