@@ -11,11 +11,11 @@
 #ifndef PROTEUS_UTILS_H
 #define PROTEUS_UTILS_H
 
-#include <filesystem>
-#include <string>
 #include "proteus/Error.h"
 #include "proteus/Logger.hpp"
 #include "proteus/TimeTracing.hpp"
+#include <filesystem>
+#include <string>
 
 #include <llvm/ADT/Twine.h>
 #include <llvm/Support/SourceMgr.h>
@@ -40,7 +40,7 @@ void saveToFileAtomic(llvm::StringRef Filepath, T &&Data) {
   std::error_code EC;
   llvm::raw_fd_ostream Out(TempPath, EC);
   if (EC)
-    PROTEUS_FATAL_ERROR("Cannot open file " + TempPath);
+    proteus::reportFatalError("Cannot open file " + TempPath);
   Out << Data;
   Out.close();
 

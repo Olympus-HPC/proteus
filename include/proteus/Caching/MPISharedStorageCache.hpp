@@ -100,9 +100,9 @@ public:
 
   std::string getName() const override { return "MPISharedStorage"; }
 
-  std::unique_ptr<CompiledLibrary> lookup(HashT &HashValue) override;
+  std::unique_ptr<CompiledLibrary> lookup(const HashT &HashValue) override;
 
-  void store(HashT &HashValue, const CacheEntry &Entry) override;
+  void store(const HashT &HashValue, const CacheEntry &Entry) override;
 
   void finalize() override;
 
@@ -113,7 +113,7 @@ public:
   uint64_t getAccesses() const override { return Accesses; }
 
 private:
-  void forwardToWriter(HashT &HashValue, const CacheEntry &Entry);
+  void forwardToWriter(const HashT &HashValue, const CacheEntry &Entry);
   void waitForPendingSends();
   std::vector<char> packMessage(const HashT &HashValue,
                                 const CacheEntry &Entry);

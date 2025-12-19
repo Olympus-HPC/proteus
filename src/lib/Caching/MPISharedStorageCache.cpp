@@ -49,17 +49,17 @@ void MPICommHandle::ensureInitialized() {
   int MPIInitialized = 0;
   MPI_Initialized(&MPIInitialized);
   if (!MPIInitialized) {
-    PROTEUS_FATAL_ERROR("MPICommHandle requires MPI to be initialized");
+    reportFatalError("MPICommHandle requires MPI to be initialized");
   }
 
   // Check MPI thread level (MPI_THREAD_MULTIPLE required).
   int Provided = 0;
   MPI_Query_thread(&Provided);
   if (Provided != MPI_THREAD_MULTIPLE) {
-    PROTEUS_FATAL_ERROR("MPISharedStorageCache requires MPI_THREAD_MULTIPLE "
-                        "(provided level: " +
-                        std::to_string(Provided) +
-                        "). Initialize MPI with MPI_Init_thread()");
+    reportFatalError("MPISharedStorageCache requires MPI_THREAD_MULTIPLE "
+                     "(provided level: " +
+                     std::to_string(Provided) +
+                     "). Initialize MPI with MPI_Init_thread()");
   }
 
   MPI_Comm_dup(MPI_COMM_WORLD, &Comm);
@@ -181,7 +181,7 @@ void MPISharedStorageCache::finalize() {
 }
 
 std::unique_ptr<CompiledLibrary>
-MPISharedStorageCache::lookup(HashT &HashValue) {
+MPISharedStorageCache::lookup(const HashT &HashValue) {
   TIMESCOPE("MPISharedStorageCache::lookup");
   Accesses++;
 
@@ -198,14 +198,13 @@ MPISharedStorageCache::lookup(HashT &HashValue) {
 
   if (std::filesystem::exists(Filebase + ".so")) {
     Hits++;
-    return std::make_unique<CompiledLibrary>(
-        SmallString<128>{Filebase + ".so"});
+    return std::make_unique<CompiledLibrary>(Filebase + ".so");
   }
 
   return nullptr;
 }
 
-void MPISharedStorageCache::store(HashT &HashValue, const CacheEntry &Entry) {
+void MPISharedStorageCache::store(const HashT &HashValue, const CacheEntry &Entry) {
   TIMESCOPE("MPISharedStorageCache::store");
 
   ensureCommThreadStarted();
@@ -261,15 +260,15 @@ void MPISharedStorageCache::ensureCommThreadStarted() {
   CommThread.start([this] { communicationThreadMain(); });
 }
 
-void MPISharedStorageCache::forwardToWriter(HashT &HashValue,
+void MPISharedStorageCache::forwardToWriter(const HashT &HashValue,
                                             const CacheEntry &Entry) {
   auto Pending = std::make_unique<PendingSend>();
   Pending->Buffer = packMessage(HashValue, Entry);
 
   if (Pending->Buffer.size() >
       static_cast<size_t>(std::numeric_limits<int>::max())) {
-    PROTEUS_FATAL_ERROR("MPI message size exceeds INT_MAX: " +
-                        std::to_string(Pending->Buffer.size()) + " bytes");
+    reportFatalError("MPI message size exceeds INT_MAX: " +
+                     std::to_string(Pending->Buffer.size()) + " bytes");
   }
 
   MPI_Comm Comm = CommHandle.get();
@@ -277,8 +276,7 @@ void MPISharedStorageCache::forwardToWriter(HashT &HashValue,
                       static_cast<int>(Pending->Buffer.size()), MPI_BYTE,
                       /*dest=*/0, Tag, Comm, &Pending->Request);
   if (Err != MPI_SUCCESS) {
-    PROTEUS_FATAL_ERROR("MPI_Isend failed with error code " +
-                        std::to_string(Err));
+    reportFatalError("MPI_Isend failed with error code " + std::to_string(Err));
   }
 
   PendingSends.push_back(std::move(Pending));
@@ -300,8 +298,8 @@ std::vector<char> MPISharedStorageCache::packMessage(const HashT &HashValue,
   uint64_t BufferSize = Entry.Buffer.getBufferSize();
 
   if (BufferSize > static_cast<size_t>(std::numeric_limits<int>::max())) {
-    PROTEUS_FATAL_ERROR("Buffer size exceeds MPI int limit: " +
-                        std::to_string(BufferSize) + " bytes");
+    reportFatalError("Buffer size exceeds MPI int limit: " +
+                     std::to_string(BufferSize) + " bytes");
   }
 
   int HashSizeBytes, HashStrBytes, FlagBytes, BufSizeBytes, DataBytes;
