@@ -182,8 +182,6 @@ if(PROTEUS_ENABLE_CUDA)
 endif()
 
 if(PROTEUS_ENABLE_MPI)
-  target_include_directories(proteus SYSTEM PRIVATE ${MPI_CXX_INCLUDE_DIRS})
-  target_include_directories(proteusCore SYSTEM INTERFACE ${MPI_CXX_INCLUDE_DIRS})
   list(APPEND libs MPI::MPI_CXX)
 endif()
 
