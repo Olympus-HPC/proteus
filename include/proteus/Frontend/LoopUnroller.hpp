@@ -3,7 +3,9 @@
 
 #include <optional>
 
-#include <llvm/IR/BasicBlock.h>
+namespace llvm {
+class BasicBlock;
+} // namespace llvm
 
 namespace proteus {
 

@@ -11,16 +11,15 @@
 #ifndef PROTEUS_OBJECTCACHE_HPP
 #define PROTEUS_OBJECTCACHE_HPP
 
-#include <cstdint>
-#include <memory>
-#include <string>
+#include "proteus/CompiledLibrary.hpp"
+#include "proteus/Hashing.hpp"
 
 #include <llvm/ADT/SmallString.h>
 #include <llvm/Support/MemoryBufferRef.h>
 
-#include "proteus/CompiledLibrary.hpp"
-#include "proteus/Hashing.hpp"
-
+#include <cstdint>
+#include <memory>
+#include <string>
 namespace proteus {
 
 using namespace llvm;
@@ -42,8 +41,8 @@ public:
   virtual ~ObjectCache() = default;
 
   virtual std::string getName() const = 0;
-  virtual std::unique_ptr<CompiledLibrary> lookup(HashT &HashValue) = 0;
-  virtual void store(HashT &HashValue, const CacheEntry &Entry) = 0;
+  virtual std::unique_ptr<CompiledLibrary> lookup(const HashT &HashValue) = 0;
+  virtual void store(const HashT &HashValue, const CacheEntry &Entry) = 0;
   virtual void printStats() = 0;
   virtual uint64_t getHits() const = 0;
   virtual uint64_t getAccesses() const = 0;

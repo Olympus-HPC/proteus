@@ -1,3 +1,11 @@
+#include "AnnotationHandler.h"
+
+#include "Helpers.h"
+#include "Types.h"
+
+#include "proteus/Error.h"
+#include "proteus/RuntimeConstantTypeHelpers.h"
+
 #include <llvm/ADT/SetVector.h>
 #include <llvm/Demangle/Demangle.h>
 #include <llvm/IR/Constants.h>
@@ -9,13 +17,6 @@
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/JSON.h>
 #include <llvm/Support/MemoryBuffer.h>
-
-#include "proteus/Error.h"
-#include "proteus/RuntimeConstantTypeHelpers.h"
-
-#include "AnnotationHandler.h"
-#include "Helpers.h"
-#include "Types.h"
 
 namespace proteus {
 
@@ -124,7 +125,7 @@ static Argument *tryFindArgFromLoad(Value *V) {
       continue;
 
     if (SingleStore != nullptr)
-      PROTEUS_FATAL_ERROR("Expected single store");
+      reportFatalError("Expected single store");
 
     SingleStore = SI;
   }
@@ -143,7 +144,7 @@ static Argument *getOriginatingArgument(Value *V,
 
   // Pattern rules to identify an originating argument.
   if (AnnotCall->getParent() != &AnnotCall->getFunction()->getEntryBlock())
-    PROTEUS_FATAL_ERROR(
+    reportFatalError(
         "Expected instrumentation annotation to be in the entry basic block");
 
   const BasicBlock &EntryBB = AnnotCall->getFunction()->getEntryBlock();
@@ -176,11 +177,11 @@ static SmallPtrSet<Argument *, 16>
 tryGatherCoercedArguments(Value *Obj, const Instruction *AnnotCall) {
   AllocaInst *AI = dyn_cast<AllocaInst>(Obj);
   if (!AI)
-    PROTEUS_FATAL_ERROR("Expected object in local alloca");
+    reportFatalError("Expected object in local alloca");
 
   // Pattern rules to identify arguments for coerced objects.
   if (AnnotCall->getParent() != &AnnotCall->getFunction()->getEntryBlock())
-    PROTEUS_FATAL_ERROR(
+    reportFatalError(
         "Expected instrumentation annotation to be in the entry basic block");
 
   const BasicBlock &EntryBB = AnnotCall->getFunction()->getEntryBlock();
@@ -210,7 +211,7 @@ tryGatherCoercedArguments(Value *Obj, const Instruction *AnnotCall) {
           return Arg;
       }
 
-      PROTEUS_FATAL_ERROR("Expected argument");
+      reportFatalError("Expected argument");
     }
 
     if (match(&I, m_Store(m_Value(V), m_Specific(Dst)))) {
@@ -226,7 +227,7 @@ tryGatherCoercedArguments(Value *Obj, const Instruction *AnnotCall) {
           return Arg;
       }
 
-      PROTEUS_FATAL_ERROR("Expected argument");
+      reportFatalError("Expected argument");
     }
 
     if (match(&I,
@@ -243,7 +244,7 @@ tryGatherCoercedArguments(Value *Obj, const Instruction *AnnotCall) {
           return Arg;
       }
 
-      PROTEUS_FATAL_ERROR("Expected argument");
+      reportFatalError("Expected argument");
     }
 
     return nullptr;
@@ -262,7 +263,7 @@ tryGatherCoercedArguments(Value *Obj, const Instruction *AnnotCall) {
                                                         m_Value(Src), m_Value(),
                                                         m_Value()))) {
       if (!CoercedArgs.empty())
-        PROTEUS_FATAL_ERROR("Expected empty coerced arguments");
+        reportFatalError("Expected empty coerced arguments");
 
       // Restart detection for the Src operand.
       const Instruction &E = I;
@@ -286,12 +287,12 @@ createVectorRuntimeConstantInfo(RuntimeConstantType RCType,
                                 const Argument *Arg) {
   VectorType *VecTy = dyn_cast<VectorType>(Arg->getType());
   if (!VecTy)
-    PROTEUS_FATAL_ERROR("Expected vector type");
+    reportFatalError("Expected vector type");
 
   ElementCount EC = VecTy->getElementCount();
   int32_t NumElts = EC.getKnownMinValue();
   if (EC.isScalable())
-    PROTEUS_FATAL_ERROR("Unsupported scalable vector type");
+    reportFatalError("Unsupported scalable vector type");
 
   Type *EltTy = VecTy->getElementType();
   RuntimeConstantType EltRCType = convertTypeToRuntimeConstantType(EltTy);
@@ -408,30 +409,30 @@ void AnnotationHandler::parseManifestFileAnnotations(
 
   auto ErrorOrManifestBuf = MemoryBuffer::getFile(UniqueFilename);
   if (!ErrorOrManifestBuf)
-    PROTEUS_FATAL_ERROR("Error reading json manifest file " + UniqueFilename);
+    reportFatalError("Error reading json manifest file " + UniqueFilename);
 
   std::unique_ptr<MemoryBuffer> ManifestBuf = std::move(*ErrorOrManifestBuf);
   auto ExpectedJsonValue = json::parse(ManifestBuf->getBuffer());
   if (auto E = ExpectedJsonValue.takeError())
-    PROTEUS_FATAL_ERROR("Failed to parse json: " + toString(std::move(E)));
+    reportFatalError("Failed to parse json: " + toString(std::move(E)));
 
   json::Value ManifestValue = *ExpectedJsonValue;
   json::Object *Manifest = ManifestValue.getAsObject();
   if (!Manifest)
-    PROTEUS_FATAL_ERROR("Failed to parse json: manifest object");
+    reportFatalError("Failed to parse json: manifest object");
 
   json::Array *KernelArray = Manifest->getArray("manifest");
   if (!KernelArray)
-    PROTEUS_FATAL_ERROR("Failed to parse json: kernel array");
+    reportFatalError("Failed to parse json: kernel array");
 
   for (auto &Entry : *KernelArray) {
     json::Object *KernelObject = Entry.getAsObject();
     if (!KernelObject)
-      PROTEUS_FATAL_ERROR("Failed parsing json: kernel object");
+      reportFatalError("Failed parsing json: kernel object");
 
     auto OptionalKernelSym = KernelObject->getString("symbol");
     if (!OptionalKernelSym)
-      PROTEUS_FATAL_ERROR("Failed parsing json: function symbol");
+      reportFatalError("Failed parsing json: function symbol");
 
     StringRef KernelSym = *OptionalKernelSym;
 
@@ -441,10 +442,9 @@ void AnnotationHandler::parseManifestFileAnnotations(
       ConstantDataArray *CDA =
           dyn_cast<ConstantDataArray>(KernelSymGV->getInitializer());
       if (!CDA)
-        PROTEUS_FATAL_ERROR("Expected ConstantDataArray");
+        reportFatalError("Expected ConstantDataArray");
       if (!CDA->isString())
-        PROTEUS_FATAL_ERROR(
-            "Expected string constant storing the kernel symbol");
+        reportFatalError("Expected string constant storing the kernel symbol");
 
       // Get the value as a CString to avoid including an extra null
       // terminator character that spuriously fails the following comparison.
@@ -452,7 +452,7 @@ void AnnotationHandler::parseManifestFileAnnotations(
       if (MappedKernelSym == KernelSym) {
         F = dyn_cast<Function>(Stub);
         if (!F)
-          PROTEUS_FATAL_ERROR("Expected stub function");
+          reportFatalError("Expected stub function");
         break;
       }
     }
@@ -468,20 +468,20 @@ void AnnotationHandler::parseManifestFileAnnotations(
 
     json::Array *JsonRCInfoArray = KernelObject->getArray("rc");
     if (!JsonRCInfoArray)
-      PROTEUS_FATAL_ERROR("Failed parsing json: jit args");
+      reportFatalError("Failed parsing json: jit args");
     // Update the RCInfoMap for the stub function proxying the kernel.
     auto &RCInfos = RCInfoMap[F];
     for (auto J : *JsonRCInfoArray) {
       auto CreateRuntimeConstantInfo = [](json::Object *JsonRCDict) {
         json::Value *ArgV = JsonRCDict->get("arg");
         if (!ArgV)
-          PROTEUS_FATAL_ERROR("Expected arg in runtime constant info");
+          reportFatalError("Expected arg in runtime constant info");
         auto OptArgNo = ArgV->getAsInteger();
         int32_t ArgNo = *OptArgNo;
 
         json::Value *TypeV = JsonRCDict->get("type");
         if (!TypeV)
-          PROTEUS_FATAL_ERROR("Expected type in runtime constant info");
+          reportFatalError("Expected type in runtime constant info");
         auto OptRCType = TypeV->getAsInteger();
         RuntimeConstantType RCType =
             static_cast<RuntimeConstantType>(*OptRCType);
@@ -490,7 +490,7 @@ void AnnotationHandler::parseManifestFileAnnotations(
           json::Value *EltTypeV = JsonRCDict->get("elt-type");
           auto OptEltType = EltTypeV->getAsInteger();
           if (!OptEltType)
-            PROTEUS_FATAL_ERROR("Expected elt-type in runtime constant info");
+            reportFatalError("Expected elt-type in runtime constant info");
           RuntimeConstantType EltType =
               static_cast<RuntimeConstantType>(*OptEltType);
 
@@ -500,17 +500,17 @@ void AnnotationHandler::parseManifestFileAnnotations(
 
           // Check for semantic errors.
           if (NumEltsV && NumEltsPosV)
-            PROTEUS_FATAL_ERROR(
+            reportFatalError(
                 "Setting both NumElts and NumEltsPos is incorrect");
 
           if (!NumEltsV && !NumEltsPosV)
-            PROTEUS_FATAL_ERROR("Either NumElts or NumEltsPos must be set");
+            reportFatalError("Either NumElts or NumEltsPos must be set");
 
           if (NumEltsPosV && !NumEltsTypeV)
-            PROTEUS_FATAL_ERROR("NumEltsType must be set if NumEltsPos is set");
+            reportFatalError("NumEltsType must be set if NumEltsPos is set");
 
           if (!NumEltsPosV && NumEltsTypeV)
-            PROTEUS_FATAL_ERROR("NumEltsPos must be set if NumEltsType is set");
+            reportFatalError("NumEltsPos must be set if NumEltsType is set");
 
           if (NumEltsV) {
             int32_t NumElts = NumEltsV->getAsInteger().value();
@@ -527,20 +527,20 @@ void AnnotationHandler::parseManifestFileAnnotations(
         if (RCType == RuntimeConstantType::OBJECT) {
           json::Value *SizeV = JsonRCDict->get("size");
           if (!SizeV)
-            PROTEUS_FATAL_ERROR("Expected key 'size' type in runtime "
-                                "constant info for object");
+            reportFatalError("Expected key 'size' type in runtime "
+                             "constant info for object");
           auto OptSize = SizeV->getAsInteger();
           if (!OptSize)
-            PROTEUS_FATAL_ERROR("Expected key 'size' type is integer");
+            reportFatalError("Expected key 'size' type is integer");
           int32_t Size = *OptSize;
 
           json::Value *PassByValueV = JsonRCDict->get("pass-by-value");
           if (!PassByValueV)
-            PROTEUS_FATAL_ERROR("Expected key 'pass-by-value' type in runtime "
-                                "constant info for object");
+            reportFatalError("Expected key 'pass-by-value' type in runtime "
+                             "constant info for object");
           auto OptPassByValue = PassByValueV->getAsBoolean();
           if (!OptPassByValue)
-            PROTEUS_FATAL_ERROR("Expected key 'pass-by-value' is boolean");
+            reportFatalError("Expected key 'pass-by-value' is boolean");
           bool PassByValue = *OptPassByValue;
 
           return RuntimeConstantInfo{RCType, ArgNo, Size, PassByValue};
@@ -551,9 +551,8 @@ void AnnotationHandler::parseManifestFileAnnotations(
 
       RuntimeConstantInfo RCI = CreateRuntimeConstantInfo(J.getAsObject());
       if (!RCInfos.insert(RCI))
-        PROTEUS_FATAL_ERROR(
-            "Duplicate JIT annotation for argument (0-index): " +
-            std::to_string(RCI.ArgInfo.Pos));
+        reportFatalError("Duplicate JIT annotation for argument (0-index): " +
+                         std::to_string(RCI.ArgInfo.Pos));
     }
   }
 
@@ -725,12 +724,12 @@ void AnnotationHandler::createDeviceManifestFile(
   int FD = -1;
   std::error_code EC = sys::fs::openFileForWrite(UniqueFilename, FD);
   if (EC)
-    PROTEUS_FATAL_ERROR("Error creating device manifest file: " +
-                        UniqueFilename + ", error: " + EC.message());
+    reportFatalError("Error creating device manifest file: " + UniqueFilename +
+                     ", error: " + EC.message());
   raw_fd_ostream OS(FD, /*shouldClose=*/true);
   if (OS.has_error())
-    PROTEUS_FATAL_ERROR("Error opening device manifest file: " +
-                        UniqueFilename + ", error: " + OS.error().message());
+    reportFatalError("Error opening device manifest file: " + UniqueFilename +
+                     ", error: " + OS.error().message());
 
   json::Object ManifestInfo;
   json::Array KernelArray;
@@ -795,7 +794,7 @@ void AnnotationHandler::parseJitArgAnnotations(
         continue;
 
       if (CB->getNumUses() != 0)
-        PROTEUS_FATAL_ERROR("Expected zero uses of the annotation function");
+        reportFatalError("Expected zero uses of the annotation function");
 
       CallsToDelete.push_back(CB);
 
@@ -805,7 +804,7 @@ void AnnotationHandler::parseJitArgAnnotations(
 
       Argument *Arg = getOriginatingArgument(V, CB);
       if (!Arg)
-        PROTEUS_FATAL_ERROR(
+        reportFatalError(
             "Expected non-null argument. Possible cause: proteus::jit_arg "
             "argument is not an argument of the enclosing function.");
 
@@ -818,8 +817,8 @@ void AnnotationHandler::parseJitArgAnnotations(
           ArgNo,
       };
       if (!ConstantArgs.insert(RCI))
-        PROTEUS_FATAL_ERROR("Duplicate argument number found: " +
-                            std::to_string(Arg->getArgNo()));
+        reportFatalError("Duplicate argument number found: " +
+                         std::to_string(Arg->getArgNo()));
     }
   }
 
@@ -834,7 +833,7 @@ void AnnotationHandler::parseJitArgAnnotations(
     AnnotationF->eraseFromParent();
 
   if (verifyModule(M, &errs()))
-    PROTEUS_FATAL_ERROR("Broken JIT module found, compilation aborted!");
+    reportFatalError("Broken JIT module found, compilation aborted!");
 }
 
 void AnnotationHandler::parseJitArrayAnnotations(
@@ -850,7 +849,7 @@ void AnnotationHandler::parseJitArrayAnnotations(
         continue;
 
       if (CB->getNumUses() != 0)
-        PROTEUS_FATAL_ERROR("Expected zero uses of the annotation function");
+        reportFatalError("Expected zero uses of the annotation function");
 
       CallsToDelete.push_back(CB);
 
@@ -863,7 +862,7 @@ void AnnotationHandler::parseJitArrayAnnotations(
 
       Argument *Arg = getOriginatingArgument(V, CB);
       if (!Arg)
-        PROTEUS_FATAL_ERROR(
+        reportFatalError(
             "Expected non-null argument. Possible cause: proteus::jit_array "
             "argument is not an argument of the enclosing function.");
 
@@ -880,13 +879,13 @@ void AnnotationHandler::parseJitArrayAnnotations(
 
         RuntimeConstantInfo RCI{RCType, ArgNo, NumElts, EltType};
         if (!ConstantArgs.insert(RCI))
-          PROTEUS_FATAL_ERROR("Duplicate argument number found: " +
-                              std::to_string(Arg->getArgNo()));
+          reportFatalError("Duplicate argument number found: " +
+                           std::to_string(Arg->getArgNo()));
       } else {
         // Find NumElts corresponding to a runtime constant argument.
         Argument *NumEltsArg = getOriginatingArgument(Size, CB);
         if (!NumEltsArg)
-          PROTEUS_FATAL_ERROR("Expected non-null argument for size");
+          reportFatalError("Expected non-null argument for size");
 
         RuntimeConstantType NumEltsType =
             convertTypeToRuntimeConstantType(NumEltsArg->getType());
@@ -895,8 +894,8 @@ void AnnotationHandler::parseJitArrayAnnotations(
         RuntimeConstantInfo RCI{RCType, ArgNo, EltType, NumEltsType,
                                 NumEltsPos};
         if (!ConstantArgs.insert(RCI))
-          PROTEUS_FATAL_ERROR("Duplicate argument number found: " +
-                              std::to_string(Arg->getArgNo()));
+          reportFatalError("Duplicate argument number found: " +
+                           std::to_string(Arg->getArgNo()));
       }
     }
   }
@@ -912,7 +911,7 @@ void AnnotationHandler::parseJitArrayAnnotations(
     AnnotationF->eraseFromParent();
 
   if (verifyModule(M, &errs()))
-    PROTEUS_FATAL_ERROR("Broken JIT module found, compilation aborted!");
+    reportFatalError("Broken JIT module found, compilation aborted!");
 }
 
 void AnnotationHandler::parseJitObjectAnnotations(
@@ -928,7 +927,7 @@ void AnnotationHandler::parseJitObjectAnnotations(
         continue;
 
       if (CB->getNumUses() != 0)
-        PROTEUS_FATAL_ERROR("Expected zero uses of the annotation function");
+        reportFatalError("Expected zero uses of the annotation function");
 
       CallsToDelete.push_back(CB);
 
@@ -946,8 +945,8 @@ void AnnotationHandler::parseJitObjectAnnotations(
 
         ConstantInt *SizeCI = dyn_cast<ConstantInt>(SizeV);
         if (!SizeCI)
-          PROTEUS_FATAL_ERROR("Expected constant for the size argument of "
-                              "proteus::jit_object");
+          reportFatalError("Expected constant for the size argument of "
+                           "proteus::jit_object");
         int32_t Size = SizeCI->getZExtValue();
 
         // If the object argument is passed byref or byval then the argument
@@ -961,8 +960,8 @@ void AnnotationHandler::parseJitObjectAnnotations(
 
         auto &ConstantArgs = RCInfoMap[JitFunction];
         if (!ConstantArgs.insert(RCI))
-          PROTEUS_FATAL_ERROR("Duplicate argument number found: " +
-                              std::to_string(ArgNo));
+          reportFatalError("Duplicate argument number found: " +
+                           std::to_string(ArgNo));
       } else {
         // Detect coercion and gather scalar arguments to create runtime
         // constants infos for those.
@@ -970,7 +969,7 @@ void AnnotationHandler::parseJitObjectAnnotations(
             tryGatherCoercedArguments(Ptr, CB);
 
         if (CoercedArgs.empty())
-          PROTEUS_FATAL_ERROR(
+          reportFatalError(
               "Expected non-null argument. Possible cause: "
               "proteus::jit_object "
               "argument is not an argument of the enclosing function and "
@@ -1006,15 +1005,15 @@ void AnnotationHandler::parseJitObjectAnnotations(
               return RCI;
             }
 
-            PROTEUS_FATAL_ERROR("Expected scalar or static array type for "
-                                "argument " +
-                                std::to_string(Arg->getArgNo()));
+            reportFatalError("Expected scalar or static array type for "
+                             "argument " +
+                             std::to_string(Arg->getArgNo()));
           };
 
           RuntimeConstantInfo RCI = CreateRuntimeConstantInfo();
           if (!ConstantArgs.insert(RCI))
-            PROTEUS_FATAL_ERROR("Duplicate argument number found: " +
-                                std::to_string(Arg->getArgNo()));
+            reportFatalError("Duplicate argument number found: " +
+                             std::to_string(Arg->getArgNo()));
         }
       }
     }
@@ -1031,7 +1030,7 @@ void AnnotationHandler::parseJitObjectAnnotations(
     AnnotationF->eraseFromParent();
 
   if (verifyModule(M, &errs()))
-    PROTEUS_FATAL_ERROR("Broken JIT module found, compilation aborted!");
+    reportFatalError("Broken JIT module found, compilation aborted!");
 }
 
 static RuntimeConstantInfo parseAttributeJsonRuntimeConstantArray(
@@ -1045,23 +1044,23 @@ static RuntimeConstantInfo parseAttributeJsonRuntimeConstantArray(
     if (K == "elt-type") {
       auto OptEltType = V.getAsInteger();
       if (!OptEltType)
-        PROTEUS_FATAL_ERROR(
+        reportFatalError(
             "Expected integer value for array info key 'elt-type'");
       EltType = static_cast<RuntimeConstantType>(*OptEltType);
     } else if (K == "num-elts") {
       OptNumElts = V.getAsInteger();
       if (!OptNumElts)
-        PROTEUS_FATAL_ERROR(
+        reportFatalError(
             "Expected integer value for array info key 'num-elts'");
     } else if (K == "num-elts-pos") {
       OptNumEltsPos = V.getAsInteger();
       if (!OptNumEltsPos)
-        PROTEUS_FATAL_ERROR(
+        reportFatalError(
             "Expected integer value for array info key 'num-elts-pos'");
     } else if (K == "num-elts-type") {
       auto OptV = V.getAsInteger();
       if (!OptV)
-        PROTEUS_FATAL_ERROR(
+        reportFatalError(
             "Expected integer value for array info key 'num-elts-type'");
       OptNumEltsType = static_cast<RuntimeConstantType>(*OptV);
     }
@@ -1069,22 +1068,21 @@ static RuntimeConstantInfo parseAttributeJsonRuntimeConstantArray(
 
   // Semantic checks for num-elts and num-elts-pos keys.
   if (OptNumElts && OptNumEltsPos)
-    PROTEUS_FATAL_ERROR("Expected either of mutually exclusive keys 'num-elts' "
-                        "and 'num-elts-pos' to be set, but they are both set "
-                        "for array info of runtime constant");
+    reportFatalError("Expected either of mutually exclusive keys 'num-elts' "
+                     "and 'num-elts-pos' to be set, but they are both set "
+                     "for array info of runtime constant");
 
   if (!OptNumElts && !OptNumEltsPos)
-    PROTEUS_FATAL_ERROR("Expected either NumElts or NumEltsPos set for array "
-                        "info of runtime constant");
+    reportFatalError("Expected either NumElts or NumEltsPos set for array "
+                     "info of runtime constant");
 
   if (OptNumEltsPos && !OptNumEltsType)
-    PROTEUS_FATAL_ERROR(
-        "Expected NumEltsType is set when NumEltsPos is set for "
-        "array info of runtime constant");
+    reportFatalError("Expected NumEltsType is set when NumEltsPos is set for "
+                     "array info of runtime constant");
 
   if (!OptNumEltsPos && OptNumEltsType)
-    PROTEUS_FATAL_ERROR("Expected NumEltsPos is set when NumEltrType is set "
-                        "for array info of runtime constant");
+    reportFatalError("Expected NumEltsPos is set when NumEltrType is set "
+                     "for array info of runtime constant");
 
   if (OptNumElts) {
     return RuntimeConstantInfo{RCType, ArgNo, *OptNumElts, EltType};
@@ -1105,7 +1103,7 @@ static RuntimeConstantInfo parseAttributeJsonRuntimeConstantObject(
     if (K == "size") {
       auto OptSize = V.getAsInteger();
       if (!OptSize)
-        PROTEUS_FATAL_ERROR("Expected integer value for key 'size'");
+        reportFatalError("Expected integer value for key 'size'");
       Size = *OptSize;
 
       continue;
@@ -1114,13 +1112,13 @@ static RuntimeConstantInfo parseAttributeJsonRuntimeConstantObject(
     if (K == "pass-by-value") {
       auto OptPassByValue = V.getAsBoolean();
       if (!OptPassByValue)
-        PROTEUS_FATAL_ERROR("Expected integer value for key 'size'");
+        reportFatalError("Expected integer value for key 'size'");
       PassByValue = *OptPassByValue;
 
       continue;
     }
 
-    PROTEUS_FATAL_ERROR("Unsupported key " + K.str());
+    reportFatalError("Unsupported key " + K.str());
   }
 
   return RuntimeConstantInfo{RCType, ArgNo, Size, PassByValue};
@@ -1147,7 +1145,7 @@ void AnnotationHandler::parseJitGlobalAnnotations(
       // Check the annotated function is a kernel function or a device
       // lambda for device compilation.
       if (!isDeviceKernel(Fn) && !isLambdaFunction(*Fn))
-        PROTEUS_FATAL_ERROR(
+        reportFatalError(
             std::string{} + __FILE__ + ":" + std::to_string(__LINE__) +
             " => Expected the annotated Fn " + Fn->getName() + " (" +
             demangle(Fn->getName().str()) +
@@ -1194,13 +1192,12 @@ void AnnotationHandler::parseJitGlobalAnnotations(
     auto *AnnotArgs = cast<ConstantStruct>(Entry->getOperand(4)->getOperand(0));
 
     SmallSetVector<RuntimeConstantInfo, 16> ParsedRuntimeConstantInfo;
-    auto InsertRuntimeConstantInfo =
-        [&ParsedRuntimeConstantInfo](const RuntimeConstantInfo &RCI) {
-          if (!ParsedRuntimeConstantInfo.insert(RCI))
-            PROTEUS_FATAL_ERROR(
-                "Duplicate JIT annotation for argument (0-index): " +
-                std::to_string(RCI.ArgInfo.Pos));
-        };
+    auto InsertRuntimeConstantInfo = [&ParsedRuntimeConstantInfo](
+                                         const RuntimeConstantInfo &RCI) {
+      if (!ParsedRuntimeConstantInfo.insert(RCI))
+        reportFatalError("Duplicate JIT annotation for argument (0-index): " +
+                         std::to_string(RCI.ArgInfo.Pos));
+    };
 
     for (unsigned int J = 0; J < AnnotArgs->getNumOperands(); ++J) {
       Constant *C = AnnotArgs->getOperand(J)->stripPointerCasts();
@@ -1211,15 +1208,14 @@ void AnnotationHandler::parseJitGlobalAnnotations(
         // We subtract 1 to convert to 0-start index.
         size_t ArgNo = Index->getValue().getZExtValue() - 1;
         if (ArgNo >= Fn->arg_size())
-          PROTEUS_FATAL_ERROR("Expected ArgNo (0-index) " +
-                              std::to_string(ArgNo) + " < arg_size " +
-                              std::to_string(Fn->arg_size()) +
-                              " for function " + Fn->getName());
+          reportFatalError("Expected ArgNo (0-index) " + std::to_string(ArgNo) +
+                           " < arg_size " + std::to_string(Fn->arg_size()) +
+                           " for function " + Fn->getName());
 
         RuntimeConstantType RCType =
             convertTypeToRuntimeConstantType(Fn->getArg(ArgNo)->getType());
         if (!isScalarRuntimeConstantType(RCType))
-          PROTEUS_FATAL_ERROR(
+          reportFatalError(
               "Expected scalar type for attribute annotation, found " +
               toString(RCType));
 
@@ -1228,13 +1224,12 @@ void AnnotationHandler::parseJitGlobalAnnotations(
       } else {
         auto *CDA = dyn_cast<ConstantDataArray>(C->getOperand(0));
         if (!CDA)
-          PROTEUS_FATAL_ERROR("Expected constant data array string");
+          reportFatalError("Expected constant data array string");
 
         StringRef RCDictStr = CDA->getAsCString();
         auto ExpectedRCDict = json::parse(RCDictStr);
         if (auto E = ExpectedRCDict.takeError())
-          PROTEUS_FATAL_ERROR(
-              "Failed to parse runtime constant info json dict");
+          reportFatalError("Failed to parse runtime constant info json dict");
 
         json::Value RCDictV = *ExpectedRCDict;
         json::Object *RCDict = RCDictV.getAsObject();
@@ -1243,7 +1238,7 @@ void AnnotationHandler::parseJitGlobalAnnotations(
         // types.
         auto OptArgNo = RCDict->getInteger("arg");
         if (!OptArgNo)
-          PROTEUS_FATAL_ERROR(
+          reportFatalError(
               "Expected 'arg' key in runtime constant info json dict");
         // We subtract 1 to convert to 0-start index.
         int32_t ArgNo = *OptArgNo - 1;
@@ -1253,7 +1248,7 @@ void AnnotationHandler::parseJitGlobalAnnotations(
           // Auto-detect type for a scalar argument.
           Type *ArgType = Fn->getArg(ArgNo)->getType();
           if (ArgType->isPointerTy())
-            PROTEUS_FATAL_ERROR(
+            reportFatalError(
                 "Cannot auto-detect runtime type from argument "
                 "LLVM type because it is a pointer. Expected 'type' key in "
                 "runtime constant info json dict");
@@ -1265,7 +1260,7 @@ void AnnotationHandler::parseJitGlobalAnnotations(
         if (RCType == RuntimeConstantType::OBJECT) {
           json::Object *JsonObjInfo = RCDict->getObject("objinfo");
           if (!JsonObjInfo)
-            PROTEUS_FATAL_ERROR(
+            reportFatalError(
                 "Expected 'objinfo' key for runtime constant object");
           RuntimeConstantInfo RCI = parseAttributeJsonRuntimeConstantObject(
               RCType, ArgNo, JsonObjInfo);
@@ -1274,7 +1269,7 @@ void AnnotationHandler::parseJitGlobalAnnotations(
                    RCType == RuntimeConstantType::STATIC_ARRAY) {
           json::Object *JsonArrInfo = RCDict->getObject("arrinfo");
           if (!JsonArrInfo)
-            PROTEUS_FATAL_ERROR(
+            reportFatalError(
                 "Expected 'objinfo' key for runtime constant object");
           RuntimeConstantInfo RCI = parseAttributeJsonRuntimeConstantArray(
               RCType, ArgNo, JsonArrInfo);
@@ -1287,9 +1282,9 @@ void AnnotationHandler::parseJitGlobalAnnotations(
           RuntimeConstantInfo RCI{RCType, ArgNo};
           InsertRuntimeConstantInfo(RCI);
         } else {
-          PROTEUS_FATAL_ERROR("Unexpected runtime constant type: " +
-                              std::to_string(static_cast<int32_t>(RCType)) +
-                              " for function " + Fn->getName());
+          reportFatalError("Unexpected runtime constant type: " +
+                           std::to_string(static_cast<int32_t>(RCType)) +
+                           " for function " + Fn->getName());
         }
       }
     }
@@ -1297,8 +1292,8 @@ void AnnotationHandler::parseJitGlobalAnnotations(
     // Insert RC infos and sort JFI.ConstantArgs for determinism.
     for (auto &RCInfo : ParsedRuntimeConstantInfo) {
       if (!RCInfos.insert(RCInfo)) {
-        PROTEUS_FATAL_ERROR("Duplicate entry found for arg no " +
-                            std::to_string(RCInfo.ArgInfo.Pos));
+        reportFatalError("Duplicate entry found for arg no " +
+                         std::to_string(RCInfo.ArgInfo.Pos));
       }
     }
   }
@@ -1322,12 +1317,12 @@ void AnnotationHandler::removeJitGlobalAnnotations() {
   for (unsigned I = 0; I != N; ++I) {
     auto *Entry = dyn_cast<ConstantStruct>(Init->getOperand(I));
     if (!Entry)
-      PROTEUS_FATAL_ERROR("Expected constant struct in global annotations");
+      reportFatalError("Expected constant struct in global annotations");
 
     auto *Annotation =
         dyn_cast<ConstantDataArray>(Entry->getOperand(1)->getOperand(0));
     if (!Annotation)
-      PROTEUS_FATAL_ERROR("Expected constant data array as annotation string");
+      reportFatalError("Expected constant data array as annotation string");
 
     StringRef AStr = Annotation->getAsCString();
     if (AStr == "jit")

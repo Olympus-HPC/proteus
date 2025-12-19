@@ -43,7 +43,7 @@ inline RuntimeConstantType convertTypeToRuntimeConstantType(Type *Ty) {
   std::string TypeString;
   raw_string_ostream TypeOstream(TypeString);
   Ty->print(TypeOstream);
-  PROTEUS_FATAL_ERROR("Unknown Type " + TypeOstream.str());
+  reportFatalError("Unknown Type " + TypeOstream.str());
 }
 
 inline Type *convertRuntimeConstantTypeToLLVMType(RuntimeConstantType RCType,
@@ -62,11 +62,11 @@ inline Type *convertRuntimeConstantTypeToLLVMType(RuntimeConstantType RCType,
   case RuntimeConstantType::DOUBLE:
     return Type::getDoubleTy(Ctx);
   case RuntimeConstantType::LONG_DOUBLE:
-    PROTEUS_FATAL_ERROR("Unsupported");
+    reportFatalError("Unsupported");
   case RuntimeConstantType::PTR:
     return PointerType::getUnqual(Ctx);
   default:
-    PROTEUS_FATAL_ERROR("Unknown RuntimeConstantType " + toString(RCType));
+    reportFatalError("Unknown RuntimeConstantType " + toString(RCType));
   }
 }
 
@@ -87,8 +87,8 @@ inline size_t getSizeInBytes(RuntimeConstantType RCType) {
   case RuntimeConstantType::LONG_DOUBLE:
     return sizeof(long double);
   default:
-    PROTEUS_FATAL_ERROR("Unknown size for RuntimeConstantType " +
-                        toString(RCType));
+    reportFatalError("Unknown size for RuntimeConstantType " +
+                     toString(RCType));
   }
 }
 
@@ -109,8 +109,8 @@ template <typename T> T getValue(const RuntimeConstant &RC) {
   case RuntimeConstantType::LONG_DOUBLE:
     return RC.Value.LongDoubleVal;
   default:
-    PROTEUS_FATAL_ERROR("Cannot get value for RuntimeConstantType " +
-                        toString(RC.Type));
+    reportFatalError("Cannot get value for RuntimeConstantType " +
+                     toString(RC.Type));
   }
 }
 
@@ -141,7 +141,7 @@ inline std::string toString(const RuntimeConstantType RCType) {
   case RuntimeConstantType::OBJECT:
     return "OBJECT";
   default:
-    PROTEUS_FATAL_ERROR("Unknown RCType " + std::to_string(RCType));
+    reportFatalError("Unknown RCType " + std::to_string(RCType));
   }
 }
 

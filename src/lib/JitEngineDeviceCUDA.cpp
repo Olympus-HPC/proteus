@@ -33,7 +33,7 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
               << "extractLinkedBitcode " << ModuleId << "\n");
 
   if (!ModuleIdToFatBinary.count(ModuleId))
-    PROTEUS_FATAL_ERROR("Expected to find module id " + ModuleId + " in map");
+    reportFatalError("Expected to find module id " + ModuleId + " in map");
 
   CUdeviceptr DevPtr;
   size_t Bytes;
@@ -53,7 +53,7 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
   auto M = getLazyIRModule(MemoryBuffer::getMemBufferCopy(Bitcode, ModuleId),
                            Diag, Ctx, true);
   if (!M)
-    PROTEUS_FATAL_ERROR("Error parsing IR: " + Diag.getMessage());
+    reportFatalError("Error parsing IR: " + Diag.getMessage());
   M->setModuleIdentifier(ModuleId);
 
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus") << "Parse IR " << ModuleId << " "
@@ -69,7 +69,7 @@ HashT JitEngineDeviceCUDA::getModuleHash(BinaryInfo &BinInfo) {
   CUmodule CUMod;
   FatbinWrapperT *FatbinWrapper = BinInfo.getFatbinWrapper();
   if (!FatbinWrapper)
-    PROTEUS_FATAL_ERROR("Expected FatbinWrapper in map");
+    reportFatalError("Expected FatbinWrapper in map");
 
   auto &LinkedModuleIds = BinInfo.getModuleIds();
 
@@ -112,7 +112,7 @@ void JitEngineDeviceCUDA::extractModules(BinaryInfo &BinInfo) {
 
   FatbinWrapperT *FatbinWrapper = BinInfo.getFatbinWrapper();
   if (!FatbinWrapper)
-    PROTEUS_FATAL_ERROR("Expected FatbinWrapper in map");
+    reportFatalError("Expected FatbinWrapper in map");
 
   SmallVector<std::unique_ptr<Module>> LinkedModules;
   auto &Ctx = *BinInfo.getLLVMContext();

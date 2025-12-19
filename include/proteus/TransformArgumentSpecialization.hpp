@@ -11,14 +11,14 @@
 #ifndef PROTEUS_TRANSFORM_ARGUMENT_SPECIALIZATION_HPP
 #define PROTEUS_TRANSFORM_ARGUMENT_SPECIALIZATION_HPP
 
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/Support/Debug.h>
-
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Config.hpp"
 #include "proteus/Debug.h"
 #include "proteus/Logger.hpp"
 #include "proteus/RuntimeConstantTypeHelpers.h"
+
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/Support/Debug.h>
 
 namespace proteus {
 
@@ -30,8 +30,8 @@ private:
   static ArrayRef<T> createArrayRef(const RuntimeConstant &RC) {
     T *TypedPtr = reinterpret_cast<T *>(RC.ArrInfo.Blob.get());
     if (RC.ArrInfo.NumElts <= 0)
-      PROTEUS_FATAL_ERROR("Invalid number of elements in array: " +
-                          std::to_string(RC.ArrInfo.NumElts));
+      reportFatalError("Invalid number of elements in array: " +
+                       std::to_string(RC.ArrInfo.NumElts));
 
     return ArrayRef<T>(TypedPtr, RC.ArrInfo.NumElts);
   }
@@ -55,8 +55,8 @@ private:
     case RuntimeConstantType::DOUBLE:
       return ConstantDataArray::get(M.getContext(), createArrayRef<double>(RC));
     default:
-      PROTEUS_FATAL_ERROR("Unsupported array element type: " +
-                          toString(RC.ArrInfo.EltType));
+      reportFatalError("Unsupported array element type: " +
+                       toString(RC.ArrInfo.EltType));
     }
   }
 
@@ -79,8 +79,8 @@ private:
       return ConstantDataVector::get(M.getContext(),
                                      createArrayRef<double>(RC));
     default:
-      PROTEUS_FATAL_ERROR("Unsupported vector element type: " +
-                          toString(RC.ArrInfo.EltType));
+      reportFatalError("Unsupported vector element type: " +
+                       toString(RC.ArrInfo.EltType));
     }
   }
 
@@ -171,8 +171,8 @@ public:
         std::string TypeString;
         raw_string_ostream TypeOstream(TypeString);
         ArgType->print(TypeOstream);
-        PROTEUS_FATAL_ERROR("JIT Incompatible type in runtime constant: " +
-                            TypeOstream.str());
+        reportFatalError("JIT Incompatible type in runtime constant: " +
+                         TypeOstream.str());
       }
       }
 

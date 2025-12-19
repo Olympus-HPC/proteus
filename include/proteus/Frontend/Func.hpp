@@ -1,12 +1,6 @@
 #ifndef PROTEUS_FRONTEND_FUNC_HPP
 #define PROTEUS_FRONTEND_FUNC_HPP
 
-#include <memory>
-
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/Module.h>
-#include <type_traits>
-
 #include "proteus/AddressSpace.hpp"
 #include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.hpp"
@@ -14,6 +8,23 @@
 #include "proteus/Frontend/TypeMap.hpp"
 #include "proteus/Frontend/Var.hpp"
 #include "proteus/Frontend/VarStorage.hpp"
+
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <vector>
+
+namespace llvm {
+class BasicBlock;
+class Function;
+class FunctionCallee;
+class AllocaInst;
+class Type;
+class Value;
+class LLVMContext;
+class ArrayType;
+} // namespace llvm
 
 namespace proteus {
 
@@ -44,26 +55,179 @@ struct EmptyLambda {
 };
 
 class FuncBase {
+public:
+  struct Impl;
+
+  JitModule &getJitModule() { return J; }
+
+  LLVMContext &getContext();
+
+  // Storage creation operations.
+  std::unique_ptr<ScalarStorage> createScalarStorage(const std::string &Name,
+                                                     Type *AllocaTy);
+  std::unique_ptr<PointerStorage>
+  createPointerStorage(const std::string &Name, Type *AllocaTy, Type *ElemTy);
+  std::unique_ptr<ArrayStorage>
+  createArrayStorage(const std::string &Name, AddressSpace AS, Type *ArrTy);
+
+  // Insertion point management.
+  void setInsertPoint(BasicBlock *BB);
+  void setInsertPointBegin(BasicBlock *BB);
+  void setInsertPointAtEntry();
+  void clearInsertPoint();
+  BasicBlock *getInsertBlock();
+
+  // Basic block management.
+  std::tuple<BasicBlock *, BasicBlock *> splitCurrentBlock();
+  BasicBlock *createBasicBlock(const std::string &Name = "",
+                               BasicBlock *InsertBefore = nullptr);
+  void eraseTerminator(BasicBlock *BB);
+  BasicBlock *getUniqueSuccessor(BasicBlock *BB);
+
+  // Arithmetic operations.
+  Value *createAdd(Value *LHS, Value *RHS);
+  Value *createFAdd(Value *LHS, Value *RHS);
+  Value *createSub(Value *LHS, Value *RHS);
+  Value *createFSub(Value *LHS, Value *RHS);
+  Value *createMul(Value *LHS, Value *RHS);
+  Value *createFMul(Value *LHS, Value *RHS);
+  Value *createUDiv(Value *LHS, Value *RHS);
+  Value *createSDiv(Value *LHS, Value *RHS);
+  Value *createFDiv(Value *LHS, Value *RHS);
+  Value *createURem(Value *LHS, Value *RHS);
+  Value *createSRem(Value *LHS, Value *RHS);
+  Value *createFRem(Value *LHS, Value *RHS);
+
+  // Logical operations.
+  Value *createAnd(Value *LHS, Value *RHS);
+  Value *createOr(Value *LHS, Value *RHS);
+  Value *createXor(Value *LHS, Value *RHS);
+  Value *createNot(Value *Val);
+
+  // Comparison operations.
+  Value *createICmpEQ(Value *LHS, Value *RHS);
+  Value *createICmpNE(Value *LHS, Value *RHS);
+  Value *createICmpSLT(Value *LHS, Value *RHS);
+  Value *createICmpSGT(Value *LHS, Value *RHS);
+  Value *createICmpSGE(Value *LHS, Value *RHS);
+  Value *createICmpSLE(Value *LHS, Value *RHS);
+  Value *createICmpUGT(Value *LHS, Value *RHS);
+  Value *createICmpUGE(Value *LHS, Value *RHS);
+  Value *createICmpULT(Value *LHS, Value *RHS);
+  Value *createICmpULE(Value *LHS, Value *RHS);
+  Value *createFCmpOEQ(Value *LHS, Value *RHS);
+  Value *createFCmpONE(Value *LHS, Value *RHS);
+  Value *createFCmpOLT(Value *LHS, Value *RHS);
+  Value *createFCmpOLE(Value *LHS, Value *RHS);
+  Value *createFCmpOGT(Value *LHS, Value *RHS);
+  Value *createFCmpOGE(Value *LHS, Value *RHS);
+  Value *createFCmpULT(Value *LHS, Value *RHS);
+  Value *createFCmpULE(Value *LHS, Value *RHS);
+
+  // Atomic operations.
+  Value *createAtomicAdd(Value *Addr, Value *Val);
+  Value *createAtomicSub(Value *Addr, Value *Val);
+  Value *createAtomicMax(Value *Addr, Value *Val);
+  Value *createAtomicMin(Value *Addr, Value *Val);
+
+  // Load/Store operations.
+  Value *createLoad(Type *Ty, Value *Ptr, const std::string &Name = "");
+  void createStore(Value *Val, Value *Ptr);
+
+  // Call operations.
+  Value *createCall(const std::string &FName, Type *RetTy,
+                    const std::vector<Type *> &ArgTys,
+                    const std::vector<Value *> &Args);
+  Value *createCall(const std::string &FName, Type *RetTy);
+
+  // GEP operations.
+  Value *createInBoundsGEP(Type *Ty, Value *Ptr,
+                           const std::vector<Value *> IdxList,
+                           const std::string &Name = "");
+  // NOLINTNEXTLINE
+  Value *createConstInBoundsGEP1_64(Type *Ty, Value *Ptr, size_t Idx);
+  // NOLINTNEXTLINE
+  Value *createConstInBoundsGEP2_64(Type *Ty, Value *Ptr, size_t Idx0,
+                                    size_t Idx1);
+
+  // Type operations.
+  unsigned getAddressSpace(Type *Ty);
+  Type *getPointerType(Type *ElemTy, unsigned AS);
+  Type *getPointerTypeUnqual(Type *ElemTy);
+  Type *getInt32Ty();
+  Type *getInt16Ty();
+  Type *getInt64Ty();
+  Type *getFloatTy();
+  bool isIntegerTy(Type *Ty);
+  bool isFloatingPointTy(Type *Ty);
+
+  // Conversion operations.
+  template <typename From, typename To> Value *convert(Value *V) {
+    static_assert(std::is_arithmetic_v<From>, "From type must be arithmetic");
+    static_assert(std::is_arithmetic_v<To>, "To type must be arithmetic");
+
+    auto &Ctx = getContext();
+
+    if constexpr (std::is_same_v<From, To>) {
+      return V;
+    }
+
+    Type *DestTy = TypeMap<To>::get(Ctx);
+
+    if constexpr (std::is_integral_v<From> && std::is_floating_point_v<To>) {
+      if constexpr (std::is_signed_v<From>) {
+        return createSIToFP(V, DestTy);
+      }
+
+      return createUIToFP(V, DestTy);
+    }
+
+    if constexpr (std::is_floating_point_v<From> && std::is_integral_v<To>) {
+      if constexpr (std::is_signed_v<To>) {
+        return createFPToSI(V, DestTy);
+      }
+
+      return createFPToUI(V, DestTy);
+    }
+
+    if constexpr (std::is_integral_v<From> && std::is_integral_v<To>) {
+      // FuncBase::createIntCast handles Trunc/SExt/ZExt logic internally
+      return createIntCast(V, DestTy, std::is_signed_v<From>);
+    }
+
+    if constexpr (std::is_floating_point_v<From> &&
+                  std::is_floating_point_v<To>) {
+      // FuncBase::createFPCast handles FPExt/FPTrunc logic internally
+      return createFPCast(V, DestTy);
+    }
+
+    reportFatalError("Unsupported conversion");
+  }
+
+  // Cast operations.
+  // These handle SExt/ZExt/Trunc and FPExt/FPTrunc automatically
+  llvm::Value *createIntCast(llvm::Value *V, llvm::Type *DestTy, bool IsSigned);
+  llvm::Value *createFPCast(llvm::Value *V, llvm::Type *DestTy);
+
+  // Specific conversions
+  llvm::Value *createSIToFP(llvm::Value *V, llvm::Type *DestTy);
+  llvm::Value *createUIToFP(llvm::Value *V, llvm::Type *DestTy);
+  llvm::Value *createFPToSI(llvm::Value *V, llvm::Type *DestTy);
+  llvm::Value *createFPToUI(llvm::Value *V, llvm::Type *DestTy);
+  llvm::Value *createBitCast(llvm::Value *V, llvm::Type *DestTy);
+
+  // Constant creation.
+  llvm::Value *getConstantInt(llvm::Type *Ty, uint64_t Val);
+  llvm::Value *getConstantFP(llvm::Type *Ty, double Val);
+  Value *createZExt(Value *V, Type *DestTy);
+
 protected:
   JitModule &J;
-  FunctionCallee FC;
-  IRBuilder<> IRB;
-  IRBuilderBase::InsertPoint IP;
 
   std::string Name;
+  std::unique_ptr<Impl> PImpl;
 
   enum class ScopeKind { FUNCTION, IF, FOR, WHILE };
-  struct Scope {
-    std::string File;
-    int Line;
-    ScopeKind Kind;
-    IRBuilderBase::InsertPoint ContIP;
-
-    explicit Scope(const char *File, int Line, ScopeKind Kind,
-                   IRBuilderBase::InsertPoint ContIP)
-        : File(File), Line(Line), Kind(Kind), ContIP(ContIP) {}
-  };
-  std::vector<Scope> Scopes;
 
   std::string toString(ScopeKind Kind) {
     switch (Kind) {
@@ -76,61 +240,69 @@ protected:
     case ScopeKind::WHILE:
       return "WHILE";
     default:
-      PROTEUS_FATAL_ERROR("Unsupported Kind " +
-                          std::to_string(static_cast<int>(Kind)));
+      reportFatalError("Unsupported Kind " +
+                       std::to_string(static_cast<int>(Kind)));
     }
   }
 
-  template <typename T>
-  Var<T> emitAtomic(AtomicRMWInst::BinOp Op, const Var<T *> &Addr,
-                    const Var<T> &Val);
+  // Control flow operations.
+  void createBr(llvm::BasicBlock *Dest);
+  void createCondBr(llvm::Value *Cond, llvm::BasicBlock *True,
+                    llvm::BasicBlock *False);
+  void createRetVoid();
+  void createRet(llvm::Value *V);
+
+  // Scope management.
+  void pushScope(const char *File, const int Line, ScopeKind Kind,
+                 BasicBlock *NextBlock);
 
 public:
-  FuncBase(JitModule &J, FunctionCallee FC);
+  FuncBase(JitModule &J, const std::string &Name, Type *RetTy,
+           const std::vector<Type *> &ArgTys);
+  ~FuncBase();
 
   TargetModelType getTargetModel() const;
 
   Function *getFunction();
+  Value *getArg(size_t Idx);
 
-  AllocaInst *emitAlloca(Type *Ty, StringRef Name,
+#if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
+  // Kernel management.
+  void setKernel();
+  void setLaunchBoundsForKernel(int MaxThreadsPerBlock, int MinBlocksPerSM);
+#endif
+
+  AllocaInst *emitAlloca(Type *Ty, const std::string &Name,
                          AddressSpace AS = AddressSpace::DEFAULT);
 
-  Value *emitArrayCreate(Type *Ty, AddressSpace AT, StringRef Name);
+  Value *emitArrayCreate(Type *Ty, AddressSpace AT, const std::string &Name);
 
-  IRBuilderBase &getIRBuilder();
-
-  template <typename T> Var<T> declVar(StringRef Name = "var") {
+  template <typename T> Var<T> declVar(const std::string &Name = "var") {
     static_assert(!std::is_array_v<T>, "Expected non-array type");
 
-    Function *F = getFunction();
-    auto &Ctx = F->getContext();
+    auto &Ctx = getContext();
     Type *AllocaTy = TypeMap<T>::get(Ctx);
-    auto *Alloca = emitAlloca(AllocaTy, Name);
 
     if constexpr (std::is_pointer_v<T>) {
       Type *PtrElemTy = TypeMap<T>::getPointerElemType(Ctx);
-      return Var<T>(std::make_unique<PointerStorage>(Alloca, IRB, PtrElemTy),
-                    *this);
+      return Var<T>{createPointerStorage(Name, AllocaTy, PtrElemTy), *this};
     } else {
-      return Var<T>(std::make_unique<ScalarStorage>(Alloca, IRB), *this);
+      return Var<T>{createScalarStorage(Name, AllocaTy), *this};
     }
   }
 
   template <typename T>
   Var<T> declVar(size_t NElem, AddressSpace AS = AddressSpace::DEFAULT,
-                 StringRef Name = "array_var") {
+                 const std::string &Name = "array_var") {
     static_assert(std::is_array_v<T>, "Expected array type");
 
-    Function *F = getFunction();
-    auto *BasePointer =
-        emitArrayCreate(TypeMap<T>::get(F->getContext(), NElem), AS, Name);
+    auto *ArrTy = TypeMap<T>::get(getContext(), NElem);
 
-    auto *ArrTy = cast<ArrayType>(TypeMap<T>::get(F->getContext(), NElem));
-    return Var<T>(std::make_unique<ArrayStorage>(BasePointer, IRB, ArrTy),
-                  *this);
+    return Var<T>{createArrayStorage(Name, AS, ArrTy), *this};
   }
 
-  template <typename T> Var<T> defVar(const T &Val, StringRef Name = "var") {
+  template <typename T>
+  Var<T> defVar(const T &Val, const std::string &Name = "var") {
     using RawT = std::remove_const_t<T>;
     Var<RawT> V = declVar<RawT>(Name);
     V = Val;
@@ -138,7 +310,7 @@ public:
   }
 
   template <typename T, typename U>
-  Var<T> defVar(const Var<U> &Val, StringRef Name = "var") {
+  Var<T> defVar(const Var<U> &Val, const std::string &Name = "var") {
     using RawT = std::remove_const_t<T>;
     Var<RawT> Res = declVar<RawT>(Name);
     Res = Val;
@@ -146,7 +318,8 @@ public:
   }
 
   template <typename T>
-  Var<const T> defRuntimeConst(const T &Val, StringRef Name = "run.const.var") {
+  Var<const T> defRuntimeConst(const T &Val,
+                               const std::string &Name = "run.const.var") {
     return Var<const T>(defVar<T>(Val, Name));
   }
 
@@ -177,20 +350,20 @@ public:
   template <typename Sig>
   std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>,
                    Var<typename FnSig<Sig>::RetT>>
-  call(StringRef Name);
+  call(const std::string &Name);
 
   template <typename Sig>
   std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
-  call(StringRef Name);
+  call(const std::string &Name);
 
   template <typename Sig, typename... ArgVars>
   std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>,
                    Var<typename FnSig<Sig>::RetT>>
-  call(StringRef Name, ArgVars &&...ArgsVars);
+  call(const std::string &Name, ArgVars &&...ArgsVars);
 
   template <typename Sig, typename... ArgVars>
   std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
-  call(StringRef Name, ArgVars &&...ArgsVars);
+  call(const std::string &Name, ArgVars &&...ArgsVars);
 
   template <typename BuiltinFuncT>
   decltype(auto) callBuiltin(BuiltinFuncT &&BuiltinFunc) {
@@ -239,22 +412,17 @@ public:
 
   void ret();
 
-  StringRef getName() const { return Name; }
+  const std::string &getName() const { return Name; }
 
-  void setName(StringRef NewName) {
-    Name = NewName.str();
-    Function *F = getFunction();
-    F->setName(Name);
-  }
+  void setName(const std::string &NewName);
 
   // Convert the given Var's value to type U and return a new Var holding
   // the converted value.
   template <typename U, typename T>
   std::enable_if_t<std::is_convertible_v<T, U>, Var<U>>
   convert(const Var<T> &V) {
-    auto &IRBRef = getIRBuilder();
     Var<U> Res = declVar<U>("convert.");
-    Value *Converted = proteus::convert<T, U>(IRBRef, V.loadValue());
+    Value *Converted = convert<T, U>(V.loadValue());
     Res.storeValue(Converted);
     return Res;
   }
@@ -269,25 +437,21 @@ private:
 
 private:
   template <typename T, std::size_t ArgIdx> Var<T> createArg() {
-    Function *F = getFunction();
     auto Var = declVar<T>("arg." + std::to_string(ArgIdx));
     if constexpr (std::is_pointer_v<T>) {
-      Var.storePointer(F->getArg(ArgIdx));
+      Var.storePointer(FuncBase::getArg(ArgIdx));
     } else {
-      Var.storeValue(F->getArg(ArgIdx));
+      Var.storeValue(FuncBase::getArg(ArgIdx));
     }
     return Var;
   }
 
   template <std::size_t... Is> void declArgsImpl(std::index_sequence<Is...>) {
-    Function *F = getFunction();
-    auto &EntryBB = F->getEntryBlock();
-    IP = IRBuilderBase::InsertPoint(&EntryBB, EntryBB.end());
-    IRB.restoreIP(IP);
+    setInsertPointAtEntry();
 
     (std::get<Is>(ArgumentsT).emplace(createArg<ArgT, Is>()), ...);
 
-    IRB.ClearInsertionPoint();
+    clearInsertPoint();
   }
 
   template <std::size_t... Is> auto getArgsImpl(std::index_sequence<Is...>) {
@@ -295,8 +459,11 @@ private:
   }
 
 public:
-  Func(JitModule &J, FunctionCallee FC, Dispatcher &Dispatch)
-      : FuncBase(J, FC), Dispatch(Dispatch) {}
+  Func(JitModule &J, LLVMContext &Ctx, const std::string &Name,
+       Dispatcher &Dispatch)
+      : FuncBase(J, Name, TypeMap<RetT>::get(Ctx),
+                 {TypeMap<ArgT>::get(Ctx)...}),
+        Dispatch(Dispatch) {}
 
   RetT operator()(ArgT... Args);
 
@@ -324,99 +491,79 @@ void FuncBase::beginFor(Var<IterT> &IterVar, const Var<InitT> &Init,
                 "Loop iterator must be an integral type");
   static_assert(is_mutable_v<IterT>, "Loop iterator must be mutable");
 
-  Function *F = getFunction();
   // Update the terminator of the current basic block due to the split
   // control-flow.
-  BasicBlock *CurBlock = IP.getBlock();
-  BasicBlock *NextBlock =
-      CurBlock->splitBasicBlock(IP.getPoint(), CurBlock->getName() + ".split");
+  auto [CurBlock, NextBlock] = splitCurrentBlock();
+  pushScope(File, Line, ScopeKind::FOR, NextBlock);
 
-  auto ContIP = IRBuilderBase::InsertPoint(NextBlock, NextBlock->begin());
-  Scopes.emplace_back(File, Line, ScopeKind::FOR, ContIP);
-
-  BasicBlock *Header =
-      BasicBlock::Create(F->getContext(), "loop.header", F, NextBlock);
-  BasicBlock *LoopCond =
-      BasicBlock::Create(F->getContext(), "loop.cond", F, NextBlock);
-  BasicBlock *Body =
-      BasicBlock::Create(F->getContext(), "loop.body", F, NextBlock);
-  BasicBlock *Latch =
-      BasicBlock::Create(F->getContext(), "loop.inc", F, NextBlock);
-  BasicBlock *LoopExit =
-      BasicBlock::Create(F->getContext(), "loop.end", F, NextBlock);
+  BasicBlock *Header = createBasicBlock("loop.header", NextBlock);
+  BasicBlock *LoopCond = createBasicBlock("loop.cond", NextBlock);
+  BasicBlock *Body = createBasicBlock("loop.body", NextBlock);
+  BasicBlock *Latch = createBasicBlock("loop.inc", NextBlock);
+  BasicBlock *LoopExit = createBasicBlock("loop.end", NextBlock);
 
   // Erase the old terminator and branch to the header.
-  CurBlock->getTerminator()->eraseFromParent();
-  IRB.SetInsertPoint(CurBlock);
-  { IRB.CreateBr(Header); }
+  eraseTerminator(CurBlock);
+  setInsertPoint(CurBlock);
+  { createBr(Header); }
 
-  IRB.SetInsertPoint(Header);
+  setInsertPoint(Header);
   {
     IterVar = Init;
-    IRB.CreateBr(LoopCond);
+    createBr(LoopCond);
   }
 
-  IRB.SetInsertPoint(LoopCond);
+  setInsertPoint(LoopCond);
   {
     auto CondVar = IterVar < UpperBound;
     Value *Cond = CondVar.loadValue();
-    IRB.CreateCondBr(Cond, Body, LoopExit);
+    createCondBr(Cond, Body, LoopExit);
   }
 
-  IRB.SetInsertPoint(Body);
-  IRB.CreateBr(Latch);
+  setInsertPoint(Body);
+  createBr(Latch);
 
-  IRB.SetInsertPoint(Latch);
+  setInsertPoint(Latch);
   {
     IterVar = IterVar + Inc;
-    IRB.CreateBr(LoopCond);
+    createBr(LoopCond);
   }
 
-  IRB.SetInsertPoint(LoopExit);
-  { IRB.CreateBr(NextBlock); }
+  setInsertPoint(LoopExit);
+  { createBr(NextBlock); }
 
-  IP = IRBuilderBase::InsertPoint(Body, Body->begin());
-  IRB.restoreIP(IP);
+  setInsertPointBegin(Body);
 }
 
 template <typename CondLambda>
 void FuncBase::beginWhile(CondLambda &&Cond, const char *File, int Line) {
-  Function *F = getFunction();
   // Update the terminator of the current basic block due to the split
   // control-flow.
-  BasicBlock *CurBlock = IP.getBlock();
-  BasicBlock *NextBlock =
-      CurBlock->splitBasicBlock(IP.getPoint(), CurBlock->getName() + ".split");
+  auto [CurBlock, NextBlock] = splitCurrentBlock();
+  pushScope(File, Line, ScopeKind::WHILE, NextBlock);
 
-  auto ContIP = IRBuilderBase::InsertPoint(NextBlock, NextBlock->begin());
-  Scopes.emplace_back(File, Line, ScopeKind::WHILE, ContIP);
+  BasicBlock *LoopCond = createBasicBlock("while.cond", NextBlock);
+  BasicBlock *Body = createBasicBlock("while.body", NextBlock);
+  BasicBlock *LoopExit = createBasicBlock("while.end", NextBlock);
 
-  BasicBlock *LoopCond =
-      BasicBlock::Create(F->getContext(), "while.cond", F, NextBlock);
-  BasicBlock *Body =
-      BasicBlock::Create(F->getContext(), "while.body", F, NextBlock);
-  BasicBlock *LoopExit =
-      BasicBlock::Create(F->getContext(), "while.end", F, NextBlock);
+  eraseTerminator(CurBlock);
+  setInsertPoint(CurBlock);
+  { createBr(LoopCond); }
 
-  CurBlock->getTerminator()->eraseFromParent();
-  IRB.SetInsertPoint(CurBlock);
-  { IRB.CreateBr(LoopCond); }
-
-  IRB.SetInsertPoint(LoopCond);
+  setInsertPoint(LoopCond);
   {
     auto CondVar = Cond();
     Value *CondV = CondVar.loadValue();
-    IRB.CreateCondBr(CondV, Body, LoopExit);
+    createCondBr(CondV, Body, LoopExit);
   }
 
-  IRB.SetInsertPoint(Body);
-  IRB.CreateBr(LoopCond);
+  setInsertPoint(Body);
+  createBr(LoopCond);
 
-  IRB.SetInsertPoint(LoopExit);
-  { IRB.CreateBr(NextBlock); }
+  setInsertPoint(LoopExit);
+  { createBr(NextBlock); }
 
-  IP = IRBuilderBase::InsertPoint(Body, Body->begin());
-  IRB.restoreIP(IP);
+  setInsertPointBegin(Body);
 }
 
 // Var implementations (defined here after FuncBase is
@@ -428,22 +575,20 @@ Var<std::common_type_t<T, U>> binOp(const Var<T> &L, const Var<U> &R, IntOp IOp,
                                     FPOp FOp) {
   FuncBase &Fn = L.Fn;
   if (&Fn != &R.Fn)
-    PROTEUS_FATAL_ERROR("Variables should belong to the same function");
-
-  auto &IRB = Fn.getIRBuilder();
+    reportFatalError("Variables should belong to the same function");
 
   Value *LHS = L.loadValue();
   Value *RHS = R.loadValue();
 
   using CommonT = std::common_type_t<T, U>;
-  LHS = convert<T, CommonT>(IRB, LHS);
-  RHS = convert<U, CommonT>(IRB, RHS);
+  LHS = Fn.convert<T, CommonT>(LHS);
+  RHS = Fn.convert<U, CommonT>(RHS);
 
   Value *Result = nullptr;
   if constexpr (std::is_integral_v<CommonT>) {
-    Result = IOp(IRB, LHS, RHS);
+    Result = IOp(Fn, LHS, RHS);
   } else {
-    Result = FOp(IRB, LHS, RHS);
+    Result = FOp(Fn, LHS, RHS);
   }
 
   auto ResultVar = Fn.declVar<std::common_type_t<T, U>>("res.");
@@ -458,31 +603,29 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 compoundAssignConst(Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
                     const U &ConstValue, IntOp IOp, FPOp FOp) {
   static_assert(std::is_convertible_v<U, T>, "U must be convertible to T");
-  auto &IRB = LHS.Fn.getIRBuilder();
 
   using CleanU = std::remove_cv_t<std::remove_reference_t<U>>;
 
-  Function *Function = LHS.Fn.getFunction();
-  auto &Ctx = Function->getContext();
+  auto &Ctx = LHS.Fn.getContext();
   Type *RHSType = TypeMap<CleanU>::get(Ctx);
 
   Value *RHS = nullptr;
   if constexpr (std::is_integral_v<CleanU>) {
-    RHS = ConstantInt::get(RHSType, ConstValue);
+    RHS = LHS.Fn.gettConstantInt(RHSType, ConstValue);
   } else {
-    RHS = ConstantFP::get(RHSType, ConstValue);
+    RHS = LHS.Fn.getConstantFP(RHSType, ConstValue);
   }
 
   Value *LHSVal = LHS.loadValue();
 
-  RHS = convert<CleanU, T>(IRB, RHS);
+  RHS = LHS.Fn.template convert<CleanU, T>(RHS);
   Value *Result = nullptr;
 
   if constexpr (std::is_integral_v<T>) {
-    Result = IOp(IRB, LHSVal, RHS);
+    Result = IOp(LHS.Fn, LHSVal, RHS);
   } else {
     static_assert(std::is_floating_point_v<T>, "Unsupported type");
-    Result = FOp(IRB, LHSVal, RHS);
+    Result = FOp(LHS.Fn, LHSVal, RHS);
   }
 
   LHS.storeValue(Result);
@@ -494,21 +637,19 @@ template <typename T, typename U, typename IntOp, typename FPOp>
 Var<bool> cmpOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
   FuncBase &Fn = L.Fn;
   if (&Fn != &R.Fn)
-    PROTEUS_FATAL_ERROR("Variables should belong to the same function");
-
-  auto &IRB = Fn.getIRBuilder();
+    reportFatalError("Variables should belong to the same function");
 
   Value *LHS = L.loadValue();
   Value *RHS = R.loadValue();
 
-  RHS = convert<U, T>(IRB, RHS);
+  RHS = Fn.convert<U, T>(RHS);
 
   Value *Result = nullptr;
   if constexpr (std::is_integral_v<T>) {
-    Result = IOp(IRB, LHS, RHS);
+    Result = IOp(Fn, LHS, RHS);
   } else {
     static_assert(std::is_floating_point_v<T>, "Unsupported type");
-    Result = FOp(IRB, LHS, RHS);
+    Result = FOp(Fn, LHS, RHS);
   }
 
   auto ResultVar = Fn.declVar<bool>("res.");
@@ -523,12 +664,12 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::Var(const Var<U> &V)
     : VarStorageOwner<VarStorage>(V.Fn) {
   // Allocate storage for the target type T.
   using RawT = std::remove_const_t<T>;
-  Type *TargetTy = TypeMap<RawT>::get(Fn.getFunction()->getContext());
-  auto *Alloca = Fn.emitAlloca(TargetTy, "conv.var");
-  Storage = std::make_unique<ScalarStorage>(Alloca, Fn.getIRBuilder());
-  auto &IRB = Fn.getIRBuilder();
+
+  Type *TargetTy = TypeMap<RawT>::get(Fn.getContext());
+  Storage = Fn.createScalarStorage("conv.var", TargetTy);
+
   using RawU = std::remove_const_t<U>;
-  auto *Converted = convert<RawU, RawT>(IRB, V.loadValue());
+  auto *Converted = Fn.convert<RawU, RawT>(V.loadValue());
   storeValue(Converted);
 }
 
@@ -557,23 +698,17 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(Var &&V) {
 template <typename T>
 Var<std::add_pointer_t<T>>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::getAddress() {
-  auto &IRB = Fn.getIRBuilder();
-
   Value *Slot = getSlot();
-  auto *SlotPtrTy = cast<PointerType>(Slot->getType());
   Type *ElemTy = getAllocatedType();
 
-  unsigned AddrSpace = SlotPtrTy->getAddressSpace();
-  Type *PtrTy = PointerType::get(ElemTy, AddrSpace);
+  unsigned AddrSpace = Fn.getAddressSpace(getSlotType());
+  Type *PtrTy = Fn.getPointerType(ElemTy, AddrSpace);
   Value *PtrVal = Slot;
-  if (PtrVal->getType() != PtrTy)
-    PtrVal = IRB.CreateBitCast(Slot, PtrTy);
-
-  auto *PtrSlot = Fn.emitAlloca(PtrTy, "addr.tmp");
-  IRB.CreateStore(PtrVal, PtrSlot);
+  PtrVal = Fn.createBitCast(Slot, PtrTy);
 
   std::unique_ptr<PointerStorage> ResultStorage =
-      std::make_unique<PointerStorage>(PtrSlot, IRB, ElemTy);
+      Fn.createPointerStorage("addr.tmp", PtrTy, ElemTy);
+  Fn.createStore(PtrVal, ResultStorage->getSlot());
 
   return Var<std::add_pointer_t<T>>(std::move(ResultStorage), Fn);
 }
@@ -583,9 +718,8 @@ template <typename U>
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(const Var<U> &V) {
   static_assert(is_mutable_v<T>, "Cannot assign to Var<const T>");
-  auto &IRB = Fn.getIRBuilder();
-  auto *Converted = convert<std::remove_const_t<U>, std::remove_const_t<T>>(
-      IRB, V.loadValue());
+  auto *Converted =
+      Fn.convert<std::remove_const_t<U>, std::remove_const_t<T>>(V.loadValue());
   storeValue(Converted);
   return *this;
 }
@@ -601,12 +735,12 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(
 
   Type *LHSType = getValueType();
 
-  if (LHSType->isIntegerTy()) {
-    storeValue(ConstantInt::get(LHSType, ConstValue));
-  } else if (LHSType->isFloatingPointTy()) {
-    storeValue(ConstantFP::get(LHSType, ConstValue));
+  if (Fn.isIntegerTy(LHSType)) {
+    storeValue(Fn.getConstantInt(LHSType, ConstValue));
+  } else if (Fn.isFloatingPointTy(LHSType)) {
+    storeValue(Fn.getConstantFP(LHSType, ConstValue));
   } else {
-    PROTEUS_FATAL_ERROR("Unsupported type");
+    reportFatalError("Unsupported type");
   }
 
   return *this;
@@ -619,8 +753,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateAdd(L, R); },
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFAdd(L, R); });
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createAdd(L, R); },
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createFAdd(L, R); });
 }
 
 template <typename T>
@@ -630,8 +764,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSub(L, R); },
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFSub(L, R); });
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createSub(L, R); },
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createFSub(L, R); });
 }
 
 template <typename T>
@@ -641,8 +775,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateMul(L, R); },
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFMul(L, R); });
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createMul(L, R); },
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createFMul(L, R); });
 }
 
 template <typename T>
@@ -652,8 +786,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSDiv(L, R); },
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFDiv(L, R); });
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createSDiv(L, R); },
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createFDiv(L, R); });
 }
 
 template <typename T>
@@ -663,8 +797,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSRem(L, R); },
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFRem(L, R); });
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createSRem(L, R); },
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createFRem(L, R); });
 }
 
 // Arithmetic operators with ConstValue
@@ -745,8 +879,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+=(
                 "Can only add arithmetic types to Var");
   return compoundAssignConst(
       *this, ConstValue,
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateAdd(L, R); },
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFAdd(L, R); });
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createAdd(L, R); },
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createFAdd(L, R); });
 }
 
 template <typename T>
@@ -770,8 +904,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-=(
                 "Can only subtract arithmetic types from Var");
   return compoundAssignConst(
       *this, ConstValue,
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSub(L, R); },
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFSub(L, R); });
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createSub(L, R); },
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createFSub(L, R); });
 }
 
 template <typename T>
@@ -795,8 +929,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*=(
                 "Can only multiply Var by arithmetic types");
   return compoundAssignConst(
       *this, ConstValue,
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateMul(L, R); },
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFMul(L, R); });
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createMul(L, R); },
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createFMul(L, R); });
 }
 
 template <typename T>
@@ -820,8 +954,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/=(
                 "Can only divide Var by arithmetic types");
   return compoundAssignConst(
       *this, ConstValue,
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSDiv(L, R); },
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFDiv(L, R); });
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createSDiv(L, R); },
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createFDiv(L, R); });
 }
 
 template <typename T>
@@ -845,8 +979,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%=(
                 "Can only modulo Var by arithmetic types");
   return compoundAssignConst(
       *this, ConstValue,
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateSRem(L, R); },
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateFRem(L, R); });
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createSRem(L, R); },
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createFRem(L, R); });
 }
 
 template <typename T>
@@ -858,19 +992,16 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-() const {
 
 template <typename T>
 Var<bool> Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator!() const {
-  auto &IRB = Fn.getIRBuilder();
   Value *V = loadValue();
   Value *ResV = nullptr;
   if constexpr (std::is_same_v<T, bool>) {
-    ResV = IRB.CreateNot(V);
+    ResV = Fn.createNot(V);
   } else if constexpr (std::is_integral_v<T>) {
-    Value *Zero = ConstantInt::get(V->getType(), 0);
-    ResV = IRB.CreateICmpEQ(V, Zero);
+    Value *Zero = Fn.getConstantInt(getValueType(), 0);
+    ResV = Fn.createICmpEQ(V, Zero);
   } else {
-    static_assert(std::is_floating_point_v<T>,
-                  "Unsupported type for operator!");
-    Value *Zero = ConstantFP::get(V->getType(), 0.0);
-    ResV = IRB.CreateFCmpOEQ(V, Zero);
+    Value *Zero = Fn.getConstantFP(getValueType(), 0.0);
+    ResV = Fn.createFCmpOEQ(V, Zero);
   }
   auto Ret = Fn.declVar<bool>("not.");
   Ret.storeValue(ResV);
@@ -880,22 +1011,18 @@ Var<bool> Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator!() const {
 template <typename T>
 Var<std::remove_extent_t<T>>
 Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](size_t Index) {
-  auto &IRB = Fn.getIRBuilder();
-  auto *ArrayTy = cast<ArrayType>(getAllocatedType());
+  auto *ArrayTy = getAllocatedType();
   auto *BasePointer = getSlot();
 
   // GEP into the array aggregate: [0, Index]
-  auto *GEP = IRB.CreateConstInBoundsGEP2_64(ArrayTy, BasePointer, 0, Index);
+  auto *GEP = Fn.createConstInBoundsGEP2_64(ArrayTy, BasePointer, 0, Index);
   Type *ElemTy = getValueType();
-  auto *BasePtrTy = cast<PointerType>(BasePointer->getType());
-  unsigned AddrSpace = BasePtrTy->getAddressSpace();
-  Type *ElemPtrTy = PointerType::get(ElemTy, AddrSpace);
-
-  auto *PtrSlot = Fn.emitAlloca(ElemPtrTy, "elem.ptr");
-  IRB.CreateStore(GEP, PtrSlot);
+  unsigned AddrSpace = Fn.getAddressSpace(getSlotType());
+  Type *ElemPtrTy = Fn.getPointerType(ElemTy, AddrSpace);
 
   std::unique_ptr<PointerStorage> ResultStorage =
-      std::make_unique<PointerStorage>(PtrSlot, IRB, ElemTy);
+      Fn.createPointerStorage("elem.ptr", ElemPtrTy, ElemTy);
+  Fn.createStore(GEP, ResultStorage->getSlot());
   return Var<std::remove_extent_t<T>>(std::move(ResultStorage), Fn);
 }
 
@@ -904,44 +1031,37 @@ template <typename IdxT>
 std::enable_if_t<std::is_integral_v<IdxT>, Var<std::remove_extent_t<T>>>
 Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](
     const Var<IdxT> &Index) {
-  auto &IRB = Fn.getIRBuilder();
-  auto *ArrayTy = cast<ArrayType>(getAllocatedType());
+  auto *ArrayTy = getAllocatedType();
   auto *BasePointer = getSlot();
 
   Value *IdxVal = Index.loadValue();
-  Value *Zero = llvm::ConstantInt::get(IdxVal->getType(), 0);
-  auto *GEP = IRB.CreateInBoundsGEP(ArrayTy, BasePointer, {Zero, IdxVal});
+  Value *Zero = Fn.getConstantInt(Index.getValueType(), 0);
+  auto *GEP = Fn.createInBoundsGEP(ArrayTy, BasePointer, {Zero, IdxVal});
   Type *ElemTy = getValueType();
-  auto *BasePtrTy = cast<PointerType>(BasePointer->getType());
-  unsigned AddrSpace = BasePtrTy->getAddressSpace();
-  Type *ElemPtrTy = PointerType::get(ElemTy, AddrSpace);
-
-  auto *PtrSlot = Fn.emitAlloca(ElemPtrTy, "elem.ptr");
-  IRB.CreateStore(GEP, PtrSlot);
+  unsigned AddrSpace = Fn.getAddressSpace(getSlotType());
+  Type *ElemPtrTy = Fn.getPointerType(ElemTy, AddrSpace);
 
   std::unique_ptr<VarStorage> ResultStorage =
-      std::make_unique<PointerStorage>(PtrSlot, IRB, ElemTy);
+      Fn.createPointerStorage("elem.ptr", ElemPtrTy, ElemTy);
+  Fn.createStore(GEP, ResultStorage->getSlot());
+
   return Var<std::remove_extent_t<T>>(std::move(ResultStorage), Fn);
 }
 
 template <typename T>
 Var<std::remove_pointer_t<T>>
 Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator[](size_t Index) {
-  auto &IRB = Fn.getIRBuilder();
-
-  auto *PointerElemTy =
-      TypeMap<std::remove_pointer_t<T>>::get(Fn.getFunction()->getContext());
+  auto *PointerElemTy = TypeMap<std::remove_pointer_t<T>>::get(Fn.getContext());
   auto *Ptr = loadPointer();
-  auto *GEP = IRB.CreateConstInBoundsGEP1_64(PointerElemTy, Ptr, Index);
-  unsigned AddrSpace = cast<PointerType>(Ptr->getType())->getAddressSpace();
-  Type *ElemPtrTy = PointerType::get(PointerElemTy, AddrSpace);
+  auto *GEP = Fn.createConstInBoundsGEP1_64(PointerElemTy, Ptr, Index);
+  unsigned AddrSpace = Fn.getAddressSpace(getAllocatedType());
+  Type *ElemPtrTy = Fn.getPointerType(PointerElemTy, AddrSpace);
 
   // Create a pointer storage to hold the LValue for
   // the Array[Index].
-  auto *PtrSlot = Fn.emitAlloca(ElemPtrTy, "elem.ptr");
-  IRB.CreateStore(GEP, PtrSlot);
   std::unique_ptr<PointerStorage> ResultStorage =
-      std::make_unique<PointerStorage>(PtrSlot, IRB, PointerElemTy);
+      Fn.createPointerStorage("elem.ptr", ElemPtrTy, PointerElemTy);
+  Fn.createStore(GEP, ResultStorage->getSlot());
 
   return Var<std::remove_pointer_t<T>>(std::move(ResultStorage), Fn);
 }
@@ -951,22 +1071,19 @@ template <typename IdxT>
 std::enable_if_t<std::is_arithmetic_v<IdxT>, Var<std::remove_pointer_t<T>>>
 Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator[](
     const Var<IdxT> &Index) {
-  auto &IRB = Fn.getIRBuilder();
 
-  auto *PointeeType =
-      TypeMap<std::remove_pointer_t<T>>::get(Fn.getFunction()->getContext());
+  auto *PointeeType = TypeMap<std::remove_pointer_t<T>>::get(Fn.getContext());
   auto *Ptr = loadPointer();
   auto *IdxValue = Index.loadValue();
-  auto *GEP = IRB.CreateInBoundsGEP(PointeeType, Ptr, IdxValue);
-  unsigned AddrSpace = cast<PointerType>(Ptr->getType())->getAddressSpace();
-  Type *ElemPtrTy = PointerType::get(PointeeType, AddrSpace);
+  auto *GEP = Fn.createInBoundsGEP(PointeeType, Ptr, {IdxValue});
+  unsigned AddrSpace = Fn.getAddressSpace(getAllocatedType());
+  Type *ElemPtrTy = Fn.getPointerType(PointeeType, AddrSpace);
 
   // Create a pointer storage to hold the LValue for
   // the Array[Index].
-  auto *PtrSlot = Fn.emitAlloca(ElemPtrTy, "elem.ptr");
-  IRB.CreateStore(GEP, PtrSlot);
   std::unique_ptr<PointerStorage> ResultStorage =
-      std::make_unique<PointerStorage>(PtrSlot, IRB, PointeeType);
+      Fn.createPointerStorage("elem.ptr", ElemPtrTy, PointeeType);
+  Fn.createStore(GEP, ResultStorage->getSlot());
 
   return Var<std::remove_pointer_t<T>>(std::move(ResultStorage), Fn);
 }
@@ -981,25 +1098,18 @@ Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator*() {
 template <typename T>
 Var<std::add_pointer_t<T>>
 Var<T, std::enable_if_t<std::is_pointer_v<T>>>::getAddress() {
-  auto &IRB = Fn.getIRBuilder();
-
   Value *PtrVal = loadPointer();
-  auto *PtrTy = cast<PointerType>(PtrVal->getType());
   Type *ElemTy = getValueType();
 
-  unsigned AddrSpace = PtrTy->getAddressSpace();
-  Type *PointeePtrTy = PointerType::get(ElemTy, AddrSpace);
-  Type *TargetPtrTy = PointerType::getUnqual(PointeePtrTy);
+  unsigned AddrSpace = Fn.getAddressSpace(getAllocatedType());
+  Type *PointeePtrTy = Fn.getPointerType(ElemTy, AddrSpace);
+  Type *TargetPtrTy = Fn.getPointerTypeUnqual(PointeePtrTy);
 
-  if (PtrVal->getType() != PointeePtrTy) {
-    PtrVal = IRB.CreateBitCast(PtrVal, PointeePtrTy);
-  }
-
-  auto *PtrSlot = Fn.emitAlloca(TargetPtrTy, "addr.ptr.tmp");
-  IRB.CreateStore(PtrVal, PtrSlot);
+  PtrVal = Fn.createBitCast(PtrVal, PointeePtrTy);
 
   std::unique_ptr<PointerStorage> ResultStorage =
-      std::make_unique<PointerStorage>(PtrSlot, IRB, PointeePtrTy);
+      Fn.createPointerStorage("addr.ptr.tmp", TargetPtrTy, PointeePtrTy);
+  Fn.createStore(PtrVal, ResultStorage->getSlot());
 
   return Var<std::add_pointer_t<T>>(std::move(ResultStorage), Fn);
 }
@@ -1010,22 +1120,22 @@ std::enable_if_t<std::is_arithmetic_v<OffsetT>,
                  Var<T, std::enable_if_t<std::is_pointer_v<T>>>>
 Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator+(
     const Var<OffsetT> &Offset) const {
-  auto &IRB = Fn.getIRBuilder();
-
   auto *OffsetVal = Offset.loadValue();
-  auto *IdxVal = convert<OffsetT, int64_t>(IRB, OffsetVal);
+  auto *IdxVal = Fn.convert<OffsetT, int64_t>(OffsetVal);
 
   auto *BasePtr = loadPointer();
   auto *ElemTy = getValueType();
 
-  auto *GEP = IRB.CreateInBoundsGEP(ElemTy, BasePtr, IdxVal, "ptr.add");
+  auto *GEP = Fn.createInBoundsGEP(ElemTy, BasePtr, IdxVal, "ptr.add");
 
-  unsigned AddrSpace = cast<PointerType>(BasePtr->getType())->getAddressSpace();
-  auto *ElemPtrTy = PointerType::get(ElemTy, AddrSpace);
-  auto *PtrSlot = Fn.emitAlloca(ElemPtrTy, "ptr.add.tmp");
-  IRB.CreateStore(GEP, PtrSlot);
+  unsigned AddrSpace = Fn.getAddressSpace(getAllocatedType());
+  auto *ElemPtrTy = Fn.getPointerType(ElemTy, AddrSpace);
+
   std::unique_ptr<PointerStorage> ResultStorage =
-      std::make_unique<PointerStorage>(PtrSlot, IRB, ElemTy);
+      Fn.createPointerStorage("ptr.add.tmp", ElemPtrTy, ElemTy);
+  ;
+  Fn.createStore(GEP, ResultStorage->getSlot());
+
   return Var<T, std::enable_if_t<std::is_pointer_v<T>>>(
       std::move(ResultStorage), Fn);
 }
@@ -1036,21 +1146,21 @@ std::enable_if_t<std::is_arithmetic_v<OffsetT>,
                  Var<T, std::enable_if_t<std::is_pointer_v<T>>>>
 Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator+(
     OffsetT Offset) const {
-  auto &IRB = Fn.getIRBuilder();
-  auto *IntTy = IRB.getInt64Ty();
-  Value *IdxVal = ConstantInt::get(IntTy, Offset);
+  auto *IntTy = Fn.getInt64Ty();
+  Value *IdxVal = Fn.getConstantInt(IntTy, Offset);
 
   auto *BasePtr = loadPointer();
   auto *ElemTy = getValueType();
 
-  auto *GEP = IRB.CreateInBoundsGEP(ElemTy, BasePtr, IdxVal, "ptr.add");
+  auto *GEP = Fn.createInBoundsGEP(ElemTy, BasePtr, {IdxVal}, "ptr.add");
 
-  unsigned AddrSpace = cast<PointerType>(BasePtr->getType())->getAddressSpace();
-  auto *ElemPtrTy = PointerType::get(ElemTy, AddrSpace);
-  auto *PtrSlot = Fn.emitAlloca(ElemPtrTy, "ptr.add.tmp");
-  IRB.CreateStore(GEP, PtrSlot);
+  unsigned AddrSpace = Fn.getAddressSpace(getAllocatedType());
+  auto *ElemPtrTy = Fn.getPointerType(ElemTy, AddrSpace);
+
   std::unique_ptr<PointerStorage> ResultStorage =
-      std::make_unique<PointerStorage>(PtrSlot, IRB, ElemTy);
+      Fn.createPointerStorage("ptr.add.tmp", ElemPtrTy, ElemTy);
+  Fn.createStore(GEP, ResultStorage->getSlot());
+
   return Var<T, std::enable_if_t<std::is_pointer_v<T>>>(
       std::move(ResultStorage), Fn);
 }
@@ -1063,12 +1173,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator>(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
-      [](IRBuilderBase &B, Value *L, Value *R) {
-        return B.CreateICmpSGT(L, R);
-      },
-      [](IRBuilderBase &B, Value *L, Value *R) {
-        return B.CreateFCmpOGT(L, R);
-      });
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createICmpSGT(L, R); },
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createFCmpOGT(L, R); });
 }
 
 template <typename T>
@@ -1078,12 +1184,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator>=(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
-      [](IRBuilderBase &B, Value *L, Value *R) {
-        return B.CreateICmpSGE(L, R);
-      },
-      [](IRBuilderBase &B, Value *L, Value *R) {
-        return B.CreateFCmpOGE(L, R);
-      });
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createICmpSGE(L, R); },
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createFCmpOGE(L, R); });
 }
 
 template <typename T>
@@ -1093,12 +1195,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator<(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
-      [](IRBuilderBase &B, Value *L, Value *R) {
-        return B.CreateICmpSLT(L, R);
-      },
-      [](IRBuilderBase &B, Value *L, Value *R) {
-        return B.CreateFCmpOLT(L, R);
-      });
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createICmpSLT(L, R); },
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createFCmpOLT(L, R); });
 }
 
 template <typename T>
@@ -1108,12 +1206,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator<=(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
-      [](IRBuilderBase &B, Value *L, Value *R) {
-        return B.CreateICmpSLE(L, R);
-      },
-      [](IRBuilderBase &B, Value *L, Value *R) {
-        return B.CreateFCmpOLE(L, R);
-      });
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createICmpSLE(L, R); },
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createFCmpOLE(L, R); });
 }
 
 template <typename T>
@@ -1123,10 +1217,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator==(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateICmpEQ(L, R); },
-      [](IRBuilderBase &B, Value *L, Value *R) {
-        return B.CreateFCmpOEQ(L, R);
-      });
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createICmpEQ(L, R); },
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createFCmpOEQ(L, R); });
 }
 
 template <typename T>
@@ -1136,10 +1228,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator!=(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
-      [](IRBuilderBase &B, Value *L, Value *R) { return B.CreateICmpNE(L, R); },
-      [](IRBuilderBase &B, Value *L, Value *R) {
-        return B.CreateFCmpONE(L, R);
-      });
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createICmpNE(L, R); },
+      [](FuncBase &Fn, Value *L, Value *R) { return Fn.createFCmpONE(L, R); });
 }
 
 template <typename T>
@@ -1238,31 +1328,15 @@ operator%(const T &ConstValue, const Var<U> &V) {
   return Tmp % V;
 }
 
-// Atomic operations for Var
-template <typename T>
-Var<T> FuncBase::emitAtomic(AtomicRMWInst::BinOp Op, const Var<T *> &Addr,
-                            const Var<T> &Val) {
-  static_assert(std::is_arithmetic_v<T>, "Atomic ops require arithmetic type");
-
-  auto &IRB = getIRBuilder();
-  auto *Result = IRB.CreateAtomicRMW(
-      Op, Addr.loadPointer(), Val.loadValue(), MaybeAlign(),
-      AtomicOrdering::SequentiallyConsistent, SyncScope::SingleThread);
-
-  auto Ret = declVar<T>("atomic.rmw.res.");
-  Ret.storeValue(Result);
-  return Ret;
-}
-
 template <typename T>
 std::enable_if_t<std::is_arithmetic_v<T>, Var<T>>
 FuncBase::atomicAdd(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicAdd requires arithmetic type");
 
-  Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
-  auto Op =
-      ValueType->isFloatingPointTy() ? AtomicRMWInst::FAdd : AtomicRMWInst::Add;
-  return emitAtomic(Op, Addr, Val);
+  Value *Result = createAtomicAdd(Addr.loadPointer(), Val.loadValue());
+  auto Ret = declVar<T>("atomic.add.res.");
+  Ret.storeValue(Result);
+  return Ret;
 }
 
 template <typename T>
@@ -1270,10 +1344,10 @@ std::enable_if_t<std::is_arithmetic_v<T>, Var<T>>
 FuncBase::atomicSub(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicSub requires arithmetic type");
 
-  Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
-  auto Op =
-      ValueType->isFloatingPointTy() ? AtomicRMWInst::FSub : AtomicRMWInst::Sub;
-  return emitAtomic(Op, Addr, Val);
+  Value *Result = createAtomicSub(Addr.loadPointer(), Val.loadValue());
+  auto Ret = declVar<T>("atomic.sub.res.");
+  Ret.storeValue(Result);
+  return Ret;
 }
 
 template <typename T>
@@ -1281,10 +1355,10 @@ std::enable_if_t<std::is_arithmetic_v<T>, Var<T>>
 FuncBase::atomicMax(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicMax requires arithmetic type");
 
-  Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
-  auto Op =
-      ValueType->isFloatingPointTy() ? AtomicRMWInst::FMax : AtomicRMWInst::Max;
-  return emitAtomic(Op, Addr, Val);
+  Value *Result = createAtomicMax(Addr.loadPointer(), Val.loadValue());
+  auto Ret = declVar<T>("atomic.max.res.");
+  Ret.storeValue(Result);
+  return Ret;
 }
 
 template <typename T>
@@ -1292,69 +1366,50 @@ std::enable_if_t<std::is_arithmetic_v<T>, Var<T>>
 FuncBase::atomicMin(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicMin requires arithmetic type");
 
-  Type *ValueType = TypeMap<T>::get(getFunction()->getContext());
-  auto Op =
-      ValueType->isFloatingPointTy() ? AtomicRMWInst::FMin : AtomicRMWInst::Min;
-  return emitAtomic(Op, Addr, Val);
+  Value *Result = createAtomicMin(Addr.loadPointer(), Val.loadValue());
+  auto Ret = declVar<T>("atomic.min.res.");
+  Ret.storeValue(Result);
+  return Ret;
 }
 
-inline void FuncBase::ret() {
-  auto *CurBB = IP.getBlock();
-  if (!CurBB->getSingleSuccessor())
-    PROTEUS_FATAL_ERROR("Expected single successor for current block");
-  auto *TermI = CurBB->getTerminator();
-
-  auto &IRB = getIRBuilder();
-  IRB.CreateRetVoid();
-
-  TermI->eraseFromParent();
-}
+inline void FuncBase::ret() { createRetVoid(); }
 
 template <typename T> void FuncBase::ret(const Var<T> &RetVal) {
-  auto *CurBB = IP.getBlock();
-  if (!CurBB->getSingleSuccessor())
-    PROTEUS_FATAL_ERROR("Expected single successor for current block");
-  auto *TermI = CurBB->getTerminator();
-
-  auto &IRB = getIRBuilder();
   Value *RetValue = RetVal.loadValue();
-  IRB.CreateRet(RetValue);
-
-  TermI->eraseFromParent();
+  createRet(RetValue);
 }
 
 // Helper struct to convert Var operands to a target type T.
-// Used by emitIntrinsic to convert all operands to the intrinsic's result type.
-// C++17 doesn't support template parameters on lambdas, so we use a struct.
+// Used by emitIntrinsic to convert all operands to the intrinsic's result
+// type. C++17 doesn't support template parameters on lambdas, so we use a
+// struct.
 template <typename T> struct IntrinsicOperandConverter {
-  IRBuilderBase &IRB;
+  FuncBase &Fn;
 
   template <typename U> Value *operator()(const Var<U> &Operand) const {
-    return convert<U, T>(IRB, Operand.loadValue());
+    return Fn.convert<U, T>(Operand.loadValue());
   }
 };
 
 // Helper for emitting intrinsics with Var
 template <typename T, typename... Operands>
-static Var<T> emitIntrinsic(StringRef IntrinsicName, Type *ResultType,
+static Var<T> emitIntrinsic(const std::string &IntrinsicName, Type *ResultType,
                             const Operands &...Ops) {
   static_assert(sizeof...(Ops) > 0, "Intrinsic requires at least one operand");
 
   auto &Fn = std::get<0>(std::tie(Ops...)).Fn;
   auto CheckFn = [&Fn](const auto &Operand) {
     if (&Operand.Fn != &Fn)
-      PROTEUS_FATAL_ERROR("Variables should belong to the same function");
+      reportFatalError("Variables should belong to the same function");
   };
   (CheckFn(Ops), ...);
 
-  auto &IRB = Fn.getIRBuilder();
-  auto &M = *Fn.getFunction()->getParent();
+  IntrinsicOperandConverter<T> ConvertOperand{Fn};
 
-  IntrinsicOperandConverter<T> ConvertOperand{IRB};
-
-  FunctionCallee Callee = M.getOrInsertFunction(IntrinsicName, ResultType,
-                                                ((void)Ops, ResultType)...);
-  Value *Call = IRB.CreateCall(Callee, {ConvertOperand(Ops)...});
+  // All operands are converted to the result type.
+  std::vector<Type *> ArgTys(sizeof...(Ops), ResultType);
+  Value *Call = Fn.createCall(IntrinsicName, ResultType, ArgTys,
+                              {ConvertOperand(Ops)...});
 
   auto ResultVar = Fn.template declVar<T>("res.");
   ResultVar.storeValue(Call);
@@ -1365,8 +1420,8 @@ static Var<T> emitIntrinsic(StringRef IntrinsicName, Type *ResultType,
 template <typename T> Var<float> powf(const Var<float> &L, const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "powf requires floating-point type");
-  auto &IRB = L.Fn.getIRBuilder();
-  auto *ResultType = IRB.getFloatTy();
+
+  auto *ResultType = R.Fn.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.pow.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1381,8 +1436,7 @@ template <typename T> Var<float> sqrtf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "sqrtf requires floating-point type");
 
-  auto &IRB = R.Fn.getIRBuilder();
-  auto *ResultType = IRB.getFloatTy();
+  auto *ResultType = R.Fn.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.sqrt.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1397,8 +1451,7 @@ template <typename T> Var<float> expf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "expf requires floating-point type");
 
-  auto &IRB = R.Fn.getIRBuilder();
-  auto *ResultType = IRB.getFloatTy();
+  auto *ResultType = R.Fn.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.exp.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1413,8 +1466,7 @@ template <typename T> Var<float> sinf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "sinf requires floating-point type");
 
-  auto &IRB = R.Fn.getIRBuilder();
-  auto *ResultType = IRB.getFloatTy();
+  auto *ResultType = R.Fn.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.sin.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1429,8 +1481,7 @@ template <typename T> Var<float> cosf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "cosf requires floating-point type");
 
-  auto &IRB = R.Fn.getIRBuilder();
-  auto *ResultType = IRB.getFloatTy();
+  auto *ResultType = R.Fn.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.cos.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1445,8 +1496,7 @@ template <typename T> Var<float> fabs(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "fabs requires floating-point type");
 
-  auto &IRB = R.Fn.getIRBuilder();
-  auto *ResultType = IRB.getFloatTy();
+  auto *ResultType = R.Fn.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.fabs.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1461,8 +1511,7 @@ template <typename T> Var<float> truncf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "truncf requires floating-point type");
 
-  auto &IRB = R.Fn.getIRBuilder();
-  auto *ResultType = IRB.getFloatTy();
+  auto *ResultType = R.Fn.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.trunc.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1477,8 +1526,7 @@ template <typename T> Var<float> logf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "logf requires floating-point type");
 
-  auto &IRB = R.Fn.getIRBuilder();
-  auto *ResultType = IRB.getFloatTy();
+  auto *ResultType = R.Fn.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.log.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1493,8 +1541,7 @@ template <typename T> Var<float> absf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "absf requires floating-point type");
 
-  auto &IRB = R.Fn.getIRBuilder();
-  auto *ResultType = IRB.getFloatTy();
+  auto *ResultType = R.Fn.getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.fabs.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1512,7 +1559,7 @@ std::enable_if_t<std::is_arithmetic_v<T>, Var<T>> min(const Var<T> &L,
 
   FuncBase &Fn = L.Fn;
   if (&Fn != &R.Fn)
-    PROTEUS_FATAL_ERROR("Variables should belong to the same function");
+    reportFatalError("Variables should belong to the same function");
 
   Var<T> ResultVar = Fn.declVar<T>("min_res");
   ResultVar = R;
@@ -1529,7 +1576,7 @@ std::enable_if_t<std::is_arithmetic_v<T>, Var<T>> max(const Var<T> &L,
 
   FuncBase &Fn = L.Fn;
   if (&Fn != &R.Fn)
-    PROTEUS_FATAL_ERROR("Variables should belong to the same function");
+    reportFatalError("Variables should belong to the same function");
 
   Var<T> ResultVar = Fn.declVar<T>("max_res");
   ResultVar = R;

@@ -7,7 +7,8 @@
 // clang-format on
 
 #include <proteus/JitFrontend.hpp>
-#include <proteus/JitInterface.hpp>
+
+#include <iostream>
 
 using namespace proteus;
 

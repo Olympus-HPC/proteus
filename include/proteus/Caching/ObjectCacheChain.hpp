@@ -31,8 +31,8 @@ class ObjectCacheChain {
 public:
   explicit ObjectCacheChain(const std::string &Label);
 
-  std::unique_ptr<CompiledLibrary> lookup(HashT &HashValue);
-  void store(HashT &HashValue, const CacheEntry &Entry);
+  std::unique_ptr<CompiledLibrary> lookup(const HashT &HashValue);
+  void store(const HashT &HashValue, const CacheEntry &Entry);
   void printStats();
   void finalize();
 
@@ -40,7 +40,8 @@ private:
   void addCache(std::unique_ptr<ObjectCache> Cache);
   void buildFromConfig(const std::string &ConfigStr);
   std::unique_ptr<ObjectCache> createCache(const std::string &Name);
-  void promoteToLevel(HashT &HashValue, const CacheEntry &Entry, size_t Level);
+  void promoteToLevel(const HashT &HashValue, const CacheEntry &Entry,
+                      size_t Level);
 
   std::vector<std::unique_ptr<ObjectCache>> Caches;
   const std::string Label;

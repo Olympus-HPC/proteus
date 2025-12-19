@@ -17,7 +17,7 @@ public:
 
   std::unique_ptr<MemoryBuffer> compile(std::unique_ptr<LLVMContext> Ctx,
                                         std::unique_ptr<Module> Mod,
-                                        HashT ModuleHash,
+                                        const HashT &ModuleHash,
                                         bool DisableIROpt = false) override {
     // This is necessary to ensure Ctx outlives M. Setting [[maybe_unused]] can
     // trigger a lifetime bug.
@@ -26,7 +26,7 @@ public:
     std::unique_ptr<MemoryBuffer> ObjectModule =
         Jit.compileOnly(*ModOwner, DisableIROpt);
     if (!ObjectModule)
-      PROTEUS_FATAL_ERROR("Expected non-null object library");
+      reportFatalError("Expected non-null object library");
 
     ObjectCache.store(
         ModuleHash, CacheEntry::staticObject(ObjectModule->getMemBufferRef()));
@@ -35,20 +35,20 @@ public:
   }
 
   std::unique_ptr<CompiledLibrary>
-  lookupCompiledLibrary(HashT ModuleHash) override {
+  lookupCompiledLibrary(const HashT &ModuleHash) override {
     return ObjectCache.lookup(ModuleHash);
   }
 
-  DispatchResult launch(void *, LaunchDims, LaunchDims, ArrayRef<void *>,
-                        uint64_t, void *) override {
-    PROTEUS_FATAL_ERROR("Host does not support launch");
+  DispatchResult launch(void *, LaunchDims, LaunchDims, void *[], uint64_t,
+                        void *) override {
+    reportFatalError("Host does not support launch");
   }
 
   StringRef getDeviceArch() const override {
-    PROTEUS_FATAL_ERROR("Host dispatcher does not implement getDeviceArch");
+    reportFatalError("Host dispatcher does not implement getDeviceArch");
   }
 
-  void *getFunctionAddress(StringRef FnName, HashT ModuleHash,
+  void *getFunctionAddress(const std::string &FnName, const HashT &ModuleHash,
                            CompiledLibrary &Library) override {
     HashT FuncHash = hash(FnName, ModuleHash);
 
@@ -62,18 +62,18 @@ public:
 
     void *FuncAddr = Jit.getFunctionAddress(FnName, Library);
     if (!FuncAddr)
-      PROTEUS_FATAL_ERROR("Failed to find address for function " + FnName);
+      reportFatalError("Failed to find address for function " + FnName);
 
     CodeCache.insert(FuncHash, FuncAddr, FnName);
 
     return FuncAddr;
   }
 
-  void registerDynamicLibrary(HashT HashValue,
-                              const SmallString<128> &Path) override {
+  void registerDynamicLibrary(const HashT &HashValue,
+                              const std::string &Path) override {
     auto Buf = MemoryBuffer::getFileAsStream(Path);
     if (!Buf)
-      PROTEUS_FATAL_ERROR("Failed to read dynamic library: " + Path);
+      reportFatalError("Failed to read dynamic library: " + Path);
     ObjectCache.store(HashValue,
                       CacheEntry::sharedObject((*Buf)->getMemBufferRef()));
   }

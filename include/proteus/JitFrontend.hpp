@@ -1,30 +1,18 @@
 #ifndef PROTEUS_JIT_DEV_HPP
 #define PROTEUS_JIT_DEV_HPP
 
-#include <llvm/ADT/StringRef.h>
-#include <llvm/Bitcode/BitcodeWriter.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/Verifier.h>
-#include <llvm/Support/Debug.h>
-#include <llvm/Support/MemoryBuffer.h>
-#include <llvm/TargetParser/Host.h>
-#include <llvm/TargetParser/Triple.h>
-
-#include <deque>
-#include <type_traits>
-
-#include "proteus/CoreLLVMDevice.hpp"
 #include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.hpp"
 #include "proteus/Frontend/Func.hpp"
 #include "proteus/Frontend/LoopNest.hpp"
 #include "proteus/Frontend/TypeMap.hpp"
 
-#include <iostream>
+#include <deque>
+#include <type_traits>
 
 namespace proteus {
-using namespace llvm;
+
+struct CompiledLibrary;
 
 class JitModule {
 private:
@@ -37,15 +25,16 @@ private:
   std::string TargetTriple;
   Dispatcher &Dispatch;
 
-  HashT ModuleHash = 0;
+  std::unique_ptr<HashT> ModuleHash;
   bool IsCompiled = false;
 
   template <typename... ArgT> struct KernelHandle;
 
   template <typename RetT, typename... ArgT>
-  Func<RetT, ArgT...> &buildFuncFromArgsList(FunctionCallee FC,
+  Func<RetT, ArgT...> &buildFuncFromArgsList(const std::string &Name,
                                              ArgTypeList<ArgT...>) {
-    auto TypedFn = std::make_unique<Func<RetT, ArgT...>>(*this, FC, Dispatch);
+    auto TypedFn =
+        std::make_unique<Func<RetT, ArgT...>>(*this, *Ctx, Name, Dispatch);
     Func<RetT, ArgT...> &TypedFnRef = *TypedFn;
     Functions.emplace_back(std::move(TypedFn));
     TypedFnRef.declArgs();
@@ -53,14 +42,19 @@ private:
   }
 
   template <typename... ArgT>
-  KernelHandle<ArgT...> buildKernelFromArgsList(FunctionCallee FC,
+  KernelHandle<ArgT...> buildKernelFromArgsList(const std::string &Name,
                                                 ArgTypeList<ArgT...>) {
-    auto TypedFn = std::make_unique<Func<void, ArgT...>>(*this, FC, Dispatch);
+    auto TypedFn =
+        std::make_unique<Func<void, ArgT...>>(*this, *Ctx, Name, Dispatch);
     Func<void, ArgT...> &TypedFnRef = *TypedFn;
     TypedFn->declArgs();
-    std::unique_ptr<FuncBase> &Fn = Functions.emplace_back(std::move(TypedFn));
 
-    setKernel(*Fn);
+#if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
+    std::unique_ptr<FuncBase> &Fn = Functions.emplace_back(std::move(TypedFn));
+    Fn->setKernel();
+#else
+    reportFatalError("setKernel() is only supported for CUDA/HIP");
+#endif
     return KernelHandle<ArgT...>{TypedFnRef, *this};
   }
 
@@ -71,19 +65,15 @@ private:
     void setLaunchBounds([[maybe_unused]] int MaxThreadsPerBlock,
                          [[maybe_unused]] int MinBlocksPerSM = 0) {
       if (!M.isDeviceModule())
-        PROTEUS_FATAL_ERROR("Expected a device module for setLaunchBounds");
+        reportFatalError("Expected a device module for setLaunchBounds");
 
       if (M.isCompiled())
-        PROTEUS_FATAL_ERROR("setLaunchBounds must be called before compile()");
+        reportFatalError("setLaunchBounds must be called before compile()");
 
 #if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
-      Function *Fn = F.getFunction();
-      if (!Fn)
-        PROTEUS_FATAL_ERROR("Expected non-null Function");
-
-      setLaunchBoundsForKernel(*Fn, MaxThreadsPerBlock, MinBlocksPerSM);
+      F.setLaunchBoundsForKernel(MaxThreadsPerBlock, MinBlocksPerSM);
 #else
-      PROTEUS_FATAL_ERROR("Unsupported target for setLaunchBounds");
+      reportFatalError("Unsupported target for setLaunchBounds");
 #endif
     }
 
@@ -107,7 +97,7 @@ private:
         // Func object to avoid cache lookups.
         // TODO: Re-think caching and dispatchers.
         auto KernelFunc = reinterpret_cast<decltype(F.getCompiledFunc())>(
-            M.Dispatch.getFunctionAddress(F.getName(), M.ModuleHash,
+            M.Dispatch.getFunctionAddress(F.getName(), M.getModuleHash(),
                                           M.getLibrary()));
 
         F.setCompiledFunc(KernelFunc);
@@ -127,39 +117,8 @@ private:
             (TargetModel == TargetModelType::HIP));
   }
 
-  void setKernel(FuncBase &F) {
-    switch (TargetModel) {
-    case TargetModelType::CUDA: {
-      NamedMDNode *MD = Mod->getOrInsertNamedMetadata("nvvm.annotations");
-
-      Metadata *MDVals[] = {
-          ConstantAsMetadata::get(F.getFunction()),
-          MDString::get(*Ctx, "kernel"),
-          ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(*Ctx), 1))};
-      // Append metadata to nvvm.annotations.
-      MD->addOperand(MDNode::get(*Ctx, MDVals));
-
-      // Add a function attribute for the kernel.
-      F.getFunction()->addFnAttr(Attribute::get(*Ctx, "kernel"));
-      return;
-    }
-    case TargetModelType::HIP:
-      F.getFunction()->setCallingConv(CallingConv::AMDGPU_KERNEL);
-      return;
-    case TargetModelType::HOST:
-      PROTEUS_FATAL_ERROR("Host does not support setKernel");
-    default:
-      PROTEUS_FATAL_ERROR("Unsupported target " + TargetTriple);
-    }
-  }
-
 public:
-  JitModule(StringRef Target = "host")
-      : Ctx{std::make_unique<LLVMContext>()},
-        Mod{std::make_unique<Module>("JitModule", *Ctx)},
-        TargetModel{parseTargetModel(Target)},
-        TargetTriple(getTargetTriple(TargetModel)),
-        Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
+  JitModule(const std::string &Target = "host");
 
   // Disable copy and move constructors.
   JitModule(const JitModule &) = delete;
@@ -167,114 +126,67 @@ public:
   JitModule(JitModule &&) = delete;
   JitModule &operator=(JitModule &&) = delete;
 
-  template <typename Sig> auto &addFunction(StringRef Name) {
+  ~JitModule();
+
+  template <typename Sig> auto &addFunction(const std::string &Name) {
     using RetT = typename FnSig<Sig>::RetT;
     using ArgT = typename FnSig<Sig>::ArgsTList;
 
     if (IsCompiled)
-      PROTEUS_FATAL_ERROR(
-          "The module is compiled, no further code can be added");
+      reportFatalError("The module is compiled, no further code can be added");
 
-    Mod->setTargetTriple(TargetTriple);
-    FunctionCallee FC = getFunctionCallee<RetT>(Name, ArgT{});
-
-    Function *F = dyn_cast<Function>(FC.getCallee());
-    if (!F)
-      PROTEUS_FATAL_ERROR("Unexpected");
-
-    return buildFuncFromArgsList<RetT>(FC, ArgT{});
+    return buildFuncFromArgsList<RetT>(Name, ArgT{});
   }
 
   bool isCompiled() const { return IsCompiled; }
 
   const Module &getModule() const { return *Mod; }
+  Module &getModule() { return *Mod; }
 
-  template <typename Sig> auto addKernel(StringRef Name) {
+  template <typename Sig> auto addKernel(const std::string &Name) {
     using RetT = typename FnSig<Sig>::RetT;
     static_assert(std::is_void_v<RetT>, "Kernels must have void return type");
     using ArgT = typename FnSig<Sig>::ArgsTList;
 
     if (IsCompiled)
-      PROTEUS_FATAL_ERROR(
-          "The module is compiled, no further code can be added");
+      reportFatalError("The module is compiled, no further code can be added");
 
     if (!isDeviceModule())
-      PROTEUS_FATAL_ERROR("Expected a device module for addKernel");
+      reportFatalError("Expected a device module for addKernel");
 
-    Mod->setTargetTriple(TargetTriple);
-    FunctionCallee FC = getFunctionCallee<void>(Name, ArgT{});
-    Function *F = dyn_cast<Function>(FC.getCallee());
-    if (!F)
-      PROTEUS_FATAL_ERROR("Unexpected");
-
-    return buildKernelFromArgsList(FC, ArgT{});
+    return buildKernelFromArgsList(Name, ArgT{});
   }
 
-  void compile(bool Verify = false) {
-    if (IsCompiled)
-      return;
+  void compile(bool Verify = false);
 
-    if (Verify)
-      if (verifyModule(*Mod, &errs())) {
-        PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
-      }
-
-    SmallVector<char, 0> Buffer;
-    raw_svector_ostream OS(Buffer);
-    WriteBitcodeToFile(*Mod, OS);
-
-    // Create a unique module hash based on the bitcode and append to all
-    // function names to make them unique.
-    // TODO: Is this necessary?
-    ModuleHash = hash(StringRef{Buffer.data(), Buffer.size()});
-    for (auto &JitF : Functions) {
-      JitF->setName(JitF->getName().str() + "$" + ModuleHash.toString());
-    }
-
-    if ((Library = Dispatch.lookupCompiledLibrary(ModuleHash))) {
-      IsCompiled = true;
-      return;
-    }
-
-    Library = std::make_unique<CompiledLibrary>(
-        Dispatch.compile(std::move(Ctx), std::move(Mod), ModuleHash));
-    IsCompiled = true;
-  }
-
-  HashT getModuleHash() const { return ModuleHash; }
+  const HashT &getModuleHash() const;
 
   Dispatcher &getDispatcher() const { return Dispatch; }
 
   TargetModelType getTargetModel() const { return TargetModel; }
+
+  const std::string &getTargetTriple() const { return TargetTriple; }
 
   CompiledLibrary &getLibrary() {
     if (!IsCompiled)
       compile();
 
     if (!Library)
-      PROTEUS_FATAL_ERROR("Expected non-null library after compilation");
+      reportFatalError("Expected non-null library after compilation");
 
     return *Library;
   }
 
-  template <typename RetT, typename... ArgT>
-  FunctionCallee getFunctionCallee(StringRef Name, ArgTypeList<ArgT...>) {
-    return Mod->getOrInsertFunction(Name, TypeMap<RetT>::get(*Ctx),
-                                    TypeMap<ArgT>::get(*Ctx)...);
-  }
-
-  void print() { Mod->print(outs(), nullptr); }
+  void print();
 };
 
 template <typename Sig>
 std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>,
                  Var<typename FnSig<Sig>::RetT>>
-FuncBase::call(StringRef Name) {
+FuncBase::call(const std::string &Name) {
   using RetT = typename FnSig<Sig>::RetT;
 
-  using ArgT = typename FnSig<Sig>::ArgsTList;
-  FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
-  auto *Call = IRB.CreateCall(Callee);
+  auto *Call = createCall(Name, TypeMap<RetT>::get(getContext()));
   Var<RetT> Ret = declVar<RetT>("ret");
   Ret.storeValue(Call);
   return Ret;
@@ -282,21 +194,23 @@ FuncBase::call(StringRef Name) {
 
 template <typename Sig>
 std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
-FuncBase::call(StringRef Name) {
+FuncBase::call(const std::string &Name) {
   using RetT = typename FnSig<Sig>::RetT;
-  using ArgT = typename FnSig<Sig>::ArgsTList;
-  FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
-  IRB.CreateCall(Callee);
+  createCall(Name, TypeMap<RetT>::get(getContext()));
+}
+
+template <typename... Ts>
+std::vector<Type *> unpackArgTypes(ArgTypeList<Ts...>, LLVMContext &Ctx) {
+  return {TypeMap<Ts>::get(Ctx)...};
 }
 
 template <typename Sig, typename... ArgVars>
 std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>,
                  Var<typename FnSig<Sig>::RetT>>
-FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
-
+FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
   using RetT = typename FnSig<Sig>::RetT;
   using ArgT = typename FnSig<Sig>::ArgsTList;
-  FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
+
   auto GetArgVal = [](auto &&Arg) {
     using ArgVarT = std::decay_t<decltype(Arg)>;
     if constexpr (std::is_pointer_v<typename ArgVarT::ValueType>)
@@ -305,7 +219,11 @@ FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
       return Arg.loadValue();
   };
 
-  auto *Call = IRB.CreateCall(Callee, {GetArgVal(ArgsVars)...});
+  auto &Ctx = getContext();
+  std::vector<Type *> ArgTys = unpackArgTypes(ArgT{}, Ctx);
+  std::vector<Value *> ArgVals = {GetArgVal(ArgsVars)...};
+
+  auto *Call = createCall(Name, TypeMap<RetT>::get(Ctx), ArgTys, ArgVals);
 
   Var<RetT> Ret = declVar<RetT>("ret");
   Ret.storeValue(Call);
@@ -314,11 +232,10 @@ FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
 
 template <typename Sig, typename... ArgVars>
 std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
-FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
+FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
   using RetT = typename FnSig<Sig>::RetT;
   using ArgT = typename FnSig<Sig>::ArgsTList;
 
-  FunctionCallee Callee = J.getFunctionCallee<RetT>(Name, ArgT{});
   auto GetArgVal = [](auto &&Arg) {
     using ArgVarT = std::decay_t<decltype(Arg)>;
     if constexpr (std::is_pointer_v<typename ArgVarT::ValueType>)
@@ -327,7 +244,10 @@ FuncBase::call(StringRef Name, ArgVars &&...ArgsVars) {
       return Arg.loadValue();
   };
 
-  IRB.CreateCall(Callee, {GetArgVal(ArgsVars)...});
+  auto &Ctx = getContext();
+  std::vector<Type *> ArgTys = unpackArgTypes(ArgT{}, Ctx);
+  createCall(Name, TypeMap<RetT>::get(getContext()), ArgTys,
+             {GetArgVal(ArgsVars)...});
 }
 
 template <typename RetT, typename... ArgT>
@@ -342,7 +262,7 @@ RetT Func<RetT, ArgT...>::operator()(ArgT... Args) {
   }
 
   if (J.getTargetModel() != TargetModelType::HOST)
-    PROTEUS_FATAL_ERROR(
+    reportFatalError(
         "Target is a GPU model, cannot directly run functions, use launch()");
 
   if constexpr (std::is_void_v<RetT>)

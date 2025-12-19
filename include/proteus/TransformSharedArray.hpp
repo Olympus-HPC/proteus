@@ -11,15 +11,15 @@
 #ifndef PROTEUS_TRANSFORM_SHARED_ARRAY_HPP
 #define PROTEUS_TRANSFORM_SHARED_ARRAY_HPP
 
+#include "proteus/Debug.h"
+#include "proteus/Logger.hpp"
+#include "proteus/Utils.h"
+
 #include <llvm/Analysis/ConstantFolding.h>
 #include <llvm/Demangle/Demangle.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Support/Debug.h>
-
-#include "proteus/Debug.h"
-#include "proteus/Logger.hpp"
-#include "proteus/Utils.h"
 
 namespace proteus {
 
@@ -36,17 +36,17 @@ public:
         while (!Func.user_empty()) {
           User *Usr = *Func.user_begin();
           if (!isa<CallBase>(Usr))
-            PROTEUS_FATAL_ERROR("Expected call user");
+            reportFatalError("Expected call user");
 
           CallBase *CB = cast<CallBase>(Usr);
           assert(CB->arg_size() == 2 && "Expected 2 arguments: N and sizeof");
           int64_t N;
           int64_t Sizeof;
           if (!getConstantValue(CB->getArgOperand(0), N, M.getDataLayout()))
-            PROTEUS_FATAL_ERROR("Expected constant N argument");
+            reportFatalError("Expected constant N argument");
           if (!getConstantValue(CB->getArgOperand(1), Sizeof,
                                 M.getDataLayout()))
-            PROTEUS_FATAL_ERROR("Expected constant Sizeof argument");
+            reportFatalError("Expected constant Sizeof argument");
 
           ArrayType *AType =
               ArrayType::get(Type::getInt8Ty(M.getContext()), N * Sizeof);
@@ -81,8 +81,7 @@ public:
 
         if (Config::get().ProteusDebugOutput) {
           if (verifyModule(M, &errs()))
-            PROTEUS_FATAL_ERROR(
-                "Broken module found, JIT compilation aborted!");
+            reportFatalError("Broken module found, JIT compilation aborted!");
         }
       }
     }

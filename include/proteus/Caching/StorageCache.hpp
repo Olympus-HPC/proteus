@@ -11,14 +11,13 @@
 #ifndef PROTEUS_JITSTOREDCACHE_HPP
 #define PROTEUS_JITSTOREDCACHE_HPP
 
-#include <cstdint>
-
-#include <llvm/Support/MemoryBufferRef.h>
-
 #include "proteus/Caching/ObjectCache.hpp"
 #include "proteus/CompiledLibrary.hpp"
 #include "proteus/Hashing.hpp"
 
+#include <llvm/Support/MemoryBufferRef.h>
+
+#include <cstdint>
 namespace proteus {
 
 using namespace llvm;
@@ -34,9 +33,9 @@ public:
 
   std::string getName() const override { return "Storage"; }
 
-  std::unique_ptr<CompiledLibrary> lookup(HashT &HashValue) override;
+  std::unique_ptr<CompiledLibrary> lookup(const HashT &HashValue) override;
 
-  void store(HashT &HashValue, const CacheEntry &Entry) override;
+  void store(const HashT &HashValue, const CacheEntry &Entry) override;
 
   void printStats() override;
 

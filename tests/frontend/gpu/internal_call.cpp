@@ -8,7 +8,6 @@
 
 #include <proteus/Frontend/Builtins.hpp>
 #include <proteus/JitFrontend.hpp>
-#include <proteus/JitInterface.hpp>
 
 #if PROTEUS_ENABLE_HIP
 #define TARGET "hip"
@@ -21,6 +20,8 @@
 #endif
 
 #include "../../gpu/gpu_common.h"
+
+#include <iostream>
 
 using namespace proteus;
 

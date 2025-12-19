@@ -1,14 +1,13 @@
 #ifndef CORE_HIP_HPP
 #define CORE_HIP_HPP
 
-#include <unordered_map>
-
-#include <llvm/ADT/StringRef.h>
-
 #include "proteus/Error.h"
 #include "proteus/GlobalVarInfo.hpp"
 #include "proteus/UtilsHIP.h"
 
+#include <llvm/ADT/StringRef.h>
+
+#include <unordered_map>
 // NOTE: HIP_SYMBOL is defined only if HIP compilation is enabled (-x hip),
 // although it shouldn't be necessary since HIP RTC can JIT compile code.  Also,
 // HIP_SYMBOL is defined differently depending on whether ROCm compiles for AMD
@@ -46,8 +45,8 @@ inline hipFunction_t getKernelFunctionFromImage(
   if (RelinkGlobalsByCopy) {
     for (auto &[GlobalName, GVI] : VarNameToGlobalInfo) {
       if (!GVI.DevAddr)
-        PROTEUS_FATAL_ERROR("Cannot copy to Global Var " + GlobalName +
-                            " without a concrete device address");
+        reportFatalError("Cannot copy to Global Var " + GlobalName +
+                         " without a concrete device address");
 
       hipDeviceptr_t Dptr;
       size_t Bytes;

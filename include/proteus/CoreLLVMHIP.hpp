@@ -1,6 +1,14 @@
 #ifndef PROTEUS_CORE_LLVM_HIP_HPP
 #define PROTEUS_CORE_LLVM_HIP_HPP
 
+#include "proteus/CoreLLVM.hpp"
+#include "proteus/Debug.h"
+#include "proteus/Error.h"
+#include "proteus/Logger.hpp"
+#include "proteus/TimeTracing.hpp"
+#include "proteus/Utils.h"
+#include "proteus/UtilsHIP.h"
+
 #include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/CodeGen/MachineModuleInfo.h>
 #include <llvm/IR/DiagnosticPrinter.h>
@@ -23,14 +31,6 @@
 #include <lld/Common/Driver.h>
 LLD_HAS_DRIVER(elf)
 #endif
-
-#include "proteus/CoreLLVM.hpp"
-#include "proteus/Debug.h"
-#include "proteus/Error.h"
-#include "proteus/Logger.hpp"
-#include "proteus/TimeTracing.hpp"
-#include "proteus/Utils.h"
-#include "proteus/UtilsHIP.h"
 
 namespace proteus {
 
@@ -144,7 +144,7 @@ codegenSerial(Module &M, StringRef DeviceArch,
   auto ExpectedTM =
       proteus::detail::createTargetMachine(M, DeviceArch, CodegenOptLevel);
   if (!ExpectedTM)
-    PROTEUS_FATAL_ERROR(toString(ExpectedTM.takeError()));
+    reportFatalError(toString(ExpectedTM.takeError()));
 
   std::unique_ptr<TargetMachine> TM = std::move(*ExpectedTM);
   TargetLibraryInfoImpl TLII(Triple(M.getTargetTriple()));
@@ -164,8 +164,8 @@ codegenSerial(Module &M, StringRef DeviceArch,
   raw_svector_ostream OS(ObjectCode);
   auto ExpectedF = createTempFile("object", "o");
   if (auto E = ExpectedF.takeError())
-    PROTEUS_FATAL_ERROR("Error creating object tmp file " +
-                        toString(std::move(E)));
+    reportFatalError("Error creating object tmp file " +
+                     toString(std::move(E)));
   auto ObjectFile = std::move(*ExpectedF);
   auto FileStream = std::make_unique<CachedFileStream>(
       std::make_unique<llvm::raw_fd_ostream>(ObjectFile.FD, false));
@@ -215,7 +215,7 @@ codegenParallel(Module &M, StringRef DeviceArch, unsigned int OptLevel = 3,
   auto ExpectedTM =
       proteus::detail::createTargetMachine(M, DeviceArch, CodegenOptLevel);
   if (!ExpectedTM)
-    PROTEUS_FATAL_ERROR(toString(ExpectedTM.takeError()));
+    reportFatalError(toString(ExpectedTM.takeError()));
   std::unique_ptr<TargetMachine> TM = std::move(*ExpectedTM);
 
   lto::Config Conf;
@@ -345,21 +345,21 @@ codegenParallel(Module &M, StringRef DeviceArch, unsigned int OptLevel = 3,
     std::string TaskStr = Task ? "." + std::to_string(Task) : "";
     auto ExpectedF = createTempFile("lto-shard" + TaskStr, "o");
     if (auto E = ExpectedF.takeError())
-      PROTEUS_FATAL_ERROR("Error creating tmp file " + toString(std::move(E)));
+      reportFatalError("Error creating tmp file " + toString(std::move(E)));
     ObjectFiles[Task] =
         std::make_unique<sys::fs::TempFile>(std::move(*ExpectedF));
     auto Ret = std::make_unique<CachedFileStream>(
         std::make_unique<llvm::raw_fd_ostream>(ObjectFiles[Task]->FD, false));
     if (!Ret)
-      PROTEUS_FATAL_ERROR("Error creating CachedFileStream");
+      reportFatalError("Error creating CachedFileStream");
     return Ret;
   };
 
   if (Error E = L.run(AddStream))
-    PROTEUS_FATAL_ERROR("Error: " + toString(std::move(E)));
+    reportFatalError("Error: " + toString(std::move(E)));
 
   if (LTOError)
-    PROTEUS_FATAL_ERROR(toString(
+    reportFatalError(toString(
         createStringError(inconvertibleErrorCode(),
                           "Errors encountered inside the LTO pipeline.")));
 
@@ -458,17 +458,17 @@ codegenObject(Module &M, StringRef DeviceArch,
     break;
 #endif
   default:
-    PROTEUS_FATAL_ERROR("Unknown Codegen Option");
+    reportFatalError("Unknown Codegen Option");
   }
 
   if (ObjectFiles.empty())
-    PROTEUS_FATAL_ERROR("Expected non-empty vector of object files");
+    reportFatalError("Expected non-empty vector of object files");
 
 #if LLVM_VERSION_MAJOR >= 18
   auto ExpectedF = detail::createTempFile("proteus-jit", "o");
   if (auto E = ExpectedF.takeError())
-    PROTEUS_FATAL_ERROR("Error creating shared object file " +
-                        toString(std::move(E)));
+    reportFatalError("Error creating shared object file " +
+                     toString(std::move(E)));
 
   auto SharedObject = std::move(*ExpectedF);
 
@@ -499,32 +499,32 @@ codegenObject(Module &M, StringRef DeviceArch,
     lld::Result S = lld::lldMain(Args, llvm::outs(), llvm::errs(),
                                  {{lld::Gnu, &lld::elf::link}});
     if (S.retCode)
-      PROTEUS_FATAL_ERROR("Error: lld failed");
+      reportFatalError("Error: lld failed");
   }
 
   ErrorOr<std::unique_ptr<MemoryBuffer>> Buffer =
       MemoryBuffer::getFileAsStream(SharedObject.TmpName);
   if (!Buffer)
-    PROTEUS_FATAL_ERROR("Error reading file: " + Buffer.getError().message());
+    reportFatalError("Error reading file: " + Buffer.getError().message());
 
   // Remove temporary files.
   for (auto &File : ObjectFiles) {
     if (!File)
       continue;
     if (auto E = File->discard())
-      PROTEUS_FATAL_ERROR("Error removing object tmp file " +
-                          toString(std::move(E)));
+      reportFatalError("Error removing object tmp file " +
+                       toString(std::move(E)));
   }
   if (auto E = SharedObject.discard())
-    PROTEUS_FATAL_ERROR("Error removing shared object tmp file " +
-                        toString(std::move(E)));
+    reportFatalError("Error removing shared object tmp file " +
+                     toString(std::move(E)));
 
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                        << "Codegen linking " << T.elapsed() << " ms\n");
 
   return std::move(*Buffer);
 #else
-  PROTEUS_FATAL_ERROR("Expected LLVM18 for non-RTC codegen");
+  reportFatalError("Expected LLVM18 for non-RTC codegen");
 #endif
 }
 

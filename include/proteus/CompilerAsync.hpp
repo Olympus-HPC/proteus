@@ -1,13 +1,13 @@
 #ifndef PROTEUS_ASYNC_COMPILER_HPP
 #define PROTEUS_ASYNC_COMPILER_HPP
 
-#include <condition_variable>
-#include <deque>
-#include <thread>
-
 #include "proteus/CompilationTask.hpp"
 #include "proteus/Debug.h"
 #include "proteus/Hashing.hpp"
+
+#include <condition_variable>
+#include <deque>
+#include <thread>
 
 namespace proteus {
 
@@ -69,7 +69,7 @@ public:
       if (!Active)
         break;
       if (Worklist.empty())
-        PROTEUS_FATAL_ERROR("Expected non-empty Worklist");
+        reportFatalError("Expected non-empty Worklist");
       CompilationTask CT = std::move(Worklist.front());
       Worklist.pop_front();
       Lock.unlock();

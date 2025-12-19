@@ -1,11 +1,9 @@
 #ifndef PROTEUS_TARGET_MODE_H
 #define PROTEUS_TARGET_MODE_H
 
-#include <llvm/ADT/StringRef.h>
-#include <llvm/TargetParser/Host.h>
-#include <llvm/TargetParser/Triple.h>
-
 #include "proteus/Error.h"
+
+#include <llvm/TargetParser/Host.h>
 
 namespace proteus {
 
@@ -13,7 +11,7 @@ using namespace llvm;
 
 enum class TargetModelType { HOST, CUDA, HIP, HOST_HIP, HOST_CUDA };
 
-inline TargetModelType parseTargetModel(StringRef Target) {
+inline TargetModelType parseTargetModel(const std::string &Target) {
   if (Target == "host" || Target == "native") {
     return TargetModelType::HOST;
   }
@@ -34,7 +32,7 @@ inline TargetModelType parseTargetModel(StringRef Target) {
     return TargetModelType::HOST_CUDA;
   }
 
-  PROTEUS_FATAL_ERROR("Unsupported target " + Target);
+  reportFatalError("Unsupported target " + Target);
 }
 
 inline std::string getTargetTriple(TargetModelType Model) {
@@ -48,7 +46,7 @@ inline std::string getTargetTriple(TargetModelType Model) {
   case TargetModelType::HIP:
     return "amdgcn-amd-amdhsa";
   default:
-    PROTEUS_FATAL_ERROR("Unsupported target model");
+    reportFatalError("Unsupported target model");
   }
 }
 

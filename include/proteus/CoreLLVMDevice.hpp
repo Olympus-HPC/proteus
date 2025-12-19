@@ -84,7 +84,7 @@ inline void setKernelDimsRange(Module &M, dim3 &GridDim, dim3 &BlockDim) {
   auto AttachRange = [&](ArrayRef<StringRef> IntrinsicNames,
                          uint32_t DimValue) {
     if (DimValue == 0) {
-      PROTEUS_FATAL_ERROR("Dimension value cannot be zero");
+      reportFatalError("Dimension value cannot be zero");
     }
 
     for (auto IntrinsicName : IntrinsicNames) {
@@ -189,9 +189,8 @@ inline void replaceGlobalVariablesWithPointers(
         if (isa<Instruction>(User))
           continue;
 
-        PROTEUS_FATAL_ERROR(
-            "Expected Instruction or Constant user for Value: " + toString(*V) +
-            " , User: " + toString(*User));
+        reportFatalError("Expected Instruction or Constant user for Value: " +
+                         toString(*V) + " , User: " + toString(*User));
       }
     }
 
@@ -221,7 +220,7 @@ inline void replaceGlobalVariablesWithPointers(
 
   if (Config::get().ProteusDebugOutput) {
     if (verifyModule(M, &errs()))
-      PROTEUS_FATAL_ERROR("Broken module found, JIT compilation aborted!");
+      reportFatalError("Broken module found, JIT compilation aborted!");
   }
 }
 
@@ -231,8 +230,7 @@ inline void relinkGlobalsObject(
   Expected<object::ELF64LEObjectFile> DeviceElfOrErr =
       object::ELF64LEObjectFile::create(Object);
   if (auto E = DeviceElfOrErr.takeError())
-    PROTEUS_FATAL_ERROR("Cannot create the device elf: " +
-                        toString(std::move(E)));
+    reportFatalError("Cannot create the device elf: " + toString(std::move(E)));
   auto &DeviceElf = *DeviceElfOrErr;
 
   for (auto &[GlobalName, GVI] : VarNameToGlobalInfo) {
@@ -247,33 +245,33 @@ inline void relinkGlobalsObject(
 
       Expected<uint64_t> ValueOrErr = Symbol.getValue();
       if (!ValueOrErr)
-        PROTEUS_FATAL_ERROR("Expected symbol value");
+        reportFatalError("Expected symbol value");
       uint64_t SymbolValue = *ValueOrErr;
 
       // Get the section containing the symbol
       auto SectionOrErr = Symbol.getSection();
       if (!SectionOrErr)
-        PROTEUS_FATAL_ERROR("Cannot retrieve section");
+        reportFatalError("Cannot retrieve section");
       const auto &Section = *SectionOrErr;
       if (Section == DeviceElf.section_end())
-        PROTEUS_FATAL_ERROR("Expected sybmol in section");
+        reportFatalError("Expected sybmol in section");
 
       // Get the section's address and data
       Expected<StringRef> SectionDataOrErr = Section->getContents();
       if (!SectionDataOrErr)
-        PROTEUS_FATAL_ERROR("Error retrieving section data");
+        reportFatalError("Error retrieving section data");
       StringRef SectionData = *SectionDataOrErr;
 
       // Calculate offset within the section
       uint64_t SectionAddr = Section->getAddress();
       uint64_t Offset = SymbolValue - SectionAddr;
       if (Offset >= SectionData.size())
-        PROTEUS_FATAL_ERROR("Expected offset within section size");
+        reportFatalError("Expected offset within section size");
 
       uint64_t *Data = (uint64_t *)(SectionData.data() + Offset);
       if (!GVI.DevAddr)
-        PROTEUS_FATAL_ERROR("Cannot set global Var " + GlobalName +
-                            " without a concrete device address");
+        reportFatalError("Cannot set global Var " + GlobalName +
+                         " without a concrete device address");
 
       *Data = reinterpret_cast<uint64_t>(GVI.DevAddr);
       break;
@@ -300,7 +298,7 @@ inline void specializeIR(
     const SmallVector<RuntimeConstant> &RCVec = LR.getJitVariables(LambdaType);
     Function *F = M.getFunction(FnName);
     if (!F)
-      PROTEUS_FATAL_ERROR("Expected non-null Function");
+      reportFatalError("Expected non-null Function");
     TransformLambdaSpecialization::transform(M, *F, RCVec);
   }
 

@@ -6,12 +6,13 @@
 #include "proteus/TimeTracing.hpp"
 
 #include <llvm/ADT/ArrayRef.h>
-#include <string>
 #if LLVM_VERSION_MAJOR >= 18
 #include <llvm/ADT/StableHashing.h>
 #else
 #include <llvm/CodeGen/StableHashing.h>
 #endif
+
+#include <string>
 
 namespace proteus {
 
@@ -23,7 +24,7 @@ private:
 
 public:
   inline HashT(const stable_hash HashValue) { Value = HashValue; }
-  inline HashT(StringRef S) { S.getAsInteger(0, Value); }
+  inline HashT(const StringRef &S) { S.getAsInteger(0, Value); }
   inline stable_hash getValue() const { return Value; }
   inline std::string toString() const { return std::to_string(Value); }
   inline bool operator==(const HashT &Other) const {
@@ -58,11 +59,11 @@ inline std::enable_if_t<std::is_scalar<T>::value, HashT> hashValue(const T &V) {
 template <typename T>
 inline HashT hashRuntimeConstantArray(const RuntimeConstant &RC) {
   if (RC.ArrInfo.NumElts <= 0)
-    PROTEUS_FATAL_ERROR("Invalid number of elements in array: " +
-                        std::to_string(RC.ArrInfo.NumElts));
+    reportFatalError("Invalid number of elements in array: " +
+                     std::to_string(RC.ArrInfo.NumElts));
 
   if (!RC.ArrInfo.Blob)
-    PROTEUS_FATAL_ERROR("Expected non-null Blob");
+    reportFatalError("Expected non-null Blob");
 
   return hashValue(
       StringRef{reinterpret_cast<const char *>(RC.ArrInfo.Blob.get()),
@@ -71,10 +72,10 @@ inline HashT hashRuntimeConstantArray(const RuntimeConstant &RC) {
 
 inline HashT hashRuntimeConstantObject(const RuntimeConstant &RC) {
   if (RC.ObjInfo.Size <= 0)
-    PROTEUS_FATAL_ERROR("Invalid object size <= 0");
+    reportFatalError("Invalid object size <= 0");
 
   if (!RC.ObjInfo.Blob)
-    PROTEUS_FATAL_ERROR("Expected non-null Blob");
+    reportFatalError("Expected non-null Blob");
 
   return hashValue(
       StringRef{reinterpret_cast<const char *>(RC.ObjInfo.Blob.get()),
@@ -99,8 +100,8 @@ inline HashT hashArrayRefElement(const RuntimeConstant &RC) {
     case RuntimeConstantType::DOUBLE:
       return hashRuntimeConstantArray<double>(RC);
     default:
-      PROTEUS_FATAL_ERROR("Unsupported array element type: " +
-                          toString(RC.ArrInfo.EltType));
+      reportFatalError("Unsupported array element type: " +
+                       toString(RC.ArrInfo.EltType));
     }
   } else if (RC.Type == RuntimeConstantType::OBJECT) {
     return hashRuntimeConstantObject(RC);
@@ -109,7 +110,7 @@ inline HashT hashArrayRefElement(const RuntimeConstant &RC) {
         StringRef{reinterpret_cast<const char *>(&RC.Value), sizeof(RC.Value)});
   }
 
-  PROTEUS_FATAL_ERROR("Unsupported type " + toString(RC.Type));
+  reportFatalError("Unsupported type " + toString(RC.Type));
 }
 
 inline HashT hashValue(ArrayRef<RuntimeConstant> Arr) {
@@ -133,12 +134,7 @@ inline HashT hash(FirstT &&First, RestTs &&...Rest) {
   TIMESCOPE(__FUNCTION__);
   HashT HashValue = hashValue(First);
 
-  (
-      [&HashValue, &Rest]() {
-        HashValue = stable_hash_combine(HashValue.getValue(),
-                                        hashValue(Rest).getValue());
-      }(),
-      ...);
+  ((HashValue = hashCombine(HashValue, hashValue(Rest))), ...);
 
   return HashValue;
 }

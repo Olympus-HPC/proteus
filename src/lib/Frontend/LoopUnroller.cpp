@@ -1,10 +1,9 @@
 #include "proteus/Frontend/LoopUnroller.hpp"
 
+#include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Metadata.h>
-
-#include "proteus/Error.h"
 
 namespace proteus {
 
