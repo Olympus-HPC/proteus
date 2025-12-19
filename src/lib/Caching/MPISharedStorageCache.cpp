@@ -204,7 +204,8 @@ MPISharedStorageCache::lookup(const HashT &HashValue) {
   return nullptr;
 }
 
-void MPISharedStorageCache::store(const HashT &HashValue, const CacheEntry &Entry) {
+void MPISharedStorageCache::store(const HashT &HashValue,
+                                  const CacheEntry &Entry) {
   TIMESCOPE("MPISharedStorageCache::store");
 
   ensureCommThreadStarted();
