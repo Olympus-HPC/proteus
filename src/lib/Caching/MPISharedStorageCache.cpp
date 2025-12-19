@@ -57,9 +57,9 @@ void MPICommHandle::ensureInitialized() {
   MPI_Query_thread(&Provided);
   if (Provided != MPI_THREAD_MULTIPLE) {
     reportFatalError("MPISharedStorageCache requires MPI_THREAD_MULTIPLE "
-                        "(provided level: " +
-                        std::to_string(Provided) +
-                        "). Initialize MPI with MPI_Init_thread()");
+                     "(provided level: " +
+                     std::to_string(Provided) +
+                     "). Initialize MPI with MPI_Init_thread()");
   }
 
   MPI_Comm_dup(MPI_COMM_WORLD, &Comm);
@@ -198,8 +198,7 @@ MPISharedStorageCache::lookup(const HashT &HashValue) {
 
   if (std::filesystem::exists(Filebase + ".so")) {
     Hits++;
-    return std::make_unique<CompiledLibrary>(
-        SmallString<128>{Filebase + ".so"});
+    return std::make_unique<CompiledLibrary>(Filebase + ".so");
   }
 
   return nullptr;
@@ -269,7 +268,7 @@ void MPISharedStorageCache::forwardToWriter(const HashT &HashValue,
   if (Pending->Buffer.size() >
       static_cast<size_t>(std::numeric_limits<int>::max())) {
     reportFatalError("MPI message size exceeds INT_MAX: " +
-                        std::to_string(Pending->Buffer.size()) + " bytes");
+                     std::to_string(Pending->Buffer.size()) + " bytes");
   }
 
   MPI_Comm Comm = CommHandle.get();
@@ -277,8 +276,7 @@ void MPISharedStorageCache::forwardToWriter(const HashT &HashValue,
                       static_cast<int>(Pending->Buffer.size()), MPI_BYTE,
                       /*dest=*/0, Tag, Comm, &Pending->Request);
   if (Err != MPI_SUCCESS) {
-    reportFatalError("MPI_Isend failed with error code " +
-                        std::to_string(Err));
+    reportFatalError("MPI_Isend failed with error code " + std::to_string(Err));
   }
 
   PendingSends.push_back(std::move(Pending));
@@ -301,7 +299,7 @@ std::vector<char> MPISharedStorageCache::packMessage(const HashT &HashValue,
 
   if (BufferSize > static_cast<size_t>(std::numeric_limits<int>::max())) {
     reportFatalError("Buffer size exceeds MPI int limit: " +
-                        std::to_string(BufferSize) + " bytes");
+                     std::to_string(BufferSize) + " bytes");
   }
 
   int HashSizeBytes, HashStrBytes, FlagBytes, BufSizeBytes, DataBytes;
