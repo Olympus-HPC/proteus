@@ -82,6 +82,11 @@ private:
   int Size = -1;
 };
 
+struct PendingSend {
+  std::vector<char> Buffer;
+  MPI_Request Request;
+};
+
 struct UnpackedMessage {
   HashT Hash;
   std::vector<char> Data;
@@ -109,6 +114,7 @@ public:
 
 private:
   void forwardToWriter(const HashT &HashValue, const CacheEntry &Entry);
+  void waitForPendingSends();
   std::vector<char> packMessage(const HashT &HashValue,
                                 const CacheEntry &Entry);
   UnpackedMessage unpackMessage(const std::vector<char> &Buffer);
@@ -127,6 +133,7 @@ private:
   MPICommHandle CommHandle;
   CommThreadHandle CommThread;
   bool Finalized = false;
+  std::vector<std::unique_ptr<PendingSend>> PendingSends;
 };
 
 } // namespace proteus
