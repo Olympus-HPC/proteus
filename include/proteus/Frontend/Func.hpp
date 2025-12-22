@@ -1406,7 +1406,7 @@ template <typename T> struct IntrinsicOperandConverter {
   FuncBase &Fn;
 
   template <typename U> Value *operator()(const Var<U> &Operand) const {
-    return Fn.convert<U, T>(Operand.loadValue());
+    return Fn.convert<clean_t<U>, clean_t<T>>(Operand.loadValue());
   }
 };
 
