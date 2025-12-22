@@ -165,9 +165,7 @@ void MPISharedStorageCache::finalize() {
 
   MPI_Comm Comm = CommHandle.get();
 
-  // Phase 1: Non-rank-0 complete their sends.
-  if (CommHandle.getRank() != 0)
-    waitForPendingSends();
+  waitForPendingSends();
 
   MPI_Barrier(Comm);
 
