@@ -146,11 +146,6 @@ void MPISharedStorageCache::finalize() {
   int MPIFinalized = 0;
   MPI_Finalized(&MPIFinalized);
   if (MPIFinalized) {
-    if (!PendingSends.empty()) {
-      Logger::trace("[MPISharedStorageCache] Warning: MPI already finalized, "
-                    "cannot complete " +
-                    std::to_string(PendingSends.size()) + " pending sends\n");
-    }
     CommThread.stop();
     Finalized = true;
     return;
@@ -158,20 +153,14 @@ void MPISharedStorageCache::finalize() {
 
   if (Config::get().ProteusTraceOutput >= 1) {
     Logger::trace("[MPISharedStorageCache:" + Label + "] Rank " +
-                  std::to_string(CommHandle.getRank()) +
-                  " flushing, PendingSends=" +
-                  std::to_string(PendingSends.size()) + "\n");
+                  std::to_string(CommHandle.getRank()) + " finalizing\n");
   }
 
   MPI_Comm Comm = CommHandle.get();
 
-  // Phase 1: Non-rank-0 complete their sends.
-  if (CommHandle.getRank() != 0)
-    waitForPendingSends();
-
   MPI_Barrier(Comm);
 
-  // Phase 2: Stop the communication thread (rank 0).
+  // Stop the communication thread (rank 0).
   // Thread drains remaining messages before exiting.
   CommThread.stop();
 
@@ -263,31 +252,19 @@ void MPISharedStorageCache::ensureCommThreadStarted() {
 
 void MPISharedStorageCache::forwardToWriter(const HashT &HashValue,
                                             const CacheEntry &Entry) {
-  auto Pending = std::make_unique<PendingSend>();
-  Pending->Buffer = packMessage(HashValue, Entry);
+  std::vector<char> Buffer = packMessage(HashValue, Entry);
 
-  if (Pending->Buffer.size() >
-      static_cast<size_t>(std::numeric_limits<int>::max())) {
+  if (Buffer.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
     reportFatalError("MPI message size exceeds INT_MAX: " +
-                     std::to_string(Pending->Buffer.size()) + " bytes");
+                     std::to_string(Buffer.size()) + " bytes");
   }
 
   MPI_Comm Comm = CommHandle.get();
-  int Err = MPI_Isend(Pending->Buffer.data(),
-                      static_cast<int>(Pending->Buffer.size()), MPI_BYTE,
-                      /*dest=*/0, Tag, Comm, &Pending->Request);
+  int Err = MPI_Send(Buffer.data(), static_cast<int>(Buffer.size()), MPI_BYTE,
+                     /*dest=*/0, Tag, Comm);
   if (Err != MPI_SUCCESS) {
-    reportFatalError("MPI_Isend failed with error code " + std::to_string(Err));
+    reportFatalError("MPI_Send failed with error code " + std::to_string(Err));
   }
-
-  PendingSends.push_back(std::move(Pending));
-}
-
-void MPISharedStorageCache::waitForPendingSends() {
-  for (auto &Pending : PendingSends) {
-    MPI_Wait(&Pending->Request, MPI_STATUS_IGNORE);
-  }
-  PendingSends.clear();
 }
 
 std::vector<char> MPISharedStorageCache::packMessage(const HashT &HashValue,
