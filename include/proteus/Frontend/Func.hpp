@@ -693,6 +693,21 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator=(Var &&V) {
 template <typename T>
 Var<std::add_pointer_t<T>>
 Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::getAddress() {
+  if constexpr (std::is_reference_v<T>) {
+    // For references, load the pointer to create a T*.
+    auto *PtrStorage = static_cast<PointerStorage *>(Storage.get());
+    Value *PtrVal = PtrStorage->loadPointer();
+    Type *ElemTy = PtrStorage->getValueType();
+    unsigned AddrSpace = Fn.getAddressSpace(PtrStorage->getSlotType());
+    Type *PtrTy = Fn.getPointerType(ElemTy, AddrSpace);
+
+    std::unique_ptr<PointerStorage> ResultStorage =
+        Fn.createPointerStorage("addr.ref.tmp", PtrTy, ElemTy);
+    Fn.createStore(PtrVal, ResultStorage->getSlot());
+
+    return Var<std::add_pointer_t<T>>(std::move(ResultStorage), Fn);
+  }
+
   Value *Slot = getSlot();
   Type *ElemTy = getAllocatedType();
 
