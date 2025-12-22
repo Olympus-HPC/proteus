@@ -114,7 +114,8 @@ public:
 
 private:
   void forwardToWriter(const HashT &HashValue, const CacheEntry &Entry);
-  void waitForPendingSends();
+  void pollPendingSends();
+  void completeAllPendingSends();
   std::vector<char> packMessage(const HashT &HashValue,
                                 const CacheEntry &Entry);
   UnpackedMessage unpackMessage(const std::vector<char> &Buffer);
