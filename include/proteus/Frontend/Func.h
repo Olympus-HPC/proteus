@@ -153,6 +153,7 @@ public:
 
   // Type operations.
   unsigned getAddressSpace(Type *Ty);
+  unsigned getAddressSpaceFromValue(Value *PtrVal);
   Type *getPointerType(Type *ElemTy, unsigned AS);
   Type *getPointerTypeUnqual(Type *ElemTy);
   Type *getInt32Ty();
@@ -280,6 +281,8 @@ public:
 
   template <typename T> Var<T> declVar(const std::string &Name = "var") {
     static_assert(!std::is_array_v<T>, "Expected non-array type");
+    static_assert(!std::is_reference_v<T>,
+                  "declVar does not support reference types");
 
     auto &Ctx = getContext();
     Type *AllocaTy = TypeMap<T>::get(Ctx);
@@ -698,8 +701,9 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::getAddress() {
     auto *PtrStorage = static_cast<PointerStorage *>(Storage.get());
     Value *PtrVal = PtrStorage->loadPointer();
     Type *ElemTy = PtrStorage->getValueType();
-    unsigned AddrSpace = Fn.getAddressSpace(PtrStorage->getSlotType());
+    unsigned AddrSpace = Fn.getAddressSpaceFromValue(PtrVal);
     Type *PtrTy = Fn.getPointerType(ElemTy, AddrSpace);
+    PtrVal = Fn.createBitCast(PtrVal, PtrTy);
 
     std::unique_ptr<PointerStorage> ResultStorage =
         Fn.createPointerStorage("addr.ref.tmp", PtrTy, ElemTy);
