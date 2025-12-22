@@ -28,7 +28,7 @@ int main() {
   auto KernelHandle = J.addKernel<void(
       const double *, const double *, double *, double *, double *, double *,
       double *, double *, double *, double *, double *, double *, double *,
-      double *, double *, double *, double *)>("operators");
+      double *, double *, double *, double *, double *)>("operators");
   auto &F = KernelHandle.F;
   auto &Arg0 = F.getArg<0>();
   auto &Arg1 = F.getArg<1>();
@@ -47,6 +47,7 @@ int main() {
   auto &Arg14 = F.getArg<14>();
   auto &Arg15 = F.getArg<15>();
   auto &Arg16 = F.getArg<16>();
+  auto &Arg17 = F.getArg<17>();
   F.beginFunction();
   {
     Arg2[0] = Arg0[0] + Arg1[0];
@@ -82,20 +83,22 @@ int main() {
     auto NotCond = !(Cmp <= 5.0);
     Arg13[0] = NotCond;
 
-    // Test reference semantics: store dereference result in auto variable.
-    // This tests that operator*() returns Var<T&> which works correctly.
-    auto Ref14 = *Arg14;
+    // Check that Var<T*> operator* returns Var<T&>.
+    Var<double &> Ref14 = *Arg14;
     Ref14 = 42.0;
 
-    // Test reference semantics: store subscript result in auto variable.
-    // This tests that operator[] returns Var<T&> which works correctly.
-    auto Ref15 = Arg15[0];
+    // Check that Var<T[]> operator[] returns Var<T&>.
+    Var<double &> Ref15 = Arg15[0];
     Ref15 = 43.0;
 
-    // Test that arithmetic on reference types works correctly.
-    // The result should be Var<T> (not Var<T&>).
-    auto Ref16 = *Arg16;
+    Var<double &> Ref16 = *Arg16;
     Ref16 = Ref14 + Ref15;
+
+    // Test that getAddress() on Var<T&> returns the referenced pointer.
+    auto Ref17 = *Arg17;
+    auto Addr17 = Ref17.getAddress();
+    auto RefAddr17 = *Addr17;
+    RefAddr17 = 44.0;
 
     F.ret();
   }
@@ -104,7 +107,7 @@ int main() {
   J.compile();
 
   double *R0, *R1, *R2, *R3, *R4, *R5, *R6, *R7, *R8, *R9, *R10, *R11, *R12,
-      *R13, *R14, *R15, *R16;
+      *R13, *R14, *R15, *R16, *R17;
   gpuErrCheck(gpuMallocManaged(&R0, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R1, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R2, sizeof(double)));
@@ -122,14 +125,15 @@ int main() {
   gpuErrCheck(gpuMallocManaged(&R14, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R15, sizeof(double)));
   gpuErrCheck(gpuMallocManaged(&R16, sizeof(double)));
+  gpuErrCheck(gpuMallocManaged(&R17, sizeof(double)));
 
   *R0 = 2.0;
   *R1 = 3.0;
-  *R14 = *R15 = *R16 = 0.0;
+  *R14 = *R15 = *R16 = *R17 = 0.0;
 
   gpuErrCheck(KernelHandle.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, R0, R1, R2,
                                   R3, R4, R5, R6, R7, R8, R9, R10, R11, R12,
-                                  R13, R14, R15, R16));
+                                  R13, R14, R15, R16, R17));
   gpuErrCheck(gpuDeviceSynchronize());
 
   std::cout << "R0 = " << *R0 << "\n";
@@ -149,6 +153,7 @@ int main() {
   std::cout << "R14 = " << *R14 << "\n";
   std::cout << "R15 = " << *R15 << "\n";
   std::cout << "R16 = " << *R16 << "\n";
+  std::cout << "R17 = " << *R17 << "\n";
 
   gpuErrCheck(gpuFree(R0));
   gpuErrCheck(gpuFree(R1));
@@ -167,6 +172,7 @@ int main() {
   gpuErrCheck(gpuFree(R14));
   gpuErrCheck(gpuFree(R15));
   gpuErrCheck(gpuFree(R16));
+  gpuErrCheck(gpuFree(R17));
 
   proteus::finalize();
   return 0;
@@ -190,6 +196,7 @@ int main() {
 // CHECK-NEXT: R14 = 42
 // CHECK-NEXT: R15 = 43
 // CHECK-NEXT: R16 = 85
+// CHECK-NEXT: R17 = 44
 // CHECK-NEXT: proteus][Dispatcher{{CUDA|HIP}}] MemoryCache rank 0 hits 0 accesses 1
 // CHECK-NEXT: [proteus][Dispatcher{{CUDA|HIP}}] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: [proteus][Dispatcher{{CUDA|HIP}}] StorageCache rank 0 hits 0 accesses 1
