@@ -25,8 +25,9 @@ inline constexpr bool is_pointer_unref_v =
 // Used for the primary Var specialization for numeric types.
 template <typename T>
 inline constexpr bool is_scalar_arithmetic_v =
-    std::is_arithmetic_v<std::remove_reference_t<T>> && !std::is_pointer_v<T> &&
-    !std::is_array_v<T>;
+    std::is_arithmetic_v<std::remove_reference_t<T>> &&
+    !std::is_pointer_v<std::remove_reference_t<T>> &&
+    !std::is_array_v<std::remove_reference_t<T>>;
 
 // NOLINTEND(readability-identifier-naming)
 
