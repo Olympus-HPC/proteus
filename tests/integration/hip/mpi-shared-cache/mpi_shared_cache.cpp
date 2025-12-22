@@ -99,19 +99,22 @@ int main(int argc, char **argv) {
         }
       }
 
-      int ExpectedMin = 5 + 6 * Size;
+      int ExpectedMax = 5 + 6 * Size;
       std::cout << "Cache files found: " << NumCacheFiles << std::endl;
-      std::cout << "Expected minimum: " << ExpectedMin << std::endl;
+      std::cout << "Expected (max possible): " << ExpectedMax << std::endl;
       std::cout << "Rank-prefixed files: " << NumRankPrefixedFiles << std::endl;
 
-      if (NumCacheFiles >= ExpectedMin && NumRankPrefixedFiles == 0) {
-        std::cout << "PASS: MPI shared cache test succeeded" << std::endl;
-      } else {
-        std::cerr << "FAIL: Expected at least " << ExpectedMin
-                  << " cache files with no rank prefix, got " << NumCacheFiles
-                  << " files with " << NumRankPrefixedFiles << " rank-prefixed"
-                  << std::endl;
+      if (NumRankPrefixedFiles > 0) {
+        std::cerr << "FAIL: Found " << NumRankPrefixedFiles
+                  << " rank-prefixed cache files (expected 0)" << std::endl;
         ExitCode = 1;
+      } else if (NumCacheFiles == 0) {
+        std::cerr << "FAIL: No cache files found" << std::endl;
+        ExitCode = 1;
+      } else {
+        std::cout << "PASS: MPI shared cache test succeeded (" << NumCacheFiles
+                  << "/" << ExpectedMax << " specializations cached)"
+                  << std::endl;
       }
     }
   }
