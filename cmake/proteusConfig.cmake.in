@@ -30,7 +30,7 @@ endif()
 set(PROTEUS_ENABLE_MPI "@PROTEUS_ENABLE_MPI@")
 if(PROTEUS_ENABLE_MPI)
     find_dependency(MPI REQUIRED)
-    message(STATUS "MPI found")
+    message(STATUS "Found MPI library ${MPI_CXX_LIBRARY}")
 endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/ProteusFunctions.cmake")
