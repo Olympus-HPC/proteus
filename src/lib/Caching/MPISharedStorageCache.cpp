@@ -8,6 +8,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <limits>
@@ -165,7 +166,7 @@ void MPISharedStorageCache::finalize() {
 
   MPI_Comm Comm = CommHandle.get();
 
-  waitForPendingSends();
+  completeAllPendingSends();
 
   MPI_Barrier(Comm);
 
@@ -279,9 +280,25 @@ void MPISharedStorageCache::forwardToWriter(const HashT &HashValue,
   }
 
   PendingSends.push_back(std::move(Pending));
+  pollPendingSends();
 }
 
-void MPISharedStorageCache::waitForPendingSends() {
+void MPISharedStorageCache::pollPendingSends() {
+  if (PendingSends.empty())
+    return;
+
+  auto IsDone = [](const std::unique_ptr<PendingSend> &Pending) {
+    int Done = 0;
+    MPI_Test(&Pending->Request, &Done, MPI_STATUS_IGNORE);
+    return Done != 0;
+  };
+
+  PendingSends.erase(
+      std::remove_if(PendingSends.begin(), PendingSends.end(), IsDone),
+      PendingSends.end());
+}
+
+void MPISharedStorageCache::completeAllPendingSends() {
   for (auto &Pending : PendingSends) {
     MPI_Wait(&Pending->Request, MPI_STATUS_IGNORE);
   }
