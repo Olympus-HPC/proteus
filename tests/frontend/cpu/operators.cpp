@@ -15,13 +15,13 @@ int main() {
   proteus::init();
 
   auto J = proteus::JitModule();
-  auto &F = J.addFunction<void(const double *, const double *, double *,
-                               double *, double *, double *, double *, double *,
-                               double *, double *, double *, double *, double *,
-                               double *, double *, double *)>("operators");
+  auto &F = J.addFunction<void(
+      const double *, const double *, double *, double *, double *, double *,
+      double *, double *, double *, double *, double *, double *, double *,
+      double *, double *, double *, double *, double *, double *)>("operators");
 
   auto [Arg0, Arg1, Arg2, Arg3, Arg4, Arg5, Arg6, Arg7, Arg8, Arg9, Arg10,
-        Arg11, Arg12, Arg13, Arg14, Arg15] = F.getArgs();
+        Arg11, Arg12, Arg13, Arg14, Arg15, Arg16, Arg17, Arg18] = F.getArgs();
   F.beginFunction();
   {
     Arg2[0] = Arg0[0] + Arg1[0];
@@ -61,18 +61,34 @@ int main() {
 
     Arg14[0] = -Arg0[0];
 
+    // Test reference semantics: store dereference result in auto variable.
+    // This tests that operator*() returns Var<T&> which works correctly.
+    auto Ref16 = *Arg16;
+    Ref16 = 42.0;
+
+    // Test reference semantics: store subscript result in auto variable.
+    // This tests that operator[] returns Var<T&> which works correctly.
+    auto Ref17 = Arg17[0];
+    Ref17 = 43.0;
+
+    // Test that arithmetic on reference types works correctly.
+    // The result should be Var<T> (not Var<T&>).
+    auto Ref18 = *Arg18;
+    Ref18 = Ref16 + Ref17;
+
     F.ret();
   }
   F.endFunction();
 
   J.compile();
 
-  double R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14,
-      R15 = 0.0;
+  double R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15,
+      R16, R17, R18;
   R0 = 2.0;
   R1 = 3.0;
+  R16 = R17 = R18 = 0.0;
   F(&R0, &R1, &R2, &R3, &R4, &R5, &R6, &R7, &R8, &R9, &R10, &R11, &R12, &R13,
-    &R14, &R15);
+    &R14, &R15, &R16, &R17, &R18);
 
   std::cout << "R0 = " << R0 << "\n";
   std::cout << "R1 = " << R1 << "\n";
@@ -90,6 +106,9 @@ int main() {
   std::cout << "R13 = " << R13 << "\n";
   std::cout << "R14 = " << R14 << "\n";
   std::cout << "R15 = " << R15 << "\n";
+  std::cout << "R16 = " << R16 << "\n";
+  std::cout << "R17 = " << R17 << "\n";
+  std::cout << "R18 = " << R18 << "\n";
 
   proteus::finalize();
   return 0;
@@ -112,5 +131,8 @@ int main() {
 // CHECK-NEXT: R13 = 1
 // CHECK-NEXT: R14 = -2
 // CHECK-NEXT: R15 = 0
+// CHECK-NEXT: R16 = 42
+// CHECK-NEXT: R17 = 43
+// CHECK-NEXT: R18 = 85
 // CHECK-FIRST: [proteus][DispatcherHost] StorageCache rank 0 hits 0 accesses 1
 // CHECK-SECOND: [proteus][DispatcherHost] StorageCache rank 0 hits 1 accesses 1

@@ -125,14 +125,6 @@ llvm::Type *TypeMap<bool[]>::getPointerElemType(LLVMContext &) {
 }
 bool TypeMap<bool[]>::isSigned() { return false; }
 
-llvm::Type *TypeMap<double &>::get(LLVMContext &Ctx, std::size_t) {
-  return PointerType::getUnqual(Ctx);
-}
-llvm::Type *TypeMap<double &>::getPointerElemType(LLVMContext &Ctx) {
-  return Type::getDoubleTy(Ctx);
-}
-bool TypeMap<double &>::isSigned() { return false; }
-
 llvm::Type *TypeMap<double *>::get(LLVMContext &Ctx, std::size_t) {
   return PointerType::getUnqual(Ctx);
 }

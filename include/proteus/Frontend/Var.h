@@ -2,6 +2,7 @@
 #define PROTEUS_FRONTEND_VAR_H
 
 #include "proteus/Frontend/TypeMap.h"
+#include "proteus/Frontend/TypeTraits.h"
 #include "proteus/Frontend/VarStorage.h"
 
 #include <type_traits>
@@ -36,9 +37,10 @@ template <typename StorageT> struct VarStorageOwner {
 // Primary template declaration
 template <typename T, typename = void> struct Var;
 
-// Specialization for arithmetic types
+// Specialization for arithmetic types (including references to arithmetic
+// types).
 template <typename T>
-struct Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>
+struct Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>
     : public VarStorageOwner<VarStorage> {
   using ValueType = T;
   using ElemType = T;
@@ -108,7 +110,7 @@ struct Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>
   operator%(const U &ConstValue) const;
 
   // Unary operators
-  Var operator-() const;
+  Var<clean_t<T>> operator-() const;
   Var<bool> operator!() const;
 
   // Compound assignment operators
@@ -134,51 +136,51 @@ struct Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>
 
   // Comparison operators
   template <typename U>
-  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
   operator>(const Var<U> &Other) const;
 
   template <typename U>
-  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
   operator>=(const Var<U> &Other) const;
 
   template <typename U>
-  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
   operator<(const Var<U> &Other) const;
 
   template <typename U>
-  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
   operator<=(const Var<U> &Other) const;
 
   template <typename U>
-  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
   operator==(const Var<U> &Other) const;
 
   template <typename U>
-  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
   operator!=(const Var<U> &Other) const;
 
   template <typename U>
-  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
   operator>(const U &ConstValue) const;
 
   template <typename U>
-  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
   operator>=(const U &ConstValue) const;
 
   template <typename U>
-  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
   operator<(const U &ConstValue) const;
 
   template <typename U>
-  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
   operator<=(const U &ConstValue) const;
 
   template <typename U>
-  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
   operator==(const U &ConstValue) const;
 
   template <typename U>
-  std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
+  std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
   operator!=(const U &ConstValue) const;
 };
 
@@ -192,21 +194,22 @@ struct Var<T, std::enable_if_t<std::is_array_v<T>>>
   Var(std::unique_ptr<ArrayStorage> Storage, FuncBase &Fn)
       : VarStorageOwner<ArrayStorage>(std::move(Storage), Fn) {}
 
-  Var<ElemType> operator[](size_t Index);
+  Var<std::add_lvalue_reference_t<ElemType>> operator[](size_t Index);
 
   template <typename IdxT>
-  std::enable_if_t<std::is_integral_v<IdxT>, Var<ElemType>>
+  std::enable_if_t<std::is_integral_v<IdxT>,
+                   Var<std::add_lvalue_reference_t<ElemType>>>
   operator[](const Var<IdxT> &Index);
 
   Var<std::add_pointer_t<ValueType>> getAddress() const = delete;
 };
 
-// Specialization for pointer types
+// Specialization for pointer types (including references to pointers)
 template <typename T>
-struct Var<T, std::enable_if_t<std::is_pointer_v<T>>>
+struct Var<T, std::enable_if_t<is_pointer_unref_v<T>>>
     : public VarStorageOwner<PointerStorage> {
   using ValueType = T;
-  using ElemType = std::remove_pointer_t<T>;
+  using ElemType = std::remove_pointer_t<std::remove_reference_t<T>>;
 
   Var(std::unique_ptr<PointerStorage> Storage, FuncBase &Fn)
       : VarStorageOwner<PointerStorage>(std::move(Storage), Fn) {}
@@ -215,29 +218,30 @@ struct Var<T, std::enable_if_t<std::is_pointer_v<T>>>
   Value *loadPointer() const { return this->Storage->loadPointer(); }
   void storePointer(Value *Ptr) { this->Storage->storePointer(Ptr); }
 
-  Var<ElemType> operator[](size_t Index);
+  Var<std::add_lvalue_reference_t<ElemType>> operator[](size_t Index);
 
   template <typename IdxT>
-  std::enable_if_t<std::is_arithmetic_v<IdxT>, Var<ElemType>>
+  std::enable_if_t<std::is_arithmetic_v<IdxT>,
+                   Var<std::add_lvalue_reference_t<ElemType>>>
   operator[](const Var<IdxT> &Index);
 
-  Var<ElemType> operator*();
+  Var<std::add_lvalue_reference_t<ElemType>> operator*();
 
   Var<std::add_pointer_t<ValueType>> getAddress();
 
   template <typename OffsetT>
   std::enable_if_t<std::is_arithmetic_v<OffsetT>,
-                   Var<T, std::enable_if_t<std::is_pointer_v<T>>>>
+                   Var<T, std::enable_if_t<is_pointer_unref_v<T>>>>
   operator+(const Var<OffsetT> &Offset) const;
 
   template <typename OffsetT>
   std::enable_if_t<std::is_arithmetic_v<OffsetT>,
-                   Var<T, std::enable_if_t<std::is_pointer_v<T>>>>
+                   Var<T, std::enable_if_t<is_pointer_unref_v<T>>>>
   operator+(OffsetT Offset) const;
 
   template <typename OffsetT>
   friend std::enable_if_t<std::is_arithmetic_v<OffsetT>,
-                          Var<T, std::enable_if_t<std::is_pointer_v<T>>>>
+                          Var<T, std::enable_if_t<is_pointer_unref_v<T>>>>
   operator+(OffsetT Offset, const Var &Ptr) {
     return Ptr + Offset;
   }
