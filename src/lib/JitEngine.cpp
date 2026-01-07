@@ -28,7 +28,7 @@ JitEngine::JitEngine() {
 }
 
 std::string JitEngine::mangleSuffix(HashT &HashValue) {
-  return "$jit$" + HashValue.toString() + "$";
+  return ".jit_" + HashValue.toString();
 }
 
 SmallVector<RuntimeConstant> JitEngine::getRuntimeConstantValues(
