@@ -38,7 +38,7 @@ void JitModule::compile(bool Verify) {
   ModuleHash =
       std::make_unique<HashT>(hash(StringRef{Buffer.data(), Buffer.size()}));
   for (auto &JitF : Functions) {
-    JitF->setName(JitF->getName() + "$" + ModuleHash->toString());
+    JitF->setName(JitF->getName() + ModuleHash->toMangledSuffix());
   }
 
   if ((Library = Dispatch.lookupCompiledLibrary(*ModuleHash))) {

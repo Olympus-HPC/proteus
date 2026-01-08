@@ -566,7 +566,7 @@ JitEngineDevice<ImplT>::compileAndRun(
   // specialization will be in its own module uniquely identify by HashValue.
   // It exists only for debugging purposes to verify that the jitted kernel
   // executes.
-  std::string Suffix = mangleSuffix(HashValue);
+  std::string Suffix = HashValue.toMangledSuffix();
   std::string KernelMangled = (KernelInfo.getName() + Suffix);
 
   if (Config::get().ProteusUseStoredCache) {
