@@ -232,7 +232,7 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   if (JitFnPtr)
     return JitFnPtr;
 
-  std::string Suffix = mangleSuffix(HashValue);
+  std::string Suffix = HashValue.toMangledSuffix();
   std::string MangledFnName = FnName.str() + Suffix;
   std::unique_ptr<CompiledLibrary> Library;
 
