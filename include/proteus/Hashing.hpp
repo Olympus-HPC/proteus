@@ -27,6 +27,15 @@ public:
   inline HashT(const StringRef &S) { S.getAsInteger(0, Value); }
   inline stable_hash getValue() const { return Value; }
   inline std::string toString() const { return std::to_string(Value); }
+  // Returns a suffix for mangled JIT function names. CUDA uses "$" delimiters
+  // because "." generates invalid PTX. HIP/Host use "." for demangle-ability.
+  inline std::string toMangledSuffix() const {
+#if PROTEUS_ENABLE_CUDA
+    return "$jit$" + toString() + "$";
+#else
+    return ".jit." + toString();
+#endif
+  }
   inline bool operator==(const HashT &Other) const {
     return Value == Other.Value;
   }

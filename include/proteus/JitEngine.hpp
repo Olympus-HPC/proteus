@@ -43,8 +43,6 @@ protected:
                            ArrayRef<RuntimeConstantInfo *> RCInfoArray);
 
   JitEngine();
-
-  std::string mangleSuffix(HashT &HashValue);
 };
 
 } // namespace proteus
