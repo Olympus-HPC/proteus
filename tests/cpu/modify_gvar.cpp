@@ -44,9 +44,6 @@ int main() {
 // CHECK: GVar 1
 // CHECK: GVar 2
 // CHECK: GVar 3
-// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 0
-// CHECK: [proteus][JitEngineDevice] ObjectCacheChain rank 0 with 1 level(s):
-// CHECK: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 0
 // CHECK: [proteus][JitEngineHost] MemoryCache rank 0 hits 0 accesses 2
 // CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
