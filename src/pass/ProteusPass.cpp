@@ -216,14 +216,14 @@ private:
     Function *JITFn = JITInfo.first;
     JitFunctionInfo &JFI = JITInfo.second;
 
-    ValueToValueMapTy VMap;
-    auto JitMod = CloneModule(M, VMap, [](const GlobalValue *GV) {
-      if (const GlobalVariable *G = dyn_cast<GlobalVariable>(GV))
-        if (!G->isConstant())
-          return false;
+    auto JitMod = cloneKernelFromModules(
+        {M}, JITFn->getName(), [](const GlobalValue *GV) {
+          if (const GlobalVariable *G = dyn_cast<GlobalVariable>(GV))
+            if (!G->isConstant())
+              return false;
 
-      return true;
-    });
+          return true;
+        });
 
     Function *JitF = JitMod->getFunction(JITFn->getName());
     if (!JitF)
