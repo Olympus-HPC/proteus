@@ -10,9 +10,6 @@ namespace proteus {
 template <typename T>
 using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 
-// Alias for backwards compatibility
-template <typename T> using clean_t = remove_cvref_t<T>;
-
 // NOLINTBEGIN(readability-identifier-naming)
 
 // True if T (after removing references) is an arithmetic type.
