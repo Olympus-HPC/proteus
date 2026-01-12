@@ -164,7 +164,9 @@ public:
   bool isFloatingPointTy(Type *Ty);
 
   // Conversion operations.
-  template <typename From, typename To> Value *convert(Value *V) {
+  template <typename FromT, typename ToT> Value *convert(Value *V) {
+    using From = remove_cvref_t<FromT>;
+    using To = remove_cvref_t<ToT>;
     static_assert(std::is_arithmetic_v<From>, "From type must be arithmetic");
     static_assert(std::is_arithmetic_v<To>, "To type must be arithmetic");
 
@@ -429,8 +431,7 @@ public:
   convert(const Var<T> &V) {
     using ResultT = std::remove_reference_t<U>;
     Var<ResultT> Res = declVar<ResultT>("convert.");
-    Value *Converted =
-        convert<remove_cvref_t<T>, remove_cvref_t<U>>(V.loadValue());
+    Value *Converted = convert<T, U>(V.loadValue());
     Res.storeValue(Converted);
     return Res;
   }
@@ -587,8 +588,8 @@ binOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
   if (&Fn != &R.Fn)
     reportFatalError("Variables should belong to the same function");
 
-  Value *LHS = Fn.convert<remove_cvref_t<T>, CommonT>(L.loadValue());
-  Value *RHS = Fn.convert<remove_cvref_t<U>, CommonT>(R.loadValue());
+  Value *LHS = Fn.convert<T, CommonT>(L.loadValue());
+  Value *RHS = Fn.convert<U, CommonT>(R.loadValue());
 
   Value *Result = nullptr;
   if constexpr (std::is_integral_v<CommonT>) {
@@ -623,7 +624,7 @@ compoundAssignConst(Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &LHS,
 
   Value *LHSVal = LHS.loadValue();
 
-  RHS = LHS.Fn.template convert<remove_cvref_t<U>, remove_cvref_t<T>>(RHS);
+  RHS = LHS.Fn.template convert<U, T>(RHS);
   Value *Result = nullptr;
 
   if constexpr (std::is_integral_v<remove_cvref_t<T>>) {
@@ -646,7 +647,7 @@ Var<bool> cmpOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
     reportFatalError("Variables should belong to the same function");
 
   Value *LHS = L.loadValue();
-  Value *RHS = Fn.convert<remove_cvref_t<U>, remove_cvref_t<T>>(R.loadValue());
+  Value *RHS = Fn.convert<U, T>(R.loadValue());
 
   Value *Result = nullptr;
   if constexpr (std::is_integral_v<remove_cvref_t<T>>) {
@@ -671,8 +672,7 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::Var(const Var<U> &V)
   Type *TargetTy = TypeMap<remove_cvref_t<T>>::get(Fn.getContext());
   Storage = Fn.createScalarStorage("conv.var", TargetTy);
 
-  auto *Converted =
-      Fn.convert<remove_cvref_t<U>, remove_cvref_t<T>>(V.loadValue());
+  auto *Converted = Fn.convert<U, T>(V.loadValue());
   storeValue(Converted);
 }
 
@@ -738,8 +738,7 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator=(
     const Var<U> &V) {
   static_assert(is_mutable_v<T>, "Cannot assign to Var<const T>");
-  auto *Converted =
-      Fn.convert<remove_cvref_t<U>, remove_cvref_t<T>>(V.loadValue());
+  auto *Converted = Fn.convert<U, T>(V.loadValue());
   storeValue(Converted);
   return *this;
 }
@@ -1422,8 +1421,7 @@ template <typename T> struct IntrinsicOperandConverter {
   FuncBase &Fn;
 
   template <typename U> Value *operator()(const Var<U> &Operand) const {
-    return Fn.convert<remove_cvref_t<U>, remove_cvref_t<T>>(
-        Operand.loadValue());
+    return Fn.convert<U, T>(Operand.loadValue());
   }
 };
 
