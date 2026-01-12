@@ -315,6 +315,15 @@ struct LinkingCloner {
       auto *GV = WorkList.pop_back_val();
 
       if (auto *F = dyn_cast<Function>(GV)) {
+        // If the function has a personality function, resolve it as it needs to
+        // be declared in the cloned module.
+        if (F->hasPersonalityFn()) {
+          if (auto *PersGV = dyn_cast<GlobalValue>(
+                  F->getPersonalityFn()->stripPointerCasts())) {
+            resolveGV(Defs, PersGV, WorkList, Found);
+          }
+        }
+
         for (auto &BB : *F) {
           for (auto &I : BB) {
             // Add direct calls to other functions.
