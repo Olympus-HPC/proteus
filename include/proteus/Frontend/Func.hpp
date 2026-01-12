@@ -429,7 +429,8 @@ public:
   convert(const Var<T> &V) {
     using ResultT = std::remove_reference_t<U>;
     Var<ResultT> Res = declVar<ResultT>("convert.");
-    Value *Converted = convert<clean_t<T>, clean_t<U>>(V.loadValue());
+    Value *Converted =
+        convert<remove_cvref_t<T>, remove_cvref_t<U>>(V.loadValue());
     Res.storeValue(Converted);
     return Res;
   }
@@ -578,16 +579,16 @@ void FuncBase::beginWhile(CondLambda &&Cond, const char *File, int Line) {
 
 // Helper function for binary operations on Var types
 template <typename T, typename U, typename IntOp, typename FPOp>
-Var<std::common_type_t<clean_t<T>, clean_t<U>>>
+Var<std::common_type_t<remove_cvref_t<T>, remove_cvref_t<U>>>
 binOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
-  using CommonT = std::common_type_t<clean_t<T>, clean_t<U>>;
+  using CommonT = std::common_type_t<remove_cvref_t<T>, remove_cvref_t<U>>;
 
   FuncBase &Fn = L.Fn;
   if (&Fn != &R.Fn)
     reportFatalError("Variables should belong to the same function");
 
-  Value *LHS = Fn.convert<clean_t<T>, CommonT>(L.loadValue());
-  Value *RHS = Fn.convert<clean_t<U>, CommonT>(R.loadValue());
+  Value *LHS = Fn.convert<remove_cvref_t<T>, CommonT>(L.loadValue());
+  Value *RHS = Fn.convert<remove_cvref_t<U>, CommonT>(R.loadValue());
 
   Value *Result = nullptr;
   if constexpr (std::is_integral_v<CommonT>) {
@@ -607,14 +608,14 @@ template <typename T, typename U, typename IntOp, typename FPOp>
 Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &
 compoundAssignConst(Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &LHS,
                     const U &ConstValue, IntOp IOp, FPOp FOp) {
-  static_assert(std::is_convertible_v<clean_t<U>, clean_t<T>>,
+  static_assert(std::is_convertible_v<remove_cvref_t<U>, remove_cvref_t<T>>,
                 "U must be convertible to T");
 
   auto &Ctx = LHS.Fn.getContext();
-  Type *RHSType = TypeMap<clean_t<U>>::get(Ctx);
+  Type *RHSType = TypeMap<remove_cvref_t<U>>::get(Ctx);
 
   Value *RHS = nullptr;
-  if constexpr (std::is_integral_v<clean_t<U>>) {
+  if constexpr (std::is_integral_v<remove_cvref_t<U>>) {
     RHS = LHS.Fn.getConstantInt(RHSType, ConstValue);
   } else {
     RHS = LHS.Fn.getConstantFP(RHSType, ConstValue);
@@ -622,13 +623,14 @@ compoundAssignConst(Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &LHS,
 
   Value *LHSVal = LHS.loadValue();
 
-  RHS = LHS.Fn.template convert<clean_t<U>, clean_t<T>>(RHS);
+  RHS = LHS.Fn.template convert<remove_cvref_t<U>, remove_cvref_t<T>>(RHS);
   Value *Result = nullptr;
 
-  if constexpr (std::is_integral_v<clean_t<T>>) {
+  if constexpr (std::is_integral_v<remove_cvref_t<T>>) {
     Result = IOp(LHS.Fn, LHSVal, RHS);
   } else {
-    static_assert(std::is_floating_point_v<clean_t<T>>, "Unsupported type");
+    static_assert(std::is_floating_point_v<remove_cvref_t<T>>,
+                  "Unsupported type");
     Result = FOp(LHS.Fn, LHSVal, RHS);
   }
 
@@ -644,13 +646,14 @@ Var<bool> cmpOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
     reportFatalError("Variables should belong to the same function");
 
   Value *LHS = L.loadValue();
-  Value *RHS = Fn.convert<clean_t<U>, clean_t<T>>(R.loadValue());
+  Value *RHS = Fn.convert<remove_cvref_t<U>, remove_cvref_t<T>>(R.loadValue());
 
   Value *Result = nullptr;
-  if constexpr (std::is_integral_v<clean_t<T>>) {
+  if constexpr (std::is_integral_v<remove_cvref_t<T>>) {
     Result = IOp(Fn, LHS, RHS);
   } else {
-    static_assert(std::is_floating_point_v<clean_t<T>>, "Unsupported type");
+    static_assert(std::is_floating_point_v<remove_cvref_t<T>>,
+                  "Unsupported type");
     Result = FOp(Fn, LHS, RHS);
   }
 
@@ -665,10 +668,11 @@ template <typename U, typename>
 Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::Var(const Var<U> &V)
     : VarStorageOwner<VarStorage>(V.Fn) {
   // Allocate storage for the target type T.
-  Type *TargetTy = TypeMap<clean_t<T>>::get(Fn.getContext());
+  Type *TargetTy = TypeMap<remove_cvref_t<T>>::get(Fn.getContext());
   Storage = Fn.createScalarStorage("conv.var", TargetTy);
 
-  auto *Converted = Fn.convert<clean_t<U>, clean_t<T>>(V.loadValue());
+  auto *Converted =
+      Fn.convert<remove_cvref_t<U>, remove_cvref_t<T>>(V.loadValue());
   storeValue(Converted);
 }
 
@@ -734,7 +738,8 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator=(
     const Var<U> &V) {
   static_assert(is_mutable_v<T>, "Cannot assign to Var<const T>");
-  auto *Converted = Fn.convert<clean_t<U>, clean_t<T>>(V.loadValue());
+  auto *Converted =
+      Fn.convert<remove_cvref_t<U>, remove_cvref_t<T>>(V.loadValue());
   storeValue(Converted);
   return *this;
 }
@@ -999,10 +1004,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator%=(
 }
 
 template <typename T>
-Var<clean_t<T>>
+Var<remove_cvref_t<T>>
 Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator-() const {
-  auto MinusOne =
-      Fn.defVar<clean_t<T>>(static_cast<clean_t<T>>(-1), "minus_one.");
+  auto MinusOne = Fn.defVar<remove_cvref_t<T>>(
+      static_cast<remove_cvref_t<T>>(-1), "minus_one.");
   return MinusOne * (*this);
 }
 
@@ -1011,9 +1016,9 @@ Var<bool>
 Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator!() const {
   Value *V = loadValue();
   Value *ResV = nullptr;
-  if constexpr (std::is_same_v<clean_t<T>, bool>) {
+  if constexpr (std::is_same_v<remove_cvref_t<T>, bool>) {
     ResV = Fn.createNot(V);
-  } else if constexpr (std::is_integral_v<clean_t<T>>) {
+  } else if constexpr (std::is_integral_v<remove_cvref_t<T>>) {
     Value *Zero = Fn.getConstantInt(getValueType(), 0);
     ResV = Fn.createICmpEQ(V, Zero);
   } else {
@@ -1417,7 +1422,8 @@ template <typename T> struct IntrinsicOperandConverter {
   FuncBase &Fn;
 
   template <typename U> Value *operator()(const Var<U> &Operand) const {
-    return Fn.convert<clean_t<U>, clean_t<T>>(Operand.loadValue());
+    return Fn.convert<remove_cvref_t<U>, remove_cvref_t<T>>(
+        Operand.loadValue());
   }
 };
 
@@ -1583,13 +1589,13 @@ template <typename T> Var<float> absf(const Var<T> &R) {
 }
 
 template <typename T>
-std::enable_if_t<is_arithmetic_unref_v<T>, Var<clean_t<T>>>
+std::enable_if_t<is_arithmetic_unref_v<T>, Var<remove_cvref_t<T>>>
 min(const Var<T> &L, const Var<T> &R) {
   FuncBase &Fn = L.Fn;
   if (&Fn != &R.Fn)
     reportFatalError("Variables should belong to the same function");
 
-  auto ResultVar = Fn.declVar<clean_t<T>>("min_res");
+  auto ResultVar = Fn.declVar<remove_cvref_t<T>>("min_res");
   ResultVar = R;
   Fn.beginIf(L < R);
   { ResultVar = L; }
@@ -1598,14 +1604,14 @@ min(const Var<T> &L, const Var<T> &R) {
 }
 
 template <typename T>
-std::enable_if_t<is_arithmetic_unref_v<T>, Var<clean_t<T>>>
+std::enable_if_t<is_arithmetic_unref_v<T>, Var<remove_cvref_t<T>>>
 max(const Var<T> &L, const Var<T> &R) {
 
   FuncBase &Fn = L.Fn;
   if (&Fn != &R.Fn)
     reportFatalError("Variables should belong to the same function");
 
-  auto ResultVar = Fn.declVar<clean_t<T>>("max_res");
+  auto ResultVar = Fn.declVar<remove_cvref_t<T>>("max_res");
   ResultVar = R;
   Fn.beginIf(L > R);
   { ResultVar = L; }

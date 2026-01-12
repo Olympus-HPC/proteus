@@ -110,7 +110,7 @@ struct Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>
   operator%(const U &ConstValue) const;
 
   // Unary operators
-  Var<clean_t<T>> operator-() const;
+  Var<remove_cvref_t<T>> operator-() const;
   Var<bool> operator!() const;
 
   // Compound assignment operators
