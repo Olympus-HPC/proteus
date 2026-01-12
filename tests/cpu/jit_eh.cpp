@@ -19,7 +19,7 @@ int GVar = 1;
 __attribute__((annotate("jit"))) void modifyGVar() {
   if (GVar == 0)
     throw std::runtime_error("GVar is zero!");
-  GVar += 2;
+  GVar += 1;
 }
 
 int main() {
