@@ -2,7 +2,7 @@
 
 #include <hip/hip_runtime.h>
 
-#include "proteus/CppJitModule.hpp"
+#include "proteus/CppJitModule.h"
 
 using namespace proteus;
 

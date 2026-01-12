@@ -9,7 +9,7 @@
 #include <climits>
 #include <cstdio>
 
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 template <typename T> void testConst(T *A) {
   proteus::jit_array(A, 3);

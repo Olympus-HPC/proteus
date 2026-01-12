@@ -10,7 +10,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 __global__ void foo0(int *, int *, int);
 __global__ void foo1(int *, int *, int);

@@ -1,0 +1,264 @@
+#ifndef PROTEUS_CORE_LLVM_CUDA_H
+#define PROTEUS_CORE_LLVM_CUDA_H
+
+#include <llvm/ADT/SmallVector.h>
+#include <llvm/ADT/StringRef.h>
+#include <llvm/CodeGen/MachineModuleInfo.h>
+#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/IR/Module.h>
+#include <llvm/Support/MemoryBufferRef.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/Target/TargetMachine.h>
+
+#include "proteus/CoreLLVM.h"
+#include "proteus/Debug.h"
+#include "proteus/Logger.h"
+#include "proteus/TimeTracing.h"
+#include "proteus/UtilsCUDA.h"
+
+namespace proteus {
+
+using namespace llvm;
+
+namespace detail {
+
+inline const SmallVector<StringRef> &gridDimXFnName() {
+  static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.nctaid.x"};
+  return Names;
+}
+
+inline const SmallVector<StringRef> &gridDimYFnName() {
+  static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.nctaid.y"};
+  return Names;
+}
+
+inline const SmallVector<StringRef> &gridDimZFnName() {
+  static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.nctaid.z"};
+  return Names;
+}
+
+inline const SmallVector<StringRef> &blockDimXFnName() {
+  static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.ntid.x"};
+  return Names;
+}
+
+inline const SmallVector<StringRef> &blockDimYFnName() {
+  static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.ntid.y"};
+  return Names;
+}
+
+inline const SmallVector<StringRef> &blockDimZFnName() {
+  static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.ntid.z"};
+  return Names;
+}
+
+inline const SmallVector<StringRef> &blockIdxXFnName() {
+  static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.ctaid.x"};
+  return Names;
+}
+
+inline const SmallVector<StringRef> &blockIdxYFnName() {
+  static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.ctaid.y"};
+  return Names;
+}
+
+inline const SmallVector<StringRef> &blockIdxZFnName() {
+  static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.ctaid.z"};
+  return Names;
+}
+
+inline const SmallVector<StringRef> &threadIdxXFnName() {
+  static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.tid.x"};
+  return Names;
+}
+
+inline const SmallVector<StringRef> &threadIdxYFnName() {
+  static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.tid.y"};
+  return Names;
+}
+
+inline const SmallVector<StringRef> &threadIdxZFnName() {
+  static SmallVector<StringRef> Names = {"llvm.nvvm.read.ptx.sreg.tid.z"};
+  return Names;
+}
+
+} // namespace detail
+
+inline void setLaunchBoundsForKernel(Function &F, int MaxThreadsPerSM,
+                                     int MinBlocksPerSM = 0) {
+  auto *M = F.getParent();
+  NamedMDNode *NvvmAnnotations = M->getNamedMetadata("nvvm.annotations");
+  assert(NvvmAnnotations && "Expected non-null nvvm.annotations metadata");
+  auto *FuncMetadata = ConstantAsMetadata::get(&F);
+
+  auto SetMDNode = [&](const char *MDName, int MDValue) {
+    auto *MDNodeName = MDString::get(M->getContext(), MDName);
+    auto *MDNodeValue = ConstantAsMetadata::get(
+        ConstantInt::get(Type::getInt32Ty(M->getContext()), MDValue));
+
+    for (auto *MetadataNode : NvvmAnnotations->operands()) {
+      if (MetadataNode->getNumOperands() != 3)
+        continue;
+
+      auto *PtrMetadata = MetadataNode->getOperand(0).get();
+      auto *DescMetadata = MetadataNode->getOperand(1).get();
+      if (PtrMetadata == FuncMetadata && MDNodeName == DescMetadata) {
+        MetadataNode->replaceOperandWith(2, MDNodeValue);
+        return;
+      }
+    }
+    Metadata *MDVals[] = {FuncMetadata, MDNodeName, MDNodeValue};
+    NvvmAnnotations->addOperand(MDNode::get(M->getContext(), MDVals));
+  };
+
+  // TODO: fix hardcoded 1024 as the maximum, by reading device
+  // properties.
+  SetMDNode("maxntid", std::min(1024, MaxThreadsPerSM));
+  if (MinBlocksPerSM != 0)
+    SetMDNode("minctasm", MinBlocksPerSM);
+}
+
+inline void codegenPTX(Module &M, StringRef DeviceArch,
+                       SmallVectorImpl<char> &PTXStr) {
+  // TODO: It is possbile to use PTX directly through the CUDA PTX JIT
+  // interface. Maybe useful if we can re-link globals using the CUDA API.
+  // Check this reference for PTX JIT caching:
+  // https://developer.nvidia.com/blog/cuda-pro-tip-understand-fat-binaries-jit-caching/
+  // Interesting env vars: CUDA_CACHE_DISABLE, CUDA_CACHE_MAXSIZE,
+  // CUDA_CACHE_PATH, CUDA_FORCE_PTX_JIT.
+
+  Timer T;
+  auto TMExpected = proteus::detail::createTargetMachine(M, DeviceArch);
+  if (!TMExpected)
+    reportFatalError(toString(TMExpected.takeError()));
+
+  std::unique_ptr<TargetMachine> TM = std::move(*TMExpected);
+  TargetLibraryInfoImpl TLII(Triple(M.getTargetTriple()));
+  M.setDataLayout(TM->createDataLayout());
+
+  legacy::PassManager PM;
+  PM.add(new TargetLibraryInfoWrapperPass(TLII));
+  MachineModuleInfoWrapperPass *MMIWP =
+#if LLVM_VERSION_MAJOR >= 20
+      new MachineModuleInfoWrapperPass(TM.get());
+#else
+      new MachineModuleInfoWrapperPass(
+          reinterpret_cast<LLVMTargetMachine *>(TM.get()));
+#endif
+
+  raw_svector_ostream PTXOS(PTXStr);
+#if LLVM_VERSION_MAJOR >= 18
+  TM->addPassesToEmitFile(PM, PTXOS, nullptr, CodeGenFileType::AssemblyFile,
+                          /* DisableVerify */ false, MMIWP);
+#else
+  TM->addPassesToEmitFile(PM, PTXOS, nullptr, CGFT_AssemblyFile,
+                          /* DisableVerify */ false, MMIWP);
+#endif
+
+  PM.run(M);
+
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                       << "Codegen ptx " << T.elapsed() << " ms\n");
+}
+
+inline std::unique_ptr<MemoryBuffer>
+codegenObject(Module &M, StringRef DeviceArch,
+              SmallPtrSetImpl<void *> &GlobalLinkedBinaries,
+              CodegenOption CGOption = CodegenOption::RTC) {
+  if (CGOption != CodegenOption::RTC)
+    reportFatalError("Only RTC compilation is supported for CUDA");
+  SmallVector<char, 4096> PTXStr;
+  size_t BinSize;
+
+  codegenPTX(M, DeviceArch, PTXStr);
+  PTXStr.push_back('\0');
+
+  Timer T;
+  nvPTXCompilerHandle PTXCompiler;
+  proteusNvPTXCompilerErrCheck(
+      nvPTXCompilerCreate(&PTXCompiler, PTXStr.size(), PTXStr.data()));
+  std::string ArchOpt = ("--gpu-name=" + DeviceArch).str();
+  std::string RDCOption = "";
+  if (!GlobalLinkedBinaries.empty())
+    RDCOption = "-c";
+
+  if (Config::get().ProteusDebugOutput) {
+    const char *CompileOptions[] = {ArchOpt.c_str(), "--verbose",
+                                    RDCOption.c_str()};
+    size_t NumCompileOptions = 2 + (RDCOption.empty() ? 0 : 1);
+    proteusNvPTXCompilerErrCheck(
+        nvPTXCompilerCompile(PTXCompiler, NumCompileOptions, CompileOptions));
+  } else {
+    const char *CompileOptions[] = {ArchOpt.c_str(), RDCOption.c_str()};
+    size_t NumCompileOptions = 1 + (RDCOption.empty() ? 0 : 1);
+    proteusNvPTXCompilerErrCheck(
+        nvPTXCompilerCompile(PTXCompiler, NumCompileOptions, CompileOptions));
+  }
+
+  proteusNvPTXCompilerErrCheck(
+      nvPTXCompilerGetCompiledProgramSize(PTXCompiler, &BinSize));
+  auto ObjBuf = WritableMemoryBuffer::getNewUninitMemBuffer(BinSize);
+  proteusNvPTXCompilerErrCheck(
+      nvPTXCompilerGetCompiledProgram(PTXCompiler, ObjBuf->getBufferStart()));
+
+  if (Config::get().ProteusDebugOutput) {
+    size_t LogSize;
+    proteusNvPTXCompilerErrCheck(
+        nvPTXCompilerGetInfoLogSize(PTXCompiler, &LogSize));
+    auto Log = std::make_unique<char[]>(LogSize);
+    proteusNvPTXCompilerErrCheck(
+        nvPTXCompilerGetInfoLog(PTXCompiler, Log.get()));
+    Logger::logs("proteus") << "=== nvPTXCompiler Log\n" << Log.get() << "\n";
+  }
+
+  proteusNvPTXCompilerErrCheck(nvPTXCompilerDestroy(&PTXCompiler));
+
+  std::unique_ptr<MemoryBuffer> FinalObjBuf;
+  if (!GlobalLinkedBinaries.empty()) {
+    // Create CUDA context if needed. This is required by threaded async
+    // compilation.
+    CUcontext CUCtx;
+    proteusCuErrCheck(cuCtxGetCurrent(&CUCtx));
+    if (!CUCtx) {
+      CUdevice CUDev;
+      CUresult CURes = cuCtxGetDevice(&CUDev);
+      if (CURes == CUDA_ERROR_INVALID_CONTEXT or !CUDev)
+        proteusCuErrCheck(cuDeviceGet(&CUDev, 0));
+
+      proteusCuErrCheck(cuCtxGetCurrent(&CUCtx));
+      proteusCuErrCheck(cuCtxCreate(&CUCtx, 0, CUDev));
+    }
+
+    // TODO: re-implement using the more recent nvJitLink interface.
+    CUlinkState CULinkState;
+    proteusCuErrCheck(cuLinkCreate(0, nullptr, nullptr, &CULinkState));
+    for (auto *Ptr : GlobalLinkedBinaries) {
+      // We do not know the size of the binary but the CUDA API just needs a
+      // non-zero argument.
+      proteusCuErrCheck(cuLinkAddData(CULinkState, CU_JIT_INPUT_FATBINARY, Ptr,
+                                      1, "", 0, 0, 0));
+    }
+
+    // Again using a non-zero argument, though we can get the size from the ptx
+    // compiler.
+    proteusCuErrCheck(cuLinkAddData(
+        CULinkState, CU_JIT_INPUT_FATBINARY,
+        static_cast<void *>(ObjBuf->getBufferStart()), 1, "", 0, 0, 0));
+
+    void *BinOut;
+    size_t BinSize;
+    proteusCuErrCheck(cuLinkComplete(CULinkState, &BinOut, &BinSize));
+    FinalObjBuf = MemoryBuffer::getMemBufferCopy(
+        StringRef{static_cast<char *>(BinOut), BinSize});
+  } else {
+    FinalObjBuf = std::move(ObjBuf);
+  }
+
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
+                       << "Codegen CUDA RTC " << T.elapsed() << " ms\n");
+  return FinalObjBuf;
+}
+
+} // namespace proteus
+
+#endif

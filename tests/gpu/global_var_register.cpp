@@ -6,7 +6,7 @@
 
 #include "gpu_common.h"
 #include <cstdio>
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 struct LargeStruct {
   char Blob[107];
@@ -55,21 +55,21 @@ int main() {
 // CHECK-DAG: IntVar has size of [[SZ_INT]]
 
 // LongVar
-// CHECK-DAG: [GVarInfo]: LongVar HAddr:{{0x[0-9a-f]+}} DevAddr:{{0x[0-9a-f]+}} VarSize:[[SZ_LONG:[0-9]+]] 
+// CHECK-DAG: [GVarInfo]: LongVar HAddr:{{0x[0-9a-f]+}} DevAddr:{{0x[0-9a-f]+}} VarSize:[[SZ_LONG:[0-9]+]]
 // CHECK-DAG: LongVar has size of [[SZ_LONG]]
 
 // FloatVar
-// CHECK-DAG: [GVarInfo]: FloatVar HAddr:{{0x[0-9a-f]+}} DevAddr:{{0x[0-9a-f]+}} VarSize:[[SZ_FLOAT:[0-9]+]] 
+// CHECK-DAG: [GVarInfo]: FloatVar HAddr:{{0x[0-9a-f]+}} DevAddr:{{0x[0-9a-f]+}} VarSize:[[SZ_FLOAT:[0-9]+]]
 // CHECK-DAG: FloatVar has size of [[SZ_FLOAT]]
 
 // DoubleVar
-// CHECK-DAG: [GVarInfo]: DoubleVar HAddr:{{0x[0-9a-f]+}} DevAddr:{{0x[0-9a-f]+}} VarSize:[[SZ_DOUBLE:[0-9]+]] 
+// CHECK-DAG: [GVarInfo]: DoubleVar HAddr:{{0x[0-9a-f]+}} DevAddr:{{0x[0-9a-f]+}} VarSize:[[SZ_DOUBLE:[0-9]+]]
 // CHECK-DAG: DoubleVar has size of [[SZ_DOUBLE]]
 
 // LSVar
-// CHECK-DAG: [GVarInfo]: LSVar HAddr:{{0x[0-9a-f]+}} DevAddr:{{0x[0-9a-f]+}} VarSize:[[SZ_LS:[0-9]+]] 
+// CHECK-DAG: [GVarInfo]: LSVar HAddr:{{0x[0-9a-f]+}} DevAddr:{{0x[0-9a-f]+}} VarSize:[[SZ_LS:[0-9]+]]
 // CHECK-DAG: LSVar has size of [[SZ_LS]]
 
 // SSVar
-// CHECK-DAG: [GVarInfo]: SSVar HAddr:{{0x[0-9a-f]+}} DevAddr:{{0x[0-9a-f]+}} VarSize:[[SZ_SS:[0-9]+]] 
+// CHECK-DAG: [GVarInfo]: SSVar HAddr:{{0x[0-9a-f]+}} DevAddr:{{0x[0-9a-f]+}} VarSize:[[SZ_SS:[0-9]+]]
 // CHECK-DAG: SSVar has size of [[SZ_SS]]

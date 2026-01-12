@@ -11,9 +11,9 @@
 #include <cstdlib>
 #include <string>
 
-#include "proteus/Hashing.hpp"
-#include "proteus/JitEngine.hpp"
-#include "proteus/TimeTracing.hpp"
+#include "proteus/Hashing.h"
+#include "proteus/JitEngine.h"
+#include "proteus/TimeTracing.h"
 
 namespace proteus {
 

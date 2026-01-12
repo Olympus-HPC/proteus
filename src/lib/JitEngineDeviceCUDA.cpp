@@ -8,9 +8,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "proteus/JitEngineDeviceCUDA.hpp"
-#include "proteus/CoreLLVM.hpp"
-#include "proteus/JitEngineDevice.hpp"
+#include "proteus/JitEngineDeviceCUDA.h"
+#include "proteus/CoreLLVM.h"
+#include "proteus/JitEngineDevice.h"
 #include "proteus/Utils.h"
 #include "proteus/UtilsCUDA.h"
 

@@ -10,7 +10,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 extern __device__ int Gvar0;
 

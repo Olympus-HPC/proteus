@@ -8,7 +8,7 @@
 
 #include <iostream>
 
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 // NOTE: Global variable to be modified inside JIT code must have external
 // linkage to be accessible from JIT modules. Static internal linkage global

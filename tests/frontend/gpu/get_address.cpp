@@ -4,8 +4,8 @@
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
-#include <proteus/Frontend/Builtins.hpp>
-#include <proteus/JitFrontend.hpp>
+#include <proteus/Frontend/Builtins.h>
+#include <proteus/JitFrontend.h>
 
 #include "../../gpu/gpu_common.h"
 

@@ -6,8 +6,8 @@
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
-#include <proteus/Frontend/Builtins.hpp>
-#include <proteus/JitFrontend.hpp>
+#include <proteus/Frontend/Builtins.h>
+#include <proteus/JitFrontend.h>
 
 #if PROTEUS_ENABLE_HIP
 #define TARGET "hip"

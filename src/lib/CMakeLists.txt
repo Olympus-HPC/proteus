@@ -192,5 +192,5 @@ install(
 # Install headers preserving directory structure
 install(DIRECTORY ${PROTEUS_PROJECT_INCLUDE_DIR}/
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-  FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+  FILES_MATCHING PATTERN "*.h"
 )

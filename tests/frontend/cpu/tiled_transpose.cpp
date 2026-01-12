@@ -11,8 +11,8 @@
 #include <cstdlib>
 #include <iostream>
 
-#include <proteus/JitFrontend.hpp>
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitFrontend.h>
+#include <proteus/JitInterface.h>
 
 static auto getTiled2DTransposeFunction(int ROWS, int COLS, int TileSize) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");

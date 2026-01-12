@@ -1,14 +1,14 @@
-#include "proteus/Frontend/Dispatcher.hpp"
+#include "proteus/Frontend/Dispatcher.h"
 
 #include "proteus/Error.h"
-#include "proteus/Frontend/DispatcherHost.hpp"
+#include "proteus/Frontend/DispatcherHost.h"
 #if PROTEUS_ENABLE_HIP
-#include "proteus/Frontend/DispatcherHIP.hpp"
-#include "proteus/Frontend/DispatcherHostHIP.hpp"
+#include "proteus/Frontend/DispatcherHIP.h"
+#include "proteus/Frontend/DispatcherHostHIP.h"
 #endif
 #if PROTEUS_ENABLE_CUDA
-#include "proteus/Frontend/DispatcherCUDA.hpp"
-#include "proteus/Frontend/DispatcherHostCUDA.hpp"
+#include "proteus/Frontend/DispatcherCUDA.h"
+#include "proteus/Frontend/DispatcherHostCUDA.h"
 #endif
 
 namespace proteus {

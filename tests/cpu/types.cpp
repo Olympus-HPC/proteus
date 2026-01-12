@@ -10,7 +10,7 @@
 
 #include <iostream>
 
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 template <typename T> __attribute__((annotate("jit", 1))) void test(T Arg) {
   volatile T Local;

@@ -1,7 +1,7 @@
 #include <hip/hip_runtime.h>
 #include <stdio.h>
 
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 void foo();
 void bar();

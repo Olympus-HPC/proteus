@@ -11,7 +11,7 @@
 
 #include "gpu_common.h"
 
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 struct DimInt {
   int X, Y, Z;

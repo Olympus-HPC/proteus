@@ -6,7 +6,7 @@
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
-#include "proteus/CppJitModule.hpp"
+#include "proteus/CppJitModule.h"
 
 #if PROTEUS_ENABLE_HIP
 #define TARGET "host_hip"

@@ -9,7 +9,7 @@
 #include <climits>
 #include <cstdio>
 
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 // The size of array must be provided at compile time.
 #define N 3

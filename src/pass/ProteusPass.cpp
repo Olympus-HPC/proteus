@@ -31,8 +31,8 @@
 #include "proteus/Cloning.h"
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Error.h"
-#include "proteus/Hashing.hpp"
-#include "proteus/Logger.hpp"
+#include "proteus/Hashing.h"
+#include "proteus/Logger.h"
 #include "proteus/RuntimeConstantTypeHelpers.h"
 
 #include <llvm/ADT/SmallPtrSet.h>

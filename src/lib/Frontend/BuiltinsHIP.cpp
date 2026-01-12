@@ -1,5 +1,5 @@
-#include "proteus/Frontend/Builtins.hpp"
-#include "proteus/Frontend/Func.hpp"
+#include "proteus/Frontend/Builtins.h"
+#include "proteus/Frontend/Func.h"
 
 #include <llvm/IR/Module.h>
 

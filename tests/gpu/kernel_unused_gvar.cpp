@@ -9,7 +9,7 @@
 #include <cstdio>
 
 #include "gpu_common.h"
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 extern __global__ void kernelGvar();
 

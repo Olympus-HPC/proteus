@@ -10,13 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "proteus/JitEngineHost.hpp"
+#include "proteus/JitEngineHost.h"
 #include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/CompilerInterfaceTypes.h"
-#include "proteus/CoreLLVM.hpp"
-#include "proteus/LambdaRegistry.hpp"
-#include "proteus/TransformArgumentSpecialization.hpp"
-#include "proteus/TransformLambdaSpecialization.hpp"
+#include "proteus/CoreLLVM.h"
+#include "proteus/LambdaRegistry.h"
+#include "proteus/TransformArgumentSpecialization.h"
+#include "proteus/TransformLambdaSpecialization.h"
 #if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
 #include "proteus/CompilerInterfaceDevice.h"
 #endif

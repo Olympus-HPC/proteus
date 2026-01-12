@@ -6,8 +6,8 @@
 
 #include <iostream>
 
-#include <proteus/JitFrontend.hpp>
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitFrontend.h>
+#include <proteus/JitInterface.h>
 
 using namespace proteus;
 

@@ -10,7 +10,7 @@
 #include <cstdlib>
 #include <iostream>
 
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 __attribute__((annotate("jit", R"({"arg":1})", R"({"arg":4})"))) void
 myDaxpy(double A, double *X, double *Y, size_t N) {

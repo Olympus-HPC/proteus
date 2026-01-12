@@ -9,7 +9,7 @@
 #include <cstdio>
 
 #include "gpu_common.h"
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 __global__ __attribute__((annotate("jit", 1))) void kernel(int I) {
   printf("Kernel i %d\n", I);

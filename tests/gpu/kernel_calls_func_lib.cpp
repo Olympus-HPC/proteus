@@ -8,7 +8,7 @@
 
 #include "gpu_common.h"
 #include <cstdio>
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 // Forward declaration
 extern __device__ void deviceFunction(int A);

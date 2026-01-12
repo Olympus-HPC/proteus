@@ -3,7 +3,7 @@
 
 #include <llvm/Support/MemoryBuffer.h>
 
-#include "proteus/CompiledLibrary.hpp"
+#include "proteus/CompiledLibrary.h"
 
 namespace proteus {
 

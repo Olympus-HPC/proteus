@@ -10,8 +10,8 @@
 
 #include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/CompilerInterfaceTypes.h"
-#include "proteus/JitEngineHost.hpp"
-#include "proteus/LambdaRegistry.hpp"
+#include "proteus/JitEngineHost.h"
+#include "proteus/LambdaRegistry.h"
 
 using namespace proteus;
 using namespace llvm;

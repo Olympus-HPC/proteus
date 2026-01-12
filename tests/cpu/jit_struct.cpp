@@ -9,7 +9,7 @@
 #include <climits>
 #include <cstdio>
 
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 struct DimInt {
   int X, Y, Z;

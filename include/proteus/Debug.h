@@ -4,7 +4,7 @@
 #include <llvm/IR/Value.h>
 #include <llvm/Support/raw_ostream.h>
 
-#include "proteus/Config.hpp"
+#include "proteus/Config.h"
 
 #define PROTEUS_DBG(x)                                                         \
   do                                                                           \

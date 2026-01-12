@@ -1,4 +1,4 @@
-#include "proteus/Frontend/TypeMap.hpp"
+#include "proteus/Frontend/TypeMap.h"
 
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/LLVMContext.h>
