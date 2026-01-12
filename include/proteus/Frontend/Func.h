@@ -421,13 +421,14 @@ public:
   void setName(const std::string &NewName);
 
   // Convert the given Var's value to type U and return a new Var holding
-  // the converted value.
+  // the converted value. Preserves cv-qualifiers but drops references.
   template <typename U, typename T>
   std::enable_if_t<std::is_convertible_v<std::remove_reference_t<T>,
                                          std::remove_reference_t<U>>,
-                   Var<clean_t<U>>>
+                   Var<std::remove_reference_t<U>>>
   convert(const Var<T> &V) {
-    Var<clean_t<U>> Res = declVar<clean_t<U>>("convert.");
+    using ResultT = std::remove_reference_t<U>;
+    Var<ResultT> Res = declVar<ResultT>("convert.");
     Value *Converted = convert<clean_t<T>, clean_t<U>>(V.loadValue());
     Res.storeValue(Converted);
     return Res;

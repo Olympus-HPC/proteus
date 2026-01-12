@@ -82,6 +82,12 @@ int main() {
     auto RefAddr19 = *Addr19;
     RefAddr19 = 44.0;
 
+    // Test that convert<const U> preserves the const qualifier.
+    auto MutableVar = F.declVar<double>("mutable");
+    MutableVar = 100.0;
+    auto ConvertedConst = F.convert<const double>(MutableVar);
+    static_assert(std::is_same_v<decltype(ConvertedConst), Var<const double>>);
+
     F.ret();
   }
   F.endFunction();
