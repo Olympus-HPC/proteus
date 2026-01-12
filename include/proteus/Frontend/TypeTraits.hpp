@@ -5,9 +5,10 @@
 
 namespace proteus {
 
-// Type alias to remove cv-qualifiers and references.
+// Type alias to remove cv-qualifiers and references (C++17 equivalent of
+// C++20's std::remove_cvref_t).
 template <typename T>
-using clean_t = std::remove_cv_t<std::remove_reference_t<T>>;
+using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 
 // NOLINTBEGIN(readability-identifier-naming)
 
