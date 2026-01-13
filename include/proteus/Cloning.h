@@ -315,6 +315,15 @@ struct LinkingCloner {
       auto *GV = WorkList.pop_back_val();
 
       if (auto *F = dyn_cast<Function>(GV)) {
+        // If the function has a personality function, resolve it as it needs to
+        // be declared in the cloned module.
+        if (F->hasPersonalityFn()) {
+          if (auto *PersGV = dyn_cast<GlobalValue>(
+                  F->getPersonalityFn()->stripPointerCasts())) {
+            resolveGV(Defs, PersGV, WorkList, Found);
+          }
+        }
+
         for (auto &BB : *F) {
           for (auto &I : BB) {
             // Add direct calls to other functions.
@@ -346,9 +355,10 @@ struct LinkingCloner {
     return Found;
   }
 
-  std::unique_ptr<Module>
-  cloneClosure(Module &M, LLVMContext &Ctx,
-               SmallPtrSetImpl<GlobalValue *> const &Reachable) {
+  std::unique_ptr<Module> cloneClosure(
+      Module &M, LLVMContext &Ctx,
+      SmallPtrSetImpl<GlobalValue *> const &Reachable,
+      function_ref<bool(const GlobalValue *)> ShouldCloneDefinition = nullptr) {
     auto ModuleOut =
         std::make_unique<Module>(M.getName().str() + ".closure.clone", Ctx);
     ModuleOut->setSourceFileName(M.getSourceFileName());
@@ -420,6 +430,12 @@ struct LinkingCloner {
 
     // Clone function bodies and global variable initializers.
     for (GlobalValue *GV : Reachable) {
+      // Check if the ShouldCloneDefinition callback exists and call to exclude
+      // or include the definition of this GV.
+      if (ShouldCloneDefinition)
+        if (!ShouldCloneDefinition(GV))
+          continue;
+
       if (auto *F = dyn_cast<Function>(GV)) {
         Function *NF = cast<Function>(VMap[F]);
         SmallVector<ReturnInst *, 8> Returns;
@@ -494,9 +510,9 @@ struct LinkingCloner {
   }
 };
 
-inline std::unique_ptr<Module>
-cloneKernelFromModules(ArrayRef<std::reference_wrapper<Module>> Mods,
-                       StringRef EntryName) {
+inline std::unique_ptr<Module> cloneKernelFromModules(
+    ArrayRef<std::reference_wrapper<Module>> Mods, StringRef EntryName,
+    function_ref<bool(const GlobalValue *)> ShouldCloneDefinition = nullptr) {
   auto Cloner = LinkingCloner();
   LinkingCloner::DefMaps Defs = Cloner.buildDefMaps(Mods);
 
@@ -536,8 +552,8 @@ cloneKernelFromModules(ArrayRef<std::reference_wrapper<Module>> Mods,
   }
 
   // Clone closure in new module.
-  auto KernelModule =
-      Cloner.cloneClosure(*EntryM, EntryF->getContext(), Reachable);
+  auto KernelModule = Cloner.cloneClosure(*EntryM, EntryF->getContext(),
+                                          Reachable, ShouldCloneDefinition);
 
   return KernelModule;
 }

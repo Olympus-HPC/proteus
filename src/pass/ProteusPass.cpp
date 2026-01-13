@@ -216,16 +216,18 @@ private:
     Function *JITFn = JITInfo.first;
     JitFunctionInfo &JFI = JITInfo.second;
 
-    ValueToValueMapTy VMap;
-    auto JitMod = CloneModule(M, VMap, [](const GlobalValue *GV) {
-      if (const GlobalVariable *G = dyn_cast<GlobalVariable>(GV))
-        if (!G->isConstant())
-          return false;
+    auto JitMod = cloneKernelFromModules(
+        {M}, JITFn->getName(), [](const GlobalValue *GV) {
+          if (const GlobalVariable *G = dyn_cast<GlobalVariable>(GV))
+            if (!G->isConstant())
+              return false;
 
-      return true;
-    });
+          return true;
+        });
 
-    Function *JitF = cast<Function>(VMap[JITFn]);
+    Function *JitF = JitMod->getFunction(JITFn->getName());
+    if (!JitF)
+      reportFatalError("Expected JIT function in cloned module");
     JitF->setLinkage(GlobalValue::ExternalLinkage);
 
     // Internalize functions, besides JIT function, in the module
@@ -236,6 +238,12 @@ private:
 
       if (&JitModF == JitF)
         continue;
+
+      // Remove Comdat from functions to be internalized, otherwise they will
+      // stay external. The JIT module is not linked with anything else, so
+      // Comdat is not needed.
+      if (JitModF.hasComdat())
+        JitModF.setComdat(nullptr);
 
       // Internalize other functions in the module.
       JitModF.setLinkage(GlobalValue::InternalLinkage);
