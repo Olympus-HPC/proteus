@@ -14,12 +14,11 @@
 #include "proteus/Error.h"
 #include "proteus/Logger.hpp"
 #include "proteus/TimeTracing.hpp"
-#include <filesystem>
-#include <string>
 
 #include <llvm/ADT/Twine.h>
 #include <llvm/Support/SourceMgr.h>
 
+#include <filesystem>
 #include <string>
 
 template <typename T>
@@ -33,6 +32,8 @@ inline void saveToFile(llvm::StringRef Filepath, T &&Data) {
 }
 
 // Write to temp file first, then rename so readers never see a partial file.
+// Note: rename() atomicity is not guaranteed on NFS; concurrent readers may
+// occasionally see missing files, causing redundant compilation.
 template <typename T>
 void saveToFileAtomic(llvm::StringRef Filepath, T &&Data) {
   std::string TempPath = Filepath.str() + ".tmp";

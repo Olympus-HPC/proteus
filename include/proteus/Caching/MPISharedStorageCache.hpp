@@ -11,6 +11,12 @@
 #ifndef PROTEUS_MPISHAREDSTORAGECACHE_HPP
 #define PROTEUS_MPISHAREDSTORAGECACHE_HPP
 
+#include "proteus/Caching/ObjectCache.hpp"
+#include "proteus/CompiledLibrary.hpp"
+#include "proteus/Hashing.hpp"
+
+#include <mpi.h>
+
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -20,12 +26,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-
-#include <mpi.h>
-
-#include "proteus/Caching/ObjectCache.hpp"
-#include "proteus/CompiledLibrary.hpp"
-#include "proteus/Hashing.hpp"
 
 namespace proteus {
 
