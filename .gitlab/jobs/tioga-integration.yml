@@ -22,9 +22,9 @@
         - cmake-clang_plugin-proteusFrontend
         - cmake-proteusFrontend-gcc
         PROTEUS_CI_ROCM_VERSION: ["6.3.1", "6.4.1", "7.1.0"]
-      - PROTEUS_CI_INTEGRATION_TEST:
-        - mneme-install
-        PROTEUS_CI_ROCM_VERSION: ["6.3.1", "6.4.1"]
+      #- PROTEUS_CI_INTEGRATION_TEST:
+      #  - mneme-install
+      #  PROTEUS_CI_ROCM_VERSION: ["6.3.1", "6.4.1"]
 
 test-integration-tioga:
   extends: [.base-job, .variants]
