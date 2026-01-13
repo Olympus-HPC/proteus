@@ -21,9 +21,11 @@
 #include <filesystem>
 #include <string>
 
+// Write to temp file first, then rename so readers never see a partial file.
+// Note: rename() atomicity is not guaranteed on NFS; concurrent readers may
+// occasionally see missing files, causing redundant compilation.
 template <typename T>
 inline void saveToFile(llvm::StringRef Filepath, T &&Data) {
-  // Write to temp file first, then rename so readers never see a partial file.
   std::string TempPath = Filepath.str() + ".tmp";
 
   std::error_code EC;

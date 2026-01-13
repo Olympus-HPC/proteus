@@ -69,9 +69,8 @@ void StorageCache::store(const HashT &HashValue, const CacheEntry &Entry) {
                          "-cache-jit-" + HashValue.toString();
   std::string Extension = Entry.isSharedObject() ? ".so" : ".o";
 
-  saveToFile(
-      Filebase + Extension,
-      StringRef{Entry.Buffer.getBufferStart(), Entry.Buffer.getBufferSize()});
+  saveToFile(Filebase + Extension, StringRef{Entry.Buffer.getBufferStart(),
+                                             Entry.Buffer.getBufferSize()});
 }
 
 void StorageCache::printStats() {

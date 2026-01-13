@@ -345,7 +345,6 @@ std::vector<char> MPISharedStorageCache::packMessage(const HashT &HashValue,
            static_cast<int>(BufferSize), MPI_BYTE, Packed.data(), TotalSize,
            &Position, Comm);
 
-  Packed.resize(Position);
   return Packed;
 }
 
