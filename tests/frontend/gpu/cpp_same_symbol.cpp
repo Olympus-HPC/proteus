@@ -9,7 +9,7 @@
 // Tests that kernels with the same symbol from different modules are correctly
 // cached and execute individually.
 
-#include "proteus/CppJitModule.hpp"
+#include "proteus/CppJitModule.h"
 
 #include "../../gpu/gpu_common.h"
 

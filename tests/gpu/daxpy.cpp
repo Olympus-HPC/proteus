@@ -10,7 +10,7 @@
 #include <iostream>
 
 #include "gpu_common.h"
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 __global__ __attribute__((annotate("jit", 4), noinline)) void
 daxpyImpl(double A, double *X, double *Y, size_t N) {

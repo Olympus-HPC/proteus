@@ -10,7 +10,7 @@
 #include <cstdio>
 
 #include "gpu_common.h"
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 template <typename T> __global__ void testConst(T *A) {
   proteus::jit_array(A, 3);

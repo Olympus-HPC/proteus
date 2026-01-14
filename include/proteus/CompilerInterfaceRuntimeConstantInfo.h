@@ -4,7 +4,7 @@
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Debug.h"
 #include "proteus/Error.h"
-#include "proteus/Logger.hpp"
+#include "proteus/Logger.h"
 #include "proteus/RuntimeConstantTypeHelpers.h"
 
 #include <optional>

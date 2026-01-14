@@ -7,8 +7,8 @@
 // clang-format on
 
 #include <iostream>
-#include <proteus/JitFrontend.hpp>
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitFrontend.h>
+#include <proteus/JitInterface.h>
 
 // Test unroll() without count.
 static auto getUnrollEnableFunction(int N) {

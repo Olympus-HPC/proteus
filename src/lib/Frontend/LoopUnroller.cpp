@@ -1,4 +1,4 @@
-#include "proteus/Frontend/LoopUnroller.hpp"
+#include "proteus/Frontend/LoopUnroller.h"
 
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>

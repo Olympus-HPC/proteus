@@ -1,5 +1,5 @@
 #include "gpu_common.h"
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 __device__ int Gvar = 23;
 

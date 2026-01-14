@@ -9,8 +9,8 @@
 #include <cstdio>
 
 #include "gpu_common.h"
-#include "launcher.hpp"
-#include <proteus/JitInterface.hpp>
+#include "launcher.h"
+#include <proteus/JitInterface.h>
 
 void foo();
 

@@ -10,7 +10,7 @@
 #include <cstdio>
 
 #include "gpu_common.h"
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 // The size of array must be provided at compile time.
 #define N 3

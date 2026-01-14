@@ -154,7 +154,7 @@ Here's an illustrative example to compile a DAXPY kernel through this API:
 
 ```cpp
 #include <format>
-#include <proteus/CppJitModule.hpp>
+#include <proteus/CppJitModule.h>
 
 // Allocate and initialize input vectors A and B, and specify their size N.
 double *X = ...; // Pointer to vector X

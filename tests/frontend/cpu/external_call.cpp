@@ -8,8 +8,8 @@
 
 #include <iostream>
 
-#include <proteus/JitFrontend.hpp>
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitFrontend.h>
+#include <proteus/JitInterface.h>
 
 extern "C" {
 void hello() { std::cout << "Hello!\n"; }

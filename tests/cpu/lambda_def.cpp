@@ -8,7 +8,7 @@
 
 #include <cstdio>
 
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 template <typename F> void run(F &&Func) {
   proteus::register_lambda(Func);

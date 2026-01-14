@@ -8,10 +8,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "proteus/Caching/StorageCache.hpp"
-#include "proteus/CompiledLibrary.hpp"
-#include "proteus/Config.hpp"
-#include "proteus/Hashing.hpp"
+#include "proteus/Caching/StorageCache.h"
+#include "proteus/CompiledLibrary.h"
+#include "proteus/Config.h"
+#include "proteus/Hashing.h"
 #include "proteus/Utils.h"
 
 #include <llvm/ADT/StringRef.h>

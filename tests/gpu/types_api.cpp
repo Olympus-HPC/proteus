@@ -10,7 +10,7 @@
 #include <cstdlib>
 
 #include "gpu_common.h"
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 template <typename T> __global__ void kernel(T Arg) {
   proteus::jit_arg(Arg);

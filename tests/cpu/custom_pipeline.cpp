@@ -18,7 +18,7 @@
 #include <cstdlib>
 #include <iostream>
 
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 __attribute__((annotate("jit"))) void foo() { std::cout << "foo" << "\n"; }
 

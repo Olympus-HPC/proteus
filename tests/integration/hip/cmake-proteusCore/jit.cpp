@@ -2,8 +2,8 @@
 #include <iostream>
 #include <string>
 
-#include <proteus/CoreLLVM.hpp>
-#include <proteus/CoreLLVMDevice.hpp>
+#include <proteus/CoreLLVM.h>
+#include <proteus/CoreLLVMDevice.h>
 #include <proteus/Error.h>
 #include <proteus/Utils.h>
 

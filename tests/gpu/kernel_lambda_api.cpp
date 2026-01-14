@@ -10,7 +10,7 @@
 #include <cstdio>
 
 #include "gpu_common.h"
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 template <typename BODY, typename IndexType, typename Params>
 __global__ void kernel(const BODY Body, const IndexType Length, Params Param) {

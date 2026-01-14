@@ -3,7 +3,7 @@
 
 #include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/Error.h"
-#include "proteus/Logger.hpp"
+#include "proteus/Logger.h"
 
 #include <llvm/ADT/SetVector.h>
 #include <llvm/Demangle/Demangle.h>

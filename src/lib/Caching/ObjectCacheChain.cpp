@@ -8,12 +8,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "proteus/Caching/ObjectCacheChain.hpp"
+#include "proteus/Caching/ObjectCacheChain.h"
 
-#include "proteus/Caching/StorageCache.hpp"
-#include "proteus/Config.hpp"
-#include "proteus/Logger.hpp"
-#include "proteus/TimeTracing.hpp"
+#include "proteus/Caching/StorageCache.h"
+#include "proteus/Config.h"
+#include "proteus/Logger.h"
+#include "proteus/TimeTracing.h"
 #include "proteus/Utils.h"
 
 #include <llvm/ADT/SmallVector.h>

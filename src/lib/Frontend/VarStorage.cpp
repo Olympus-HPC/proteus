@@ -1,4 +1,4 @@
-#include "proteus/Frontend/VarStorage.hpp"
+#include "proteus/Frontend/VarStorage.h"
 #include "proteus/Error.h"
 
 #include <llvm/IR/IRBuilder.h>

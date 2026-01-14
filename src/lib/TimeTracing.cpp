@@ -1,7 +1,7 @@
 
-#include "proteus/TimeTracing.hpp"
+#include "proteus/TimeTracing.h"
 
-#include "proteus/Config.hpp"
+#include "proteus/Config.h"
 
 #include <llvm/Support/TimeProfiler.h>
 

@@ -10,7 +10,7 @@
 
 #include <iostream>
 
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 template <typename T> void test(T Arg) {
   proteus::jit_arg(Arg);
