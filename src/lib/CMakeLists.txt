@@ -38,43 +38,55 @@ if(PROTEUS_ENABLE_HIP)
   )
 endif()
 
+add_library(proteus STATIC ${SOURCES})
+set(PROTEUS_TARGETS proteus)
+
 if(BUILD_SHARED)
   if(PROTEUS_ENABLE_CUDA)
     message(FATAL_ERROR "For CUDA, using libproteus as SHARED fails for device globals")
   endif()
 
-  add_library(proteus SHARED ${SOURCES})
-else()
-  add_library(proteus STATIC ${SOURCES})
+  add_library(proteus_shared SHARED ${SOURCES})
+  list(APPEND PROTEUS_TARGETS proteus_shared)
 endif()
 
 add_library(proteusCore INTERFACE)
 add_library(proteusFrontend INTERFACE)
 
-target_compile_definitions(proteus PUBLIC ${LLVM_DEFINITIONS})
+foreach(proteus_target ${PROTEUS_TARGETS})
+  target_compile_definitions(${proteus_target} PUBLIC ${LLVM_DEFINITIONS})
+endforeach()
 target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
 
 target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
 
 if(PROTEUS_ENABLE_HIP)
-  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_HIP)
+  foreach(proteus_target ${PROTEUS_TARGETS})
+    target_compile_definitions(${proteus_target} PUBLIC PROTEUS_ENABLE_HIP)
+  endforeach()
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_HIP)
 elseif(PROTEUS_ENABLE_CUDA)
-  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_CUDA)
-  target_compile_definitions(proteus PRIVATE LIBDEVICE_BC_PATH="${LIBDEVICE_BC_FILE}")
-  target_compile_definitions(proteus PRIVATE PROTEUS_CUDA_LIBDIR="${CUDAToolkit_LIBRARY_DIR}")
+  foreach(proteus_target ${PROTEUS_TARGETS})
+    target_compile_definitions(${proteus_target} PUBLIC PROTEUS_ENABLE_CUDA)
+    target_compile_definitions(${proteus_target} PRIVATE LIBDEVICE_BC_PATH="${LIBDEVICE_BC_FILE}")
+    target_compile_definitions(${proteus_target} PRIVATE PROTEUS_CUDA_LIBDIR="${CUDAToolkit_LIBRARY_DIR}")
+  endforeach()
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_CUDA)
 endif()
 
-target_include_directories(proteus
-  SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS})
+foreach(proteus_target ${PROTEUS_TARGETS})
+  target_include_directories(${proteus_target}
+    SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS})
+endforeach()
 target_include_directories(proteusCore
   SYSTEM INTERFACE ${LLVM_INCLUDE_DIRS})
 
-target_include_directories(proteus
-  PUBLIC
-  $<BUILD_INTERFACE:${PROTEUS_PROJECT_INCLUDE_DIR}>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+foreach(proteus_target ${PROTEUS_TARGETS})
+  target_include_directories(${proteus_target}
+    PUBLIC
+    $<BUILD_INTERFACE:${PROTEUS_PROJECT_INCLUDE_DIR}>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+endforeach()
 
 target_include_directories(proteusCore
   INTERFACE
@@ -97,7 +109,9 @@ if(NOT LLVM_ENABLE_RTTI)
 endif()
 
 if(PROTEUS_ENABLE_HIP)
-  target_include_directories(proteus SYSTEM PRIVATE ${hip_INCLUDE_DIRS})
+  foreach(proteus_target ${PROTEUS_TARGETS})
+    target_include_directories(${proteus_target} SYSTEM PRIVATE ${hip_INCLUDE_DIRS})
+  endforeach()
   target_include_directories(proteusCore SYSTEM INTERFACE ${hip_INCLUDE_DIRS})
 
   # NOTE: HIP compilation (-x hip) is needed to include the HIP_SYMBOL macro,
@@ -119,7 +133,9 @@ if(PROTEUS_ENABLE_HIP)
 endif()
 
 if(PROTEUS_ENABLE_CUDA)
-  target_include_directories(proteus SYSTEM PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+  foreach(proteus_target ${PROTEUS_TARGETS})
+    target_include_directories(${proteus_target} SYSTEM PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+  endforeach()
   target_include_directories(proteusCore SYSTEM INTERFACE ${CUDAToolkit_INCLUDE_DIRS})
 
   # list(APPEND libs CUDA::cuda_driver CUDA::cudart)
@@ -165,25 +181,29 @@ message(STATUS "Found LLVM libraries: ${libs}")
 message(STATUS "Found Clang libraries: ${clang_libs}")
 
 # Enclose linked libraries in a link group to avoid linker errors due to unresolved symbols.
-target_link_libraries(proteus PUBLIC
-  "$<$<PLATFORM_ID:Linux>:-Wl,--start-group>"
-  ${libs} ${clang_libs}
-  "$<$<PLATFORM_ID:Linux>:-Wl,--end-group>"
-  "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>"
-)
-target_compile_definitions(proteus PRIVATE PROTEUS_CLANGXX_BIN="${CLANGXX}")
+foreach(proteus_target ${PROTEUS_TARGETS})
+  target_link_libraries(${proteus_target} PUBLIC
+    "$<$<PLATFORM_ID:Linux>:-Wl,--start-group>"
+    ${libs} ${clang_libs}
+    "$<$<PLATFORM_ID:Linux>:-Wl,--end-group>"
+    "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>"
+  )
+  target_compile_definitions(${proteus_target} PRIVATE PROTEUS_CLANGXX_BIN="${CLANGXX}")
+endforeach()
 
 target_link_libraries(proteusFrontend INTERFACE proteus "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 
 target_link_libraries(proteusCore INTERFACE proteus "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 
-set_target_properties(proteus PROPERTIES
-  INSTALL_RPATH_USE_LINK_PATH TRUE
-  INTERFACE_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}"
-)
+foreach(proteus_target ${PROTEUS_TARGETS})
+  set_target_properties(${proteus_target} PROPERTIES
+    INSTALL_RPATH_USE_LINK_PATH TRUE
+    INTERFACE_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}"
+  )
+endforeach()
 
 install(
-  TARGETS proteus proteusCore proteusFrontend
+  TARGETS ${PROTEUS_TARGETS} proteusCore proteusFrontend
   EXPORT proteusTargets
   RUNTIME DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
