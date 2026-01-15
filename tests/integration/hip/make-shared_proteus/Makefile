@@ -3,4 +3,4 @@ all:
 		-I${PROTEUS_INSTALL_DIR}/include \
 		-L${PROTEUS_INSTALL_DIR}/lib64  \
 		-Wl,-rpath,${PROTEUS_INSTALL_DIR}/lib64 \
-		-lproteus
+		-l:libproteus.so
