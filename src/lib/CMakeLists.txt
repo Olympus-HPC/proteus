@@ -47,6 +47,7 @@ if(BUILD_SHARED)
   endif()
 
   add_library(proteus_shared SHARED ${SOURCES})
+  set_target_properties(proteus_shared PROPERTIES OUTPUT_NAME proteus)
   list(APPEND PROTEUS_TARGETS proteus_shared)
 endif()
 
