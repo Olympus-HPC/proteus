@@ -34,12 +34,21 @@ int main() {
 
   CppJitModule CJM{TARGET, Code};
   auto Kernel = CJM.getKernel<void(int)>("foo");
+
+  // Test brace-init syntax.
   Kernel.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, 42);
+  gpuErrCheck(gpuDeviceSynchronize());
+
+  // Test dim3 implicit conversion.
+  dim3 Grid(1, 1, 1);
+  dim3 Block(1, 1, 1);
+  Kernel.launch(Grid, Block, 0, nullptr, 43);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
 // clang-format off
 // CHECK: Kernel 42
+// CHECK: Kernel 43
 // CHECK: [proteus][Dispatcher{{CUDA|HIP}}] MemoryCache rank 0 hits 0 accesses 1
 // CHECK: [proteus][Dispatcher{{CUDA|HIP}}] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: [proteus][Dispatcher{{CUDA|HIP}}] StorageCache rank 0 hits 0 accesses 1
