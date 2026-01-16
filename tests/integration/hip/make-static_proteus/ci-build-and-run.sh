@@ -7,7 +7,7 @@ cmake -S ${CI_PROJECT_DIR} -B build-proteus \
     -DCMAKE_INSTALL_PREFIX=${PWD}/install-proteus \
     -DPROTEUS_ENABLE_HIP=on \
     -DENABLE_TESTS=off \
-    -DBUILD_SHARED=on
+    -DBUILD_SHARED=off
 
 pushd build-proteus
 make -j install
@@ -19,8 +19,7 @@ LLVM_LIBS+=" "$(${LLVM_INSTALL_DIR}/bin/llvm-config --system-libs)
 
 cp -r ${TEST_DIR}/* .
 export PROTEUS_INSTALL_DIR=${PWD}/install-proteus
-export LLVM_LIBFLAGS="-L ${LLVM_LIBDIR} ${LLVM_LIBS}"
+export LLVM_LIBFLAGS="-L ${LLVM_LIBDIR} ${LLVM_LIBS} -llldCommon -llldELF"
 echo "LLVM_LIBFLAGS ${LLVM_LIBFLAGS}"
 make -j
 ./main
-

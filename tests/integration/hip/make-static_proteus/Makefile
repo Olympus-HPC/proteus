@@ -4,4 +4,5 @@ all:
 		-L${PROTEUS_INSTALL_DIR}/lib64  \
 		-Wl,-rpath,${PROTEUS_INSTALL_DIR}/lib64 \
 		-lproteus \
-		${LLVM_LIBFLAGS}
+		${LLVM_LIBFLAGS} \
+		-lhiprtc

@@ -20,7 +20,7 @@ target_link_options(libfoo
 target_link_libraries(libfoo PUBLIC hip::device)
 set_target_properties(libfoo PROPERTIES
   INTERFACE_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib")
-add_proteus(libfoo)
+add_proteus(libfoo LINK_SHARED)
 
 # libbar
 set_source_files_properties(libbar.cpp PROPERTIES LANGUAGE HIP)
@@ -35,7 +35,7 @@ target_link_options(libbar
 target_link_libraries(libbar PUBLIC hip::device)
 set_target_properties(libbar PROPERTIES
   INTERFACE_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/lib")
-add_proteus(libbar)
+add_proteus(libbar LINK_SHARED)
 
 # main
 set_source_files_properties(main.cpp PROPERTIES LANGUAGE HIP)
@@ -52,6 +52,6 @@ target_link_options(main
 )
 target_link_libraries(main PUBLIC libfoo libbar)
 set_target_properties(main PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
-add_proteus(main)
+add_proteus(main LINK_SHARED)
 
 install(TARGETS main libfoo libbar)
