@@ -12,20 +12,12 @@
 #include "gpu_common.h"
 #include <proteus/JitInterface.hpp>
 
-enum color {
-    Red, 
-    Yellow, 
-    Green
-};
+enum color { Red, Yellow, Green };
 
-enum class compiler {
-    Clang,
-    GCC,
-    NVCC
-};
+enum class compiler { Clang, GCC, NVCC };
 
 __global__ __attribute__((annotate("jit", 1))) void print_color(color arg) {
-  switch (arg){
+  switch (arg) {
   case Red: {
     printf("Red\n");
     break;
@@ -39,27 +31,28 @@ __global__ __attribute__((annotate("jit", 1))) void print_color(color arg) {
     break;
   }
   default:
-  break;
+    break;
   }
   return;
 }
 
-__global__ __attribute__((annotate("jit", 1))) void print_compiler(compiler arg) {
-switch (arg){
-  case compiler::Clang:{
-  printf("clang\n");
-  break;
+__global__ __attribute__((annotate("jit", 1))) void
+print_compiler(compiler arg) {
+  switch (arg) {
+  case compiler::Clang: {
+    printf("clang\n");
+    break;
   }
-  case compiler::GCC:{
-  printf("gcc\n");
-  break;
+  case compiler::GCC: {
+    printf("gcc\n");
+    break;
   }
-  case compiler::NVCC:{
-  printf("nvcc\n");
-  break;
+  case compiler::NVCC: {
+    printf("nvcc\n");
+    break;
   }
   default:
-  break;
+    break;
   }
   return;
 }
@@ -79,7 +72,7 @@ int main() {
   gpuErrCheck(gpuDeviceSynchronize());
   gpuErrCheck(launcher(print_compiler, Compiler));
   gpuErrCheck(gpuDeviceSynchronize());
-  
+
   proteus::finalize();
   return 0;
 }

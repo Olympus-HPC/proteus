@@ -27,6 +27,7 @@ enum RuntimeConstantType : int32_t {
   FLOAT,
   DOUBLE,
   LONG_DOUBLE,
+  ENUM,
   PTR,
   STATIC_ARRAY,
   VECTOR,

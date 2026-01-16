@@ -811,6 +811,7 @@ void AnnotationHandler::parseJitArgAnnotations(
       auto &ConstantArgs = RCInfoMap[JitFunction];
       RuntimeConstantType RCType =
           convertTypeToRuntimeConstantType(Arg->getType());
+      llvm::outs()<<"ARG TYPE "<< *Arg->getType();
       int32_t ArgNo = Arg->getArgNo();
       RuntimeConstantInfo RCI{
           RCType,

@@ -36,6 +36,7 @@ inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
   case RuntimeConstantType::INT32:
     return ConstantInt::get(ArgType, RC.Value.Int32Val);
   case RuntimeConstantType::INT64:
+  case RuntimeConstantType::ENUM:
     return ConstantInt::get(ArgType, RC.Value.Int64Val);
   case RuntimeConstantType::FLOAT:
     return ConstantFP::get(ArgType, RC.Value.FloatVal);

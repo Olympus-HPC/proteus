@@ -169,6 +169,9 @@ dispatchGetRuntimeConstantValue(void **Args,
     PROTEUS_DBG(Logger::logs("proteus")
                 << "Value " << RC.Value.DoubleVal << "\n");
     break;
+  case RuntimeConstantType::ENUM:
+    RC.Value.Int64Val = getRuntimeConstantValue<int64_t>(Arg);
+    break;
   case RuntimeConstantType::LONG_DOUBLE:
     // NOTE: long double on device should correspond to plain double.
     // XXX: CUDA with a long double SILENTLY fails to create a working

@@ -96,6 +96,8 @@ template <typename T> inline static RuntimeConstantType convertCTypeToRCType() {
     return RuntimeConstantType::LONG_DOUBLE;
   } else if constexpr (std::is_pointer_v<T>) {
     return RuntimeConstantType::PTR;
+  } else if constexpr (std::is_enum_v<T>) {
+    return RuntimeConstantType::ENUM;
   } else {
     return RuntimeConstantType::NONE;
   }

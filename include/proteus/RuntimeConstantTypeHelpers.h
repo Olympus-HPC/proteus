@@ -140,6 +140,8 @@ inline std::string toString(const RuntimeConstantType RCType) {
     return "ARRAY";
   case RuntimeConstantType::OBJECT:
     return "OBJECT";
+  case RuntimeConstantType::ENUM:
+    return "ENUM";
   default:
     reportFatalError("Unknown RCType " + std::to_string(RCType));
   }

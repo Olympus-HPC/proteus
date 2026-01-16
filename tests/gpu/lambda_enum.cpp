@@ -12,18 +12,9 @@
 #include "gpu_common.h"
 #include <proteus/JitInterface.hpp>
 
-enum color {
-    Red, 
-    Yellow, 
-    Green
-};
+enum color { Red = 1, Yellow = 0, Green = -2 };
 
-enum class compiler {
-    Clang,
-    GCC,
-    NVCC
-};
-
+enum class compiler { Clang, GCC, NVCC };
 
 template <typename T>
 __global__ __attribute__((annotate("jit"))) void kernel(T LB) {
@@ -40,50 +31,61 @@ int main() {
   proteus::init();
   color Color = color::Green;
   compiler Compiler = compiler::Clang;
-  
-  auto color_lambda = [=, Color = proteus::jit_variable(Color)]
-                                    __device__  ()__attribute__((annotate("jit"))) {
-                                        switch (Color){
-                                          case Red: {
-                                            printf("Red\n");
-                                            break;
-                                          }
-                                          case Yellow: {
-                                            printf("Yellow\n");
-                                            break;
-                                          }
-                                          case Green: {
-                                            printf("Green\n");
-                                            break;
-                                          }
-                                          default:
-                                          break;
-                                          }
-                                    };
-    auto compiler_lambda = [=, Compiler = proteus::jit_variable(Compiler)]
-                                    __device__  ()__attribute__((annotate("jit"))) {
-                                      switch (Compiler){
-                                        case compiler::Clang:{
-                                          printf("clang\n");
-                                          break;
-                                        }
-                                        case compiler::GCC:{
-                                          printf("gcc\n");
-                                          break;
-                                        }
-                                        case compiler::NVCC:{
-                                          printf("nvcc\n");
-                                          break;
-                                        }
-                                        default:
-                                        break;
-                                        }
-                                        return;
-                                    };
 
+  auto color_lambda = [=, Color = proteus::jit_variable(Color)] __device__()
+                          __attribute__((annotate("jit"))) {
+                            switch (Color) {
+                            case Red: {
+                              printf("Red\n");
+                              break;
+                            }
+                            case Yellow: {
+                              printf("Yellow\n");
+                              break;
+                            }
+                            case Green: {
+                              printf("Green\n");
+                              break;
+                            }
+                            default:
+                              break;
+                            }
+                          };
+  auto compiler_lambda =
+      [=, Compiler = proteus::jit_variable(Compiler)] __device__()
+          __attribute__((annotate("jit"))) {
+            switch (Compiler) {
+            case compiler::Clang: {
+              printf("clang\n");
+              break;
+            }
+            case compiler::GCC: {
+              printf("gcc\n");
+              break;
+            }
+            case compiler::NVCC: {
+              printf("nvcc\n");
+              break;
+            }
+            default:
+              break;
+            }
+            return;
+          };
+
+          if (std::is_enum_v<compiler>) {
+            printf("COMP ENUM IS ENUM\n");
+          } else {
+            printf("COMP ENUM IS NON-ENUM\n");
+          }
+          
+          if (std::is_enum_v<color>) {
+            printf("COLOR ENUM IS ENUM\n");
+          } else {
+            printf("COLOR ENUM IS NON-ENUM\n");
+          }
   run(color_lambda);
   run(compiler_lambda);
-  
   proteus::finalize();
   return 0;
 }
