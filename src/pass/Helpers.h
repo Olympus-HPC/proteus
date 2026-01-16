@@ -1,14 +1,14 @@
 #ifndef PROTEUS_PASS_HELPERS_H
 #define PROTEUS_PASS_HELPERS_H
 
+#include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
+#include "proteus/Error.h"
+#include "proteus/Logger.h"
+
 #include <llvm/ADT/SetVector.h>
 #include <llvm/Demangle/Demangle.h>
 #include <llvm/IR/Module.h>
 #include <llvm/TargetParser/Triple.h>
-
-#include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
-#include "proteus/Error.h"
-#include "proteus/Logger.hpp"
 
 #define DEBUG_TYPE "proteus-pass"
 #define DEBUG(x)                                                               \
@@ -72,8 +72,7 @@ bool inline isDeviceCompilation(Module &M) {
 inline std::string getUniqueFileID(Module &M) {
   llvm::sys::fs::UniqueID ID;
   if (auto EC = llvm::sys::fs::getUniqueID(M.getSourceFileName(), ID))
-    PROTEUS_FATAL_ERROR("Could not get unique id for source file " +
-                        EC.message());
+    reportFatalError("Could not get unique id for source file " + EC.message());
 
   SmallString<64> Out;
   llvm::raw_svector_ostream OutStr(Out);
@@ -84,9 +83,12 @@ inline std::string getUniqueFileID(Module &M) {
 
 inline bool isDeviceKernel(const Function *F) {
   if (!F)
-    PROTEUS_FATAL_ERROR("Expected non-null function");
+    reportFatalError("Expected non-null function");
 
 #if PROTEUS_ENABLE_CUDA
+#if LLVM_VERSION_MAJOR >= 20
+  return (F->getCallingConv() == CallingConv::PTX_Kernel);
+#else
   const Module &M = *F->getParent();
   auto GetDeviceKernels = [&M]() {
     SmallPtrSet<Function *, 16> Kernels;
@@ -125,6 +127,7 @@ inline bool isDeviceKernel(const Function *F) {
 
   return false;
 #endif
+#endif
 
 #if PROTEUS_ENABLE_HIP
   return (F->getCallingConv() == CallingConv::AMDGPU_KERNEL);
@@ -160,6 +163,14 @@ template <> struct DenseMapInfo<RuntimeConstantInfo> {
             (LHS.ArgInfo.Pos == RHS.ArgInfo.Pos));
   }
 };
+
+inline bool isDeviceKernelHostStub(
+    const DenseMap<Value *, GlobalVariable *> &StubToKernelMap, Function &Fn) {
+  if (StubToKernelMap.contains(&Fn))
+    return true;
+
+  return false;
+}
 
 } // namespace llvm
 

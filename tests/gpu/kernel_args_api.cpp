@@ -9,7 +9,7 @@
 #include <cstdio>
 
 #include "gpu_common.h"
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 __global__ void kernel(int Arg1, int Arg2, int Arg3) {
   proteus::jit_arg(Arg1);

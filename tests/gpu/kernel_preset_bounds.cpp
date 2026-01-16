@@ -9,7 +9,7 @@
 #include <cstdio>
 
 #include "gpu_common.h"
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 __global__ __attribute__((annotate("jit"))) __launch_bounds__(128,
                                                               4) void kernel() {

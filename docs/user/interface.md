@@ -28,7 +28,7 @@ __global__
 __attribute__((annotate("jit", 1, 2)))
 void daxpy(double A, size_t N, double *X, double *Y) {
     int tid = threadIdx.x + (blockIdx.x * blockDim.x);
-    int stride = blockDim.x * gidDim.x;
+    int stride = blockDim.x * gridDim.x;
     for(int i=tid; i<N; i+=stride)
       X[i] = A*X[i] + Y[i];
 }
@@ -137,7 +137,7 @@ void daxpy(double A, size_t N, double *X, double *Y) {
   proteus::jit_arg(A);
   proteus::jit_arg(N);
   int tid = threadIdx.x + (blockIdx.x * blockDim.x);
-  int stride = blockDim.x * gidDim.x;
+  int stride = blockDim.x * gridDim.x;
   for(int i=tid; i<N; i+=stride)
     X[i] = A*X[i] + Y[i];
 }
@@ -154,7 +154,7 @@ Here's an illustrative example to compile a DAXPY kernel through this API:
 
 ```cpp
 #include <format>
-#include <proteus/CppJitModule.hpp>
+#include <proteus/CppJitModule.h>
 
 // Allocate and initialize input vectors A and B, and specify their size N.
 double *X = ...; // Pointer to vector X
@@ -168,7 +168,7 @@ std::string Code = std::format(R"cpp(
   void daxpy(double *X, double *Y)
   {{
     int tid = threadIdx.x + (blockIdx.x * blockDim.x);
-    int stride = blockDim.x * gidDim.x;
+    int stride = blockDim.x * gridDim.x;
     for(int i=tid; i<{0}; i+=stride)
       X[i] = {1}*X[i] + Y[i];
   }})cpp", N, A);

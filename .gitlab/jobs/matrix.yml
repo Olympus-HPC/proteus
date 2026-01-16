@@ -51,11 +51,5 @@ variables:
     - rm -rf ${CI_BUILDS_DIR}
     - echo "=== End CI Build and Test==="
 
-.build-variants:
-  parallel:
-    matrix:
-      - PROTEUS_CI_ENABLE_TIME_TRACING: ["on", "off"]
-        PROTEUS_CI_LLVM_VERSION: ["18.1.8", "19.1.7"]
-
 build-and-test-matrix:
-  extends: [.base-job, .build-variants]
+  extends: [.base-job]

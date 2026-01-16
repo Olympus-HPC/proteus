@@ -1,17 +1,31 @@
 @PACKAGE_INIT@
 
 include(CMakeFindDependencyMacro)
-set(PROTEUS_LLVM_DIR "@LLVM_DIR@")
-find_dependency(LLVM REQUIRED CONFIG)
 
-file(REAL_PATH "${LLVM_DIR}" LLVM_DIR)
-
-if (NOT "${LLVM_DIR}" STREQUAL "${PROTEUS_LLVM_DIR}")
-    message(FATAL_ERROR "Mismatch between target LLVM_DIR = ${LLVM_DIR} "
-    "and Proteus LLVM_DIR = ${PROTEUS_LLVM_DIR}. "
-    "Use the same LLVM installation when compiling.")
-endif()
+string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" PROTEUS_LLVM_VERSION "@LLVM_VERSION@")
+find_dependency(LLVM ${PROTEUS_LLVM_VERSION} EXACT REQUIRED CONFIG)
 message(STATUS "LLVM DIR = ${LLVM_DIR}")
+
+string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" PROTEUS_CLANG_VERSION "@Clang_VERSION@")
+find_dependency(Clang ${PROTEUS_CLANG_VERSION} EXACT REQUIRED CONFIG HINTS "${LLVM_INSTALL_PREFIX}")
+message(STATUS "Clang DIR = ${Clang_DIR}")
+
+# We want to link with LLD with HIP.
+set(PROTEUS_ENABLE_HIP "@PROTEUS_ENABLE_HIP@")
+if(PROTEUS_ENABLE_HIP)
+    # Store HIP/HIPRTC versions.
+    set(PROTEUS_HIP_VERSION "@hip_VERSION@")
+    find_dependency(hip ${PROTEUS_HIP_VERSION} EXACT REQUIRED CONFIG)
+    message(STATUS "hip DIR = ${hip_DIR}")
+
+    set(PROTEUS_HIPRTC_VERSION "@hiprtc_VERSION@")
+    find_dependency(hiprtc ${PROTEUS_HIPRTC_VERSION} EXACT REQUIRED CONFIG)
+    message(STATUS "hiprtc DIR = ${hiprtc_DIR}")
+
+    string(REGEX MATCH "^[0-9]+\\.[0-9]+\\.[0-9]+" PROTEUS_LLD_VERSION "@LLD_VERSION@")
+    find_dependency(LLD ${PROTEUS_LLD_VERSION} EXACT REQUIRED CONFIG HINTS "${LLVM_INSTALL_PREFIX}")
+    message(STATUS "LLD DIR = ${LLD_DIR}")
+endif()
 
 include("${CMAKE_CURRENT_LIST_DIR}/ProteusFunctions.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/proteusTargets.cmake")

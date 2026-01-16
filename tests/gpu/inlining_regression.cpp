@@ -9,8 +9,8 @@
 #include <cstdlib>
 #include <iostream>
 
-#include "raja_style_launch.hpp"
-#include <proteus/JitInterface.hpp>
+#include "raja_style_launch.h"
+#include <proteus/JitInterface.h>
 
 int main() {
   proteus::init();

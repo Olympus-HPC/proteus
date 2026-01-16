@@ -1,5 +1,7 @@
-#include <cstdint>
-#include <memory>
+#include "proteus/CppJitModule.h"
+
+#include "proteus/CompiledLibrary.h"
+#include "proteus/Hashing.h"
 
 #include <clang/CodeGen/CodeGenAction.h>
 #include <clang/Driver/Compilation.h>
@@ -8,6 +10,7 @@
 #include <clang/Frontend/CompilerInstance.h>
 #include <clang/Frontend/CompilerInvocation.h>
 #include <clang/Lex/PreprocessorOptions.h>
+
 #include <llvm/IR/Module.h>
 #include <llvm/Option/ArgList.h>
 #include <llvm/Support/MemoryBuffer.h>
@@ -15,8 +18,8 @@
 #include <llvm/TargetParser/Host.h>
 #include <llvm/TargetParser/Triple.h>
 
-#include "proteus/CppJitModule.hpp"
-#include "proteus/Hashing.hpp"
+#include <cstdint>
+#include <memory>
 
 namespace proteus {
 
@@ -30,20 +33,27 @@ static std::vector<std::string> ExtraToolchainArgs = {};
 using namespace clang;
 using namespace llvm;
 
-CppJitModule::CppJitModule(TargetModelType TargetModel, StringRef Code,
+CppJitModule::CppJitModule(TargetModelType TargetModel, const std::string &Code,
                            const std::vector<std::string> &ExtraArgs)
-    : TargetModel(TargetModel), Code(Code.str()), ModuleHash(hash(Code)),
-      ExtraArgs(ExtraArgs), Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
-CppJitModule::CppJitModule(StringRef Target, StringRef Code,
+    : TargetModel(TargetModel), Code(Code),
+      ModuleHash(std::make_unique<HashT>(hash(Code))), ExtraArgs(ExtraArgs),
+      Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
+CppJitModule::CppJitModule(const std::string &Target, const std::string &Code,
                            const std::vector<std::string> &ExtraArgs)
-    : TargetModel(parseTargetModel(Target)), Code(Code), ModuleHash(hash(Code)),
-      ExtraArgs(ExtraArgs), Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
+    : TargetModel(parseTargetModel(Target)), Code(Code),
+      ModuleHash(std::make_unique<HashT>(hash(Code))), ExtraArgs(ExtraArgs),
+      Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
+CppJitModule::~CppJitModule() = default;
 
 void CppJitModule::compileCppToDynamicLibrary() {
   // Create compiler instance.
   CompilerInstance Compiler;
   // Create diagnostics engine.
+#if LLVM_VERSION_MAJOR >= 20
+  Compiler.createDiagnostics(*vfs::getRealFileSystem());
+#else
   Compiler.createDiagnostics();
+#endif
 
   // We build a driver to compile to a dynamic library object.
   // Create temp source file
@@ -51,13 +61,13 @@ void CppJitModule::compileCppToDynamicLibrary() {
   std::error_code EC =
       sys::fs::createTemporaryFile("proteus", "cpp", SourcePath);
   if (EC)
-    PROTEUS_FATAL_ERROR("Failed to create temp source file");
+    reportFatalError("Failed to create temp source file");
 
   // Write source code to temp file
   {
     raw_fd_ostream OS(SourcePath, EC);
     if (EC)
-      PROTEUS_FATAL_ERROR("Failed to write source file");
+      reportFatalError("Failed to write source file");
     OS << Code;
   }
 
@@ -65,7 +75,7 @@ void CppJitModule::compileCppToDynamicLibrary() {
   SmallString<128> OutputPath;
   EC = sys::fs::createTemporaryFile("proteus", "so", OutputPath);
   if (EC)
-    PROTEUS_FATAL_ERROR("Failed to create temp output file");
+    reportFatalError("Failed to create temp output file");
 
   std::string OffloadArch = "--offload-arch=" + Dispatch.getDeviceArch().str();
 
@@ -96,12 +106,12 @@ void CppJitModule::compileCppToDynamicLibrary() {
 
   auto *C = D.BuildCompilation(DriverArgs);
   if (!C || Compiler.getDiagnostics().hasErrorOccurred())
-    PROTEUS_FATAL_ERROR("Building Driver failed");
+    reportFatalError("Building Driver failed");
 
   // Extract the argument from the compilation job.
   const clang::driver::JobList &Jobs = C->getJobs();
   if (Jobs.empty())
-    PROTEUS_FATAL_ERROR("Expected compilation job, found empty joblist");
+    reportFatalError("Expected compilation job, found empty joblist");
 
   // Execute ALL jobs (device compilation, bundling, host compilation)
   SmallVector<std::pair<int, const clang::driver::Command *>, 4>
@@ -111,12 +121,12 @@ void CppJitModule::compileCppToDynamicLibrary() {
   if (Res != 0 || !FailingCommands.empty()) {
     sys::fs::remove(SourcePath);
     sys::fs::remove(OutputPath);
-    PROTEUS_FATAL_ERROR("Compilation failed");
+    reportFatalError("Compilation failed");
   }
 
   // Register the dynamic library file with the dispatcher to make it available
   // post compilation.
-  Dispatch.registerDynamicLibrary(ModuleHash, OutputPath);
+  Dispatch.registerDynamicLibrary(*ModuleHash, OutputPath.c_str());
 
   sys::fs::remove(SourcePath);
   sys::fs::remove(OutputPath);
@@ -126,10 +136,14 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
   // Create compiler instance.
   CompilerInstance Compiler;
   // Create diagnostics engine.
+#if LLVM_VERSION_MAJOR >= 20
+  Compiler.createDiagnostics(*vfs::getRealFileSystem());
+#else
   Compiler.createDiagnostics();
+#endif
 
   // Hashing should treat Code as a pointer and size to hash all bytes.
-  std::string SourceName = ModuleHash.toString() + ".cpp";
+  std::string SourceName = ModuleHash->toString() + ".cpp";
 
   // Set up driver arguments and build a driver invocation to extract cc1
   // arguments. This is needed to retrieve system include paths that the driver
@@ -173,19 +187,19 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
   D.setCheckInputsExist(false);
   auto *C = D.BuildCompilation(DriverArgs);
   if (!C || Compiler.getDiagnostics().hasErrorOccurred())
-    PROTEUS_FATAL_ERROR("Building Driver failed");
+    reportFatalError("Building Driver failed");
 
   // Extract the argument from the compilation job.
   const clang::driver::JobList &Jobs = C->getJobs();
   if (Jobs.empty())
-    PROTEUS_FATAL_ERROR("Expected compilation job, found empty joblist");
+    reportFatalError("Expected compilation job, found empty joblist");
 
   const clang::driver::Command &Cmd =
       llvm::cast<clang::driver::Command>(*Jobs.begin());
   const auto &CC1Args = Cmd.getArguments();
   // Use StringRef to make sure we compare by value and pointers.
   if (!llvm::is_contained(CC1Args, StringRef{"-cc1"}))
-    PROTEUS_FATAL_ERROR("Expected first job to be the compilation");
+    reportFatalError("Expected first job to be the compilation");
 
   // Create compiler invocation with minimal arguments.
   auto Invocation = std::make_shared<CompilerInvocation>();
@@ -212,11 +226,11 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
   EmitLLVMOnlyAction Action;
 
   if (!Compiler.ExecuteAction(Action))
-    PROTEUS_FATAL_ERROR("Failed to execute action");
+    reportFatalError("Failed to execute action");
 
   std::unique_ptr<llvm::Module> Module = Action.takeModule();
   if (!Module)
-    PROTEUS_FATAL_ERROR("Failed to take LLVM module");
+    reportFatalError("Failed to take LLVM module");
 
   std::unique_ptr<LLVMContext> Ctx{Action.takeLLVMContext()};
 
@@ -226,7 +240,7 @@ CppJitModule::CompilationResult CppJitModule::compileCppToIR() {
 void CppJitModule::compile() {
   // Lookup in the object cache of the dispatcher before lowering the cpp code
   // to LLVM IR.
-  if ((Library = Dispatch.lookupCompiledLibrary(ModuleHash))) {
+  if ((Library = Dispatch.lookupCompiledLibrary(*ModuleHash))) {
     IsCompiled = true;
     return;
   }
@@ -237,19 +251,31 @@ void CppJitModule::compile() {
     compileCppToDynamicLibrary();
     // Retrieve the compiled library from the dispatcher which stores the
     // dynamic library file.
-    Library = Dispatch.lookupCompiledLibrary(ModuleHash);
+    Library = Dispatch.lookupCompiledLibrary(*ModuleHash);
     if (!Library)
-      PROTEUS_FATAL_ERROR("Expected non-null library after compilation");
+      reportFatalError("Expected non-null library after compilation");
     break;
   default:
     auto CRes = compileCppToIR();
     auto ObjectModule =
-        Dispatch.compile(std::move(CRes.Ctx), std::move(CRes.Mod), ModuleHash,
+        Dispatch.compile(std::move(CRes.Ctx), std::move(CRes.Mod), *ModuleHash,
                          /*DisableIROpt=*/true);
     Library = std::make_unique<CompiledLibrary>(std::move(ObjectModule));
   }
 
   IsCompiled = true;
 }
+
+void *CppJitModule::getFunctionAddress(const std::string &Name) {
+  return Dispatch.getFunctionAddress(Name, *ModuleHash, getLibrary());
+}
+
+void CppJitModule::launch(void *KernelFunc, LaunchDims GridDim,
+                          LaunchDims BlockDim, void *KernelArgs[],
+                          uint64_t ShmemSize, void *Stream) {
+  Dispatch.launch(KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
+}
+
+CppJitModule::CompilationResult::~CompilationResult() = default;
 
 } // namespace proteus

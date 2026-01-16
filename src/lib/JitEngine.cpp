@@ -11,15 +11,13 @@
 #include <cstdlib>
 #include <string>
 
-#include "proteus/Hashing.hpp"
-#include "proteus/JitEngine.hpp"
-#include "proteus/TimeTracing.hpp"
+#include "proteus/Hashing.h"
+#include "proteus/JitEngine.h"
+#include "proteus/TimeTracing.h"
 
 namespace proteus {
 
-#if PROTEUS_ENABLE_TIME_TRACING
 TimeTracerRAII TimeTracer;
-#endif
 
 using namespace llvm;
 
@@ -27,10 +25,6 @@ JitEngine::JitEngine() {
   if (Config::get().ProteusDebugOutput) {
     Config::get().dump(Logger::logs("proteus"));
   }
-}
-
-std::string JitEngine::mangleSuffix(HashT &HashValue) {
-  return "$jit$" + HashValue.toString() + "$";
 }
 
 SmallVector<RuntimeConstant> JitEngine::getRuntimeConstantValues(

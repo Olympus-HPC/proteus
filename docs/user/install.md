@@ -19,7 +19,7 @@ See [Integration](integration.md) section for more details on integrating with y
 ## Building
 
 Proteus uses `cmake` for building and requires an existing LLVM installation (CI
-tests cover LLVM 18/19 with CUDA 12.2 and AMD ROCm versions 6.2.1, 6.3.1, 6.4.1).
+tests cover LLVM 18/19/20 with CUDA 12.2 and AMD ROCm versions 6.3.1, 6.4.1, 7.1.0).
 
 The top-level `CMakeLists.txt` defines the following build options:
 
@@ -27,7 +27,6 @@ The top-level `CMakeLists.txt` defines the following build options:
 * `ENABLE_TESTS`: build Proteus tests.
 * `PROTEUS_ENABLE_HIP`: enable HIP support.
 * `PROTEUS_ENABLE_CUDA`: enable CUDA support.
-* `PROTEUS_ENABLE_TIME_TRACING`: generate a JSON time-trace file for Proteus operations (for flame graphs visualization).
 
 !!! info "Host, CUDA and HIP support"
     Proteus always supports host JIT compilation.

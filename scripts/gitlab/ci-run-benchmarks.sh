@@ -4,7 +4,7 @@ set -e
 
 echo "CI_COMMIT_REF_NAME ${CI_COMMIT_REF_NAME}"
 # Fetch the PR ID from the branch name.
-PR_INFO=$(curl -s -L -H "Authorization: Bearer $GITHUB_TOKEN" \
+PR_INFO=$(curl --retry 5 --retry-connrefused --retry-delay 5 -s -L -H "Authorization: Bearer $GITHUB_TOKEN" \
                -H "Accept: application/vnd.github+json" \
                -H "X-GitHub-Api-Version: 2022-11-28" \
                "https://api.github.com/repos/Olympus-HPC/proteus/pulls?head=Olympus-HPC:${CI_COMMIT_REF_NAME}")
@@ -19,7 +19,7 @@ fi
 PR_ID=$(echo "${PR_INFO}" | jq -r '.[0].number')
 echo "Processing PR ${PR_ID}"
 
-COMMENTS_INFO=$(curl -L \
+COMMENTS_INFO=$(curl --retry 5 --retry-connrefused --retry-delay 5 -L \
   -H "Accept: application/vnd.github+json" \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
@@ -46,7 +46,7 @@ echo "Install miniconda..."
 PYTHON_VERSION=3.12
 MINICONDA_DIR=/tmp/proteus-ci-${CI_JOB_ID}/miniconda3
 mkdir -p ${MINICONDA_DIR}
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -m).sh -O ${MINICONDA_DIR}/miniconda.sh
+wget --tries=5 --retry-connrefused --wait=5 https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -m).sh -O ${MINICONDA_DIR}/miniconda.sh
 bash ${MINICONDA_DIR}/miniconda.sh -b -u -p ${MINICONDA_DIR}
 rm ${MINICONDA_DIR}/miniconda.sh
 source ${MINICONDA_DIR}/bin/activate
@@ -76,7 +76,6 @@ if [ "${CI_MACHINE}" == "matrix" ]; then
 
   CMAKE_MACHINE_OPTIONS="\
     -DCMAKE_PREFIX_PATH=$CONDA_PREFIX;$CONDA_PREFIX/lib/cmake \
-    -DPROTEUS_LINK_SHARED_LLVM=on \
     -DPROTEUS_ENABLE_CUDA=on \
     -DCMAKE_CUDA_ARCHITECTURES=90 \
     -DCMAKE_CUDA_COMPILER=${LLVM_INSTALL_DIR}/bin/clang++ \
@@ -181,7 +180,7 @@ git commit -m "${RESULTS_COMMIT}"
 git push
 
 # Post the comment to the GitHub PR.
-curl -L -X POST \
+curl --retry 5 --retry-connrefused --retry-delay 5 -L -X POST \
   -H "Accept: application/vnd.github+json" \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "X-GitHub-Api-Version: 2022-11-28" \

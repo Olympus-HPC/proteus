@@ -1,17 +1,16 @@
-name: Build and test
+name: CI
 
 on:
   pull_request:
 
 jobs:
   build-and-test:
-    name: proteus ${{ matrix.os }} LLVM ${{ matrix.llvm }}
+    name: proteus ${{ matrix.os }} LLVM ${{ matrix.llvm }} shared ${{ matrix.build_shared }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest]
-        llvm: [18.1.8, 19.1.7]
-        enable_time_tracing: [on, off]
+        llvm: [18.1.8, 19.1.7, 20.1.8]
         build_shared: [on, off]
     defaults:
       run:
@@ -32,7 +31,7 @@ jobs:
             llvmdev=${{ matrix.llvm }} \
             lit=${{ matrix.llvm }} \
             zlib zstd
-      - name: Build  enable_time_tracing=${{ matrix.enable_time_tracing }} build_shared=${{ matrix.build_shared }}
+      - name: Build build_shared=${{ matrix.build_shared }}
         run: |
           mkdir -p build
           pushd build
@@ -41,9 +40,8 @@ jobs:
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DENABLE_DEVELOPER_COMPILER_FLAGS=on \
+            -DENABLE_TESTS=on \
             -DLLVM_INSTALL_DIR=$(llvm-config --prefix) \
-            -DPROTEUS_LINK_SHARED_LLVM=on \
-            -DPROTEUS_ENABLE_TIME_TRACING=${{ matrix.enable_time_tracing }} \
             -DBUILD_SHARED=${{ matrix.build_shared }} |& tee cmake_output.log
           if grep -q "Manually-specified variables were not used by the project:" cmake_output.log; then
             echo "Error: Unused variables detected"

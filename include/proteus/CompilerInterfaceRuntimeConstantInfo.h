@@ -1,14 +1,13 @@
 #ifndef PROTEUS_COMPILER_INTERFACE_RUNTIME_CONSTANT_INFO_H
 #define PROTEUS_COMPILER_INTERFACE_RUNTIME_CONSTANT_INFO_H
 
-#include <optional>
-
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Debug.h"
 #include "proteus/Error.h"
+#include "proteus/Logger.h"
 #include "proteus/RuntimeConstantTypeHelpers.h"
 
-#include "proteus/Debug.h"
-#include "proteus/Logger.hpp"
+#include <optional>
 
 namespace proteus {
 
@@ -66,7 +65,7 @@ struct RuntimeConstantInfo {
   explicit RuntimeConstantInfo(RuntimeConstantType Type, int32_t Pos)
       : ArgInfo{Type, Pos} {
     if (Type == RuntimeConstantType::ARRAY)
-      PROTEUS_FATAL_ERROR("Missing array info");
+      reportFatalError("Missing array info");
   }
 
   explicit RuntimeConstantInfo(RuntimeConstantType Type, int32_t Pos,
@@ -76,8 +75,8 @@ struct RuntimeConstantInfo {
     if ((Type != RuntimeConstantType::ARRAY) &&
         (Type != RuntimeConstantType::STATIC_ARRAY) &&
         (Type != RuntimeConstantType::VECTOR))
-      PROTEUS_FATAL_ERROR("Expected array runtime constant but type is " +
-                          toString(Type));
+      reportFatalError("Expected array runtime constant but type is " +
+                       toString(Type));
   }
 
   explicit RuntimeConstantInfo(RuntimeConstantType Type, int32_t Pos,
@@ -87,8 +86,8 @@ struct RuntimeConstantInfo {
       : ArgInfo{Type, Pos},
         OptArrInfo{RuntimeConstantArrayInfo{EltType, NumEltsType, NumEltsPos}} {
     if (Type != RuntimeConstantType::ARRAY)
-      PROTEUS_FATAL_ERROR("Expected array runtime constant but type is " +
-                          std::to_string(Type));
+      reportFatalError("Expected array runtime constant but type is " +
+                       std::to_string(Type));
   }
 
   explicit RuntimeConstantInfo(RuntimeConstantType Type, int32_t Pos,
@@ -96,8 +95,8 @@ struct RuntimeConstantInfo {
       : ArgInfo{Type, Pos},
         OptObjInfo{RuntimeConstantObjectInfo{Size, PassByValue}} {
     if (Type != RuntimeConstantType::OBJECT)
-      PROTEUS_FATAL_ERROR("Expected object runtime constant but type is " +
-                          std::to_string(Type));
+      reportFatalError("Expected object runtime constant but type is " +
+                       std::to_string(Type));
   }
 
   bool operator==(const RuntimeConstantInfo &O) const {
@@ -129,7 +128,7 @@ template <typename T> inline T getRuntimeConstantValue(void *Arg) {
   } else if constexpr (std::is_pointer_v<T>) {
     return static_cast<T>(*(intptr_t *)Arg);
   } else {
-    PROTEUS_FATAL_ERROR("Unsupported type for runtime constant value");
+    reportFatalError("Unsupported type for runtime constant value");
   }
 }
 
@@ -257,8 +256,7 @@ dispatchGetRuntimeConstantValue(void **Args,
     break;
   }
   default:
-    PROTEUS_FATAL_ERROR("Unsupported runtime constant type: " +
-                        toString(RC.Type));
+    reportFatalError("Unsupported runtime constant type: " + toString(RC.Type));
   }
 
   return RC;

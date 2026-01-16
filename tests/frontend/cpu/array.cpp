@@ -4,7 +4,9 @@
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
-#include <proteus/JitFrontend.hpp>
+#include <proteus/JitFrontend.h>
+
+#include <iostream>
 
 using namespace proteus;
 

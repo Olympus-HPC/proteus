@@ -8,7 +8,7 @@
 
 #include "gpu_common.h"
 #include <cstdio>
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 __device__ int inc(int Item) { return Item + 1; }
 

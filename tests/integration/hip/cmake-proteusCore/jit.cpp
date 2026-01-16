@@ -2,8 +2,8 @@
 #include <iostream>
 #include <string>
 
-#include <proteus/CoreLLVM.hpp>
-#include <proteus/CoreLLVMDevice.hpp>
+#include <proteus/CoreLLVM.h>
+#include <proteus/CoreLLVMDevice.h>
 #include <proteus/Error.h>
 #include <proteus/Utils.h>
 
@@ -32,15 +32,15 @@ int main(int argc, char **argv) {
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> Buffer =
       llvm::MemoryBuffer::getFile(BitcodeFN);
   if (!Buffer)
-    PROTEUS_FATAL_ERROR("Error loading file " + BitcodeFN +
-                        "\n Error Code:" + Buffer.getError().message());
+    proteus::reportFatalError("Error loading file " + BitcodeFN +
+                              "\n Error Code:" + Buffer.getError().message());
 
   llvm::Expected<std::unique_ptr<llvm::Module>> ModuleOrErr =
       llvm::parseBitcodeFile(Buffer->get()->getMemBufferRef(), Ctx);
 
   if (!ModuleOrErr)
-    PROTEUS_FATAL_ERROR("Error parsing bitcode: " +
-                        llvm::toString(ModuleOrErr.takeError()));
+    proteus::reportFatalError("Error parsing bitcode: " +
+                              llvm::toString(ModuleOrErr.takeError()));
 
   llvm::SmallPtrSet<void *, 8> GlobalLinkedBinaries;
   auto Mod = std::move(ModuleOrErr.get());

@@ -10,7 +10,7 @@
 #include <cstdlib>
 #include <iostream>
 
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 void myDaxpy(double A, double *X, double *Y, size_t N) {
   proteus::jit_arg(A);

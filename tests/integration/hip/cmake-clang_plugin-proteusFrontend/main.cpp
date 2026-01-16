@@ -1,6 +1,6 @@
 #include <cstdio>
 
-#include "proteus/CppJitModule.hpp"
+#include "proteus/CppJitModule.h"
 
 using namespace proteus;
 

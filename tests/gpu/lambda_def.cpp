@@ -9,7 +9,7 @@
 #include <cstdio>
 
 #include "gpu_common.h"
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 template <typename T>
 __global__ __attribute__((annotate("jit"))) void kernel(T LB) {

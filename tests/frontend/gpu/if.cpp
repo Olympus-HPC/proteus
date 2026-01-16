@@ -8,8 +8,8 @@
 
 #include <iostream>
 
-#include <proteus/JitFrontend.hpp>
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitFrontend.h>
+#include <proteus/JitInterface.h>
 
 #include "../../gpu/gpu_common.h"
 

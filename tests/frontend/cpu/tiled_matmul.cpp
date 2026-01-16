@@ -9,8 +9,8 @@
 #include <cstdlib>
 #include <iostream>
 
-#include <proteus/JitFrontend.hpp>
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitFrontend.h>
+#include <proteus/JitInterface.h>
 
 static auto getTiledMatmulFunction(int N, int TileI, int TileJ, int TileK) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
@@ -33,9 +33,9 @@ static auto getTiledMatmulFunction(int N, int TileI, int TileJ, int TileK) {
       auto IncOne = F.defRuntimeConst<int>(1, "inc");
       auto Zero = F.defRuntimeConst<int>(0, "zero");
 
-      F.buildLoopNest(F.forLoop({I, Zero, UbnI, IncOne}).tile(TileI),
-                      F.forLoop({J, Zero, UbnJ, IncOne}).tile(TileJ),
-                      F.forLoop({K, Zero, UbnK, IncOne},
+      F.buildLoopNest(F.forLoop(I, Zero, UbnI, IncOne).tile(TileI),
+                      F.forLoop(J, Zero, UbnJ, IncOne).tile(TileJ),
+                      F.forLoop(K, Zero, UbnK, IncOne,
                                 [&]() {
                                   auto CIdx = I * N + J;
                                   auto AIdx = I * N + K;

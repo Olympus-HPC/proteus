@@ -11,20 +11,21 @@
 #ifndef PROTEUS_UTILS_H
 #define PROTEUS_UTILS_H
 
-#include <string>
+#include "proteus/Error.h"
+#include "proteus/Logger.h"
+#include "proteus/TimeTracing.h"
 
 #include <llvm/ADT/Twine.h>
 #include <llvm/Support/SourceMgr.h>
 
-#include "proteus/Error.h"
-#include "proteus/Logger.hpp"
-#include "proteus/TimeTracing.hpp"
+#include <string>
 
-template <typename T> void saveToFile(llvm::StringRef Filepath, T &&Data) {
+template <typename T>
+inline void saveToFile(llvm::StringRef Filepath, T &&Data) {
   std::error_code EC;
   llvm::raw_fd_ostream Out(Filepath, EC);
   if (EC)
-    PROTEUS_FATAL_ERROR("Cannot open file" + Filepath);
+    proteus::reportFatalError("Cannot open file" + Filepath);
   Out << Data;
   Out.close();
 }

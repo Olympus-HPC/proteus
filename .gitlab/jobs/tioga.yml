@@ -54,8 +54,7 @@ variables:
 .build-variants:
   parallel:
     matrix:
-      - PROTEUS_CI_ENABLE_TIME_TRACING: ["on", "off"]
-        PROTEUS_CI_BUILD_SHARED: ["on", "off"]
+      - PROTEUS_CI_BUILD_SHARED: ["on", "off"]
 
 build-and-test-tioga:
   extends: [.base-job, .build-variants]

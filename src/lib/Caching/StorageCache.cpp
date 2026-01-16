@@ -8,18 +8,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <cstdint>
-#include <filesystem>
+#include "proteus/Caching/StorageCache.h"
+#include "proteus/CompiledLibrary.h"
+#include "proteus/Config.h"
+#include "proteus/Hashing.h"
+#include "proteus/Utils.h"
 
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/MemoryBufferRef.h>
 
-#include "proteus/Caching/StorageCache.hpp"
-#include "proteus/CompiledLibrary.hpp"
-#include "proteus/Config.hpp"
-#include "proteus/Hashing.hpp"
-#include "proteus/Utils.h"
+#include <cstdint>
+#include <filesystem>
 
 namespace proteus {
 
@@ -38,7 +38,7 @@ StorageCache::StorageCache(const std::string &Label)
   std::filesystem::create_directory(StorageDirectory);
 }
 
-std::unique_ptr<CompiledLibrary> StorageCache::lookup(HashT &HashValue) {
+std::unique_ptr<CompiledLibrary> StorageCache::lookup(const HashT &HashValue) {
   TIMESCOPE("object lookup");
   Accesses++;
 
@@ -56,31 +56,21 @@ std::unique_ptr<CompiledLibrary> StorageCache::lookup(HashT &HashValue) {
 
   if (std::filesystem::exists(Filebase + ".so")) {
     Hits++;
-    return std::make_unique<CompiledLibrary>(
-        SmallString<128>{Filebase + ".so"});
+    return std::make_unique<CompiledLibrary>(Filebase + ".so");
   }
 
   return nullptr;
 }
 
-void StorageCache::store(HashT &HashValue, MemoryBufferRef ObjBufRef) {
+void StorageCache::store(const HashT &HashValue, const CacheEntry &Entry) {
   TIMESCOPE("Store cache");
 
   std::string Filebase = StorageDirectory + "/" + DistributedRank +
                          "-cache-jit-" + HashValue.toString();
+  std::string Extension = Entry.isSharedObject() ? ".so" : ".o";
 
-  saveToFile(Filebase + ".o",
-             StringRef{ObjBufRef.getBufferStart(), ObjBufRef.getBufferSize()});
-}
-
-void StorageCache::storeDynamicLibrary(HashT &HashValue,
-                                       const SmallString<128> &Path) {
-  TIMESCOPE("Store cache");
-
-  std::string Filebase = StorageDirectory + "/" + DistributedRank +
-                         "-cache-jit-" + HashValue.toString();
-
-  sys::fs::copy_file(Path, Filebase + ".so");
+  saveToFile(Filebase + Extension, StringRef{Entry.Buffer.getBufferStart(),
+                                             Entry.Buffer.getBufferSize()});
 }
 
 void StorageCache::printStats() {

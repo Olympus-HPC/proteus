@@ -5,7 +5,7 @@
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
-#include "proteus/CppJitModule.hpp"
+#include "proteus/CppJitModule.h"
 
 #include "../../gpu/gpu_common.h"
 
@@ -20,6 +20,8 @@
 #else
 #error "Expected PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA defined"
 #endif
+
+#include <iostream>
 
 using namespace proteus;
 

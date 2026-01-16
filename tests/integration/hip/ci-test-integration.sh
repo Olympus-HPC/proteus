@@ -23,7 +23,7 @@ export TEST_DIR=${CI_PROJECT_DIR}/tests/integration/hip/${PROTEUS_CI_INTEGRATION
 mkdir -p /tmp/proteus-ci-$(basename ${TEST_DIR})-${CI_JOB_ID}
 pushd /tmp/proteus-ci-$(basename ${TEST_DIR})-${CI_JOB_ID}
 
-rm -rf build-proteus install-proteus build
+rm -rf build-proteus install-proteus build install
 bash ${TEST_DIR}/ci-build-and-run.sh
 
 popd

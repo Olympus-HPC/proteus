@@ -29,7 +29,6 @@ if [ "${CI_MACHINE}" == "matrix" ]; then
 
   LLVM_INSTALL_DIR=$(llvm-config --prefix)
   CMAKE_OPTIONS_MACHINE=" -DCMAKE_PREFIX_PATH=$CONDA_PREFIX;$CONDA_PREFIX/lib/cmake"
-  CMAKE_OPTIONS_MACHINE+=" -DPROTEUS_LINK_SHARED_LLVM=on"
   CMAKE_OPTIONS_MACHINE+=" -DPROTEUS_ENABLE_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=90"
   CMAKE_OPTIONS_MACHINE+=" -DCMAKE_CUDA_COMPILER=$LLVM_INSTALL_DIR/bin/clang++"
   # Clang 18 has a bug with CUDA and the GNU C++ standard library extensions:
@@ -58,8 +57,8 @@ CMAKE_OPTIONS="-DLLVM_INSTALL_DIR=$LLVM_INSTALL_DIR"
 CMAKE_OPTIONS+=" -DCMAKE_BUILD_TYPE=Release"
 CMAKE_OPTIONS+=" -DCMAKE_C_COMPILER=$LLVM_INSTALL_DIR/bin/clang -DCMAKE_CXX_COMPILER=$LLVM_INSTALL_DIR/bin/clang++"
 CMAKE_OPTIONS+=" -DENABLE_DEVELOPER_COMPILER_FLAGS=on"
+CMAKE_OPTIONS+=" -DENABLE_TESTS=on"
 CMAKE_OPTIONS+=${CMAKE_OPTIONS_MACHINE}
-CMAKE_OPTIONS+=" -DPROTEUS_ENABLE_TIME_TRACING=${PROTEUS_CI_ENABLE_TIME_TRACING}"
 if [ -n "${PROTEUS_CI_BUILD_SHARED}" ]; then
   CMAKE_OPTIONS+=" -DBUILD_SHARED=${PROTEUS_CI_BUILD_SHARED}"
 fi
@@ -73,11 +72,6 @@ if grep -q "Manually-specified variables were not used by the project:" cmake_ou
     exit 1
 fi
 make -j
-
-if  [ "$PROTEUS_CI_ENABLE_DEBUG" == "on" ] || [ "$PROTEUS_CI_ENABLE_TIME_TRACING" == "on" ]; then
-  echo "Skipping tests for debug output or time tracing builds."
-  exit 0
-fi
 
 # Test synchronous compilation (default) and kernel clone options.
 echo "### $(date) START TESTING SYNC COMPILATION KERNEL_CLONE cross-clone ###"
@@ -107,13 +101,16 @@ if [ "${CI_MACHINE}" == "tioga" ] || [ "${CI_MACHINE}" == "tuolumne" ]; then
   PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 PROTEUS_CODEGEN=serial ctest -j8 -T test --output-on-failure
   echo "### $(date) END TESTING (BLOCKING) ASYNC COMPILATION WITH PROTEUS CODEGEN SERIAL ###"
 
-  if [ "${PROTEUS_CI_ROCM_VERSION}" == "6.2.1" ] || [ "${PROTEUS_CI_ROCM_VERSION}" == "6.3.1" ];  then
+  if [ "${PROTEUS_CI_ROCM_VERSION}" == "6.3.1" ] \
+     || [ "${PROTEUS_CI_ROCM_VERSION}" == "6.4.1" ] \
+     || [ "${PROTEUS_CI_ROCM_VERSION}" == "7.1.0" ]; then
     echo "### $(date) START TESTING SYNC COMPILATION WITH PROTEUS CODEGEN PARALLEL ###"
     PROTEUS_CODEGEN=parallel ctest -j8 -T test --output-on-failure
     echo "### $(date) END TESTING SYNC COMPILATION WITH PROTEUS HIP CODEGEN PARALLEL ###"
 
     echo "### $(date) START TESTING (BLOCKING) ASYNC COMPILATION WITH PROTEUS CODEGEN PARALLEL ###"
-    PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 PROTEUS_CODEGEN=parallel ctest -j8 -T test --output-on-failure
+    PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 PROTEUS_CODEGEN=parallel \
+      ctest -j8 -T test --output-on-failure
     echo "### $(date) END TESTING (BLOCKING) ASYNC COMPILATION WITH PROTEUS CODEGEN PARALLEL ###"
   fi
 fi

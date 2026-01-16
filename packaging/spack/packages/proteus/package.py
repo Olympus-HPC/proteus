@@ -1,0 +1,116 @@
+# Copyright 2024-2025 Lawrence Livermore National Security, LLC and
+# Proteus developers. See the top-level COPYRIGHT file for details.
+#
+# SPDX-License-Identifier: (Apache-2.0 WITH LLVM-exception)
+
+from spack_repo.builtin.build_systems.cuda import CudaPackage
+from spack_repo.builtin.build_systems.rocm import ROCmPackage
+
+from spack.package import *
+
+
+class Proteus(CMakePackage, CudaPackage, ROCmPackage):
+    """
+    Proteus: A Programmable Just-In-Time (JIT) Compiler based on LLVM.
+    It embeds seamlessly into existing C++ codebases and accelerates
+    CUDA, HIP, and host-only C/C++ applications.
+    """
+
+    homepage = "https://github.com/Olympus-HPC/proteus"
+    git = "https://github.com/Olympus-HPC/proteus.git"
+
+    maintainers("ggeorgakoudis")
+
+    license("Apache-2.0 WITH LLVM-exception")
+
+    version("main", branch="main")
+
+    # Variants to control build options.
+    variant(
+        "shared",
+        default=False,
+        description="Build Proteus as a shared library (BUILD_SHARED)",
+    )
+    variant(
+        "tests", default=False, description="Enable building of tests (ENABLE_TESTS)"
+    )
+    variant(
+        "developer_flags",
+        default=False,
+        description="Enable developer flags (ENABLE_DEVELOPER_COMPILER_FLAGS)",
+    )
+
+    # Disallow enabling both CUDA and HIP at the same time.
+    conflicts(
+        "+cuda +rocm",
+        msg="Proteus cannot be built with both +cuda and +rocm simultaneously",
+    )
+    # Disallow building proteus as shared library with CUDA due to issue with
+    # JIT compilation and device globals.
+    conflicts(
+        "+shared +cuda",
+        msg="Proteus cannot be built as a shared library with +cuda enabled "
+        "due to JIT compilation issues with device globals",
+    )
+    # Require the Clang compiler since tests use the Proteus LLVM plugin.
+    requires("%clang@18:19", when="+tests")
+
+    # Build Dependencies.
+    depends_on("c", type="build")
+    depends_on("cxx", type="build")
+    depends_on("cmake@3.18:", type="build")
+
+    # Proteus LLVM and Clang dependencies.
+    # CUDA enabled.
+    depends_on("llvm@18:19 +clang targets=all", when="+cuda")
+
+    # ROCm enabled, use the AMDGPU LLVM build.
+    depends_on("llvm-amdgpu@6.2:6.4", when="+rocm")
+
+    # Host-only (no CUDA or HIP).
+    depends_on("llvm@18:19 +clang", when="~rocm ~cuda")
+
+    # CUDA and HIP dependencies.
+    depends_on("cuda@12:", when="+cuda")
+    depends_on("hip@6.2:6.4", when="+rocm")
+
+    def cmake_args(self):
+        # Enforce clang when building tests
+        if "+tests" in self.spec and not self.spec.satisfies("%clang"):
+            raise InstallError(
+                "Building Proteus with +tests requires the Clang compiler (%clang18:19), "
+                f"but spec: {self.spec} is using the compiler: {self.spec.compiler}."
+            )
+
+        args = []
+
+        # Helper to find LLVM/Clang config: prefer whichever provider is present
+        if "llvm-amdgpu" in self.spec:
+            llvm_provider = self.spec["llvm-amdgpu"]
+        elif "llvm" in self.spec:
+            llvm_provider = self.spec["llvm"]
+        else:
+            raise InstallError(
+                "Proteus requires an LLVM provider (llvm or llvm-amdgpu)"
+            )
+
+        args.append(self.define("LLVM_INSTALL_DIR", llvm_provider.prefix))
+
+        # BUILD_SHARED (default static).
+        args.append(self.define_from_variant("BUILD_SHARED", "shared"))
+
+        # ENABLE_TESTS.
+        args.append(self.define_from_variant("ENABLE_TESTS", "tests"))
+
+        # PROTEUS_ENABLE_HIP / PROTEUS_ENABLE_CUDA.
+        args.append(self.define_from_variant("PROTEUS_ENABLE_HIP", "rocm"))
+        args.append(self.define_from_variant("PROTEUS_ENABLE_CUDA", "cuda"))
+
+        # ENABLE_DEVELOPER_COMPILER_FLAGS.
+        args.append(
+            self.define_from_variant(
+                "ENABLE_DEVELOPER_COMPILER_FLAGS", "developer_flags"
+            )
+        )
+
+        return args

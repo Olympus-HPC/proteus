@@ -9,8 +9,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "proteus/CompilerInterfaceDevice.h"
-#include "proteus/CompilerInterfaceDeviceInternal.hpp"
-#include "proteus/JitEngineDevice.hpp"
+#include "proteus/CompilerInterfaceDeviceInternal.h"
+#include "proteus/JitEngineDevice.h"
 
 using namespace proteus;
 

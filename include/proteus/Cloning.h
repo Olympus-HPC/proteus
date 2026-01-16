@@ -1,15 +1,16 @@
 #ifndef PROTEUS_CLONING_H
 #define PROTEUS_CLONING_H
 
-#include <llvm/Analysis/CallGraph.h>
-#include <llvm/IR/Constants.h>
-#include <llvm/IR/Verifier.h>
-#include <llvm/Transforms/Utils/Cloning.h>
-
-#include "proteus/Config.hpp"
+#include "proteus/Config.h"
 #include "proteus/Debug.h"
 #include "proteus/Error.h"
-#include "proteus/Logger.hpp"
+#include "proteus/Logger.h"
+
+#include <llvm/Analysis/CallGraph.h>
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Verifier.h>
+#include <llvm/Transforms/Utils/Cloning.h>
 
 namespace proteus {
 
@@ -28,7 +29,7 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, StringRef Name,
 
   auto *KernelFunction = M.getFunction(Name);
   if (!KernelFunction)
-    PROTEUS_FATAL_ERROR("Expected function " + Name);
+    reportFatalError("Expected function " + Name);
 
   SmallPtrSet<Function *, 8> ReachableFunctions;
   SmallPtrSet<GlobalVariable *, 16> ReachableGlobals;
@@ -174,7 +175,7 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, StringRef Name,
   if (Config::get().ProteusDebugOutput) {
     Logger::logfile(Name.str() + ".mini.ll", *KernelModuleTmp);
     if (verifyModule(*KernelModuleTmp, &errs()))
-      PROTEUS_FATAL_ERROR("Broken mini-module found, JIT compilation aborted!");
+      reportFatalError("Broken mini-module found, JIT compilation aborted!");
   }
 
   return KernelModuleTmp;
@@ -268,11 +269,11 @@ struct LinkingCloner {
         SmallVector<char> ErrMsg;
         raw_svector_ostream OS{ErrMsg};
         G->print(OS);
-        PROTEUS_FATAL_ERROR("Expected aliasee to be a global value: " + ErrMsg);
+        reportFatalError("Expected aliasee to be a global value: " + ErrMsg);
       }
       ResolvedGV = GA;
     } else {
-      PROTEUS_FATAL_ERROR("Unsupported global value: " + toString(*G));
+      reportFatalError("Unsupported global value: " + toString(*G));
     }
 
     if (ResolvedGV && Found.insert(ResolvedGV).second) {
@@ -314,6 +315,15 @@ struct LinkingCloner {
       auto *GV = WorkList.pop_back_val();
 
       if (auto *F = dyn_cast<Function>(GV)) {
+        // If the function has a personality function, resolve it as it needs to
+        // be declared in the cloned module.
+        if (F->hasPersonalityFn()) {
+          if (auto *PersGV = dyn_cast<GlobalValue>(
+                  F->getPersonalityFn()->stripPointerCasts())) {
+            resolveGV(Defs, PersGV, WorkList, Found);
+          }
+        }
+
         for (auto &BB : *F) {
           for (auto &I : BB) {
             // Add direct calls to other functions.
@@ -338,16 +348,17 @@ struct LinkingCloner {
       } else if (auto *GA = dyn_cast<GlobalAlias>(GV)) {
         scanConstant(GA->getAliasee(), Defs, WorkList, Found);
       } else {
-        PROTEUS_FATAL_ERROR("Unsupported global value: " + toString(*GV));
+        reportFatalError("Unsupported global value: " + toString(*GV));
       }
     }
 
     return Found;
   }
 
-  std::unique_ptr<Module>
-  cloneClosure(Module &M, LLVMContext &Ctx,
-               SmallPtrSetImpl<GlobalValue *> const &Reachable) {
+  std::unique_ptr<Module> cloneClosure(
+      Module &M, LLVMContext &Ctx,
+      SmallPtrSetImpl<GlobalValue *> const &Reachable,
+      function_ref<bool(const GlobalValue *)> ShouldCloneDefinition = nullptr) {
     auto ModuleOut =
         std::make_unique<Module>(M.getName().str() + ".closure.clone", Ctx);
     ModuleOut->setSourceFileName(M.getSourceFileName());
@@ -413,12 +424,18 @@ struct LinkingCloner {
         NGA->setVisibility(GA->getVisibility());
         VMap[GA] = NGA;
       } else {
-        PROTEUS_FATAL_ERROR("Unsupported global value: " + toString(*GV));
+        reportFatalError("Unsupported global value: " + toString(*GV));
       }
     }
 
     // Clone function bodies and global variable initializers.
     for (GlobalValue *GV : Reachable) {
+      // Check if the ShouldCloneDefinition callback exists and call to exclude
+      // or include the definition of this GV.
+      if (ShouldCloneDefinition)
+        if (!ShouldCloneDefinition(GV))
+          continue;
+
       if (auto *F = dyn_cast<Function>(GV)) {
         Function *NF = cast<Function>(VMap[F]);
         SmallVector<ReturnInst *, 8> Returns;
@@ -441,7 +458,7 @@ struct LinkingCloner {
         auto *NGA = cast<GlobalAlias>(VMap[GA]);
         NGA->setAliasee(MapValue(Aliasee, VMap));
       } else {
-        PROTEUS_FATAL_ERROR("Unsupported global value: " + toString(*GV));
+        reportFatalError("Unsupported global value: " + toString(*GV));
       }
     }
 
@@ -486,16 +503,16 @@ struct LinkingCloner {
 
     if (Config::get().ProteusDebugOutput) {
       if (verifyModule(*ModuleOut, &errs()))
-        PROTEUS_FATAL_ERROR(
+        reportFatalError(
             "Broken cross-module clone found, JIT compilation aborted!");
     }
     return ModuleOut;
   }
 };
 
-inline std::unique_ptr<Module>
-cloneKernelFromModules(ArrayRef<std::reference_wrapper<Module>> Mods,
-                       StringRef EntryName) {
+inline std::unique_ptr<Module> cloneKernelFromModules(
+    ArrayRef<std::reference_wrapper<Module>> Mods, StringRef EntryName,
+    function_ref<bool(const GlobalValue *)> ShouldCloneDefinition = nullptr) {
   auto Cloner = LinkingCloner();
   LinkingCloner::DefMaps Defs = Cloner.buildDefMaps(Mods);
 
@@ -509,7 +526,7 @@ cloneKernelFromModules(ArrayRef<std::reference_wrapper<Module>> Mods,
     }
   }
   if (!EntryF)
-    PROTEUS_FATAL_ERROR("Expected non-null entry function");
+    reportFatalError("Expected non-null entry function");
 
   // Compute the transitive closure starting from the entry function.
   SmallVector<Function *> ToVisit{EntryF};
@@ -520,7 +537,7 @@ cloneKernelFromModules(ArrayRef<std::reference_wrapper<Module>> Mods,
     // Due to lazy parsing, make sure the function is materialized before
     // traversing it.
     if (auto E = F->materialize())
-      PROTEUS_FATAL_ERROR("Failed to materialize: " + toString(std::move(E)));
+      reportFatalError("Failed to materialize: " + toString(std::move(E)));
 
     auto ThisReachable = Cloner.findTransitiveClosure(F, Defs);
     for (auto *GV : ThisReachable) {
@@ -535,8 +552,8 @@ cloneKernelFromModules(ArrayRef<std::reference_wrapper<Module>> Mods,
   }
 
   // Clone closure in new module.
-  auto KernelModule =
-      Cloner.cloneClosure(*EntryM, EntryF->getContext(), Reachable);
+  auto KernelModule = Cloner.cloneClosure(*EntryM, EntryF->getContext(),
+                                          Reachable, ShouldCloneDefinition);
 
   return KernelModule;
 }

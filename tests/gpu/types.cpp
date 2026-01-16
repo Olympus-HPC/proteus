@@ -10,7 +10,7 @@
 #include <cstdlib>
 
 #include "gpu_common.h"
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 template <typename T>
 __global__ __attribute__((annotate("jit", 1))) void kernel(T Arg) {
@@ -37,16 +37,8 @@ int main() {
   gpuErrCheck(gpuDeviceSynchronize());
   kernel<<<1, 1>>>(1.0);
   gpuErrCheck(gpuDeviceSynchronize());
-// CUDA AOT compilation with a `long double` breaks on lassen.
-// We re-test the `double` type with a different value (to avoid caching).
-#if PROTEUS_ENABLE_HIP
-  kernel<<<1, 1>>>(2.0l);
-#elif PROTEUS_ENABLE_CUDA
-  kernel<<<1, 1>>>(2.0);
-#else
-#error "Expected PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA"
-#endif
-  gpuErrCheck(gpuDeviceSynchronize());
+  // CUDA/HIP do not support long double on GPUs, demoting to double, hence we
+  // do not support or test.
   kernel<<<1, 1>>>(true);
   gpuErrCheck(gpuDeviceSynchronize());
   kernel<<<1, 1>>>('a');
@@ -72,15 +64,12 @@ int main() {
 // CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kernelIdEvT_ ArgNo 0 with value double 1.000000e+00
 // CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
-// HIP sees long double, CUDA sees double, thus the regex.
-// CHECK-FIRST: [ArgSpec] Replaced Function {{_Z6kernelI[ed]EvT_}} ArgNo 0 with value double 2.000000e+00
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kernelIbEvT_ ArgNo 0 with value i1 true
 // CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kernelIcEvT_ ArgNo 0 with value i8 97
 // CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kernelIhEvT_ ArgNo 0 with value i8 97
 // CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
-// CHECK-FIRST: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 12
-// CHECK-COUNT-12: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 12 accesses 12
+// CHECK-FIRST: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 11
+// CHECK-COUNT-11: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 11 accesses 11

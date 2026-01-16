@@ -1,7 +1,7 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_SPECIALIZE_DIMS_ASSUME=1 PROTEUS_TRACE_OUTPUT=1 %build/daxpy.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/daxpy.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: PROTEUS_SPECIALIZE_DIMS_RANGE=1 PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 %build/daxpy.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_SPECIALIZE_DIMS_RANGE=1 PROTEUS_CACHE_DIR="%t.$$.proteus" %build/daxpy.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
@@ -10,7 +10,7 @@
 #include <iostream>
 
 #include "gpu_common.h"
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 __global__ __attribute__((annotate("jit", 4), noinline)) void
 daxpyImpl(double A, double *X, double *Y, size_t N) {
@@ -66,8 +66,8 @@ int main() {
 // clang-format off
 // CHECK: 0
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z9daxpyImpldPdS_m ArgNo 3 with value i64 1024
-// CHECK-FIRST: [DimSpec]
-// CHECK-FIRST: [DimSpec]
+// CHECK-FIRST: [DimSpec] Range {{llvm.amdgcn.workitem.id.x|llvm.nvvm.read.ptx.sreg.tid.x}} [0,256)
+// CHECK-FIRST: [DimSpec] Range {{llvm.amdgcn.workgroup.id.x|llvm.nvvm.read.ptx.sreg.ctaid.x}} [0,4)
 // CHECK: 19944.1
 // CHECK: 39888.2
 // CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 1 accesses 2

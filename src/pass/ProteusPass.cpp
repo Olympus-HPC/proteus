@@ -25,7 +25,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <string>
+#include "AnnotationHandler.h"
+#include "Helpers.h"
+
+#include "proteus/Cloning.h"
+#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Error.h"
+#include "proteus/Hashing.h"
+#include "proteus/Logger.h"
+#include "proteus/RuntimeConstantTypeHelpers.h"
 
 #include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/ADT/StringRef.h>
@@ -72,15 +80,7 @@
 #include <llvm/Transforms/Utils/Cloning.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
-#include "proteus/Cloning.h"
-#include "proteus/CompilerInterfaceTypes.h"
-#include "proteus/Error.h"
-#include "proteus/Hashing.hpp"
-#include "proteus/Logger.hpp"
-#include "proteus/RuntimeConstantTypeHelpers.h"
-
-#include "AnnotationHandler.h"
-#include "Helpers.h"
+#include <string>
 
 using namespace llvm;
 using namespace proteus;
@@ -137,8 +137,6 @@ public:
     registerLambdaFunctions(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
-      AnnotHandler.parseManifestFileAnnotations(StubToKernelMap,
-                                                JitFunctionInfoMap);
       instrumentRegisterFunction(M);
       emitJitLaunchKernelCall(M);
     }
@@ -160,7 +158,7 @@ public:
           << M << "=== End Post Original Host Module\n");
 
     if (verifyModule(M, &errs()))
-      PROTEUS_FATAL_ERROR("Broken original module found, compilation aborted!");
+      reportFatalError("Broken original module found, compilation aborted!");
 
     return true;
   }
@@ -218,16 +216,18 @@ private:
     Function *JITFn = JITInfo.first;
     JitFunctionInfo &JFI = JITInfo.second;
 
-    ValueToValueMapTy VMap;
-    auto JitMod = CloneModule(M, VMap, [](const GlobalValue *GV) {
-      if (const GlobalVariable *G = dyn_cast<GlobalVariable>(GV))
-        if (!G->isConstant())
-          return false;
+    auto JitMod = cloneKernelFromModules(
+        {M}, JITFn->getName(), [](const GlobalValue *GV) {
+          if (const GlobalVariable *G = dyn_cast<GlobalVariable>(GV))
+            if (!G->isConstant())
+              return false;
 
-      return true;
-    });
+          return true;
+        });
 
-    Function *JitF = cast<Function>(VMap[JITFn]);
+    Function *JitF = JitMod->getFunction(JITFn->getName());
+    if (!JitF)
+      reportFatalError("Expected JIT function in cloned module");
     JitF->setLinkage(GlobalValue::ExternalLinkage);
 
     // Internalize functions, besides JIT function, in the module
@@ -238,6 +238,12 @@ private:
 
       if (&JitModF == JitF)
         continue;
+
+      // Remove Comdat from functions to be internalized, otherwise they will
+      // stay external. The JIT module is not linked with anything else, so
+      // Comdat is not needed.
+      if (JitModF.hasComdat())
+        JitModF.setComdat(nullptr);
 
       // Internalize other functions in the module.
       JitModF.setLinkage(GlobalValue::InternalLinkage);
@@ -261,7 +267,7 @@ private:
     emitJitFunctionArgMetadata(*JitMod, JFI, *JitF);
 
     if (verifyModule(*JitMod, &errs()))
-      PROTEUS_FATAL_ERROR("Broken JIT module found, compilation aborted!");
+      reportFatalError("Broken JIT module found, compilation aborted!");
 
     raw_string_ostream OS(JFI.ModuleIR);
     WriteBitcodeToFile(*JitMod, OS);
@@ -305,8 +311,8 @@ private:
         M.getContext(),
         ArrayRef<uint8_t>((const uint8_t *)Bitcode.data(), Bitcode.size()));
     if (M.getNamedGlobal(GVName))
-      PROTEUS_FATAL_ERROR(
-          "Expected unique name for jit module global variable " + GVName);
+      reportFatalError("Expected unique name for jit module global variable " +
+                       GVName);
     auto *GV =
         new GlobalVariable(M, JitModule->getType(), /* isConstant */ true,
                            GlobalValue::ExternalLinkage, JitModule, GVName);
@@ -375,7 +381,7 @@ private:
         MemoryBufferRef MBRef{BitcodeData, GVar.getName()};
         auto ExpectedParsedModule = parseBitcodeFile(MBRef, Ctx);
         if (auto E = ExpectedParsedModule.takeError())
-          PROTEUS_FATAL_ERROR("Error: " + toString(std::move(E)));
+          reportFatalError("Error: " + toString(std::move(E)));
         auto ParsedModule = std::move(*ExpectedParsedModule);
         for (auto &G : ParsedModule->global_values()) {
           if (!G.isDeclaration())
@@ -410,7 +416,7 @@ private:
       StripDebugInfo(*PrunedLTOModule);
 
       if (verifyModule(*PrunedLTOModule, &errs()))
-        PROTEUS_FATAL_ERROR(
+        reportFatalError(
             "Broken pruned lto module found, compilation aborted!");
 
       SmallVector<char> Bitcode;
@@ -420,8 +426,8 @@ private:
                             "pruned.lto.module"};
       auto ExpectedPrunedLTOModuleInCtx = parseBitcodeFile(MBRef, Ctx);
       if (auto E = ExpectedPrunedLTOModuleInCtx.takeError())
-        PROTEUS_FATAL_ERROR("Error parsing pruned lto module " +
-                            toString(std::move(E)));
+        reportFatalError("Error parsing pruned lto module " +
+                         toString(std::move(E)));
       LinkedModules.push_back(std::move(*ExpectedPrunedLTOModuleInCtx));
     };
 
@@ -441,7 +447,7 @@ private:
     Linker IRLinker(*LinkedModule);
     for (auto &Mod : LinkedModules) {
       if (IRLinker.linkInModule(std::move(Mod)))
-        PROTEUS_FATAL_ERROR("Linking failed");
+        reportFatalError("Linking failed");
     }
 
     runCleanupPassPipeline(*LinkedModule);
@@ -455,13 +461,13 @@ private:
         auto KernelName = Sym.getKey();
 
         if (!LinkedModule->getFunction(KernelName))
-          PROTEUS_FATAL_ERROR("Expected kernel function in linked module");
+          reportFatalError("Expected kernel function in linked module");
 
         auto KernelModule = cloneKernelFromModules({*LinkedModule}, KernelName);
         runCleanupPassPipeline(*KernelModule);
 
         if (verifyModule(*KernelModule, &errs()))
-          PROTEUS_FATAL_ERROR(
+          reportFatalError(
               "Broken original module found, compilation aborted!");
 
         emitModuleDevice(LTOModule, *KernelModule, KernelName, false);
@@ -594,7 +600,7 @@ private:
       ArrayType *RuntimeConstantInfoPtrArrayTy,
       GlobalVariable *RuntimeConstantInfoPtrArray, size_t Idx) {
     if (!RCInfo.OptArrInfo)
-      PROTEUS_FATAL_ERROR("Expected existing array info");
+      reportFatalError("Expected existing array info");
 
     FunctionCallee CreateFn =
         getProteusCreateRuntimeConstantInfoArrayConstSizeFn(M);
@@ -622,7 +628,7 @@ private:
       ArrayType *RuntimeConstantInfoPtrArrayTy,
       GlobalVariable *RuntimeConstantInfoPtrArray, size_t Idx) {
     if (!RCInfo.OptArrInfo)
-      PROTEUS_FATAL_ERROR("Expected array info");
+      reportFatalError("Expected array info");
 
     FunctionCallee CreateFn =
         getProteusCreateRuntimeConstantInfoArrayRunConstSizeFn(M);
@@ -650,7 +656,7 @@ private:
                                     GlobalVariable *RuntimeConstantInfoPtrArray,
                                     size_t Idx) {
     if (!RCInfo.OptArrInfo)
-      PROTEUS_FATAL_ERROR("Expected array info");
+      reportFatalError("Expected array info");
 
     if (RCInfo.OptArrInfo->OptNumEltsRCInfo) {
       emitRuntimeConstantInfoArrayRunConstSize(
@@ -668,7 +674,7 @@ private:
       ArrayType *RuntimeConstantInfoPtrArrayTy,
       GlobalVariable *RuntimeConstantInfoPtrArray, size_t Idx) {
     if (!RCInfo.OptObjInfo)
-      PROTEUS_FATAL_ERROR("Expected object info");
+      reportFatalError("Expected object info");
 
     FunctionCallee CreateFn = getProteusCreateRuntimeConstantInfoObjectFn(M);
 
@@ -757,8 +763,8 @@ private:
                                       RuntimeConstantInfoPtrArrayTy,
                                       RuntimeConstantInfoPtrArray, I);
       } else {
-        PROTEUS_FATAL_ERROR("Unsupported runtime constant type " +
-                            toString(RCInfo.ArgInfo.Type));
+        reportFatalError("Unsupported runtime constant type " +
+                         toString(RCInfo.ArgInfo.Type));
       }
     }
     // Mark runtime constants info as initialized.
@@ -801,8 +807,9 @@ private:
           Builder.CreateStore(ArgPtrAllocas[ArgI], GEP);
         }
       }
-    } else
-      ArgPtrs = Constant::getNullValue(ArgPtrsTy->getPointerTo());
+    } else {
+      ArgPtrs = Constant::getNullValue(PointerType::getUnqual(ArgPtrsTy));
+    }
 
     auto *JitFnPtr =
         Builder.CreateCall(JitEntryFn, {FnNameGlobal, StrIRGlobal,
@@ -855,8 +862,8 @@ private:
       return StubToKernelMap;
 
     if (!RegisterFunctionName) {
-      PROTEUS_FATAL_ERROR("getKernelHostStubs only callable with `EnableHIP or "
-                          "EnableCUDA set.");
+      reportFatalError("getKernelHostStubs only callable with `EnableHIP or "
+                       "EnableCUDA set.");
       return StubToKernelMap;
     }
     RegisterFunction = M.getFunction(RegisterFunctionName);
@@ -879,15 +886,6 @@ private:
               << "\n");
       }
     return StubToKernelMap;
-  }
-
-  bool isDeviceKernelHostStub(
-      const DenseMap<Value *, GlobalVariable *> &StubToKernelMap,
-      Function &Fn) {
-    if (StubToKernelMap.contains(&Fn))
-      return true;
-
-    return false;
   }
 
   bool hasDeviceLaunchKernelCalls(Module &M) {
@@ -916,7 +914,7 @@ private:
     JitLaunchKernelFnTy = LaunchKernelFn->getFunctionType();
 
     if (!JitLaunchKernelFnTy)
-      PROTEUS_FATAL_ERROR(
+      reportFatalError(
           "Expected non-null jit entry function type, check "
           "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags "
           "for ProteusPass");
@@ -946,7 +944,7 @@ private:
     }
 
     if (!CallOrInvoke)
-      PROTEUS_FATAL_ERROR(
+      reportFatalError(
           "Expected non-null jit launch kernel call or invoke, check "
           "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags "
           "for ProteusPass");
@@ -958,14 +956,14 @@ private:
   void emitJitLaunchKernelCall(Module &M) {
     Function *LaunchKernelFn = nullptr;
     if (!LaunchFunctionName) {
-      PROTEUS_FATAL_ERROR(
+      reportFatalError(
           "Expected non-null LaunchKernelFn, check "
           "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags "
           "for ProteusPass");
     }
     LaunchKernelFn = M.getFunction(LaunchFunctionName);
     if (!LaunchKernelFn)
-      PROTEUS_FATAL_ERROR(
+      reportFatalError(
           "Expected non-null LaunchKernelFn, check "
           "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags "
           "for ProteusPass");
@@ -1167,7 +1165,7 @@ private:
   /// runtime registration with __jit_register_function.
   void instrumentRegisterFunction(Module &M) {
     if (!RegisterFunctionName) {
-      PROTEUS_FATAL_ERROR(
+      reportFatalError(
           "instrumentRegisterJITFunc only callable with `EnableHIP or "
           "EnableCUDA set.");
       return;
@@ -1222,8 +1220,8 @@ private:
                                         RuntimeConstantInfoPtrArrayTy,
                                         RuntimeConstantInfoPtrArray, I);
         } else {
-          PROTEUS_FATAL_ERROR("Unsupported runtime constant type " +
-                              toString(RCInfo.ArgInfo.Type));
+          reportFatalError("Unsupported runtime constant type " +
+                           toString(RCInfo.ArgInfo.Type));
         }
       }
 
@@ -1260,7 +1258,7 @@ private:
       Value *V = CB;
       while (!Ptr) {
         if (!V->hasOneUser())
-          PROTEUS_FATAL_ERROR("Expected single user");
+          reportFatalError("Expected single user");
 
         StoreInst *S = dyn_cast<StoreInst>(*(V->users().begin()));
         if (S) {
@@ -1280,7 +1278,7 @@ private:
       for (auto *User : Function->users()) {
         CallBase *CB = dyn_cast<CallBase>(User);
         if (!CB)
-          PROTEUS_FATAL_ERROR(
+          reportFatalError(
               "Expected CallBase as user of proteus::jit_variable function");
 
         DEBUG(Logger::logs("proteus-pass") << "call: " << *CB << "\n");
@@ -1296,11 +1294,11 @@ private:
           auto *GEPTy = GEP->getSourceElementType();
           StructType *STy = dyn_cast<StructType>(GEPTy);
           if (!STy)
-            PROTEUS_FATAL_ERROR("Expected struct type for lambda");
+            reportFatalError("Expected struct type for lambda");
           const StructLayout *SL = M.getDataLayout().getStructLayout(STy);
           ConstantInt *SlotC = dyn_cast<ConstantInt>(Slot);
           if (!SlotC)
-            PROTEUS_FATAL_ERROR("Expected constant slot");
+            reportFatalError("Expected constant slot");
           auto Offset = SL->getElementOffset(SlotC->getZExtValue());
           Constant *OffsetCI = ConstantInt::get(Types.Int32Ty, Offset);
           CB->setArgOperand(2, OffsetCI);
@@ -1371,8 +1369,8 @@ private:
       for (auto *User : Function->users()) {
         CallBase *CB = dyn_cast<CallBase>(User);
         if (!CB)
-          PROTEUS_FATAL_ERROR("Expected CallBase as user of "
-                              "proteus::register_lambda function");
+          reportFatalError("Expected CallBase as user of "
+                           "proteus::register_lambda function");
 
         IRBuilder<> Builder(CB);
         auto *LambdaNameGlobal = Builder.CreateGlobalString(LambdaType);
@@ -1421,21 +1419,30 @@ struct LegacyProteusPass : public ModulePass {
 //-----------------------------------------------------------------------------
 llvm::PassPluginLibraryInfo getProteusPassPluginInfo() {
   const auto Callback = [](PassBuilder &PB) {
-    // TODO: decide where to insert it in the pipeline. Early avoids
-    // inlining jit function (which disables jit'ing) but may require more
-    // optimization, hence overhead, at runtime. We choose after early
-    // simplifications which should avoid inlining and present a reasonably
-    // analyzable IR module.
+  // TODO: decide where to insert it in the pipeline. Early avoids
+  // inlining jit function (which disables jit'ing) but may require more
+  // optimization, hence overhead, at runtime. We choose after early
+  // simplifications which should avoid inlining and present a reasonably
+  // analyzable IR module.
 
-    // NOTE: For device jitting it should be possible to register the pass late
-    // to reduce compilation time and does lose the kernel due to inlining.
-    // However, there are linking errors, working assumption is that the hiprtc
-    // linker cannot re-link already linked device libraries and aborts.
+  // NOTE: For device jitting it should be possible to register the pass late
+  // to reduce compilation time and does lose the kernel due to inlining.
+  // However, there are linking errors, working assumption is that the hiprtc
+  // linker cannot re-link already linked device libraries and aborts.
 
-    // PB.registerPipelineStartEPCallback(
-    // PB.registerOptimizerLastEPCallback(
+  // PB.registerPipelineStartEPCallback(
+  // PB.registerOptimizerLastEPCallback(
+#if LLVM_VERSION_MAJOR >= 20
     PB.registerPipelineEarlySimplificationEPCallback(
-        [&](ModulePassManager &MPM, auto) {
+        [&](ModulePassManager &MPM, OptimizationLevel,
+            ThinOrFullLTOPhase LTOPhase) {
+          if (LTOPhase != ThinOrFullLTOPhase::None) {
+            reportFatalError("Expected registration only for non-LTO");
+          }
+#else
+    PB.registerPipelineEarlySimplificationEPCallback(
+        [&](ModulePassManager &MPM, OptimizationLevel) {
+#endif
           MPM.addPass(ProteusPass{false});
           return true;
         });

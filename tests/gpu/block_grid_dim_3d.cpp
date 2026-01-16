@@ -1,8 +1,8 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_SPECIALIZE_DIMS_ASSUME=1 PROTEUS_TRACE_OUTPUT=1 %build/block_grid_dim_3d.%ext |  %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_SPECIALIZE_DIMS_RANGE=1 PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 %build/block_grid_dim_3d.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/block_grid_dim_3d.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: PROTEUS_SPECIALIZE_DIMS_RANGE=1 PROTEUS_CACHE_DIR="%t.$$.proteus" %build/block_grid_dim_3d.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
@@ -10,7 +10,7 @@
 #include <cstdio>
 
 #include "gpu_common.h"
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 __global__ __attribute__((annotate("jit"))) void kernel() {
   unsigned int Idx = threadIdx.z + blockIdx.z * blockDim.z;
@@ -49,10 +49,10 @@ int main() {
 // CHECK-FIRST: [DimSpec] Replace call to {{_ZNK17__HIP_CoordinatesI14__HIP_BlockDimE3__ZcvjEv|_ZL21__hip_get_block_dim_zv|llvm.nvvm.read.ptx.sreg.ntid.z}} with constant i32 4
 // CHECK-FIRST: [DimSpec]
 // CHECK-FIRST: [DimSpec]
+// CHECK-FIRST: [DimSpec] Range {{llvm.amdgcn.workitem.id.z|llvm.nvvm.read.ptx.sreg.tid.z}} [0,4)
 // CHECK-FIRST: [DimSpec]
 // CHECK-FIRST: [DimSpec]
-// CHECK-FIRST: [DimSpec]
-// CHECK-FIRST: [DimSpec]
+// CHECK-FIRST: [DimSpec] Range {{llvm.amdgcn.workgroup.id.z|llvm.nvvm.read.ptx.sreg.ctaid.z}} [0,1)
 // CHECK-FIRST: [LaunchBoundSpec] MaxThreads 4 MinBlocksPerSM 0
 // CHECK: ThreadId: (0 0 3) BlockID: (0 0 0) BlockDim: (1 1 4) GridDim: (1 1 1)
 // CHECK-FIRST: [DimSpec] Replace call to {{_ZNK17__HIP_CoordinatesI13__HIP_GridDimE3__XcvjEv|_ZL20__hip_get_grid_dim_xv|llvm.nvvm.read.ptx.sreg.nctaid.x}} with constant i32 1

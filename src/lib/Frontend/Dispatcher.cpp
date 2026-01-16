@@ -1,16 +1,14 @@
-#include "proteus/Frontend/Dispatcher.hpp"
+#include "proteus/Frontend/Dispatcher.h"
+
 #include "proteus/Error.h"
-
-#include "proteus/Frontend/DispatcherHost.hpp"
-
+#include "proteus/Frontend/DispatcherHost.h"
 #if PROTEUS_ENABLE_HIP
-#include "proteus/Frontend/DispatcherHIP.hpp"
-#include "proteus/Frontend/DispatcherHostHIP.hpp"
+#include "proteus/Frontend/DispatcherHIP.h"
+#include "proteus/Frontend/DispatcherHostHIP.h"
 #endif
-
 #if PROTEUS_ENABLE_CUDA
-#include "proteus/Frontend/DispatcherCUDA.hpp"
-#include "proteus/Frontend/DispatcherHostCUDA.hpp"
+#include "proteus/Frontend/DispatcherCUDA.h"
+#include "proteus/Frontend/DispatcherHostCUDA.h"
 #endif
 
 namespace proteus {
@@ -21,7 +19,7 @@ Dispatcher &getHostHIPDispatcher() {
 #if PROTEUS_ENABLE_HIP
   return DispatcherHostHIP::instance();
 #else
-  PROTEUS_FATAL_ERROR("HIP support is not enabled");
+  reportFatalError("HIP support is not enabled");
 #endif
 }
 
@@ -29,7 +27,7 @@ Dispatcher &getHostCUDADispatcher() {
 #if PROTEUS_ENABLE_CUDA
   return DispatcherHostCUDA::instance();
 #else
-  PROTEUS_FATAL_ERROR("CUDA support is not enabled");
+  reportFatalError("CUDA support is not enabled");
 #endif
 }
 
@@ -39,7 +37,7 @@ Dispatcher &getHIPDispatcher() {
 #if PROTEUS_ENABLE_HIP
   return DispatcherHIP::instance();
 #else
-  PROTEUS_FATAL_ERROR("HIP support is not enabled");
+  reportFatalError("HIP support is not enabled");
 #endif
 }
 
@@ -47,7 +45,7 @@ Dispatcher &getCUDADispatcher() {
 #if PROTEUS_ENABLE_CUDA
   return DispatcherCUDA::instance();
 #else
-  PROTEUS_FATAL_ERROR("CUDA support is not enabled");
+  reportFatalError("CUDA support is not enabled");
 #endif
 }
 } // anonymous namespace
@@ -65,8 +63,10 @@ Dispatcher &Dispatcher::getDispatcher(TargetModelType TargetModel) {
   case TargetModelType::CUDA:
     return getCUDADispatcher();
   default:
-    PROTEUS_FATAL_ERROR("Unsupported model type");
+    reportFatalError("Unsupported model type");
   }
 }
+
+Dispatcher::~Dispatcher() = default;
 
 } // namespace proteus

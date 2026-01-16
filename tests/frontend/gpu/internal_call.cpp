@@ -6,9 +6,8 @@
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
-#include <proteus/Frontend/Builtins.hpp>
-#include <proteus/JitFrontend.hpp>
-#include <proteus/JitInterface.hpp>
+#include <proteus/Frontend/Builtins.h>
+#include <proteus/JitFrontend.h>
 
 #if PROTEUS_ENABLE_HIP
 #define TARGET "hip"
@@ -21,6 +20,8 @@
 #endif
 
 #include "../../gpu/gpu_common.h"
+
+#include <iostream>
 
 using namespace proteus;
 
