@@ -102,7 +102,23 @@ if(LLVM_LINK_LLVM_DYLIB)
   endif()
   set(libs LLVM)
 else()
-  set(libs ${LLVM_AVAILABLE_LIBS})
+  llvm_map_components_to_libnames(libs
+    Analysis
+    BitReader
+    BitWriter
+    Core
+    ExecutionEngine
+    IPO
+    IRReader
+    Linker
+    MC
+    ${LLVM_TARGETS_TO_BUILD}
+    Object
+    OrcJit
+    Passes
+    Support
+    Target
+  )
 endif()
 
 if(NOT LLVM_ENABLE_RTTI)
@@ -183,7 +199,7 @@ message(STATUS "Found Clang libraries: ${clang_libs}")
 
 # Enclose linked libraries in a link group to avoid linker errors due to unresolved symbols.
 foreach(proteus_target ${PROTEUS_TARGETS})
-  target_link_libraries(${proteus_target} PUBLIC
+  target_link_libraries(${proteus_target} PRIVATE
     "$<$<PLATFORM_ID:Linux>:-Wl,--start-group>"
     ${libs} ${clang_libs}
     "$<$<PLATFORM_ID:Linux>:-Wl,--end-group>"
