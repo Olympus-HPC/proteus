@@ -16,6 +16,7 @@ set(SOURCES
   Frontend/Func.cpp
   Frontend/JitFrontend.cpp
   Frontend/LoopUnroller.cpp
+  Frontend/TargetModel.cpp
   Frontend/TypeMap.cpp
   Frontend/VarStorage.cpp
 )
