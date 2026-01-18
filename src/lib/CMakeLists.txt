@@ -165,12 +165,18 @@ message(STATUS "Found LLVM libraries: ${libs}")
 message(STATUS "Found Clang libraries: ${clang_libs}")
 
 # Enclose linked libraries in a link group to avoid linker errors due to unresolved symbols.
-target_link_libraries(proteus PUBLIC
+target_link_libraries(proteus PRIVATE
   "$<$<PLATFORM_ID:Linux>:-Wl,--start-group>"
   ${libs} ${clang_libs}
   "$<$<PLATFORM_ID:Linux>:-Wl,--end-group>"
   "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>"
 )
+
+if(UNIX AND NOT APPLE)
+  target_link_options(proteus PRIVATE "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
+endif()
+
+
 target_compile_definitions(proteus PRIVATE PROTEUS_CLANGXX_BIN="${CLANGXX}")
 
 target_link_libraries(proteusFrontend INTERFACE proteus "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
