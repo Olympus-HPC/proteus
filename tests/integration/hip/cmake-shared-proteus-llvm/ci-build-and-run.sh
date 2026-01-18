@@ -22,4 +22,5 @@ make -j install
 popd
 
 # Run from install directory.
+export LD_LIBRARY_PATH=${PWD}/install-proteus/lib64:$LD_LIBRARY_PATH
 install/bin/main
