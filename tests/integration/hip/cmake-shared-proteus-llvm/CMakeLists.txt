@@ -13,5 +13,6 @@ target_link_options(main PRIVATE --no-undefined)
 set_target_properties(main PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 add_proteus(main)
+target_link_libraries(main PRIVATE LLVM)
 
 install(TARGETS main)
