@@ -1,0 +1,9 @@
+{
+  global:
+    __jit_*;
+    __proteus_*;
+    extern "C++" {
+      proteus::*;
+    };
+  local: *;
+};
