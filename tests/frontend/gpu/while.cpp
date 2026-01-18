@@ -11,7 +11,6 @@
 #include <proteus/Frontend/Builtins.hpp>
 #include <proteus/JitFrontend.hpp>
 #include <proteus/JitInterface.hpp>
-#include <proteus/Utils.h>
 
 #include "../../gpu/gpu_common.h"
 
