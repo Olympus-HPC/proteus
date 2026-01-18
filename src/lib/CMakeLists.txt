@@ -55,7 +55,7 @@ add_library(proteusCore INTERFACE)
 add_library(proteusFrontend INTERFACE)
 
 foreach(proteus_target ${PROTEUS_TARGETS})
-  target_compile_definitions(${proteus_target} PUBLIC ${LLVM_DEFINITIONS})
+  target_compile_definitions(${proteus_target} PRIVATE ${LLVM_DEFINITIONS})
 endforeach()
 target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
 
@@ -77,7 +77,7 @@ endif()
 
 foreach(proteus_target ${PROTEUS_TARGETS})
   target_include_directories(${proteus_target}
-    SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS})
+    SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
 endforeach()
 target_include_directories(proteusCore
   SYSTEM INTERFACE ${LLVM_INCLUDE_DIRS})
