@@ -57,4 +57,4 @@ variables:
       - PROTEUS_CI_BUILD_SHARED: ["on", "off"]
 
 build-and-test-matrix:
-  extends: [.base-job .build-variants]
+  extends: [.base-job, .build-variants]
