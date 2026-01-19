@@ -15,13 +15,12 @@
 #include "proteus/CompiledLibrary.h"
 #include "proteus/Hashing.h"
 
-#include <mpi.h>
-
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <memory>
+#include <mpi.h>
 #include <mutex>
 #include <string>
 #include <thread>

@@ -4,15 +4,15 @@
 // Creates many specializations: 5 from testKernel + 6*NumRanks from
 // configKernel.
 
+#include <proteus/JitInterface.hpp>
+
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <hip/hip_runtime.h>
 #include <iostream>
 #include <mpi.h>
 #include <string>
-
-#include <hip/hip_runtime.h>
-#include <proteus/JitInterface.hpp>
 
 #define gpuErrCheck(CALL)                                                      \
   {                                                                            \
