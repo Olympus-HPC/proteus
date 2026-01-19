@@ -6,6 +6,11 @@ else()
     message(FATAL_ERROR "PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA must be defined for GPU tests")
 endif()
 
+set(proteus_lib_target proteus)
+if (BUILD_SHARED)
+  set(proteus_lib_target proteus_shared)
+endif()
+
 # The first argument is the executable to generate, the second arguments is the
 # source file with checks. Any following arguments are other source files
 # (without checks) to compile for generating the executable.
@@ -18,7 +23,7 @@ function(CREATE_GPU_TEST exe check_source)
     )
     add_dependencies(${exe}.${lang} ProteusPass)
 
-    target_link_libraries(${exe}.${lang} PUBLIC proteus)
+    target_link_libraries(${exe}.${lang} PUBLIC ${proteus_lib_target})
 
     target_compile_options(
         ${exe}.${lang}
@@ -26,7 +31,10 @@ function(CREATE_GPU_TEST exe check_source)
         -fpass-plugin=$<TARGET_FILE:ProteusPass>
     )
 
-    # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
+    if(PROTEUS_ENABLE_CUDA)
+      set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
+    endif()
+
     add_test(NAME ${exe}.${lang} COMMAND ${LIT} -vv -D EXT=${lang} -DFILECHECK=${FILECHECK} ${check_source})
     set_tests_properties(${exe}.${lang} PROPERTIES LABELS "gpu;gpu-basic")
 endfunction()
@@ -40,7 +48,7 @@ function(CREATE_GPU_TEST_RDC exe check_source)
     )
     add_dependencies(${exe}.${lang}.rdc ProteusPass)
 
-    target_link_libraries(${exe}.${lang}.rdc PUBLIC proteus)
+    target_link_libraries(${exe}.${lang}.rdc PUBLIC ${proteus_lib_target})
 
     if(PROTEUS_ENABLE_HIP)
         # This is unsupported see: https://gitlab.kitware.com/cmake/cmake/-/issues/23210
@@ -69,7 +77,7 @@ function(CREATE_GPU_TEST_RDC exe check_source)
         )
         target_compile_options(${exe}.${lang}.rdc PRIVATE --no-offload-new-driver)
 
-        # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
+        set_target_properties(${exe}.${lang}.rdc PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
         set_target_properties(${exe}.${lang}.rdc PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
     else()
         message(FATAL_ERROR "PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA must be defined for GPU tests")
@@ -117,7 +125,7 @@ function(CREATE_GPU_LIBRARY lib source)
 
         target_link_options(${lib} PUBLIC -fgpu-rdc --hip-link)
     elseif(PROTEUS_ENABLE_CUDA)
-        # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
+        set_target_properties(${lib} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
         target_compile_options(${lib} PRIVATE --no-offload-new-driver)
         set_target_properties(${lib} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
     else()
@@ -135,7 +143,7 @@ function(CREATE_PROTEUS_GPU_LIBRARY lib source)
         OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES}"
     )
     add_dependencies(${lib} ProteusPass)
-    target_link_libraries(${lib} PUBLIC proteus)
+    target_link_libraries(${lib} PUBLIC ${proteus_lib_target})
 
     if(PROTEUS_ENABLE_HIP)
         # This is unsupported see: https://gitlab.kitware.com/cmake/cmake/-/issues/23210
@@ -155,7 +163,7 @@ function(CREATE_PROTEUS_GPU_LIBRARY lib source)
             -fpass-plugin=$<TARGET_FILE:ProteusPass>
         )
         target_compile_options(${lib} PRIVATE --no-offload-new-driver)
-        # set_target_properties(${exe}.${lang} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
+        set_target_properties(${lib} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
         set_target_properties(${lib} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
     else()
         message(FATAL_ERROR "PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA must be defined for GPU tests")
