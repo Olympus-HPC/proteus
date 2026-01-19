@@ -42,7 +42,6 @@ private:
   std::unique_ptr<ObjectCache> createCache(const std::string &Name);
   void promoteToLevel(const HashT &HashValue, const CacheEntry &Entry,
                       size_t Level);
-  void ensureInitialized();
 
   std::vector<std::unique_ptr<ObjectCache>> Caches;
   const std::string Label;

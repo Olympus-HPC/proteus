@@ -387,7 +387,7 @@ void MPISharedStorageCache::saveToDisk(const HashT &HashValue, const char *Data,
   if (std::filesystem::exists(Filepath))
     return;
 
-  saveToFile(Filepath, StringRef{Data, Size});
+  saveToFileAtomic(Filepath, StringRef{Data, Size});
 
   if (Config::get().ProteusTraceOutput >= 1) {
     Logger::trace("[MPISharedStorageCache] Saved " + Filebase + Extension +
