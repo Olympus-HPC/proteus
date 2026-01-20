@@ -200,7 +200,12 @@ endforeach()
 
 target_link_libraries(proteusFrontend INTERFACE proteus "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 
+
+if(BUILD_SHARED AND LLVM_LINK_LLVM_DYLIB)
+target_link_libraries(proteusCore INTERFACE proteus_shared "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+else()
 target_link_libraries(proteusCore INTERFACE proteus "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+endif()
 
 foreach(proteus_target ${PROTEUS_TARGETS})
   set_target_properties(${proteus_target} PROPERTIES
