@@ -307,6 +307,10 @@ public:
     return Var<T>{createArrayStorage(Name, AS, ArrTy), *this};
   }
 
+  template <typename... Ts> auto declVars() {
+    return std::make_tuple(declVar<Ts>()...);
+  }
+
   template <typename T>
   Var<T> defVar(const T &Val, const std::string &Name = "var") {
     using RawT = std::remove_const_t<T>;
@@ -321,6 +325,10 @@ public:
     Var<RawT> Res = declVar<RawT>(Name);
     Res = Val;
     return Var<T>(Res);
+  }
+
+  template <typename... ArgT> auto defVars(ArgT &&...Args) {
+    return std::make_tuple(defVar(std::forward<ArgT>(Args))...);
   }
 
   template <typename T>

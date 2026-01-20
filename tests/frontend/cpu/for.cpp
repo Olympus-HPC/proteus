@@ -20,12 +20,12 @@ int main() {
   auto &Arg = F.getArg<0>();
   F.beginFunction();
   {
-    auto I = F.declVar<int>("i");
-    auto UB = F.defVar<int>(10, "ub");
-    auto Inc = F.defVar<int>(1, "inc");
+    auto [I, AddVal] = F.declVars<int, double>();
+    auto [UB, Inc] = F.defVars(10, 1);
     I = 0;
+    AddVal = 1.0;
     F.beginFor(I, I, UB, Inc);
-    { Arg[I] = Arg[I] + 1.0; }
+    { Arg[I] = Arg[I] + AddVal; }
     F.endFor();
     F.ret();
   }
