@@ -1,6 +1,7 @@
 #ifndef PROTEUS_FRONTEND_DISPATCHER_H
 #define PROTEUS_FRONTEND_DISPATCHER_H
 
+#include "proteus/Error.h"
 #include "proteus/Frontend/TargetModel.h"
 
 #if PROTEUS_ENABLE_HIP && __HIP__
@@ -49,7 +50,6 @@ template <typename R, typename... Args> struct sig_traits<R(Args...)> {
 
 using namespace llvm;
 
-// in Dispatcher.h (or a new Errors.h)
 struct DispatchResult {
   int Ret;
 
