@@ -1,4 +1,4 @@
-// RUN: PROTEUS_AUTO_READONLY_CAPTURES=1 PROTEUS_TRACE_OUTPUT="specialization" %build/lambda_written_captures 2>&1 | %FILECHECK %s
+// RUN: PROTEUS_AUTO_READONLY_CAPTURES=1 PROTEUS_TRACE_OUTPUT="specialization" %build/%exe 2>&1 | %FILECHECK %s
 
 #include <iostream>
 
