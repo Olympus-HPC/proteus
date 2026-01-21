@@ -1,0 +1,22 @@
+[proteus] => RegisterLambda main::$_0
+[proteus] PROTEUS_USE_STORED_CACHE 1
+PROTEUS_CACHE_DIR None
+PROTEUS_AUTO_READONLY_CAPTURES 1
+ID:Default CG:RTC SA:1 LB:1 SD:1 SDR:1 OL:3 CGL:3 TMT:-1 BPSM:0 
+[proteus] Hashing:  FnName _ZZ4mainENK3$_0clEv RCVec [ [proteus]  ] LambdaVec [ [proteus]  ] -> Hash 6500402321169189735
+[proteus] Address range: [ 0x10297c000,  0x10297c04c]	Symbol: ltmp0
+[proteus] Address range: [ 0x102980050,  0x102980070]	Symbol: ltmp1
+[proteus] Address range: [ 0x10297c000,  0x10297c04c]	Symbol: __ZZ4mainENK3$_0clEv.jit.6500402321169189735
+[proteus] ===
+__ZZ4mainENK3$_0clEv.jit.6500402321169189735: 1
+___cxa_atexit: 4
+___dso_handle: 12
+___lljit.atexit_helper: 12
+___lljit.cxa_atexit_helper: 4
+___lljit.platform_support_instance: 4
+___lljit.run_atexits_helper: 12
+___lljit_run_atexits: 12
+_atexit: 12
+_main: 1
+===
+[proteus] === JIT compile: _ZZ4mainENK3$_0clEv Mangled _ZZ4mainENK3$_0clEv.jit.6500402321169189735 RC HashValue 6500402321169189735 Addr 0x10297c000

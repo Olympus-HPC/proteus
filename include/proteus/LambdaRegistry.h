@@ -64,12 +64,11 @@ public:
     const StringRef LambdaTypeRef{LambdaType};
     PROTEUS_DBG(Logger::logs("proteus")
                 << "=> RegisterLambda " << LambdaTypeRef << "\n");
-    // Copy PendingJitVariables if there were changed, otherwise the runtime
-    // values for the lambda definition have not changed.
-    if (!PendingJitVariables.empty()) {
-      JitVariableMap[LambdaTypeRef] = PendingJitVariables;
-      PendingJitVariables.clear();
-    }
+    // Always register the lambda type in the map, even if there are no
+    // explicit jit_variable calls. This allows auto-detection to work for
+    // lambdas with only auto-detected captures.
+    JitVariableMap[LambdaTypeRef] = PendingJitVariables;
+    PendingJitVariables.clear();
   }
 
   const SmallVector<RuntimeConstant> &getJitVariables(StringRef LambdaTypeRef) {
