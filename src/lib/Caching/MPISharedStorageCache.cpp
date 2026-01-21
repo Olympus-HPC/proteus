@@ -19,11 +19,12 @@
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/MemoryBuffer.h>
 
+#include <mpi.h>
+
 #include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <limits>
-#include <mpi.h>
 
 namespace proteus {
 

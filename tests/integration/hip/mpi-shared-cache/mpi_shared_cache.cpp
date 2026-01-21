@@ -4,7 +4,7 @@
 // Creates many specializations: 5 from testKernel + 6*NumRanks from
 // configKernel.
 
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 #include <cstdio>
 #include <cstdlib>
