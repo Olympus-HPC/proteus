@@ -21,6 +21,7 @@
 #include "llvm/IR/Type.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace proteus {
 
@@ -171,6 +172,79 @@ inline llvm::SmallVector<CaptureInfo> analyzeReadOnlyCaptures(Function &F) {
   }
 
   return Captures;
+}
+
+inline RuntimeConstant readValueFromMemory(const void *Ptr, Type *Ty,
+                                           int32_t SlotIndex) {
+  RuntimeConstant RC(RuntimeConstantType::NONE, SlotIndex);
+
+  if (Ty->isIntegerTy(1)) {
+    RC.Type = RuntimeConstantType::BOOL;
+    RC.Value.BoolVal = *static_cast<const bool *>(Ptr);
+  } else if (Ty->isIntegerTy(8)) {
+    RC.Type = RuntimeConstantType::INT8;
+    RC.Value.Int8Val = *static_cast<const int8_t *>(Ptr);
+  } else if (Ty->isIntegerTy(32)) {
+    RC.Type = RuntimeConstantType::INT32;
+    RC.Value.Int32Val = *static_cast<const int32_t *>(Ptr);
+  } else if (Ty->isIntegerTy(64)) {
+    RC.Type = RuntimeConstantType::INT64;
+    RC.Value.Int64Val = *static_cast<const int64_t *>(Ptr);
+  } else if (Ty->isFloatTy()) {
+    RC.Type = RuntimeConstantType::FLOAT;
+    RC.Value.FloatVal = *static_cast<const float *>(Ptr);
+  } else if (Ty->isDoubleTy()) {
+    RC.Type = RuntimeConstantType::DOUBLE;
+    RC.Value.DoubleVal = *static_cast<const double *>(Ptr);
+  }
+
+  return RC;
+}
+
+inline SmallVector<RuntimeConstant>
+extractAutoDetectedCaptures(const void *LambdaClosure,
+                            const SmallVector<CaptureInfo> &DetectedCaptures,
+                            const DataLayout &DL, StructType *ClosureType) {
+  SmallVector<RuntimeConstant> Result;
+  if (!LambdaClosure || !ClosureType || DetectedCaptures.empty())
+    return Result;
+
+  const StructLayout *SL = DL.getStructLayout(ClosureType);
+  const char *ClosureBytes = static_cast<const char *>(LambdaClosure);
+
+  for (const auto &Cap : DetectedCaptures) {
+    if (!Cap.IsReadOnly)
+      continue;
+
+    uint64_t ByteOffset = SL->getElementOffset(Cap.SlotIndex);
+    Result.push_back(
+        readValueFromMemory(ClosureBytes + ByteOffset, Cap.CaptureType,
+                            Cap.SlotIndex));
+  }
+
+  return Result;
+}
+
+inline StructType *inferClosureType(Function &F) {
+  if (F.arg_empty())
+    return nullptr;
+
+  Argument *ClosureArg = &*F.arg_begin();
+  for (User *U : ClosureArg->users()) {
+    if (auto *GEP = dyn_cast<GetElementPtrInst>(U)) {
+      if (auto *STy = dyn_cast<StructType>(GEP->getSourceElementType()))
+        return STy;
+    }
+  }
+
+  return nullptr;
+}
+
+inline SmallString<128> traceOutAuto(int Slot, Constant *C) {
+  SmallString<128> S;
+  raw_svector_ostream OS(S);
+  OS << "[LambdaSpec][Auto] Replacing slot " << Slot << " with " << *C << "\n";
+  return S;
 }
 
 } // namespace proteus
