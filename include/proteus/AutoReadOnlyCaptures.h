@@ -13,14 +13,18 @@
 
 #include "proteus/CompilerInterfaceTypes.h"
 
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DataLayout.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/DataLayout.h"
+#include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace proteus {
@@ -90,9 +94,9 @@ inline llvm::SmallVector<CaptureInfo> analyzeReadOnlyCaptures(Function &F) {
   llvm::DenseMap<int32_t, CaptureInfo> SlotInfo;
 
   // Analyze all uses of the closure argument
-  for (User *User : ClosureArg->users()) {
+  for (User *ClosureUser : ClosureArg->users()) {
     // Case 1: Direct LoadInst (single-value capture at slot 0)
-    if (auto *LI = dyn_cast<LoadInst>(User)) {
+    if (auto *LI = dyn_cast<LoadInst>(ClosureUser)) {
       Type *LoadType = LI->getType();
       if (!isSupportedScalarType(LoadType))
         continue;
@@ -110,7 +114,7 @@ inline llvm::SmallVector<CaptureInfo> analyzeReadOnlyCaptures(Function &F) {
     }
 
     // Case 2: GetElementPtrInst (struct field access)
-    if (auto *GEP = dyn_cast<GetElementPtrInst>(User)) {
+    if (auto *GEP = dyn_cast<GetElementPtrInst>(ClosureUser)) {
       // For struct access: GEP ptr, 0, fieldIndex
       if (GEP->getNumIndices() >= 2) {
         if (auto *CI = dyn_cast<ConstantInt>(GEP->getOperand(2))) {
@@ -244,6 +248,40 @@ inline SmallString<128> traceOutAuto(int Slot, Constant *C) {
   SmallString<128> S;
   raw_svector_ostream OS(S);
   OS << "[LambdaSpec][Auto] Replacing slot " << Slot << " with " << *C << "\n";
+  return S;
+}
+
+/// Overload for RuntimeConstant - formats value as LLVM type string
+inline SmallString<128> traceOutAuto(int Slot, const RuntimeConstant &RC) {
+  SmallString<128> S;
+  raw_svector_ostream OS(S);
+  OS << "[LambdaSpec][Auto] Replacing slot " << Slot << " with ";
+
+  switch (RC.Type) {
+  case RuntimeConstantType::BOOL:
+    OS << "i1 " << (RC.Value.BoolVal ? "1" : "0");
+    break;
+  case RuntimeConstantType::INT8:
+    OS << "i8 " << static_cast<int>(RC.Value.Int8Val);
+    break;
+  case RuntimeConstantType::INT32:
+    OS << "i32 " << RC.Value.Int32Val;
+    break;
+  case RuntimeConstantType::INT64:
+    OS << "i64 " << RC.Value.Int64Val;
+    break;
+  case RuntimeConstantType::FLOAT:
+    OS << "float " << format("%e", RC.Value.FloatVal);
+    break;
+  case RuntimeConstantType::DOUBLE:
+    OS << "double " << format("%e", RC.Value.DoubleVal);
+    break;
+  default:
+    OS << "<unsupported type>";
+    break;
+  }
+
+  OS << "\n";
   return S;
 }
 
