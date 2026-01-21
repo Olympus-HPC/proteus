@@ -11,6 +11,7 @@
 #ifndef PROTEUS_JITENGINEDEVICE_H
 #define PROTEUS_JITENGINEDEVICE_H
 
+#include "proteus/AutoReadOnlyCaptures.h"
 #include "proteus/Caching/MemoryCache.h"
 #include "proteus/Caching/ObjectCacheChain.h"
 #include "proteus/Cloning.h"
@@ -419,8 +420,24 @@ public:
     return KernelInfo.getBitcode();
   }
 
+  // Helper to find which kernel argument index holds the lambda closure
+  int findLambdaArgIndex(JITKernelInfo &KernelInfo, StringRef LambdaFnName) {
+    // For template kernels like: kernel<LambdaT>(LambdaT lambda)
+    // The lambda is typically the first non-pointer argument after grid/block dims
+    //
+    // Implementation options:
+    // 1. Parse kernel signature from IR
+    // 2. Store arg index in LambdaCalleeInfo when matching
+    // 3. Convention: lambda is always at a specific position
+
+    // For now, assume lambda is at arg index 0 for simple kernels
+    // TODO: Enhance LambdaCalleeInfo to track argument index
+    return 0;
+  }
+
   void getLambdaJitValues(JITKernelInfo &KernelInfo,
-                          SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
+                          SmallVector<RuntimeConstant> &LambdaJitValuesVec,
+                          void **KernelArgs) {
     LambdaRegistry LR = LambdaRegistry::instance();
     if (LR.empty()) {
       KernelInfo.setLambdaCalleeInfo({});
@@ -449,10 +466,63 @@ public:
     }
 
     for (auto &[FnName, LambdaType] : KernelInfo.getLambdaCalleeInfo()) {
-      const SmallVector<RuntimeConstant> &Values =
+      // Get explicit jit_variable captures
+      const SmallVector<RuntimeConstant> &ExplicitValues =
           LR.getJitVariables(LambdaType);
-      LambdaJitValuesVec.insert(LambdaJitValuesVec.end(), Values.begin(),
-                                Values.end());
+
+      // Start with explicit values
+      SmallVector<RuntimeConstant> MergedValues(ExplicitValues.begin(),
+                                                 ExplicitValues.end());
+
+      // Auto-detect if enabled
+      if (Config::get().ProteusAutoReadOnlyCaptures) {
+        Module &KernelModule = getModule(KernelInfo);
+        Function *LambdaFn = KernelModule.getFunction(FnName);
+
+        if (LambdaFn) {
+          // 1. Analyze IR for read-only captures
+          auto DetectedCaptures = analyzeReadOnlyCaptures(*LambdaFn);
+
+          if (!DetectedCaptures.empty()) {
+            // 2. Get closure type and data layout
+            const DataLayout &DL = KernelModule.getDataLayout();
+            StructType *ClosureType = inferClosureType(*LambdaFn);
+
+            // 3. Get lambda closure pointer from KernelArgs
+            int LambdaArgIndex = findLambdaArgIndex(KernelInfo, FnName);
+            const void *LambdaClosure =
+                *reinterpret_cast<const void **>(KernelArgs[LambdaArgIndex]);
+
+            // 4. Extract auto-detected capture values
+            auto AutoCaptures = extractAutoDetectedCaptures(
+                LambdaClosure, DetectedCaptures, DL, ClosureType);
+
+            // 5. Merge (explicit takes precedence)
+            mergeCaptures(MergedValues, AutoCaptures);
+
+            // 6. Trace auto-detected captures
+            if (Config::get().ProteusTraceOutput >= 1) {
+              for (const auto &RC : AutoCaptures) {
+                // Only trace if it wasn't already explicit
+                bool WasExplicit = false;
+                for (const auto &Explicit : ExplicitValues) {
+                  if (Explicit.Pos == RC.Pos) {
+                    WasExplicit = true;
+                    break;
+                  }
+                }
+                if (!WasExplicit) {
+                  Logger::trace(traceOutAuto(RC.Pos, RC));
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Append merged values to output
+      LambdaJitValuesVec.insert(LambdaJitValuesVec.end(),
+                                MergedValues.begin(), MergedValues.end());
     }
   }
 
@@ -550,7 +620,7 @@ JitEngineDevice<ImplT>::compileAndRun(
       getRuntimeConstantValues(KernelArgs, KernelInfo.getRCInfoArray());
 
   SmallVector<RuntimeConstant> LambdaJitValuesVec;
-  getLambdaJitValues(KernelInfo, LambdaJitValuesVec);
+  getLambdaJitValues(KernelInfo, LambdaJitValuesVec, KernelArgs);
 
   HashT HashValue =
       hash(getStaticHash(KernelInfo), RCVec, LambdaJitValuesVec, GridDim.x,

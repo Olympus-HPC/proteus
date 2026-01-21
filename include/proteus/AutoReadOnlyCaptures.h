@@ -22,6 +22,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/Format.h"
 
 namespace proteus {
 
@@ -244,6 +245,40 @@ inline SmallString<128> traceOutAuto(int Slot, Constant *C) {
   SmallString<128> S;
   raw_svector_ostream OS(S);
   OS << "[LambdaSpec][Auto] Replacing slot " << Slot << " with " << *C << "\n";
+  return S;
+}
+
+/// Overload for RuntimeConstant - formats value as LLVM type string
+inline SmallString<128> traceOutAuto(int Slot, const RuntimeConstant &RC) {
+  SmallString<128> S;
+  raw_svector_ostream OS(S);
+  OS << "[LambdaSpec][Auto] Replacing slot " << Slot << " with ";
+
+  switch (RC.Type) {
+  case RuntimeConstantType::BOOL:
+    OS << "i1 " << (RC.Value.BoolVal ? "1" : "0");
+    break;
+  case RuntimeConstantType::INT8:
+    OS << "i8 " << static_cast<int>(RC.Value.Int8Val);
+    break;
+  case RuntimeConstantType::INT32:
+    OS << "i32 " << RC.Value.Int32Val;
+    break;
+  case RuntimeConstantType::INT64:
+    OS << "i64 " << RC.Value.Int64Val;
+    break;
+  case RuntimeConstantType::FLOAT:
+    OS << "float " << format("%e", RC.Value.FloatVal);
+    break;
+  case RuntimeConstantType::DOUBLE:
+    OS << "double " << format("%e", RC.Value.DoubleVal);
+    break;
+  default:
+    OS << "<unsupported type>";
+    break;
+  }
+
+  OS << "\n";
   return S;
 }
 
