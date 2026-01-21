@@ -20,8 +20,8 @@ int main() {
   auto &Arg = F.getArg<0>();
   F.beginFunction();
   {
-    auto [I, AddVal] = F.declVars<int, double>();
-    auto [UB, Inc] = F.defVars(10, 1);
+    auto [I, AddVal] = F.declVars<int, double>("I", "AddVal");
+    auto [UB, Inc] = F.defVars(std::pair{10, "UB"}, std::pair{1, "Inc"});
     I = 0;
     AddVal = 1.0;
     F.beginFor(I, I, UB, Inc);

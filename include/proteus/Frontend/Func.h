@@ -311,6 +311,13 @@ public:
     return std::make_tuple(declVar<Ts>()...);
   }
 
+  template <typename... Ts, typename... NameTs>
+  auto declVars(NameTs &&...Names) {
+    static_assert(sizeof...(Ts) == sizeof...(NameTs),
+                  "Number of types must match number of names");
+    return std::make_tuple(declVar<Ts>(std::forward<NameTs>(Names))...);
+  }
+
   template <typename T>
   Var<T> defVar(const T &Val, const std::string &Name = "var") {
     using RawT = std::remove_const_t<T>;
@@ -327,6 +334,13 @@ public:
     return Var<T>(Res);
   }
 
+  template <
+      typename T, typename NameT,
+      typename = std::enable_if_t<std::is_convertible_v<NameT, std::string>>>
+  Var<std::remove_const_t<T>> defVar(std::pair<T, NameT> P) {
+    return defVar(P.first, std::string(P.second));
+  }
+
   template <typename... ArgT> auto defVars(ArgT &&...Args) {
     return std::make_tuple(defVar(std::forward<ArgT>(Args))...);
   }
@@ -335,6 +349,13 @@ public:
   Var<const T> defRuntimeConst(const T &Val,
                                const std::string &Name = "run.const.var") {
     return Var<const T>(defVar<T>(Val, Name));
+  }
+
+  template <
+      typename T, typename NameT,
+      typename = std::enable_if_t<std::is_convertible_v<NameT, std::string>>>
+  Var<const T> defRuntimeConst(std::pair<T, NameT> P) {
+    return defRuntimeConst(P.first, std::string(P.second));
   }
 
   template <typename... ArgT> auto defRuntimeConsts(ArgT &&...Args) {
