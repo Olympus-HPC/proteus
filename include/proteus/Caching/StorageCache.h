@@ -43,6 +43,8 @@ public:
 
   uint64_t getAccesses() const override { return Accesses; }
 
+  void finalize() override {}
+
 private:
   uint64_t Hits = 0;
   uint64_t Accesses = 0;
