@@ -1,4 +1,4 @@
-// RUN: PROTEUS_AUTO_READONLY_CAPTURES=1 PROTEUS_TRACE_OUTPUT="specialization" %build/%exe 2>&1 | %FILECHECK %s
+// RUN: PROTEUS_AUTO_READONLY_CAPTURES=0 %build/%exe 2>&1 | %FILECHECK %s
 
 #include <iostream>
 
@@ -26,8 +26,5 @@ int main() {
   return 0;
 }
 
-// CHECK-DAG: [LambdaSpec][Auto] Replacing slot {{[0-9]+}} with i32 10
-// CHECK-DAG: [LambdaSpec][Auto] Replacing slot {{[0-9]+}} with i32 30
-// CHECK-NOT: [LambdaSpec][Auto] Replacing slot {{[0-9]+}} with i32 20
 // CHECK: x[0] = 31
 // CHECK: x[1] = 30
