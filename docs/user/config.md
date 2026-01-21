@@ -18,6 +18,7 @@ through environment variables.
 | `PROTEUS_KERNEL_CLONE` | `"link-clone-prune"`, `"link-clone-light"`, `"cross-clone"` (default: `"cross-clone"`) | Cloning method for JIT module creation |
 | `PROTEUS_ASYNC_COMPILATION` | `0` or `1` (default: `0`) | Enable asynchronous compilation |
 | `PROTEUS_ASYNC_THREADS` | Integer `>= 1` (default: `1`) | Number of threads used for asynchronous compilation |
+| `PROTEUS_AUTO_READONLY_CAPTURES` | `0` or `1` (default: `1`) | Enable automatic detection of read-only lambda captures for JIT specialization. When enabled, scalar captures (`int`, `float`, `double`, `bool`) that are read-only within the lambda body are automatically specialized without requiring explicit `jit_variable()` annotation. |
 | `PROTEUS_ASYNC_TEST_BLOCKING` | `0` or `1` (default: `0`) | Make asynchronous compilation blocking for testing |
 | `PROTEUS_ENABLE_TIMERS` | `0` or `1` (default: `0`) | Enable timer-based profiling output in JIT operations |
 | `PROTEUS_TRACE_OUTPUT` | Semicolon-separated tokens: `specialization`, `ir-dump`, `kernel-trace`, `cache-stats` (default: empty) | Enable trace output. `specialization` prints specialization info, `ir-dump` dumps LLVM IR post-optimization, `kernel-trace` prints an end-of-run per-kernel summary with specialization and launch counts, and `cache-stats` prints object-cache hit/access statistics. Example: `"specialization;kernel-trace"` |
