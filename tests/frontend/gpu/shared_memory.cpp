@@ -70,8 +70,10 @@ int main() {
 
   std::cout << "Launching with NumBlocks " << NumBlocks << " each with "
             << ThreadsPerBlock << " threads...\n";
-  gpuErrCheck(KernelHandle.launch({NumBlocks, 1, 1}, {ThreadsPerBlock, 1, 1}, 0,
-                                  nullptr, A));
+
+  dim3 Grid(NumBlocks, 1, 1);
+  dim3 Block(ThreadsPerBlock, 1, 1);
+  gpuErrCheck(KernelHandle.launch(Grid, Block, 0, nullptr, A));
 
   gpuErrCheck(gpuDeviceSynchronize());
 

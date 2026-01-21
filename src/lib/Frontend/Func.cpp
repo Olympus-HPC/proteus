@@ -422,6 +422,11 @@ unsigned FuncBase::getAddressSpace(Type *Ty) {
 
   return PtrTy->getAddressSpace();
 }
+
+unsigned FuncBase::getAddressSpaceFromValue(Value *PtrVal) {
+  return getAddressSpace(PtrVal->getType());
+}
+
 Type *FuncBase::getPointerType(Type *ElemTy, unsigned AS) {
   return PointerType::get(ElemTy, AS);
 }

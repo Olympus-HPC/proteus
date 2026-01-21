@@ -6,6 +6,7 @@
 #include "proteus/Frontend/Dispatcher.h"
 #include "proteus/Frontend/TargetModel.h"
 #include "proteus/Frontend/TypeMap.h"
+#include "proteus/Frontend/TypeTraits.h"
 #include "proteus/Frontend/Var.h"
 #include "proteus/Frontend/VarStorage.h"
 
@@ -152,6 +153,7 @@ public:
 
   // Type operations.
   unsigned getAddressSpace(Type *Ty);
+  unsigned getAddressSpaceFromValue(Value *PtrVal);
   Type *getPointerType(Type *ElemTy, unsigned AS);
   Type *getPointerTypeUnqual(Type *ElemTy);
   Type *getInt32Ty();
@@ -162,7 +164,9 @@ public:
   bool isFloatingPointTy(Type *Ty);
 
   // Conversion operations.
-  template <typename From, typename To> Value *convert(Value *V) {
+  template <typename FromT, typename ToT> Value *convert(Value *V) {
+    using From = remove_cvref_t<FromT>;
+    using To = remove_cvref_t<ToT>;
     static_assert(std::is_arithmetic_v<From>, "From type must be arithmetic");
     static_assert(std::is_arithmetic_v<To>, "To type must be arithmetic");
 
@@ -279,6 +283,8 @@ public:
 
   template <typename T> Var<T> declVar(const std::string &Name = "var") {
     static_assert(!std::is_array_v<T>, "Expected non-array type");
+    static_assert(!std::is_reference_v<T>,
+                  "declVar does not support reference types");
 
     auto &Ctx = getContext();
     Type *AllocaTy = TypeMap<T>::get(Ctx);
@@ -376,16 +382,16 @@ public:
   }
 
   template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var<T>>
+  std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
   atomicAdd(const Var<T *> &Addr, const Var<T> &Val);
   template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var<T>>
+  std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
   atomicSub(const Var<T *> &Addr, const Var<T> &Val);
   template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var<T>>
+  std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
   atomicMax(const Var<T *> &Addr, const Var<T> &Val);
   template <typename T>
-  std::enable_if_t<std::is_arithmetic_v<T>, Var<T>>
+  std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
   atomicMin(const Var<T *> &Addr, const Var<T> &Val);
 
   template <typename IterT, typename InitT, typename UpperT, typename IncT,
@@ -417,11 +423,14 @@ public:
   void setName(const std::string &NewName);
 
   // Convert the given Var's value to type U and return a new Var holding
-  // the converted value.
+  // the converted value. Preserves cv-qualifiers but drops references.
   template <typename U, typename T>
-  std::enable_if_t<std::is_convertible_v<T, U>, Var<U>>
+  std::enable_if_t<std::is_convertible_v<std::remove_reference_t<T>,
+                                         std::remove_reference_t<U>>,
+                   Var<std::remove_reference_t<U>>>
   convert(const Var<T> &V) {
-    Var<U> Res = declVar<U>("convert.");
+    using ResultT = std::remove_reference_t<U>;
+    Var<ResultT> Res = declVar<ResultT>("convert.");
     Value *Converted = convert<T, U>(V.loadValue());
     Res.storeValue(Converted);
     return Res;
@@ -571,18 +580,16 @@ void FuncBase::beginWhile(CondLambda &&Cond, const char *File, int Line) {
 
 // Helper function for binary operations on Var types
 template <typename T, typename U, typename IntOp, typename FPOp>
-Var<std::common_type_t<T, U>> binOp(const Var<T> &L, const Var<U> &R, IntOp IOp,
-                                    FPOp FOp) {
+Var<std::common_type_t<remove_cvref_t<T>, remove_cvref_t<U>>>
+binOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
+  using CommonT = std::common_type_t<remove_cvref_t<T>, remove_cvref_t<U>>;
+
   FuncBase &Fn = L.Fn;
   if (&Fn != &R.Fn)
     reportFatalError("Variables should belong to the same function");
 
-  Value *LHS = L.loadValue();
-  Value *RHS = R.loadValue();
-
-  using CommonT = std::common_type_t<T, U>;
-  LHS = Fn.convert<T, CommonT>(LHS);
-  RHS = Fn.convert<U, CommonT>(RHS);
+  Value *LHS = Fn.convert<T, CommonT>(L.loadValue());
+  Value *RHS = Fn.convert<U, CommonT>(R.loadValue());
 
   Value *Result = nullptr;
   if constexpr (std::is_integral_v<CommonT>) {
@@ -591,7 +598,7 @@ Var<std::common_type_t<T, U>> binOp(const Var<T> &L, const Var<U> &R, IntOp IOp,
     Result = FOp(Fn, LHS, RHS);
   }
 
-  auto ResultVar = Fn.declVar<std::common_type_t<T, U>>("res.");
+  auto ResultVar = Fn.declVar<CommonT>("res.");
   ResultVar.storeValue(Result);
 
   return ResultVar;
@@ -599,32 +606,32 @@ Var<std::common_type_t<T, U>> binOp(const Var<T> &L, const Var<U> &R, IntOp IOp,
 
 // Helper function for compound assignment with a constant
 template <typename T, typename U, typename IntOp, typename FPOp>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
-compoundAssignConst(Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &LHS,
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &
+compoundAssignConst(Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &LHS,
                     const U &ConstValue, IntOp IOp, FPOp FOp) {
-  static_assert(std::is_convertible_v<U, T>, "U must be convertible to T");
-
-  using CleanU = std::remove_cv_t<std::remove_reference_t<U>>;
+  static_assert(std::is_convertible_v<remove_cvref_t<U>, remove_cvref_t<T>>,
+                "U must be convertible to T");
 
   auto &Ctx = LHS.Fn.getContext();
-  Type *RHSType = TypeMap<CleanU>::get(Ctx);
+  Type *RHSType = TypeMap<remove_cvref_t<U>>::get(Ctx);
 
   Value *RHS = nullptr;
-  if constexpr (std::is_integral_v<CleanU>) {
-    RHS = LHS.Fn.gettConstantInt(RHSType, ConstValue);
+  if constexpr (std::is_integral_v<remove_cvref_t<U>>) {
+    RHS = LHS.Fn.getConstantInt(RHSType, ConstValue);
   } else {
     RHS = LHS.Fn.getConstantFP(RHSType, ConstValue);
   }
 
   Value *LHSVal = LHS.loadValue();
 
-  RHS = LHS.Fn.template convert<CleanU, T>(RHS);
+  RHS = LHS.Fn.template convert<U, T>(RHS);
   Value *Result = nullptr;
 
-  if constexpr (std::is_integral_v<T>) {
+  if constexpr (std::is_integral_v<remove_cvref_t<T>>) {
     Result = IOp(LHS.Fn, LHSVal, RHS);
   } else {
-    static_assert(std::is_floating_point_v<T>, "Unsupported type");
+    static_assert(std::is_floating_point_v<remove_cvref_t<T>>,
+                  "Unsupported type");
     Result = FOp(LHS.Fn, LHSVal, RHS);
   }
 
@@ -640,15 +647,14 @@ Var<bool> cmpOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
     reportFatalError("Variables should belong to the same function");
 
   Value *LHS = L.loadValue();
-  Value *RHS = R.loadValue();
-
-  RHS = Fn.convert<U, T>(RHS);
+  Value *RHS = Fn.convert<U, T>(R.loadValue());
 
   Value *Result = nullptr;
-  if constexpr (std::is_integral_v<T>) {
+  if constexpr (std::is_integral_v<remove_cvref_t<T>>) {
     Result = IOp(Fn, LHS, RHS);
   } else {
-    static_assert(std::is_floating_point_v<T>, "Unsupported type");
+    static_assert(std::is_floating_point_v<remove_cvref_t<T>>,
+                  "Unsupported type");
     Result = FOp(Fn, LHS, RHS);
   }
 
@@ -660,30 +666,27 @@ Var<bool> cmpOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
 
 template <typename T>
 template <typename U, typename>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::Var(const Var<U> &V)
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::Var(const Var<U> &V)
     : VarStorageOwner<VarStorage>(V.Fn) {
   // Allocate storage for the target type T.
-  using RawT = std::remove_const_t<T>;
-
-  Type *TargetTy = TypeMap<RawT>::get(Fn.getContext());
+  Type *TargetTy = TypeMap<remove_cvref_t<T>>::get(Fn.getContext());
   Storage = Fn.createScalarStorage("conv.var", TargetTy);
 
-  using RawU = std::remove_const_t<U>;
-  auto *Converted = Fn.convert<RawU, RawT>(V.loadValue());
+  auto *Converted = Fn.convert<U, T>(V.loadValue());
   storeValue(Converted);
 }
 
 template <typename T>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(const Var &V) {
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator=(const Var &V) {
   static_assert(is_mutable_v<T>, "Cannot assign to Var<const T>");
   storeValue(V.loadValue());
   return *this;
 }
 
 template <typename T>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(Var &&V) {
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator=(Var &&V) {
   static_assert(is_mutable_v<T>, "Cannot assign to Var<const T>");
   if (this->Storage == nullptr) {
     // If we don't have storage, clone it from the source.
@@ -697,7 +700,23 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(Var &&V) {
 
 template <typename T>
 Var<std::add_pointer_t<T>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::getAddress() {
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::getAddress() {
+  if constexpr (std::is_reference_v<T>) {
+    // For references, load the pointer to create a T*.
+    auto *PtrStorage = static_cast<PointerStorage *>(Storage.get());
+    Value *PtrVal = PtrStorage->loadPointer();
+    Type *ElemTy = PtrStorage->getValueType();
+    unsigned AddrSpace = Fn.getAddressSpaceFromValue(PtrVal);
+    Type *PtrTy = Fn.getPointerType(ElemTy, AddrSpace);
+    PtrVal = Fn.createBitCast(PtrVal, PtrTy);
+
+    std::unique_ptr<PointerStorage> ResultStorage =
+        Fn.createPointerStorage("addr.ref.tmp", PtrTy, ElemTy);
+    Fn.createStore(PtrVal, ResultStorage->getSlot());
+
+    return Var<std::add_pointer_t<T>>(std::move(ResultStorage), Fn);
+  }
+
   Value *Slot = getSlot();
   Type *ElemTy = getAllocatedType();
 
@@ -715,19 +734,19 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::getAddress() {
 
 template <typename T>
 template <typename U>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(const Var<U> &V) {
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator=(
+    const Var<U> &V) {
   static_assert(is_mutable_v<T>, "Cannot assign to Var<const T>");
-  auto *Converted =
-      Fn.convert<std::remove_const_t<U>, std::remove_const_t<T>>(V.loadValue());
+  auto *Converted = Fn.convert<U, T>(V.loadValue());
   storeValue(Converted);
   return *this;
 }
 
 template <typename T>
 template <typename U>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator=(
     const U &ConstValue) {
   static_assert(is_mutable_v<T>, "Cannot assign to Var<const T>");
   static_assert(std::is_arithmetic_v<U>,
@@ -749,7 +768,7 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator=(
 template <typename T>
 template <typename U>
 Var<std::common_type_t<T, U>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator+(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
@@ -760,7 +779,7 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+(
 template <typename T>
 template <typename U>
 Var<std::common_type_t<T, U>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator-(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
@@ -771,7 +790,7 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-(
 template <typename T>
 template <typename U>
 Var<std::common_type_t<T, U>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator*(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
@@ -782,7 +801,7 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*(
 template <typename T>
 template <typename U>
 Var<std::common_type_t<T, U>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator/(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
@@ -793,7 +812,7 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/(
 template <typename T>
 template <typename U>
 Var<std::common_type_t<T, U>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator%(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
@@ -805,7 +824,7 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%(
 template <typename T>
 template <typename U>
 std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator+(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>,
                 "Can only add arithmetic types to Var");
@@ -816,7 +835,7 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+(
 template <typename T>
 template <typename U>
 std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator-(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>,
                 "Can only subtract arithmetic types from Var");
@@ -827,7 +846,7 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-(
 template <typename T>
 template <typename U>
 std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator*(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>,
                 "Can only multiply Var by arithmetic types");
@@ -838,7 +857,7 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*(
 template <typename T>
 template <typename U>
 std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator/(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>,
                 "Can only divide Var by arithmetic types");
@@ -849,7 +868,7 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/(
 template <typename T>
 template <typename U>
 std::enable_if_t<std::is_arithmetic_v<U>, Var<std::common_type_t<T, U>>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator%(
     const U &ConstValue) const {
   static_assert(std::is_arithmetic_v<U>,
                 "Can only modulo Var by arithmetic types");
@@ -860,8 +879,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%(
 // Compound assignment operators for Var
 template <typename T>
 template <typename U>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+=(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator+=(
     const Var<U> &Other) {
   static_assert(is_mutable_v<T>, "Cannot use += on Var<const T>");
   auto Result = (*this) + Other;
@@ -871,8 +890,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+=(
 
 template <typename T>
 template <typename U>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+=(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator+=(
     const U &ConstValue) {
   static_assert(is_mutable_v<T>, "Cannot use += on Var<const T>");
   static_assert(std::is_arithmetic_v<U>,
@@ -885,8 +904,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator+=(
 
 template <typename T>
 template <typename U>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-=(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator-=(
     const Var<U> &Other) {
   static_assert(is_mutable_v<T>, "Cannot use -= on Var<const T>");
   auto Result = (*this) - Other;
@@ -896,8 +915,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-=(
 
 template <typename T>
 template <typename U>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-=(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator-=(
     const U &ConstValue) {
   static_assert(is_mutable_v<T>, "Cannot use -= on Var<const T>");
   static_assert(std::is_arithmetic_v<U>,
@@ -910,8 +929,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-=(
 
 template <typename T>
 template <typename U>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*=(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator*=(
     const Var<U> &Other) {
   static_assert(is_mutable_v<T>, "Cannot use *= on Var<const T>");
   auto Result = (*this) * Other;
@@ -921,8 +940,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*=(
 
 template <typename T>
 template <typename U>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*=(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator*=(
     const U &ConstValue) {
   static_assert(is_mutable_v<T>, "Cannot use *= on Var<const T>");
   static_assert(std::is_arithmetic_v<U>,
@@ -935,8 +954,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator*=(
 
 template <typename T>
 template <typename U>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/=(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator/=(
     const Var<U> &Other) {
   static_assert(is_mutable_v<T>, "Cannot use /= on Var<const T>");
   auto Result = (*this) / Other;
@@ -946,8 +965,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/=(
 
 template <typename T>
 template <typename U>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/=(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator/=(
     const U &ConstValue) {
   static_assert(is_mutable_v<T>, "Cannot use /= on Var<const T>");
   static_assert(std::is_arithmetic_v<U>,
@@ -960,8 +979,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator/=(
 
 template <typename T>
 template <typename U>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%=(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator%=(
     const Var<U> &Other) {
   static_assert(is_mutable_v<T>, "Cannot use %= on Var<const T>");
   auto Result = (*this) % Other;
@@ -971,8 +990,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%=(
 
 template <typename T>
 template <typename U>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>> &
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%=(
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator%=(
     const U &ConstValue) {
   static_assert(is_mutable_v<T>, "Cannot use %= on Var<const T>");
   static_assert(std::is_arithmetic_v<U>,
@@ -984,19 +1003,21 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator%=(
 }
 
 template <typename T>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator-() const {
-  auto MinusOne = Fn.defVar<T>(static_cast<T>(-1), "minus_one.");
+Var<remove_cvref_t<T>>
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator-() const {
+  auto MinusOne = Fn.defVar<remove_cvref_t<T>>(
+      static_cast<remove_cvref_t<T>>(-1), "minus_one.");
   return MinusOne * (*this);
 }
 
 template <typename T>
-Var<bool> Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator!() const {
+Var<bool>
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator!() const {
   Value *V = loadValue();
   Value *ResV = nullptr;
-  if constexpr (std::is_same_v<T, bool>) {
+  if constexpr (std::is_same_v<remove_cvref_t<T>, bool>) {
     ResV = Fn.createNot(V);
-  } else if constexpr (std::is_integral_v<T>) {
+  } else if constexpr (std::is_integral_v<remove_cvref_t<T>>) {
     Value *Zero = Fn.getConstantInt(getValueType(), 0);
     ResV = Fn.createICmpEQ(V, Zero);
   } else {
@@ -1009,7 +1030,7 @@ Var<bool> Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator!() const {
 }
 
 template <typename T>
-Var<std::remove_extent_t<T>>
+Var<std::add_lvalue_reference_t<std::remove_extent_t<T>>>
 Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](size_t Index) {
   auto *ArrayTy = getAllocatedType();
   auto *BasePointer = getSlot();
@@ -1023,12 +1044,14 @@ Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](size_t Index) {
   std::unique_ptr<PointerStorage> ResultStorage =
       Fn.createPointerStorage("elem.ptr", ElemPtrTy, ElemTy);
   Fn.createStore(GEP, ResultStorage->getSlot());
-  return Var<std::remove_extent_t<T>>(std::move(ResultStorage), Fn);
+  return Var<std::add_lvalue_reference_t<std::remove_extent_t<T>>>(
+      std::move(ResultStorage), Fn);
 }
 
 template <typename T>
 template <typename IdxT>
-std::enable_if_t<std::is_integral_v<IdxT>, Var<std::remove_extent_t<T>>>
+std::enable_if_t<std::is_integral_v<IdxT>,
+                 Var<std::add_lvalue_reference_t<std::remove_extent_t<T>>>>
 Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](
     const Var<IdxT> &Index) {
   auto *ArrayTy = getAllocatedType();
@@ -1045,59 +1068,70 @@ Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](
       Fn.createPointerStorage("elem.ptr", ElemPtrTy, ElemTy);
   Fn.createStore(GEP, ResultStorage->getSlot());
 
-  return Var<std::remove_extent_t<T>>(std::move(ResultStorage), Fn);
+  return Var<std::add_lvalue_reference_t<std::remove_extent_t<T>>>(
+      std::move(ResultStorage), Fn);
 }
 
 template <typename T>
-Var<std::remove_pointer_t<T>>
-Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator[](size_t Index) {
-  auto *PointerElemTy = TypeMap<std::remove_pointer_t<T>>::get(Fn.getContext());
+Var<std::add_lvalue_reference_t<
+    std::remove_pointer_t<std::remove_reference_t<T>>>>
+Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator[](size_t Index) {
+  auto *PointerElemTy =
+      TypeMap<std::remove_pointer_t<std::remove_reference_t<T>>>::get(
+          Fn.getContext());
   auto *Ptr = loadPointer();
   auto *GEP = Fn.createConstInBoundsGEP1_64(PointerElemTy, Ptr, Index);
   unsigned AddrSpace = Fn.getAddressSpace(getAllocatedType());
   Type *ElemPtrTy = Fn.getPointerType(PointerElemTy, AddrSpace);
 
-  // Create a pointer storage to hold the LValue for
-  // the Array[Index].
+  // Create a pointer storage to hold the LValue for the Array[Index].
   std::unique_ptr<PointerStorage> ResultStorage =
       Fn.createPointerStorage("elem.ptr", ElemPtrTy, PointerElemTy);
   Fn.createStore(GEP, ResultStorage->getSlot());
 
-  return Var<std::remove_pointer_t<T>>(std::move(ResultStorage), Fn);
+  return Var<std::add_lvalue_reference_t<
+      std::remove_pointer_t<std::remove_reference_t<T>>>>(
+      std::move(ResultStorage), Fn);
 }
 
 template <typename T>
 template <typename IdxT>
-std::enable_if_t<std::is_arithmetic_v<IdxT>, Var<std::remove_pointer_t<T>>>
-Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator[](
+std::enable_if_t<std::is_arithmetic_v<IdxT>,
+                 Var<std::add_lvalue_reference_t<
+                     std::remove_pointer_t<std::remove_reference_t<T>>>>>
+Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator[](
     const Var<IdxT> &Index) {
 
-  auto *PointeeType = TypeMap<std::remove_pointer_t<T>>::get(Fn.getContext());
+  auto *PointeeType =
+      TypeMap<std::remove_pointer_t<std::remove_reference_t<T>>>::get(
+          Fn.getContext());
   auto *Ptr = loadPointer();
   auto *IdxValue = Index.loadValue();
   auto *GEP = Fn.createInBoundsGEP(PointeeType, Ptr, {IdxValue});
   unsigned AddrSpace = Fn.getAddressSpace(getAllocatedType());
   Type *ElemPtrTy = Fn.getPointerType(PointeeType, AddrSpace);
 
-  // Create a pointer storage to hold the LValue for
-  // the Array[Index].
+  // Create a pointer storage to hold the LValue for the Array[Index].
   std::unique_ptr<PointerStorage> ResultStorage =
       Fn.createPointerStorage("elem.ptr", ElemPtrTy, PointeeType);
   Fn.createStore(GEP, ResultStorage->getSlot());
 
-  return Var<std::remove_pointer_t<T>>(std::move(ResultStorage), Fn);
+  return Var<std::add_lvalue_reference_t<
+      std::remove_pointer_t<std::remove_reference_t<T>>>>(
+      std::move(ResultStorage), Fn);
 }
 
 // Pointer type operator*
 template <typename T>
-Var<std::remove_pointer_t<T>>
-Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator*() {
+Var<std::add_lvalue_reference_t<
+    std::remove_pointer_t<std::remove_reference_t<T>>>>
+Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator*() {
   return (*this)[0];
 }
 
 template <typename T>
 Var<std::add_pointer_t<T>>
-Var<T, std::enable_if_t<std::is_pointer_v<T>>>::getAddress() {
+Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::getAddress() {
   Value *PtrVal = loadPointer();
   Type *ElemTy = getValueType();
 
@@ -1117,8 +1151,8 @@ Var<T, std::enable_if_t<std::is_pointer_v<T>>>::getAddress() {
 template <typename T>
 template <typename OffsetT>
 std::enable_if_t<std::is_arithmetic_v<OffsetT>,
-                 Var<T, std::enable_if_t<std::is_pointer_v<T>>>>
-Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator+(
+                 Var<T, std::enable_if_t<is_pointer_unref_v<T>>>>
+Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator+(
     const Var<OffsetT> &Offset) const {
   auto *OffsetVal = Offset.loadValue();
   auto *IdxVal = Fn.convert<OffsetT, int64_t>(OffsetVal);
@@ -1136,15 +1170,15 @@ Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator+(
   ;
   Fn.createStore(GEP, ResultStorage->getSlot());
 
-  return Var<T, std::enable_if_t<std::is_pointer_v<T>>>(
+  return Var<T, std::enable_if_t<is_pointer_unref_v<T>>>(
       std::move(ResultStorage), Fn);
 }
 
 template <typename T>
 template <typename OffsetT>
 std::enable_if_t<std::is_arithmetic_v<OffsetT>,
-                 Var<T, std::enable_if_t<std::is_pointer_v<T>>>>
-Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator+(
+                 Var<T, std::enable_if_t<is_pointer_unref_v<T>>>>
+Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator+(
     OffsetT Offset) const {
   auto *IntTy = Fn.getInt64Ty();
   Value *IdxVal = Fn.getConstantInt(IntTy, Offset);
@@ -1161,15 +1195,15 @@ Var<T, std::enable_if_t<std::is_pointer_v<T>>>::operator+(
       Fn.createPointerStorage("ptr.add.tmp", ElemPtrTy, ElemTy);
   Fn.createStore(GEP, ResultStorage->getSlot());
 
-  return Var<T, std::enable_if_t<std::is_pointer_v<T>>>(
+  return Var<T, std::enable_if_t<is_pointer_unref_v<T>>>(
       std::move(ResultStorage), Fn);
 }
 
 // Comparison operators for Var
 template <typename T>
 template <typename U>
-std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator>(
+std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator>(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
@@ -1179,8 +1213,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator>(
 
 template <typename T>
 template <typename U>
-std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator>=(
+std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator>=(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
@@ -1190,8 +1224,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator>=(
 
 template <typename T>
 template <typename U>
-std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator<(
+std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator<(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
@@ -1201,8 +1235,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator<(
 
 template <typename T>
 template <typename U>
-std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator<=(
+std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator<=(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
@@ -1212,8 +1246,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator<=(
 
 template <typename T>
 template <typename U>
-std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator==(
+std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator==(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
@@ -1223,8 +1257,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator==(
 
 template <typename T>
 template <typename U>
-std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator!=(
+std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator!=(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
@@ -1234,8 +1268,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator!=(
 
 template <typename T>
 template <typename U>
-std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator>(
+std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator>(
     const U &ConstValue) const {
   Var<U> Tmp = Fn.defVar<U>(ConstValue, "cmp.");
   return (*this) > Tmp;
@@ -1243,8 +1277,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator>(
 
 template <typename T>
 template <typename U>
-std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator>=(
+std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator>=(
     const U &ConstValue) const {
   Var<U> Tmp = Fn.defVar<U>(ConstValue, "cmp.");
   return (*this) >= Tmp;
@@ -1252,8 +1286,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator>=(
 
 template <typename T>
 template <typename U>
-std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator<(
+std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator<(
     const U &ConstValue) const {
   Var<U> Tmp = Fn.defVar<U>(ConstValue, "cmp.");
   return (*this) < Tmp;
@@ -1261,8 +1295,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator<(
 
 template <typename T>
 template <typename U>
-std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator<=(
+std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator<=(
     const U &ConstValue) const {
   auto Tmp = Fn.defVar<U>(ConstValue, "cmp.");
   return (*this) <= Tmp;
@@ -1270,8 +1304,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator<=(
 
 template <typename T>
 template <typename U>
-std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator==(
+std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator==(
     const U &ConstValue) const {
   Var<U> Tmp = Fn.defVar<U>(ConstValue, "cmp.");
   return (*this) == Tmp;
@@ -1279,8 +1313,8 @@ Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator==(
 
 template <typename T>
 template <typename U>
-std::enable_if_t<std::is_arithmetic_v<U>, Var<bool>>
-Var<T, std::enable_if_t<std::is_arithmetic_v<T>>>::operator!=(
+std::enable_if_t<is_arithmetic_unref_v<U>, Var<bool>>
+Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator!=(
     const U &ConstValue) const {
   auto Tmp = Fn.defVar<U>(ConstValue, "cmp.");
   return (*this) != Tmp;
@@ -1329,7 +1363,7 @@ operator%(const T &ConstValue, const Var<U> &V) {
 }
 
 template <typename T>
-std::enable_if_t<std::is_arithmetic_v<T>, Var<T>>
+std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicAdd(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicAdd requires arithmetic type");
 
@@ -1340,7 +1374,7 @@ FuncBase::atomicAdd(const Var<T *> &Addr, const Var<T> &Val) {
 }
 
 template <typename T>
-std::enable_if_t<std::is_arithmetic_v<T>, Var<T>>
+std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicSub(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicSub requires arithmetic type");
 
@@ -1351,7 +1385,7 @@ FuncBase::atomicSub(const Var<T *> &Addr, const Var<T> &Val) {
 }
 
 template <typename T>
-std::enable_if_t<std::is_arithmetic_v<T>, Var<T>>
+std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicMax(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicMax requires arithmetic type");
 
@@ -1362,7 +1396,7 @@ FuncBase::atomicMax(const Var<T *> &Addr, const Var<T> &Val) {
 }
 
 template <typename T>
-std::enable_if_t<std::is_arithmetic_v<T>, Var<T>>
+std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicMin(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicMin requires arithmetic type");
 
@@ -1553,15 +1587,13 @@ template <typename T> Var<float> absf(const Var<T> &R) {
 }
 
 template <typename T>
-std::enable_if_t<std::is_arithmetic_v<T>, Var<T>> min(const Var<T> &L,
-                                                      const Var<T> &R) {
-  static_assert(std::is_arithmetic_v<T>, "min requires arithmetic type");
-
+std::enable_if_t<is_arithmetic_unref_v<T>, Var<remove_cvref_t<T>>>
+min(const Var<T> &L, const Var<T> &R) {
   FuncBase &Fn = L.Fn;
   if (&Fn != &R.Fn)
     reportFatalError("Variables should belong to the same function");
 
-  Var<T> ResultVar = Fn.declVar<T>("min_res");
+  auto ResultVar = Fn.declVar<remove_cvref_t<T>>("min_res");
   ResultVar = R;
   Fn.beginIf(L < R);
   { ResultVar = L; }
@@ -1570,15 +1602,14 @@ std::enable_if_t<std::is_arithmetic_v<T>, Var<T>> min(const Var<T> &L,
 }
 
 template <typename T>
-std::enable_if_t<std::is_arithmetic_v<T>, Var<T>> max(const Var<T> &L,
-                                                      const Var<T> &R) {
-  static_assert(std::is_arithmetic_v<T>, "max requires arithmetic type");
+std::enable_if_t<is_arithmetic_unref_v<T>, Var<remove_cvref_t<T>>>
+max(const Var<T> &L, const Var<T> &R) {
 
   FuncBase &Fn = L.Fn;
   if (&Fn != &R.Fn)
     reportFatalError("Variables should belong to the same function");
 
-  Var<T> ResultVar = Fn.declVar<T>("max_res");
+  auto ResultVar = Fn.declVar<remove_cvref_t<T>>("max_res");
   ResultVar = R;
   Fn.beginIf(L > R);
   { ResultVar = L; }

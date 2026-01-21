@@ -103,12 +103,6 @@ template <> struct TypeMap<bool[]> {
   static bool isSigned();
 };
 
-template <> struct TypeMap<double &> {
-  static llvm::Type *get(llvm::LLVMContext &Ctx, std::size_t NElem = 0);
-  static llvm::Type *getPointerElemType(llvm::LLVMContext &Ctx);
-  static bool isSigned();
-};
-
 template <> struct TypeMap<double *> {
   static llvm::Type *get(llvm::LLVMContext &Ctx, std::size_t NElem = 0);
   static llvm::Type *getPointerElemType(llvm::LLVMContext &Ctx);
@@ -125,6 +119,9 @@ template <> struct TypeMap<float *> {
 template <typename T> struct TypeMap<const T> : TypeMap<T> {};
 
 template <typename T> struct TypeMap<const T *> : TypeMap<T *> {};
+
+// Forward reference types to their value types.
+template <typename T> struct TypeMap<T &> : TypeMap<T> {};
 
 } // namespace proteus
 

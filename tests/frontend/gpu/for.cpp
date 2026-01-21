@@ -10,7 +10,6 @@
 
 #include <proteus/JitFrontend.h>
 #include <proteus/JitInterface.h>
-#include <proteus/Utils.h>
 
 #include "../../gpu/gpu_common.h"
 

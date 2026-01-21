@@ -1,6 +1,7 @@
 #ifndef PROTEUS_FRONTEND_DISPATCHER_H
 #define PROTEUS_FRONTEND_DISPATCHER_H
 
+#include "proteus/Error.h"
 #include "proteus/Frontend/TargetModel.h"
 
 #if PROTEUS_ENABLE_HIP && __HIP__
@@ -9,6 +10,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <type_traits>
 
 namespace llvm {
 class LLVMContext;
@@ -18,6 +20,20 @@ class MemoryBuffer;
 
 struct LaunchDims {
   unsigned X = 1, Y = 1, Z = 1;
+
+  constexpr LaunchDims() = default;
+
+  constexpr LaunchDims(unsigned X, unsigned Y = 1, unsigned Z = 1)
+      : X(X), Y(Y), Z(Z) {}
+
+  // Templated converting constructor for dim3-like types.
+  template <
+      typename T,
+      typename = std::enable_if_t<
+          std::is_convertible_v<decltype(std::declval<T>().x), unsigned> &&
+          std::is_convertible_v<decltype(std::declval<T>().y), unsigned> &&
+          std::is_convertible_v<decltype(std::declval<T>().z), unsigned>>>
+  constexpr LaunchDims(const T &Dims) : X(Dims.x), Y(Dims.y), Z(Dims.z) {}
 };
 
 namespace proteus {
@@ -34,7 +50,6 @@ template <typename R, typename... Args> struct sig_traits<R(Args...)> {
 
 using namespace llvm;
 
-// in Dispatcher.h (or a new Errors.h)
 struct DispatchResult {
   int Ret;
 

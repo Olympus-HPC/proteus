@@ -11,17 +11,17 @@
 #ifndef PROTEUS_OBJECTCACHECHAIN_H
 #define PROTEUS_OBJECTCACHECHAIN_H
 
-#include <cstdint>
-#include <memory>
-#include <string>
-#include <vector>
+#include "proteus/Caching/ObjectCache.h"
+#include "proteus/CompiledLibrary.h"
+#include "proteus/Hashing.h"
 
 #include <llvm/ADT/SmallString.h>
 #include <llvm/Support/MemoryBufferRef.h>
 
-#include "proteus/Caching/ObjectCache.h"
-#include "proteus/CompiledLibrary.h"
-#include "proteus/Hashing.h"
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
 
 namespace proteus {
 
@@ -34,6 +34,7 @@ public:
   std::unique_ptr<CompiledLibrary> lookup(const HashT &HashValue);
   void store(const HashT &HashValue, const CacheEntry &Entry);
   void printStats();
+  void finalize();
 
 private:
   void addCache(std::unique_ptr<ObjectCache> Cache);
