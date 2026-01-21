@@ -36,6 +36,8 @@
 
 #include <memory>
 
+#include "proteus/AutoReadOnlyCaptures.h"
+
 using namespace proteus;
 using namespace llvm;
 using namespace llvm::orc;
@@ -133,8 +135,10 @@ JitEngineHost::~JitEngineHost() {
     CacheChain->printStats();
 }
 
-void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
-                                 ArrayRef<RuntimeConstant> RCArray) {
+void JitEngineHost::specializeIR(
+    Module &M, StringRef FnName, StringRef Suffix,
+    ArrayRef<RuntimeConstant> RCArray,
+    const SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
   TIMESCOPE(JitEngineHost, specializeIR);
   Function *F = M.getFunction(FnName);
   assert(F && "Expected non-null function!");
@@ -160,8 +164,8 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
   if (!LambdaRegistry::instance().empty()) {
     if (auto OptionalMapIt =
             LambdaRegistry::instance().matchJitVariableMap(F->getName())) {
-      auto &RCVec = OptionalMapIt.value()->getSecond();
-      TransformLambdaSpecialization::transform(M, *F, RCVec);
+      // Use the merged lambda values from getLambdaJitValues
+      TransformLambdaSpecialization::transform(M, *F, LambdaJitValuesVec);
     }
   }
 
@@ -175,7 +179,7 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
   }
 }
 
-void getLambdaJitValues(StringRef FnName,
+void getLambdaJitValues(Module &M, StringRef FnName, void **Args,
                         SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
   TIMESCOPE("proteus::getLambdaJitValues");
   LambdaRegistry &LR = LambdaRegistry::instance();
@@ -193,7 +197,62 @@ void getLambdaJitValues(StringRef FnName,
   if (!OptionalMapIt)
     return;
 
-  LambdaJitValuesVec = OptionalMapIt.value()->getSecond();
+  // Get the explicit jit_variable captures
+  const SmallVector<RuntimeConstant> &ExplicitValues =
+      OptionalMapIt.value()->getSecond();
+
+  // Start with explicit values
+  SmallVector<RuntimeConstant> MergedValues(ExplicitValues.begin(),
+                                            ExplicitValues.end());
+
+  // Auto-detect if enabled
+  if (Config::get().ProteusAutoReadOnlyCaptures) {
+    Function *F = M.getFunction(FnName);
+    if (F && Args && Args[0]) {
+      // 1. Analyze IR for read-only captures
+      auto DetectedCaptures = analyzeReadOnlyCaptures(*F);
+
+      if (!DetectedCaptures.empty()) {
+        // 2. Get closure type and data layout
+        const DataLayout &DL = M.getDataLayout();
+        StructType *ClosureType = inferClosureType(*F);
+
+        if (ClosureType) {
+          // 3. Get lambda closure pointer from Args
+          // The host ABI passes the closure by pointer, so Args[0] points to
+          // a slot that stores the actual closure address.
+          const void *LambdaClosure =
+              *reinterpret_cast<const void *const *>(Args[0]);
+
+          // 4. Extract auto-detected capture values
+          auto AutoCaptures = extractAutoDetectedCaptures(
+              LambdaClosure, DetectedCaptures, DL, ClosureType);
+
+          // 5. Merge (explicit takes precedence)
+          mergeCaptures(MergedValues, AutoCaptures);
+
+          // 6. Trace auto-detected captures
+          if (Config::get().traceSpecializations()) {
+            for (const auto &RC : AutoCaptures) {
+              // Only trace if it wasn't already explicit
+              bool WasExplicit = false;
+              for (const auto &Explicit : ExplicitValues) {
+                if (Explicit.Pos == RC.Pos) {
+                  WasExplicit = true;
+                  break;
+                }
+              }
+              if (!WasExplicit) {
+                Logger::trace(traceOutAuto(RC.Pos, RC));
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  LambdaJitValuesVec = MergedValues;
 }
 
 void *
@@ -217,7 +276,7 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   SmallVector<RuntimeConstant> RCVec =
       getRuntimeConstantValues(Args, RCInfoArray);
   SmallVector<RuntimeConstant> LambdaJitValuesVec;
-  getLambdaJitValues(FnName, LambdaJitValuesVec);
+  getLambdaJitValues(*M, FnName, Args, LambdaJitValuesVec);
 
   HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesVec);
   if (Config::get().ProteusDebugOutput) {
@@ -247,7 +306,7 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   } else {
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".input.ll", *M));
     // Specialize the module using runtime values.
-    specializeIR(*M, FnName, Suffix, RCVec);
+    specializeIR(*M, FnName, Suffix, RCVec, LambdaJitValuesVec);
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".specialized.ll", *M));
     // Compile the object.
     auto ObjectModule = compileOnly(*M);
