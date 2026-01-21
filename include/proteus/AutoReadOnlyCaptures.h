@@ -112,52 +112,66 @@ inline llvm::SmallVector<CaptureInfo> analyzeReadOnlyCaptures(Function &F) {
 
     // Case 2: GetElementPtrInst (struct field access)
     if (auto *GEP = dyn_cast<GetElementPtrInst>(User)) {
-      // For struct access: GEP ptr, 0, fieldIndex
+      int32_t ByteOffset = -1;
+      int32_t SlotIndex = -1;
+
+      // Handle two GEP patterns:
+      // 1. Typed struct GEP: getelementptr %struct.type, ptr, 0, fieldIndex
+      // 2. Byte-offset GEP: getelementptr i8, ptr, byteOffset
       if (GEP->getNumIndices() >= 2) {
+        // Typed struct GEP - extract field index from second index
         if (auto *CI = dyn_cast<ConstantInt>(GEP->getOperand(2))) {
-          int32_t SlotIndex = CI->getSExtValue();
-
-          // Analyze users of this GEP
-          bool IsReadOnly = true;
-          Type *CaptureType = nullptr;
-
-          for (llvm::User *GEPUser : GEP->users()) {
-            // Check for stores to this slot
-            if (auto *SI = dyn_cast<StoreInst>(GEPUser)) {
-              if (SI->getPointerOperand() == GEP) {
-                IsReadOnly = false;
-              }
-            }
-            // Get the capture type from loads
-            else if (auto *LI = dyn_cast<LoadInst>(GEPUser)) {
-              if (!CaptureType)
-                CaptureType = LI->getType();
+          SlotIndex = CI->getSExtValue();
+          // Compute byte offset from DataLayout if available
+          if (auto *STy = dyn_cast<StructType>(GEP->getSourceElementType())) {
+            if (const DataLayout *DL = &F.getParent()->getDataLayout()) {
+              const StructLayout *SL = DL->getStructLayout(STy);
+              ByteOffset = SL->getElementOffset(SlotIndex);
             }
           }
+        }
+      } else if (GEP->getNumIndices() == 1) {
+        // Byte-offset GEP - use byte offset directly as both offset and slot
+        if (auto *CI = dyn_cast<ConstantInt>(GEP->getOperand(1))) {
+          ByteOffset = CI->getSExtValue();
+          // For byte-offset GEPs, use the byte offset itself as the slot index
+          // to avoid collisions when multiple captures have different offsets
+          SlotIndex = ByteOffset;
+        }
+      }
 
-          // Check if the GEP itself escapes
-          if (pointerEscapes(GEP)) {
-            IsReadOnly = false;
-          }
+      if (SlotIndex >= 0) {
+        // Analyze users of this GEP
+        bool IsReadOnly = true;
+        Type *CaptureType = nullptr;
 
-          // Only add if we found a capture type and it's supported
-          if (CaptureType && isSupportedScalarType(CaptureType)) {
-            if (SlotInfo.find(SlotIndex) == SlotInfo.end()) {
-              // Compute byte offset from DataLayout if available
-              int32_t Offset = 0;
-              if (auto *STy = dyn_cast<StructType>(GEP->getSourceElementType())) {
-                if (const DataLayout *DL = &F.getParent()->getDataLayout()) {
-                  const StructLayout *SL = DL->getStructLayout(STy);
-                  Offset = SL->getElementOffset(SlotIndex);
-                }
-              }
-
-              SlotInfo[SlotIndex] = {Offset, SlotIndex, CaptureType, IsReadOnly};
-            } else {
-              // Update read-only status if we found a store
-              if (!IsReadOnly)
-                SlotInfo[SlotIndex].IsReadOnly = false;
+        for (llvm::User *GEPUser : GEP->users()) {
+          // Check for stores to this slot
+          if (auto *SI = dyn_cast<StoreInst>(GEPUser)) {
+            if (SI->getPointerOperand() == GEP) {
+              IsReadOnly = false;
             }
+          }
+          // Get the capture type from loads
+          else if (auto *LI = dyn_cast<LoadInst>(GEPUser)) {
+            if (!CaptureType)
+              CaptureType = LI->getType();
+          }
+        }
+
+        // Check if the GEP itself escapes
+        if (pointerEscapes(GEP)) {
+          IsReadOnly = false;
+        }
+
+        // Only add if we found a capture type and it's supported
+        if (CaptureType && isSupportedScalarType(CaptureType)) {
+          if (SlotInfo.find(SlotIndex) == SlotInfo.end()) {
+            SlotInfo[SlotIndex] = {ByteOffset, SlotIndex, CaptureType, IsReadOnly};
+          } else {
+            // Update read-only status if we found a store
+            if (!IsReadOnly)
+              SlotInfo[SlotIndex].IsReadOnly = false;
           }
         }
       }

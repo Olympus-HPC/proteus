@@ -212,16 +212,31 @@ void getLambdaJitValues(Module &M, StringRef FnName, void **Args,
         const DataLayout &DL = M.getDataLayout();
         StructType *ClosureType = inferClosureType(*F);
 
+        // 3. Get lambda closure pointer from Args
+        // For host JIT, the lambda closure is passed as the first argument
+        // Args[0] contains a pointer-to-pointer to the lambda closure (due to ABI)
+        const void *LambdaClosure = *static_cast<const void **>(Args[0]);
+
+        // 4. Extract auto-detected capture values
+        // If we have a ClosureType, use the struct-based extraction
+        // Otherwise, use byte offsets directly
+        SmallVector<RuntimeConstant> AutoCaptures;
         if (ClosureType) {
-          // 3. Get lambda closure pointer from Args
-          // For host JIT, the lambda closure is passed as the first argument
-          // Args[0] contains a pointer to the lambda closure
-          const void *LambdaClosure = Args[0];
-
-          // 4. Extract auto-detected capture values
-          auto AutoCaptures = extractAutoDetectedCaptures(
+          AutoCaptures = extractAutoDetectedCaptures(
               LambdaClosure, DetectedCaptures, DL, ClosureType);
+        } else {
+          // Use byte-offset extraction for untyped closures
+          const char *ClosureBytes = static_cast<const char *>(LambdaClosure);
+          for (const auto &Cap : DetectedCaptures) {
+            if (Cap.IsReadOnly && Cap.Offset >= 0) {
+              AutoCaptures.push_back(
+                  readValueFromMemory(ClosureBytes + Cap.Offset, Cap.CaptureType,
+                                      Cap.SlotIndex));
+            }
+          }
+        }
 
+        if (!AutoCaptures.empty()) {
           // 5. Merge (explicit takes precedence)
           mergeCaptures(MergedValues, AutoCaptures);
 
