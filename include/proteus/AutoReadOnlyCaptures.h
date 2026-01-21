@@ -121,7 +121,7 @@ inline llvm::SmallVector<CaptureInfo> analyzeReadOnlyCaptures(Function &F) {
           bool IsReadOnly = true;
           Type *CaptureType = nullptr;
 
-          for (User *GEPUser : GEP->users()) {
+          for (llvm::User *GEPUser : GEP->users()) {
             // Check for stores to this slot
             if (auto *SI = dyn_cast<StoreInst>(GEPUser)) {
               if (SI->getPointerOperand() == GEP) {
