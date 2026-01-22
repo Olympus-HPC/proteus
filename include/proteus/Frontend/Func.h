@@ -334,10 +334,17 @@ public:
     return Var<T>(Res);
   }
 
+  template <typename U>
+  Var<U> defVar(const Var<U> &Val, const std::string &Name = "var") {
+    Var<U> Res = declVar<U>(Name);
+    Res = Val;
+    return Res;
+  }
+
   template <
       typename T, typename NameT,
       typename = std::enable_if_t<std::is_convertible_v<NameT, std::string>>>
-  Var<T> defVar(std::pair<T, NameT> P) {
+  auto defVar(std::pair<T, NameT> P) {
     return defVar(P.first, std::string(P.second));
   }
 

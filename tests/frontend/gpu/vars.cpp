@@ -216,6 +216,40 @@ int main() {
     gpuErrCheck(gpuFree(Result));
   }
 
+  // Test defVar pair overload with Var<T> returns Var<T>, not Var<Var<T>>.
+  {
+    auto J = proteus::JitModule(TARGET);
+    auto KernelHandle = J.addKernel<void(double *)>("defVarPairVar");
+    auto &F = KernelHandle.F;
+
+    auto &Arg = F.getArg<0>();
+    F.beginFunction();
+    {
+      auto V1 = F.defVar(3.14159, "original");
+      auto V2 = F.defVar(std::pair{V1, "copy"});
+      Arg[0] = V2;
+      F.ret();
+    }
+    F.endFunction();
+
+    std::cout.flush();
+    J.print();
+    fflush(stdout);
+
+    J.compile();
+
+    double *Result;
+    gpuErrCheck(gpuMallocManaged(&Result, sizeof(double) * 1));
+    Result[0] = 0.0;
+
+    gpuErrCheck(KernelHandle.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, Result));
+    gpuErrCheck(gpuDeviceSynchronize());
+
+    std::cout << "defVarPairVar[0] = " << Result[0] << "\n";
+
+    gpuErrCheck(gpuFree(Result));
+  }
+
   proteus::finalize();
   return 0;
 }
@@ -251,5 +285,9 @@ int main() {
 // CHECK: defVarsMixed[0] = 123
 // CHECK-NEXT: defVarsMixed[1] = 456.789
 
-// CHECK-FIRST: [proteus][Dispatcher{{CUDA|HIP}}] StorageCache rank 0 hits 0 accesses 5
-// CHECK-SECOND: [proteus][Dispatcher{{CUDA|HIP}}] StorageCache rank 0 hits 5 accesses 5
+// CHECK: define {{.*}} @defVarPairVar
+// CHECK-DAG: %copy = alloca double
+// CHECK: defVarPairVar[0] = 3.14159
+
+// CHECK-FIRST: [proteus][Dispatcher{{CUDA|HIP}}] StorageCache rank 0 hits 0 accesses 6
+// CHECK-SECOND: [proteus][Dispatcher{{CUDA|HIP}}] StorageCache rank 0 hits 6 accesses 6

@@ -163,6 +163,33 @@ int main() {
     std::cout << "defVarsMixed[1] = " << Result[1] << "\n";
   }
 
+  // Test defVar pair overload with Var<T> returns Var<T>, not Var<Var<T>>.
+  {
+    auto J = proteus::JitModule();
+    auto &F = J.addFunction<void(double *)>("defVarPairVar");
+
+    auto &Arg = F.getArg<0>();
+    F.beginFunction();
+    {
+      auto V1 = F.defVar(3.14159, "original");
+      auto V2 = F.defVar(std::pair{V1, "copy"});
+      Arg[0] = V2;
+      F.ret();
+    }
+    F.endFunction();
+
+    std::cout.flush();
+    J.print();
+    fflush(stdout);
+
+    J.compile();
+
+    double Result[1] = {0.0};
+    F(Result);
+
+    std::cout << "defVarPairVar[0] = " << Result[0] << "\n";
+  }
+
   proteus::finalize();
   return 0;
 }
@@ -198,5 +225,9 @@ int main() {
 // CHECK: defVarsMixed[0] = 123
 // CHECK-NEXT: defVarsMixed[1] = 456.789
 
-// CHECK-FIRST: [proteus][DispatcherHost] StorageCache rank 0 hits 0 accesses 5
-// CHECK-SECOND: [proteus][DispatcherHost] StorageCache rank 0 hits 5 accesses 5
+// CHECK: define {{.*}} @defVarPairVar
+// CHECK-DAG: %copy = alloca double
+// CHECK: defVarPairVar[0] = 3.14159
+
+// CHECK-FIRST: [proteus][DispatcherHost] StorageCache rank 0 hits 0 accesses 6
+// CHECK-SECOND: [proteus][DispatcherHost] StorageCache rank 0 hits 6 accesses 6
