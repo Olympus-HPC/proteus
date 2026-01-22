@@ -337,7 +337,7 @@ public:
   template <
       typename T, typename NameT,
       typename = std::enable_if_t<std::is_convertible_v<NameT, std::string>>>
-  Var<std::remove_const_t<T>> defVar(std::pair<T, NameT> P) {
+  Var<T> defVar(std::pair<T, NameT> P) {
     return defVar(P.first, std::string(P.second));
   }
 
