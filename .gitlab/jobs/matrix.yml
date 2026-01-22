@@ -51,5 +51,10 @@ variables:
     - rm -rf ${CI_BUILDS_DIR}
     - echo "=== End CI Build and Test==="
 
+.build-variants:
+  parallel:
+    matrix:
+      - PROTEUS_CI_BUILD_SHARED: ["on", "off"]
+
 build-and-test-matrix:
-  extends: [.base-job]
+  extends: [.base-job, .build-variants]

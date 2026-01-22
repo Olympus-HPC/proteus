@@ -49,11 +49,10 @@ add_library(proteus STATIC ${SOURCES})
 set(PROTEUS_TARGETS proteus)
 
 if(BUILD_SHARED)
-  if(PROTEUS_ENABLE_CUDA)
-    message(FATAL_ERROR "For CUDA, using libproteus as SHARED fails for device globals")
-  endif()
-
   add_library(proteus_shared SHARED ${SOURCES})
+  if(PROTEUS_ENABLE_CUDA)
+    set_target_properties(proteus_shared PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
+  endif()
   set_target_properties(proteus_shared PROPERTIES OUTPUT_NAME proteus)
   list(APPEND PROTEUS_TARGETS proteus_shared)
 endif()
@@ -167,8 +166,6 @@ if(PROTEUS_ENABLE_CUDA)
   endforeach()
   target_include_directories(proteusCore SYSTEM INTERFACE ${CUDAToolkit_INCLUDE_DIRS})
 
-  # list(APPEND libs CUDA::cuda_driver CUDA::cudart)
-  list(APPEND libs CUDA::cuda_driver CUDA::cudart_static)
   # TODO: update cmake requirement to > 3.26 to supports the nvPTXCompiler target.
   # list(APPEND libs CUDA::cuda_driver CUDA::cudart_static CUDA::nvptxcompiler_static)
   find_library(LIBNVPTXCOMPILER
@@ -215,9 +212,19 @@ message(STATUS "Found Clang libraries: ${clang_libs}")
 
 # Enclose linked libraries in a link group to avoid linker errors due to unresolved symbols.
 foreach(proteus_target ${PROTEUS_TARGETS})
+  set(device_rt_libs "")
+  if(PROTEUS_ENABLE_CUDA)
+    list(APPEND device_rt_libs CUDA::cuda_driver)
+    if(proteus_target STREQUAL "proteus_shared")
+      list(APPEND device_rt_libs CUDA::cudart) 
+    else()
+      list(APPEND device_rt_libs CUDA::cudart_static) 
+    endif()
+  endif()
+  
   target_link_libraries(${proteus_target} PRIVATE
     "$<$<PLATFORM_ID:Linux>:-Wl,--start-group>"
-    ${libs} ${clang_libs}
+    ${device_rt_libs} ${libs} ${clang_libs}
     "$<$<PLATFORM_ID:Linux>:-Wl,--end-group>"
     "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>"
   )
