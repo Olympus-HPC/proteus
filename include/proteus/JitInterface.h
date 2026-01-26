@@ -18,6 +18,7 @@
 #include <cassert>
 #include <cstring>
 #include <utility>
+#include <iostream>
 
 extern "C" void __jit_push_variable(proteus::RuntimeConstant RC);
 extern "C" void __jit_register_lambda(const char *Symbol);
@@ -97,6 +98,7 @@ template <typename T> inline static RuntimeConstantType convertCTypeToRCType() {
   } else if constexpr (std::is_pointer_v<T>) {
     return RuntimeConstantType::PTR;
   } else if constexpr (std::is_enum_v<T>) {
+    std::cout << "PRINTING SIZE OF UNDERLYING ENUM " << sizeof(T) << "\n";
     return RuntimeConstantType::ENUM;
   } else {
     return RuntimeConstantType::NONE;
@@ -107,6 +109,8 @@ template <typename T>
 static __attribute__((noinline)) T jit_variable(T V, int Pos = -1,
                                                 int Offset = -1) noexcept {
   RuntimeConstant RC{convertCTypeToRCType<T>(), Pos, Offset};
+  RC.BitWidth = sizeof(T);
+  RC.Signed = std::is_signed_v<T>;
   std::memcpy(static_cast<void *>(&RC), &V, sizeof(T));
   __jit_push_variable(RC);
 

@@ -10,7 +10,7 @@
 #include <cstdio>
 
 #include "gpu_common.h"
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 enum color { Red, Yellow, Green };
 
@@ -80,10 +80,10 @@ int main() {
 // clang-format off
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kerneli ArgNo 0 with value i32 42
 // CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
-// CHECK: Kernel 42
+// CHECK: Green
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kerneli ArgNo 0 with value i32 24
 // CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
-// CHECK: Kernel 24
+// CHECK: clang
 // CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 2
 // CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0

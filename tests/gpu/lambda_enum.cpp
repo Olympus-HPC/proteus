@@ -10,15 +10,30 @@
 #include <cstdio>
 
 #include "gpu_common.h"
-#include <proteus/JitInterface.hpp>
+#include <proteus/JitInterface.h>
 
 enum color { Red = 1, Yellow = 0, Green = -2 };
 
 enum class compiler { Clang, GCC, NVCC };
 
+enum class Small : uint8_t { 
+  A = 255,
+  B = 42,
+};
+
+enum class Flags : uint32_t {
+  None = 0,
+  HighBit = 0x80000000u
+};
+
 template <typename T>
 __global__ __attribute__((annotate("jit"))) void kernel(T LB) {
   LB();
+}
+
+__device__ void nativeEcho(Small v) {
+  // Should always truncate and treat as uint8_t
+  printf("VALUE %hhu\n", static_cast<uint8_t>(v));
 }
 
 template <typename T> void run(T &&LB) {
@@ -31,6 +46,11 @@ int main() {
   proteus::init();
   color Color = color::Green;
   compiler Compiler = compiler::Clang;
+  Small a = Small::A;
+  Small b = Small::B;
+  Flags f = Flags::HighBit;
+  bool native_negative =
+      static_cast<uint32_t>(f) < 0;  // always false
 
   auto color_lambda = [ =, Color = proteus::jit_variable(Color) ] __device__()
       __attribute__((annotate("jit"))) {
@@ -73,19 +93,31 @@ int main() {
     return;
   };
 
+  auto uint_lambda = [=, a = proteus::jit_variable(a), 
+    b = proteus::jit_variable(b)] __attribute__((annotate("jit"))) {
+    nativeEcho(a);
+    if (a > b) {
+      printf("Less than\n");
+    } 
+  };
+  // // constexpr uint64_t big_int = 1 << 63;
+  // auto flags_lambda = [=, f = proteus::jit_variable(f)] __attribute__((annotate("jit"))) {
+  //   if (uint32_t(f) > 0) {
+  //     printf("Less than\n");
+  //   }
+  // };
+  
   run(color_lambda);
   run(compiler_lambda);
+  run(uint_lambda);
+  //run(flags_lambda);
   proteus::finalize();
   return 0;
 }
 
 // clang-format off
-// CHECK-FIRST: [ArgSpec] Replaced Function _Z6kerneli ArgNo 0 with value i32 42
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
-// CHECK: Kernel 42
-// CHECK-FIRST: [ArgSpec] Replaced Function _Z6kerneli ArgNo 0 with value i32 24
-// CHECK-FIRST: [LaunchBoundSpec] MaxThreads 1 MinBlocksPerSM 0
-// CHECK: Kernel 24
+// CHECK: Green
+// CHECK: clang
 // CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 2
 // CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0

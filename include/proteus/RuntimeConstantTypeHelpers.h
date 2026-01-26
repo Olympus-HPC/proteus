@@ -14,8 +14,7 @@ namespace proteus {
 using namespace llvm;
 
 RuntimeConstantType convertTypeToRuntimeConstantType(Type *Ty);
-Type *convertRuntimeConstantTypeToLLVMType(RuntimeConstantType RCType,
-                                           LLVMContext &Ctx);
+
 inline std::string toString(const RuntimeConstantType RCType);
 
 inline RuntimeConstantType convertTypeToRuntimeConstantType(Type *Ty) {
@@ -46,30 +45,6 @@ inline RuntimeConstantType convertTypeToRuntimeConstantType(Type *Ty) {
   reportFatalError("Unknown Type " + TypeOstream.str());
 }
 
-inline Type *convertRuntimeConstantTypeToLLVMType(RuntimeConstantType RCType,
-                                                  LLVMContext &Ctx) {
-  switch (RCType) {
-  case RuntimeConstantType::BOOL:
-    return Type::getInt1Ty(Ctx);
-  case RuntimeConstantType::INT8:
-    return Type::getInt8Ty(Ctx);
-  case RuntimeConstantType::INT32:
-    return Type::getInt32Ty(Ctx);
-  case RuntimeConstantType::INT64:
-    return Type::getInt64Ty(Ctx);
-  case RuntimeConstantType::FLOAT:
-    return Type::getFloatTy(Ctx);
-  case RuntimeConstantType::DOUBLE:
-    return Type::getDoubleTy(Ctx);
-  case RuntimeConstantType::LONG_DOUBLE:
-    reportFatalError("Unsupported");
-  case RuntimeConstantType::PTR:
-    return PointerType::getUnqual(Ctx);
-  default:
-    reportFatalError("Unknown RuntimeConstantType " + toString(RCType));
-  }
-}
-
 inline size_t getSizeInBytes(RuntimeConstantType RCType) {
   switch (RCType) {
   case RuntimeConstantType::BOOL:
@@ -79,6 +54,7 @@ inline size_t getSizeInBytes(RuntimeConstantType RCType) {
   case RuntimeConstantType::INT32:
     return sizeof(int32_t);
   case RuntimeConstantType::INT64:
+  case RuntimeConstantType::ENUM:
     return sizeof(int64_t);
   case RuntimeConstantType::FLOAT:
     return sizeof(float);
@@ -101,6 +77,7 @@ template <typename T> T getValue(const RuntimeConstant &RC) {
   case RuntimeConstantType::INT32:
     return RC.Value.Int32Val;
   case RuntimeConstantType::INT64:
+  case RuntimeConstantType::ENUM:
     return RC.Value.Int64Val;
   case RuntimeConstantType::FLOAT:
     return RC.Value.FloatVal;
