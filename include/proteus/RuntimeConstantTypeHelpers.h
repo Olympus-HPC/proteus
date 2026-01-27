@@ -54,7 +54,6 @@ inline size_t getSizeInBytes(RuntimeConstantType RCType) {
   case RuntimeConstantType::INT32:
     return sizeof(int32_t);
   case RuntimeConstantType::INT64:
-  case RuntimeConstantType::ENUM:
     return sizeof(int64_t);
   case RuntimeConstantType::FLOAT:
     return sizeof(float);
@@ -77,7 +76,6 @@ template <typename T> T getValue(const RuntimeConstant &RC) {
   case RuntimeConstantType::INT32:
     return RC.Value.Int32Val;
   case RuntimeConstantType::INT64:
-  case RuntimeConstantType::ENUM:
     return RC.Value.Int64Val;
   case RuntimeConstantType::FLOAT:
     return RC.Value.FloatVal;
@@ -117,8 +115,6 @@ inline std::string toString(const RuntimeConstantType RCType) {
     return "ARRAY";
   case RuntimeConstantType::OBJECT:
     return "OBJECT";
-  case RuntimeConstantType::ENUM:
-    return "ENUM";
   default:
     reportFatalError("Unknown RCType " + std::to_string(RCType));
   }

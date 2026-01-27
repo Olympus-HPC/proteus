@@ -11,7 +11,6 @@
 #ifndef PROTEUS_TRANSFORM_LAMBDA_SPECIALIZATION_H
 #define PROTEUS_TRANSFORM_LAMBDA_SPECIALIZATION_H
 
-#include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Debug.h"
 #include "proteus/Utils.h"
@@ -44,13 +43,6 @@ inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
     return ConstantFP::get(ArgType, RC.Value.DoubleVal);
   case RuntimeConstantType::LONG_DOUBLE:
     return ConstantFP::get(ArgType, RC.Value.LongDoubleVal);
-  case RuntimeConstantType::ENUM: {
-    RuntimeConstant UnderlyingIntRC (RC);
-    UnderlyingIntRC.Type = getRuntimeConstantTypeFromBitWidth(RC.BitWidth, RC.Signed);
-    llvm::outs() << "BIT WIDTH " << RC.BitWidth;
-    llvm::outs() << UnderlyingIntRC.Type;
-    return getConstant(Ctx, ArgType, UnderlyingIntRC);
-  }
   case RuntimeConstantType::PTR: {
     auto *IntC = ConstantInt::get(Type::getInt64Ty(Ctx), RC.Value.Int64Val);
     return ConstantExpr::getIntToPtr(IntC, ArgType);

@@ -108,8 +108,6 @@ inline HashT hashArrayRefElement(const RuntimeConstant &RC) {
       return hashRuntimeConstantArray<float>(RC);
     case RuntimeConstantType::DOUBLE:
       return hashRuntimeConstantArray<double>(RC);
-    case RuntimeConstantType::ENUM:
-      return hashRuntimeConstantArray<int64_t>(RC);
     default:
       reportFatalError("Unsupported array element type: " +
                        toString(RC.ArrInfo.EltType));

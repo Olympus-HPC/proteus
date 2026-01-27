@@ -132,17 +132,6 @@ template <typename T> inline T getRuntimeConstantValue(void *Arg) {
   }
 }
 
-inline RuntimeConstantType getRuntimeConstantTypeFromBitWidth(uint8_t Width, bool Signed) {
-   if (Width == 1) {
-    return RuntimeConstantType::INT8;
-  } else if (Width == 4) {
-    return RuntimeConstantType::INT32;
-  } else if (Width == 8) {
-    return RuntimeConstantType::INT64;
-  } 
-  return RuntimeConstantType::NONE;
-}
-
 inline RuntimeConstant
 dispatchGetRuntimeConstantValue(void **Args,
                                 const RuntimeConstantInfo &RCInfo) {
@@ -180,15 +169,6 @@ dispatchGetRuntimeConstantValue(void **Args,
     PROTEUS_DBG(Logger::logs("proteus")
                 << "Value " << RC.Value.DoubleVal << "\n");
     break;
-  case RuntimeConstantType::ENUM: {
-    RuntimeConstantInfo UnderlyingIntInfo (getRuntimeConstantTypeFromBitWidth(RC.BitWidth, RC.Signed), RCInfo.ArgInfo.Pos);
-    PROTEUS_DBG(Logger::logs("proteus")
-                << "Fetching ENUM value ");
-    // The recursive call should handle the rest of the logging here.
-    RuntimeConstant UnderlyingIntRC  = dispatchGetRuntimeConstantValue(Args, UnderlyingIntInfo);
-    RC.Value = UnderlyingIntRC.Value;
-    break;
-  }
   case RuntimeConstantType::LONG_DOUBLE:
     // NOTE: long double on device should correspond to plain double.
     // XXX: CUDA with a long double SILENTLY fails to create a working

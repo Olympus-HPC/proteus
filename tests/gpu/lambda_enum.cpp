@@ -16,14 +16,14 @@ enum color { Red = 1, Yellow = 0, Green = -2 };
 
 enum class compiler { Clang, GCC, NVCC };
 
-enum class Small : uint8_t { 
+enum class Small : uint8_t {
   A = 255,
   B = 42,
 };
 
-enum class Flags : uint32_t {
+enum class Flags : uint64_t {
   None = 0,
-  HighBit = 0x80000000u
+  HighBit = 0xffffffffffffffff,
 };
 
 template <typename T>
@@ -33,7 +33,14 @@ __global__ __attribute__((annotate("jit"))) void kernel(T LB) {
 
 __device__ void nativeEcho(Small v) {
   // Should always truncate and treat as uint8_t
-  printf("VALUE %hhu\n", static_cast<uint8_t>(v));
+  switch (v) {
+  case Small::A:
+    printf("A\n");
+    break;
+  case Small::B:
+    printf("B\n");
+    break;
+  }
 }
 
 template <typename T> void run(T &&LB) {
@@ -49,8 +56,7 @@ int main() {
   Small a = Small::A;
   Small b = Small::B;
   Flags f = Flags::HighBit;
-  bool native_negative =
-      static_cast<uint32_t>(f) < 0;  // always false
+  bool native_negative = static_cast<uint32_t>(f) < 0; // always false
 
   auto color_lambda = [ =, Color = proteus::jit_variable(Color) ] __device__()
       __attribute__((annotate("jit"))) {
@@ -93,24 +99,39 @@ int main() {
     return;
   };
 
-  auto uint_lambda = [=, a = proteus::jit_variable(a), 
-    b = proteus::jit_variable(b)] __attribute__((annotate("jit"))) {
+  auto uint_lambda =
+      [ =, a = proteus::jit_variable(a), b = proteus::jit_variable(b) ]
+      __attribute__((annotate("jit"))) {
     nativeEcho(a);
+    nativeEcho(b);
     if (a > b) {
       printf("Less than\n");
-    } 
+    }
+  };
+
+  auto flags_lambda = [=, f = proteus::jit_variable(f)] {
+    int64_t max_signed = std::numeric_limits<int64_t>::max();
+    printf("max signed %ld \n", max_signed);
+    if ((uint64_t)f > (uint64_t)max_signed) {
+      printf("no narrowing occurred %lu", f);
+    } else {
+      printf("narrowing occurred %lu", f);
+    }
   };
   // // constexpr uint64_t big_int = 1 << 63;
-  // auto flags_lambda = [=, f = proteus::jit_variable(f)] __attribute__((annotate("jit"))) {
+  // auto flags_lambda = [=, f = proteus::jit_variable(f)]
+  // __attribute__((annotate("jit"))) {
   //   if (uint32_t(f) > 0) {
   //     printf("Less than\n");
   //   }
   // };
-  
-  run(color_lambda);
-  run(compiler_lambda);
+
+  // run(color_lambda);
+  // run(compiler_lambda);
   run(uint_lambda);
-  //run(flags_lambda);
+  printf("expected  %lu", f);
+  run(flags_lambda);
+  // run(flags_lambda);
   proteus::finalize();
   return 0;
 }

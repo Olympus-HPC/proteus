@@ -17,6 +17,8 @@
 
 namespace proteus {
 
+// We don't have a proper ENUM type because we just explicity use the underlying
+// integral type
 enum RuntimeConstantType : int32_t {
   BEGIN,
   NONE = 0,
@@ -27,7 +29,6 @@ enum RuntimeConstantType : int32_t {
   FLOAT,
   DOUBLE,
   LONG_DOUBLE,
-  ENUM,
   PTR,
   STATIC_ARRAY,
   VECTOR,
@@ -75,8 +76,6 @@ struct RuntimeConstant {
   RuntimeConstantType Type;
   int32_t Pos;
   int32_t Offset;
-  uint8_t BitWidth;
-  bool Signed;
 
   ArrayInfo ArrInfo{0, RuntimeConstantType::NONE, nullptr};
   ObjectInfo ObjInfo{0, false, nullptr};
