@@ -222,8 +222,10 @@ foreach(proteus_target ${PROTEUS_TARGETS})
     "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>"
   )
 
+  # Use a version script to hide internal symbols, especially from LLVM static
+  # libraries, on Linux.
   if(UNIX AND NOT APPLE)
-    target_link_options(proteus_target PRIVATE "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
+    target_link_options(${proteus_target} PRIVATE "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
   endif()
 
   target_compile_definitions(${proteus_target} PRIVATE PROTEUS_CLANGXX_BIN="${CLANGXX}")
