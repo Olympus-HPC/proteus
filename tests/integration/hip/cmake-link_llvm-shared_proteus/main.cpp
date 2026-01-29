@@ -13,10 +13,9 @@ __attribute__((annotate("jit"))) __global__ void kernel() {
 
 int main() {
   proteus::init();
-  llvm::InitializeAllTargets();
-  llvm::InitializeAllTargetMCs();
-  llvm::InitializeAllAsmPrinters();
-  llvm::cl::ResetAllOptionOccurrences();
+  LLVMInitializeAMDGPUTarget();
+  LLVMInitializeAMDGPUTargetMC();
+  LLVMInitializeAMDGPUAsmPrinter();
   kernel<<<1, 1>>>();
 
   proteus::finalize();
