@@ -1,9 +1,11 @@
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/TargetSelect.h"
-#include <hip/hip_runtime.h>
-#include <stdio.h>
+#include <proteus/JitInterface.h>
 
-#include <proteus/JitInterface.hpp>
+#include <llvm/Support/CommandLine.h>
+#include <llvm/Support/TargetSelect.h>
+
+#include <hip/hip_runtime.h>
+
+#include <stdio.h>
 
 __attribute__((annotate("jit"))) __global__ void kernel() {
   printf("kernel\n");
