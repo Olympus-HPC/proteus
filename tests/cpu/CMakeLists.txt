@@ -26,7 +26,9 @@ function(CREATE_CPU_TEST exe check_source)
         $<LINK_ONLY:-rdynamic>
     )
 
-    add_test(NAME ${exe} COMMAND ${LIT} -vv -D FILECHECK=${FILECHECK} ${check_source})
+    # Provide an explicit %ext substitution so LIT RUN lines like
+    # `%build/<test>.%ext` resolve to the built executable.
+    add_test(NAME ${exe} COMMAND ${LIT} -vv -D EXT=${CMAKE_EXECUTABLE_SUFFIX} -D FILECHECK=${FILECHECK} -D EXE=${exe} ${check_source})
     set_tests_properties(${exe} PROPERTIES LABELS "cpu")
 endfunction()
 
@@ -49,7 +51,11 @@ exec_root = tempfile.mkdtemp(prefix='lit.tmp.', dir='${CMAKE_CURRENT_BINARY_DIR}
 config.test_exec_root = exec_root
 atexit.register(lambda: shutil.rmtree(exec_root, ignore_errors=False))
 
+ext = lit_config.params['EXT']
+exe = lit_config.params['EXE']
 FILECHECK = lit_config.params['FILECHECK']
+config.substitutions.append(('%ext', ext))
+config.substitutions.append(('%exe', exe))
 config.substitutions.append(('%FILECHECK', FILECHECK))
 config.substitutions.append(('%target_arch', platform.machine()))
 config.substitutions.append(('%build', '${CMAKE_CURRENT_BINARY_DIR}'))
@@ -66,6 +72,10 @@ CREATE_CPU_TEST(lambda lambda.cpp)
 CREATE_CPU_TEST(lambda_def lambda_def.cpp)
 CREATE_CPU_TEST(lambda_multiple lambda_multiple.cpp)
 CREATE_CPU_TEST(lambda_multiple_api lambda_multiple_api.cpp)
+CREATE_CPU_TEST(lambda_written_captures lambda_written_captures.cpp)
+CREATE_CPU_TEST(lambda_auto_readonly lambda_auto_readonly.cpp)
+CREATE_CPU_TEST(lambda_mixed_captures lambda_mixed_captures.cpp)
+CREATE_CPU_TEST(lambda_pointer_captures lambda_pointer_captures.cpp)
 CREATE_CPU_TEST(types_jit_array types_jit_array.cpp)
 CREATE_CPU_TEST(dynamic_jit_array dynamic_jit_array.cpp)
 CREATE_CPU_TEST(jit_struct jit_struct.cpp)
