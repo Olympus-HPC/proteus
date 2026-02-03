@@ -20,7 +20,8 @@
 #include <cstring>
 #include <utility>
 
-extern "C" void __jit_push_variable(proteus::RuntimeConstant RC);
+extern "C" void __jit_register_variable(proteus::RuntimeConstant RC,
+                                        const char *AssociatedLambda);
 extern "C" void __jit_register_lambda(const char *Symbol);
 
 namespace proteus {
@@ -95,11 +96,12 @@ template <typename T> inline static RuntimeConstantType convertCTypeToRCType() {
 }
 
 template <typename T>
-static __attribute__((noinline)) T jit_variable(T V, int Pos = -1,
-                                                int Offset = -1) noexcept {
+static __attribute__((noinline)) T
+jit_variable(T V, int Pos = -1, int Offset = -1,
+             const char *AssociatedLambda = "") noexcept {
   RuntimeConstant RC{convertCTypeToRCType<T>(), Pos, Offset};
   std::memcpy(static_cast<void *>(&RC), &V, sizeof(T));
-  __jit_push_variable(RC);
+  __jit_register_variable(RC, AssociatedLambda);
 
   return V;
 }
