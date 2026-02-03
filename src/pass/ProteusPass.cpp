@@ -137,7 +137,7 @@ public:
     instrumentRegisterFunction(M);
 
     findJitVariables(M);
-    instrumentRegisterJitVariablesWithLambda(M);
+    instrumentRegisterJitVariablesWithLambda(M, StubToKernelMap);
     registerLambdaFunctions(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
@@ -166,7 +166,7 @@ public:
 
     if (verifyModule(M, &errs()))
       reportFatalError("Broken original module found, compilation aborted!");
-llvm::outs()<<M;
+    llvm::outs() << M;
     return true;
   }
 
@@ -1241,44 +1241,42 @@ private:
     }
   }
 
-  auto instrumentRegisterJitVariablesWithLambda(Module& M) {
-
-    llvm::SmallVector<CallBase*, 16> JitVarFunctions;
-    llvm::DenseSet<Value*> Discovered;
-    llvm::DenseMap<CallBase*,  Type*> CallBaseToLambda;
+  void instrumentRegisterJitVariablesWithLambda(
+      Module &M, const DenseMap<Value *, GlobalVariable *> &StubToKernelMap) {
+    llvm::SmallVector<CallBase *, 16> JitVarFunctions;
+    llvm::DenseMap<CallBase *, Type *> CallBaseToLambda;
     for (auto &F : M.getFunctionList()) {
       std::string DemangledName = demangle(F.getName().str());
       if (StringRef{DemangledName}.contains("proteus::jit_variable")) {
-        // JitVarFunctions.push_back(&F);
-        for (User* Usr : F.users()) {
-          if (CallBase *CB = dyn_cast<CallBase>(Usr))  {
-            JitVarFunctions.push_back(CB); 
+        for (User *Usr : F.users()) {
+          if (CallBase *CB = dyn_cast<CallBase>(Usr)) {
+            JitVarFunctions.push_back(CB);
           }
         }
       }
     }
-    
-    for (CallBase* CB : JitVarFunctions) {
-      // traverse use-def from each callsite, the CB value will be used by the allocated
-      // lambda class.
-      std::queue<Value*> WorkList;
+
+    for (CallBase *CB : JitVarFunctions) {
+      // traverse use-def from each callsite, the CB value will be used by the
+      // allocated lambda class.
+      std::queue<Value *> WorkList;
+      llvm::DenseSet<Value *> Discovered;
       WorkList.push(CB);
-      for (User* Usr : CB->users()) {
+      for (User *Usr : CB->users()) {
         WorkList.push(Usr);
       }
       while (!JitVarFunctions.empty()) {
-        Value* Val = WorkList.front();
+        Value *Val = WorkList.front();
         WorkList.pop();
-        if (Discovered.contains(Val)) 
+        if (Discovered.contains(Val))
           continue;
         Discovered.insert(Val);
-        assert(Val && "Expected non null value?\n");
         // gep
-        if (GetElementPtrInst* GEP = dyn_cast<GetElementPtrInst>(Val)) {
+        if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(Val)) {
           WorkList.push(GEP->getPointerOperand());
         }
         // store. E.G. to the first field of a lambda class
-        if (StoreInst* Store = dyn_cast<StoreInst>(Val)) {
+        if (StoreInst *Store = dyn_cast<StoreInst>(Val)) {
           WorkList.push(Store->getPointerOperand());
         }
         // load
@@ -1286,9 +1284,11 @@ private:
         //   WorkList.push(Store->getPointerOperand());
         // }
         // alloca
-        if (AllocaInst* Alloc = dyn_cast<AllocaInst>(Val)) {
-          if (StructType* LambdaType = dyn_cast<StructType>(Alloc->getAllocatedType())) {
-            llvm::outs()<<"FOUND LAMBDA " << *LambdaType << " associated with " << *CB << "\n";
+        if (AllocaInst *Alloc = dyn_cast<AllocaInst>(Val)) {
+          if (StructType *LambdaType =
+                  dyn_cast<StructType>(Alloc->getAllocatedType())) {
+            llvm::outs() << "FOUND LAMBDA " << *LambdaType
+                         << " associated with " << *CB << "\n";
             // We found the allocation site for the lambda
             CallBaseToLambda[CB] = LambdaType;
             break;
@@ -1296,15 +1296,29 @@ private:
         }
       }
     }
-    
-    // print out the results
-    for (const auto& [CB, LambdaType] : CallBaseToLambda) {
-      llvm::outs() << "ASSOCIATING JIT VAR " << *CB << " WITH " << *LambdaType  << "\n";
+
+    // convert to demangled op name
+    for (const auto &[CB, LambdaType] : CallBaseToLambda) {
+      for (auto &[Val, _] : StubToKernelMap) {
+        Function *Func = dyn_cast<Function>(Val);
+        for (BasicBlock &BB : *Func) {
+          for (Instruction &I : BB) {
+            if (auto *Alloc = dyn_cast<AllocaInst>(&I);
+                Alloc && Alloc->getAllocatedType() == LambdaType) {
+              std::string DemangledName = demangle(Func->getName().str());
+              StringRef DemangledLambdaType =
+                  parseLambdaType(DemangledName, "__device_stub__kernel");
+              IRBuilder<> Builder(CB);
+              auto *LambdaNameGlobal =
+                  Builder.CreateGlobalString(DemangledLambdaType);
+              CB->setArgOperand(3, LambdaNameGlobal);
+            }
+          }
+        }
+      }
     }
-    
-    return CallBaseToLambda;
   }
-  
+
   void findJitVariables(Module &M) {
     DEBUG(Logger::logs("proteus-pass") << "finding jit variables" << "\n");
     DEBUG(Logger::logs("proteus-pass") << "users..." << "\n");
@@ -1380,13 +1394,17 @@ private:
     }
   }
 
-  StringRef parseLambdaType(StringRef DemangledName) {
+  // Parse the lambda name from the template parameters of a function template
+  // E.G. given "Haystack<Needle>" as DemangledName and "Haystack" as
+  // FuncTemplateName return "Needle"
+  StringRef parseLambdaType(StringRef DemangledName,
+                            const char *FuncTemplateName) {
     int L = -1;
     int R = -1;
     int Level = 0;
     // Start after the function symbol to avoid parsing its templated return
     // type.
-    size_t Start = DemangledName.find("proteus::register_lambda");
+    size_t Start = DemangledName.find(FuncTemplateName);
     for (size_t I = Start, E = DemangledName.size(); I < E; ++I) {
       const char C = DemangledName[I];
       if (C == '<') {
@@ -1410,13 +1428,11 @@ private:
       R--;
     // Slicing returns characters [Start, End).
     return DemangledName.slice(L + 1, R);
-    ;
   }
 
   void registerLambdaFunctions(Module &M) {
     DEBUG(Logger::logs("proteus-pass")
           << "registering lambda functions" << "\n");
-    const auto& JitVariableTo
     SmallVector<Function *, 16> LambdaFunctions;
     for (auto &F : M.getFunctionList()) {
       if (StringRef{demangle(F.getName().str())}.contains(
@@ -1427,7 +1443,8 @@ private:
 
     for (auto *Function : LambdaFunctions) {
       auto DemangledName = llvm::demangle(Function->getName().str());
-      StringRef LambdaType = parseLambdaType(DemangledName);
+      StringRef LambdaType =
+          parseLambdaType(DemangledName, "proteus::register_lambda");
 
       DEBUG(Logger::logs("proteus-pass")
             << Function->getName() << " " << DemangledName << " " << LambdaType
