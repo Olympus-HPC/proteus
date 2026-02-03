@@ -1,8 +1,14 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
+<<<<<<< HEAD
 // RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="specialization;cache-stats" %build/lambda_spec_test | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
 // RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="specialization;cache-stats" %build/lambda_spec_test | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+=======
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="specialization" %build/lambda_spec_test | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// Second run uses the object cache.
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="specialization" %build/lambda_spec_test | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+>>>>>>> 68c6d3c (Working)
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
@@ -10,28 +16,50 @@
 
 #include <proteus/JitInterface.h>
 
+<<<<<<< HEAD
 template <typename LambdaType> class Abstraction {
 public:
   LambdaType Lambda;
   Abstraction(const LambdaType &Lam) : Lambda(Lam){};
   auto operator()() { return Lambda(); }
+=======
+template<typename LambdaType>
+class Abstraction {
+  public:
+  LambdaType Lambda;
+  Abstraction(const LambdaType& Lam) : Lambda(Lam) {};
+  auto operator()() {
+    return Lambda();
+  }
+>>>>>>> 68c6d3c (Working)
 };
 
 void printInt(int I) { printf("Integer = %d\n", I); }
 
 template <typename T> void run(T &&LB) {
   proteus::register_lambda(LB);
+<<<<<<< HEAD
   Abstraction<T> Abs(LB);
   run2(Abs);
 }
 
 template <typename T> void run2(T &&LB) { LB(); }
+=======
+  Abstraction<T> Abs (LB) ;
+  run2(Abs);
+}
+
+template<typename T> void run2(T&& LB) {
+  LB();
+}
+>>>>>>> 68c6d3c (Working)
 
 int main() {
   int Zero = 0;
   int One = 1;
   int Two = 2;
 
+<<<<<<< HEAD
   auto ZeroLambda = [ =, C = proteus::jit_variable(Zero) ]()
       __attribute__((annotate("jit"))) {
     printInt(C);
@@ -46,6 +74,16 @@ int main() {
       [ =, C = proteus::jit_variable(Two) ]() __attribute__((annotate("jit"))) {
     printInt(C);
   };
+=======
+  auto ZeroLambda = [=, C = proteus::jit_variable(Zero)] ()
+                         __attribute__((annotate("jit"))) { printInt(C); };
+
+  auto OneLambda = [=, C = proteus::jit_variable(One)] ()
+                        __attribute__((annotate("jit"))) { printInt(C); };
+
+  auto TwoLambda = [=, C = proteus::jit_variable(Two)] ()
+                        __attribute__((annotate("jit"))) { printInt(C); };
+>>>>>>> 68c6d3c (Working)
 
   run(ZeroLambda);
   run(OneLambda);

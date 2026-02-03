@@ -109,7 +109,7 @@ jit_variable(T V, int Pos = -1, int Offset = -1,
 }
 
 template <typename T>
-static __attribute__((noinline)) T &&
+static __attribute__((noinline)) T&&
 register_lambda(T &&t, const char *Symbol = "") noexcept {
   assert(Symbol && "Expected non-null Symbol");
   __jit_register_lambda(Symbol);

@@ -122,10 +122,10 @@ public:
     // and return.
     if (isDeviceCompilation(M)) {
       emitJitModuleDevice(M, IsLTO);
-      // llvm::outs()<<M;
+
       return true;
     }
-
+    llvm::outs() << M;
     // ================
     // Host compilation
     // ================
@@ -166,7 +166,7 @@ public:
 
     if (verifyModule(M, &errs()))
       reportFatalError("Broken original module found, compilation aborted!");
-llvm::outs()<<M;
+
     return true;
   }
 
@@ -1271,6 +1271,10 @@ private:
     }
 
     for (CallBase *CB : JitVarCallsites) {
+<<<<<<< HEAD
+=======
+      llvm::outs() << "JIT VAR CALLSITE "<< *CB<<"\n";
+>>>>>>> 68c6d3c (Working)
       // traverse use-def from each callsite, the CB value will be used by the
       // allocated lambda class.
       std::queue<Value *> WorkList;
@@ -1291,6 +1295,15 @@ private:
         } else if (StoreInst *Store = dyn_cast<StoreInst>(Val)) {
           // store. E.G. to the first field of a lambda class
           WorkList.push(Store->getPointerOperand());
+        } else if (ReturnInst *Ret = dyn_cast<ReturnInst>(Val)) {
+          Function* ParentFunction = Ret->getFunction();
+          for (auto* Usr : ParentFunction->users()) {
+            WorkList.push(Usr);
+          }
+        } else if (CallBase *NestedCB = dyn_cast<CallBase>(Val)) {
+          for (User *Usr : NestedCB->users()) {
+            WorkList.push(Usr);
+          }
         } else if (AllocaInst *Alloc = dyn_cast<AllocaInst>(Val)) {
           // alloca
           StructType *LambdaType =
@@ -1298,8 +1311,14 @@ private:
           if (!LambdaType)
             continue;
           // We found the allocation site for the lambda
+          // TODO(JB) is it possible for one lambda factory function to declare lambdas of differing LLVM types?
+          // what about
+          // auto declareLambda(int runtimeConst) {
+          // return [=, C = proteus::jit_variable(runtimeConst)] ()
+          //                        __attribute__((annotate("jit"))) { printInt(C); };
+          // answer no, differing return types. phew
           CallBaseToLambda[CB] = LambdaType;
-          break;
+
         }
       }
     }
@@ -1344,10 +1363,12 @@ private:
       if (It == LambdaTypeToGlobalName.end())
         reportFatalError("Failed to find the lambda association info");
       CB->setArgOperand(3, It->second);
+      llvm::outs() << "Associating " << *CB << " with lambda type " << *LambdaType<<"\n";
     }
   }
 
-  /// findJitVariables modifies calls to proteus::jit_variable by injecting
+  /// findJitVariables modifies calls to proteus::jit_variable by injecting the corresponding
+  /// lambda name into the callsite
   void findJitVariables(Module &M) {
     DEBUG(Logger::logs("proteus-pass") << "finding jit variables" << "\n");
     DEBUG(Logger::logs("proteus-pass") << "users..." << "\n");
@@ -1360,66 +1381,65 @@ private:
         JitFunctions.push_back(&F);
       }
     }
-
-    auto FindStorePtr = [&](CallBase *CB) {
-      // Find the store instruction user of the JitVariableCB to extract the
-      // pointer to the lambda anonymous class object.
-      Value *Ptr = nullptr;
-      Value *V = CB;
-      while (!Ptr) {
-        if (!V->hasOneUser())
-          reportFatalError("Expected single user");
-
-        StoreInst *S = dyn_cast<StoreInst>(*(V->users().begin()));
-        if (S) {
-          DEBUG(Logger::logs("proteus-pass") << "store: " << *S << "\n");
-          Ptr = S->getPointerOperand();
-          break;
-        }
-
-        // Recurse to the next user.
-        V = *V->users().begin();
-      }
-
-      return Ptr;
-    };
-
+    // store jitvariablecb to list of all alloca
+    // alloca to GEP and Store
+    // for each alloca, create a call to jit_variable
+    // replace the store value operand or GEP assignment value with the new jit_variable call
     for (auto *Function : JitFunctions) {
       for (auto *User : Function->users()) {
-        CallBase *CB = dyn_cast<CallBase>(User);
-        if (!CB)
+        CallBase *JitVariableCB = dyn_cast<CallBase>(User);
+
+        if (!JitVariableCB)
           reportFatalError(
               "Expected CallBase as user of proteus::jit_variable function");
-
-        DEBUG(Logger::logs("proteus-pass") << "call: " << *CB << "\n");
-
-        Value *V = FindStorePtr(CB);
-
-        GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(V);
-        if (GEP) {
-          DEBUG(Logger::logs("proteus-pass") << "gep: " << *GEP << "\n");
-          auto *Slot = GEP->getOperand(GEP->getNumOperands() - 1);
-          DEBUG(Logger::logs("proteus-pass") << "slot: " << *Slot << "\n");
-          CB->setArgOperand(1, Slot);
-          auto *GEPTy = GEP->getSourceElementType();
-          StructType *STy = dyn_cast<StructType>(GEPTy);
-          if (!STy)
-            reportFatalError("Expected struct type for lambda");
-          const StructLayout *SL = M.getDataLayout().getStructLayout(STy);
-          ConstantInt *SlotC = dyn_cast<ConstantInt>(Slot);
-          if (!SlotC)
-            reportFatalError("Expected constant slot");
-          auto Offset = SL->getElementOffset(SlotC->getZExtValue());
-          Constant *OffsetCI = ConstantInt::get(Types.Int32Ty, Offset);
-          CB->setArgOperand(2, OffsetCI);
-        } else {
-          DEBUG(Logger::logs("proteus-pass")
-                << "no gep, assuming slot 0" << "\n");
-          Constant *C = ConstantInt::get(Types.Int32Ty, 0);
-          CB->setArgOperand(1, C);
-          CB->setArgOperand(2, C);
-        }
-      }
+        std::queue<Value *> WorkList;
+        WorkList.push(JitVariableCB);
+        int i = 0;
+        DEBUG(Logger::logs("proteus-pass") << "call: " << *JitVariableCB << "\n");
+        while (!WorkList.empty()) {
+          Value *V = WorkList.front();
+          WorkList.pop();
+          ++i;
+          llvm::outs() << i << " : " << *V <<"\n";
+          if (CallBase *CB = dyn_cast<CallBase>(V)) {
+            for (auto *Usr : CB->users())
+              WorkList.push(Usr);
+          } else if (StoreInst *Store = dyn_cast<StoreInst>(V)) {
+            // two cases: (1) either stored directly to struct (zero index)
+            if (auto* Alloca = dyn_cast<AllocaInst>(Store->getPointerOperand())) {
+              DEBUG(Logger::logs("proteus-pass")
+                  << "no gep, assuming slot 0" << "\n");
+              Constant *C = ConstantInt::get(Types.Int32Ty, 0);
+              JitVariableCB->setArgOperand(1, C);
+              JitVariableCB->setArgOperand(2, C);
+            // (2) either get element pointer, or further indirection
+            } else {
+              WorkList.push(Store->getPointerOperand());
+            }
+          } else if (ReturnInst *Ret = dyn_cast<ReturnInst>(V)) {
+            auto *ParentFunction = Ret->getFunction();
+            for (auto *Usr : ParentFunction->users())
+              if (CallBase *CB = dyn_cast<CallBase>(Usr))
+                WorkList.push(CB);
+          } else if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(V)) {
+            DEBUG(Logger::logs("proteus-pass") << "gep: " << *GEP << "\n");
+            auto *Slot = GEP->getOperand(GEP->getNumOperands() - 1);
+            DEBUG(Logger::logs("proteus-pass") << "slot: " << *Slot << "\n");
+            JitVariableCB->setArgOperand(1, Slot);
+            auto *GEPTy = GEP->getSourceElementType();
+            StructType *STy = dyn_cast<StructType>(GEPTy);
+            if (!STy)
+              reportFatalError("Expected struct type for lambda");
+            const StructLayout *SL = M.getDataLayout().getStructLayout(STy);
+            ConstantInt *SlotC = dyn_cast<ConstantInt>(Slot);
+            if (!SlotC)
+              reportFatalError("Expected constant slot");
+            auto Offset = SL->getElementOffset(SlotC->getZExtValue());
+            Constant *OffsetCI = ConstantInt::get(Types.Int32Ty, Offset);
+            JitVariableCB->setArgOperand(2, OffsetCI);
+          }
+        } //while
+      } //for function users
     }
   }
 

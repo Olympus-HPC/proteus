@@ -1,8 +1,14 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
+<<<<<<< HEAD
 // RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_TRACE_OUTPUT="specialization;cache-stats" %build/lambda_spec_test.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
 // RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_TRACE_OUTPUT="specialization;cache-stats" %build/lambda_spec_test.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+=======
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_TRACE_OUTPUT="specialization" %build/lambda_spec_test.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// Second run uses the object cache.
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_TRACE_OUTPUT="specialization" %build/lambda_spec_test.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+>>>>>>> 68c6d3c (Working)
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
@@ -30,6 +36,7 @@ int main() {
   int One = 1;
   int Two = 2;
 
+<<<<<<< HEAD
   auto ZeroLambda = [ =, C = proteus::jit_variable(Zero) ]()
       __attribute__((annotate("jit"))) {
     printInt(C);
@@ -44,6 +51,16 @@ int main() {
       [ =, C = proteus::jit_variable(Two) ]() __attribute__((annotate("jit"))) {
     printInt(C);
   };
+=======
+  auto ZeroLambda = [=, C = proteus::jit_variable(Zero)] ()
+                         __attribute__((annotate("jit"))) { printInt(C); };
+
+  auto OneLambda = [=, C = proteus::jit_variable(One)] ()
+                        __attribute__((annotate("jit"))) { printInt(C); };
+
+  auto TwoLambda = [=, C = proteus::jit_variable(Two)] ()
+                        __attribute__((annotate("jit"))) { printInt(C); };
+>>>>>>> 68c6d3c (Working)
 
   run(ZeroLambda);
   run(OneLambda);

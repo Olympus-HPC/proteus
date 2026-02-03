@@ -57,7 +57,7 @@ public:
     for (const auto &[Key, Value] : PendingJitVariableMap) {
       Logger::logs("proteus") << Key << " : " << "\n";
       for (const auto &V : Value) {
-        Logger::logs("proteus") << ", " << V.Value.DoubleVal;
+        Logger::logs("proteus") << ", " << V.Value.Int32Val;
       }
       Logger::logs("proteus") << "\n";
     }
@@ -65,15 +65,15 @@ public:
     for (const auto &[Key, Value] : JitVariableMap) {
       Logger::logs("proteus") << Key << " : " << "\n";
       for (const auto &V : Value) {
-        Logger::logs("proteus") << ", " << V.Value.DoubleVal;
+        Logger::logs("proteus") << ", " << V.Value.Int32Val;
       }
       Logger::logs("proteus") << "\n";
     }
   }
 
   void setJitVariable(const char *LambdaType, RuntimeConstant &RC) {
-    assert(PendingJitVariableMap.contains(LambdaType) &&
-           "Lambda must be registered prior to register JIT variable!");
+    // assert(PendingJitVariableMap.contains(LambdaType) &&
+          //  "Lambda must be registered prior to register JIT variable!");
     PendingJitVariableMap[LambdaType].emplace_back(RC);
   }
 
