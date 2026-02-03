@@ -30,8 +30,9 @@ __jit_entry(char *FnName, char *IR, int IRSize, void **Args,
   return JitFnPtr;
 }
 
-extern "C" __attribute__((used)) void __jit_push_variable(RuntimeConstant RC) {
-  LambdaRegistry::instance().pushJitVariable(RC);
+extern "C" __attribute__((used)) void
+__jit_register_variable(RuntimeConstant RC, const char *LambdaName) {
+  LambdaRegistry::instance().setJitVariable(LambdaName, RC);
 }
 
 extern "C" __attribute__((used)) void
