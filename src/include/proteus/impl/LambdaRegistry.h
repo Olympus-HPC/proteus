@@ -67,6 +67,10 @@ public:
     // values for the lambda definition have not changed.
     if (!PendingJitVariables.empty()) {
       JitVariableMap[LambdaTypeRef] = PendingJitVariables;
+      llvm::outs() << "printing variables for ref " << LambdaTypeRef << "\n";
+      for (auto& var : PendingJitVariables) {
+        llvm::outs() << var.Value.Int32Val << "\n";
+      }
       PendingJitVariables.clear();
     }
   }

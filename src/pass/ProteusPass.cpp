@@ -80,6 +80,7 @@
 #include <llvm/Transforms/Utils/Cloning.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
+#include <queue>
 #include <string>
 
 using namespace llvm;
@@ -121,7 +122,7 @@ public:
     // and return.
     if (isDeviceCompilation(M)) {
       emitJitModuleDevice(M, IsLTO);
-
+      // llvm::outs()<<M;
       return true;
     }
 
@@ -136,6 +137,7 @@ public:
     instrumentRegisterFunction(M);
 
     findJitVariables(M);
+    instrumentRegisterJitVariablesWithLambda(M);
     registerLambdaFunctions(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
@@ -164,7 +166,7 @@ public:
 
     if (verifyModule(M, &errs()))
       reportFatalError("Broken original module found, compilation aborted!");
-
+llvm::outs()<<M;
     return true;
   }
 
@@ -1239,6 +1241,70 @@ private:
     }
   }
 
+  auto instrumentRegisterJitVariablesWithLambda(Module& M) {
+
+    llvm::SmallVector<CallBase*, 16> JitVarFunctions;
+    llvm::DenseSet<Value*> Discovered;
+    llvm::DenseMap<CallBase*,  Type*> CallBaseToLambda;
+    for (auto &F : M.getFunctionList()) {
+      std::string DemangledName = demangle(F.getName().str());
+      if (StringRef{DemangledName}.contains("proteus::jit_variable")) {
+        // JitVarFunctions.push_back(&F);
+        for (User* Usr : F.users()) {
+          if (CallBase *CB = dyn_cast<CallBase>(Usr))  {
+            JitVarFunctions.push_back(CB); 
+          }
+        }
+      }
+    }
+    
+    for (CallBase* CB : JitVarFunctions) {
+      // traverse use-def from each callsite, the CB value will be used by the allocated
+      // lambda class.
+      std::queue<Value*> WorkList;
+      WorkList.push(CB);
+      for (User* Usr : CB->users()) {
+        WorkList.push(Usr);
+      }
+      while (!JitVarFunctions.empty()) {
+        Value* Val = WorkList.front();
+        WorkList.pop();
+        if (Discovered.contains(Val)) 
+          continue;
+        Discovered.insert(Val);
+        assert(Val && "Expected non null value?\n");
+        // gep
+        if (GetElementPtrInst* GEP = dyn_cast<GetElementPtrInst>(Val)) {
+          WorkList.push(GEP->getPointerOperand());
+        }
+        // store. E.G. to the first field of a lambda class
+        if (StoreInst* Store = dyn_cast<StoreInst>(Val)) {
+          WorkList.push(Store->getPointerOperand());
+        }
+        // load
+        // if (LoadInst* Load = dyn_cast<LoadInst>(Val)) {
+        //   WorkList.push(Store->getPointerOperand());
+        // }
+        // alloca
+        if (AllocaInst* Alloc = dyn_cast<AllocaInst>(Val)) {
+          if (StructType* LambdaType = dyn_cast<StructType>(Alloc->getAllocatedType())) {
+            llvm::outs()<<"FOUND LAMBDA " << *LambdaType << " associated with " << *CB << "\n";
+            // We found the allocation site for the lambda
+            CallBaseToLambda[CB] = LambdaType;
+            break;
+          }
+        }
+      }
+    }
+    
+    // print out the results
+    for (const auto& [CB, LambdaType] : CallBaseToLambda) {
+      llvm::outs() << "ASSOCIATING JIT VAR " << *CB << " WITH " << *LambdaType  << "\n";
+    }
+    
+    return CallBaseToLambda;
+  }
+  
   void findJitVariables(Module &M) {
     DEBUG(Logger::logs("proteus-pass") << "finding jit variables" << "\n");
     DEBUG(Logger::logs("proteus-pass") << "users..." << "\n");
@@ -1350,7 +1416,7 @@ private:
   void registerLambdaFunctions(Module &M) {
     DEBUG(Logger::logs("proteus-pass")
           << "registering lambda functions" << "\n");
-
+    const auto& JitVariableTo
     SmallVector<Function *, 16> LambdaFunctions;
     for (auto &F : M.getFunctionList()) {
       if (StringRef{demangle(F.getName().str())}.contains(
