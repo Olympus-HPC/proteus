@@ -122,7 +122,7 @@ public:
     // and return.
     if (isDeviceCompilation(M)) {
       emitJitModuleDevice(M, IsLTO);
-
+      // llvm::outs()<<M;
       return true;
     }
 
@@ -166,7 +166,7 @@ public:
 
     if (verifyModule(M, &errs()))
       reportFatalError("Broken original module found, compilation aborted!");
-
+llvm::outs()<<M;
     return true;
   }
 
