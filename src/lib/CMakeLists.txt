@@ -16,6 +16,7 @@ set(SOURCES
   Frontend/Func.cpp
   Frontend/JitFrontend.cpp
   Frontend/LoopUnroller.cpp
+  Frontend/TargetModel.cpp
   Frontend/TypeMap.cpp
   Frontend/VarStorage.cpp
 )
@@ -38,6 +39,12 @@ if(PROTEUS_ENABLE_HIP)
   )
 endif()
 
+if(PROTEUS_ENABLE_MPI)
+  list(APPEND SOURCES
+    Caching/MPISharedStorageCache.cpp
+  )
+endif()
+
 add_library(proteus STATIC ${SOURCES})
 set_target_properties(proteus PROPERTIES POSITION_INDEPENDENT_CODE ON)
 set(PROTEUS_TARGETS proteus)
@@ -56,11 +63,16 @@ add_library(proteusCore INTERFACE)
 add_library(proteusFrontend INTERFACE)
 
 foreach(proteus_target ${PROTEUS_TARGETS})
-  target_compile_definitions(${proteus_target} PUBLIC ${LLVM_DEFINITIONS})
+  target_compile_definitions(${proteus_target} PRIVATE ${LLVM_DEFINITIONS})
 endforeach()
 target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
 
 target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
+
+if(PROTEUS_ENABLE_MPI)
+  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_MPI)
+  target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_MPI)
+endif()
 
 if(PROTEUS_ENABLE_HIP)
   foreach(proteus_target ${PROTEUS_TARGETS})
@@ -78,7 +90,7 @@ endif()
 
 foreach(proteus_target ${PROTEUS_TARGETS})
   target_include_directories(${proteus_target}
-    SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS})
+    SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
 endforeach()
 target_include_directories(proteusCore
   SYSTEM INTERFACE ${LLVM_INCLUDE_DIRS})
@@ -103,7 +115,23 @@ if(LLVM_LINK_LLVM_DYLIB)
   endif()
   set(libs LLVM)
 else()
-  set(libs ${LLVM_AVAILABLE_LIBS})
+  llvm_map_components_to_libnames(libs
+    Analysis
+    BitReader
+    BitWriter
+    Core
+    ExecutionEngine
+    IPO
+    IRReader
+    Linker
+    MC
+    ${LLVM_TARGETS_TO_BUILD}
+    Object
+    OrcJit
+    Passes
+    Support
+    Target
+  )
 endif()
 
 if(NOT LLVM_ENABLE_RTTI)
@@ -154,6 +182,10 @@ if(PROTEUS_ENABLE_CUDA)
   message(STATUS "Found libnvptxcompiler: ${LIBNVPTXCOMPILER}")
 endif()
 
+if(PROTEUS_ENABLE_MPI)
+  list(APPEND libs MPI::MPI_CXX)
+endif()
+
 find_program(CLANGXX
   NAMES clang++
   NO_DEFAULT_PATH
@@ -184,12 +216,19 @@ message(STATUS "Found Clang libraries: ${clang_libs}")
 
 # Enclose linked libraries in a link group to avoid linker errors due to unresolved symbols.
 foreach(proteus_target ${PROTEUS_TARGETS})
-  target_link_libraries(${proteus_target} PUBLIC
+  target_link_libraries(${proteus_target} PRIVATE
     "$<$<PLATFORM_ID:Linux>:-Wl,--start-group>"
     ${libs} ${clang_libs}
     "$<$<PLATFORM_ID:Linux>:-Wl,--end-group>"
     "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>"
   )
+
+  # Use a version script to hide internal symbols, especially from LLVM static
+  # libraries, on Linux.
+  if(UNIX AND NOT APPLE)
+    target_link_options(${proteus_target} PRIVATE "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
+  endif()
+
   target_compile_definitions(${proteus_target} PRIVATE PROTEUS_CLANGXX_BIN="${CLANGXX}")
 endforeach()
 

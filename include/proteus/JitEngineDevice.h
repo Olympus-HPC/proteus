@@ -568,6 +568,8 @@ public:
     if (Config::get().ProteusAsyncCompilation)
       CompilerAsync::instance(Config::get().ProteusAsyncThreads)
           .joinAllThreads();
+
+    LibraryCache.finalize();
   }
 
   StringRef getDeviceArch() const { return DeviceArch; }
