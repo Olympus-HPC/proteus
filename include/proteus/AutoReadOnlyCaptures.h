@@ -285,10 +285,10 @@ inline SmallString<128> traceOutAuto(int Slot, const RuntimeConstant &RC) {
     OS << "i64 " << RC.Value.Int64Val;
     break;
   case RuntimeConstantType::FLOAT:
-    OS << "float " << format("%e", RC.Value.FloatVal);
+    OS << "float " << format("%g", RC.Value.FloatVal);
     break;
   case RuntimeConstantType::DOUBLE:
-    OS << "double " << format("%e", RC.Value.DoubleVal);
+    OS << "double " << format("%g", RC.Value.DoubleVal);
     break;
   default:
     OS << "<unsupported type>";
