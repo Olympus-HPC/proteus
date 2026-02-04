@@ -39,6 +39,7 @@ if(PROTEUS_ENABLE_HIP)
 endif()
 
 add_library(proteus STATIC ${SOURCES})
+set_target_properties(proteus PROPERTIES POSITION_INDEPENDENT_CODE ON)
 set(PROTEUS_TARGETS proteus)
 
 if(BUILD_SHARED)

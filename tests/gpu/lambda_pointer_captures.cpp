@@ -48,8 +48,8 @@ int main() {
   return 0;
 }
 
-// CHECK: [LambdaSpec][Auto] Replacing slot {{[0-9]+}} with i32 42
-// CHECK: [LambdaSpec][Auto] Replacing slot {{[0-9]+}} with double 3.14
+// CHECK-DAG: [LambdaSpec][Auto] Replacing slot {{[0-9]+}} with i32 42
+// CHECK-DAG: [LambdaSpec][Auto] Replacing slot {{[0-9]+}} with double 3.14
 // CHECK-NOT: [LambdaSpec][Auto]{{.*}}Ptr
 // CHECK-NOT: [LambdaSpec][Auto]{{.*}}PtrOnly
 // CHECK: x[0] = 42

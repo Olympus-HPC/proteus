@@ -15,9 +15,12 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/DataLayout.h"
@@ -282,10 +285,10 @@ inline SmallString<128> traceOutAuto(int Slot, const RuntimeConstant &RC) {
     OS << "i64 " << RC.Value.Int64Val;
     break;
   case RuntimeConstantType::FLOAT:
-    OS << "float " << format("%e", RC.Value.FloatVal);
+    OS << "float " << format("%g", RC.Value.FloatVal);
     break;
   case RuntimeConstantType::DOUBLE:
-    OS << "double " << format("%e", RC.Value.DoubleVal);
+    OS << "double " << format("%g", RC.Value.DoubleVal);
     break;
   default:
     OS << "<unsupported type>";

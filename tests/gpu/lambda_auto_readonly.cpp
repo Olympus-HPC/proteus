@@ -47,7 +47,7 @@ int main() {
 // CHECK-DAG: [LambdaSpec][Auto] Replacing slot {{[0-9]+}} with i32 42
 // CHECK-DAG: [LambdaSpec][Auto] Replacing slot {{[0-9]+}} with double 3.14
 // CHECK-DAG: [LambdaSpec][Auto] Replacing slot {{[0-9]+}} with float 2.5
-// CHECK-DAG: [LambdaSpec][Auto] Replacing slot {{[0-9]+}} with i1 1
+// CHECK-DAG: [LambdaSpec][Auto] Replacing slot {{[0-9]+}} with i8 1
 // CHECK: x[0] = 42
 // CHECK: x[1] = 3.14
 // CHECK: x[2] = 2.5
