@@ -16,7 +16,7 @@ int main() {
 
   auto lambda = [=, &X,
                  A = proteus::jit_variable(A),
-                 C = proteus::jit_variable(C)] __attribute__((annotate("jit"))) {
+                 C = proteus::jit_variable(C)] () __attribute__((annotate("jit"))) {
     X[0] = A + B;
     X[1] = C + D;
   };
