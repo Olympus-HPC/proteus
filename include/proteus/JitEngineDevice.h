@@ -421,8 +421,7 @@ public:
   }
 
   void getLambdaJitValues(JITKernelInfo &KernelInfo,
-                          SmallVector<RuntimeConstant> &LambdaJitValuesVec,
-                          void **KernelArgs) {
+                          SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
     LambdaRegistry LR = LambdaRegistry::instance();
     if (LR.empty()) {
       KernelInfo.setLambdaCalleeInfo({});
@@ -608,7 +607,7 @@ JitEngineDevice<ImplT>::compileAndRun(
       getRuntimeConstantValues(KernelArgs, KernelInfo.getRCInfoArray());
 
   SmallVector<RuntimeConstant> LambdaJitValuesVec;
-  getLambdaJitValues(KernelInfo, LambdaJitValuesVec, KernelArgs);
+  getLambdaJitValues(KernelInfo, LambdaJitValuesVec);
 
   HashT HashValue =
       hash(getStaticHash(KernelInfo), RCVec, LambdaJitValuesVec, GridDim.x,
