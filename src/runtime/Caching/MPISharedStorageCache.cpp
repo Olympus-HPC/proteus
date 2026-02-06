@@ -70,6 +70,12 @@ MPICommHandle::MPICommHandle() {
   }
 }
 
+MPI_Comm MPICommHandle::get() { return Comm; }
+
+int MPICommHandle::getRank() { return Rank; }
+
+int MPICommHandle::getSize() { return Size; }
+
 MPICommHandle::~MPICommHandle() {
   if (Comm == MPI_COMM_NULL)
     return;
