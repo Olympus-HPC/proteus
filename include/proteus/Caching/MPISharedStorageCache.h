@@ -29,8 +29,6 @@
 
 namespace proteus {
 
-/// Validates MPI is properly initialized for Proteus MPI storage cache.
-/// Called during proteus::init() when mpi-storage is configured.
 void validateMPIForProteus();
 
 class CommThreadHandle {
