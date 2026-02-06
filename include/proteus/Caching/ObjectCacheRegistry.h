@@ -33,9 +33,9 @@ public:
 
   std::optional<std::reference_wrapper<ObjectCacheChain>> get(StringRef Label);
 
-  void finalizeAll();
+  void finalize();
 
-  void printStatsAll();
+  void printStats();
 
 private:
   ObjectCacheRegistry() = default;

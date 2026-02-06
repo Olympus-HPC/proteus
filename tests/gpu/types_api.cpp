@@ -45,6 +45,7 @@ int main() {
   gpuErrCheck(gpuDeviceSynchronize());
   kernel<<<1, 1>>>((unsigned char)'a');
   gpuErrCheck(gpuDeviceSynchronize());
+  proteus::finalize();
 }
 
 // clang-format off

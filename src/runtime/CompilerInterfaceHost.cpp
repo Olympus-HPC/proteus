@@ -8,6 +8,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "proteus/Caching/ObjectCacheRegistry.h"
 #include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/JitEngineHost.h"
@@ -43,8 +44,12 @@ extern "C" void __jit_init_host() {
 }
 
 extern "C" void __jit_finalize_host() {
-  if (auto CacheOpt = ObjectCacheRegistry::instance().get("JitEngineHost"))
-    CacheOpt->get().finalize();
+  JitEngineHost &Jit = JitEngineHost::instance();
+  Jit.finalize();
+}
+
+extern "C" void __jit_finalize_caches() {
+  ObjectCacheRegistry::instance().finalize();
 }
 
 extern "C" void __jit_enable_host() {

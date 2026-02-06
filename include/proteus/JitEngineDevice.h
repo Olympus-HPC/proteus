@@ -557,10 +557,7 @@ public:
       CompilerAsync::instance(Config::get().ProteusAsyncThreads)
           .joinAllThreads();
 
-    if (auto CacheOpt =
-            ObjectCacheRegistry::instance().get("JitEngineDevice")) {
-      CacheOpt->get().finalize();
-    }
+    finalizeCacheChain();
   }
 
   StringRef getDeviceArch() const { return DeviceArch; }
