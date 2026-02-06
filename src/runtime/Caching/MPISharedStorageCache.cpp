@@ -34,7 +34,7 @@ using namespace llvm;
 // MPI Validation
 //===----------------------------------------------------------------------===//
 
-void validateMPIForProteus() {
+void validateMPIConfig() {
   int MPIInitialized = 0;
   MPI_Initialized(&MPIInitialized);
   if (!MPIInitialized) {
@@ -58,7 +58,7 @@ void validateMPIForProteus() {
 //===----------------------------------------------------------------------===//
 
 MPICommHandle::MPICommHandle() {
-  validateMPIForProteus();
+  validateMPIConfig();
 
   MPI_Comm_dup(MPI_COMM_WORLD, &Comm);
   MPI_Comm_rank(Comm, &Rank);

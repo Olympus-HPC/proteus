@@ -526,8 +526,6 @@ public:
           "compilation.");
   }
 
-  // Returns cache reference if caching is enabled and initialized.
-  // Returns nullopt if caching is disabled.
   std::optional<std::reference_wrapper<ObjectCacheChain>> getLibraryCache() {
     if (!Config::get().ProteusUseStoredCache)
       return std::nullopt;
