@@ -98,17 +98,11 @@ public:
   }
 
 private:
-  ObjectCacheChain &getObjectCache() {
-    auto CacheOpt = ObjectCacheRegistry::instance().get("DispatcherCUDA");
-    if (!CacheOpt)
-      reportFatalError("ObjectCache missing for DispatcherCUDA.");
-    return CacheOpt->get();
-  }
-
   JitEngineDeviceCUDA &Jit;
   DispatcherCUDA() : Jit(JitEngineDeviceCUDA::instance()) {
     TargetModel = TargetModelType::CUDA;
-    ObjectCacheRegistry::instance().create("DispatcherCUDA");
+    DispatcherName = "DispatcherCUDA";
+    ObjectCacheRegistry::instance().create(DispatcherName);
   }
   MemoryCache<CUfunction> CodeCache{"DispatcherCUDA"};
 };

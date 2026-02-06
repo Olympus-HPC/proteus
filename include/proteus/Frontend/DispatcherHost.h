@@ -81,7 +81,8 @@ public:
 protected:
   DispatcherHost() : Jit(JitEngineHost::instance()) {
     TargetModel = TargetModelType::HOST;
-    ObjectCacheRegistry::instance().create("DispatcherHost");
+    DispatcherName = "DispatcherHost";
+    ObjectCacheRegistry::instance().create(DispatcherName);
   }
 
   ~DispatcherHost() {
@@ -90,13 +91,6 @@ protected:
   }
 
 private:
-  ObjectCacheChain &getObjectCache() {
-    auto CacheOpt = ObjectCacheRegistry::instance().get("DispatcherHost");
-    if (!CacheOpt)
-      reportFatalError("ObjectCache missing for DispatcherHost.");
-    return CacheOpt->get();
-  }
-
   JitEngineHost &Jit;
   MemoryCache<void *> CodeCache{"DispatcherHost"};
 };
