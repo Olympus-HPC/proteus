@@ -1,5 +1,6 @@
 #include "proteus/Frontend/Dispatcher.h"
 
+#include "proteus/Caching/ObjectCacheRegistry.h"
 #include "proteus/Error.h"
 #include "proteus/Frontend/DispatcherHost.h"
 #if PROTEUS_ENABLE_HIP
@@ -65,6 +66,13 @@ Dispatcher &Dispatcher::getDispatcher(TargetModelType TargetModel) {
   default:
     reportFatalError("Unsupported model type");
   }
+}
+
+ObjectCacheChain &Dispatcher::getObjectCache() {
+  auto CacheOpt = ObjectCacheRegistry::instance().get(DispatcherName);
+  if (!CacheOpt)
+    reportFatalError("ObjectCache missing for " + DispatcherName + ".");
+  return CacheOpt->get();
 }
 
 Dispatcher::~Dispatcher() = default;

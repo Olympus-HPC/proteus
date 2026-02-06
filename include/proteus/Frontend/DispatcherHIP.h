@@ -90,17 +90,11 @@ public:
   }
 
 private:
-  ObjectCacheChain &getObjectCache() {
-    auto CacheOpt = ObjectCacheRegistry::instance().get("DispatcherHIP");
-    if (!CacheOpt)
-      reportFatalError("ObjectCache missing for DispatcherHIP.");
-    return CacheOpt->get();
-  }
-
   JitEngineDeviceHIP &Jit;
   DispatcherHIP() : Jit(JitEngineDeviceHIP::instance()) {
     TargetModel = TargetModelType::HIP;
-    ObjectCacheRegistry::instance().create("DispatcherHIP");
+    DispatcherName = "DispatcherHIP";
+    ObjectCacheRegistry::instance().create(DispatcherName);
   }
   MemoryCache<hipFunction_t> CodeCache{"DispatcherHIP"};
 };
