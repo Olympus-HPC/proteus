@@ -13,7 +13,9 @@
 #ifndef PROTEUS_JIT_INTERFACE_H
 #define PROTEUS_JIT_INTERFACE_H
 
+#include "Init.h"
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Init.h"
 
 #include <cassert>
 #include <cstring>
@@ -142,6 +144,7 @@ inline void disable() {
 }
 
 inline void init() {
+  proteusIsInitialized() = true;
   __jit_init_host();
 #if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
   __jit_init_device();

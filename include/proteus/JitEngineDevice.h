@@ -21,6 +21,7 @@
 #include "proteus/CoreLLVM.h"
 #include "proteus/Debug.h"
 #include "proteus/Hashing.h"
+#include "proteus/Init.h"
 #include "proteus/JitEngine.h"
 #include "proteus/TimeTracing.h"
 #include "proteus/Utils.h"
@@ -517,13 +518,6 @@ public:
             ObjectCacheRegistry::instance().get("JitEngineDevice")) {
       CacheOpt->get().finalize();
     }
-  }
-
-  void ensureProteusInitialized() const {
-    if (!ObjectCacheRegistry::instance().get("JitEngineDevice"))
-      reportFatalError(
-          "proteus not initialized. Call proteus::init() before using JIT "
-          "compilation.");
   }
 
 public:
