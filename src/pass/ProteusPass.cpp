@@ -1248,10 +1248,11 @@ private:
   /// (3) Look at all callbases of each proteus::register_lambda template
   /// instantiation. Because we
   ///.    force passage of the lambda by value to register_lambda, the
-  ///instantiation must contain an .    AllocaInst of the lambda's corresponding
-  ///anonymous class.  The demangled name of the lambda .    can be deduced from
-  ///the name of the Clang-generated template instantiation. . (4) Inject the
-  ///demangled name into the original callbase of the `jit_variable` function.
+  /// instantiation must contain an .    AllocaInst of the lambda's
+  /// corresponding anonymous class.  The demangled name of the lambda .    can
+  /// be deduced from the name of the Clang-generated template instantiation. .
+  /// (4) Inject the demangled name into the original callbase of the
+  /// `jit_variable` function.
   void registerJitVariablesWithLambda(Module &M) {
     llvm::SmallVector<CallBase *, 16> JitVarFunctions;
     llvm::DenseMap<CallBase *, Type *> CallBaseToLambda;

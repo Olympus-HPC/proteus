@@ -45,6 +45,8 @@ extern "C" void __jit_enable_host() {
   Jit.enable();
 }
 
+extern "C" __attribute__((noinline)) void __jit_take_address(void const *) {}
+
 extern "C" void __jit_disable_host() {
   JitEngineHost &Jit = JitEngineHost::instance();
   Jit.disable();
