@@ -33,8 +33,6 @@ public:
 
   std::optional<std::reference_wrapper<ObjectCacheChain>> get(StringRef Label);
 
-  void finalize();
-
   void printStats();
 
 private:
