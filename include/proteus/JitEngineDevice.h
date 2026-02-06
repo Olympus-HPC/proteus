@@ -538,17 +538,10 @@ public:
     return CacheOpt;
   }
 
-  static bool isRuntimeConstructed() { return RuntimeConstructedFlag(); }
-
 private:
   static bool &InitializedFlag() {
     static bool Initialized = false;
     return Initialized;
-  }
-
-  static bool &RuntimeConstructedFlag() {
-    static bool Constructed = false;
-    return Constructed;
   }
 
 public:
@@ -563,7 +556,7 @@ public:
   StringRef getDeviceArch() const { return DeviceArch; }
 
 protected:
-  JitEngineDevice() { RuntimeConstructedFlag() = true; }
+  JitEngineDevice() {}
 
   ~JitEngineDevice() {
     CodeCache.printStats();
