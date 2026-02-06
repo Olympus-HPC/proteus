@@ -29,7 +29,7 @@
 
 namespace proteus {
 
-void validateMPIForProteus();
+void validateMPIConfig();
 
 class CommThreadHandle {
 public:
