@@ -25,7 +25,7 @@ endif()
 set(PROTEUS_PASS_SOURCES
   ${PROJECT_SOURCE_DIR}/src/pass/AnnotationHandler.cpp
   ${PROJECT_SOURCE_DIR}/src/pass/ProteusPass.cpp
-  ${PROJECT_SOURCE_DIR}/src/lib/Error.cpp
+  ${PROJECT_SOURCE_DIR}/src/runtime/Error.cpp
 )
 
 add_library(ProteusPass SHARED
