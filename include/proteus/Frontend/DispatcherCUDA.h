@@ -3,7 +3,7 @@
 
 #if PROTEUS_ENABLE_CUDA
 
-#include "proteus/Caching/ObjectCacheChain.h"
+#include "proteus/Caching/ObjectCacheRegistry.h"
 #include "proteus/Frontend/Dispatcher.h"
 #include "proteus/JitEngineDeviceCUDA.h"
 
@@ -39,7 +39,7 @@ public:
     if (!ObjectModule)
       reportFatalError("Expected non-null object library");
 
-    ObjectCache.store(
+    getObjectCache().store(
         ModuleHash, CacheEntry::staticObject(ObjectModule->getMemBufferRef()));
 
     return ObjectModule;
@@ -47,7 +47,7 @@ public:
 
   std::unique_ptr<CompiledLibrary>
   lookupCompiledLibrary(const HashT &ModuleHash) override {
-    return ObjectCache.lookup(ModuleHash);
+    return getObjectCache().lookup(ModuleHash);
   }
 
   DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
@@ -94,16 +94,23 @@ public:
 
   ~DispatcherCUDA() {
     CodeCache.printStats();
-    ObjectCache.printStats();
+    getObjectCache().printStats();
   }
 
 private:
+  ObjectCacheChain &getObjectCache() {
+    auto CacheOpt = ObjectCacheRegistry::instance().get("DispatcherCUDA");
+    if (!CacheOpt)
+      reportFatalError("ObjectCache missing for DispatcherCUDA.");
+    return CacheOpt->get();
+  }
+
   JitEngineDeviceCUDA &Jit;
   DispatcherCUDA() : Jit(JitEngineDeviceCUDA::instance()) {
     TargetModel = TargetModelType::CUDA;
+    ObjectCacheRegistry::instance().create("DispatcherCUDA");
   }
   MemoryCache<CUfunction> CodeCache{"DispatcherCUDA"};
-  ObjectCacheChain ObjectCache{"DispatcherCUDA"};
 };
 
 } // namespace proteus

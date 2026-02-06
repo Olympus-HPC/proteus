@@ -79,6 +79,7 @@ int main() {
 
   launch(C, X);
   gpuErrCheck(gpuFree(X));
+  proteus::finalize();
 }
 
 // clang-format off

@@ -63,6 +63,12 @@ public:
     Initialized = true;
   }
 
+  void finalize() {
+    if (auto CacheOpt = ObjectCacheRegistry::instance().get("JitEngineHost")) {
+      CacheOpt->get().finalize();
+    }
+  }
+
   void ensureProteusInitialized() const {
     if (!Initialized)
       reportFatalError(

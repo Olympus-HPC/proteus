@@ -1,7 +1,7 @@
 #ifndef PROTEUS_FRONTEND_DISPATCHER_HOST_H
 #define PROTEUS_FRONTEND_DISPATCHER_HOST_H
 
-#include "proteus/Caching/ObjectCacheChain.h"
+#include "proteus/Caching/ObjectCacheRegistry.h"
 #include "proteus/CompiledLibrary.h"
 #include "proteus/Frontend/Dispatcher.h"
 #include "proteus/JitEngineHost.h"
@@ -28,7 +28,7 @@ public:
     if (!ObjectModule)
       reportFatalError("Expected non-null object library");
 
-    ObjectCache.store(
+    getObjectCache().store(
         ModuleHash, CacheEntry::staticObject(ObjectModule->getMemBufferRef()));
 
     return ObjectModule;
@@ -36,7 +36,7 @@ public:
 
   std::unique_ptr<CompiledLibrary>
   lookupCompiledLibrary(const HashT &ModuleHash) override {
-    return ObjectCache.lookup(ModuleHash);
+    return getObjectCache().lookup(ModuleHash);
   }
 
   DispatchResult launch(void *, LaunchDims, LaunchDims, void *[], uint64_t,
@@ -74,24 +74,31 @@ public:
     auto Buf = MemoryBuffer::getFileAsStream(Path);
     if (!Buf)
       reportFatalError("Failed to read dynamic library: " + Path);
-    ObjectCache.store(HashValue,
-                      CacheEntry::sharedObject((*Buf)->getMemBufferRef()));
+    getObjectCache().store(HashValue,
+                           CacheEntry::sharedObject((*Buf)->getMemBufferRef()));
   }
 
 protected:
   DispatcherHost() : Jit(JitEngineHost::instance()) {
     TargetModel = TargetModelType::HOST;
+    ObjectCacheRegistry::instance().create("DispatcherHost");
   }
 
   ~DispatcherHost() {
     CodeCache.printStats();
-    ObjectCache.printStats();
+    getObjectCache().printStats();
   }
 
 private:
+  ObjectCacheChain &getObjectCache() {
+    auto CacheOpt = ObjectCacheRegistry::instance().get("DispatcherHost");
+    if (!CacheOpt)
+      reportFatalError("ObjectCache missing for DispatcherHost.");
+    return CacheOpt->get();
+  }
+
   JitEngineHost &Jit;
   MemoryCache<void *> CodeCache{"DispatcherHost"};
-  ObjectCacheChain ObjectCache{"DispatcherHost"};
 };
 
 } // namespace proteus

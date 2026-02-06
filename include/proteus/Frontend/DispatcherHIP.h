@@ -3,7 +3,7 @@
 
 #if PROTEUS_ENABLE_HIP
 
-#include "proteus/Caching/ObjectCacheChain.h"
+#include "proteus/Caching/ObjectCacheRegistry.h"
 #include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.h"
 #include "proteus/JitEngineDeviceHIP.h"
@@ -31,7 +31,7 @@ public:
     if (!ObjectModule)
       reportFatalError("Expected non-null object library");
 
-    ObjectCache.store(
+    getObjectCache().store(
         ModuleHash, CacheEntry::staticObject(ObjectModule->getMemBufferRef()));
 
     return ObjectModule;
@@ -39,7 +39,7 @@ public:
 
   std::unique_ptr<CompiledLibrary>
   lookupCompiledLibrary(const HashT &ModuleHash) override {
-    return ObjectCache.lookup(ModuleHash);
+    return getObjectCache().lookup(ModuleHash);
   }
 
   DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
@@ -58,7 +58,7 @@ public:
 
   ~DispatcherHIP() {
     CodeCache.printStats();
-    ObjectCache.printStats();
+    getObjectCache().printStats();
   }
 
   void *getFunctionAddress(const std::string &KernelName,
@@ -90,12 +90,19 @@ public:
   }
 
 private:
+  ObjectCacheChain &getObjectCache() {
+    auto CacheOpt = ObjectCacheRegistry::instance().get("DispatcherHIP");
+    if (!CacheOpt)
+      reportFatalError("ObjectCache missing for DispatcherHIP.");
+    return CacheOpt->get();
+  }
+
   JitEngineDeviceHIP &Jit;
   DispatcherHIP() : Jit(JitEngineDeviceHIP::instance()) {
     TargetModel = TargetModelType::HIP;
+    ObjectCacheRegistry::instance().create("DispatcherHIP");
   }
   MemoryCache<hipFunction_t> CodeCache{"DispatcherHIP"};
-  ObjectCacheChain ObjectCache{"DispatcherHIP"};
 };
 
 } // namespace proteus

@@ -128,6 +128,7 @@ MPISharedStorageCache::MPISharedStorageCache(const std::string &Label)
                            : ".proteus"),
       Label(Label), Tag(computeTag(Label)) {
   std::filesystem::create_directories(StorageDirectory);
+  startCommThread();
 }
 
 MPISharedStorageCache::~MPISharedStorageCache() { finalize(); }
@@ -176,8 +177,6 @@ MPISharedStorageCache::lookup(const HashT &HashValue) {
   TIMESCOPE("MPISharedStorageCache::lookup");
   Accesses++;
 
-  ensureCommThreadStarted();
-
   std::string Filebase =
       StorageDirectory + "/cache-jit-" + HashValue.toString();
 
@@ -199,7 +198,6 @@ void MPISharedStorageCache::store(const HashT &HashValue,
                                   const CacheEntry &Entry) {
   TIMESCOPE("MPISharedStorageCache::store");
 
-  ensureCommThreadStarted();
   forwardToWriter(HashValue, Entry);
 }
 
@@ -244,8 +242,8 @@ void MPISharedStorageCache::communicationThreadMain() {
   }
 }
 
-void MPISharedStorageCache::ensureCommThreadStarted() {
-  if (CommHandle.getRank() != 0 || CommThread.isRunning())
+void MPISharedStorageCache::startCommThread() {
+  if (CommHandle.getRank() != 0)
     return;
   CommThread.start([this] { communicationThreadMain(); });
 }

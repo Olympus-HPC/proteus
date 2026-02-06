@@ -126,7 +126,7 @@ private:
   static int computeTag(const std::string &Label);
 
   void communicationThreadMain();
-  void ensureCommThreadStarted();
+  void startCommThread();
 
   uint64_t Hits = 0;
   uint64_t Accesses = 0;

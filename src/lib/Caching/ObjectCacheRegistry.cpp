@@ -34,13 +34,13 @@ ObjectCacheRegistry::get(StringRef Label) {
   return std::ref(*It->second);
 }
 
-void ObjectCacheRegistry::finalizeAll() {
+void ObjectCacheRegistry::finalize() {
   for (auto &[_, Chain] : Chains) {
     Chain->finalize();
   }
 }
 
-void ObjectCacheRegistry::printStatsAll() {
+void ObjectCacheRegistry::printStats() {
   for (auto &[_, Chain] : Chains) {
     Chain->printStats();
   }
