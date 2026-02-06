@@ -30,6 +30,7 @@ extern "C" void __jit_enable_host();
 extern "C" void __jit_enable_device();
 extern "C" void __jit_disable_host();
 extern "C" void __jit_disable_device();
+extern "C" void __jit_take_address(void const *);
 
 namespace proteus {
 
@@ -114,11 +115,14 @@ jit_variable(T V, int Pos = -1, int Offset = -1,
 }
 
 template <typename T>
-static __attribute__((noinline)) T&&
+static __attribute__((noinline)) T
 register_lambda(T t, const char *Symbol = "") noexcept {
   assert(Symbol && "Expected non-null Symbol");
+  // Force LLVM to generate an AllocaInst of the underlying Clang--generated
+  // anonymous class for T.
+  __jit_take_address(&t);
   __jit_register_lambda(Symbol);
-  return std::forward<T>(t);
+  return t;
 }
 
 #if defined(__CUDACC__) || defined(__HIP__)
