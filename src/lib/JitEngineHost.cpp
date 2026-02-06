@@ -241,7 +241,7 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 
   // Lookup the code library in the object cache chain to load without
   // compiling, if found.
-  auto CacheOpt = getLibraryCache();
+  auto CacheOpt = getLibraryCache("JitEngineHost");
   if (CacheOpt && (Library = CacheOpt->get().lookup(HashValue))) {
     loadCompiledLibrary(*Library);
   } else {
