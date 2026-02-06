@@ -17,6 +17,8 @@ struct FuncStore {
 void launcher(FuncStore &FS) { FS.Func.run(42); }
 
 int main() {
+  proteus::init();
+
   const char *Code = R"cpp(
     #include <cstdio>
 
@@ -30,6 +32,9 @@ int main() {
   Func.run(42);
   FuncStore FS{Func};
   launcher(FS);
+
+  proteus::finalize();
+  return 0;
 }
 
 // clang-format off

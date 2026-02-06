@@ -94,6 +94,7 @@ auto createJitModule2() {
 }
 
 int main() {
+  proteus::init();
   auto [J1, KernelHandle11, KernelHandle12] = createJitModule1();
   auto [J2, KernelHandle21, KernelHandle22] = createJitModule2();
 
@@ -118,6 +119,7 @@ int main() {
 
   gpuErrCheck(gpuFree(V));
 
+  proteus::finalize();
   return 0;
 }
 

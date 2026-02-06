@@ -1,10 +1,12 @@
 #include <cstdio>
 
 #include "proteus/CppJitModule.h"
+#include <proteus/JitInterface.h>
 
 using namespace proteus;
 
 int main() {
+  proteus::init();
   const char *Code = R"cpp(
         #include <cstdio>
         extern "C" void foo() {
@@ -15,5 +17,6 @@ int main() {
   auto Foo = CJM.getFunction<void()>("foo");
   Foo.run();
 
+  proteus::finalize();
   return 0;
 }

@@ -9,6 +9,7 @@
 #include <cstdio>
 
 #include "gpu_common.h"
+#include <proteus/JitInterface.h>
 
 #if defined(__HIP_DEVICE_COMPILE__) ||                                         \
     (defined(__CUDA__) && defined(__CUDA_ARCH__))
@@ -35,8 +36,10 @@ __global__ __attribute__((annotate("jit"))) void kernel() {
 }
 
 int main() {
+  proteus::init();
   kernel<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
+  proteus::finalize();
   return 0;
 }
 

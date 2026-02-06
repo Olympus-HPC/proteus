@@ -379,6 +379,7 @@ private:
         getEnvOrDefaultString("PROTEUS_TIME_TRACE_FILE").value_or("");
   }
 };
+
 } // namespace proteus
 
 #endif

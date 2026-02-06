@@ -29,6 +29,10 @@
 
 namespace proteus {
 
+/// Validates MPI is properly initialized for Proteus MPI storage cache.
+/// Called during proteus::init() when mpi-storage is configured.
+void validateMPIForProteus();
+
 class CommThreadHandle {
 public:
   CommThreadHandle() = default;
@@ -64,19 +68,17 @@ private:
 
 class MPICommHandle {
 public:
-  MPICommHandle() = default;
+  MPICommHandle();
   ~MPICommHandle();
 
   MPICommHandle(const MPICommHandle &) = delete;
   MPICommHandle &operator=(const MPICommHandle &) = delete;
 
-  MPI_Comm get();
-  int getRank();
-  int getSize();
+  MPI_Comm get() const { return Comm; }
+  int getRank() const { return Rank; }
+  int getSize() const { return Size; }
 
 private:
-  void ensureInitialized();
-
   MPI_Comm Comm = MPI_COMM_NULL;
   int Rank = -1;
   int Size = -1;

@@ -14,6 +14,8 @@
 using namespace proteus;
 
 int main() {
+  proteus::init();
+
   const char *Code = R"cpp(
     #include <cstdio>
 
@@ -37,6 +39,9 @@ int main() {
   CppJitModule CJM2("host", Code2);
   auto Foo2 = CJM2.getFunction<void(int)>("foo");
   Foo2.run(42);
+
+  proteus::finalize();
+  return 0;
 }
 
 // clang-format off

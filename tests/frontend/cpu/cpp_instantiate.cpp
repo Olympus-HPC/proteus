@@ -13,6 +13,8 @@
 using namespace proteus;
 
 int main() {
+  proteus::init();
+
   const char *Code = R"cpp(
     #include <cstdio>
     #include <typeinfo>
@@ -43,6 +45,7 @@ int main() {
   InstTypeD.run<void>();
   InstTypeF.run<void>();
 
+  proteus::finalize();
   return 0;
 }
 

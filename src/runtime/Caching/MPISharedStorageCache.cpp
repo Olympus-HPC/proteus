@@ -31,30 +31,18 @@ namespace proteus {
 using namespace llvm;
 
 //===----------------------------------------------------------------------===//
-// MPICommHandle implementation
+// MPI Validation
 //===----------------------------------------------------------------------===//
 
-MPICommHandle::~MPICommHandle() {
-  if (Comm == MPI_COMM_NULL)
-    return;
-
-  int MPIFinalized = 0;
-  MPI_Finalized(&MPIFinalized);
-  if (!MPIFinalized)
-    MPI_Comm_free(&Comm);
-}
-
-void MPICommHandle::ensureInitialized() {
-  if (Comm != MPI_COMM_NULL)
-    return;
-
+void validateMPIForProteus() {
   int MPIInitialized = 0;
   MPI_Initialized(&MPIInitialized);
   if (!MPIInitialized) {
-    reportFatalError("MPICommHandle requires MPI to be initialized");
+    reportFatalError("proteus::init() with mpi-storage cache requires MPI to "
+                     "be initialized. Call MPI_Init_thread() before "
+                     "proteus::init()");
   }
 
-  // Check MPI thread level (MPI_THREAD_MULTIPLE required).
   int Provided = 0;
   MPI_Query_thread(&Provided);
   if (Provided != MPI_THREAD_MULTIPLE) {
@@ -63,6 +51,14 @@ void MPICommHandle::ensureInitialized() {
                      std::to_string(Provided) +
                      "). Initialize MPI with MPI_Init_thread()");
   }
+}
+
+//===----------------------------------------------------------------------===//
+// MPICommHandle implementation
+//===----------------------------------------------------------------------===//
+
+MPICommHandle::MPICommHandle() {
+  validateMPIForProteus();
 
   MPI_Comm_dup(MPI_COMM_WORLD, &Comm);
   MPI_Comm_rank(Comm, &Rank);
@@ -74,19 +70,14 @@ void MPICommHandle::ensureInitialized() {
   }
 }
 
-MPI_Comm MPICommHandle::get() {
-  ensureInitialized();
-  return Comm;
-}
+MPICommHandle::~MPICommHandle() {
+  if (Comm == MPI_COMM_NULL)
+    return;
 
-int MPICommHandle::getRank() {
-  ensureInitialized();
-  return Rank;
-}
-
-int MPICommHandle::getSize() {
-  ensureInitialized();
-  return Size;
+  int MPIFinalized = 0;
+  MPI_Finalized(&MPIFinalized);
+  if (!MPIFinalized)
+    MPI_Comm_free(&Comm);
 }
 
 //===----------------------------------------------------------------------===//
@@ -254,8 +245,6 @@ void MPISharedStorageCache::communicationThreadMain() {
 }
 
 void MPISharedStorageCache::ensureCommThreadStarted() {
-  // We use 'ensureCommThreadStarted' to avoid problems where
-  // proteus is initialized before MPI.
   if (CommHandle.getRank() != 0 || CommThread.isRunning())
     return;
   CommThread.start([this] { communicationThreadMain(); });

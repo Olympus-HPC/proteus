@@ -49,6 +49,8 @@ int main() {
 
 // clang-format off
 // CHECK-FIRST: [ObjectCacheChain] Added cache level: storage
+// CHECK-FIRST-NEXT: [ObjectCacheChain] Chain for JitEngineHost: Storage
+// CHECK-FIRST: [ObjectCacheChain] Added cache level: storage
 // CHECK-FIRST-NEXT: [ObjectCacheChain] Chain for JitEngineDevice: Storage
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kernelIZ4mainEUlmE_mPiEvT_T0_T1_{{[^ ]*}} ArgNo 1 with value i64 1024
 // CHECK-DAG: Kernel Index 256/1024

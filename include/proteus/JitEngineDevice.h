@@ -12,7 +12,7 @@
 #define PROTEUS_JITENGINEDEVICE_H
 
 #include "proteus/Caching/MemoryCache.h"
-#include "proteus/Caching/ObjectCacheChain.h"
+#include "proteus/Caching/ObjectCacheRegistry.h"
 #include "proteus/Cloning.h"
 #include "proteus/CompilerAsync.h"
 #include "proteus/CompilerInterfaceTypes.h"
@@ -508,26 +508,75 @@ public:
     return KernelInfo.getStaticHash();
   }
 
+  static void initCacheChain() {
+    ObjectCacheRegistry::instance().create("JitEngineDevice");
+    InitializedFlag() = true;
+  }
+
+  static void finalizeCacheChain() {
+    if (auto CacheOpt =
+            ObjectCacheRegistry::instance().get("JitEngineDevice")) {
+      CacheOpt->get().finalize();
+    }
+  }
+
+  void ensureProteusInitialized() const {
+    if (!InitializedFlag())
+      reportFatalError(
+          "proteus not initialized. Call proteus::init() before using JIT "
+          "compilation.");
+  }
+
+  // Returns cache reference if caching is enabled and initialized.
+  // Returns nullopt if caching is disabled.
+  std::optional<std::reference_wrapper<ObjectCacheChain>> getLibraryCache() {
+    if (!Config::get().ProteusUseStoredCache)
+      return std::nullopt;
+    auto CacheOpt = ObjectCacheRegistry::instance().get("JitEngineDevice");
+    if (!CacheOpt)
+      reportFatalError("LibraryCache missing for JitEngineDevice.");
+    return CacheOpt;
+  }
+
+  static bool isRuntimeConstructed() { return RuntimeConstructedFlag(); }
+
+private:
+  static bool &InitializedFlag() {
+    static bool Initialized = false;
+    return Initialized;
+  }
+
+  static bool &RuntimeConstructedFlag() {
+    static bool Constructed = false;
+    return Constructed;
+  }
+
+public:
   void finalize() {
     if (Config::get().ProteusAsyncCompilation)
       CompilerAsync::instance(Config::get().ProteusAsyncThreads)
           .joinAllThreads();
 
-    LibraryCache.finalize();
+    if (auto CacheOpt =
+            ObjectCacheRegistry::instance().get("JitEngineDevice")) {
+      CacheOpt->get().finalize();
+    }
   }
 
   StringRef getDeviceArch() const { return DeviceArch; }
 
 protected:
-  JitEngineDevice() {}
+  JitEngineDevice() { RuntimeConstructedFlag() = true; }
 
   ~JitEngineDevice() {
     CodeCache.printStats();
-    LibraryCache.printStats();
+    if (auto CacheOpt =
+            ObjectCacheRegistry::instance().get("JitEngineDevice")) {
+      CacheOpt->get().printStats();
+    }
   }
 
   MemoryCache<KernelFunction_t> CodeCache{"JitEngineDevice"};
-  ObjectCacheChain LibraryCache{"JitEngineDevice"};
   std::string DeviceArch;
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
@@ -539,6 +588,7 @@ JitEngineDevice<ImplT>::compileAndRun(
     JITKernelInfo &KernelInfo, dim3 GridDim, dim3 BlockDim, void **KernelArgs,
     uint64_t ShmemSize, typename DeviceTraits<ImplT>::DeviceStream_t Stream) {
   TIMESCOPE("compileAndRun");
+  ensureProteusInitialized();
 
   auto &BinInfo = KernelInfo.getBinaryInfo();
 
@@ -571,8 +621,8 @@ JitEngineDevice<ImplT>::compileAndRun(
   std::string Suffix = HashValue.toMangledSuffix();
   std::string KernelMangled = (KernelInfo.getName() + Suffix);
 
-  if (Config::get().ProteusUseStoredCache) {
-    auto CompiledLib = LibraryCache.lookup(HashValue);
+  if (auto CacheOpt = getLibraryCache()) {
+    auto CompiledLib = CacheOpt->get().lookup(HashValue);
     if (CompiledLib) {
       if (!Config::get().ProteusRelinkGlobalsByCopy)
         relinkGlobalsObject(CompiledLib->ObjectModule->getMemBufferRef(),
@@ -639,10 +689,9 @@ JitEngineDevice<ImplT>::compileAndRun(
       BinInfo.getVarNameToGlobalInfo());
 
   CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
-  if (Config::get().ProteusUseStoredCache) {
-    LibraryCache.store(HashValue,
-                       CacheEntry::staticObject(ObjBuf->getMemBufferRef()));
-  }
+  if (auto CacheOpt = getLibraryCache())
+    CacheOpt->get().store(HashValue,
+                          CacheEntry::staticObject(ObjBuf->getMemBufferRef()));
 
   return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                               ShmemSize, Stream);
