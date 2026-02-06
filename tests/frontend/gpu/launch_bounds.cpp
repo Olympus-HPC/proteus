@@ -20,6 +20,7 @@ constexpr int MaxThreadsPerBlock = 128;
 constexpr int MinBlocksPerSM = 4;
 
 int main() {
+  proteus::init();
   auto J = proteus::JitModule(TARGET);
 
   auto KernelHandle = J.addKernel<void()>("dsl_static_bounds");
@@ -32,6 +33,7 @@ int main() {
   KernelHandle.setLaunchBounds(MaxThreadsPerBlock, MinBlocksPerSM);
 
   J.print();
+  proteus::finalize();
   return 0;
 }
 

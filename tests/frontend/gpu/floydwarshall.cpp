@@ -141,6 +141,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  proteus::init();
+
   int numNodes = atoi(argv[1]);
   int numIterations = atoi(argv[2]);
   int blockSize = atoi(argv[3]);
@@ -277,6 +279,8 @@ int main(int argc, char **argv) {
 
   free(pathDistanceMatrix);
   free(pathMatrix);
+
+  proteus::finalize();
   return 0;
 }
 

@@ -8,7 +8,6 @@
 
 #include <iostream>
 #include <proteus/JitFrontend.h>
-#include <proteus/JitInterface.h>
 
 static auto get3DLoopNestFunction(int DI, int DJ, int DK, int TileI, int TileJ,
                                   int TileK) {

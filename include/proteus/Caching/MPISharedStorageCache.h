@@ -29,6 +29,8 @@
 
 namespace proteus {
 
+void validateMPIConfig();
+
 class CommThreadHandle {
 public:
   CommThreadHandle() = default;
@@ -64,7 +66,7 @@ private:
 
 class MPICommHandle {
 public:
-  MPICommHandle() = default;
+  MPICommHandle();
   ~MPICommHandle();
 
   MPICommHandle(const MPICommHandle &) = delete;
@@ -75,8 +77,6 @@ public:
   int getSize();
 
 private:
-  void ensureInitialized();
-
   MPI_Comm Comm = MPI_COMM_NULL;
   int Rank = -1;
   int Size = -1;
@@ -124,7 +124,7 @@ private:
   static int computeTag(const std::string &Label);
 
   void communicationThreadMain();
-  void ensureCommThreadStarted();
+  void startCommThread();
 
   uint64_t Hits = 0;
   uint64_t Accesses = 0;

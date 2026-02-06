@@ -13,14 +13,19 @@
 #ifndef PROTEUS_JITENGINEHOST_H
 #define PROTEUS_JITENGINEHOST_H
 
+#include <functional>
+#include <optional>
 #include <string>
 
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
 
 #include "proteus/Caching/MemoryCache.h"
-#include "proteus/Caching/ObjectCacheChain.h"
+#include "proteus/Caching/ObjectCacheRegistry.h"
 #include "proteus/CompiledLibrary.h"
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Config.h"
+#include "proteus/Error.h"
+#include "proteus/Init.h"
 #include "proteus/JitEngine.h"
 
 namespace proteus {
@@ -54,11 +59,20 @@ public:
 
   void *getFunctionAddress(StringRef FnName, CompiledLibrary &Library);
 
+  void initCacheChain() {
+    ObjectCacheRegistry::instance().create("JitEngineHost");
+  }
+
+  void finalize() {
+    if (auto CacheOpt = ObjectCacheRegistry::instance().get("JitEngineHost")) {
+      CacheOpt->get().finalize();
+    }
+  }
+
 private:
   JitEngineHost();
   void addStaticLibrarySymbols();
   MemoryCache<void *> CodeCache{"JitEngineHost"};
-  ObjectCacheChain LibraryCache{"JitEngineHost"};
 };
 
 } // namespace proteus

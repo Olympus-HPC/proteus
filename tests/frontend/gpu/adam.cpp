@@ -132,6 +132,8 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  proteus::init();
+
   const int vector_size = atoi(argv[1]);
   const int time_step = atoi(argv[2]);
   const int repeat = atoi(argv[3]);
@@ -226,6 +228,8 @@ int main(int argc, char *argv[]) {
   free(v);
   free(g);
   free(r);
+
+  proteus::finalize();
   return 0;
 }
 

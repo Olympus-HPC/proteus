@@ -39,6 +39,7 @@
 using namespace proteus;
 
 int main() {
+  proteus::init();
   const char *Code = INCLUDE "\n" DEF_CHECK "\n"
                              R"cpp(
     #include <cstdio>
@@ -97,6 +98,7 @@ int main() {
   auto Bar = CJM.getFunction<void()>("bar");
   Bar.run();
 
+  proteus::finalize();
   return 0;
 }
 

@@ -13,6 +13,8 @@
 using namespace proteus;
 
 int main() {
+  proteus::init();
+
   const char *Code = R"cpp(
     #include <cstdio>
     template<typename T>
@@ -58,6 +60,7 @@ int main() {
 
   std::cout << "main V " << V << "\n";
 
+  proteus::finalize();
   return 0;
 }
 

@@ -24,6 +24,8 @@ using namespace builtins::gpu;
 #endif
 
 int main() {
+  proteus::init();
+
   auto J = proteus::JitModule(TARGET);
 
   auto KernelHandle =
@@ -125,6 +127,7 @@ int main() {
 
   gpuErrCheck(gpuFree(IntCounters));
   gpuErrCheck(gpuFree(FloatCounters));
+  proteus::finalize();
   return (IntVerified && FloatVerified) ? 0 : 1;
 }
 

@@ -74,6 +74,8 @@ auto createJitModule2() {
 }
 
 int main() {
+  proteus::init();
+
   auto [J1, F11, F12] = createJitModule1();
   auto [J2, F21, F22] = createJitModule2();
 
@@ -91,6 +93,7 @@ int main() {
   F22(&V);
   std::cout << "V " << V << "\n";
 
+  proteus::finalize();
   return 0;
 }
 
@@ -99,7 +102,7 @@ int main() {
 // CHECK-NEXT: V 23
 // CHECK-NEXT: V 142
 // CHECK-NEXT: V 123
-// CHECK-NEXT: [proteus][DispatcherHost] MemoryCache rank 0 hits 0 accesses 4
+// CHECK: [proteus][DispatcherHost] MemoryCache rank 0 hits 0 accesses 4
 // CHECK-COUNT-4: [proteus][DispatcherHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: [proteus][DispatcherHost] StorageCache rank 0 hits 0 accesses 2
 // CHECK-SECOND: [proteus][DispatcherHost] StorageCache rank 0 hits 2 accesses 2

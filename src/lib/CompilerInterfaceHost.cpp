@@ -16,6 +16,8 @@
 using namespace proteus;
 using namespace llvm;
 
+// NOLINTBEGIN(readability-identifier-naming)
+
 extern "C" __attribute__((used)) void *
 __jit_entry(char *FnName, char *IR, int IRSize, void **Args,
             RuntimeConstantInfo **RCInfoArrayPtr, int NumRuntimeConstants) {
@@ -37,9 +39,15 @@ __jit_register_lambda(const char *Symbol) {
   LambdaRegistry::instance().registerLambda(Symbol);
 }
 
-extern "C" void __jit_init_host() {}
+extern "C" void __jit_init_host() {
+  JitEngineHost &Jit = JitEngineHost::instance();
+  Jit.initCacheChain();
+}
 
-extern "C" void __jit_finalize_host() {}
+extern "C" void __jit_finalize_host() {
+  JitEngineHost &Jit = JitEngineHost::instance();
+  Jit.finalize();
+}
 
 extern "C" void __jit_enable_host() {
   JitEngineHost &Jit = JitEngineHost::instance();
@@ -50,3 +58,5 @@ extern "C" void __jit_disable_host() {
   JitEngineHost &Jit = JitEngineHost::instance();
   Jit.disable();
 }
+
+// NOLINTEND(readability-identifier-naming)

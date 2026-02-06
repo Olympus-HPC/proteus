@@ -12,7 +12,7 @@
 #define PROTEUS_JITENGINEDEVICE_H
 
 #include "proteus/Caching/MemoryCache.h"
-#include "proteus/Caching/ObjectCacheChain.h"
+#include "proteus/Caching/ObjectCacheRegistry.h"
 #include "proteus/Cloning.h"
 #include "proteus/CompilerAsync.h"
 #include "proteus/CompilerInterfaceTypes.h"
@@ -21,6 +21,7 @@
 #include "proteus/CoreLLVM.h"
 #include "proteus/Debug.h"
 #include "proteus/Hashing.h"
+#include "proteus/Init.h"
 #include "proteus/JitEngine.h"
 #include "proteus/TimeTracing.h"
 #include "proteus/Utils.h"
@@ -508,12 +509,24 @@ public:
     return KernelInfo.getStaticHash();
   }
 
+  static void initCacheChain() {
+    ObjectCacheRegistry::instance().create("JitEngineDevice");
+  }
+
+  static void finalizeCacheChain() {
+    if (auto CacheOpt =
+            ObjectCacheRegistry::instance().get("JitEngineDevice")) {
+      CacheOpt->get().finalize();
+    }
+  }
+
+public:
   void finalize() {
     if (Config::get().ProteusAsyncCompilation)
       CompilerAsync::instance(Config::get().ProteusAsyncThreads)
           .joinAllThreads();
 
-    LibraryCache.finalize();
+    finalizeCacheChain();
   }
 
   StringRef getDeviceArch() const { return DeviceArch; }
@@ -523,11 +536,13 @@ protected:
 
   ~JitEngineDevice() {
     CodeCache.printStats();
-    LibraryCache.printStats();
+    if (auto CacheOpt =
+            ObjectCacheRegistry::instance().get("JitEngineDevice")) {
+      CacheOpt->get().printStats();
+    }
   }
 
   MemoryCache<KernelFunction_t> CodeCache{"JitEngineDevice"};
-  ObjectCacheChain LibraryCache{"JitEngineDevice"};
   std::string DeviceArch;
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
@@ -539,6 +554,7 @@ JitEngineDevice<ImplT>::compileAndRun(
     JITKernelInfo &KernelInfo, dim3 GridDim, dim3 BlockDim, void **KernelArgs,
     uint64_t ShmemSize, typename DeviceTraits<ImplT>::DeviceStream_t Stream) {
   TIMESCOPE("compileAndRun");
+  ensureProteusInitialized();
 
   auto &BinInfo = KernelInfo.getBinaryInfo();
 
@@ -571,8 +587,8 @@ JitEngineDevice<ImplT>::compileAndRun(
   std::string Suffix = HashValue.toMangledSuffix();
   std::string KernelMangled = (KernelInfo.getName() + Suffix);
 
-  if (Config::get().ProteusUseStoredCache) {
-    auto CompiledLib = LibraryCache.lookup(HashValue);
+  if (auto CacheOpt = getLibraryCache("JitEngineDevice")) {
+    auto CompiledLib = CacheOpt->get().lookup(HashValue);
     if (CompiledLib) {
       if (!Config::get().ProteusRelinkGlobalsByCopy)
         relinkGlobalsObject(CompiledLib->ObjectModule->getMemBufferRef(),
@@ -639,10 +655,9 @@ JitEngineDevice<ImplT>::compileAndRun(
       BinInfo.getVarNameToGlobalInfo());
 
   CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
-  if (Config::get().ProteusUseStoredCache) {
-    LibraryCache.store(HashValue,
-                       CacheEntry::staticObject(ObjBuf->getMemBufferRef()));
-  }
+  if (auto CacheOpt = getLibraryCache("JitEngineDevice"))
+    CacheOpt->get().store(HashValue,
+                          CacheEntry::staticObject(ObjBuf->getMemBufferRef()));
 
   return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                               ShmemSize, Stream);

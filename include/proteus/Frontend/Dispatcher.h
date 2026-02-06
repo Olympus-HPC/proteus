@@ -38,6 +38,7 @@ struct LaunchDims {
 
 namespace proteus {
 
+class ObjectCacheChain;
 struct CompiledLibrary;
 class HashT;
 
@@ -75,6 +76,9 @@ struct DispatchResult;
 class Dispatcher {
 protected:
   TargetModelType TargetModel;
+  std::string DispatcherName;
+
+  ObjectCacheChain &getObjectCache();
 
 public:
   static Dispatcher &getDispatcher(TargetModelType TargetModel);

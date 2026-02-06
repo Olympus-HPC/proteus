@@ -3,10 +3,12 @@
 #include <iostream>
 
 #include "../../../gpu/gpu_common.h"
+#include <proteus/JitInterface.h>
 
 void daxpy(double A, double *X, double *Y, int N);
 
 int main(int argc, char **argv) {
+  proteus::init();
   int N = 1024;
   double *X;
   double *Y;
@@ -29,4 +31,7 @@ int main(int argc, char **argv) {
 
   gpuErrCheck(gpuFree(X));
   gpuErrCheck(gpuFree(Y));
+
+  proteus::finalize();
+  return 0;
 }

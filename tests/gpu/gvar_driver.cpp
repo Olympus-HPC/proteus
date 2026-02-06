@@ -3,12 +3,16 @@
 // RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/gvar_tracking.%ext | %FILECHECK %s --check-prefixes=CHECK
 // clang-format on
 
+#include <proteus/JitInterface.h>
+
 void printGVal2(int HValue);
 void printGVal1(int HValue);
 
 int main() {
+  proteus::init();
   printGVal1(2);
   printGVal2(3);
+  proteus::finalize();
 }
 
 // NOTE: On my testing system I am getting this output:

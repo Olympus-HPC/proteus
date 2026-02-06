@@ -33,6 +33,8 @@ void launcher(KernelStore &KS) {
 }
 
 int main() {
+  proteus::init();
+
   const char *Code = INCLUDE R"cpp(
     __global__
     extern "C" void foo(int a) {
@@ -46,6 +48,8 @@ int main() {
   KernelStore KS{Kernel};
   launcher(KS);
   gpuErrCheck(gpuDeviceSynchronize());
+  proteus::finalize();
+  return 0;
 }
 
 // clang-format off
