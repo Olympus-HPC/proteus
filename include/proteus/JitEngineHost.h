@@ -25,6 +25,7 @@
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Config.h"
 #include "proteus/Error.h"
+#include "proteus/Init.h"
 #include "proteus/JitEngine.h"
 
 namespace proteus {
@@ -60,7 +61,6 @@ public:
 
   void initCacheChain() {
     ObjectCacheRegistry::instance().create("JitEngineHost");
-    Initialized = true;
   }
 
   void finalize() {
@@ -69,18 +69,10 @@ public:
     }
   }
 
-  void ensureProteusInitialized() const {
-    if (!Initialized)
-      reportFatalError(
-          "proteus not initialized. Call proteus::init() before using JIT "
-          "compilation.");
-  }
-
 private:
   JitEngineHost();
   void addStaticLibrarySymbols();
   MemoryCache<void *> CodeCache{"JitEngineHost"};
-  bool Initialized = false;
 };
 
 } // namespace proteus

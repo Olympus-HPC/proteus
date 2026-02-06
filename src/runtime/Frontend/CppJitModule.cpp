@@ -39,14 +39,14 @@ CppJitModule::CppJitModule(TargetModelType TargetModel, const std::string &Code,
     : TargetModel(TargetModel), Code(Code),
       ModuleHash(std::make_unique<HashT>(hash(Code))), ExtraArgs(ExtraArgs),
       Dispatch(Dispatcher::getDispatcher(TargetModel)) {
-  JitEngineHost::instance().ensureProteusInitialized();
+  ensureProteusInitialized();
 }
 CppJitModule::CppJitModule(const std::string &Target, const std::string &Code,
                            const std::vector<std::string> &ExtraArgs)
     : TargetModel(parseTargetModel(Target)), Code(Code),
       ModuleHash(std::make_unique<HashT>(hash(Code))), ExtraArgs(ExtraArgs),
       Dispatch(Dispatcher::getDispatcher(TargetModel)) {
-  JitEngineHost::instance().ensureProteusInitialized();
+  ensureProteusInitialized();
 }
 CppJitModule::~CppJitModule() = default;
 
