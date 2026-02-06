@@ -8,7 +8,6 @@
 
 #include <iostream>
 #include <proteus/JitFrontend.h>
-#include <proteus/JitInterface.h>
 
 // Test unroll() without count.
 static auto getUnrollEnableFunction(int N) {

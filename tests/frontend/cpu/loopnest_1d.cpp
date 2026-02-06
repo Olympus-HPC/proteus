@@ -8,7 +8,6 @@
 
 #include <iostream>
 #include <proteus/JitFrontend.h>
-#include <proteus/JitInterface.h>
 
 static auto get1DLoopNestFunction(int N, int TileSize) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");

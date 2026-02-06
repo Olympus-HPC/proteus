@@ -2,6 +2,7 @@
 
 #include "proteus/CompiledLibrary.h"
 #include "proteus/Hashing.h"
+#include "proteus/JitEngineHost.h"
 
 #include <clang/CodeGen/CodeGenAction.h>
 #include <clang/Driver/Compilation.h>
@@ -37,12 +38,16 @@ CppJitModule::CppJitModule(TargetModelType TargetModel, const std::string &Code,
                            const std::vector<std::string> &ExtraArgs)
     : TargetModel(TargetModel), Code(Code),
       ModuleHash(std::make_unique<HashT>(hash(Code))), ExtraArgs(ExtraArgs),
-      Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
+      Dispatch(Dispatcher::getDispatcher(TargetModel)) {
+  JitEngineHost::instance().ensureProteusInitialized();
+}
 CppJitModule::CppJitModule(const std::string &Target, const std::string &Code,
                            const std::vector<std::string> &ExtraArgs)
     : TargetModel(parseTargetModel(Target)), Code(Code),
       ModuleHash(std::make_unique<HashT>(hash(Code))), ExtraArgs(ExtraArgs),
-      Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
+      Dispatch(Dispatcher::getDispatcher(TargetModel)) {
+  JitEngineHost::instance().ensureProteusInitialized();
+}
 CppJitModule::~CppJitModule() = default;
 
 void CppJitModule::compileCppToDynamicLibrary() {

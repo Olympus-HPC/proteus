@@ -71,6 +71,7 @@ auto createJitModule1() {
 }
 
 int main() {
+  proteus::init();
   auto [J, KernelHandle] = createJitModule1();
 
   double *V;
@@ -83,6 +84,7 @@ int main() {
 
   gpuErrCheck(gpuFree(V));
 
+  proteus::finalize();
   return 0;
 }
 

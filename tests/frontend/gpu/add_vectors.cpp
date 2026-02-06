@@ -8,7 +8,6 @@
 
 #include <proteus/Frontend/Builtins.h>
 #include <proteus/JitFrontend.h>
-#include <proteus/JitInterface.h>
 
 #include "../../gpu/gpu_common.h"
 
@@ -26,6 +25,8 @@ using namespace builtins::gpu;
 #endif
 
 int main() {
+  proteus::init();
+
   auto J = proteus::JitModule(TARGET);
 
   // Add a kernel with the signature: void add_vectors(double *A, double *B,
@@ -106,6 +107,7 @@ int main() {
   gpuErrCheck(gpuFree(A));
   gpuErrCheck(gpuFree(B));
 
+  proteus::finalize();
   return 0;
 }
 

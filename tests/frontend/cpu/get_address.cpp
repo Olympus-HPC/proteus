@@ -7,11 +7,12 @@
 #include <iostream>
 
 #include <proteus/JitFrontend.h>
-#include <proteus/JitInterface.h>
 
 using namespace proteus;
 
 int main() {
+  proteus::init();
+
   auto J = proteus::JitModule("host");
   {
     auto &Setter = J.addFunction<void(int *)>("set_via_ptr");
@@ -62,6 +63,7 @@ int main() {
   std::cout << "  after store via **: " << Results[2] << "\n";
   std::cout << "  after internal set_via_ptr: " << Results[3] << "\n";
 
+  proteus::finalize();
   return 0;
 }
 

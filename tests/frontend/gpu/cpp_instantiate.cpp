@@ -26,6 +26,8 @@
 using namespace proteus;
 
 int main() {
+  proteus::init();
+
   const char *Code = INCLUDE R"cpp(
     template<int V>
     __global__ void foo(double A, double *R) {
@@ -69,6 +71,7 @@ int main() {
 
   gpuErrCheck(gpuFree(R));
 
+  proteus::finalize();
   return 0;
 }
 

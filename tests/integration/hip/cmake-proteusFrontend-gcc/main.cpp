@@ -3,10 +3,12 @@
 #include <hip/hip_runtime.h>
 
 #include "proteus/CppJitModule.h"
+#include <proteus/JitInterface.h>
 
 using namespace proteus;
 
 int main() {
+  proteus::init();
   const char *CPUCode = R"cpp(
     #include <cstdio>
 
@@ -33,5 +35,6 @@ int main() {
   if (hipDeviceSynchronize() != hipSuccess)
     throw std::runtime_error("hipDeviceSynchronize failed");
 
+  proteus::finalize();
   return 0;
 }

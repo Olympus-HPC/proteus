@@ -9,7 +9,6 @@
 #include <cstdlib>
 #include <iostream>
 #include <proteus/JitFrontend.h>
-#include <proteus/JitInterface.h>
 
 static auto get3DUniformTileFunction(int DI, int DJ, int DK, int Tile) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
