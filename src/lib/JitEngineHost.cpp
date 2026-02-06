@@ -132,9 +132,10 @@ JitEngineHost::~JitEngineHost() {
   LibraryCache.printStats();
 }
 
-void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
-                                 ArrayRef<RuntimeConstant> RCArray,
-                                 const SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
+void JitEngineHost::specializeIR(
+    Module &M, StringRef FnName, StringRef Suffix,
+    ArrayRef<RuntimeConstant> RCArray,
+    const SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
   TIMESCOPE("specializeIR");
   Function *F = M.getFunction(FnName);
   assert(F && "Expected non-null function!");
@@ -198,7 +199,7 @@ void getLambdaJitValues(Module &M, StringRef FnName, void **Args,
 
   // Start with explicit values
   SmallVector<RuntimeConstant> MergedValues(ExplicitValues.begin(),
-                                             ExplicitValues.end());
+                                            ExplicitValues.end());
 
   // Auto-detect if enabled
   if (Config::get().ProteusAutoReadOnlyCaptures) {
@@ -214,13 +215,15 @@ void getLambdaJitValues(Module &M, StringRef FnName, void **Args,
 
         // 3. Get lambda closure pointer - try cache first, fallback to Args
         const void *LambdaClosure = nullptr;
-        const auto *ClosureData = LR.getClosureData(OptionalMapIt.value()->first);
+        const auto *ClosureData =
+            LR.getClosureData(OptionalMapIt.value()->first);
         if (ClosureData && !ClosureData->empty()) {
           LambdaClosure = ClosureData->data();
         } else if (Args) {
           // Fallback to Args[0] for backward compatibility
           // For host JIT, the lambda closure is passed as the first argument
-          // Args[0] contains a pointer-to-pointer to the lambda closure (due to ABI)
+          // Args[0] contains a pointer-to-pointer to the lambda closure (due to
+          // ABI)
           LambdaClosure = *static_cast<const void **>(Args[0]);
         }
 
@@ -238,9 +241,8 @@ void getLambdaJitValues(Module &M, StringRef FnName, void **Args,
             const char *ClosureBytes = static_cast<const char *>(LambdaClosure);
             for (const auto &Cap : DetectedCaptures) {
               if (Cap.IsReadOnly && Cap.Offset >= 0) {
-                AutoCaptures.push_back(
-                    readValueFromMemory(ClosureBytes + Cap.Offset, Cap.CaptureType,
-                                        Cap.SlotIndex));
+                AutoCaptures.push_back(readValueFromMemory(
+                    ClosureBytes + Cap.Offset, Cap.CaptureType, Cap.SlotIndex));
               }
             }
           }

@@ -13,19 +13,19 @@
 
 #include "proteus/CompilerInterfaceTypes.h"
 
-#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DataLayout.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/Constants.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/DataLayout.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace proteus {
 
@@ -33,16 +33,16 @@ using namespace llvm;
 
 /// Information about a detected lambda capture
 struct CaptureInfo {
-  int32_t Offset;              // Byte offset within lambda closure
-  int32_t SlotIndex;           // GEP slot index for struct access (0-based)
-  llvm::Type *CaptureType;     // LLVM type of the capture
-  bool IsReadOnly;             // Whether capture is read-only
+  int32_t Offset;          // Byte offset within lambda closure
+  int32_t SlotIndex;       // GEP slot index for struct access (0-based)
+  llvm::Type *CaptureType; // LLVM type of the capture
+  bool IsReadOnly;         // Whether capture is read-only
 };
 
 /// Check if a type is a supported scalar type for auto-detection
 inline bool isSupportedScalarType(llvm::Type *Ty) {
-  if (Ty->isIntegerTy(1) || Ty->isIntegerTy(8) ||
-      Ty->isIntegerTy(32) || Ty->isIntegerTy(64))
+  if (Ty->isIntegerTy(1) || Ty->isIntegerTy(8) || Ty->isIntegerTy(32) ||
+      Ty->isIntegerTy(64))
     return true;
   if (Ty->isFloatTy() || Ty->isDoubleTy())
     return true;
@@ -53,11 +53,11 @@ inline bool isSupportedScalarType(llvm::Type *Ty) {
 inline bool pointerEscapes(llvm::Value *V) {
   for (auto *User : V->users()) {
     if (isa<StoreInst>(User))
-      return true;  // Pointer stored somewhere
+      return true; // Pointer stored somewhere
     if (isa<CallInst>(User) || isa<InvokeInst>(User))
-      return true;  // Pointer passed to function
+      return true; // Pointer passed to function
     if (auto *GEP = dyn_cast<GetElementPtrInst>(User)) {
-      if (pointerEscapes(GEP))  // Recurse for derived pointers
+      if (pointerEscapes(GEP)) // Recurse for derived pointers
         return true;
     }
     // LoadInst is fine - just reading the value
@@ -65,7 +65,8 @@ inline bool pointerEscapes(llvm::Value *V) {
   return false;
 }
 
-/// Merge auto-detected captures with explicit captures (explicit takes precedence)
+/// Merge auto-detected captures with explicit captures (explicit takes
+/// precedence)
 inline void mergeCaptures(llvm::SmallVectorImpl<RuntimeConstant> &Explicit,
                           const llvm::SmallVectorImpl<RuntimeConstant> &Auto) {
   // Build set of slots already covered by explicit captures
@@ -170,7 +171,8 @@ inline llvm::SmallVector<CaptureInfo> analyzeReadOnlyCaptures(Function &F) {
         // Only add if we found a capture type and it's supported
         if (CaptureType && isSupportedScalarType(CaptureType)) {
           if (SlotInfo.find(SlotIndex) == SlotInfo.end()) {
-            SlotInfo[SlotIndex] = {ByteOffset, SlotIndex, CaptureType, IsReadOnly};
+            SlotInfo[SlotIndex] = {ByteOffset, SlotIndex, CaptureType,
+                                   IsReadOnly};
           } else {
             // Update read-only status if we found a store
             if (!IsReadOnly)
@@ -235,9 +237,8 @@ extractAutoDetectedCaptures(const void *LambdaClosure,
       continue;
 
     uint64_t ByteOffset = SL->getElementOffset(Cap.SlotIndex);
-    Result.push_back(
-        readValueFromMemory(ClosureBytes + ByteOffset, Cap.CaptureType,
-                            Cap.SlotIndex));
+    Result.push_back(readValueFromMemory(ClosureBytes + ByteOffset,
+                                         Cap.CaptureType, Cap.SlotIndex));
   }
 
   return Result;

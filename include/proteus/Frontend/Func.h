@@ -550,7 +550,9 @@ void FuncBase::beginFor(Var<IterT> &IterVar, const Var<InitT> &Init,
   // Erase the old terminator and branch to the header.
   eraseTerminator(CurBlock);
   setInsertPoint(CurBlock);
-  { createBr(Header); }
+  {
+    createBr(Header);
+  }
 
   setInsertPoint(Header);
   {
@@ -575,7 +577,9 @@ void FuncBase::beginFor(Var<IterT> &IterVar, const Var<InitT> &Init,
   }
 
   setInsertPoint(LoopExit);
-  { createBr(NextBlock); }
+  {
+    createBr(NextBlock);
+  }
 
   setInsertPointBegin(Body);
 }
@@ -593,7 +597,9 @@ void FuncBase::beginWhile(CondLambda &&Cond, const char *File, int Line) {
 
   eraseTerminator(CurBlock);
   setInsertPoint(CurBlock);
-  { createBr(LoopCond); }
+  {
+    createBr(LoopCond);
+  }
 
   setInsertPoint(LoopCond);
   {
@@ -606,7 +612,9 @@ void FuncBase::beginWhile(CondLambda &&Cond, const char *File, int Line) {
   createBr(LoopCond);
 
   setInsertPoint(LoopExit);
-  { createBr(NextBlock); }
+  {
+    createBr(NextBlock);
+  }
 
   setInsertPointBegin(Body);
 }
@@ -1632,7 +1640,9 @@ min(const Var<T> &L, const Var<T> &R) {
   auto ResultVar = Fn.declVar<remove_cvref_t<T>>("min_res");
   ResultVar = R;
   Fn.beginIf(L < R);
-  { ResultVar = L; }
+  {
+    ResultVar = L;
+  }
   Fn.endIf();
   return ResultVar;
 }
@@ -1648,7 +1658,9 @@ max(const Var<T> &L, const Var<T> &R) {
   auto ResultVar = Fn.declVar<remove_cvref_t<T>>("max_res");
   ResultVar = R;
   Fn.beginIf(L > R);
-  { ResultVar = L; }
+  {
+    ResultVar = L;
+  }
   Fn.endIf();
   return ResultVar;
 }

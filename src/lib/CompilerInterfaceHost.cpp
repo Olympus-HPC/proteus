@@ -33,7 +33,8 @@ extern "C" __attribute__((used)) void __jit_push_variable(RuntimeConstant RC) {
 }
 
 extern "C" __attribute__((used)) void
-__jit_register_lambda(const char *Symbol, const void *ClosurePtr, size_t ClosureSize) {
+__jit_register_lambda(const char *Symbol, const void *ClosurePtr,
+                      size_t ClosureSize) {
   LambdaRegistry::instance().registerLambda(Symbol, ClosurePtr, ClosureSize);
 }
 

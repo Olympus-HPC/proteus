@@ -79,14 +79,16 @@ public:
   // The LambdaType input argument is created as a global variable in the
   // ProteusPass, thus it has program-wide lifetime. Hence it is valid for
   // LambdaTypeRef to store a reference to it.
-  inline void registerLambda(const char *LambdaType, const void *ClosurePtr = nullptr,
+  inline void registerLambda(const char *LambdaType,
+                             const void *ClosurePtr = nullptr,
                              size_t ClosureSize = 0) {
     const StringRef LambdaTypeRef{LambdaType};
     PROTEUS_DBG(Logger::logs("proteus")
                 << "=> RegisterLambda " << LambdaTypeRef << "\n");
 
-    // Only update JitVariableMap if this is a new registration or if we have pending variables
-    // This prevents overwriting explicit captures when register_lambda is called multiple times
+    // Only update JitVariableMap if this is a new registration or if we have
+    // pending variables This prevents overwriting explicit captures when
+    // register_lambda is called multiple times
     auto It = JitVariableMap.find(LambdaTypeRef);
     if (It == JitVariableMap.end() || !PendingJitVariables.empty()) {
       JitVariableMap[LambdaTypeRef] = PendingJitVariables;
@@ -95,7 +97,8 @@ public:
 
     // Store closure data if auto-detection is enabled
     // Only store on first registration to avoid unnecessary copies
-    if (Config::get().ProteusAutoReadOnlyCaptures && ClosurePtr && ClosureSize > 0) {
+    if (Config::get().ProteusAutoReadOnlyCaptures && ClosurePtr &&
+        ClosureSize > 0) {
       auto ClosureIt = ClosureMap.find(LambdaTypeRef);
       if (ClosureIt == ClosureMap.end()) {
         ClosureMap[LambdaTypeRef] = ClosureData(ClosurePtr, ClosureSize);

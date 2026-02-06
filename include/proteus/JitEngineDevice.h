@@ -456,7 +456,7 @@ public:
 
       // Start with explicit values
       SmallVector<RuntimeConstant> MergedValues(ExplicitValues.begin(),
-                                                 ExplicitValues.end());
+                                                ExplicitValues.end());
 
       // Auto-detect if enabled
       if (Config::get().ProteusAutoReadOnlyCaptures) {
@@ -506,8 +506,8 @@ public:
       }
 
       // Append merged values to output
-      LambdaJitValuesVec.insert(LambdaJitValuesVec.end(),
-                                MergedValues.begin(), MergedValues.end());
+      LambdaJitValuesVec.insert(LambdaJitValuesVec.end(), MergedValues.begin(),
+                                MergedValues.end());
     }
   }
 
