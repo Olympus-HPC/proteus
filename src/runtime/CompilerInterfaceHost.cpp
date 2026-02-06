@@ -16,6 +16,8 @@
 using namespace proteus;
 using namespace llvm;
 
+// NOLINTBEGIN(readability-identifier-naming)
+
 extern "C" __attribute__((used)) void *
 __jit_entry(char *FnName, char *IR, int IRSize, void **Args,
             RuntimeConstantInfo **RCInfoArrayPtr, int NumRuntimeConstants) {
@@ -56,3 +58,5 @@ extern "C" void __jit_disable_host() {
   JitEngineHost &Jit = JitEngineHost::instance();
   Jit.disable();
 }
+
+// NOLINTEND(readability-identifier-naming)

@@ -14,6 +14,8 @@
 
 using namespace proteus;
 
+// NOLINTBEGIN(readability-identifier-naming)
+
 // NOTE: A great mystery is: why does this work ONLY if HostAddr is a CONST
 // void* for HIP
 extern "C" __attribute((used)) void __jit_register_var(void *Handle,
@@ -80,3 +82,5 @@ extern "C" void __jit_disable_device() {
   auto &Jit = JitDeviceImplT::instance();
   Jit.disable();
 }
+
+// NOLINTEND(readability-identifier-naming)
