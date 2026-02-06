@@ -19,7 +19,7 @@ inline bool &proteusIsInitialized() {
 }
 
 inline void ensureProteusInitialized() {
-  if (!isInitialized())
+  if (!proteusIsInitialized())
     reportFatalError(
         "proteus not initialized. Call proteus::init() before using JIT "
         "compilation.");
