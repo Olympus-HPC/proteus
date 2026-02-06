@@ -19,9 +19,11 @@
 #include <llvm/IR/Module.h>
 #include <llvm/Target/TargetMachine.h>
 
+#include "proteus/Caching/ObjectCacheRegistry.h"
 #include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/Config.h"
 #include "proteus/CoreLLVM.h"
+#include "proteus/Error.h"
 #include "proteus/Hashing.h"
 
 namespace proteus {
@@ -38,6 +40,16 @@ public:
   void disable() { Config::get().ProteusDisable = true; }
 
 protected:
+  std::optional<std::reference_wrapper<ObjectCacheChain>>
+  getLibraryCache(const std::string &EngineName) {
+    if (!Config::get().ProteusUseStoredCache)
+      return std::nullopt;
+    auto CacheOpt = ObjectCacheRegistry::instance().get(EngineName);
+    if (!CacheOpt)
+      reportFatalError("LibraryCache missing for " + EngineName + ".");
+    return CacheOpt;
+  }
+
   SmallVector<RuntimeConstant>
   getRuntimeConstantValues(void **KernelArgs,
                            ArrayRef<RuntimeConstantInfo *> RCInfoArray);

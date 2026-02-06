@@ -526,15 +526,6 @@ public:
           "compilation.");
   }
 
-  std::optional<std::reference_wrapper<ObjectCacheChain>> getLibraryCache() {
-    if (!Config::get().ProteusUseStoredCache)
-      return std::nullopt;
-    auto CacheOpt = ObjectCacheRegistry::instance().get("JitEngineDevice");
-    if (!CacheOpt)
-      reportFatalError("LibraryCache missing for JitEngineDevice.");
-    return CacheOpt;
-  }
-
 public:
   void finalize() {
     if (Config::get().ProteusAsyncCompilation)
@@ -602,7 +593,7 @@ JitEngineDevice<ImplT>::compileAndRun(
   std::string Suffix = HashValue.toMangledSuffix();
   std::string KernelMangled = (KernelInfo.getName() + Suffix);
 
-  if (auto CacheOpt = getLibraryCache()) {
+  if (auto CacheOpt = getLibraryCache("JitEngineDevice")) {
     auto CompiledLib = CacheOpt->get().lookup(HashValue);
     if (CompiledLib) {
       if (!Config::get().ProteusRelinkGlobalsByCopy)
@@ -670,7 +661,7 @@ JitEngineDevice<ImplT>::compileAndRun(
       BinInfo.getVarNameToGlobalInfo());
 
   CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
-  if (auto CacheOpt = getLibraryCache())
+  if (auto CacheOpt = getLibraryCache("JitEngineDevice"))
     CacheOpt->get().store(HashValue,
                           CacheEntry::staticObject(ObjBuf->getMemBufferRef()));
 
