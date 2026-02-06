@@ -25,7 +25,6 @@ extern "C" void __jit_init_host();
 extern "C" void __jit_init_device();
 extern "C" void __jit_finalize_host();
 extern "C" void __jit_finalize_device();
-extern "C" void __jit_finalize_caches();
 extern "C" void __jit_enable_host();
 extern "C" void __jit_enable_device();
 extern "C" void __jit_disable_host();
@@ -154,7 +153,6 @@ inline void finalize() {
 #if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
   __jit_finalize_device();
 #endif
-  __jit_finalize_caches();
 }
 
 } // namespace proteus
