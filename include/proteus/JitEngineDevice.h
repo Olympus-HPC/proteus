@@ -510,7 +510,6 @@ public:
 
   static void initCacheChain() {
     ObjectCacheRegistry::instance().create("JitEngineDevice");
-    InitializedFlag() = true;
   }
 
   static void finalizeCacheChain() {
@@ -521,7 +520,7 @@ public:
   }
 
   void ensureProteusInitialized() const {
-    if (!InitializedFlag())
+    if (!ObjectCacheRegistry::instance().get("JitEngineDevice"))
       reportFatalError(
           "proteus not initialized. Call proteus::init() before using JIT "
           "compilation.");
@@ -536,12 +535,6 @@ public:
     if (!CacheOpt)
       reportFatalError("LibraryCache missing for JitEngineDevice.");
     return CacheOpt;
-  }
-
-private:
-  static bool &InitializedFlag() {
-    static bool Initialized = false;
-    return Initialized;
   }
 
 public:
