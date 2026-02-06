@@ -137,7 +137,7 @@ public:
     instrumentRegisterFunction(M);
 
     findJitVariables(M);
-    instrumentRegisterJitVariablesWithLambda(M, StubToKernelMap);
+    registerJitVariablesWithLambda(M);
     registerLambdaFunctions(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
@@ -1241,8 +1241,18 @@ private:
     }
   }
 
-  void instrumentRegisterJitVariablesWithLambda(
-      Module &M, const DenseMap<Value *, GlobalVariable *> &StubToKernelMap) {
+  /// This function tells the Proteus runtime which variables to replace with
+  /// constants at runtime within a given lambda.  Here's how it works: (1)
+  /// Start at the callbase of each jit_variable function (2) Do very simple
+  /// use-def traversal to find the associated anonymous class (e.g. class.anon)
+  /// (3) Look at all callbases of each proteus::register_lambda template
+  /// instantiation. Because we
+  ///.    force passage of the lambda by value to register_lambda, the
+  ///instantiation must contain an .    AllocaInst of the lambda's corresponding
+  ///anonymous class.  The demangled name of the lambda .    can be deduced from
+  ///the name of the Clang-generated template instantiation. . (4) Inject the
+  ///demangled name into the original callbase of the `jit_variable` function.
+  void registerJitVariablesWithLambda(Module &M) {
     llvm::SmallVector<CallBase *, 16> JitVarFunctions;
     llvm::DenseMap<CallBase *, Type *> CallBaseToLambda;
     for (auto &F : M.getFunctionList()) {
@@ -1265,7 +1275,7 @@ private:
       for (User *Usr : CB->users()) {
         WorkList.push(Usr);
       }
-      while (!JitVarFunctions.empty()) {
+      while (!WorkList.empty()) {
         Value *Val = WorkList.front();
         WorkList.pop();
         if (Discovered.contains(Val))
@@ -1279,16 +1289,10 @@ private:
         if (StoreInst *Store = dyn_cast<StoreInst>(Val)) {
           WorkList.push(Store->getPointerOperand());
         }
-        // load
-        // if (LoadInst* Load = dyn_cast<LoadInst>(Val)) {
-        //   WorkList.push(Store->getPointerOperand());
-        // }
         // alloca
         if (AllocaInst *Alloc = dyn_cast<AllocaInst>(Val)) {
           if (StructType *LambdaType =
                   dyn_cast<StructType>(Alloc->getAllocatedType())) {
-            llvm::outs() << "FOUND LAMBDA " << *LambdaType
-                         << " associated with " << *CB << "\n";
             // We found the allocation site for the lambda
             CallBaseToLambda[CB] = LambdaType;
             break;
@@ -1297,25 +1301,35 @@ private:
       }
     }
 
-    // convert to demangled op name
-    for (const auto &[CB, LambdaType] : CallBaseToLambda) {
-      for (auto &[Val, _] : StubToKernelMap) {
-        Function *Func = dyn_cast<Function>(Val);
-        for (BasicBlock &BB : *Func) {
-          for (Instruction &I : BB) {
-            if (auto *Alloc = dyn_cast<AllocaInst>(&I);
-                Alloc && Alloc->getAllocatedType() == LambdaType) {
-              std::string DemangledName = demangle(Func->getName().str());
-              StringRef DemangledLambdaType =
-                  parseLambdaType(DemangledName, "__device_stub__kernel");
-              IRBuilder<> Builder(CB);
-              auto *LambdaNameGlobal =
-                  Builder.CreateGlobalString(DemangledLambdaType);
-              CB->setArgOperand(3, LambdaNameGlobal);
+    // Inject lambda's Clang-generated name into the jit_variable callsite.
+    for (auto &[CB, LambdaType] : CallBaseToLambda) {
+      bool FoundLambda = false;
+      for (auto &F : M.getFunctionList()) {
+        if (StringRef{demangle(F.getName().str())}.contains(
+                "proteus::register_lambda") &&
+            !FoundLambda) {
+          for (BasicBlock &BB : F) {
+            for (Instruction &I : BB) {
+              if (auto *Alloc = dyn_cast<AllocaInst>(&I);
+                  Alloc && Alloc->getAllocatedType() == LambdaType) {
+                // Demangle the register_lambda instantiation containing
+                // demangled name
+                std::string DemangledName = demangle(F.getName().str());
+                StringRef DemangledLambdaType =
+                    parseLambdaType(DemangledName, "proteus::register_lambda");
+                // Inject the demangled name back into the callsite
+                IRBuilder<> Builder(CB);
+                auto *LambdaNameGlobal =
+                    Builder.CreateGlobalString(DemangledLambdaType);
+                CB->setArgOperand(3, LambdaNameGlobal);
+                FoundLambda = true;
+              }
             }
           }
         }
       }
+      assert(FoundLambda && "Expected register_lambda call contained in Module "
+                            "corresponding to jit_variable");
     }
   }
 
