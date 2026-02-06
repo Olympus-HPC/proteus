@@ -42,7 +42,8 @@ public:
   ~JitEngineHost();
 
   void specializeIR(Module &M, StringRef FnName, StringRef Suffix,
-                    ArrayRef<RuntimeConstant> RCArray);
+                    ArrayRef<RuntimeConstant> RCArray,
+                    const SmallVector<RuntimeConstant> &LambdaJitValuesVec);
 
   void *compileAndLink(StringRef FnName, char *IR, int IRSize, void **Args,
                        ArrayRef<RuntimeConstantInfo *> RCInfoArray);

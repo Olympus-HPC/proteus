@@ -13,10 +13,11 @@ target_include_directories(IRLinker
 if(APPLE)
   # On macOS we avoid the use of the -Bsymbolic linker flag.
   target_link_libraries(IRLinker
-  PRIVATE LLVMLinker)
+  PRIVATE LLVMLinker proteus)
 else()
   target_link_libraries(IRLinker
   PRIVATE LLVMLinker
+  proteus
   -Wl,-Bsymbolic)
 endif()
 

@@ -11,6 +11,7 @@
 #ifndef PROTEUS_JITENGINEDEVICE_H
 #define PROTEUS_JITENGINEDEVICE_H
 
+#include "proteus/AutoReadOnlyCaptures.h"
 #include "proteus/Caching/MemoryCache.h"
 #include "proteus/Caching/ObjectCacheChain.h"
 #include "proteus/Cloning.h"
@@ -449,10 +450,64 @@ public:
     }
 
     for (auto &[FnName, LambdaType] : KernelInfo.getLambdaCalleeInfo()) {
-      const SmallVector<RuntimeConstant> &Values =
+      // Get explicit jit_variable captures
+      const SmallVector<RuntimeConstant> &ExplicitValues =
           LR.getJitVariables(LambdaType);
-      LambdaJitValuesVec.insert(LambdaJitValuesVec.end(), Values.begin(),
-                                Values.end());
+
+      // Start with explicit values
+      SmallVector<RuntimeConstant> MergedValues(ExplicitValues.begin(),
+                                                ExplicitValues.end());
+
+      // Auto-detect if enabled
+      if (Config::get().ProteusAutoReadOnlyCaptures) {
+        Module &KernelModule = getModule(KernelInfo);
+        Function *LambdaFn = KernelModule.getFunction(FnName);
+
+        if (LambdaFn) {
+          // 1. Analyze IR for read-only captures
+          auto DetectedCaptures = analyzeReadOnlyCaptures(*LambdaFn);
+
+          if (!DetectedCaptures.empty()) {
+            // 2. Get closure type and data layout
+            const DataLayout &DL = KernelModule.getDataLayout();
+            StructType *ClosureType = inferClosureType(*LambdaFn);
+
+            // 3. Get lambda closure from cached data (not KernelArgs)
+            const auto *ClosureData = LR.getClosureData(LambdaType);
+            if (ClosureData && !ClosureData->empty()) {
+              const void *LambdaClosure = ClosureData->data();
+
+              // 4. Extract auto-detected capture values
+              auto AutoCaptures = extractAutoDetectedCaptures(
+                  LambdaClosure, DetectedCaptures, DL, ClosureType);
+
+              // 5. Merge (explicit takes precedence)
+              mergeCaptures(MergedValues, AutoCaptures);
+
+              // 6. Trace auto-detected captures
+              if (Config::get().ProteusTraceOutput >= 1) {
+                for (const auto &RC : AutoCaptures) {
+                  // Only trace if it wasn't already explicit
+                  bool WasExplicit = false;
+                  for (const auto &Explicit : ExplicitValues) {
+                    if (Explicit.Pos == RC.Pos) {
+                      WasExplicit = true;
+                      break;
+                    }
+                  }
+                  if (!WasExplicit) {
+                    Logger::trace(traceOutAuto(RC.Pos, RC));
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Append merged values to output
+      LambdaJitValuesVec.insert(LambdaJitValuesVec.end(), MergedValues.begin(),
+                                MergedValues.end());
     }
   }
 

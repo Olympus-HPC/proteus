@@ -470,7 +470,9 @@ void FuncBase::beginFunction(const char *File, int Line) {
   PImpl->IRB.CreateBr(ExitBB);
 
   PImpl->IRB.SetInsertPoint(ExitBB);
-  { PImpl->IRB.CreateUnreachable(); }
+  {
+    PImpl->IRB.CreateUnreachable();
+  }
 
   PImpl->IP = IRBuilderBase::InsertPoint(BodyBB, BodyBB->begin());
   PImpl->IRB.restoreIP(PImpl->IP);
@@ -569,10 +571,14 @@ void FuncBase::beginIf(const Var<bool> &CondVar, const char *File, int Line) {
   }
 
   PImpl->IRB.SetInsertPoint(ThenBlock);
-  { PImpl->IRB.CreateBr(ExitBlock); }
+  {
+    PImpl->IRB.CreateBr(ExitBlock);
+  }
 
   PImpl->IRB.SetInsertPoint(ExitBlock);
-  { PImpl->IRB.CreateBr(NextBlock); }
+  {
+    PImpl->IRB.CreateBr(NextBlock);
+  }
 
   PImpl->IP = IRBuilderBase::InsertPoint(ThenBlock, ThenBlock->begin());
   PImpl->IRB.restoreIP(PImpl->IP);

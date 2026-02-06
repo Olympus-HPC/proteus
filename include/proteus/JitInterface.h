@@ -20,7 +20,9 @@
 #include <utility>
 
 extern "C" void __jit_push_variable(proteus::RuntimeConstant RC);
-extern "C" void __jit_register_lambda(const char *Symbol);
+extern "C" void __jit_register_lambda(const char *Symbol,
+                                      const void *ClosurePtr,
+                                      size_t ClosureSize);
 extern "C" void __jit_init_host();
 extern "C" void __jit_init_device();
 extern "C" void __jit_finalize_host();
@@ -58,9 +60,9 @@ jit_object(T *V, size_t Size = sizeof(std::remove_pointer_t<T>)) noexcept;
 
 #if defined(__CUDACC__) || defined(__HIP__)
 template <typename T>
-__attribute__((noinline)) __device__ std::enable_if_t<
-    std::is_trivially_copyable_v<std::remove_pointer_t<T>>, void>
-jit_object(T *V, size_t Size = sizeof(T)) noexcept;
+__attribute__((noinline)) __device__
+    std::enable_if_t<std::is_trivially_copyable_v<std::remove_pointer_t<T>>,
+                     void> jit_object(T *V, size_t Size = sizeof(T)) noexcept;
 #endif
 
 template <typename T>
@@ -75,8 +77,7 @@ template <typename T>
 __attribute__((noinline)) __device__ std::enable_if_t<
     !std::is_pointer_v<T> &&
         std::is_trivially_copyable_v<std::remove_reference_t<T>>,
-    void>
-jit_object(T &V, size_t Size = sizeof(T)) noexcept;
+    void> jit_object(T &V, size_t Size = sizeof(T)) noexcept;
 #endif
 
 template <typename T> inline static RuntimeConstantType convertCTypeToRCType() {
@@ -115,7 +116,7 @@ template <typename T>
 static __attribute__((noinline)) T &&
 register_lambda(T &&t, const char *Symbol = "") noexcept {
   assert(Symbol && "Expected non-null Symbol");
-  __jit_register_lambda(Symbol);
+  __jit_register_lambda(Symbol, &t, sizeof(T));
   return std::forward<T>(t);
 }
 
