@@ -10,6 +10,7 @@
 #include "proteus/JitInterface.h"
 #include "proteus/Init.h"
 
+// NOLINTBEGIN(readability-identifier-naming)
 extern "C" void __jit_init_host();
 extern "C" void __jit_init_device();
 extern "C" void __jit_finalize_host();
@@ -18,6 +19,7 @@ extern "C" void __jit_enable_host();
 extern "C" void __jit_enable_device();
 extern "C" void __jit_disable_host();
 extern "C" void __jit_disable_device();
+// NOLINTEND(readability-identifier-naming)
 
 namespace proteus {
 
