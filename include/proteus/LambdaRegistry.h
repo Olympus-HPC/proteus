@@ -53,8 +53,10 @@ public:
     return It;
   }
 
-  void pushJitVariable(RuntimeConstant &RC) {
-    PendingJitVariables.emplace_back(RC);
+  void setJitVariable(const char *LambdaType, RuntimeConstant RC) {
+    assert(JitVariableMap.contains(LambdaType) &&
+           "Lambda must be registered prior to register JIT variable!");
+    JitVariableMap[LambdaType].push_back(RC);
   }
 
   // The LambdaType input argument is created as a global variable in the
@@ -66,10 +68,8 @@ public:
                 << "=> RegisterLambda " << LambdaTypeRef << "\n");
     // Copy PendingJitVariables if there were changed, otherwise the runtime
     // values for the lambda definition have not changed.
-    if (!PendingJitVariables.empty()) {
-      JitVariableMap[LambdaTypeRef] = PendingJitVariables;
-      PendingJitVariables.clear();
-    }
+    if (!JitVariableMap.contains(LambdaTypeRef))
+      JitVariableMap[LambdaTypeRef] = SmallVector<RuntimeConstant>{};
   }
 
   const SmallVector<RuntimeConstant> &getJitVariables(StringRef LambdaTypeRef) {
@@ -80,7 +80,6 @@ public:
 
 private:
   explicit LambdaRegistry() = default;
-  SmallVector<RuntimeConstant> PendingJitVariables;
   DenseMap<StringRef, SmallVector<RuntimeConstant>> JitVariableMap;
 };
 
