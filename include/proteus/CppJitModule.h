@@ -2,7 +2,7 @@
 #define PROTEUS_CPPFRONTEND_H
 
 #include "proteus/Frontend/Dispatcher.h"
-#include "proteus/JitInterface.h"
+#include "proteus/Init.h"
 
 #include <algorithm>
 #include <sstream>

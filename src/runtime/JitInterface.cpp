@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "proteus/JitInterface.h"
+#include "proteus/Error.h"
 #include "proteus/Init.h"
 
 // NOLINTBEGIN(readability-identifier-naming)
@@ -22,6 +22,18 @@ extern "C" void __jit_disable_device();
 // NOLINTEND(readability-identifier-naming)
 
 namespace proteus {
+
+bool &proteusIsInitialized() {
+  static bool Initialized = false;
+  return Initialized;
+}
+
+void ensureProteusInitialized() {
+  if (!proteusIsInitialized())
+    reportFatalError(
+        "proteus not initialized. Call proteus::init() before using JIT "
+        "compilation.");
+}
 
 void init() {
   proteusIsInitialized() = true;

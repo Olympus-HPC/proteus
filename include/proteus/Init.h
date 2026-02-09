@@ -9,21 +9,15 @@
 #ifndef PROTEUS_INIT_H
 #define PROTEUS_INIT_H
 
-#include "proteus/Error.h"
-
 namespace proteus {
 
-inline bool &proteusIsInitialized() {
-  static bool Initialized = false;
-  return Initialized;
-}
+bool &proteusIsInitialized();
+void ensureProteusInitialized();
 
-inline void ensureProteusInitialized() {
-  if (!proteusIsInitialized())
-    reportFatalError(
-        "proteus not initialized. Call proteus::init() before using JIT "
-        "compilation.");
-}
+void init();
+void finalize();
+void enable();
+void disable();
 
 } // namespace proteus
 

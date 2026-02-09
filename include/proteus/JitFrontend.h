@@ -6,7 +6,7 @@
 #include "proteus/Frontend/Func.h"
 #include "proteus/Frontend/LoopNest.h"
 #include "proteus/Frontend/TypeMap.h"
-#include "proteus/JitInterface.h"
+#include "proteus/Init.h"
 
 #include <deque>
 #include <type_traits>

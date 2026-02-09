@@ -14,6 +14,7 @@
 #define PROTEUS_JIT_INTERFACE_H
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Init.h"
 
 #include <cassert>
 #include <cstring>
@@ -122,11 +123,6 @@ shared_array([[maybe_unused]] size_t N,
   return reinterpret_cast<T *>(shmem);
 }
 #endif
-
-void init();
-void finalize();
-void enable();
-void disable();
 
 } // namespace proteus
 
