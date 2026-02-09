@@ -22,5 +22,5 @@ jobs:
 
       - name: Check public headers
         run: |
-          python scripts/check_headers.py include/proteus
+          python scripts/checks/check_headers.py
           echo "✅ No internal headers found in public API"
