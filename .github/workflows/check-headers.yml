@@ -5,6 +5,7 @@ on:
     paths:
       - 'include/**/*.h'
       - 'src/include/**/*.h'
+      - 'scripts/checks/check-headers.py'
       - '.github/workflows/check-headers.yml'
 
 jobs:

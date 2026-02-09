@@ -17,7 +17,7 @@ def check_public_headers(include_dir):
                     continue
                 if re.search(r'#include\s+[<"].*proteus/impl.*[>"]', line):
                     print(f"::error file={header},line={line_num}::Public header includes internal header: {line.strip()}")
-                    found_issue = True
+                    found_error = True
     if found_error:
        sys.exit(1)
     else:
