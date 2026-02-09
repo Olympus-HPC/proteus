@@ -1,0 +1,184 @@
+//===-- MPIHelpers.cpp -- MPI helper classes for cache implementations --===//
+//
+// Part of the Proteus Project, under the Apache License v2.0 with LLVM
+// Exceptions. See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+//
+//===----------------------------------------------------------------------===//
+
+#include "proteus/Caching/MPIHelpers.h"
+
+#include "proteus/Caching/ObjectCache.h"
+#include "proteus/Config.h"
+#include "proteus/Error.h"
+#include "proteus/Logger.h"
+
+#include <llvm/ADT/StringRef.h>
+
+#include <mpi.h>
+
+#include <limits>
+
+namespace proteus {
+
+//===----------------------------------------------------------------------===//
+// MPI Validation
+//===----------------------------------------------------------------------===//
+
+void validateMPIConfig() {
+  int MPIInitialized = 0;
+  MPI_Initialized(&MPIInitialized);
+  if (!MPIInitialized) {
+    reportFatalError("proteus::init() with mpi-storage cache requires MPI to "
+                     "be initialized. Call MPI_Init_thread() before "
+                     "proteus::init()");
+  }
+
+  int Provided = 0;
+  MPI_Query_thread(&Provided);
+  if (Provided != MPI_THREAD_MULTIPLE) {
+    reportFatalError("MPI caching requires MPI_THREAD_MULTIPLE "
+                     "(provided level: " +
+                     std::to_string(Provided) +
+                     "). Initialize MPI with MPI_Init_thread()");
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// MPICommHandle implementation
+//===----------------------------------------------------------------------===//
+
+MPICommHandle::MPICommHandle() {
+  validateMPIConfig();
+
+  MPI_Comm_dup(MPI_COMM_WORLD, &Comm);
+  MPI_Comm_rank(Comm, &Rank);
+  MPI_Comm_size(Comm, &Size);
+
+  if (Config::get().ProteusTraceOutput >= 1) {
+    Logger::trace("[MPICommHandle] Initialized communicator for rank " +
+                  std::to_string(Rank) + "/" + std::to_string(Size) + "\n");
+  }
+}
+
+MPICommHandle::~MPICommHandle() {
+  if (Comm == MPI_COMM_NULL)
+    return;
+
+  int MPIFinalized = 0;
+  MPI_Finalized(&MPIFinalized);
+  if (!MPIFinalized)
+    MPI_Comm_free(&Comm);
+}
+
+MPI_Comm MPICommHandle::get() { return Comm; }
+
+int MPICommHandle::getRank() { return Rank; }
+
+int MPICommHandle::getSize() { return Size; }
+
+CommThreadHandle::~CommThreadHandle() { stop(); }
+
+void CommThreadHandle::stop() {
+  if (!Thread)
+    return;
+
+  {
+    std::lock_guard<std::mutex> Lock(Mutex);
+    ShutdownFlag.store(true, std::memory_order_release);
+  }
+  CondVar.notify_all();
+
+  if (Thread->joinable())
+    Thread->join();
+  Thread.reset();
+  Running.store(false, std::memory_order_release);
+}
+
+bool CommThreadHandle::isRunning() const {
+  return Running.load(std::memory_order_acquire);
+}
+
+bool CommThreadHandle::shutdownRequested() const {
+  return ShutdownFlag.load(std::memory_order_acquire);
+}
+
+bool CommThreadHandle::waitOrShutdown(std::chrono::milliseconds Timeout) {
+  std::unique_lock<std::mutex> Lock(Mutex);
+  return CondVar.wait_for(Lock, Timeout,
+                          [this] { return ShutdownFlag.load(); });
+}
+
+std::vector<char> packStoreMessage(MPI_Comm Comm, const HashT &HashValue,
+                                   const CacheEntry &Entry) {
+  std::string HashStr = HashValue.toString();
+  uint32_t HashSize = static_cast<uint32_t>(HashStr.size());
+  uint8_t IsDynLib = Entry.isSharedObject() ? 1 : 0;
+  uint64_t BufferSize = Entry.Buffer.getBufferSize();
+
+  if (BufferSize > static_cast<size_t>(std::numeric_limits<int>::max())) {
+    reportFatalError("Buffer size exceeds MPI int limit: " +
+                     std::to_string(BufferSize) + " bytes");
+  }
+
+  int HashSizeBytes, HashStrBytes, FlagBytes, BufSizeBytes, DataBytes;
+  MPI_Pack_size(1, MPI_UINT32_T, Comm, &HashSizeBytes);
+  MPI_Pack_size(static_cast<int>(HashSize), MPI_CHAR, Comm, &HashStrBytes);
+  MPI_Pack_size(1, MPI_BYTE, Comm, &FlagBytes);
+  MPI_Pack_size(1, MPI_UINT64_T, Comm, &BufSizeBytes);
+  MPI_Pack_size(static_cast<int>(BufferSize), MPI_BYTE, Comm, &DataBytes);
+
+  int TotalSize =
+      HashSizeBytes + HashStrBytes + FlagBytes + BufSizeBytes + DataBytes;
+  std::vector<char> Packed(TotalSize);
+  int Position = 0;
+
+  MPI_Pack(&HashSize, 1, MPI_UINT32_T, Packed.data(), TotalSize, &Position,
+           Comm);
+
+  MPI_Pack(HashStr.data(), static_cast<int>(HashSize), MPI_CHAR, Packed.data(),
+           TotalSize, &Position, Comm);
+
+  MPI_Pack(&IsDynLib, 1, MPI_BYTE, Packed.data(), TotalSize, &Position, Comm);
+
+  MPI_Pack(&BufferSize, 1, MPI_UINT64_T, Packed.data(), TotalSize, &Position,
+           Comm);
+
+  MPI_Pack(const_cast<char *>(Entry.Buffer.getBufferStart()),
+           static_cast<int>(BufferSize), MPI_BYTE, Packed.data(), TotalSize,
+           &Position, Comm);
+
+  return Packed;
+}
+
+StoreMessage unpackStoreMessage(MPI_Comm Comm,
+                                const std::vector<char> &Buffer) {
+  int Position = 0;
+  int TotalSize = static_cast<int>(Buffer.size());
+
+  uint32_t HashSize = 0;
+  MPI_Unpack(Buffer.data(), TotalSize, &Position, &HashSize, 1, MPI_UINT32_T,
+             Comm);
+
+  std::string HashStr(HashSize, '\0');
+  MPI_Unpack(Buffer.data(), TotalSize, &Position, HashStr.data(),
+             static_cast<int>(HashSize), MPI_CHAR, Comm);
+
+  uint8_t IsDynLib = 0;
+  MPI_Unpack(Buffer.data(), TotalSize, &Position, &IsDynLib, 1, MPI_BYTE, Comm);
+
+  uint64_t DataSize = 0;
+  MPI_Unpack(Buffer.data(), TotalSize, &Position, &DataSize, 1, MPI_UINT64_T,
+             Comm);
+
+  std::vector<char> Data(DataSize);
+  MPI_Unpack(Buffer.data(), TotalSize, &Position, Data.data(),
+             static_cast<int>(DataSize), MPI_BYTE, Comm);
+
+  return StoreMessage{HashT(llvm::StringRef(HashStr)), std::move(Data),
+                      IsDynLib != 0};
+}
+
+} // namespace proteus

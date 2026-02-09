@@ -10,6 +10,7 @@
 
 #include "proteus/impl/Caching/ObjectCacheChain.h"
 #ifdef PROTEUS_ENABLE_MPI
+#include "proteus/impl/Caching/MPICentralizedStorageCache.h"
 #include "proteus/impl/Caching/MPISharedStorageCache.h"
 #endif
 #include "proteus/impl/Caching/StorageCache.h"
@@ -78,6 +79,15 @@ ObjectCacheChain::createCache(const std::string &Name) {
 #else
     reportFatalError(
         "MPISharedStorageCache requested but Proteus built without MPI");
+#endif
+  }
+
+  if (LowerName == "mpi-centralized") {
+#ifdef PROTEUS_ENABLE_MPI
+    return std::make_unique<MPICentralizedStorageCache>(Label);
+#else
+    reportFatalError(
+        "MPICentralizedStorageCache requested but Proteus built without MPI");
 #endif
   }
 

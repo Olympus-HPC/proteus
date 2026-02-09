@@ -37,7 +37,7 @@ pushd build
 make -j
 popd
 
-# Run the MPI shared cache test.
+# Run the MPI shared cache test with mpi-storage backend.
 CACHE_DIR=$(mktemp -d)
 echo "Using temporary cache directory: ${CACHE_DIR}"
 
@@ -45,5 +45,13 @@ PROTEUS_CACHE_DIR=${CACHE_DIR} \
 PROTEUS_OBJECT_CACHE_CHAIN="mpi-storage" \
 run_mpi 4 ./build/mpi_shared_cache
 
+rm -rf ${CACHE_DIR}/*
+echo "=> PASSED mpi-shared-cache (mpi-storage)"
+
+# Run the MPI shared cache test with mpi-centralized backend.
+PROTEUS_CACHE_DIR=${CACHE_DIR} \
+PROTEUS_OBJECT_CACHE_CHAIN="mpi-centralized" \
+run_mpi 4 ./build/mpi_shared_cache
+
 rm -rf ${CACHE_DIR}
-echo "=> PASSED mpi-shared-cache"
+echo "=> PASSED mpi-shared-cache (mpi-centralized)"

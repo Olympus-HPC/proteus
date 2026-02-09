@@ -42,6 +42,8 @@ endif()
 
 if(PROTEUS_ENABLE_MPI)
   list(APPEND SOURCES
+    Caching/MPIHelpers.cpp
+    Caching/MPICentralizedStorageCache.cpp
     Caching/MPISharedStorageCache.cpp
   )
 endif()
