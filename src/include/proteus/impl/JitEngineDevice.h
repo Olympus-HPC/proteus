@@ -288,6 +288,8 @@ public:
                 void **KernelArgs, uint64_t ShmemSize,
                 typename DeviceTraits<ImplT>::DeviceStream_t Stream);
 
+  void flushLambdaRuntimeConstants(JITKernelInfo &KernelInfo);
+
   std::pair<std::unique_ptr<Module>, std::unique_ptr<MemoryBuffer>>
   extractKernelModule(BinaryInfo &BinInfo, StringRef KernelName,
                       LLVMContext &Ctx) {
@@ -561,6 +563,18 @@ protected:
 };
 
 template <typename ImplT>
+void JitEngineDevice<ImplT>::flushLambdaRuntimeConstants(
+    JITKernelInfo &KernelInfo) {
+  if (KernelInfo.hasLambdaCalleeInfo()) {
+    LambdaRegistry &LR = LambdaRegistry::instance();
+    for (const auto &[FuncName, LambdaName] :
+         KernelInfo.getLambdaCalleeInfo()) {
+      LR.flushRuntimeConstants(LambdaName);
+    }
+  }
+}
+
+template <typename ImplT>
 typename DeviceTraits<ImplT>::DeviceError_t
 JitEngineDevice<ImplT>::compileAndRun(
     JITKernelInfo &KernelInfo, dim3 GridDim, dim3 BlockDim, void **KernelArgs,
@@ -583,14 +597,10 @@ JitEngineDevice<ImplT>::compileAndRun(
       CodeCache.lookup(HashValue);
   if (KernelFunc) {
     // We need to flush out the runtime constants belonging to any lambdas
-    // contained within.
-    if (KernelInfo.hasLambdaCalleeInfo()) {
-      LambdaRegistry &LR = LambdaRegistry::instance();
-      for (const auto &[FuncName, LambdaName] :
-           KernelInfo.getLambdaCalleeInfo()) {
-        LR.flushRuntimeConstants(LambdaName);
-      }
-    }
+    // contained within.  It would be cool if we could create a Lambda class
+    // that owns the runtime values and automatically deallocates the fector
+    // when the real lambda is launched.
+    flushLambdaRuntimeConstants(KernelInfo);
     return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                                 ShmemSize, Stream);
   }
@@ -615,6 +625,7 @@ JitEngineDevice<ImplT>::compileAndRun(
           BinInfo.getVarNameToGlobalInfo());
 
       CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
+      flushLambdaRuntimeConstants(KernelInfo);
 
       return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                                   ShmemSize, Stream);
@@ -646,6 +657,7 @@ JitEngineDevice<ImplT>::compileAndRun(
     ObjBuf = AsyncCompiler->takeCompilationResult(
         HashValue, Config::get().ProteusAsyncTestBlocking);
     if (!ObjBuf) {
+      flushLambdaRuntimeConstants(KernelInfo);
       return launchKernelDirect(KernelInfo.getKernel(), GridDim, BlockDim,
                                 KernelArgs, ShmemSize, Stream);
     }
