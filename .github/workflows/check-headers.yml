@@ -23,5 +23,5 @@ jobs:
 
       - name: Check public headers
         run: |
-          python scripts/checks/check_headers.py
+          python scripts/checks/check-headers.py
           echo "✅ No internal headers found in public API"
