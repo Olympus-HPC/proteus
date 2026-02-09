@@ -8,7 +8,7 @@ set(SOURCES
   Error.cpp
   JitEngine.cpp
   JitEngineHost.cpp
-  JitInterface.cpp
+  Init.cpp
   TimeTracing.cpp
   Caching/ObjectCacheChain.cpp
   Caching/ObjectCacheRegistry.cpp

@@ -1,14 +1,13 @@
-//===-- JitInterface.cpp -- Proteus user-facing init/finalize/enable/disable
-//--===//
+//===-- Init.cpp -- Proteus initialization/finalization --------------===//
 //
 // Part of the Proteus Project, under the Apache License v2.0 with LLVM
 // Exceptions. See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
-//===----------------------------------------------------------------------===//
+//===----------------------------------------------------------------===//
 
-#include "proteus/Error.h"
 #include "proteus/Init.h"
+#include "proteus/Error.h"
 
 // NOLINTBEGIN(readability-identifier-naming)
 extern "C" void __jit_init_host();
