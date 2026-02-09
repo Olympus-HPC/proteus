@@ -8,13 +8,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "proteus/JitEngineDeviceCUDA.h"
-#include "proteus/CoreLLVM.h"
-#include "proteus/JitEngineDevice.h"
-#include "proteus/Utils.h"
-#include "proteus/UtilsCUDA.h"
+#include "proteus/impl/JitEngineDeviceCUDA.h"
+#include "proteus/impl/CoreLLVM.h"
+#include "proteus/impl/JitEngineDevice.h"
+#include "proteus/impl/Utils.h"
+#include "proteus/impl/UtilsCUDA.h"
 
 #include <cuda_runtime.h>
+
 #include <sys/types.h>
 
 using namespace proteus;

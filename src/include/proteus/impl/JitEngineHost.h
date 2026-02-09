@@ -19,13 +19,13 @@
 
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
 
+#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Error.h"
+#include "proteus/Init.h"
 #include "proteus/impl/Caching/MemoryCache.h"
 #include "proteus/impl/Caching/ObjectCacheChain.h"
 #include "proteus/impl/CompiledLibrary.h"
-#include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/impl/Config.h"
-#include "proteus/Error.h"
-#include "proteus/Init.h"
 #include "proteus/impl/JitEngine.h"
 
 namespace proteus {

@@ -11,11 +11,11 @@
 #ifndef PROTEUS_JITENGINEDEVICE_H
 #define PROTEUS_JITENGINEDEVICE_H
 
+#include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/impl/Caching/MemoryCache.h"
 #include "proteus/impl/Caching/ObjectCacheChain.h"
 #include "proteus/impl/Cloning.h"
 #include "proteus/impl/CompilerAsync.h"
-#include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/impl/CompilerSync.h"
 #include "proteus/impl/CoreDevice.h"
 #include "proteus/impl/CoreLLVM.h"

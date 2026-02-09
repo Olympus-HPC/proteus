@@ -5,6 +5,7 @@
 
 #include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.h"
+#include "proteus/impl/Caching/ObjectCacheChain.h"
 #include "proteus/impl/JitEngineDeviceHIP.h"
 
 namespace proteus {

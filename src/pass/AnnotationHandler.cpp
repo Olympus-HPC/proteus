@@ -4,7 +4,7 @@
 #include "Types.h"
 
 #include "proteus/Error.h"
-#include "proteus/RuntimeConstantTypeHelpers.h"
+#include "proteus/impl/RuntimeConstantTypeHelpers.h"
 
 #include <llvm/ADT/SetVector.h>
 #include <llvm/Demangle/Demangle.h>

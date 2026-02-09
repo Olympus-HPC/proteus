@@ -4,6 +4,7 @@
 #if PROTEUS_ENABLE_CUDA
 
 #include "proteus/Frontend/Dispatcher.h"
+#include "proteus/impl/Caching/ObjectCacheChain.h"
 #include "proteus/impl/JitEngineDeviceCUDA.h"
 
 namespace proteus {

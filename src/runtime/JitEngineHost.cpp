@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "proteus/impl/JitEngineHost.h"
-#include "proteus/impl/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/impl/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/LambdaRegistry.h"
 #include "proteus/impl/TransformArgumentSpecialization.h"

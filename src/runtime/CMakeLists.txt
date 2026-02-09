@@ -99,7 +99,10 @@ foreach(proteus_target ${PROTEUS_TARGETS})
   target_include_directories(${proteus_target}
     PUBLIC
     $<BUILD_INTERFACE:${PROTEUS_PROJECT_INCLUDE_DIR}>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    PRIVATE
+    ${PROJECT_SOURCE_DIR}/src/include
+  )
 endforeach()
 
 target_include_directories(proteusCore
@@ -255,3 +258,10 @@ install(DIRECTORY ${PROTEUS_PROJECT_INCLUDE_DIR}/
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
   FILES_MATCHING PATTERN "*.h"
 )
+
+if(PROTEUS_INSTALL_IMPL_HEADERS)
+  install(DIRECTORY ${PROJECT_SOURCE_DIR}/src/include/
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    FILES_MATCHING PATTERN "*.h"
+  )
+endif()

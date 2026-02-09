@@ -2,10 +2,10 @@
 #include <iostream>
 #include <string>
 
-#include <proteus/impl/CoreLLVM.h>
-#include <proteus/impl/CoreLLVMDevice.h>
 #include <proteus/Error.h>
 #include <proteus/JitInterface.h>
+#include <proteus/impl/CoreLLVM.h>
+#include <proteus/impl/CoreLLVMDevice.h>
 #include <proteus/impl/Utils.h>
 
 #include <hip/hip_runtime_api.h>

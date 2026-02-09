@@ -1,9 +1,9 @@
 #ifndef PROTEUS_PASS_HELPERS_H
 #define PROTEUS_PASS_HELPERS_H
 
-#include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/Error.h"
-#include "proteus/Logger.h"
+#include "proteus/impl/CompilerInterfaceRuntimeConstantInfo.h"
+#include "proteus/impl/Logger.h"
 
 #include <llvm/ADT/SetVector.h>
 #include <llvm/Demangle/Demangle.h>

@@ -1,5 +1,4 @@
 #include "proteus/Frontend/Dispatcher.h"
-
 #include "proteus/Error.h"
 #include "proteus/impl/Frontend/DispatcherHost.h"
 #if PROTEUS_ENABLE_HIP

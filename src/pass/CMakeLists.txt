@@ -34,6 +34,7 @@ add_library(ProteusPass SHARED
 
 target_include_directories(ProteusPass
   PRIVATE ${PROJECT_SOURCE_DIR}/include
+  PRIVATE ${PROJECT_SOURCE_DIR}/src/include
   ${CMAKE_CURRENT_BINARY_DIR}
 )
 
