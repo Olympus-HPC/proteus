@@ -13,7 +13,6 @@
 
 #include "proteus/Caching/MemoryCache.h"
 #include "proteus/Caching/ObjectCacheChain.h"
-#include "proteus/Caching/ObjectCacheRegistry.h"
 #include "proteus/Cloning.h"
 #include "proteus/CompilerAsync.h"
 #include "proteus/CompilerInterfaceTypes.h"
@@ -510,15 +509,19 @@ public:
     return KernelInfo.getStaticHash();
   }
 
-  static void initCacheChain() {
-    ObjectCacheRegistry::instance().create("JitEngineDevice");
+  void initCacheChain() {
+    CacheChain = std::make_unique<ObjectCacheChain>("JitEngineDevice");
   }
 
-  static void finalizeCacheChain() {
-    if (auto CacheOpt =
-            ObjectCacheRegistry::instance().get("JitEngineDevice")) {
-      CacheOpt->get().finalize();
-    }
+  void finalizeCacheChain() {
+    if (CacheChain)
+      CacheChain->finalize();
+  }
+
+  std::optional<std::reference_wrapper<ObjectCacheChain>> getLibraryCache() {
+    if (!Config::get().ProteusUseStoredCache || !CacheChain)
+      return std::nullopt;
+    return std::ref(*CacheChain);
   }
 
 public:
@@ -537,13 +540,12 @@ protected:
 
   ~JitEngineDevice() {
     CodeCache.printStats();
-    if (auto CacheOpt =
-            ObjectCacheRegistry::instance().get("JitEngineDevice")) {
-      CacheOpt->get().printStats();
-    }
+    if (CacheChain)
+      CacheChain->printStats();
   }
 
   MemoryCache<KernelFunction_t> CodeCache{"JitEngineDevice"};
+  std::unique_ptr<ObjectCacheChain> CacheChain;
   std::string DeviceArch;
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
@@ -588,7 +590,7 @@ JitEngineDevice<ImplT>::compileAndRun(
   std::string Suffix = HashValue.toMangledSuffix();
   std::string KernelMangled = (KernelInfo.getName() + Suffix);
 
-  if (auto CacheOpt = getLibraryCache("JitEngineDevice")) {
+  if (auto CacheOpt = getLibraryCache()) {
     auto CompiledLib = CacheOpt->get().lookup(HashValue);
     if (CompiledLib) {
       if (!Config::get().ProteusRelinkGlobalsByCopy)
@@ -656,7 +658,7 @@ JitEngineDevice<ImplT>::compileAndRun(
       BinInfo.getVarNameToGlobalInfo());
 
   CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
-  if (auto CacheOpt = getLibraryCache("JitEngineDevice"))
+  if (auto CacheOpt = getLibraryCache())
     CacheOpt->get().store(HashValue,
                           CacheEntry::staticObject(ObjBuf->getMemBufferRef()));
 

@@ -1,6 +1,7 @@
 #ifndef PROTEUS_FRONTEND_DISPATCHER_H
 #define PROTEUS_FRONTEND_DISPATCHER_H
 
+#include "proteus/Caching/ObjectCacheChain.h"
 #include "proteus/Error.h"
 #include "proteus/Frontend/TargetModel.h"
 
@@ -38,7 +39,6 @@ struct LaunchDims {
 
 namespace proteus {
 
-class ObjectCacheChain;
 struct CompiledLibrary;
 class HashT;
 
@@ -76,9 +76,11 @@ struct DispatchResult;
 class Dispatcher {
 protected:
   TargetModelType TargetModel;
-  std::string DispatcherName;
+  ObjectCacheChain Cache;
 
-  ObjectCacheChain &getObjectCache();
+  Dispatcher(const std::string &Name, TargetModelType TM);
+
+  ObjectCacheChain &getObjectCache() { return Cache; }
 
 public:
   static Dispatcher &getDispatcher(TargetModelType TargetModel);

@@ -3,8 +3,6 @@
 
 #if PROTEUS_ENABLE_CUDA
 
-#include "proteus/Caching/ObjectCacheChain.h"
-#include "proteus/Caching/ObjectCacheRegistry.h"
 #include "proteus/Frontend/Dispatcher.h"
 #include "proteus/JitEngineDeviceCUDA.h"
 
@@ -100,11 +98,9 @@ public:
 
 private:
   JitEngineDeviceCUDA &Jit;
-  DispatcherCUDA() : Jit(JitEngineDeviceCUDA::instance()) {
-    TargetModel = TargetModelType::CUDA;
-    DispatcherName = "DispatcherCUDA";
-    ObjectCacheRegistry::instance().create(DispatcherName);
-  }
+  DispatcherCUDA()
+      : Dispatcher("DispatcherCUDA", TargetModelType::CUDA),
+        Jit(JitEngineDeviceCUDA::instance()) {}
   MemoryCache<CUfunction> CodeCache{"DispatcherCUDA"};
 };
 

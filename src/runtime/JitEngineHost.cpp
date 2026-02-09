@@ -127,9 +127,8 @@ void JitEngineHost::notifyLoaded(MaterializationResponsibility & /*R*/,
 
 JitEngineHost::~JitEngineHost() {
   CodeCache.printStats();
-  if (auto CacheOpt = ObjectCacheRegistry::instance().get("JitEngineHost")) {
-    CacheOpt->get().printStats();
-  }
+  if (CacheChain)
+    CacheChain->printStats();
 }
 
 void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
@@ -241,7 +240,7 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 
   // Lookup the code library in the object cache chain to load without
   // compiling, if found.
-  auto CacheOpt = getLibraryCache("JitEngineHost");
+  auto CacheOpt = getLibraryCache();
   if (CacheOpt && (Library = CacheOpt->get().lookup(HashValue))) {
     loadCompiledLibrary(*Library);
   } else {

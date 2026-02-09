@@ -66,7 +66,9 @@ __jit_launch_kernel(void *Kernel, dim3 GridDim, dim3 BlockDim,
                                       ShmemSize, Stream);
 }
 
-extern "C" void __jit_init_device() { JitDeviceImplT::initCacheChain(); }
+extern "C" void __jit_init_device() {
+  JitDeviceImplT::instance().initCacheChain();
+}
 
 extern "C" void __jit_finalize_device() {
   auto &Jit = JitDeviceImplT::instance();

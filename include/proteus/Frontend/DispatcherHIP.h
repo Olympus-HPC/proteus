@@ -3,8 +3,6 @@
 
 #if PROTEUS_ENABLE_HIP
 
-#include "proteus/Caching/ObjectCacheChain.h"
-#include "proteus/Caching/ObjectCacheRegistry.h"
 #include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.h"
 #include "proteus/JitEngineDeviceHIP.h"
@@ -92,11 +90,9 @@ public:
 
 private:
   JitEngineDeviceHIP &Jit;
-  DispatcherHIP() : Jit(JitEngineDeviceHIP::instance()) {
-    TargetModel = TargetModelType::HIP;
-    DispatcherName = "DispatcherHIP";
-    ObjectCacheRegistry::instance().create(DispatcherName);
-  }
+  DispatcherHIP()
+      : Dispatcher("DispatcherHIP", TargetModelType::HIP),
+        Jit(JitEngineDeviceHIP::instance()) {}
   MemoryCache<hipFunction_t> CodeCache{"DispatcherHIP"};
 };
 
