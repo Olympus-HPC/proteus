@@ -1,18 +1,17 @@
-#ifndef PROTEUS_FRONTEND_DISPATCHER_HIP_H
-#define PROTEUS_FRONTEND_DISPATCHER_HIP_H
+#ifndef PROTEUS_FRONTEND_DISPATCHER_CUDA_H
+#define PROTEUS_FRONTEND_DISPATCHER_CUDA_H
 
-#if PROTEUS_ENABLE_HIP
+#if PROTEUS_ENABLE_CUDA
 
-#include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.h"
-#include "proteus/JitEngineDeviceHIP.h"
+#include "proteus/impl/JitEngineDeviceCUDA.h"
 
 namespace proteus {
 
-class DispatcherHIP : public Dispatcher {
+class DispatcherCUDA : public Dispatcher {
 public:
-  static DispatcherHIP &instance() {
-    static DispatcherHIP D;
+  static DispatcherCUDA &instance() {
+    static DispatcherCUDA D;
     return D;
   }
 
@@ -24,6 +23,15 @@ public:
     // trigger a lifetime bug.
     auto CtxOwner = std::move(Ctx);
     auto ModOwner = std::move(Mod);
+
+    // CMake finds LIBDEVICE_BC_PATH.
+    auto LibDeviceBuffer = llvm::MemoryBuffer::getFile(LIBDEVICE_BC_PATH);
+    auto LibDeviceModule = llvm::parseBitcodeFile(
+        LibDeviceBuffer->get()->getMemBufferRef(), ModOwner->getContext());
+
+    llvm::Linker linker(*ModOwner);
+    linker.linkInModule(std::move(LibDeviceModule.get()),
+                        llvm::Linker::Flags::LinkOnlyNeeded);
 
     std::unique_ptr<MemoryBuffer> ObjectModule =
         Jit.compileOnly(*ModOwner, DisableIROpt);
@@ -44,21 +52,16 @@ public:
   DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
                         LaunchDims BlockDim, void *KernelArgs[],
                         uint64_t ShmemSize, void *Stream) override {
-    dim3 HipGridDim = {GridDim.X, GridDim.Y, GridDim.Z};
-    dim3 HipBlockDim = {BlockDim.X, BlockDim.Y, BlockDim.Z};
-    hipStream_t HipStream = reinterpret_cast<hipStream_t>(Stream);
+    dim3 CudaGridDim = {GridDim.X, GridDim.Y, GridDim.Z};
+    dim3 CudaBlockDim = {BlockDim.X, BlockDim.Y, BlockDim.Z};
+    cudaStream_t CudaStream = reinterpret_cast<cudaStream_t>(Stream);
 
     return proteus::launchKernelFunction(
-        reinterpret_cast<hipFunction_t>(KernelFunc), HipGridDim, HipBlockDim,
-        KernelArgs, ShmemSize, HipStream);
+        reinterpret_cast<cudaFunction_t>(KernelFunc), CudaGridDim, CudaBlockDim,
+        KernelArgs, ShmemSize, CudaStream);
   }
 
   StringRef getDeviceArch() const override { return Jit.getDeviceArch(); }
-
-  ~DispatcherHIP() {
-    CodeCache.printStats();
-    getObjectCache().printStats();
-  }
 
   void *getFunctionAddress(const std::string &KernelName,
                            const HashT &ModuleHash,
@@ -85,19 +88,24 @@ public:
   }
 
   void registerDynamicLibrary(const HashT &, const std::string &) override {
-    reportFatalError("Dispatch HIP does not support registerDynamicLibrary");
+    reportFatalError("Dispatch CUDA does not support registerDynamicLibrary");
+  }
+
+  ~DispatcherCUDA() {
+    CodeCache.printStats();
+    getObjectCache().printStats();
   }
 
 private:
-  JitEngineDeviceHIP &Jit;
-  DispatcherHIP()
-      : Dispatcher("DispatcherHIP", TargetModelType::HIP),
-        Jit(JitEngineDeviceHIP::instance()) {}
-  MemoryCache<hipFunction_t> CodeCache{"DispatcherHIP"};
+  JitEngineDeviceCUDA &Jit;
+  DispatcherCUDA()
+      : Dispatcher("DispatcherCUDA", TargetModelType::CUDA),
+        Jit(JitEngineDeviceCUDA::instance()) {}
+  MemoryCache<CUfunction> CodeCache{"DispatcherCUDA"};
 };
 
 } // namespace proteus
 
 #endif
 
-#endif // PROTEUS_FRONTEND_DISPATCHER_HIP_H
+#endif // PROTEUS_FRONTEND_DISPATCHER_CUDA_H

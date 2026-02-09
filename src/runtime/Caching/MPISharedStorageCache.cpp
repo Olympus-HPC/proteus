@@ -8,13 +8,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "proteus/Caching/MPISharedStorageCache.h"
+#include "proteus/impl/Caching/MPISharedStorageCache.h"
 
-#include "proteus/Config.h"
+#include "proteus/impl/Config.h"
 #include "proteus/Error.h"
-#include "proteus/Logger.h"
-#include "proteus/TimeTracing.h"
-#include "proteus/Utils.h"
+#include "proteus/impl/Logger.h"
+#include "proteus/impl/TimeTracing.h"
+#include "proteus/impl/Utils.h"
 
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/MemoryBuffer.h>

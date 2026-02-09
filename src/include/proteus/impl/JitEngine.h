@@ -19,11 +19,11 @@
 #include <llvm/IR/Module.h>
 #include <llvm/Target/TargetMachine.h>
 
-#include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
-#include "proteus/Config.h"
-#include "proteus/CoreLLVM.h"
+#include "proteus/impl/CompilerInterfaceRuntimeConstantInfo.h"
+#include "proteus/impl/Config.h"
+#include "proteus/impl/CoreLLVM.h"
 #include "proteus/Error.h"
-#include "proteus/Hashing.h"
+#include "proteus/impl/Hashing.h"
 
 namespace proteus {
 

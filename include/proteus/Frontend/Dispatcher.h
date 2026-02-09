@@ -1,7 +1,7 @@
 #ifndef PROTEUS_FRONTEND_DISPATCHER_H
 #define PROTEUS_FRONTEND_DISPATCHER_H
 
-#include "proteus/Caching/ObjectCacheChain.h"
+#include "proteus/impl/Caching/ObjectCacheChain.h"
 #include "proteus/Error.h"
 #include "proteus/Frontend/TargetModel.h"
 

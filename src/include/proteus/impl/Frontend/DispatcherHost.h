@@ -1,9 +1,9 @@
 #ifndef PROTEUS_FRONTEND_DISPATCHER_HOST_H
 #define PROTEUS_FRONTEND_DISPATCHER_HOST_H
 
-#include "proteus/CompiledLibrary.h"
+#include "proteus/impl/CompiledLibrary.h"
 #include "proteus/Frontend/Dispatcher.h"
-#include "proteus/JitEngineHost.h"
+#include "proteus/impl/JitEngineHost.h"
 
 namespace proteus {
 
