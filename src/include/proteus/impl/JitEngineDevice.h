@@ -580,9 +580,19 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc =
       CodeCache.lookup(HashValue);
-  if (KernelFunc)
+  if (KernelFunc) {
+    // We need to flush out the runtime constants belonging to any lambdas
+    // contained within.
+    if (KernelInfo.hasLambdaCalleeInfo()) {
+      LambdaRegistry &LR = LambdaRegistry::instance();
+      for (const auto &[FuncName, LambdaName] :
+           KernelInfo.getLambdaCalleeInfo()) {
+        LR.flushRuntimeConstants(LambdaName);
+      }
+    }
     return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                                 ShmemSize, Stream);
+  }
 
   // NOTE: we don't need a suffix to differentiate kernels, each
   // specialization will be in its own module uniquely identify by HashValue.

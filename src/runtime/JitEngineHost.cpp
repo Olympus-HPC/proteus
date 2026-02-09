@@ -161,6 +161,7 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
             LambdaRegistry::instance().matchJitVariableMap(F->getName())) {
       auto &RCVec = OptionalMapIt.value()->getSecond();
       TransformLambdaSpecialization::transform(M, *F, RCVec);
+      LambdaRegistry::instance().flushRuntimeConstants(OptionalMapIt.value()->first);
     }
   }
 
@@ -176,7 +177,7 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
 
 void getLambdaJitValues(StringRef FnName,
                         SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
-  LambdaRegistry LR = LambdaRegistry::instance();
+  LambdaRegistry& LR = LambdaRegistry::instance();
   if (LR.empty())
     return;
 
@@ -187,7 +188,7 @@ void getLambdaJitValues(StringRef FnName,
   SmallVector<StringRef> LambdaCalleeInfo;
   PROTEUS_DBG(Logger::logs("proteus")
               << " Trying F " << demangle(FnName.str()) << "\n ");
-  auto OptionalMapIt = LambdaRegistry::instance().matchJitVariableMap(FnName);
+  auto OptionalMapIt = LR.matchJitVariableMap(FnName);
   if (!OptionalMapIt)
     return;
 
@@ -231,8 +232,15 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 
   // Lookup the function pointer in the code cache.
   void *JitFnPtr = CodeCache.lookup(HashValue);
-  if (JitFnPtr)
+  if (JitFnPtr) {
+    auto& LR = LambdaRegistry::instance();
+    if (auto OptionalMapIt = LR.matchJitVariableMap(FnName); OptionalMapIt) {
+      for (const auto& v : OptionalMapIt.value()->second) {
+      }
+      LR.flushRuntimeConstants(OptionalMapIt.value()->first);
+    }
     return JitFnPtr;
+  }
 
   std::string Suffix = HashValue.toMangledSuffix();
   std::string MangledFnName = FnName.str() + Suffix;
