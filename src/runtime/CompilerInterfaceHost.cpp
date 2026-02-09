@@ -37,9 +37,7 @@ __jit_register_variable(RuntimeConstant RC, const char *LambdaName) {
 }
 
 extern "C" __attribute__((used)) void
-__jit_register_lambda(const char *Symbol) {
-  LambdaRegistry::instance().registerLambda(Symbol);
-}
+__jit_register_lambda(const char *Symbol) {}
 
 extern "C" void __jit_init_host() {
   ObjectCacheRegistry::instance().get("JitEngineHost");

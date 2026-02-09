@@ -117,11 +117,13 @@ jit_variable(T V, int Pos = -1, int Offset = -1,
 
 template <typename T>
 static __attribute__((noinline)) T
-register_lambda(T t, const char *Symbol = "") noexcept {
+register_lambda(const T &t, const char *Symbol = "") noexcept {
   assert(Symbol && "Expected non-null Symbol");
   // Force LLVM to generate an AllocaInst of the underlying Clang--generated
-  // anonymous class for T.
-  __jit_take_address(&t);
+  // anonymous class for T.  We remove this after recording the demangled
+  // lambda name.
+  T local = t;
+  __jit_take_address(&local);
   __jit_register_lambda(Symbol);
   return t;
 }

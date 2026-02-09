@@ -23,6 +23,11 @@ public:
     return Singleton;
   }
 
+  void flushRuntimeConstants(StringRef LambdaName) {
+    assert(JitVariableMap.contains(LambdaName));
+    JitVariableMap[LambdaName].clear();
+  }
+
   std::optional<DenseMap<StringRef, SmallVector<RuntimeConstant>>::iterator>
   matchJitVariableMap(StringRef FnName) {
     std::string Operator = llvm::demangle(FnName.str());
@@ -56,19 +61,6 @@ public:
     assert(JitVariableMap.contains(LambdaType) &&
            "Lambda must be registered prior to register JIT variable!");
     JitVariableMap[LambdaType].push_back(RC);
-  }
-
-  // The LambdaType input argument is created as a global variable in the
-  // ProteusPass, thus it has program-wide lifetime. Hence it is valid for
-  // LambdaTypeRef to store a reference to it.
-  inline void registerLambda(const char *LambdaType) {
-    const StringRef LambdaTypeRef{LambdaType};
-    PROTEUS_DBG(Logger::logs("proteus")
-                << "=> RegisterLambda " << LambdaTypeRef << "\n");
-    // Copy PendingJitVariables if there were changed, otherwise the runtime
-    // values for the lambda definition have not changed.
-    if (!JitVariableMap.contains(LambdaTypeRef))
-      JitVariableMap[LambdaTypeRef] = SmallVector<RuntimeConstant>{};
   }
 
   const SmallVector<RuntimeConstant> &getJitVariables(StringRef LambdaTypeRef) {
