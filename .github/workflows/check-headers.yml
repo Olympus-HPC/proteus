@@ -1,0 +1,26 @@
+name: Check Header Includes
+
+on:
+  pull_request:
+    paths:
+      - 'include/**/*.h'
+      - 'src/include/**/*.h'
+      - '.github/workflows/check-headers.yml'
+
+jobs:
+  check-headers:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Check public headers
+        run: |
+          python scripts/check_headers.py include/proteus
+          echo "✅ No internal headers found in public API"
