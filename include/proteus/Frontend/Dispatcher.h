@@ -3,7 +3,6 @@
 
 #include "proteus/Error.h"
 #include "proteus/Frontend/TargetModel.h"
-#include "proteus/impl/Caching/ObjectCacheChain.h"
 
 #if PROTEUS_ENABLE_HIP && __HIP__
 #include <hip/hip_runtime.h>
@@ -39,6 +38,7 @@ struct LaunchDims {
 
 namespace proteus {
 
+class ObjectCacheChain;
 struct CompiledLibrary;
 class HashT;
 
@@ -76,11 +76,11 @@ struct DispatchResult;
 class Dispatcher {
 protected:
   TargetModelType TargetModel;
-  ObjectCacheChain Cache;
+  std::unique_ptr<ObjectCacheChain> Cache;
 
   Dispatcher(const std::string &Name, TargetModelType TM);
 
-  ObjectCacheChain &getObjectCache() { return Cache; }
+  ObjectCacheChain &getObjectCache();
 
 public:
   static Dispatcher &getDispatcher(TargetModelType TargetModel);
