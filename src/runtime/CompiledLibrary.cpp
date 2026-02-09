@@ -1,9 +1,10 @@
-#include <memory>
-#include <string>
+
+#include "proteus/impl/CompiledLibrary.h"
 
 #include <llvm/Support/MemoryBuffer.h>
 
-#include "proteus/CompiledLibrary.h"
+#include <memory>
+#include <string>
 
 namespace proteus {
 

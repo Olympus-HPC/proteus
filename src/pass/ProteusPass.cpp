@@ -28,12 +28,12 @@
 #include "AnnotationHandler.h"
 #include "Helpers.h"
 
-#include "proteus/Cloning.h"
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Error.h"
-#include "proteus/Hashing.h"
-#include "proteus/Logger.h"
-#include "proteus/RuntimeConstantTypeHelpers.h"
+#include "proteus/impl/Cloning.h"
+#include "proteus/impl/Hashing.h"
+#include "proteus/impl/Logger.h"
+#include "proteus/impl/RuntimeConstantTypeHelpers.h"
 
 #include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/ADT/StringRef.h>

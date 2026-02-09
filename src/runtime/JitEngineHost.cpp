@@ -10,15 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "proteus/JitEngineHost.h"
-#include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
+#include "proteus/impl/JitEngineHost.h"
 #include "proteus/CompilerInterfaceTypes.h"
-#include "proteus/CoreLLVM.h"
-#include "proteus/LambdaRegistry.h"
-#include "proteus/TransformArgumentSpecialization.h"
-#include "proteus/TransformLambdaSpecialization.h"
+#include "proteus/impl/CompilerInterfaceRuntimeConstantInfo.h"
+#include "proteus/impl/CoreLLVM.h"
+#include "proteus/impl/LambdaRegistry.h"
+#include "proteus/impl/TransformArgumentSpecialization.h"
+#include "proteus/impl/TransformLambdaSpecialization.h"
 #if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
-#include "proteus/CompilerInterfaceDevice.h"
+#include "proteus/impl/CompilerInterfaceDevice.h"
 #endif
 
 #include <llvm/ExecutionEngine/JITEventListener.h>

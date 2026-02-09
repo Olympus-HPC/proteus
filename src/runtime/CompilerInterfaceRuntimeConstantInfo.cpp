@@ -1,6 +1,6 @@
 // NOLINTBEGIN(readability-identifier-naming)
 
-#include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
+#include "proteus/impl/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/CompilerInterfaceTypes.h"
 
 #include <llvm/Support/Debug.h>

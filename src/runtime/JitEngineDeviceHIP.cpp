@@ -8,11 +8,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "proteus/JitEngineDeviceHIP.h"
-#include "proteus/CoreDevice.h"
-#include "proteus/CoreLLVM.h"
-#include "proteus/CoreLLVMHIP.h"
-#include "proteus/TimeTracing.h"
+#include "proteus/impl/JitEngineDeviceHIP.h"
+#include "proteus/impl/CoreDevice.h"
+#include "proteus/impl/CoreLLVM.h"
+#include "proteus/impl/CoreLLVMHIP.h"
+#include "proteus/impl/TimeTracing.h"
 
 #if LLVM_VERSION_MAJOR == 18
 #include <lld/Common/Driver.h>

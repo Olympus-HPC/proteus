@@ -1,7 +1,7 @@
 #include "proteus/CppJitModule.h"
 
-#include "proteus/CompiledLibrary.h"
-#include "proteus/Hashing.h"
+#include "proteus/impl/CompiledLibrary.h"
+#include "proteus/impl/Hashing.h"
 
 #include <clang/CodeGen/CodeGenAction.h>
 #include <clang/Driver/Compilation.h>

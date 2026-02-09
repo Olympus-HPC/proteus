@@ -1,7 +1,6 @@
 #include "proteus/Frontend/Func.h"
-
-#include "proteus/CoreLLVMDevice.h"
 #include "proteus/JitFrontend.h"
+#include "proteus/impl/CoreLLVMDevice.h"
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>

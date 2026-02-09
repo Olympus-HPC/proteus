@@ -1,7 +1,6 @@
 #include "proteus/JitFrontend.h"
-
-#include "proteus/CompiledLibrary.h"
-#include "proteus/Hashing.h"
+#include "proteus/impl/CompiledLibrary.h"
+#include "proteus/impl/Hashing.h"
 
 #include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/IR/Module.h>
