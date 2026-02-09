@@ -12,6 +12,7 @@
 #define PROTEUS_JITENGINEDEVICE_H
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Init.h"
 #include "proteus/impl/Caching/MemoryCache.h"
 #include "proteus/impl/Caching/ObjectCacheChain.h"
 #include "proteus/impl/Cloning.h"
@@ -21,7 +22,6 @@
 #include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/Debug.h"
 #include "proteus/impl/Hashing.h"
-#include "proteus/Init.h"
 #include "proteus/impl/JitEngine.h"
 #include "proteus/impl/TimeTracing.h"
 #include "proteus/impl/Utils.h"

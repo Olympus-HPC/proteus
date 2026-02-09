@@ -1,9 +1,9 @@
 #ifndef PROTEUS_FRONTEND_DISPATCHER_H
 #define PROTEUS_FRONTEND_DISPATCHER_H
 
-#include "proteus/impl/Caching/ObjectCacheChain.h"
 #include "proteus/Error.h"
 #include "proteus/Frontend/TargetModel.h"
+#include "proteus/impl/Caching/ObjectCacheChain.h"
 
 #if PROTEUS_ENABLE_HIP && __HIP__
 #include <hip/hip_runtime.h>
