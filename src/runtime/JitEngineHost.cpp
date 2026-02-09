@@ -161,7 +161,8 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
             LambdaRegistry::instance().matchJitVariableMap(F->getName())) {
       auto &RCVec = OptionalMapIt.value()->getSecond();
       TransformLambdaSpecialization::transform(M, *F, RCVec);
-      LambdaRegistry::instance().flushRuntimeConstants(OptionalMapIt.value()->first);
+      LambdaRegistry::instance().flushRuntimeConstants(
+          OptionalMapIt.value()->first);
     }
   }
 
@@ -177,7 +178,7 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
 
 void getLambdaJitValues(StringRef FnName,
                         SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
-  LambdaRegistry& LR = LambdaRegistry::instance();
+  LambdaRegistry &LR = LambdaRegistry::instance();
   if (LR.empty())
     return;
 
@@ -233,10 +234,10 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   // Lookup the function pointer in the code cache.
   void *JitFnPtr = CodeCache.lookup(HashValue);
   if (JitFnPtr) {
-    auto& LR = LambdaRegistry::instance();
+    // If we find a cache hit we need to flush the jit_variable entries from the
+    // registry because they have already been injected into the IR by Proteus
+    auto &LR = LambdaRegistry::instance();
     if (auto OptionalMapIt = LR.matchJitVariableMap(FnName); OptionalMapIt) {
-      for (const auto& v : OptionalMapIt.value()->second) {
-      }
       LR.flushRuntimeConstants(OptionalMapIt.value()->first);
     }
     return JitFnPtr;
