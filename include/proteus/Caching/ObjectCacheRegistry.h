@@ -11,10 +11,6 @@
 #ifndef PROTEUS_OBJECTCACHEREGISTRY_H
 #define PROTEUS_OBJECTCACHEREGISTRY_H
 
-#include "proteus/Caching/ObjectCacheChain.h"
-
-#include <llvm/ADT/StringRef.h>
-
 #include <functional>
 #include <memory>
 #include <optional>
@@ -23,15 +19,18 @@
 
 namespace proteus {
 
-using namespace llvm;
+class ObjectCacheChain;
 
 class ObjectCacheRegistry {
 public:
   static ObjectCacheRegistry &instance();
 
-  void create(StringRef Label);
+  ~ObjectCacheRegistry();
 
-  std::optional<std::reference_wrapper<ObjectCacheChain>> get(StringRef Label);
+  void create(const std::string &Label);
+
+  std::optional<std::reference_wrapper<ObjectCacheChain>>
+  get(const std::string &Label);
 
   void printStats();
 

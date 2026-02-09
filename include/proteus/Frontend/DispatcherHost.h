@@ -1,6 +1,7 @@
 #ifndef PROTEUS_FRONTEND_DISPATCHER_HOST_H
 #define PROTEUS_FRONTEND_DISPATCHER_HOST_H
 
+#include "proteus/Caching/ObjectCacheChain.h"
 #include "proteus/Caching/ObjectCacheRegistry.h"
 #include "proteus/CompiledLibrary.h"
 #include "proteus/Frontend/Dispatcher.h"

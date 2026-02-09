@@ -12,6 +12,7 @@
 #define PROTEUS_JITENGINEDEVICE_H
 
 #include "proteus/Caching/MemoryCache.h"
+#include "proteus/Caching/ObjectCacheChain.h"
 #include "proteus/Caching/ObjectCacheRegistry.h"
 #include "proteus/Cloning.h"
 #include "proteus/CompilerAsync.h"

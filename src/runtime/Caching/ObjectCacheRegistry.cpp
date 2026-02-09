@@ -9,25 +9,27 @@
 //===----------------------------------------------------------------------===//
 
 #include "proteus/Caching/ObjectCacheRegistry.h"
+#include "proteus/Caching/ObjectCacheChain.h"
 
 namespace proteus {
+
+ObjectCacheRegistry::~ObjectCacheRegistry() = default;
 
 ObjectCacheRegistry &ObjectCacheRegistry::instance() {
   static auto *Registry = new ObjectCacheRegistry();
   return *Registry;
 }
 
-void ObjectCacheRegistry::create(StringRef Label) {
-  std::string Key = Label.str();
-  auto It = Chains.find(Key);
+void ObjectCacheRegistry::create(const std::string &Label) {
+  auto It = Chains.find(Label);
   if (It == Chains.end()) {
-    Chains.emplace(Key, std::make_unique<ObjectCacheChain>(Key));
+    Chains.emplace(Label, std::make_unique<ObjectCacheChain>(Label));
   }
 }
 
 std::optional<std::reference_wrapper<ObjectCacheChain>>
-ObjectCacheRegistry::get(StringRef Label) {
-  auto It = Chains.find(Label.str());
+ObjectCacheRegistry::get(const std::string &Label) {
+  auto It = Chains.find(Label);
   if (It == Chains.end()) {
     return std::nullopt;
   }

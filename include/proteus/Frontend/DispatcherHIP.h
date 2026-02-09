@@ -3,6 +3,7 @@
 
 #if PROTEUS_ENABLE_HIP
 
+#include "proteus/Caching/ObjectCacheChain.h"
 #include "proteus/Caching/ObjectCacheRegistry.h"
 #include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.h"

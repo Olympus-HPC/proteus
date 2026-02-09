@@ -20,6 +20,7 @@
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
 
 #include "proteus/Caching/MemoryCache.h"
+#include "proteus/Caching/ObjectCacheChain.h"
 #include "proteus/Caching/ObjectCacheRegistry.h"
 #include "proteus/CompiledLibrary.h"
 #include "proteus/CompilerInterfaceTypes.h"

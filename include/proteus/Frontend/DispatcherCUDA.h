@@ -3,6 +3,7 @@
 
 #if PROTEUS_ENABLE_CUDA
 
+#include "proteus/Caching/ObjectCacheChain.h"
 #include "proteus/Caching/ObjectCacheRegistry.h"
 #include "proteus/Frontend/Dispatcher.h"
 #include "proteus/JitEngineDeviceCUDA.h"
