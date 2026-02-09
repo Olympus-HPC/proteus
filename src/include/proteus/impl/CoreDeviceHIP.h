@@ -2,8 +2,8 @@
 #define CORE_HIP_H
 
 #include "proteus/Error.h"
-#include "proteus/GlobalVarInfo.h"
-#include "proteus/UtilsHIP.h"
+#include "proteus/impl/GlobalVarInfo.h"
+#include "proteus/impl/UtilsHIP.h"
 
 #include <llvm/ADT/StringRef.h>
 

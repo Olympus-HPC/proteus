@@ -12,8 +12,8 @@
 #define PROTEUS_TRANSFORM_LAMBDA_SPECIALIZATION_H
 
 #include "proteus/CompilerInterfaceTypes.h"
-#include "proteus/Debug.h"
-#include "proteus/Utils.h"
+#include "proteus/impl/Debug.h"
+#include "proteus/impl/Utils.h"
 
 #include <llvm/Demangle/Demangle.h>
 #include <llvm/IR/IRBuilder.h>

@@ -11,10 +11,12 @@
 #ifndef PROTEUS_JITENGINEDEVICECUDA_H
 #define PROTEUS_JITENGINEDEVICECUDA_H
 
-#include "proteus/JitEngineDevice.h"
-#include "proteus/Utils.h"
+#include "proteus/impl/JitEngineDevice.h"
+#include "proteus/impl/Utils.h"
+
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/SmallVector.h>
+
 #include <memory>
 
 namespace proteus {

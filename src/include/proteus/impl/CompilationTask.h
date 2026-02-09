@@ -2,12 +2,12 @@
 #define PROTEUS_COMPILATION_TASK_H
 
 #include "proteus/CompilerInterfaceTypes.h"
-#include "proteus/Config.h"
-#include "proteus/CoreLLVM.h"
-#include "proteus/CoreLLVMDevice.h"
-#include "proteus/Debug.h"
-#include "proteus/Hashing.h"
-#include "proteus/Utils.h"
+#include "proteus/impl/Config.h"
+#include "proteus/impl/CoreLLVM.h"
+#include "proteus/impl/CoreLLVMDevice.h"
+#include "proteus/impl/Debug.h"
+#include "proteus/impl/Hashing.h"
+#include "proteus/impl/Utils.h"
 
 #include <llvm/Bitcode/BitcodeReader.h>
 #include <llvm/Bitcode/BitcodeWriter.h>

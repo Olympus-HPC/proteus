@@ -13,12 +13,12 @@
 
 #if PROTEUS_ENABLE_CUDA
 
-#include "proteus/JitEngineDeviceCUDA.h"
+#include "proteus/impl/JitEngineDeviceCUDA.h"
 using JitDeviceImplT = proteus::JitEngineDeviceCUDA;
 
 #elif PROTEUS_ENABLE_HIP
 
-#include "proteus/JitEngineDeviceHIP.h"
+#include "proteus/impl/JitEngineDeviceHIP.h"
 using JitDeviceImplT = proteus::JitEngineDeviceHIP;
 
 #else

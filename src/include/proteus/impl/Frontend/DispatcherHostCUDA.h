@@ -3,8 +3,8 @@
 
 #if PROTEUS_ENABLE_CUDA
 
-#include "proteus/Frontend/DispatcherHost.h"
-#include "proteus/JitEngineDeviceCUDA.h"
+#include "proteus/impl/Frontend/DispatcherHost.h"
+#include "proteus/impl/JitEngineDeviceCUDA.h"
 
 namespace proteus {
 

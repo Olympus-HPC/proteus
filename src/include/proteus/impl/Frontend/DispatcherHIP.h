@@ -3,10 +3,10 @@
 
 #if PROTEUS_ENABLE_HIP
 
-#include "proteus/Caching/ObjectCacheChain.h"
 #include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.h"
-#include "proteus/JitEngineDeviceHIP.h"
+#include "proteus/impl/Caching/ObjectCacheChain.h"
+#include "proteus/impl/JitEngineDeviceHIP.h"
 
 namespace proteus {
 

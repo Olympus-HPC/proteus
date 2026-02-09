@@ -1,10 +1,10 @@
 #ifndef PROTEUS_CLONING_H
 #define PROTEUS_CLONING_H
 
-#include "proteus/Config.h"
-#include "proteus/Debug.h"
 #include "proteus/Error.h"
-#include "proteus/Logger.h"
+#include "proteus/impl/Config.h"
+#include "proteus/impl/Debug.h"
+#include "proteus/impl/Logger.h"
 
 #include <llvm/Analysis/CallGraph.h>
 #include <llvm/IR/Constants.h>

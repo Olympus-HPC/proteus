@@ -1,6 +1,12 @@
 #ifndef PROTEUS_CORE_LLVM_CUDA_H
 #define PROTEUS_CORE_LLVM_CUDA_H
 
+#include "proteus/impl/CoreLLVM.h"
+#include "proteus/impl/Debug.h"
+#include "proteus/impl/Logger.h"
+#include "proteus/impl/TimeTracing.h"
+#include "proteus/impl/UtilsCUDA.h"
+
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/CodeGen/MachineModuleInfo.h>
@@ -9,12 +15,6 @@
 #include <llvm/Support/MemoryBufferRef.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Target/TargetMachine.h>
-
-#include "proteus/CoreLLVM.h"
-#include "proteus/Debug.h"
-#include "proteus/Logger.h"
-#include "proteus/TimeTracing.h"
-#include "proteus/UtilsCUDA.h"
 
 namespace proteus {
 

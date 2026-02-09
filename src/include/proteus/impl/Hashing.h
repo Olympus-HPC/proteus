@@ -2,8 +2,8 @@
 #define PROTEUS_HASHING_H
 
 #include "proteus/CompilerInterfaceTypes.h"
-#include "proteus/RuntimeConstantTypeHelpers.h"
-#include "proteus/TimeTracing.h"
+#include "proteus/impl/RuntimeConstantTypeHelpers.h"
+#include "proteus/impl/TimeTracing.h"
 
 #include <llvm/ADT/ArrayRef.h>
 #if LLVM_VERSION_MAJOR >= 18

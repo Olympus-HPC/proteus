@@ -1,6 +1,5 @@
-#include "proteus/CompilerInterfaceDevice.h"
-
-#include "proteus/CoreDevice.h"
+#include "proteus/impl/CompilerInterfaceDevice.h"
+#include "proteus/impl/CoreDevice.h"
 
 // Return "auto" should resolve to cudaError_t or hipError_t.
 inline auto __jit_launch_kernel_internal(void *Kernel, dim3 GridDim,

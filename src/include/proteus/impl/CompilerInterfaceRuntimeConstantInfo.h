@@ -2,10 +2,10 @@
 #define PROTEUS_COMPILER_INTERFACE_RUNTIME_CONSTANT_INFO_H
 
 #include "proteus/CompilerInterfaceTypes.h"
-#include "proteus/Debug.h"
 #include "proteus/Error.h"
-#include "proteus/Logger.h"
-#include "proteus/RuntimeConstantTypeHelpers.h"
+#include "proteus/impl/Debug.h"
+#include "proteus/impl/Logger.h"
+#include "proteus/impl/RuntimeConstantTypeHelpers.h"
 
 #include <optional>
 

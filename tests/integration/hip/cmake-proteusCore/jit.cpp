@@ -2,10 +2,10 @@
 #include <iostream>
 #include <string>
 
-#include <proteus/CoreLLVM.h>
-#include <proteus/CoreLLVMDevice.h>
 #include <proteus/Error.h>
-#include <proteus/Utils.h>
+#include <proteus/impl/CoreLLVM.h>
+#include <proteus/impl/CoreLLVMDevice.h>
+#include <proteus/impl/Utils.h>
 
 #include <hip/hip_runtime_api.h>
 #include <llvm/Bitcode/BitcodeReader.h>

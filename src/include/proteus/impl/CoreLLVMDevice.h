@@ -2,14 +2,21 @@
 #define PROTEUS_CORE_LLVM_DEVICE_H
 
 #if PROTEUS_ENABLE_HIP
-#include "proteus/CoreLLVMHIP.h"
+#include "proteus/impl/CoreLLVMHIP.h"
 #endif
 
 #if PROTEUS_ENABLE_CUDA
-#include "proteus/CoreLLVMCUDA.h"
+#include "proteus/impl/CoreLLVMCUDA.h"
 #endif
 
 #if defined(PROTEUS_ENABLE_HIP) || defined(PROTEUS_ENABLE_CUDA)
+
+#include "proteus/impl/CoreDevice.h"
+#include "proteus/impl/GlobalVarInfo.h"
+#include "proteus/impl/LambdaRegistry.h"
+#include "proteus/impl/TransformArgumentSpecialization.h"
+#include "proteus/impl/TransformLambdaSpecialization.h"
+#include "proteus/impl/TransformSharedArray.h"
 
 #include <llvm/Analysis/CallGraph.h>
 #include <llvm/Bitcode/BitcodeReader.h>
@@ -20,13 +27,6 @@
 #include <llvm/IR/Verifier.h>
 #include <llvm/Object/ELFObjectFile.h>
 #include <llvm/Transforms/Utils/Cloning.h>
-
-#include "proteus/CoreDevice.h"
-#include "proteus/GlobalVarInfo.h"
-#include "proteus/LambdaRegistry.h"
-#include "proteus/TransformArgumentSpecialization.h"
-#include "proteus/TransformLambdaSpecialization.h"
-#include "proteus/TransformSharedArray.h"
 
 namespace proteus {
 

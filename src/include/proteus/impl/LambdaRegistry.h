@@ -1,16 +1,15 @@
 #ifndef PROTEUS_LAMBDA_INTERFACE_H
 #define PROTEUS_LAMBDA_INTERFACE_H
 
+#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Error.h"
+#include "proteus/impl/Config.h"
+#include "proteus/impl/Debug.h"
+#include "proteus/impl/Logger.h"
+
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Demangle/Demangle.h>
-
-#include "proteus/CompilerInterfaceTypes.h"
-#include "proteus/Config.h"
-#include "proteus/Debug.h"
-#include "proteus/Error.h"
-#include "proteus/Logger.h"
-
 namespace proteus {
 
 using namespace llvm;

@@ -11,9 +11,9 @@
 #ifndef PROTEUS_JITSTOREDCACHE_H
 #define PROTEUS_JITSTOREDCACHE_H
 
-#include "proteus/Caching/ObjectCache.h"
-#include "proteus/CompiledLibrary.h"
-#include "proteus/Hashing.h"
+#include "proteus/impl/Caching/ObjectCache.h"
+#include "proteus/impl/CompiledLibrary.h"
+#include "proteus/impl/Hashing.h"
 
 #include <llvm/Support/MemoryBufferRef.h>
 

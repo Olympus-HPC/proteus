@@ -12,8 +12,8 @@
 #define PROTEUS_UTILS_H
 
 #include "proteus/Error.h"
-#include "proteus/Logger.h"
-#include "proteus/TimeTracing.h"
+#include "proteus/impl/Logger.h"
+#include "proteus/impl/TimeTracing.h"
 
 #include <llvm/ADT/Twine.h>
 #include <llvm/Support/SourceMgr.h>
@@ -80,11 +80,11 @@ inline std::string getDistributedRank() {
 }
 
 #if PROTEUS_ENABLE_HIP
-#include "proteus/UtilsHIP.h"
+#include "proteus/impl/UtilsHIP.h"
 #endif
 
 #if PROTEUS_ENABLE_CUDA
-#include "proteus/UtilsCUDA.h"
+#include "proteus/impl/UtilsCUDA.h"
 #endif
 
 #endif

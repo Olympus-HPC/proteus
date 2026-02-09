@@ -1,11 +1,11 @@
 #ifndef PROTEUS_SYNC_COMPILER_H
 #define PROTEUS_SYNC_COMPILER_H
 
-#include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
+#include "proteus/impl/CompilationTask.h"
+#include "proteus/impl/Debug.h"
+#include "proteus/impl/Hashing.h"
 
-#include "proteus/CompilationTask.h"
-#include "proteus/Debug.h"
-#include "proteus/Hashing.h"
+#include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 
 namespace proteus {
 

@@ -1,8 +1,8 @@
 #ifndef PROTEUS_CORE_CUDA_H
 #define PROTEUS_CORE_CUDA_H
 
-#include "proteus/GlobalVarInfo.h"
-#include "proteus/UtilsCUDA.h"
+#include "proteus/impl/GlobalVarInfo.h"
+#include "proteus/impl/UtilsCUDA.h"
 
 #include <llvm/ADT/StringRef.h>
 

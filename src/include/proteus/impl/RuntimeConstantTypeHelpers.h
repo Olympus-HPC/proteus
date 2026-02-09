@@ -1,13 +1,13 @@
 #ifndef PROTEUS_RUNTIME_CONSTANT_TYPE_HELPERS_H
 #define PROTEUS_RUNTIME_CONSTANT_TYPE_HELPERS_H
 
-#include <string>
+#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Error.h"
 
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Type.h>
 
-#include "proteus/CompilerInterfaceTypes.h"
-#include "proteus/Error.h"
+#include <string>
 
 namespace proteus {
 

@@ -12,10 +12,10 @@
 #define PROTEUS_TRANSFORM_ARGUMENT_SPECIALIZATION_H
 
 #include "proteus/CompilerInterfaceTypes.h"
-#include "proteus/Config.h"
-#include "proteus/Debug.h"
-#include "proteus/Logger.h"
-#include "proteus/RuntimeConstantTypeHelpers.h"
+#include "proteus/impl/Config.h"
+#include "proteus/impl/Debug.h"
+#include "proteus/impl/Logger.h"
+#include "proteus/impl/RuntimeConstantTypeHelpers.h"
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/Support/Debug.h>

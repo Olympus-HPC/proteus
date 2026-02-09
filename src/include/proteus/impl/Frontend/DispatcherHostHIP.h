@@ -3,8 +3,8 @@
 
 #if PROTEUS_ENABLE_HIP
 
-#include "proteus/Frontend/DispatcherHost.h"
-#include "proteus/JitEngineDeviceHIP.h"
+#include "proteus/impl/Frontend/DispatcherHost.h"
+#include "proteus/impl/JitEngineDeviceHIP.h"
 
 namespace proteus {
 

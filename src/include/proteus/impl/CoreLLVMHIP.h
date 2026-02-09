@@ -1,13 +1,13 @@
 #ifndef PROTEUS_CORE_LLVM_HIP_H
 #define PROTEUS_CORE_LLVM_HIP_H
 
-#include "proteus/CoreLLVM.h"
-#include "proteus/Debug.h"
 #include "proteus/Error.h"
-#include "proteus/Logger.h"
-#include "proteus/TimeTracing.h"
-#include "proteus/Utils.h"
-#include "proteus/UtilsHIP.h"
+#include "proteus/impl/CoreLLVM.h"
+#include "proteus/impl/Debug.h"
+#include "proteus/impl/Logger.h"
+#include "proteus/impl/TimeTracing.h"
+#include "proteus/impl/Utils.h"
+#include "proteus/impl/UtilsHIP.h"
 
 #include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/CodeGen/MachineModuleInfo.h>

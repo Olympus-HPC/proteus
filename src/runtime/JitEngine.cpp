@@ -8,12 +8,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <cstdlib>
-#include <string>
+#include "proteus/impl/JitEngine.h"
+#include "proteus/impl/TimeTracing.h"
 
-#include "proteus/Hashing.h"
-#include "proteus/JitEngine.h"
-#include "proteus/TimeTracing.h"
+#include <cstdlib>
 
 namespace proteus {
 

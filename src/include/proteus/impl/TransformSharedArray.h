@@ -11,9 +11,9 @@
 #ifndef PROTEUS_TRANSFORM_SHARED_ARRAY_H
 #define PROTEUS_TRANSFORM_SHARED_ARRAY_H
 
-#include "proteus/Debug.h"
-#include "proteus/Logger.h"
-#include "proteus/Utils.h"
+#include "proteus/impl/Debug.h"
+#include "proteus/impl/Logger.h"
+#include "proteus/impl/Utils.h"
 
 #include <llvm/Analysis/ConstantFolding.h>
 #include <llvm/Demangle/Demangle.h>

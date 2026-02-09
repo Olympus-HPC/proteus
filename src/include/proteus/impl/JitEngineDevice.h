@@ -11,19 +11,19 @@
 #ifndef PROTEUS_JITENGINEDEVICE_H
 #define PROTEUS_JITENGINEDEVICE_H
 
-#include "proteus/Caching/MemoryCache.h"
-#include "proteus/Caching/ObjectCacheChain.h"
-#include "proteus/Cloning.h"
-#include "proteus/CompilerAsync.h"
 #include "proteus/CompilerInterfaceTypes.h"
-#include "proteus/CompilerSync.h"
-#include "proteus/CoreDevice.h"
-#include "proteus/CoreLLVM.h"
-#include "proteus/Debug.h"
-#include "proteus/Hashing.h"
-#include "proteus/JitEngine.h"
-#include "proteus/TimeTracing.h"
-#include "proteus/Utils.h"
+#include "proteus/impl/Caching/MemoryCache.h"
+#include "proteus/impl/Caching/ObjectCacheChain.h"
+#include "proteus/impl/Cloning.h"
+#include "proteus/impl/CompilerAsync.h"
+#include "proteus/impl/CompilerSync.h"
+#include "proteus/impl/CoreDevice.h"
+#include "proteus/impl/CoreLLVM.h"
+#include "proteus/impl/Debug.h"
+#include "proteus/impl/Hashing.h"
+#include "proteus/impl/JitEngine.h"
+#include "proteus/impl/TimeTracing.h"
+#include "proteus/impl/Utils.h"
 
 #include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/ADT/SmallVector.h>

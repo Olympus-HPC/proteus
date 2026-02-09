@@ -2,7 +2,7 @@
 #define PROTEUS_CONFIG_H
 
 #include "proteus/Error.h"
-#include "proteus/Logger.h"
+#include "proteus/impl/Logger.h"
 
 #include "llvm/ADT/StringMap.h"
 #include <llvm/Support/JSON.h>

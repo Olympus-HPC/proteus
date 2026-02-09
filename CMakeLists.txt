@@ -18,6 +18,7 @@ option(PROTEUS_ENABLE_MPI "Enable MPI support for shared caching" OFF)
 option(BUILD_SHARED "Builds the JIT library as shared" OFF)
 option(ENABLE_TESTS "Enable tests" OFF)
 option(ENABLE_DEVELOPER_COMPILER_FLAGS "Enable developer compiler flags: -Wall -Wextra -Werror" OFF)
+option(PROTEUS_INSTALL_IMPL_HEADERS "Install implementation headers" OFF)
 
 # Enforce LLVM_INSTALL_DIR requirement.
 if(NOT DEFINED LLVM_INSTALL_DIR OR LLVM_INSTALL_DIR STREQUAL "")

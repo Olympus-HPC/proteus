@@ -13,15 +13,13 @@
 #ifndef PROTEUS_JITENGINEHOST_H
 #define PROTEUS_JITENGINEHOST_H
 
-#include <string>
+#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/impl/Caching/MemoryCache.h"
+#include "proteus/impl/Caching/ObjectCacheChain.h"
+#include "proteus/impl/CompiledLibrary.h"
+#include "proteus/impl/JitEngine.h"
 
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
-
-#include "proteus/Caching/MemoryCache.h"
-#include "proteus/Caching/ObjectCacheChain.h"
-#include "proteus/CompiledLibrary.h"
-#include "proteus/CompilerInterfaceTypes.h"
-#include "proteus/JitEngine.h"
 
 namespace proteus {
 

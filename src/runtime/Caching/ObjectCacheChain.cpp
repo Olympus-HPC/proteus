@@ -8,16 +8,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "proteus/Caching/ObjectCacheChain.h"
-
+#include "proteus/impl/Caching/ObjectCacheChain.h"
 #ifdef PROTEUS_ENABLE_MPI
-#include "proteus/Caching/MPISharedStorageCache.h"
+#include "proteus/impl/Caching/MPISharedStorageCache.h"
 #endif
-#include "proteus/Caching/StorageCache.h"
-#include "proteus/Config.h"
-#include "proteus/Logger.h"
-#include "proteus/TimeTracing.h"
-#include "proteus/Utils.h"
+#include "proteus/impl/Caching/StorageCache.h"
+#include "proteus/impl/Config.h"
+#include "proteus/impl/Logger.h"
+#include "proteus/impl/TimeTracing.h"
+#include "proteus/impl/Utils.h"
 
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>

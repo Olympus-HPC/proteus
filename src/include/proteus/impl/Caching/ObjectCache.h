@@ -11,8 +11,8 @@
 #ifndef PROTEUS_OBJECTCACHE_H
 #define PROTEUS_OBJECTCACHE_H
 
-#include "proteus/CompiledLibrary.h"
-#include "proteus/Hashing.h"
+#include "proteus/impl/CompiledLibrary.h"
+#include "proteus/impl/Hashing.h"
 
 #include <llvm/ADT/SmallString.h>
 #include <llvm/Support/MemoryBufferRef.h>
