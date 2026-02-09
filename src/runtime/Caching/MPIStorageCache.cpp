@@ -36,7 +36,6 @@ MPIStorageCache::MPIStorageCache(const std::string &Label, int StoreTag)
                            : ".proteus"),
       Label(Label), StoreTag(StoreTag) {
   std::filesystem::create_directories(StorageDirectory);
-  startCommThread();
 }
 
 MPIStorageCache::~MPIStorageCache() { finalize(); }
@@ -85,6 +84,10 @@ void MPIStorageCache::store(const HashT &HashValue, const CacheEntry &Entry) {
 }
 
 void MPIStorageCache::startCommThread() {
+  if (Finalized)
+    reportFatalError("Cannot start MPIStorageCache communication thread after "
+                     "finalize().");
+
   if (CommHandle.getRank() != 0)
     return;
   CommThread.start([this] { communicationThreadMain(); });

@@ -75,7 +75,9 @@ ObjectCacheChain::createCache(const std::string &Name) {
 
   if (LowerName == "mpi-local-lookup") {
 #ifdef PROTEUS_ENABLE_MPI
-    return std::make_unique<MPILocalLookupCache>(Label);
+    auto Cache = std::make_unique<MPILocalLookupCache>(Label);
+    Cache->startCommThread();
+    return Cache;
 #else
     reportFatalError(
         "MPILocalLookupCache requested but Proteus built without MPI");
@@ -84,7 +86,9 @@ ObjectCacheChain::createCache(const std::string &Name) {
 
   if (LowerName == "mpi-remote-lookup") {
 #ifdef PROTEUS_ENABLE_MPI
-    return std::make_unique<MPIRemoteLookupCache>(Label);
+    auto Cache = std::make_unique<MPIRemoteLookupCache>(Label);
+    Cache->startCommThread();
+    return Cache;
 #else
     reportFatalError(
         "MPIRemoteLookupCache requested but Proteus built without MPI");

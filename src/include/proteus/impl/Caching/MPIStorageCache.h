@@ -33,6 +33,7 @@ public:
   MPIStorageCache(const std::string &Label, int StoreTag);
   ~MPIStorageCache() override;
 
+  void startCommThread();
   void store(const HashT &HashValue, const CacheEntry &Entry) override;
   void finalize() override;
   void printStats() override;
@@ -56,7 +57,6 @@ protected:
   CommThreadHandle CommThread;
 
 private:
-  void startCommThread();
   void pollPendingSends();
   void completeAllPendingSends();
 
