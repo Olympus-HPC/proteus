@@ -509,7 +509,7 @@ public:
     return KernelInfo.getStaticHash();
   }
 
-  void initCacheChain() {
+  void init() {
     CacheChain = std::make_unique<ObjectCacheChain>("JitEngineDevice");
   }
 

@@ -59,7 +59,7 @@ public:
 
   void *getFunctionAddress(StringRef FnName, CompiledLibrary &Library);
 
-  void initCacheChain() {
+  void init() {
     CacheChain = std::make_unique<ObjectCacheChain>("JitEngineHost");
   }
 

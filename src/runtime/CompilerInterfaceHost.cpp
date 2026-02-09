@@ -41,7 +41,7 @@ __jit_register_lambda(const char *Symbol) {
 
 extern "C" void __jit_init_host() {
   JitEngineHost &Jit = JitEngineHost::instance();
-  Jit.initCacheChain();
+  Jit.init();
 }
 
 extern "C" void __jit_finalize_host() {
