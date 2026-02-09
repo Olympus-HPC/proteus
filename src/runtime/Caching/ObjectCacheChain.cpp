@@ -10,8 +10,8 @@
 
 #include "proteus/impl/Caching/ObjectCacheChain.h"
 #ifdef PROTEUS_ENABLE_MPI
-#include "proteus/impl/Caching/MPICentralizedStorageCache.h"
-#include "proteus/impl/Caching/MPISharedStorageCache.h"
+#include "proteus/impl/Caching/MPILocalLookupCache.h"
+#include "proteus/impl/Caching/MPIRemoteLookupCache.h"
 #endif
 #include "proteus/impl/Caching/StorageCache.h"
 #include "proteus/impl/Config.h"
@@ -73,21 +73,21 @@ ObjectCacheChain::createCache(const std::string &Name) {
     return std::make_unique<StorageCache>(Label);
   }
 
-  if (LowerName == "mpi-storage") {
+  if (LowerName == "mpi-local-lookup") {
 #ifdef PROTEUS_ENABLE_MPI
-    return std::make_unique<MPISharedStorageCache>(Label);
+    return std::make_unique<MPILocalLookupCache>(Label);
 #else
     reportFatalError(
-        "MPISharedStorageCache requested but Proteus built without MPI");
+        "MPILocalLookupCache requested but Proteus built without MPI");
 #endif
   }
 
-  if (LowerName == "mpi-centralized") {
+  if (LowerName == "mpi-remote-lookup") {
 #ifdef PROTEUS_ENABLE_MPI
-    return std::make_unique<MPICentralizedStorageCache>(Label);
+    return std::make_unique<MPIRemoteLookupCache>(Label);
 #else
     reportFatalError(
-        "MPICentralizedStorageCache requested but Proteus built without MPI");
+        "MPIRemoteLookupCache requested but Proteus built without MPI");
 #endif
   }
 

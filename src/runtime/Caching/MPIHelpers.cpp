@@ -8,12 +8,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "proteus/Caching/MPIHelpers.h"
+#include "proteus/impl/Caching/MPIHelpers.h"
 
-#include "proteus/Caching/ObjectCache.h"
-#include "proteus/Config.h"
+#include "proteus/impl/Caching/ObjectCache.h"
+#include "proteus/impl/Config.h"
 #include "proteus/Error.h"
-#include "proteus/Logger.h"
+#include "proteus/impl/Logger.h"
 
 #include <llvm/ADT/StringRef.h>
 
@@ -31,7 +31,7 @@ void validateMPIConfig() {
   int MPIInitialized = 0;
   MPI_Initialized(&MPIInitialized);
   if (!MPIInitialized) {
-    reportFatalError("proteus::init() with mpi-storage cache requires MPI to "
+    reportFatalError("proteus::init() with MPI cache requires MPI to "
                      "be initialized. Call MPI_Init_thread() before "
                      "proteus::init()");
   }

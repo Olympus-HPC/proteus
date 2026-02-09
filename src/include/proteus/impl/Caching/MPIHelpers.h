@@ -13,8 +13,8 @@
 #ifndef PROTEUS_MPIHELPERS_H
 #define PROTEUS_MPIHELPERS_H
 
-#include "proteus/Caching/ObjectCache.h"
-#include "proteus/Hashing.h"
+#include "proteus/impl/Caching/ObjectCache.h"
+#include "proteus/impl/Hashing.h"
 
 #include <mpi.h>
 

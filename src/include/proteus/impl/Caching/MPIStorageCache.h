@@ -1,4 +1,4 @@
-//===-- MPISharedStorageCache.h -- MPI shared storage cache header --===//
+//===-- MPIStorageCache.h -- MPI storage cache base class header --===//
 //
 // Part of the Proteus Project, under the Apache License v2.0 with LLVM
 // Exceptions. See https://llvm.org/LICENSE.txt for license information.
@@ -6,10 +6,15 @@
 //
 //===----------------------------------------------------------------------===//
 //
+// Base class for MPI-based storage caches. Provides shared infrastructure for
+// store forwarding, disk persistence, pending-send management, and
+// communication thread lifecycle. Subclasses implement lookup() and
+// communicationThreadMain().
+//
 //===----------------------------------------------------------------------===//
 
-#ifndef PROTEUS_MPISHAREDSTORAGECACHE_H
-#define PROTEUS_MPISHAREDSTORAGECACHE_H
+#ifndef PROTEUS_MPISTORAGECACHE_H
+#define PROTEUS_MPISTORAGECACHE_H
 
 #include "proteus/impl/Caching/MPIHelpers.h"
 #include "proteus/impl/Caching/ObjectCache.h"
@@ -23,43 +28,38 @@
 
 namespace proteus {
 
-class MPISharedStorageCache : public ObjectCache {
+class MPIStorageCache : public ObjectCache {
 public:
-  MPISharedStorageCache(const std::string &Label);
-  ~MPISharedStorageCache() override;
-
-  std::string getName() const override { return "MPISharedStorage"; }
-
-  std::unique_ptr<CompiledLibrary> lookup(const HashT &HashValue) override;
+  MPIStorageCache(const std::string &Label, int StoreTag);
+  ~MPIStorageCache() override;
 
   void store(const HashT &HashValue, const CacheEntry &Entry) override;
-
   void finalize() override;
-
   void printStats() override;
-
   uint64_t getHits() const override { return Hits; }
-
   uint64_t getAccesses() const override { return Accesses; }
 
-private:
+protected:
+  std::unique_ptr<CompiledLibrary> lookupFromDisk(const HashT &HashValue);
+  virtual void communicationThreadMain() = 0;
+
   void forwardToWriter(const HashT &HashValue, const CacheEntry &Entry);
-  void pollPendingSends();
-  void completeAllPendingSends();
   void saveToDisk(const HashT &HashValue, const char *Data, size_t Size,
                   bool IsDynLib);
-  static int computeTag(const std::string &Label);
-
-  void communicationThreadMain();
-  void startCommThread();
 
   uint64_t Hits = 0;
   uint64_t Accesses = 0;
   const std::string StorageDirectory;
   const std::string Label;
-  const int Tag;
+  const int StoreTag;
   MPICommHandle CommHandle;
   CommThreadHandle CommThread;
+
+private:
+  void startCommThread();
+  void pollPendingSends();
+  void completeAllPendingSends();
+
   bool Finalized = false;
   std::vector<std::unique_ptr<PendingSend>> PendingSends;
 };

@@ -1,6 +1,5 @@
-// Stress test for MPI shared storage cache.
-// Verifies that when using PROTEUS_OBJECT_CACHE_CHAIN="mpi-storage",
-// only rank 0 writes cache files (no rank prefix in filenames).
+// Stress test for MPI storage caches (mpi-local-lookup and mpi-remote-lookup).
+// Verifies that only rank 0 writes cache files (no rank prefix in filenames).
 // Creates many specializations: 5 from testKernel + 6*NumRanks from
 // configKernel.
 

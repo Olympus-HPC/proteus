@@ -1,4 +1,4 @@
-//===-- MPICentralizedStorageCache.cpp -- Centralized MPI cache impl --===//
+//===-- MPIRemoteLookupCache.cpp -- MPI remote-lookup cache impl --===//
 //
 // Part of the Proteus Project, under the Apache License v2.0 with LLVM
 // Exceptions. See https://llvm.org/LICENSE.txt for license information.
@@ -8,20 +8,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "proteus/Caching/MPICentralizedStorageCache.h"
+#include "proteus/impl/Caching/MPIRemoteLookupCache.h"
 
-#include "proteus/Config.h"
+#include "proteus/impl/Config.h"
 #include "proteus/Error.h"
-#include "proteus/Logger.h"
-#include "proteus/TimeTracing.h"
-#include "proteus/Utils.h"
+#include "proteus/impl/Logger.h"
+#include "proteus/impl/TimeTracing.h"
+#include "proteus/impl/Utils.h"
 
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Support/MemoryBuffer.h>
 
 #include <mpi.h>
 
-#include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <limits>
@@ -40,68 +39,19 @@ struct LookupResponse {
   std::vector<char> Data;
 };
 
-//===----------------------------------------------------------------------===//
-// MPICentralizedStorageCache implementation
-//===----------------------------------------------------------------------===//
-
-MPICentralizedStorageCache::MPICentralizedStorageCache(const std::string &Label)
-    : StorageDirectory(Config::get().ProteusCacheDir
-                           ? Config::get().ProteusCacheDir.value()
-                           : ".proteus"),
-      Label(Label) {
-  std::filesystem::create_directories(StorageDirectory);
-  startCommThread();
-}
-
-MPICentralizedStorageCache::~MPICentralizedStorageCache() { finalize(); }
-
-void MPICentralizedStorageCache::finalize() {
-  if (Finalized)
-    return;
-
-  int MPIFinalized = 0;
-  MPI_Finalized(&MPIFinalized);
-  if (MPIFinalized) {
-    if (!PendingSends.empty()) {
-      Logger::trace("[MPICentralizedStorageCache] Warning: MPI already "
-                    "finalized, cannot complete " +
-                    std::to_string(PendingSends.size()) + " pending sends\n");
-    }
-    CommThread.stop();
-    Finalized = true;
-    return;
-  }
-
-  if (Config::get().ProteusTraceOutput >= 1) {
-    Logger::trace("[MPICentralizedStorageCache:" + Label + "] Rank " +
-                  std::to_string(CommHandle.getRank()) +
-                  " flushing, PendingSends=" +
-                  std::to_string(PendingSends.size()) + "\n");
-  }
-
-  MPI_Comm Comm = CommHandle.get();
-
-  completeAllPendingSends();
-
-  MPI_Barrier(Comm);
-
-  CommThread.stop();
-
-  MPI_Barrier(Comm);
-
-  Finalized = true;
-}
+MPIRemoteLookupCache::MPIRemoteLookupCache(const std::string &Label)
+    : MPIStorageCache(Label, /*StoreTag=*/0) {}
 
 std::unique_ptr<CompiledLibrary>
-MPICentralizedStorageCache::lookup(const HashT &HashValue) {
-  TIMESCOPE("MPICentralizedStorageCache::lookup");
+MPIRemoteLookupCache::lookup(const HashT &HashValue) {
+  TIMESCOPE("MPIRemoteLookupCache::lookup");
   Accesses++;
 
   return lookupRemote(HashValue);
 }
 
 std::unique_ptr<CompiledLibrary>
-MPICentralizedStorageCache::lookupRemote(const HashT &HashValue) {
+MPIRemoteLookupCache::lookupRemote(const HashT &HashValue) {
   MPI_Comm Comm = CommHandle.get();
 
   auto ReqBuf = packLookupRequest(HashValue);
@@ -137,33 +87,9 @@ MPICentralizedStorageCache::lookupRemote(const HashT &HashValue) {
   return std::make_unique<CompiledLibrary>(std::move(MemBuf));
 }
 
-std::unique_ptr<CompiledLibrary>
-MPICentralizedStorageCache::lookupLocal(const HashT &HashValue) {
-  std::string Filebase =
-      StorageDirectory + "/cache-jit-" + HashValue.toString();
-
-  auto CacheBuf = MemoryBuffer::getFileAsStream(Filebase + ".o");
-  if (CacheBuf) {
-    return std::make_unique<CompiledLibrary>(std::move(*CacheBuf));
-  }
-
-  if (std::filesystem::exists(Filebase + ".so")) {
-    return std::make_unique<CompiledLibrary>(Filebase + ".so");
-  }
-
-  return nullptr;
-}
-
-void MPICentralizedStorageCache::store(const HashT &HashValue,
-                                       const CacheEntry &Entry) {
-  TIMESCOPE("MPICentralizedStorageCache::store");
-
-  forwardToWriter(HashValue, Entry);
-}
-
-void MPICentralizedStorageCache::communicationThreadMain() {
+void MPIRemoteLookupCache::communicationThreadMain() {
   if (Config::get().ProteusTraceOutput >= 1) {
-    Logger::trace("[MPICentralizedStorageCache:" + Label +
+    Logger::trace("[MPIRemoteLookup:" + Label +
                   "] Communication thread started\n");
   }
 
@@ -174,7 +100,7 @@ void MPICentralizedStorageCache::communicationThreadMain() {
     int Flag = 0;
     MPI_Status Status;
 
-    MPI_Iprobe(MPI_ANY_SOURCE, TagStore, Comm, &Flag, &Status);
+    MPI_Iprobe(MPI_ANY_SOURCE, StoreTag, Comm, &Flag, &Status);
     if (Flag) {
       AnyActivity = true;
       handleStoreMessage(Status);
@@ -188,7 +114,7 @@ void MPICentralizedStorageCache::communicationThreadMain() {
 
     if (!AnyActivity) {
       if (CommThread.shutdownRequested()) {
-        MPI_Iprobe(MPI_ANY_SOURCE, TagStore, Comm, &Flag, &Status);
+        MPI_Iprobe(MPI_ANY_SOURCE, StoreTag, Comm, &Flag, &Status);
         if (Flag) {
           handleStoreMessage(Status);
           continue;
@@ -205,31 +131,25 @@ void MPICentralizedStorageCache::communicationThreadMain() {
   }
 
   if (Config::get().ProteusTraceOutput >= 1) {
-    Logger::trace("[MPICentralizedStorageCache:" + Label +
+    Logger::trace("[MPIRemoteLookup:" + Label +
                   "] Communication thread exiting\n");
   }
 }
 
-void MPICentralizedStorageCache::startCommThread() {
-  if (CommHandle.getRank() != 0)
-    return;
-  CommThread.start([this] { communicationThreadMain(); });
-}
-
-void MPICentralizedStorageCache::handleStoreMessage(MPI_Status &Status) {
+void MPIRemoteLookupCache::handleStoreMessage(MPI_Status &Status) {
   MPI_Comm Comm = CommHandle.get();
   int MsgSize = 0;
   MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
 
   std::vector<char> Buffer(MsgSize);
-  MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE, TagStore, Comm,
+  MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE, StoreTag, Comm,
            MPI_STATUS_IGNORE);
 
   auto Msg = unpackStoreMessage(Comm, Buffer);
   saveToDisk(Msg.Hash, Msg.Data.data(), Msg.Data.size(), Msg.IsDynLib);
 }
 
-void MPICentralizedStorageCache::handleLookupRequest(MPI_Status &Status) {
+void MPIRemoteLookupCache::handleLookupRequest(MPI_Status &Status) {
   MPI_Comm Comm = CommHandle.get();
   int SourceRank = Status.MPI_SOURCE;
 
@@ -245,7 +165,7 @@ void MPICentralizedStorageCache::handleLookupRequest(MPI_Status &Status) {
   bool IsDynLib = false;
   std::vector<char> Data;
 
-  auto Result = lookupLocal(Req.Hash);
+  auto Result = lookupFromDisk(Req.Hash);
   if (Result) {
     IsDynLib = Result->IsDynLib;
     if (Result->ObjectModule) {
@@ -270,7 +190,7 @@ void MPICentralizedStorageCache::handleLookupRequest(MPI_Status &Status) {
 }
 
 std::vector<char>
-MPICentralizedStorageCache::packLookupRequest(const HashT &HashValue) {
+MPIRemoteLookupCache::packLookupRequest(const HashT &HashValue) {
   MPI_Comm Comm = CommHandle.get();
   std::string HashStr = HashValue.toString();
   uint32_t HashSize = static_cast<uint32_t>(HashStr.size());
@@ -292,8 +212,8 @@ MPICentralizedStorageCache::packLookupRequest(const HashT &HashValue) {
 }
 
 std::vector<char>
-MPICentralizedStorageCache::packLookupResponse(bool Found, bool IsDynLib,
-                                               const std::vector<char> &Data) {
+MPIRemoteLookupCache::packLookupResponse(bool Found, bool IsDynLib,
+                                         const std::vector<char> &Data) {
   MPI_Comm Comm = CommHandle.get();
   uint8_t FoundByte = Found ? 1 : 0;
   uint8_t IsDynLibByte = IsDynLib ? 1 : 0;
@@ -327,8 +247,8 @@ MPICentralizedStorageCache::packLookupResponse(bool Found, bool IsDynLib,
   return Packed;
 }
 
-LookupRequest MPICentralizedStorageCache::unpackLookupRequest(
-    const std::vector<char> &Buffer) {
+LookupRequest
+MPIRemoteLookupCache::unpackLookupRequest(const std::vector<char> &Buffer) {
   MPI_Comm Comm = CommHandle.get();
   int Position = 0;
   int TotalSize = static_cast<int>(Buffer.size());
@@ -344,8 +264,8 @@ LookupRequest MPICentralizedStorageCache::unpackLookupRequest(
   return LookupRequest{HashT(StringRef(HashStr))};
 }
 
-LookupResponse MPICentralizedStorageCache::unpackLookupResponse(
-    const std::vector<char> &Buffer) {
+LookupResponse
+MPIRemoteLookupCache::unpackLookupResponse(const std::vector<char> &Buffer) {
   MPI_Comm Comm = CommHandle.get();
   int Position = 0;
   int TotalSize = static_cast<int>(Buffer.size());
@@ -374,78 +294,6 @@ LookupResponse MPICentralizedStorageCache::unpackLookupResponse(
   }
 
   return LookupResponse{FoundByte != 0, IsDynLibByte != 0, std::move(Data)};
-}
-
-void MPICentralizedStorageCache::saveToDisk(const HashT &HashValue,
-                                            const char *Data, size_t Size,
-                                            bool IsDynLib) {
-  std::string Filebase =
-      StorageDirectory + "/cache-jit-" + HashValue.toString();
-  std::string Extension = IsDynLib ? ".so" : ".o";
-  std::string Filepath = Filebase + Extension;
-
-  if (std::filesystem::exists(Filepath))
-    return;
-
-  saveToFile(Filepath, StringRef{Data, Size});
-
-  if (Config::get().ProteusTraceOutput >= 1) {
-    Logger::trace("[MPICentralizedStorageCache] Saved " + Filepath + " (" +
-                  std::to_string(Size) + " bytes)\n");
-  }
-}
-
-void MPICentralizedStorageCache::forwardToWriter(const HashT &HashValue,
-                                                 const CacheEntry &Entry) {
-  auto Pending = std::make_unique<PendingSend>();
-  Pending->Buffer = packStoreMessage(CommHandle.get(), HashValue, Entry);
-
-  if (Pending->Buffer.size() >
-      static_cast<size_t>(std::numeric_limits<int>::max())) {
-    reportFatalError("MPI message size exceeds INT_MAX: " +
-                     std::to_string(Pending->Buffer.size()) + " bytes");
-  }
-
-  MPI_Comm Comm = CommHandle.get();
-  int Err = MPI_Isend(Pending->Buffer.data(),
-                      static_cast<int>(Pending->Buffer.size()), MPI_BYTE,
-                      /*dest=*/0, TagStore, Comm, &Pending->Request);
-  if (Err != MPI_SUCCESS) {
-    reportFatalError("MPI_Isend failed with error code " + std::to_string(Err));
-  }
-
-  PendingSends.push_back(std::move(Pending));
-  pollPendingSends();
-}
-
-void MPICentralizedStorageCache::pollPendingSends() {
-  if (PendingSends.empty())
-    return;
-
-  auto IsDone = [](const std::unique_ptr<PendingSend> &Pending) {
-    int Done = 0;
-    MPI_Test(&Pending->Request, &Done, MPI_STATUS_IGNORE);
-    return Done != 0;
-  };
-
-  PendingSends.erase(
-      std::remove_if(PendingSends.begin(), PendingSends.end(), IsDone),
-      PendingSends.end());
-}
-
-void MPICentralizedStorageCache::completeAllPendingSends() {
-  for (auto &Pending : PendingSends) {
-    MPI_Wait(&Pending->Request, MPI_STATUS_IGNORE);
-  }
-  PendingSends.clear();
-}
-
-void MPICentralizedStorageCache::printStats() {
-  printf(
-      "[proteus][%s] MPICentralizedStorageCache rank %d/%d hits %lu accesses "
-      "%lu\n",
-      Label.c_str(), CommHandle.getRank(), CommHandle.getSize(), Hits,
-      Accesses);
 }
 
 } // namespace proteus
