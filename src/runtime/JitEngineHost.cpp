@@ -161,8 +161,6 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
             LambdaRegistry::instance().matchJitVariableMap(F->getName())) {
       auto &RCVec = OptionalMapIt.value()->getSecond();
       TransformLambdaSpecialization::transform(M, *F, RCVec);
-      LambdaRegistry::instance().flushRuntimeConstants(
-          OptionalMapIt.value()->first);
     }
   }
 
@@ -195,6 +193,17 @@ void getLambdaJitValues(StringRef FnName,
 
   LambdaJitValuesVec = OptionalMapIt.value()->getSecond();
 }
+namespace {
+void flushLambdaRuntimeConstants(StringRef FnName) {
+  // Whether we (a) specializeIR of a lambda (b) load from cache or (c) load
+  // from storage, we need to flush out the runtime constants from the lambda
+  // registry
+  auto &LR = LambdaRegistry::instance();
+  if (auto OptionalMapIt = LR.matchJitVariableMap(FnName); OptionalMapIt) {
+    LR.flushRuntimeConstants(OptionalMapIt.value()->first);
+  }
+}
+} // namespace
 
 void *
 JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
@@ -234,12 +243,7 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   // Lookup the function pointer in the code cache.
   void *JitFnPtr = CodeCache.lookup(HashValue);
   if (JitFnPtr) {
-    // If we find a cache hit we need to flush the jit_variable entries from the
-    // registry because they have already been injected into the IR by Proteus
-    auto &LR = LambdaRegistry::instance();
-    if (auto OptionalMapIt = LR.matchJitVariableMap(FnName); OptionalMapIt) {
-      LR.flushRuntimeConstants(OptionalMapIt.value()->first);
-    }
+    flushLambdaRuntimeConstants(FnName);
     return JitFnPtr;
   }
 
@@ -281,6 +285,8 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
               << "=== JIT compile: " << FnName << " Mangled " << MangledFnName
               << " RC HashValue " << HashValue.toString() << " Addr "
               << JitFnPtr << "\n");
+  flushLambdaRuntimeConstants(FnName);
+
   return JitFnPtr;
 }
 

@@ -12,7 +12,7 @@
 
 template<typename Lambda>
 class Abstraction {
-  public: 
+  public:
   Lambda lambda;
   Abstraction(Lambda&& lam) : lambda(lam) {};
   auto operator()() {
@@ -31,7 +31,7 @@ template <typename T> void run(T &&LB) {
 template<typename T> void run2(T&& LB) {
   LB();
 }
-  
+
 int main() {
   proteus::init();
 
@@ -39,13 +39,13 @@ int main() {
   int one = 1;
   int two = 2;
 
-  auto zero_lambda = [=, c = proteus::jit_variable(zero)] 
+  auto zero_lambda = [=, c = proteus::jit_variable(zero)] ()
                          __attribute__((annotate("jit"))) { printInt(c); };
 
-  auto one_lambda = [=, c = proteus::jit_variable(one)] 
+  auto one_lambda = [=, c = proteus::jit_variable(one)] ()
                         __attribute__((annotate("jit"))) { printInt(c); };
 
-  auto two_lambda = [=, c = proteus::jit_variable(two)] 
+  auto two_lambda = [=, c = proteus::jit_variable(two)] ()
                         __attribute__((annotate("jit"))) { printInt(c); };
 
   run(zero_lambda);
