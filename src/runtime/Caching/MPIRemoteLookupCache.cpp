@@ -10,8 +10,8 @@
 
 #include "proteus/impl/Caching/MPIRemoteLookupCache.h"
 
-#include "proteus/impl/Config.h"
 #include "proteus/Error.h"
+#include "proteus/impl/Config.h"
 #include "proteus/impl/Logger.h"
 #include "proteus/impl/TimeTracing.h"
 #include "proteus/impl/Utils.h"

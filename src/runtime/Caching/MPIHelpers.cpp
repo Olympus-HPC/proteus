@@ -10,9 +10,9 @@
 
 #include "proteus/impl/Caching/MPIHelpers.h"
 
+#include "proteus/Error.h"
 #include "proteus/impl/Caching/ObjectCache.h"
 #include "proteus/impl/Config.h"
-#include "proteus/Error.h"
 #include "proteus/impl/Logger.h"
 
 #include <llvm/ADT/StringRef.h>
