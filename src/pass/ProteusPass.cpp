@@ -117,12 +117,11 @@ public:
     // ==================
     // Device compilation
     // ==================
-
     // For device compilation, just extract the module IR of device code
     // and return.
     if (isDeviceCompilation(M)) {
       emitJitModuleDevice(M, IsLTO);
-      // llvm::outs()<<M;
+
       return true;
     }
 
@@ -139,6 +138,7 @@ public:
     findJitVariables(M);
     registerJitVariablesWithLambda(M);
     registerLambdaFunctions(M);
+    removeJitTakeAddress(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
       emitJitLaunchKernelCall(M);
@@ -166,7 +166,6 @@ public:
 
     if (verifyModule(M, &errs()))
       reportFatalError("Broken original module found, compilation aborted!");
-    llvm::outs() << M;
     return true;
   }
 
@@ -1242,16 +1241,18 @@ private:
   }
 
   /// This function tells the Proteus runtime which variables to replace with
-  /// constants at runtime within a given lambda.  Here's how it works: (1)
-  /// Start at the callbase of each jit_variable function (2) Do very simple
-  /// use-def traversal to find the associated anonymous class (e.g. class.anon)
-  /// (3) Look at all callbases of each proteus::register_lambda template
-  /// instantiation. Because we
-  ///.    force passage of the lambda by value to register_lambda, the
-  /// instantiation must contain an .    AllocaInst of the lambda's
-  /// corresponding anonymous class.  The demangled name of the lambda .    can
-  /// be deduced from the name of the Clang-generated template instantiation. .
-  /// (4) Inject the demangled name into the original callbase of the
+  /// constants at runtime within a given lambda.  Here's how it works:
+  /// 1. Start a use-def analysis at the callbase of each jit_variable
+  /// function
+  /// 2. Do very simple use-def traversal to find the associated
+  /// anonymous class (e.g. class.anon)
+  /// 3. Look at all callbases of each proteus::register_lambda template
+  /// instantiation. Because we force passage of the lambda by value to
+  /// register_lambda, the instantiation must contain an AllocaInst of the
+  /// lambda's corresponding anonymous class.  The demangled name of the
+  /// lambda can be deduced from the name of the Clang-generated template
+  /// instantiation.
+  /// 4. Inject the demangled name into the original callbase of the
   /// `jit_variable` function.
   void registerJitVariablesWithLambda(Module &M) {
     llvm::SmallVector<CallBase *, 16> JitVarFunctions;
@@ -1331,6 +1332,37 @@ private:
       }
       assert(FoundLambda && "Expected register_lambda call contained in Module "
                             "corresponding to jit_variable");
+    }
+  }
+
+  void removeJitTakeAddress(Module &M) {
+    SmallVector<CallBase *, 8> ToErase;
+    for (Function &F : M.getFunctionList()) {
+      if (StringRef{demangle(F.getName().str())}.contains(
+              "proteus::register_lambda")) {
+        for (BasicBlock &BB : F) {
+          for (Instruction &I : BB) {
+            if (CallBase *CB = dyn_cast<CallBase>(&I);
+                CB && CB->getCalledFunction() &&
+                StringRef{demangle(CB->getCalledFunction()->getName().str())} ==
+                    "__jit_take_address") {
+              assert(CB->users().size() == 0 && "");
+              // If CB is the last instruction in the block, add a safe
+              // terminator
+              if (!CB->getNextNode()) {
+                IRBuilder<> Builder(CB);
+                Builder.CreateUnreachable();
+              }
+              ToErase.push_back(CB);
+            }
+          }
+        }
+      }
+    }
+    // Erase the calls, downstream optimization passes should erase the alloca
+    // as well
+    for (CallBase *CB : ToErase) {
+      CB->eraseFromParent();
     }
   }
 
