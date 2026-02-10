@@ -21,6 +21,16 @@
 
 namespace proteus {
 
+struct LookupRequest {
+  HashT Hash;
+};
+
+struct LookupResponse {
+  bool Found;
+  bool IsDynLib;
+  std::vector<char> Data;
+};
+
 class MPIRemoteLookupCache : public MPIStorageCache {
 public:
   MPIRemoteLookupCache(const std::string &Label);

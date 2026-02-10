@@ -29,16 +29,6 @@ namespace proteus {
 
 using namespace llvm;
 
-struct LookupRequest {
-  HashT Hash;
-};
-
-struct LookupResponse {
-  bool Found;
-  bool IsDynLib;
-  std::vector<char> Data;
-};
-
 MPIRemoteLookupCache::MPIRemoteLookupCache(const std::string &Label)
     : MPIStorageCache(Label, /*StoreTag=*/0) {}
 
