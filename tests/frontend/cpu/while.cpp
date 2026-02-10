@@ -9,7 +9,6 @@
 #include <iostream>
 
 #include <proteus/JitFrontend.h>
-#include <proteus/JitInterface.h>
 
 int main() {
   proteus::init();

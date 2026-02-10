@@ -3,6 +3,7 @@
 #include <string>
 
 #include <proteus/Error.h>
+#include <proteus/JitInterface.h>
 #include <proteus/impl/CoreLLVM.h>
 #include <proteus/impl/CoreLLVMDevice.h>
 #include <proteus/impl/Utils.h>
@@ -16,6 +17,8 @@ int main(int argc, char **argv) {
     std::cerr << "Usage: ./main <bitcode> <kernel symbol>\n";
     return 1;
   }
+
+  proteus::init();
 
   std::string BitcodeFN(argv[1]);
   const char *KernelSym = argv[2];
@@ -64,5 +67,6 @@ int main(int argc, char **argv) {
 
   std::cout << "Success \n";
 
+  proteus::finalize();
   return 0;
 }

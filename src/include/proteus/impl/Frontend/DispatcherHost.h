@@ -28,7 +28,7 @@ public:
     if (!ObjectModule)
       reportFatalError("Expected non-null object library");
 
-    ObjectCache.store(
+    ObjectCache->store(
         ModuleHash, CacheEntry::staticObject(ObjectModule->getMemBufferRef()));
 
     return ObjectModule;
@@ -36,7 +36,7 @@ public:
 
   std::unique_ptr<CompiledLibrary>
   lookupCompiledLibrary(const HashT &ModuleHash) override {
-    return ObjectCache.lookup(ModuleHash);
+    return ObjectCache->lookup(ModuleHash);
   }
 
   DispatchResult launch(void *, LaunchDims, LaunchDims, void *[], uint64_t,
@@ -74,24 +74,23 @@ public:
     auto Buf = MemoryBuffer::getFileAsStream(Path);
     if (!Buf)
       reportFatalError("Failed to read dynamic library: " + Path);
-    ObjectCache.store(HashValue,
-                      CacheEntry::sharedObject((*Buf)->getMemBufferRef()));
+    ObjectCache->store(HashValue,
+                       CacheEntry::sharedObject((*Buf)->getMemBufferRef()));
   }
 
 protected:
-  DispatcherHost() : Jit(JitEngineHost::instance()) {
-    TargetModel = TargetModelType::HOST;
-  }
+  DispatcherHost()
+      : Dispatcher("DispatcherHost", TargetModelType::HOST),
+        Jit(JitEngineHost::instance()) {}
 
   ~DispatcherHost() {
     CodeCache.printStats();
-    ObjectCache.printStats();
+    ObjectCache->printStats();
   }
 
 private:
   JitEngineHost &Jit;
   MemoryCache<void *> CodeCache{"DispatcherHost"};
-  ObjectCacheChain ObjectCache{"DispatcherHost"};
 };
 
 } // namespace proteus

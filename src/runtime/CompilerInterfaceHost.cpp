@@ -9,12 +9,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/impl/Caching/ObjectCacheRegistry.h"
 #include "proteus/impl/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/impl/JitEngineHost.h"
 #include "proteus/impl/LambdaRegistry.h"
 
 using namespace proteus;
 using namespace llvm;
+
+// NOLINTBEGIN(readability-identifier-naming)
 
 extern "C" __attribute__((used)) void *
 __jit_entry(char *FnName, char *IR, int IRSize, void **Args,
@@ -37,7 +40,9 @@ __jit_register_lambda(const char *Symbol) {
   LambdaRegistry::instance().registerLambda(Symbol);
 }
 
-extern "C" void __jit_init_host() {}
+extern "C" void __jit_init_host() {
+  ObjectCacheRegistry::instance().get("JitEngineHost");
+}
 
 extern "C" void __jit_finalize_host() {}
 
@@ -50,3 +55,5 @@ extern "C" void __jit_disable_host() {
   JitEngineHost &Jit = JitEngineHost::instance();
   Jit.disable();
 }
+
+// NOLINTEND(readability-identifier-naming)

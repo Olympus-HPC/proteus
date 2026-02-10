@@ -1,6 +1,8 @@
 #include "proteus/JitFrontend.h"
+
 #include "proteus/impl/CompiledLibrary.h"
 #include "proteus/impl/Hashing.h"
+#include "proteus/impl/JitEngineHost.h"
 
 #include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/IR/Module.h>
@@ -15,6 +17,7 @@ JitModule::JitModule(const std::string &Target)
       TargetModel{parseTargetModel(Target)},
       TargetTriple(::proteus::getTargetTriple(TargetModel)),
       Dispatch(Dispatcher::getDispatcher(TargetModel)) {
+  ensureProteusInitialized();
   Mod->setTargetTriple(TargetTriple);
 }
 

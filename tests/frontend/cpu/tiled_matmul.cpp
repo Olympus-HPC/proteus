@@ -10,7 +10,6 @@
 #include <iostream>
 
 #include <proteus/JitFrontend.h>
-#include <proteus/JitInterface.h>
 
 static auto getTiledMatmulFunction(int N, int TileI, int TileJ, int TileK) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");

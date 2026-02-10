@@ -9,6 +9,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "proteus/impl/Caching/MPISharedStorageCache.h"
+
 #include "proteus/Error.h"
 #include "proteus/impl/Config.h"
 #include "proteus/impl/Logger.h"
@@ -30,30 +31,18 @@ namespace proteus {
 using namespace llvm;
 
 //===----------------------------------------------------------------------===//
-// MPICommHandle implementation
+// MPI Validation
 //===----------------------------------------------------------------------===//
 
-MPICommHandle::~MPICommHandle() {
-  if (Comm == MPI_COMM_NULL)
-    return;
-
-  int MPIFinalized = 0;
-  MPI_Finalized(&MPIFinalized);
-  if (!MPIFinalized)
-    MPI_Comm_free(&Comm);
-}
-
-void MPICommHandle::ensureInitialized() {
-  if (Comm != MPI_COMM_NULL)
-    return;
-
+void validateMPIConfig() {
   int MPIInitialized = 0;
   MPI_Initialized(&MPIInitialized);
   if (!MPIInitialized) {
-    reportFatalError("MPICommHandle requires MPI to be initialized");
+    reportFatalError("proteus::init() with mpi-storage cache requires MPI to "
+                     "be initialized. Call MPI_Init_thread() before "
+                     "proteus::init()");
   }
 
-  // Check MPI thread level (MPI_THREAD_MULTIPLE required).
   int Provided = 0;
   MPI_Query_thread(&Provided);
   if (Provided != MPI_THREAD_MULTIPLE) {
@@ -62,6 +51,14 @@ void MPICommHandle::ensureInitialized() {
                      std::to_string(Provided) +
                      "). Initialize MPI with MPI_Init_thread()");
   }
+}
+
+//===----------------------------------------------------------------------===//
+// MPICommHandle implementation
+//===----------------------------------------------------------------------===//
+
+MPICommHandle::MPICommHandle() {
+  validateMPIConfig();
 
   MPI_Comm_dup(MPI_COMM_WORLD, &Comm);
   MPI_Comm_rank(Comm, &Rank);
@@ -73,19 +70,20 @@ void MPICommHandle::ensureInitialized() {
   }
 }
 
-MPI_Comm MPICommHandle::get() {
-  ensureInitialized();
-  return Comm;
-}
+MPI_Comm MPICommHandle::get() { return Comm; }
 
-int MPICommHandle::getRank() {
-  ensureInitialized();
-  return Rank;
-}
+int MPICommHandle::getRank() { return Rank; }
 
-int MPICommHandle::getSize() {
-  ensureInitialized();
-  return Size;
+int MPICommHandle::getSize() { return Size; }
+
+MPICommHandle::~MPICommHandle() {
+  if (Comm == MPI_COMM_NULL)
+    return;
+
+  int MPIFinalized = 0;
+  MPI_Finalized(&MPIFinalized);
+  if (!MPIFinalized)
+    MPI_Comm_free(&Comm);
 }
 
 //===----------------------------------------------------------------------===//
@@ -136,6 +134,7 @@ MPISharedStorageCache::MPISharedStorageCache(const std::string &Label)
                            : ".proteus"),
       Label(Label), Tag(computeTag(Label)) {
   std::filesystem::create_directories(StorageDirectory);
+  startCommThread();
 }
 
 MPISharedStorageCache::~MPISharedStorageCache() { finalize(); }
@@ -184,8 +183,6 @@ MPISharedStorageCache::lookup(const HashT &HashValue) {
   TIMESCOPE("MPISharedStorageCache::lookup");
   Accesses++;
 
-  ensureCommThreadStarted();
-
   std::string Filebase =
       StorageDirectory + "/cache-jit-" + HashValue.toString();
 
@@ -207,7 +204,6 @@ void MPISharedStorageCache::store(const HashT &HashValue,
                                   const CacheEntry &Entry) {
   TIMESCOPE("MPISharedStorageCache::store");
 
-  ensureCommThreadStarted();
   forwardToWriter(HashValue, Entry);
 }
 
@@ -252,10 +248,8 @@ void MPISharedStorageCache::communicationThreadMain() {
   }
 }
 
-void MPISharedStorageCache::ensureCommThreadStarted() {
-  // We use 'ensureCommThreadStarted' to avoid problems where
-  // proteus is initialized before MPI.
-  if (CommHandle.getRank() != 0 || CommThread.isRunning())
+void MPISharedStorageCache::startCommThread() {
+  if (CommHandle.getRank() != 0)
     return;
   CommThread.start([this] { communicationThreadMain(); });
 }

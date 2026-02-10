@@ -8,6 +8,7 @@
 
 #include "gpu_common.h"
 #include <iostream>
+#include <proteus/JitInterface.h>
 
 // Global device variable
 __device__ int OriginalData[1024];
@@ -30,6 +31,7 @@ __global__ __attribute__((annotate("jit"))) void kernel(int *Output) {
 
 // Host function to demonstrate usage
 int main() {
+  proteus::init();
   int *Output;
 
   // Allocate managed device memory
@@ -52,6 +54,7 @@ int main() {
   // Cleanup
   gpuErrCheck(gpuFree(Output));
 
+  proteus::finalize();
   return 0;
 }
 

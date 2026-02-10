@@ -11,6 +11,8 @@
 using namespace proteus;
 
 int main() {
+  proteus::init();
+
   auto J = proteus::JitModule("host");
 
   auto &F = J.addFunction<void(double *, double *)>("arrays_test");
@@ -85,6 +87,8 @@ int main() {
 
   delete[] OutLocal;
   delete[] OutGlobal;
+
+  proteus::finalize();
   return Verified ? 0 : 1;
 }
 

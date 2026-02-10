@@ -61,6 +61,7 @@ auto createJitKernel(size_t N) {
 }
 
 int main() {
+  proteus::init();
 
   // Allocate and initialize input vectors A and B, and specify their size N.
   double *A;       // Pointer to vector A
@@ -106,6 +107,7 @@ int main() {
   gpuErrCheck(gpuFree(A));
   gpuErrCheck(gpuFree(B));
 
+  proteus::finalize();
   return 0;
 }
 

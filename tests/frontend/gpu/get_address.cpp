@@ -23,6 +23,7 @@ using namespace proteus;
 using namespace builtins::gpu;
 
 int main() {
+  proteus::init();
   auto J = proteus::JitModule(TARGET);
 
   {
@@ -90,6 +91,7 @@ int main() {
 
   gpuErrCheck(gpuFree(Results));
 
+  proteus::finalize();
   return Ok ? 0 : 1;
 }
 

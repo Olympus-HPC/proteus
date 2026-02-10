@@ -9,10 +9,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "proteus/impl/CompilerInterfaceDevice.h"
+#include "proteus/impl/Caching/ObjectCacheRegistry.h"
 #include "proteus/impl/CompilerInterfaceDeviceInternal.h"
 #include "proteus/impl/JitEngineDevice.h"
 
 using namespace proteus;
+
+// NOLINTBEGIN(readability-identifier-naming)
 
 // NOTE: A great mystery is: why does this work ONLY if HostAddr is a CONST
 // void* for HIP
@@ -64,11 +67,12 @@ __jit_launch_kernel(void *Kernel, dim3 GridDim, dim3 BlockDim,
                                       ShmemSize, Stream);
 }
 
-extern "C" void __jit_init_device() {}
+extern "C" void __jit_init_device() {
+  ObjectCacheRegistry::instance().get("JitEngineDevice");
+}
 
 extern "C" void __jit_finalize_device() {
-  auto &Jit = JitDeviceImplT::instance();
-  Jit.finalize();
+  JitDeviceImplT::instance().finalize();
 }
 
 extern "C" void __jit_enable_device() {
@@ -80,3 +84,5 @@ extern "C" void __jit_disable_device() {
   auto &Jit = JitDeviceImplT::instance();
   Jit.disable();
 }
+
+// NOLINTEND(readability-identifier-naming)

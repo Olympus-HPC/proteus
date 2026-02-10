@@ -38,6 +38,7 @@ struct LaunchDims {
 
 namespace proteus {
 
+class ObjectCacheChain;
 struct CompiledLibrary;
 class HashT;
 
@@ -75,10 +76,13 @@ struct DispatchResult;
 class Dispatcher {
 protected:
   TargetModelType TargetModel;
+  ObjectCacheChain *ObjectCache = nullptr;
+
+  Dispatcher(const std::string &Name, TargetModelType TM);
 
 public:
   static Dispatcher &getDispatcher(TargetModelType TargetModel);
-  ~Dispatcher();
+  virtual ~Dispatcher() = default;
 
   virtual std::unique_ptr<MemoryBuffer>
   compile(std::unique_ptr<LLVMContext> Ctx, std::unique_ptr<Module> M,

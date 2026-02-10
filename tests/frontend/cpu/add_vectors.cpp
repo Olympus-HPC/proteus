@@ -13,6 +13,8 @@
 using namespace proteus;
 
 int main() {
+  proteus::init();
+
   auto J = proteus::JitModule("host");
 
   // Add a function with the signature:
@@ -72,6 +74,7 @@ int main() {
   delete[] A;
   delete[] B;
 
+  proteus::finalize();
   return 0;
 }
 
