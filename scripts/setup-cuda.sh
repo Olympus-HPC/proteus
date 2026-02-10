@@ -1,5 +1,7 @@
 #!/bin/sh
 
+HOSTN=${HOSTNAME//[0-9]/}
+
 ml load cmake/3.23.1
 
 LLVM_INSTALL_DIR=$1
@@ -14,8 +16,8 @@ ml load cuda/${CUDA_VERSION}
 
 export PATH="$LLVM_INSTALL_DIR/bin":$PATH
 
-mkdir build-cuda-${CUDA_VERSION}
-pushd build-cuda-${CUDA_VERSION}
+mkdir build-${HOSTN}-cuda-${CUDA_VERSION}
+pushd build-${HOSTN}-cuda-${CUDA_VERSION}
 
 cmake .. \
 -DLLVM_INSTALL_DIR="$LLVM_INSTALL_DIR" \
@@ -24,6 +26,7 @@ cmake .. \
 -DCMAKE_C_COMPILER="$LLVM_INSTALL_DIR/bin/clang" \
 -DCMAKE_CXX_COMPILER="$LLVM_INSTALL_DIR/bin/clang++" \
 -DCMAKE_CUDA_COMPILER="$LLVM_INSTALL_DIR/bin/clang++" \
+-DCMAKE_INSTALL_PREFIX=../install-${HOSTN}-cuda-${CUDA_VERSION} \
 -DCMAKE_EXPORT_COMPILE_COMMANDS=on \
 "${@:3}"
 
