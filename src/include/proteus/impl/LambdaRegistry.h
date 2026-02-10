@@ -23,11 +23,6 @@ public:
     return Singleton;
   }
 
-  void flushRuntimeConstants(StringRef LambdaName) {
-    assert(JitVariableMap.contains(LambdaName));
-    JitVariableMap[LambdaName].clear();
-  }
-
   std::optional<DenseMap<StringRef, SmallVector<RuntimeConstant>>::iterator>
   matchJitVariableMap(StringRef FnName) {
     std::string Operator = llvm::demangle(FnName.str());
@@ -57,10 +52,39 @@ public:
     return It;
   }
 
-  void setJitVariable(const char *LambdaType, RuntimeConstant RC) {
-    assert(JitVariableMap.contains(LambdaType) &&
+  void dump() {
+    llvm::outs() << "DUMPING TMP REGISTRY \n";
+    for (const auto &[Key, Value] : PendingJitVariableMap) {
+      llvm::outs() << Key << "\n";
+      for (const auto &V : Value) {
+        llvm::outs() << "   " << V.Value.DoubleVal << "\n";
+      }
+    }
+    llvm::outs() << "DUMPING REGISTRY \n";
+    for (const auto &[Key, Value] : JitVariableMap) {
+      llvm::outs() << Key << "\n";
+      for (const auto &V : Value) {
+        llvm::outs() << "   " << V.Value.DoubleVal << "\n";
+      }
+    }
+  }
+
+  void setJitVariable(const char *LambdaType, RuntimeConstant &RC) {
+    assert(PendingJitVariableMap.contains(LambdaType) &&
            "Lambda must be registered prior to register JIT variable!");
-    JitVariableMap[LambdaType].push_back(RC);
+    PendingJitVariableMap[LambdaType].emplace_back(RC);
+  }
+
+  inline void registerLambda(const char *LambdaType) {
+    const StringRef LambdaTypeRef{LambdaType};
+    PROTEUS_DBG(Logger::logs("proteus")
+                << "=> RegisterLambda " << LambdaTypeRef << "\n");
+    // Copy PendingJitVariables if there were changed, otherwise the runtime
+    // values for the lambda definition have not changed.
+    if (!PendingJitVariableMap[LambdaTypeRef].empty()) {
+      JitVariableMap[LambdaTypeRef] = PendingJitVariableMap[LambdaTypeRef];
+      PendingJitVariableMap[LambdaTypeRef].clear();
+    }
   }
 
   const SmallVector<RuntimeConstant> &getJitVariables(StringRef LambdaTypeRef) {
@@ -72,6 +96,7 @@ public:
 private:
   explicit LambdaRegistry() = default;
   DenseMap<StringRef, SmallVector<RuntimeConstant>> JitVariableMap;
+  DenseMap<StringRef, SmallVector<RuntimeConstant>> PendingJitVariableMap;
 };
 
 } // namespace proteus

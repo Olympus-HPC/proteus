@@ -159,7 +159,7 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
   if (!LambdaRegistry::instance().empty()) {
     if (auto OptionalMapIt =
             LambdaRegistry::instance().matchJitVariableMap(F->getName())) {
-      auto &RCVec = OptionalMapIt.value()->getSecond();
+      auto &RCVec = OptionalMapIt.value()->second;
       TransformLambdaSpecialization::transform(M, *F, RCVec);
     }
   }
@@ -177,6 +177,7 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
 void getLambdaJitValues(StringRef FnName,
                         SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
   LambdaRegistry &LR = LambdaRegistry::instance();
+
   if (LR.empty())
     return;
 
@@ -191,19 +192,8 @@ void getLambdaJitValues(StringRef FnName,
   if (!OptionalMapIt)
     return;
 
-  LambdaJitValuesVec = OptionalMapIt.value()->getSecond();
+  LambdaJitValuesVec = OptionalMapIt.value()->second;
 }
-namespace {
-void flushLambdaRuntimeConstants(StringRef FnName) {
-  // Whether we (a) specializeIR of a lambda (b) load from cache or (c) load
-  // from storage, we need to flush out the runtime constants from the lambda
-  // registry
-  auto &LR = LambdaRegistry::instance();
-  if (auto OptionalMapIt = LR.matchJitVariableMap(FnName); OptionalMapIt) {
-    LR.flushRuntimeConstants(OptionalMapIt.value()->first);
-  }
-}
-} // namespace
 
 void *
 JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
@@ -242,10 +232,8 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 
   // Lookup the function pointer in the code cache.
   void *JitFnPtr = CodeCache.lookup(HashValue);
-  if (JitFnPtr) {
-    flushLambdaRuntimeConstants(FnName);
+  if (JitFnPtr)
     return JitFnPtr;
-  }
 
   std::string Suffix = HashValue.toMangledSuffix();
   std::string MangledFnName = FnName.str() + Suffix;
@@ -285,8 +273,6 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
               << "=== JIT compile: " << FnName << " Mangled " << MangledFnName
               << " RC HashValue " << HashValue.toString() << " Addr "
               << JitFnPtr << "\n");
-  flushLambdaRuntimeConstants(FnName);
-
   return JitFnPtr;
 }
 
