@@ -76,11 +76,9 @@ struct DispatchResult;
 class Dispatcher {
 protected:
   TargetModelType TargetModel;
-  ObjectCacheChain *Cache = nullptr;
+  ObjectCacheChain *ObjectCache = nullptr;
 
   Dispatcher(const std::string &Name, TargetModelType TM);
-
-  ObjectCacheChain &getObjectCache();
 
 public:
   static Dispatcher &getDispatcher(TargetModelType TargetModel);

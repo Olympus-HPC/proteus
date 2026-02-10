@@ -1,6 +1,5 @@
 #include "proteus/Frontend/Dispatcher.h"
 #include "proteus/Error.h"
-#include "proteus/impl/Caching/ObjectCacheChain.h"
 #include "proteus/impl/Caching/ObjectCacheRegistry.h"
 #include "proteus/impl/Frontend/DispatcherHost.h"
 #if PROTEUS_ENABLE_HIP
@@ -70,9 +69,7 @@ Dispatcher &Dispatcher::getDispatcher(TargetModelType TargetModel) {
 
 Dispatcher::Dispatcher(const std::string &Name, TargetModelType TM)
     : TargetModel(TM) {
-  Cache = &ObjectCacheRegistry::instance().get(Name);
+  ObjectCache = &ObjectCacheRegistry::instance().get(Name);
 }
-
-ObjectCacheChain &Dispatcher::getObjectCache() { return *Cache; }
 
 } // namespace proteus

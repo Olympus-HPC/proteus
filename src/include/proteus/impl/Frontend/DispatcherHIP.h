@@ -31,7 +31,7 @@ public:
     if (!ObjectModule)
       reportFatalError("Expected non-null object library");
 
-    getObjectCache().store(
+    ObjectCache->store(
         ModuleHash, CacheEntry::staticObject(ObjectModule->getMemBufferRef()));
 
     return ObjectModule;
@@ -39,7 +39,7 @@ public:
 
   std::unique_ptr<CompiledLibrary>
   lookupCompiledLibrary(const HashT &ModuleHash) override {
-    return getObjectCache().lookup(ModuleHash);
+    return ObjectCache->lookup(ModuleHash);
   }
 
   DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
@@ -58,7 +58,7 @@ public:
 
   ~DispatcherHIP() {
     CodeCache.printStats();
-    getObjectCache().printStats();
+    ObjectCache->printStats();
   }
 
   void *getFunctionAddress(const std::string &KernelName,

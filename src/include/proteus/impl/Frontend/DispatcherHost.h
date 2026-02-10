@@ -28,7 +28,7 @@ public:
     if (!ObjectModule)
       reportFatalError("Expected non-null object library");
 
-    getObjectCache().store(
+    ObjectCache->store(
         ModuleHash, CacheEntry::staticObject(ObjectModule->getMemBufferRef()));
 
     return ObjectModule;
@@ -36,7 +36,7 @@ public:
 
   std::unique_ptr<CompiledLibrary>
   lookupCompiledLibrary(const HashT &ModuleHash) override {
-    return getObjectCache().lookup(ModuleHash);
+    return ObjectCache->lookup(ModuleHash);
   }
 
   DispatchResult launch(void *, LaunchDims, LaunchDims, void *[], uint64_t,
@@ -74,8 +74,8 @@ public:
     auto Buf = MemoryBuffer::getFileAsStream(Path);
     if (!Buf)
       reportFatalError("Failed to read dynamic library: " + Path);
-    getObjectCache().store(HashValue,
-                           CacheEntry::sharedObject((*Buf)->getMemBufferRef()));
+    ObjectCache->store(HashValue,
+                       CacheEntry::sharedObject((*Buf)->getMemBufferRef()));
   }
 
 protected:
@@ -85,7 +85,7 @@ protected:
 
   ~DispatcherHost() {
     CodeCache.printStats();
-    getObjectCache().printStats();
+    ObjectCache->printStats();
   }
 
 private:
