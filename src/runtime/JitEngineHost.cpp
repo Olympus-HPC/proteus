@@ -127,8 +127,9 @@ void JitEngineHost::notifyLoaded(MaterializationResponsibility & /*R*/,
 
 JitEngineHost::~JitEngineHost() {
   CodeCache.printStats();
-  if (CacheChain)
-    CacheChain->printStats();
+  if (!CacheChain)
+    CacheChain = &ObjectCacheRegistry::instance().get("JitEngineHost");
+  CacheChain->printStats();
 }
 
 void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,

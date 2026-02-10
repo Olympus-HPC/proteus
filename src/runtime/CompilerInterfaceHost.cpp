@@ -41,7 +41,7 @@ __jit_register_lambda(const char *Symbol) {
 }
 
 extern "C" void __jit_init_host() {
-  JitEngineHost::instance().getLibraryCache();
+  ObjectCacheRegistry::instance().get("JitEngineHost");
 }
 
 extern "C" void __jit_finalize_host() {}
