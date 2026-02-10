@@ -1507,9 +1507,9 @@ private:
         IRBuilder<> Builder(CB);
         auto *LambdaNameGlobal = Builder.CreateGlobalString(LambdaType);
         bool HasSRETArg = false;
-        for (int i = 0; i < CB->getNumOperands(); ++i) {
+        for (uint32_t I = 0; I < CB->getNumOperands(); ++I) {
           HasSRETArg =
-              HasSRETArg || CB->paramHasAttr(i, llvm::Attribute::StructRet);
+              HasSRETArg || CB->paramHasAttr(I, llvm::Attribute::StructRet);
         }
         int LambdaNameIndex = HasSRETArg ? 2 : 1;
         CB->setArgOperand(LambdaNameIndex, LambdaNameGlobal);
