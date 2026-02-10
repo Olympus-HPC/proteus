@@ -73,9 +73,9 @@ public:
   MPICommHandle(const MPICommHandle &) = delete;
   MPICommHandle &operator=(const MPICommHandle &) = delete;
 
-  MPI_Comm get();
-  int getRank();
-  int getSize();
+  MPI_Comm get() const;
+  int getRank() const;
+  int getSize() const;
 
 private:
   MPI_Comm Comm = MPI_COMM_NULL;

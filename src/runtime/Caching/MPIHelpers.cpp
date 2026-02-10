@@ -73,11 +73,11 @@ MPICommHandle::~MPICommHandle() {
     MPI_Comm_free(&Comm);
 }
 
-MPI_Comm MPICommHandle::get() { return Comm; }
+MPI_Comm MPICommHandle::get() const { return Comm; }
 
-int MPICommHandle::getRank() { return Rank; }
+int MPICommHandle::getRank() const { return Rank; }
 
-int MPICommHandle::getSize() { return Size; }
+int MPICommHandle::getSize() const { return Size; }
 
 CommThreadHandle::~CommThreadHandle() { stop(); }
 
@@ -146,9 +146,8 @@ std::vector<char> packStoreMessage(MPI_Comm Comm, const HashT &HashValue,
   MPI_Pack(&BufferSize, 1, MPI_UINT64_T, Packed.data(), TotalSize, &Position,
            Comm);
 
-  MPI_Pack(const_cast<char *>(Entry.Buffer.getBufferStart()),
-           static_cast<int>(BufferSize), MPI_BYTE, Packed.data(), TotalSize,
-           &Position, Comm);
+  MPI_Pack(Entry.Buffer.getBufferStart(), static_cast<int>(BufferSize),
+           MPI_BYTE, Packed.data(), TotalSize, &Position, Comm);
 
   return Packed;
 }

@@ -21,9 +21,6 @@
 
 namespace proteus {
 
-struct LookupRequest;
-struct LookupResponse;
-
 class MPIRemoteLookupCache : public MPIStorageCache {
 public:
   MPIRemoteLookupCache(const std::string &Label);

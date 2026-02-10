@@ -240,8 +240,8 @@ MPIRemoteLookupCache::packLookupResponse(bool Found, bool IsDynLib,
   MPI_Pack(&DataSize, 1, MPI_UINT64_T, Packed.data(), TotalSize, &Position,
            Comm);
   if (!Data.empty()) {
-    MPI_Pack(const_cast<char *>(Data.data()), static_cast<int>(DataSize),
-             MPI_BYTE, Packed.data(), TotalSize, &Position, Comm);
+    MPI_Pack(Data.data(), static_cast<int>(DataSize), MPI_BYTE, Packed.data(),
+             TotalSize, &Position, Comm);
   }
 
   return Packed;
