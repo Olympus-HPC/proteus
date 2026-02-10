@@ -44,10 +44,7 @@ extern "C" void __jit_init_host() {
   ObjectCacheRegistry::instance().get("JitEngineHost");
 }
 
-extern "C" void __jit_finalize_host() {
-  JitEngineHost &Jit = JitEngineHost::instance();
-  Jit.finalize();
-}
+extern "C" void __jit_finalize_host() {}
 
 extern "C" void __jit_enable_host() {
   JitEngineHost &Jit = JitEngineHost::instance();

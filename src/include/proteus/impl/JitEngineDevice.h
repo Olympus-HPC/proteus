@@ -532,9 +532,8 @@ protected:
 
   ~JitEngineDevice() {
     CodeCache.printStats();
-    if (!CacheChain)
-      CacheChain = &ObjectCacheRegistry::instance().get("JitEngineDevice");
-    CacheChain->printStats();
+    if (CacheChain)
+      CacheChain->printStats();
   }
 
   MemoryCache<KernelFunction_t> CodeCache{"JitEngineDevice"};
