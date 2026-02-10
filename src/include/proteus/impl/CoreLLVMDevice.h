@@ -300,7 +300,6 @@ inline void specializeIR(
     if (!F)
       reportFatalError("Expected non-null Function");
     TransformLambdaSpecialization::transform(M, *F, RCVec);
-    LambdaRegistry::instance().flushRuntimeConstants(LambdaType);
   }
 
   // Run the shared array transform after any value specialization (arguments,

@@ -136,7 +136,7 @@ public:
     findJitVariables(M);
     registerJitVariablesWithLambda(M);
     registerLambdaFunctions(M);
-    removeJitTakeAddress(M);
+    // removeJitTakeAddress(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
       instrumentRegisterFunction(M);
@@ -161,6 +161,7 @@ public:
 
     if (verifyModule(M, &errs()))
       reportFatalError("Broken original module found, compilation aborted!");
+
     return true;
   }
 
@@ -1504,7 +1505,13 @@ private:
 
         IRBuilder<> Builder(CB);
         auto *LambdaNameGlobal = Builder.CreateGlobalString(LambdaType);
-        CB->setArgOperand(1, LambdaNameGlobal);
+        bool HasSRETArg = false;
+        for (int i = 0; i < CB->getNumOperands(); ++i) {
+          HasSRETArg =
+              HasSRETArg || CB->paramHasAttr(i, llvm::Attribute::StructRet);
+        }
+        int LambdaNameIndex = HasSRETArg ? 2 : 1;
+        CB->setArgOperand(LambdaNameIndex, LambdaNameGlobal);
       }
     }
   }

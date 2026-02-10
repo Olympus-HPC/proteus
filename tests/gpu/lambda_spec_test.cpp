@@ -1,8 +1,8 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 %build/lambda_spec_test.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_DEBUG_OUTPUT=1 %build/lambda_spec_test.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/lambda_spec_test.%ext | %FILECHECK %s --check-prefixes=CHECK
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_DEBUG_OUTPUT=1 %build/lambda_spec_test.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
@@ -47,12 +47,14 @@ int main() {
 }
 
 // clang-format off
-// CHECK-FIRST: [LambdaSpec] Function: _ZZ4mainENKUlvE_clEv RCVec size 1
 // CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 0
-// CHECK Integer = 0
-// CHECK-FIRST: [LambdaSpec] Function: _ZZ4mainENKUlvE0_clEv RCVec size 1
+// CHECK: Integer = 0
 // CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 1
-// CHECK Integer = 1
-// CHECK-FIRST: [LambdaSpec] Function: _ZZ4mainENKUlvE1_clEv RCVec size 1
+// CHECK: Integer = 1
 // CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 2
-// CHECK Integer = 2
+// CHECK: Integer = 2
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0 FnName _Z6kernelIZ4mainEUlvE1_EvT_
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0 FnName _Z6kernelIZ4mainEUlvE_EvT_
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0 FnName _Z6kernelIZ4mainEUlvE0_EvT_
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 3
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 3 accesses 3
