@@ -51,10 +51,11 @@ jobs:
           style: file
           tidy-checks: ''
           lines-changed-only: true
-          format-review: true
+          format-review: false
           tidy-review: false
+          thread-comments: false
           passive-reviews: true
-          thread-comments: true
+          step-summary: true
       - name: Check clang-format linter status
         if: steps.linter.outputs.clang-format-checks-failed != 0
         run: exit 1
