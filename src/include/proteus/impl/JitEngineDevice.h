@@ -510,8 +510,6 @@ public:
     return KernelInfo.getStaticHash();
   }
 
-  void init() {}
-
   std::optional<std::reference_wrapper<ObjectCacheChain>> getLibraryCache() {
     if (!Config::get().ProteusUseStoredCache)
       return std::nullopt;

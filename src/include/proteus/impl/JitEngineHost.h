@@ -60,15 +60,13 @@ public:
 
   void *getFunctionAddress(StringRef FnName, CompiledLibrary &Library);
 
-  void init() {
-    CacheChain = &ObjectCacheRegistry::instance().get("JitEngineHost");
-  }
-
   void finalize() {}
 
   std::optional<std::reference_wrapper<ObjectCacheChain>> getLibraryCache() {
-    if (!Config::get().ProteusUseStoredCache || !CacheChain)
+    if (!Config::get().ProteusUseStoredCache)
       return std::nullopt;
+    if (!CacheChain)
+      CacheChain = &ObjectCacheRegistry::instance().get("JitEngineHost");
     return std::ref(*CacheChain);
   }
 

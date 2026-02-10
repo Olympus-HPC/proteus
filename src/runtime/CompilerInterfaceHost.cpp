@@ -9,6 +9,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/impl/Caching/ObjectCacheRegistry.h"
 #include "proteus/impl/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/impl/JitEngineHost.h"
 #include "proteus/impl/LambdaRegistry.h"
@@ -40,8 +41,7 @@ __jit_register_lambda(const char *Symbol) {
 }
 
 extern "C" void __jit_init_host() {
-  JitEngineHost &Jit = JitEngineHost::instance();
-  Jit.init();
+  ObjectCacheRegistry::instance().get("JitEngineHost");
 }
 
 extern "C" void __jit_finalize_host() {
