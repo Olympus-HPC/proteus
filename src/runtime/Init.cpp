@@ -8,6 +8,7 @@
 
 #include "proteus/Init.h"
 #include "proteus/Error.h"
+#include "proteus/impl/Caching/ObjectCacheRegistry.h"
 
 // NOLINTBEGIN(readability-identifier-naming)
 extern "C" void __jit_init_host();
@@ -47,6 +48,7 @@ void finalize() {
 #if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
   __jit_finalize_device();
 #endif
+  ObjectCacheRegistry::instance().finalize();
 }
 
 void enable() {

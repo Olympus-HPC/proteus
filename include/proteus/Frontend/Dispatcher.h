@@ -76,7 +76,7 @@ struct DispatchResult;
 class Dispatcher {
 protected:
   TargetModelType TargetModel;
-  std::unique_ptr<ObjectCacheChain> Cache;
+  ObjectCacheChain *Cache = nullptr;
 
   Dispatcher(const std::string &Name, TargetModelType TM);
 
@@ -84,7 +84,7 @@ protected:
 
 public:
   static Dispatcher &getDispatcher(TargetModelType TargetModel);
-  ~Dispatcher();
+  virtual ~Dispatcher() = default;
 
   virtual std::unique_ptr<MemoryBuffer>
   compile(std::unique_ptr<LLVMContext> Ctx, std::unique_ptr<Module> M,

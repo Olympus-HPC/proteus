@@ -15,6 +15,7 @@
 #include "proteus/Init.h"
 #include "proteus/impl/Caching/MemoryCache.h"
 #include "proteus/impl/Caching/ObjectCacheChain.h"
+#include "proteus/impl/Caching/ObjectCacheRegistry.h"
 #include "proteus/impl/Cloning.h"
 #include "proteus/impl/CompilerAsync.h"
 #include "proteus/impl/CompilerSync.h"
@@ -509,18 +510,13 @@ public:
     return KernelInfo.getStaticHash();
   }
 
-  void init() {
-    CacheChain = std::make_unique<ObjectCacheChain>("JitEngineDevice");
-  }
-
-  void finalizeCacheChain() {
-    if (CacheChain)
-      CacheChain->finalize();
-  }
+  void init() {}
 
   std::optional<std::reference_wrapper<ObjectCacheChain>> getLibraryCache() {
-    if (!Config::get().ProteusUseStoredCache || !CacheChain)
+    if (!Config::get().ProteusUseStoredCache)
       return std::nullopt;
+    if (!CacheChain)
+      CacheChain = &ObjectCacheRegistry::instance().get("JitEngineDevice");
     return std::ref(*CacheChain);
   }
 
@@ -529,8 +525,6 @@ public:
     if (Config::get().ProteusAsyncCompilation)
       CompilerAsync::instance(Config::get().ProteusAsyncThreads)
           .joinAllThreads();
-
-    finalizeCacheChain();
   }
 
   StringRef getDeviceArch() const { return DeviceArch; }
@@ -540,12 +534,13 @@ protected:
 
   ~JitEngineDevice() {
     CodeCache.printStats();
-    if (CacheChain)
-      CacheChain->printStats();
+    if (!CacheChain)
+      CacheChain = &ObjectCacheRegistry::instance().get("JitEngineDevice");
+    CacheChain->printStats();
   }
 
   MemoryCache<KernelFunction_t> CodeCache{"JitEngineDevice"};
-  std::unique_ptr<ObjectCacheChain> CacheChain;
+  ObjectCacheChain *CacheChain = nullptr;
   std::string DeviceArch;
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;

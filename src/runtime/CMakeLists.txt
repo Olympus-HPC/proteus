@@ -11,6 +11,7 @@ set(SOURCES
   Init.cpp
   TimeTracing.cpp
   Caching/ObjectCacheChain.cpp
+  Caching/ObjectCacheRegistry.cpp
   Caching/StorageCache.cpp
   Frontend/CppJitModule.cpp
   Frontend/Dispatcher.cpp

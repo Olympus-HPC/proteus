@@ -24,6 +24,7 @@
 #include "proteus/Init.h"
 #include "proteus/impl/Caching/MemoryCache.h"
 #include "proteus/impl/Caching/ObjectCacheChain.h"
+#include "proteus/impl/Caching/ObjectCacheRegistry.h"
 #include "proteus/impl/CompiledLibrary.h"
 #include "proteus/impl/Config.h"
 #include "proteus/impl/JitEngine.h"
@@ -60,13 +61,10 @@ public:
   void *getFunctionAddress(StringRef FnName, CompiledLibrary &Library);
 
   void init() {
-    CacheChain = std::make_unique<ObjectCacheChain>("JitEngineHost");
+    CacheChain = &ObjectCacheRegistry::instance().get("JitEngineHost");
   }
 
-  void finalize() {
-    if (CacheChain)
-      CacheChain->finalize();
-  }
+  void finalize() {}
 
   std::optional<std::reference_wrapper<ObjectCacheChain>> getLibraryCache() {
     if (!Config::get().ProteusUseStoredCache || !CacheChain)
@@ -78,7 +76,7 @@ private:
   JitEngineHost();
   void addStaticLibrarySymbols();
   MemoryCache<void *> CodeCache{"JitEngineHost"};
-  std::unique_ptr<ObjectCacheChain> CacheChain;
+  ObjectCacheChain *CacheChain = nullptr;
 };
 
 } // namespace proteus
