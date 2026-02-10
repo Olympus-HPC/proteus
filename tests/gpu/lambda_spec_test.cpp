@@ -26,6 +26,7 @@ template <typename T> void run(T &&LB) {
 }
 
 int main() {
+  proteus::init();
   int zero = 0;
   int one = 1;
   int two = 2;
@@ -42,6 +43,7 @@ int main() {
   run(zero_lambda);
   run(one_lambda);
   run(two_lambda);
+  proteus::finalize();
 
   return 0;
 }
