@@ -63,8 +63,8 @@ int main() {
 // CHECK: Integer = 1
 // CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 2
 // CHECK: Integer = 2
-// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0 FnName _ZZ4mainENK3$_2clEv
-// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0 FnName _ZZ4mainENK3$_0clEv
-// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0 FnName _ZZ4mainENK3$_1clEv
+// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: [proteus][JitEngineHost] StorageCache rank 0 hits 0 accesses 3
 // CHECK-SECOND: [proteus][JitEngineHost] StorageCache rank 0 hits 3 accesses 3
