@@ -68,7 +68,7 @@ __jit_launch_kernel(void *Kernel, dim3 GridDim, dim3 BlockDim,
 }
 
 extern "C" void __jit_init_device() {
-  JitDeviceImplT::instance().getLibraryCache();
+  ObjectCacheRegistry::instance().get("JitEngineDevice");
 }
 
 extern "C" void __jit_finalize_device() {
