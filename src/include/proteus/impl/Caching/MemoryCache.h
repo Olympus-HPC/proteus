@@ -21,6 +21,7 @@
 
 #include <cstdint>
 #include <iostream>
+#include <map>
 
 namespace proteus {
 
@@ -77,12 +78,23 @@ public:
     if (CacheMap.empty())
       return;
 
+    struct KernelStats {
+      size_t Specializations = 0;
+      uint64_t TotalLaunches = 0;
+    };
+    std::map<std::string, KernelStats> Grouped;
+    for (const auto &[HashValue, JCE] : CacheMap) {
+      auto &KS = Grouped[JCE.FnName];
+      KS.Specializations++;
+      KS.TotalLaunches += JCE.NumExecs;
+    }
+
     printf("[proteus][%s] === Kernel Trace (rank %s) ===\n", Label.c_str(),
            DistributedRank.c_str());
-    for (const auto &[HashValue, JCE] : CacheMap) {
-      std::string Name = llvm::demangle(JCE.FnName);
-      printf("[proteus][%s]   %s  hash=%s  launches=%lu\n", Label.c_str(),
-             Name.c_str(), HashValue.toString().c_str(), JCE.NumExecs);
+    for (const auto &[MangledName, KS] : Grouped) {
+      std::string Name = llvm::demangle(MangledName);
+      printf("[proteus][%s]   %s  specializations=%zu  launches=%lu\n",
+             Label.c_str(), Name.c_str(), KS.Specializations, KS.TotalLaunches);
     }
     printf("[proteus][%s] === End Kernel Trace ===\n", Label.c_str());
   }

@@ -54,7 +54,7 @@ int main() {
 // CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: [proteus][JitEngineHost] === Kernel Trace (rank 0) ===
-// CHECK-COUNT-2: [proteus][JitEngineHost]   myDaxpy(double, double*, double*, unsigned long)  hash={{[0-9]+}}  launches=1
+// CHECK: [proteus][JitEngineHost]   myDaxpy(double, double*, double*, unsigned long)  specializations=2  launches=2
 // CHECK: [proteus][JitEngineHost] === End Kernel Trace ===
 // CHECK-FIRST: [proteus][JitEngineHost] StorageCache rank 0 hits 0 accesses 2
 // CHECK-SECOND: [proteus][JitEngineHost] StorageCache rank 0 hits 2 accesses 2
