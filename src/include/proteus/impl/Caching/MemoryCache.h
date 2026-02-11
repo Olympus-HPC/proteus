@@ -74,17 +74,40 @@ public:
     if (!Config::get().ProteusKernelTrace)
       return;
 
+    if (CacheMap.empty())
+      return;
+
     printf("[proteus][%s] === Kernel Trace (rank %s) ===\n", Label.c_str(),
            DistributedRank.c_str());
     for (const auto &[HashValue, JCE] : CacheMap) {
-      std::string Demangled = llvm::demangle(JCE.FnName);
+      std::string Name = demangleOrRestoreKernelName(JCE.FnName);
       printf("[proteus][%s]   %s  hash=%s  launches=%lu\n", Label.c_str(),
-             Demangled.c_str(), HashValue.toString().c_str(), JCE.NumExecs);
+             Name.c_str(), HashValue.toString().c_str(), JCE.NumExecs);
     }
     printf("[proteus][%s] === End Kernel Trace ===\n", Label.c_str());
   }
 
 private:
+  // Demangle C++ symbols, and convert synthesized cpp-frontend names
+  // (e.g. __jit_instance_bar$float$) back to readable form (bar<float>).
+  static std::string demangleOrRestoreKernelName(const std::string &FnName) {
+    const std::string Prefix = "__jit_instance_";
+    if (FnName.substr(0, Prefix.size()) != Prefix) {
+      return llvm::demangle(FnName);
+    }
+    std::string Name = FnName.substr(Prefix.size());
+    auto First = Name.find('$');
+    if (First == std::string::npos)
+      return Name;
+    auto Last = Name.rfind('$');
+    Name[First] = '<';
+    Name[Last] = '>';
+    for (size_t I = First + 1; I < Last; ++I)
+      if (Name[I] == '$')
+        Name[I] = ',';
+    return Name;
+  }
+
   struct MemoryCacheEntry {
     Function_t FunctionPtr;
     uint64_t NumExecs;
