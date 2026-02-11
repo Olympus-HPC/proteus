@@ -24,14 +24,11 @@ __global__ void kernelAPI(int A, float B, double C) {
 }
 
 int main() {
-  proteus::init();
-
   kernelAttr<<<1, 1>>>(1, 2.0f, 3.0);
   gpuErrCheck(gpuDeviceSynchronize());
   kernelAPI<<<1, 1>>>(1, 2.0f, 3.0);
   gpuErrCheck(gpuDeviceSynchronize());
 
-  proteus::finalize();
   return 0;
 }
 

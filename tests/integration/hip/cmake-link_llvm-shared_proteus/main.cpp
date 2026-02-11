@@ -12,12 +12,10 @@ __attribute__((annotate("jit"))) __global__ void kernel() {
 }
 
 int main() {
-  proteus::init();
   LLVMInitializeAMDGPUTarget();
   LLVMInitializeAMDGPUTargetMC();
   LLVMInitializeAMDGPUAsmPrinter();
   kernel<<<1, 1>>>();
 
-  proteus::finalize();
   return 0;
 }

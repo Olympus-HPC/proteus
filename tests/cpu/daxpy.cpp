@@ -20,7 +20,6 @@ __attribute__((annotate("jit", 1, 4))) void myDaxpy(double A, double *X,
 }
 
 int main() {
-  proteus::init();
 
   size_t N = 1024;
   double *X = static_cast<double *>(malloc(sizeof(double) * N));
@@ -40,7 +39,6 @@ int main() {
   free(X);
   free(Y);
 
-  proteus::finalize();
   return 0;
 }
 

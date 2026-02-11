@@ -20,8 +20,6 @@ template <typename T> void test(T Arg) {
 }
 
 int main() {
-  proteus::init();
-
   test(1);
   test(2l);
   test(3u);
@@ -37,7 +35,6 @@ int main() {
   int *Ptr = (int *)0x123;
   test(Ptr);
 
-  proteus::finalize();
   return 0;
 }
 

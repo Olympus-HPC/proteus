@@ -26,7 +26,6 @@ constexpr unsigned WarpSize = 32;
 #endif
 
 int main() {
-  proteus::init();
   auto J = proteus::JitModule(TARGET);
 
   auto KernelHandle = J.addKernel<void(double *)>("shared_reverse_warp");
@@ -96,7 +95,6 @@ int main() {
     std::cout << "Verification successful!\n";
 
   gpuErrCheck(gpuFree(A));
-  proteus::finalize();
   return Verified ? 0 : 1;
 }
 

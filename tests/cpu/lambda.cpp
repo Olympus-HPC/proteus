@@ -16,8 +16,6 @@ template <typename F> void run(F &&Func) {
 }
 
 int main() {
-  proteus::init();
-
   size_t N = 1024;
   double A = 3.14;
   double B = 1.484;
@@ -46,7 +44,6 @@ int main() {
   free(X);
   free(Y);
 
-  proteus::finalize();
   return 0;
 }
 

@@ -69,7 +69,6 @@ static auto get1DSimpleLoopNestFunction(int N) {
 }
 
 int main() {
-  proteus::init();
   constexpr int N = 8;
   constexpr int TileSize = 4;
 
@@ -116,7 +115,6 @@ int main() {
   delete[] A2;
   delete[] B2;
 
-  proteus::finalize();
   return 0;
 }
 

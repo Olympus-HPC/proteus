@@ -14,8 +14,6 @@
 #include <proteus/JitInterface.h>
 
 int main() {
-  proteus::init();
-
   // Test declVars with anonymous variables.
   {
     auto J = proteus::JitModule();
@@ -190,7 +188,6 @@ int main() {
     std::cout << "defVarPairVar[0] = " << Result[0] << "\n";
   }
 
-  proteus::finalize();
   return 0;
 }
 

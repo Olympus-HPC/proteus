@@ -57,8 +57,6 @@ auto createJitModule1() {
 }
 
 int main() {
-  proteus::init();
-
   auto [J1, F11, F12] = createJitModule1();
 
   double V = 0;
@@ -66,7 +64,6 @@ int main() {
   F11(&V);
   std::cout << "V " << V << "\n";
 
-  proteus::finalize();
   return 0;
 }
 

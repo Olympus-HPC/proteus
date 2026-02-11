@@ -28,8 +28,6 @@
 using namespace proteus;
 
 int main() {
-  proteus::init();
-
   const char *Code = INCLUDE R"cpp(
     __global__
     extern "C" void foo(int a) {
@@ -53,7 +51,6 @@ int main() {
   auto Kernel2 = CJM2.getKernel<void(int)>("foo");
   Kernel2.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, 42);
   gpuErrCheck(gpuDeviceSynchronize());
-  proteus::finalize();
   return 0;
 }
 

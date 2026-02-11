@@ -14,8 +14,6 @@
 using namespace proteus;
 
 int main() {
-  proteus::init();
-
   const char *Code = R"cpp(
     #include <cstdio>
 
@@ -40,7 +38,6 @@ int main() {
   auto Foo2 = CJM2.getFunction<void(int)>("foo");
   Foo2.run(42);
 
-  proteus::finalize();
   return 0;
 }
 

@@ -36,10 +36,8 @@ __global__ __attribute__((annotate("jit"))) void kernel() {
 }
 
 int main() {
-  proteus::init();
   kernel<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
-  proteus::finalize();
   return 0;
 }
 

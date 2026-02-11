@@ -25,7 +25,6 @@ void lambdaCaller(int V) {
 __attribute__((annotate("jit", 1))) void foo(int A) { printf("foo %d\n", A); }
 
 int main() {
-  proteus::init();
   // We expect that lambdas will specialize and NOT hit the cache since its
   // kernel invocation is templated on the unique lambda type.  The
   // non-templated kernelSimple should hit the cache as it is independent of the
@@ -37,8 +36,6 @@ int main() {
   lambdaCaller(1);
   foo(42);
   lambdaCaller(2);
-
-  proteus::finalize();
 }
 
 // clang-format off

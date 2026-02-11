@@ -20,12 +20,9 @@ __global__ void kernelFunction(int A) {
 };
 
 int main() {
-  proteus::init();
-
   kernelFunction<<<1, 1>>>(1);
   gpuErrCheck(gpuDeviceSynchronize());
 
-  proteus::finalize();
   return 0;
 }
 

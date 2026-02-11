@@ -9,10 +9,8 @@ void printGVal2(int HValue);
 void printGVal1(int HValue);
 
 int main() {
-  proteus::init();
   printGVal1(2);
   printGVal2(3);
-  proteus::finalize();
 }
 
 // NOTE: On my testing system I am getting this output:

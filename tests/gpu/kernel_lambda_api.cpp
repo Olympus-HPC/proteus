@@ -34,8 +34,6 @@ void run(BODY &&Body, IndexType Length, Params Param) {
 }
 
 int main() {
-  proteus::init();
-
   int *Param = nullptr;
   run(
       [=] __device__(size_t I) {
@@ -44,7 +42,6 @@ int main() {
       },
       1024UL, Param);
 
-  proteus::finalize();
   return 0;
 }
 

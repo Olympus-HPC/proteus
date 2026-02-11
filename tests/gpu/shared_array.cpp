@@ -27,8 +27,6 @@ template <typename Lambda> void launcher(Lambda &&Body) {
 }
 
 int main() {
-  proteus::init();
-
   int Dims = 3;
   launcher(proteus::register_lambda(
       [=, Dims = proteus::jit_variable(Dims)] __device__() {
@@ -40,7 +38,6 @@ int main() {
                Array[1], Array[2]);
       }));
 
-  proteus::finalize();
   return 0;
 }
 

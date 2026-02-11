@@ -31,7 +31,6 @@ void lambdaCaller(int V) {
 }
 
 int main() {
-  proteus::init();
   // We expect that lambdas will specialize and NOT hit the cache since its
   // kernel invocation is templated on the unique lambda type.  The
   // non-templated kernelSimple should hit the cache as it is independent of the
@@ -45,8 +44,6 @@ int main() {
   kernelSimple<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
   lambdaCaller(2);
-
-  proteus::finalize();
 }
 
 // clang-format off

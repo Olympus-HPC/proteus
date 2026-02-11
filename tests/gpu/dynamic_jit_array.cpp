@@ -55,11 +55,8 @@ template <typename T> void launcher() {
 }
 
 int main() {
-  proteus::init();
-
   launcher<int>();
 
-  proteus::finalize();
   return 0;
 }
 

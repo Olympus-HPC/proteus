@@ -25,8 +25,6 @@
 using namespace proteus;
 
 int main() {
-  proteus::init();
-
   const char *Code = INCLUDE R"cpp(
     __global__
     extern "C" void foo(int a) {
@@ -46,7 +44,6 @@ int main() {
   dim3 Block(1, 1, 1);
   Kernel.launch(Grid, Block, 0, nullptr, 43);
   gpuErrCheck(gpuDeviceSynchronize());
-  proteus::finalize();
   return 0;
 }
 

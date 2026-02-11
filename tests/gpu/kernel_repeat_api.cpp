@@ -17,13 +17,10 @@ __global__ void kernel(int I) {
 }
 
 int main() {
-  proteus::init();
-
   for (int I = 0; I < 1000; I++)
     kernel<<<1, 1>>>(42);
   gpuErrCheck(gpuDeviceSynchronize());
 
-  proteus::finalize();
   return 0;
 }
 

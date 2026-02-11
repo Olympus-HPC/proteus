@@ -13,8 +13,6 @@
 using namespace proteus;
 
 int main() {
-  proteus::init();
-
   auto J = JitModule();
   auto &F = J.addFunction<void(float *, float *, float *, int *, int *, int *)>(
       "min_test");
@@ -54,7 +52,6 @@ int main() {
   std::cout << "ri1 = " << Ri1 << "\n";
   std::cout << "riRes = " << RiRes << "\n";
 
-  proteus::finalize();
   return 0;
 }
 

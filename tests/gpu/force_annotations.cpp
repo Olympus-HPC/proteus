@@ -32,8 +32,6 @@ template <typename T> gpuError_t launcher(T KernelIn) {
 }
 
 int main() {
-  proteus::init();
-
   kernel1<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
 
@@ -43,7 +41,6 @@ int main() {
   gpuErrCheck(launcher(kernel3));
   gpuErrCheck(gpuDeviceSynchronize());
 
-  proteus::finalize();
   return 0;
 }
 

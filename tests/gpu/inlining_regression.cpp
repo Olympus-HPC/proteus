@@ -13,8 +13,6 @@
 #include <proteus/JitInterface.h>
 
 int main() {
-  proteus::init();
-
   size_t N = 1024;
   double *X;
   double *Y;
@@ -47,8 +45,6 @@ int main() {
 
   gpuErrCheck(gpuFree(X));
   gpuErrCheck(gpuFree(Y));
-
-  proteus::finalize();
 }
 
 // clang-format off

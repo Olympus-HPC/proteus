@@ -23,15 +23,12 @@ __attribute__((annotate("jit"))) void modifyGVar() {
 }
 
 int main() {
-  proteus::init();
-
   std::cout << "GVar " << GVar << std::endl;
 
   modifyGVar();
 
   std::cout << "GVar " << GVar << std::endl;
 
-  proteus::finalize();
   return 0;
 }
 

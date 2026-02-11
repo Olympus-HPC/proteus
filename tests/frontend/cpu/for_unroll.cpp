@@ -72,7 +72,6 @@ static auto getUnrollCountFunction(int N) {
 }
 
 int main() {
-  proteus::init();
   constexpr int N = 8;
 
   auto [JitMod1, F1] = getUnrollEnableFunction(N);
@@ -120,7 +119,6 @@ int main() {
   delete[] A2;
   delete[] B2;
 
-  proteus::finalize();
   return 0;
 }
 

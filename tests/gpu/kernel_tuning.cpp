@@ -27,8 +27,6 @@ __global__ __attribute__((annotate("jit"))) void baz() {
 }
 
 int main() {
-  proteus::init();
-
   foo<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
   bar<<<1, 1>>>();
@@ -38,7 +36,6 @@ int main() {
   baz<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
 
-  proteus::finalize();
   return 0;
 }
 

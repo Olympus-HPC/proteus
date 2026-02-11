@@ -25,8 +25,6 @@ __global__ __attribute__((annotate("jit"))) void kernel() {
 }
 
 int main() {
-  proteus::init();
-
   for (int Tid = 64; Tid <= 1024; Tid *= 2) {
     dim3 BlockDim(1, Tid, 1);
     dim3 GridDim(1, Tid / 64, 1);
@@ -34,7 +32,6 @@ int main() {
     gpuErrCheck(gpuDeviceSynchronize());
   }
 
-  proteus::finalize();
   return 0;
 }
 

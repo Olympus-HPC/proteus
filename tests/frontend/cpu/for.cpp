@@ -11,8 +11,6 @@
 #include <proteus/JitFrontend.h>
 
 int main() {
-  proteus::init();
-
   auto J = proteus::JitModule();
   auto &F = J.addFunction<void(double *)>("for");
 
@@ -41,7 +39,6 @@ int main() {
   for (int I = 0; I < 10; I++)
     std::cout << "X[" << I << "] = " << X[I] << "\n";
 
-  proteus::finalize();
   return 0;
 }
 

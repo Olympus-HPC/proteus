@@ -25,8 +25,6 @@ using namespace proteus;
 using namespace builtins::gpu;
 
 int main() {
-  proteus::init();
-
   auto J = JitModule(TARGET);
   auto KernelHandle =
       J.addKernel<void(float *, float *, float *, float *, float *, float *,
@@ -111,7 +109,6 @@ int main() {
   gpuErrCheck(gpuFree(TrigHost));
   gpuErrCheck(gpuFree(FabsHost));
 
-  proteus::finalize();
   return 0;
 }
 

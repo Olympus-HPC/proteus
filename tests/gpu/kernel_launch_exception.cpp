@@ -20,8 +20,6 @@ __global__ __attribute__((annotate("jit"))) void kernel() {
 }
 
 int main() {
-  proteus::init();
-
   try {
     if (gpuLaunchKernel((const void *)&kernel, 1, 1, 0, 0, 0) != gpuSuccess)
       throw std::runtime_error("Launch failed");
@@ -30,7 +28,6 @@ int main() {
   }
   gpuErrCheck(gpuDeviceSynchronize());
 
-  proteus::finalize();
   return 0;
 }
 

@@ -19,8 +19,6 @@ __global__ __attribute__((annotate("jit", 1))) void kernel(T Arg) {
 }
 
 int main() {
-  proteus::init();
-
   kernel<<<1, 1>>>(1);
   gpuErrCheck(gpuDeviceSynchronize());
   kernel<<<1, 1>>>(1l);
@@ -45,7 +43,6 @@ int main() {
   gpuErrCheck(gpuDeviceSynchronize());
   kernel<<<1, 1>>>((unsigned char)'a');
   gpuErrCheck(gpuDeviceSynchronize());
-  proteus::finalize();
 }
 
 // clang-format off

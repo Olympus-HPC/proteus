@@ -26,8 +26,6 @@ void foo(int A) {
 }
 
 int main() {
-  proteus::init();
-
   lambdaCaller(1);
   foo(42);
   lambdaCaller(2);
@@ -35,8 +33,6 @@ int main() {
   lambdaCaller(1);
   foo(42);
   lambdaCaller(2);
-
-  proteus::finalize();
 }
 
 // clang-format off
