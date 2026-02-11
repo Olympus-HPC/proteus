@@ -28,7 +28,7 @@ int main() {
 // CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 1
 // CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: [proteus][JitEngineDevice] === Kernel Trace (rank 0) ===
-// CHECK: [proteus][JitEngineDevice]   kernel()  specializations=1  launches=1
+// CHECK: [proteus][JitEngineDevice]   kernel()  rank=0  specializations=1  launches=1
 // CHECK: [proteus][JitEngineDevice] === End Kernel Trace ===
 // CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 1
 // CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 1 accesses 1
