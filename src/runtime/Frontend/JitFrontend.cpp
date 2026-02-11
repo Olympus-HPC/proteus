@@ -17,7 +17,6 @@ JitModule::JitModule(const std::string &Target)
       TargetModel{parseTargetModel(Target)},
       TargetTriple(::proteus::getTargetTriple(TargetModel)),
       Dispatch(Dispatcher::getDispatcher(TargetModel)) {
-  ensureProteusInitialized();
   Mod->setTargetTriple(TargetTriple);
 }
 
