@@ -23,6 +23,7 @@ struct RegisterFatBinaryInfo {
 };
 
 struct RegisterLinkedBinaryInfo {
+  void *Handle;
   void *FatbinWrapper;
   const char *ModuleId;
 };
@@ -46,18 +47,14 @@ public:
   SmallVector<RegisterLinkedBinaryInfo> RegisteredLinkedBinaries;
   SmallVector<RegisterFunctionInfo> RegisteredFunctions;
 
-  void registerVar(void *Handle, const void *HostAddr, const char *VarName,
-                   uint64_t VarSize) {
-    RegisteredVars.push_back({Handle, HostAddr, VarName, VarSize});
-  }
-
   void registerFatBinary(void *Handle, void *FatbinWrapper,
                          const char *ModuleId) {
     RegisteredFatBinaries.push_back({Handle, FatbinWrapper, ModuleId});
+    CurHandle = Handle;
   }
 
   void registerLinkedBinary(void *FatbinWrapper, const char *ModuleId) {
-    RegisteredLinkedBinaries.push_back({FatbinWrapper, ModuleId});
+    RegisteredLinkedBinaries.push_back({CurHandle, FatbinWrapper, ModuleId});
   }
 
   void registerFunction(void *Handle, void *Kernel, char *KernelName,
@@ -65,8 +62,21 @@ public:
     RegisteredFunctions.push_back({Handle, Kernel, KernelName, RCInfoArray});
   }
 
+  void registerVar(void *Handle, const void *HostAddr, const char *VarName,
+                   uint64_t VarSize) {
+    RegisteredVars.push_back({Handle, HostAddr, VarName, VarSize});
+  }
+  void registerFatBinaryEnd(void *Handle) {
+    if (CurHandle != Handle)
+      reportFatalError("Expected matching handle in JIT engine info registery");
+    CurHandle = nullptr;
+  }
+
 private:
   JitEngineInfoRegistry() = default;
+  // Track the current fat binary handle being registered, used to associate
+  // linked binaries.
+  void *CurHandle = nullptr;
 };
 
 } // namespace proteus
