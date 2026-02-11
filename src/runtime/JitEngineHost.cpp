@@ -127,6 +127,7 @@ void JitEngineHost::notifyLoaded(MaterializationResponsibility & /*R*/,
 
 JitEngineHost::~JitEngineHost() {
   CodeCache.printStats();
+  CodeCache.printKernelTrace();
   if (!CacheChain)
     CacheChain = &ObjectCacheRegistry::instance().get("JitEngineHost");
   CacheChain->printStats();

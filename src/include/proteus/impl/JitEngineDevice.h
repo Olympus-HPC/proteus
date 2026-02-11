@@ -532,6 +532,7 @@ protected:
 
   ~JitEngineDevice() {
     CodeCache.printStats();
+    CodeCache.printKernelTrace();
     if (!CacheChain)
       CacheChain = &ObjectCacheRegistry::instance().get("JitEngineDevice");
     CacheChain->printStats();
