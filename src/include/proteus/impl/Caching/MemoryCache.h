@@ -93,8 +93,9 @@ public:
            DistributedRank.c_str());
     for (const auto &[MangledName, KS] : Grouped) {
       std::string Name = llvm::demangle(MangledName);
-      printf("[proteus][%s]   %s  specializations=%zu  launches=%lu\n",
-             Label.c_str(), Name.c_str(), KS.Specializations, KS.TotalLaunches);
+      printf("[proteus][%s]   %s  rank=%s  specializations=%zu  launches=%lu\n",
+             Label.c_str(), Name.c_str(), DistributedRank.c_str(),
+             KS.Specializations, KS.TotalLaunches);
     }
     printf("[proteus][%s] === End Kernel Trace ===\n", Label.c_str());
   }
