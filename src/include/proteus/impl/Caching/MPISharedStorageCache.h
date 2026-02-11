@@ -132,7 +132,6 @@ private:
   const std::string Label;
   const int Tag;
   const int ShutdownTag;
-  const int AckTag;
   MPICommHandle CommHandle;
   CommThreadHandle CommThread;
   bool Finalized = false;

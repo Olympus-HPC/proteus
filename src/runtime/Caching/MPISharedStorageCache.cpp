@@ -139,13 +139,12 @@ MPISharedStorageCache::MPISharedStorageCache(const std::string &Label)
     : StorageDirectory(Config::get().ProteusCacheDir
                            ? Config::get().ProteusCacheDir.value()
                            : ".proteus"),
-      Label(Label), Tag(computeTag(Label)), ShutdownTag(Tag + 1),
-      AckTag(ShutdownTag + 1) {
+      Label(Label), Tag(computeTag(Label)), ShutdownTag(Tag + 1) {
   // Register a cleanup callback on MPI_COMM_SELF. Its attribute-delete
   // function fires during MPI_Finalize on each rank independently while MPI
-  // is still active. The finalize() method uses a point-to-point sentinel
-  // protocol (MPI_Ssend) instead of barriers for cross-rank synchronization,
-  // which is safe from a per-rank callback context.
+  // is still active. The finalize() method uses sentinels to shut down the
+  // comm thread, followed by a barrier on the duped communicator to ensure
+  // all ranks complete cleanup before any proceeds to transport teardown.
   int Keyval;
   MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN, cleanup, &Keyval, nullptr);
   MPI_Comm_set_attr(MPI_COMM_SELF, Keyval, this);
@@ -187,21 +186,19 @@ void MPISharedStorageCache::finalize() {
   int Rank = CommHandle.getRank();
 
   if (Rank != 0) {
-    // Phase 1: Signal rank 0 that this rank has completed all data sends.
+    // Signal rank 0 that this rank has completed all data sends.
     // MPI_Ssend (synchronous) blocks until rank 0 starts the matching
-    // receive, preventing this rank from returning prematurely.
+    // receive, ensuring the sentinel is not just buffered locally.
     MPI_Ssend(nullptr, 0, MPI_BYTE, /*dest=*/0, ShutdownTag, Comm);
-
-    // Phase 2: Wait for ACK from rank 0 confirming its comm thread has fully
-    // stopped. Only after receiving this ACK is it safe to proceed to MPI
-    // transport teardown.
-    MPI_Recv(nullptr, 0, MPI_BYTE, /*source=*/0, AckTag, Comm,
-             MPI_STATUS_IGNORE);
   }
 
   // On rank 0, the comm thread exits naturally after receiving Size-1
   // shutdown sentinels. On non-zero ranks, the thread was never started.
   CommThread.stop();
+
+  // Barrier ensures all ranks have completed cleanup before any rank returns
+  // from this callback. Barrier on the duped communicator should be safe.
+  MPI_Barrier(Comm);
 
   Finalized = true;
 }
@@ -280,14 +277,6 @@ void MPISharedStorageCache::communicationThreadMain() {
       }
       CommThread.waitOrShutdown(std::chrono::milliseconds(1));
     }
-  }
-
-  // Send ACKs to all non-zero ranks, confirming the comm thread will make no
-  // further MPI calls. Non-zero ranks block until they receive this ACK,
-  // preventing them from tearing down their MPI transport while this thread
-  // could still be processing messages.
-  for (int R = 1; R < Size; ++R) {
-    MPI_Send(nullptr, 0, MPI_BYTE, R, AckTag, Comm);
   }
 
   if (Config::get().ProteusTraceOutput >= 1) {
