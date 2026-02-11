@@ -9,7 +9,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "proteus/impl/CompilerInterfaceDevice.h"
-#include "proteus/impl/Caching/ObjectCacheRegistry.h"
 #include "proteus/impl/CompilerInterfaceDeviceInternal.h"
 #include "proteus/impl/JitEngineDevice.h"
 #include "proteus/impl/JitEngineInfoRegistry.h"

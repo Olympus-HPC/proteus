@@ -15,7 +15,6 @@
 #include "proteus/Init.h"
 #include "proteus/impl/Caching/MemoryCache.h"
 #include "proteus/impl/Caching/ObjectCacheChain.h"
-#include "proteus/impl/Caching/ObjectCacheRegistry.h"
 #include "proteus/impl/Cloning.h"
 #include "proteus/impl/CompilerAsync.h"
 #include "proteus/impl/CompilerSync.h"
@@ -505,14 +504,6 @@ public:
     return KernelInfo.getStaticHash();
   }
 
-  std::optional<std::reference_wrapper<ObjectCacheChain>> getLibraryCache() {
-    if (!Config::get().ProteusUseStoredCache)
-      return std::nullopt;
-    if (!CacheChain)
-      CacheChain = &ObjectCacheRegistry::instance().get("JitEngineDevice");
-    return std::ref(*CacheChain);
-  }
-
 public:
   StringRef getDeviceArch() const { return DeviceArch; }
 
@@ -545,6 +536,9 @@ protected:
 
     registerFatBinaryEnd();
 
+    if (Config::get().ProteusUseStoredCache)
+      CacheChain.emplace("JitEngineDevice");
+
     if (Config::get().ProteusAsyncCompilation)
       AsyncCompiler =
           std::make_unique<CompilerAsync>(Config::get().ProteusAsyncThreads);
@@ -558,13 +552,12 @@ protected:
       AsyncCompiler->joinAllThreads();
 
     CodeCache.printStats();
-    if (!CacheChain)
-      CacheChain = &ObjectCacheRegistry::instance().get("JitEngineDevice");
-    CacheChain->printStats();
+    if (CacheChain)
+      CacheChain->printStats();
   }
 
   MemoryCache<KernelFunction_t> CodeCache{"JitEngineDevice"};
-  ObjectCacheChain *CacheChain = nullptr;
+  std::optional<ObjectCacheChain> CacheChain;
   std::string DeviceArch;
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
@@ -603,8 +596,8 @@ JitEngineDevice<ImplT>::compileAndRun(
   std::string Suffix = HashValue.toMangledSuffix();
   std::string KernelMangled = (KernelInfo.getName() + Suffix);
 
-  if (auto CacheOpt = getLibraryCache()) {
-    auto CompiledLib = CacheOpt->get().lookup(HashValue);
+  if (CacheChain) {
+    auto CompiledLib = CacheChain->lookup(HashValue);
     if (CompiledLib) {
       if (!Config::get().ProteusRelinkGlobalsByCopy)
         relinkGlobalsObject(CompiledLib->ObjectModule->getMemBufferRef(),
@@ -670,9 +663,9 @@ JitEngineDevice<ImplT>::compileAndRun(
       BinInfo.getVarNameToGlobalInfo());
 
   CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
-  if (auto CacheOpt = getLibraryCache())
-    CacheOpt->get().store(HashValue,
-                          CacheEntry::staticObject(ObjBuf->getMemBufferRef()));
+  if (CacheChain)
+    CacheChain->store(HashValue,
+                      CacheEntry::staticObject(ObjBuf->getMemBufferRef()));
 
   return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                               ShmemSize, Stream);
