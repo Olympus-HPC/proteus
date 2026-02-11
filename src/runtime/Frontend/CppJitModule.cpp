@@ -38,16 +38,12 @@ CppJitModule::CppJitModule(TargetModelType TargetModel, const std::string &Code,
                            const std::vector<std::string> &ExtraArgs)
     : TargetModel(TargetModel), Code(Code),
       ModuleHash(std::make_unique<HashT>(hash(Code))), ExtraArgs(ExtraArgs),
-      Dispatch(Dispatcher::getDispatcher(TargetModel)) {
-  ensureProteusInitialized();
-}
+      Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
 CppJitModule::CppJitModule(const std::string &Target, const std::string &Code,
                            const std::vector<std::string> &ExtraArgs)
     : TargetModel(parseTargetModel(Target)), Code(Code),
       ModuleHash(std::make_unique<HashT>(hash(Code))), ExtraArgs(ExtraArgs),
-      Dispatch(Dispatcher::getDispatcher(TargetModel)) {
-  ensureProteusInitialized();
-}
+      Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
 CppJitModule::~CppJitModule() = default;
 
 void CppJitModule::compileCppToDynamicLibrary() {
