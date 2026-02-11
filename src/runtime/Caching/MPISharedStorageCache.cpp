@@ -90,37 +90,19 @@ MPICommHandle::~MPICommHandle() {
 // CommThreadHandle implementation
 //===----------------------------------------------------------------------===//
 
-CommThreadHandle::~CommThreadHandle() { stop(); }
+CommThreadHandle::~CommThreadHandle() { join(); }
 
-void CommThreadHandle::stop() {
+void CommThreadHandle::join() {
   if (!Thread)
     return;
-
-  {
-    std::lock_guard<std::mutex> Lock(Mutex);
-    ShutdownFlag.store(true, std::memory_order_release);
-  }
-  CondVar.notify_all();
 
   if (Thread->joinable())
     Thread->join();
   Thread.reset();
-  Running.store(false, std::memory_order_release);
+  Running = false;
 }
 
-bool CommThreadHandle::isRunning() const {
-  return Running.load(std::memory_order_acquire);
-}
-
-bool CommThreadHandle::shutdownRequested() const {
-  return ShutdownFlag.load(std::memory_order_acquire);
-}
-
-bool CommThreadHandle::waitOrShutdown(std::chrono::milliseconds Timeout) {
-  std::unique_lock<std::mutex> Lock(Mutex);
-  return CondVar.wait_for(Lock, Timeout,
-                          [this] { return ShutdownFlag.load(); });
-}
+bool CommThreadHandle::isRunning() const { return Running; }
 
 //===----------------------------------------------------------------------===//
 // MPISharedStorageCache implementation
@@ -163,14 +145,9 @@ void MPISharedStorageCache::finalize() {
   int MPIFinalized = 0;
   MPI_Finalized(&MPIFinalized);
   if (MPIFinalized) {
-    if (!PendingSends.empty()) {
-      Logger::trace("[MPISharedStorageCache] Warning: MPI already finalized, "
-                    "cannot complete " +
-                    std::to_string(PendingSends.size()) + " pending sends\n");
-    }
-    CommThread.stop();
-    Finalized = true;
-    return;
+    reportFatalError(
+        "MPI already finalized before MPISharedStorageCache cleanup. "
+        "This should never occur.");
   }
 
   if (Config::get().ProteusTraceOutput >= 1) {
@@ -194,7 +171,7 @@ void MPISharedStorageCache::finalize() {
 
   // On rank 0, the comm thread exits naturally after receiving Size-1
   // shutdown sentinels. On non-zero ranks, the thread was never started.
-  CommThread.stop();
+  CommThread.join();
 
   // Barrier ensures all ranks have completed cleanup before any rank returns
   // from this callback. Barrier on the duped communicator should be safe.
@@ -244,30 +221,15 @@ void MPISharedStorageCache::communicationThreadMain() {
   int TotalExpected = Size - 1;
 
   while (true) {
-    int Flag = 0;
     MPI_Status Status;
-    MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, Comm, &Flag, &Status);
+    MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, Comm, &Status);
 
-    if (Flag) {
-      if (Status.MPI_TAG == ShutdownTag) {
-        // Shutdown sentinel from a non-zero rank.
-        MPI_Recv(nullptr, 0, MPI_BYTE, Status.MPI_SOURCE, ShutdownTag, Comm,
-                 MPI_STATUS_IGNORE);
-        ShutdownCount++;
-      } else {
-        // Data message.
-        int MsgSize = 0;
-        MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
+    if (Status.MPI_TAG == ShutdownTag) {
+      // Shutdown sentinel from a non-zero rank.
+      MPI_Recv(nullptr, 0, MPI_BYTE, Status.MPI_SOURCE, ShutdownTag, Comm,
+               MPI_STATUS_IGNORE);
+      ShutdownCount++;
 
-        std::vector<char> Buffer(MsgSize);
-        MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE,
-                 Status.MPI_TAG, Comm, MPI_STATUS_IGNORE);
-
-        auto Msg = unpackMessage(Buffer);
-        saveToDisk(Msg.Hash, Msg.Data.data(), Msg.Data.size(), Msg.IsDynLib);
-      }
-    } else {
-      // No message available. Check exit conditions.
       if (ShutdownCount >= TotalExpected) {
         // All non-zero ranks have sent their shutdown sentinels. Due to MPI
         // non-overtaking (per-source message ordering), all data messages
@@ -275,7 +237,17 @@ void MPISharedStorageCache::communicationThreadMain() {
         // received.
         break;
       }
-      CommThread.waitOrShutdown(std::chrono::milliseconds(1));
+    } else {
+      // Data message.
+      int MsgSize = 0;
+      MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
+
+      std::vector<char> Buffer(MsgSize);
+      MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE,
+               Status.MPI_TAG, Comm, MPI_STATUS_IGNORE);
+
+      auto Msg = unpackMessage(Buffer);
+      saveToDisk(Msg.Hash, Msg.Data.data(), Msg.Data.size(), Msg.IsDynLib);
     }
   }
 
