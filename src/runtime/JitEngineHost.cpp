@@ -199,7 +199,6 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
                               void **Args,
                               ArrayRef<RuntimeConstantInfo *> RCInfoArray) {
   TIMESCOPE("compileAndLink");
-  ensureProteusInitialized();
 
   StringRef StrIR(IR, IRSize);
   auto Ctx = std::make_unique<LLVMContext>();
