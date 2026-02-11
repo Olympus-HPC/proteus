@@ -552,6 +552,7 @@ protected:
       AsyncCompiler->joinAllThreads();
 
     CodeCache.printStats();
+    CodeCache.printKernelTrace();
     if (CacheChain)
       CacheChain->printStats();
   }

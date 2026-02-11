@@ -17,6 +17,7 @@
 #include "proteus/impl/Utils.h"
 
 #include <llvm/ADT/StringRef.h>
+#include <llvm/Demangle/Demangle.h>
 
 #include <cstdint>
 #include <iostream>
@@ -53,10 +54,7 @@ public:
     CacheEntry.FunctionPtr = FunctionPtr;
     CacheEntry.NumExecs = 1;
     CacheEntry.NumHits = 0;
-
-    if (Config::get().ProteusDebugOutput) {
-      CacheEntry.FnName = FnName.str();
-    }
+    CacheEntry.FnName = FnName.str();
   }
 
   void printStats() {
@@ -66,11 +64,24 @@ public:
       std::cout << "[proteus][" << Label << "] MemoryCache rank "
                 << DistributedRank << " HashValue " << HashValue.toString()
                 << " NumExecs " << JCE.NumExecs << " NumHits " << JCE.NumHits;
-      if (Config::get().ProteusDebugOutput) {
-        printf(" FnName %s", JCE.FnName.c_str());
-      }
-      printf("\n");
+      if (Config::get().ProteusDebugOutput)
+        std::cout << " FnName " << JCE.FnName;
+      std::cout << "\n";
     }
+  }
+
+  void printKernelTrace() {
+    if (!Config::get().ProteusKernelTrace)
+      return;
+
+    printf("[proteus][%s] === Kernel Trace (rank %s) ===\n", Label.c_str(),
+           DistributedRank.c_str());
+    for (const auto &[HashValue, JCE] : CacheMap) {
+      std::string Demangled = llvm::demangle(JCE.FnName);
+      printf("[proteus][%s]   %s  hash=%s  launches=%lu\n", Label.c_str(),
+             Demangled.c_str(), HashValue.toString().c_str(), JCE.NumExecs);
+    }
+    printf("[proteus][%s] === End Kernel Trace ===\n", Label.c_str());
   }
 
 private:

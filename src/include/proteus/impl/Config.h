@@ -316,6 +316,7 @@ public:
   bool ProteusDebugOutput;
   std::optional<const std::string> ProteusCacheDir;
   std::string ProteusObjectCacheChain;
+  bool ProteusKernelTrace;
   bool ProteusEnableTimeTrace;
   std::string ProteusTimeTraceFile;
 
@@ -373,6 +374,7 @@ private:
     ProteusDebugOutput = getEnvOrDefaultBool("PROTEUS_DEBUG_OUTPUT", false);
     ProteusObjectCacheChain =
         getEnvOrDefaultString("PROTEUS_OBJECT_CACHE_CHAIN").value_or("storage");
+    ProteusKernelTrace = getEnvOrDefaultBool("PROTEUS_KERNEL_TRACE", false);
     ProteusEnableTimeTrace =
         getEnvOrDefaultBool("PROTEUS_ENABLE_TIME_TRACE", false);
     ProteusTimeTraceFile =

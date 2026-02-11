@@ -58,6 +58,7 @@ public:
 
   ~DispatcherHIP() {
     CodeCache.printStats();
+    CodeCache.printKernelTrace();
     ObjectCache->printStats();
   }
 
