@@ -11,9 +11,6 @@
 
 namespace proteus {
 
-// bool &proteusIsInitialized();
-//  void ensureProteusInitialized();
-
 [[deprecated("it is a no-op and will be removed in a future version.")]]
 void init();
 [[deprecated("it is a no-op and will be removed in a "
