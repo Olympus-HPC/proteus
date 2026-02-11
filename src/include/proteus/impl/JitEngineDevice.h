@@ -24,6 +24,7 @@
 #include "proteus/impl/Debug.h"
 #include "proteus/impl/Hashing.h"
 #include "proteus/impl/JitEngine.h"
+#include "proteus/impl/JitEngineInfoRegistry.h"
 #include "proteus/impl/TimeTracing.h"
 #include "proteus/impl/Utils.h"
 
@@ -89,7 +90,6 @@ private:
   std::optional<CallGraph> ModuleCallGraph;
   std::unique_ptr<MemoryBuffer> DeviceBinary;
   std::unordered_map<std::string, GlobalVarInfo> VarNameToGlobalInfo;
-  bool GlobalsMapped;
   std::once_flag Flag;
 
 public:
@@ -99,7 +99,7 @@ public:
       : FatbinWrapper(FatbinWrapper), Ctx(std::make_unique<LLVMContext>()),
         LinkedModuleIds(LinkedModuleIds), LinkedModule(nullptr),
         ExtractedModules(std::nullopt), ModuleCallGraph(std::nullopt),
-        DeviceBinary(nullptr), GlobalsMapped(false) {}
+        DeviceBinary(nullptr) {}
 
   FatbinWrapperT *getFatbinWrapper() const { return FatbinWrapper; }
 
@@ -192,33 +192,25 @@ public:
     LinkedModuleIds.push_back(ModuleId);
   }
 
-  void registerGlobalVar(const char *VarName, const void *Addr,
-                         uint64_t VarSize) {
-    VarNameToGlobalInfo.emplace(VarName, GlobalVarInfo(Addr, nullptr, VarSize));
-  }
+  void insertGlobalVar(const char *VarName, const void *HostAddr,
+                       const void *DeviceAddr, uint64_t VarSize) {
+    auto KV = VarNameToGlobalInfo.emplace(
+        VarName, GlobalVarInfo(HostAddr, DeviceAddr, VarSize));
 
-  void mapGlobals() {
-    std::call_once(Flag, [&]() {
-      for (auto &[GlobalName, GVI] : VarNameToGlobalInfo) {
-        void *DevPtr = resolveDeviceGlobalAddr(GVI.HostAddr);
-        VarNameToGlobalInfo.at(GlobalName).DevAddr = DevPtr;
-      }
-      auto TraceOut = [](std::unordered_map<std::string, GlobalVarInfo>
-                             &VarNameToGlobalInfo) {
-        SmallString<128> S;
-        raw_svector_ostream OS(S);
-        for (auto &[GlobalName, GVI] : VarNameToGlobalInfo) {
-          OS << "[GVarInfo]: " << GlobalName << " HAddr:" << GVI.HostAddr
-             << " DevAddr:" << GVI.DevAddr << " VarSize:" << GVI.VarSize
-             << "\n";
-        }
+    auto TraceOut = [&KV]() {
+      auto GlobalName = KV.first->first;
+      auto &GVI = KV.first->second;
 
-        return S;
-      };
-      if (Config::get().ProteusTraceOutput >= 1)
-        Logger::trace(TraceOut(VarNameToGlobalInfo));
-      GlobalsMapped = true;
-    });
+      SmallString<128> S;
+      raw_svector_ostream OS(S);
+      OS << "[GVarInfo]: " << GlobalName << " HAddr:" << GVI.HostAddr
+         << " DevAddr:" << GVI.DevAddr << " VarSize:" << GVI.VarSize << "\n";
+
+      return S;
+    };
+
+    if (Config::get().ProteusTraceOutput >= 1)
+      Logger::trace(TraceOut());
   }
 
   std::unordered_map<std::string, GlobalVarInfo> &getVarNameToGlobalInfo() {
@@ -458,16 +450,20 @@ public:
     }
   }
 
-  void insertRegisterVar(void *Handle, const char *VarName, const void *Addr,
-                         uint64_t VarSize) {
+  void registerVar(void *Handle, const char *VarName, const void *HostAddr,
+                   uint64_t VarSize) {
     if (!HandleToBinaryInfo.count(Handle))
       reportFatalError("Expected Handle in map");
     BinaryInfo &BinInfo = HandleToBinaryInfo[Handle];
 
-    BinInfo.registerGlobalVar(VarName, Addr, VarSize);
+    void *DeviceAddr = resolveDeviceGlobalAddr(HostAddr);
+    assert(DeviceAddr &&
+           "Expected non-null device address for global variable");
+
+    BinInfo.insertGlobalVar(VarName, HostAddr, DeviceAddr, VarSize);
   }
 
-  void registerLinkedBinary(FatbinWrapperT *FatbinWrapper,
+  void registerLinkedBinary(void *Handle, FatbinWrapperT *FatbinWrapper,
                             const char *ModuleId);
   void registerFatBinary(void *Handle, FatbinWrapperT *FatbinWrapper,
                          const char *ModuleId);
@@ -475,7 +471,6 @@ public:
   void registerFunction(void *Handle, void *Kernel, char *KernelName,
                         ArrayRef<RuntimeConstantInfo *> RCInfoArray);
 
-  void *CurHandle = nullptr;
   std::unordered_map<std::string, FatbinWrapperT *> ModuleIdToFatBinary;
   std::unordered_map<const void *, BinaryInfo> HandleToBinaryInfo;
   SmallVector<std::string> GlobalLinkedModuleIds;
@@ -519,18 +514,49 @@ public:
   }
 
 public:
-  void finalize() {
-    if (Config::get().ProteusAsyncCompilation)
-      CompilerAsync::instance(Config::get().ProteusAsyncThreads)
-          .joinAllThreads();
-  }
-
   StringRef getDeviceArch() const { return DeviceArch; }
 
 protected:
-  JitEngineDevice() {}
+  JitEngineDevice() {
+    auto &JitEngineInfo = JitEngineInfoRegistry::instance();
+
+    for (auto &Fatbin : JitEngineInfo.RegisteredFatBinaries) {
+      registerFatBinary(
+          Fatbin.Handle,
+          reinterpret_cast<FatbinWrapperT *>(Fatbin.FatbinWrapper),
+          Fatbin.ModuleId);
+    }
+
+    for (auto &LinkedBin : JitEngineInfo.RegisteredLinkedBinaries) {
+      registerLinkedBinary(
+          LinkedBin.Handle,
+          reinterpret_cast<FatbinWrapperT *>(LinkedBin.FatbinWrapper),
+          LinkedBin.ModuleId);
+    }
+
+    for (auto &Func : JitEngineInfo.RegisteredFunctions) {
+      registerFunction(Func.Handle, Func.Kernel, Func.KernelName,
+                       Func.RCInfoArray);
+    }
+
+    for (auto &Var : JitEngineInfo.RegisteredVars) {
+      registerVar(Var.Handle, Var.VarName, Var.HostAddr, Var.VarSize);
+    }
+
+    registerFatBinaryEnd();
+
+    if (Config::get().ProteusAsyncCompilation)
+      AsyncCompiler =
+          std::make_unique<CompilerAsync>(Config::get().ProteusAsyncThreads);
+  }
 
   ~JitEngineDevice() {
+    // Thread joining is handled by CompilerAsync's shutdown guard to ensure it
+    // happens before static objects are destroyed. If this destructor does run,
+    // joinAllThreads() is idempotent.
+    if (AsyncCompiler)
+      AsyncCompiler->joinAllThreads();
+
     CodeCache.printStats();
     if (!CacheChain)
       CacheChain = &ObjectCacheRegistry::instance().get("JitEngineDevice");
@@ -542,6 +568,7 @@ protected:
   std::string DeviceArch;
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
+  std::unique_ptr<CompilerAsync> AsyncCompiler;
 };
 
 template <typename ImplT>
@@ -550,15 +577,8 @@ JitEngineDevice<ImplT>::compileAndRun(
     JITKernelInfo &KernelInfo, dim3 GridDim, dim3 BlockDim, void **KernelArgs,
     uint64_t ShmemSize, typename DeviceTraits<ImplT>::DeviceStream_t Stream) {
   TIMESCOPE("compileAndRun");
-  ensureProteusInitialized();
 
   auto &BinInfo = KernelInfo.getBinaryInfo();
-
-  // Lazy initialize the map of device global variables to device pointers by
-  // resolving the host address to the device address. For HIP it is fine to
-  // do this earlier (e.g., instertRegisterVar), but CUDA can't. So, we
-  // initialize this here the first time we need to compile a kernel.
-  BinInfo.mapGlobals();
 
   SmallVector<RuntimeConstant> RCVec =
       getRuntimeConstantValues(KernelArgs, KernelInfo.getRCInfoArray());
@@ -606,14 +626,13 @@ JitEngineDevice<ImplT>::compileAndRun(
   std::unique_ptr<MemoryBuffer> ObjBuf = nullptr;
 
   if (Config::get().ProteusAsyncCompilation) {
-    auto &Compiler = CompilerAsync::instance(Config::get().ProteusAsyncThreads);
-    // If there is no compilation pending for the specialization, post the
-    // compilation task to the compiler.
-    if (!Compiler.isCompilationPending(HashValue)) {
+    //  If there is no compilation pending for the specialization, post the
+    //  compilation task to the compiler.
+    if (!AsyncCompiler->isCompilationPending(HashValue)) {
       PROTEUS_DBG(Logger::logs("proteus") << "Compile async for HashValue "
                                           << HashValue.toString() << "\n");
 
-      Compiler.compile(CompilationTask{
+      AsyncCompiler->compile(CompilationTask{
           KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
           GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(),
           BinInfo.getVarNameToGlobalInfo(), GlobalLinkedBinaries, DeviceArch,
@@ -625,7 +644,7 @@ JitEngineDevice<ImplT>::compileAndRun(
     // Compilation is pending, try to get the compilation result buffer. If
     // buffer is null, compilation is not done, so execute the AOT version
     // directly.
-    ObjBuf = Compiler.takeCompilationResult(
+    ObjBuf = AsyncCompiler->takeCompilationResult(
         HashValue, Config::get().ProteusAsyncTestBlocking);
     if (!ObjBuf) {
       return launchKernelDirect(KernelInfo.getKernel(), GridDim, BlockDim,
@@ -663,7 +682,6 @@ template <typename ImplT>
 void JitEngineDevice<ImplT>::registerFatBinary(void *Handle,
                                                FatbinWrapperT *FatbinWrapper,
                                                const char *ModuleId) {
-  CurHandle = Handle;
   PROTEUS_DBG(Logger::logs("proteus")
               << "Register fatbinary Handle " << Handle << " FatbinWrapper "
               << FatbinWrapper << " Binary " << (void *)FatbinWrapper->Binary
@@ -697,8 +715,6 @@ template <typename ImplT> void JitEngineDevice<ImplT>::registerFatBinaryEnd() {
   // stored in the ModuleIdToFatBinary map.
   for (auto &[ModuleId, FatbinWrapper] : ModuleIdToFatBinary)
     GlobalLinkedBinaries.erase((void *)FatbinWrapper->Binary);
-
-  CurHandle = nullptr;
 }
 
 template <typename ImplT>
@@ -732,19 +748,21 @@ void JitEngineDevice<ImplT>::registerFunction(
 }
 
 template <typename ImplT>
-void JitEngineDevice<ImplT>::registerLinkedBinary(FatbinWrapperT *FatbinWrapper,
+void JitEngineDevice<ImplT>::registerLinkedBinary(void *Handle,
+                                                  FatbinWrapperT *FatbinWrapper,
                                                   const char *ModuleId) {
   PROTEUS_DBG(Logger::logs("proteus")
               << "Register linked binary FatBinary " << FatbinWrapper
               << " Binary " << (void *)FatbinWrapper->Binary << " ModuleId "
               << ModuleId << "\n");
-  if (CurHandle) {
-    if (!HandleToBinaryInfo.count(CurHandle))
-      reportFatalError("Expected CurHandle in map");
+  if (Handle) {
+    if (!HandleToBinaryInfo.count(Handle))
+      reportFatalError("Expected Handle in map");
 
-    HandleToBinaryInfo[CurHandle].addModuleId(ModuleId);
-  } else
+    HandleToBinaryInfo[Handle].addModuleId(ModuleId);
+  } else {
     GlobalLinkedModuleIds.push_back(ModuleId);
+  }
 
   ModuleIdToFatBinary[ModuleId] = FatbinWrapper;
 }

@@ -46,11 +46,6 @@ private:
 
 class CompilerAsync {
 public:
-  static CompilerAsync &instance(int NumThreads) {
-    static CompilerAsync Singleton{NumThreads};
-    return Singleton;
-  }
-
   void compile(CompilationTask &&CT) {
     std::unique_lock Lock{Mutex};
     // Get HashValue before the move of CT.
@@ -76,6 +71,13 @@ public:
 
       Count++;
       std::unique_ptr<MemoryBuffer> ObjBuf = CT.compile();
+
+      // Ensure threads are joined before static objects are destroyed during
+      // program exit. This static is initialized after COMGR's own statics
+      // (triggered by compile() above), so C++ reverse destruction order
+      // guarantees ~ShutdownGuard runs first.
+      static ShutdownGuard Guard{this};
+
       Lock.lock();
       CompilationResultMap.at(CT.getHashValue())->set(std::move(ObjBuf));
       Lock.unlock();
@@ -97,7 +99,8 @@ public:
     CondVar.notify_all();
 
     for (auto &Thread : Threads)
-      Thread.join();
+      if (Thread.joinable())
+        Thread.join();
 
     Threads.clear();
   }
@@ -138,15 +141,6 @@ public:
     return ObjBuf;
   }
 
-private:
-  bool Active;
-  std::mutex Mutex;
-  std::condition_variable CondVar;
-  std::unordered_map<HashT, std::unique_ptr<CompilationResult>>
-      CompilationResultMap;
-  std::deque<CompilationTask> Worklist;
-  std::vector<std::thread> Threads;
-
   CompilerAsync(int NumThreads) {
     Active = true;
     for (int I = 0; I < NumThreads; ++I)
@@ -154,6 +148,26 @@ private:
   }
 
   ~CompilerAsync() { joinAllThreads(); }
+
+private:
+  // Joins threads before static objects are destroyed at exit (e.g.,
+  // COMGR/HIPRTC). Must be constructed after the first compile()) so that
+  // reverse destruction order ensures this runs first.
+  struct ShutdownGuard {
+    CompilerAsync *CA;
+    ~ShutdownGuard() {
+      if (CA)
+        CA->joinAllThreads();
+    }
+  };
+
+  bool Active;
+  std::mutex Mutex;
+  std::condition_variable CondVar;
+  std::unordered_map<HashT, std::unique_ptr<CompilationResult>>
+      CompilationResultMap;
+  std::deque<CompilationTask> Worklist;
+  std::vector<std::thread> Threads;
 };
 
 } // namespace proteus
