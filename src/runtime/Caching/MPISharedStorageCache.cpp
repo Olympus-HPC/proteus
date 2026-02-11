@@ -38,9 +38,9 @@ void validateMPIConfig() {
   int MPIInitialized = 0;
   MPI_Initialized(&MPIInitialized);
   if (!MPIInitialized) {
-    reportFatalError("proteus::init() with mpi-storage cache requires MPI to "
+    reportFatalError("mpi-storage cache requires MPI to "
                      "be initialized. Call MPI_Init_thread() before "
-                     "proteus::init()");
+                     "any JIT compilation.");
   }
 
   int Provided = 0;
