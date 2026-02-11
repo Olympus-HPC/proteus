@@ -139,7 +139,8 @@ MPISharedStorageCache::MPISharedStorageCache(const std::string &Label)
     : StorageDirectory(Config::get().ProteusCacheDir
                            ? Config::get().ProteusCacheDir.value()
                            : ".proteus"),
-      Label(Label), Tag(computeTag(Label)), ShutdownTag(Tag + 1) {
+      Label(Label), Tag(computeTag(Label)), ShutdownTag(Tag + 1),
+      AckTag(ShutdownTag + 1) {
   // Register a cleanup callback on MPI_COMM_SELF. Its attribute-delete
   // function fires during MPI_Finalize on each rank independently while MPI
   // is still active. The finalize() method uses a point-to-point sentinel
@@ -186,11 +187,16 @@ void MPISharedStorageCache::finalize() {
   int Rank = CommHandle.getRank();
 
   if (Rank != 0) {
-    // Signal rank 0 that this rank has completed all data sends.
+    // Phase 1: Signal rank 0 that this rank has completed all data sends.
     // MPI_Ssend (synchronous) blocks until rank 0 starts the matching
-    // receive, preventing this rank from returning and tearing down its
-    // MPI transport before rank 0 has acknowledged.
+    // receive, preventing this rank from returning prematurely.
     MPI_Ssend(nullptr, 0, MPI_BYTE, /*dest=*/0, ShutdownTag, Comm);
+
+    // Phase 2: Wait for ACK from rank 0 confirming its comm thread has fully
+    // stopped. Only after receiving this ACK is it safe to proceed to MPI
+    // transport teardown.
+    MPI_Recv(nullptr, 0, MPI_BYTE, /*source=*/0, AckTag, Comm,
+             MPI_STATUS_IGNORE);
   }
 
   // On rank 0, the comm thread exits naturally after receiving Size-1
@@ -274,6 +280,14 @@ void MPISharedStorageCache::communicationThreadMain() {
       }
       CommThread.waitOrShutdown(std::chrono::milliseconds(1));
     }
+  }
+
+  // Send ACKs to all non-zero ranks, confirming the comm thread will make no
+  // further MPI calls. Non-zero ranks block until they receive this ACK,
+  // preventing them from tearing down their MPI transport while this thread
+  // could still be processing messages.
+  for (int R = 1; R < Size; ++R) {
+    MPI_Send(nullptr, 0, MPI_BYTE, R, AckTag, Comm);
   }
 
   if (Config::get().ProteusTraceOutput >= 1) {
