@@ -92,7 +92,7 @@ private:
   // (e.g. __jit_instance_bar$float$) back to readable form (bar<float>).
   static std::string demangleOrRestoreKernelName(const std::string &FnName) {
     const std::string Prefix = "__jit_instance_";
-    if (FnName.substr(0, Prefix.size()) != Prefix) {
+    if (FnName.compare(0, Prefix.size(), Prefix) != 0) {
       return llvm::demangle(FnName);
     }
     std::string Name = FnName.substr(Prefix.size());
