@@ -40,12 +40,6 @@ __jit_register_lambda(const char *Symbol) {
   LambdaRegistry::instance().registerLambda(Symbol);
 }
 
-extern "C" void __jit_init_host() {
-  ObjectCacheRegistry::instance().get("JitEngineHost");
-}
-
-extern "C" void __jit_finalize_host() {}
-
 extern "C" void __jit_enable_host() {
   JitEngineHost &Jit = JitEngineHost::instance();
   Jit.enable();
