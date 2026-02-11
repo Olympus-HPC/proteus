@@ -105,6 +105,7 @@ public:
   void store(const HashT &HashValue, const CacheEntry &Entry) override;
 
   void finalize() override;
+  void finalize(bool CalledFromMPICallback);
 
   void printStats() override;
 

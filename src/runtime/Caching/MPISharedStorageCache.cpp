@@ -126,13 +126,34 @@ bool CommThreadHandle::waitOrShutdown(std::chrono::milliseconds Timeout) {
 // MPISharedStorageCache implementation
 //===----------------------------------------------------------------------===//
 
-int MPISharedStorageCache::computeTag(const std::string &Label) { return 0; }
+int MPISharedStorageCache::computeTag(const std::string &) { return 0; }
+
+static int cleanup(MPI_Comm Comm, int, void *AttributeVal, void *) {
+  MPISharedStorageCache *MSS =
+      static_cast<MPISharedStorageCache *>(AttributeVal);
+  MSS->finalize(/*CalledFromMPICallback=*/true);
+  int Rank;
+  MPI_Comm_rank(Comm, &Rank);
+  if (Config::get().ProteusTraceOutput >= 1) {
+    Logger::trace(
+        "[MPISharedStorageCache] MPI cleanup callback called on rank " +
+        std::to_string(Rank) + "\n");
+  }
+  return MPI_SUCCESS;
+}
 
 MPISharedStorageCache::MPISharedStorageCache(const std::string &Label)
     : StorageDirectory(Config::get().ProteusCacheDir
                            ? Config::get().ProteusCacheDir.value()
                            : ".proteus"),
       Label(Label), Tag(computeTag(Label)) {
+  // Set a cleanup callback at MPI finalization using MPI_COMM_SELF, so that the
+  // cache can flush pending messages and clean up resources.
+  int Keyval;
+  MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN, cleanup, &Keyval, nullptr);
+  MPI_Comm_set_attr(MPI_COMM_SELF, Keyval, this);
+  MPI_Comm_free_keyval(&Keyval);
+
   std::filesystem::create_directories(StorageDirectory);
   startCommThread();
 }
@@ -140,6 +161,10 @@ MPISharedStorageCache::MPISharedStorageCache(const std::string &Label)
 MPISharedStorageCache::~MPISharedStorageCache() { finalize(); }
 
 void MPISharedStorageCache::finalize() {
+  finalize(/*CalledFromMPICallback=*/false);
+}
+
+void MPISharedStorageCache::finalize(bool CalledFromMPICallback) {
   if (Finalized)
     return;
 
@@ -157,23 +182,31 @@ void MPISharedStorageCache::finalize() {
   }
 
   if (Config::get().ProteusTraceOutput >= 1) {
-    Logger::trace("[MPISharedStorageCache:" + Label + "] Rank " +
-                  std::to_string(CommHandle.getRank()) +
-                  " flushing, PendingSends=" +
-                  std::to_string(PendingSends.size()) + "\n");
+    Logger::trace(
+        "[MPISharedStorageCache:" + Label + "] Rank " +
+        std::to_string(CommHandle.getRank()) +
+        " flushing, PendingSends=" + std::to_string(PendingSends.size()) +
+        (CalledFromMPICallback ? " (from MPI callback)" : "") + "\n");
   }
-
-  MPI_Comm Comm = CommHandle.get();
 
   completeAllPendingSends();
 
-  MPI_Barrier(Comm);
+  // Skip MPI_Barrier when called from the MPI_COMM_SELF delete callback
+  // (triggered by MPI_Finalize). In that path, each rank enters the callback
+  // independently, so a collective on another communicator would deadlock.
+  if (!CalledFromMPICallback) {
+    MPI_Comm Comm = CommHandle.get();
+    MPI_Barrier(Comm);
+  }
 
-  // Phase 2: Stop the communication thread (rank 0).
+  // Stop the communication thread (rank 0).
   // Thread drains remaining messages before exiting.
   CommThread.stop();
 
-  MPI_Barrier(Comm);
+  if (!CalledFromMPICallback) {
+    MPI_Comm Comm = CommHandle.get();
+    MPI_Barrier(Comm);
+  }
 
   Finalized = true;
 }
