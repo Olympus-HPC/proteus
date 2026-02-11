@@ -128,17 +128,10 @@ bool CommThreadHandle::waitOrShutdown(std::chrono::milliseconds Timeout) {
 
 int MPISharedStorageCache::computeTag(const std::string &) { return 0; }
 
-static int cleanup(MPI_Comm Comm, int, void *AttributeVal, void *) {
+static int cleanup(MPI_Comm, int, void *AttributeVal, void *) {
   MPISharedStorageCache *MSS =
       static_cast<MPISharedStorageCache *>(AttributeVal);
-  MSS->finalize(/*CalledFromMPICallback=*/true);
-  int Rank;
-  MPI_Comm_rank(Comm, &Rank);
-  if (Config::get().ProteusTraceOutput >= 1) {
-    Logger::trace(
-        "[MPISharedStorageCache] MPI cleanup callback called on rank " +
-        std::to_string(Rank) + "\n");
-  }
+  MSS->finalize();
   return MPI_SUCCESS;
 }
 
@@ -146,9 +139,12 @@ MPISharedStorageCache::MPISharedStorageCache(const std::string &Label)
     : StorageDirectory(Config::get().ProteusCacheDir
                            ? Config::get().ProteusCacheDir.value()
                            : ".proteus"),
-      Label(Label), Tag(computeTag(Label)) {
-  // Set a cleanup callback at MPI finalization using MPI_COMM_SELF, so that the
-  // cache can flush pending messages and clean up resources.
+      Label(Label), Tag(computeTag(Label)), ShutdownTag(Tag + 1) {
+  // Register a cleanup callback on MPI_COMM_SELF. Its attribute-delete
+  // function fires during MPI_Finalize on each rank independently while MPI
+  // is still active. The finalize() method uses a point-to-point sentinel
+  // protocol (MPI_Ssend) instead of barriers for cross-rank synchronization,
+  // which is safe from a per-rank callback context.
   int Keyval;
   MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN, cleanup, &Keyval, nullptr);
   MPI_Comm_set_attr(MPI_COMM_SELF, Keyval, this);
@@ -161,10 +157,6 @@ MPISharedStorageCache::MPISharedStorageCache(const std::string &Label)
 MPISharedStorageCache::~MPISharedStorageCache() { finalize(); }
 
 void MPISharedStorageCache::finalize() {
-  finalize(/*CalledFromMPICallback=*/false);
-}
-
-void MPISharedStorageCache::finalize(bool CalledFromMPICallback) {
   if (Finalized)
     return;
 
@@ -182,31 +174,28 @@ void MPISharedStorageCache::finalize(bool CalledFromMPICallback) {
   }
 
   if (Config::get().ProteusTraceOutput >= 1) {
-    Logger::trace(
-        "[MPISharedStorageCache:" + Label + "] Rank " +
-        std::to_string(CommHandle.getRank()) +
-        " flushing, PendingSends=" + std::to_string(PendingSends.size()) +
-        (CalledFromMPICallback ? " (from MPI callback)" : "") + "\n");
+    Logger::trace("[MPISharedStorageCache:" + Label + "] Rank " +
+                  std::to_string(CommHandle.getRank()) +
+                  " flushing, PendingSends=" +
+                  std::to_string(PendingSends.size()) + "\n");
   }
 
   completeAllPendingSends();
 
-  // Skip MPI_Barrier when called from the MPI_COMM_SELF delete callback
-  // (triggered by MPI_Finalize). In that path, each rank enters the callback
-  // independently, so a collective on another communicator would deadlock.
-  if (!CalledFromMPICallback) {
-    MPI_Comm Comm = CommHandle.get();
-    MPI_Barrier(Comm);
+  MPI_Comm Comm = CommHandle.get();
+  int Rank = CommHandle.getRank();
+
+  if (Rank != 0) {
+    // Signal rank 0 that this rank has completed all data sends.
+    // MPI_Ssend (synchronous) blocks until rank 0 starts the matching
+    // receive, preventing this rank from returning and tearing down its
+    // MPI transport before rank 0 has acknowledged.
+    MPI_Ssend(nullptr, 0, MPI_BYTE, /*dest=*/0, ShutdownTag, Comm);
   }
 
-  // Stop the communication thread (rank 0).
-  // Thread drains remaining messages before exiting.
+  // On rank 0, the comm thread exits naturally after receiving Size-1
+  // shutdown sentinels. On non-zero ranks, the thread was never started.
   CommThread.stop();
-
-  if (!CalledFromMPICallback) {
-    MPI_Comm Comm = CommHandle.get();
-    MPI_Barrier(Comm);
-  }
 
   Finalized = true;
 }
@@ -247,31 +236,43 @@ void MPISharedStorageCache::communicationThreadMain() {
   }
 
   MPI_Comm Comm = CommHandle.get();
+  int Size = CommHandle.getSize();
+  int ShutdownCount = 0;
+  int TotalExpected = Size - 1;
 
   while (true) {
     int Flag = 0;
     MPI_Status Status;
-    MPI_Iprobe(MPI_ANY_SOURCE, Tag, Comm, &Flag, &Status);
+    MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, Comm, &Flag, &Status);
 
     if (Flag) {
-      int MsgSize = 0;
-      MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
-
-      std::vector<char> Buffer(MsgSize);
-      MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE, Tag, Comm,
-               MPI_STATUS_IGNORE);
-
-      auto Msg = unpackMessage(Buffer);
-      saveToDisk(Msg.Hash, Msg.Data.data(), Msg.Data.size(), Msg.IsDynLib);
-    } else {
-      if (CommThread.shutdownRequested()) {
-        // Final drain: one more probe to ensure queue is empty.
-        MPI_Iprobe(MPI_ANY_SOURCE, Tag, Comm, &Flag, &Status);
-        if (!Flag)
-          break;
+      if (Status.MPI_TAG == ShutdownTag) {
+        // Shutdown sentinel from a non-zero rank.
+        MPI_Recv(nullptr, 0, MPI_BYTE, Status.MPI_SOURCE, ShutdownTag, Comm,
+                 MPI_STATUS_IGNORE);
+        ShutdownCount++;
       } else {
-        CommThread.waitOrShutdown(std::chrono::milliseconds(1));
+        // Data message.
+        int MsgSize = 0;
+        MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
+
+        std::vector<char> Buffer(MsgSize);
+        MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE,
+                 Status.MPI_TAG, Comm, MPI_STATUS_IGNORE);
+
+        auto Msg = unpackMessage(Buffer);
+        saveToDisk(Msg.Hash, Msg.Data.data(), Msg.Data.size(), Msg.IsDynLib);
       }
+    } else {
+      // No message available. Check exit conditions.
+      if (ShutdownCount >= TotalExpected) {
+        // All non-zero ranks have sent their shutdown sentinels. Due to MPI
+        // non-overtaking (per-source message ordering), all data messages
+        // from each source precede its sentinel, so all data has been
+        // received.
+        break;
+      }
+      CommThread.waitOrShutdown(std::chrono::milliseconds(1));
     }
   }
 

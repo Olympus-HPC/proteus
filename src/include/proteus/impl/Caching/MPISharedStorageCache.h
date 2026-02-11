@@ -105,7 +105,6 @@ public:
   void store(const HashT &HashValue, const CacheEntry &Entry) override;
 
   void finalize() override;
-  void finalize(bool CalledFromMPICallback);
 
   void printStats() override;
 
@@ -132,6 +131,7 @@ private:
   const std::string StorageDirectory;
   const std::string Label;
   const int Tag;
+  const int ShutdownTag;
   MPICommHandle CommHandle;
   CommThreadHandle CommThread;
   bool Finalized = false;
