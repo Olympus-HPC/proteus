@@ -215,7 +215,7 @@ public:
 
         return S;
       };
-      if (Config::get().ProteusTraceOutput >= 1)
+      if (Config::get().traceSpecializations())
         Logger::trace(TraceOut(VarNameToGlobalInfo));
       GlobalsMapped = true;
     });
@@ -532,6 +532,7 @@ protected:
 
   ~JitEngineDevice() {
     CodeCache.printStats();
+    CodeCache.printKernelTrace();
     if (!CacheChain)
       CacheChain = &ObjectCacheRegistry::instance().get("JitEngineDevice");
     CacheChain->printStats();

@@ -1,6 +1,6 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_TUNED_KERNELS=%S/tuned_config.json PROTEUS_TRACE_OUTPUT=1 %build/kernel_tuning.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-%device_lang
+// RUN: PROTEUS_TUNED_KERNELS=%S/tuned_config.json PROTEUS_TRACE_OUTPUT="specialization" %build/kernel_tuning.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-%device_lang
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 

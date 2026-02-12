@@ -94,6 +94,7 @@ public:
 
   ~DispatcherCUDA() {
     CodeCache.printStats();
+    CodeCache.printKernelTrace();
     ObjectCache->printStats();
   }
 

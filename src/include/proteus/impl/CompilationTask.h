@@ -99,7 +99,7 @@ public:
         OptLevel(CGConfig.optLevel()),
         CodegenOptLevel(CGConfig.codeGenOptLevel()),
         PassPipeline(CGConfig.optPipeline()) {
-    if (Config::get().ProteusTraceOutput >= 1) {
+    if (Config::get().traceSpecializations()) {
       llvm::SmallString<128> S;
       llvm::raw_svector_ostream OS(S);
       OS << "[KernelConfig] ID:" << KernelName << " ";
@@ -160,7 +160,7 @@ public:
     replaceGlobalVariablesWithPointers(*M, VarNameToGlobalInfo);
 
     invokeOptimizeIR(*M);
-    if (Config::get().ProteusTraceOutput == 2) {
+    if (Config::get().traceIRDump()) {
       llvm::outs() << "LLVM IR module post optimization " << *M << "\n";
     }
     if (DumpIR) {
