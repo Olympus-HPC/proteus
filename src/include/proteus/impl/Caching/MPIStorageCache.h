@@ -47,6 +47,7 @@ protected:
   void forwardToWriter(const HashT &HashValue, const CacheEntry &Entry);
   void saveToDisk(const HashT &HashValue, const char *Data, size_t Size,
                   bool IsDynLib);
+  void handleStoreMessage(MPI_Status &Status);
 
   uint64_t Hits = 0;
   uint64_t Accesses = 0;

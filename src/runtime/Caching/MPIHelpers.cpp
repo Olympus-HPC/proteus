@@ -31,7 +31,7 @@ void validateMPIConfig() {
   int MPIInitialized = 0;
   MPI_Initialized(&MPIInitialized);
   if (!MPIInitialized) {
-    reportFatalError("mpi-storage cache requires MPI to be initialized. Call "
+    reportFatalError("MPI caching requires MPI to be initialized. Call "
                      "MPI_Init_thread() before any JIT compilation.");
   }
 

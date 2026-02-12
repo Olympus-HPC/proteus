@@ -39,7 +39,11 @@ MPIRemoteLookupCache::lookup(const HashT &HashValue) {
   TIMESCOPE("MPIRemoteLookupCache::lookup");
   Accesses++;
 
-  return lookupRemote(HashValue);
+  auto Result = lookupRemote(HashValue);
+  if (Result)
+    Hits++;
+
+  return Result;
 }
 
 std::unique_ptr<CompiledLibrary>
@@ -63,8 +67,6 @@ MPIRemoteLookupCache::lookupRemote(const HashT &HashValue) {
 
   if (!Resp.Found)
     return nullptr;
-
-  Hits++;
 
   auto MemBuf = MemoryBuffer::getMemBufferCopy(
       StringRef(Resp.Data.data(), Resp.Data.size()));
@@ -106,6 +108,9 @@ void MPIRemoteLookupCache::communicationThreadMain() {
         handleStoreMessage(Status);
       } else if (Tag == MPITag::LookupRequest) {
         handleLookupRequest(Status);
+      } else {
+        reportFatalError("[MPIRemoteLookup] Unexpected MPI tag: " +
+                         std::to_string(static_cast<int>(Tag)));
       }
     }
   } catch (const std::exception &E) {
@@ -118,19 +123,6 @@ void MPIRemoteLookupCache::communicationThreadMain() {
     Logger::trace("[MPIRemoteLookup:" + Label +
                   "] Communication thread exiting\n");
   }
-}
-
-void MPIRemoteLookupCache::handleStoreMessage(MPI_Status &Status) {
-  MPI_Comm Comm = CommHandle.get();
-  int MsgSize = 0;
-  MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
-
-  std::vector<char> Buffer(MsgSize);
-  MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE,
-           static_cast<int>(MPITag::Store), Comm, MPI_STATUS_IGNORE);
-
-  auto Msg = unpackStoreMessage(Comm, Buffer);
-  saveToDisk(Msg.Hash, Msg.Data.data(), Msg.Data.size(), Msg.IsDynLib);
 }
 
 void MPIRemoteLookupCache::handleLookupRequest(MPI_Status &Status) {

@@ -45,7 +45,6 @@ protected:
 private:
   std::unique_ptr<CompiledLibrary> lookupRemote(const HashT &HashValue);
 
-  void handleStoreMessage(MPI_Status &Status);
   void handleLookupRequest(MPI_Status &Status);
 
   std::vector<char> packLookupRequest(const HashT &HashValue);

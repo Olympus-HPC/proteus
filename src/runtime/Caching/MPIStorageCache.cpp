@@ -46,9 +46,10 @@ MPIStorageCache::MPIStorageCache(const std::string &Label)
   MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN, mpiCleanupCallback, &Keyval,
                          nullptr);
   MPI_Comm_set_attr(MPI_COMM_SELF, Keyval, this);
+  MPI_Comm_free_keyval(&Keyval);
 }
 
-MPIStorageCache::~MPIStorageCache() { finalize(); }
+MPIStorageCache::~MPIStorageCache() = default;
 
 void MPIStorageCache::finalize() {
   if (Finalized)
@@ -138,6 +139,19 @@ void MPIStorageCache::completeAllPendingSends() {
     MPI_Wait(&Pending->Request, MPI_STATUS_IGNORE);
   }
   PendingSends.clear();
+}
+
+void MPIStorageCache::handleStoreMessage(MPI_Status &Status) {
+  MPI_Comm Comm = CommHandle.get();
+  int MsgSize = 0;
+  MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
+
+  std::vector<char> Buffer(MsgSize);
+  MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE,
+           static_cast<int>(MPITag::Store), Comm, MPI_STATUS_IGNORE);
+
+  auto Msg = unpackStoreMessage(Comm, Buffer);
+  saveToDisk(Msg.Hash, Msg.Data.data(), Msg.Data.size(), Msg.IsDynLib);
 }
 
 void MPIStorageCache::saveToDisk(const HashT &HashValue, const char *Data,

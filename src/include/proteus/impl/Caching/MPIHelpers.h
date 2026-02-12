@@ -19,7 +19,6 @@
 #include <mpi.h>
 
 #include <memory>
-#include <mutex>
 #include <thread>
 #include <vector>
 

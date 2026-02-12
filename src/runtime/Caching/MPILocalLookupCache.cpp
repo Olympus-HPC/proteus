@@ -60,15 +60,10 @@ void MPILocalLookupCache::communicationThreadMain() {
         if (ShutdownCount == Size)
           break;
       } else if (Tag == MPITag::Store) {
-        int MsgSize = 0;
-        MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
-
-        std::vector<char> Buffer(MsgSize);
-        MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE,
-                 static_cast<int>(MPITag::Store), Comm, MPI_STATUS_IGNORE);
-
-        auto Msg = unpackStoreMessage(Comm, Buffer);
-        saveToDisk(Msg.Hash, Msg.Data.data(), Msg.Data.size(), Msg.IsDynLib);
+        handleStoreMessage(Status);
+      } else {
+        reportFatalError("[MPILocalLookup] Unexpected MPI tag: " +
+                         std::to_string(static_cast<int>(Tag)));
       }
     }
   } catch (const std::exception &E) {
