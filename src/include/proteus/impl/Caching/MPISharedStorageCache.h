@@ -54,7 +54,7 @@ public:
 private:
   std::unique_ptr<std::thread> Thread;
   mutable std::mutex Mutex;
-  bool Running;
+  bool Running = false;
 };
 
 class MPICommHandle {
