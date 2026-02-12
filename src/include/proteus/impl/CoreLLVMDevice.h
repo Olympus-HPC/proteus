@@ -64,7 +64,7 @@ inline void setKernelDims(Module &M, dim3 &GridDim, dim3 &BlockDim) {
         Value *ConstantValue =
             ConstantInt::get(Type::getInt32Ty(M.getContext()), DimValue);
         Call->replaceAllUsesWith(ConstantValue);
-        if (Config::get().ProteusTraceOutput >= 1)
+        if (Config::get().traceSpecializations())
           Logger::trace(TraceOut(IntrinsicFunction, ConstantValue));
         Call->eraseFromParent();
       }
@@ -129,7 +129,7 @@ inline void setKernelDimsRange(Module &M, dim3 &GridDim, dim3 &BlockDim) {
         Call->setMetadata(LLVMContext::MD_range, RangeNode);
 #endif
 
-        if (Config::get().ProteusTraceOutput >= 1)
+        if (Config::get().traceSpecializations())
           Logger::trace(TraceOut(IntrinsicFunction, DimValue));
       }
     }
@@ -323,7 +323,7 @@ inline void specializeIR(
 
       return S;
     };
-    if (Config::get().ProteusTraceOutput >= 1)
+    if (Config::get().traceSpecializations())
       Logger::trace(TraceOut(BlockSize, MinBlocksPerSM));
     setLaunchBoundsForKernel(*F, BlockSize, MinBlocksPerSM);
   }

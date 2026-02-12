@@ -64,7 +64,7 @@ MPICommHandle::MPICommHandle() {
   MPI_Comm_rank(Comm, &Rank);
   MPI_Comm_size(Comm, &Size);
 
-  if (Config::get().ProteusTraceOutput >= 1) {
+  if (Config::get().traceSpecializations()) {
     Logger::trace("[MPICommHandle] Initialized communicator for rank " +
                   std::to_string(Rank) + "/" + std::to_string(Size) + "\n");
   }
@@ -156,7 +156,7 @@ void MPISharedStorageCache::finalize() {
     return;
   }
 
-  if (Config::get().ProteusTraceOutput >= 1) {
+  if (Config::get().traceSpecializations()) {
     Logger::trace("[MPISharedStorageCache:" + Label + "] Rank " +
                   std::to_string(CommHandle.getRank()) +
                   " flushing, PendingSends=" +
@@ -208,7 +208,7 @@ void MPISharedStorageCache::store(const HashT &HashValue,
 }
 
 void MPISharedStorageCache::communicationThreadMain() {
-  if (Config::get().ProteusTraceOutput >= 1) {
+  if (Config::get().traceSpecializations()) {
     Logger::trace("[MPISharedStorageCache:" + Label +
                   "] Communication thread started\n");
   }
@@ -242,7 +242,7 @@ void MPISharedStorageCache::communicationThreadMain() {
     }
   }
 
-  if (Config::get().ProteusTraceOutput >= 1) {
+  if (Config::get().traceSpecializations()) {
     Logger::trace("[MPISharedStorageCache:" + Label +
                   "] Communication thread exiting\n");
   }
@@ -383,7 +383,7 @@ void MPISharedStorageCache::saveToDisk(const HashT &HashValue, const char *Data,
 
   saveToFileAtomic(Filepath, StringRef{Data, Size});
 
-  if (Config::get().ProteusTraceOutput >= 1) {
+  if (Config::get().traceSpecializations()) {
     Logger::trace("[MPISharedStorageCache] Saved " + Filebase + Extension +
                   " (" + std::to_string(Size) + " bytes)\n");
   }
