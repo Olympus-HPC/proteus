@@ -10,6 +10,7 @@
 
 #include "proteus/impl/Caching/MPILocalLookupCache.h"
 
+#include "proteus/Error.h"
 #include "proteus/impl/Config.h"
 #include "proteus/impl/Logger.h"
 #include "proteus/impl/TimeTracing.h"
@@ -19,7 +20,9 @@
 namespace proteus {
 
 MPILocalLookupCache::MPILocalLookupCache(const std::string &Label)
-    : MPIStorageCache(Label, /*StoreTag=*/0) {}
+    : MPIStorageCache(Label) {
+  startCommThread();
+}
 
 std::unique_ptr<CompiledLibrary>
 MPILocalLookupCache::lookup(const HashT &HashValue) {
@@ -40,31 +43,38 @@ void MPILocalLookupCache::communicationThreadMain() {
   }
 
   MPI_Comm Comm = CommHandle.get();
+  int Size = CommHandle.getSize();
+  int ShutdownCount = 0;
 
-  while (true) {
-    int Flag = 0;
-    MPI_Status Status;
-    MPI_Iprobe(MPI_ANY_SOURCE, StoreTag, Comm, &Flag, &Status);
+  try {
+    while (true) {
+      MPI_Status Status;
+      MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, Comm, &Status);
 
-    if (Flag) {
-      int MsgSize = 0;
-      MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
+      auto Tag = static_cast<MPITag>(Status.MPI_TAG);
 
-      std::vector<char> Buffer(MsgSize);
-      MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE, StoreTag,
-               Comm, MPI_STATUS_IGNORE);
-
-      auto Msg = unpackStoreMessage(Comm, Buffer);
-      saveToDisk(Msg.Hash, Msg.Data.data(), Msg.Data.size(), Msg.IsDynLib);
-    } else {
-      if (CommThread.shutdownRequested()) {
-        MPI_Iprobe(MPI_ANY_SOURCE, StoreTag, Comm, &Flag, &Status);
-        if (!Flag)
+      if (Tag == MPITag::Shutdown) {
+        MPI_Recv(nullptr, 0, MPI_BYTE, Status.MPI_SOURCE,
+                 static_cast<int>(MPITag::Shutdown), Comm, MPI_STATUS_IGNORE);
+        ++ShutdownCount;
+        if (ShutdownCount == Size)
           break;
-      } else {
-        CommThread.waitOrShutdown(std::chrono::milliseconds(1));
+      } else if (Tag == MPITag::Store) {
+        int MsgSize = 0;
+        MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
+
+        std::vector<char> Buffer(MsgSize);
+        MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE,
+                 static_cast<int>(MPITag::Store), Comm, MPI_STATUS_IGNORE);
+
+        auto Msg = unpackStoreMessage(Comm, Buffer);
+        saveToDisk(Msg.Hash, Msg.Data.data(), Msg.Data.size(), Msg.IsDynLib);
       }
     }
+  } catch (const std::exception &E) {
+    reportFatalError(std::string("[MPILocalLookup] Communication thread "
+                                 "encountered an exception: ") +
+                     E.what());
   }
 
   if (Config::get().ProteusTraceOutput >= 1) {

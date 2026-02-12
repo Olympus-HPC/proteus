@@ -31,9 +31,8 @@ void validateMPIConfig() {
   int MPIInitialized = 0;
   MPI_Initialized(&MPIInitialized);
   if (!MPIInitialized) {
-    reportFatalError("proteus::init() with MPI cache requires MPI to "
-                     "be initialized. Call MPI_Init_thread() before "
-                     "proteus::init()");
+    reportFatalError("mpi-storage cache requires MPI to be initialized. Call "
+                     "MPI_Init_thread() before any JIT compilation.");
   }
 
   int Provided = 0;
@@ -79,37 +78,19 @@ int MPICommHandle::getRank() const { return Rank; }
 
 int MPICommHandle::getSize() const { return Size; }
 
-CommThreadHandle::~CommThreadHandle() { stop(); }
+CommThreadHandle::~CommThreadHandle() { join(); }
 
-void CommThreadHandle::stop() {
+void CommThreadHandle::join() {
   if (!Thread)
     return;
-
-  {
-    std::lock_guard<std::mutex> Lock(Mutex);
-    ShutdownFlag.store(true, std::memory_order_release);
-  }
-  CondVar.notify_all();
 
   if (Thread->joinable())
     Thread->join();
   Thread.reset();
-  Running.store(false, std::memory_order_release);
+  Running = false;
 }
 
-bool CommThreadHandle::isRunning() const {
-  return Running.load(std::memory_order_acquire);
-}
-
-bool CommThreadHandle::shutdownRequested() const {
-  return ShutdownFlag.load(std::memory_order_acquire);
-}
-
-bool CommThreadHandle::waitOrShutdown(std::chrono::milliseconds Timeout) {
-  std::unique_lock<std::mutex> Lock(Mutex);
-  return CondVar.wait_for(Lock, Timeout,
-                          [this] { return ShutdownFlag.load(); });
-}
+bool CommThreadHandle::isRunning() const { return Running; }
 
 std::vector<char> packStoreMessage(MPI_Comm Comm, const HashT &HashValue,
                                    const CacheEntry &Entry) {

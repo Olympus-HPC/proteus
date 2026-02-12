@@ -30,10 +30,9 @@ namespace proteus {
 
 class MPIStorageCache : public ObjectCache {
 public:
-  MPIStorageCache(const std::string &Label, int StoreTag);
+  MPIStorageCache(const std::string &Label);
   ~MPIStorageCache() override;
 
-  void startCommThread();
   void store(const HashT &HashValue, const CacheEntry &Entry) override;
   void finalize() override;
   void printStats() override;
@@ -41,6 +40,7 @@ public:
   uint64_t getAccesses() const override { return Accesses; }
 
 protected:
+  void startCommThread();
   std::unique_ptr<CompiledLibrary> lookupFromDisk(const HashT &HashValue);
   virtual void communicationThreadMain() = 0;
 
@@ -52,7 +52,6 @@ protected:
   uint64_t Accesses = 0;
   const std::string StorageDirectory;
   const std::string Label;
-  const int StoreTag;
   MPICommHandle CommHandle;
   CommThreadHandle CommThread;
 

@@ -53,9 +53,6 @@ private:
                                        const std::vector<char> &Data);
   LookupRequest unpackLookupRequest(const std::vector<char> &Buffer);
   LookupResponse unpackLookupResponse(const std::vector<char> &Buffer);
-
-  static constexpr int TagLookupRequest = 1;
-  static constexpr int TagLookupResponse = 2;
 };
 
 } // namespace proteus

@@ -30,7 +30,9 @@ namespace proteus {
 using namespace llvm;
 
 MPIRemoteLookupCache::MPIRemoteLookupCache(const std::string &Label)
-    : MPIStorageCache(Label, /*StoreTag=*/0) {}
+    : MPIStorageCache(Label) {
+  startCommThread();
+}
 
 std::unique_ptr<CompiledLibrary>
 MPIRemoteLookupCache::lookup(const HashT &HashValue) {
@@ -46,16 +48,16 @@ MPIRemoteLookupCache::lookupRemote(const HashT &HashValue) {
 
   auto ReqBuf = packLookupRequest(HashValue);
   MPI_Send(ReqBuf.data(), static_cast<int>(ReqBuf.size()), MPI_BYTE, 0,
-           TagLookupRequest, Comm);
+           static_cast<int>(MPITag::LookupRequest), Comm);
 
   MPI_Status Status;
-  MPI_Probe(0, TagLookupResponse, Comm, &Status);
+  MPI_Probe(0, static_cast<int>(MPITag::LookupResponse), Comm, &Status);
 
   int RespSize = 0;
   MPI_Get_count(&Status, MPI_BYTE, &RespSize);
   std::vector<char> RespBuf(RespSize);
-  MPI_Recv(RespBuf.data(), RespSize, MPI_BYTE, 0, TagLookupResponse, Comm,
-           MPI_STATUS_IGNORE);
+  MPI_Recv(RespBuf.data(), RespSize, MPI_BYTE, 0,
+           static_cast<int>(MPITag::LookupResponse), Comm, MPI_STATUS_IGNORE);
 
   auto Resp = unpackLookupResponse(RespBuf);
 
@@ -84,40 +86,32 @@ void MPIRemoteLookupCache::communicationThreadMain() {
   }
 
   MPI_Comm Comm = CommHandle.get();
+  int Size = CommHandle.getSize();
+  int ShutdownCount = 0;
 
-  while (true) {
-    bool AnyActivity = false;
-    int Flag = 0;
-    MPI_Status Status;
+  try {
+    while (true) {
+      MPI_Status Status;
+      MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, Comm, &Status);
 
-    MPI_Iprobe(MPI_ANY_SOURCE, StoreTag, Comm, &Flag, &Status);
-    if (Flag) {
-      AnyActivity = true;
-      handleStoreMessage(Status);
-    }
+      auto Tag = static_cast<MPITag>(Status.MPI_TAG);
 
-    MPI_Iprobe(MPI_ANY_SOURCE, TagLookupRequest, Comm, &Flag, &Status);
-    if (Flag) {
-      AnyActivity = true;
-      handleLookupRequest(Status);
-    }
-
-    if (!AnyActivity) {
-      if (CommThread.shutdownRequested()) {
-        MPI_Iprobe(MPI_ANY_SOURCE, StoreTag, Comm, &Flag, &Status);
-        if (Flag) {
-          handleStoreMessage(Status);
-          continue;
-        }
-        MPI_Iprobe(MPI_ANY_SOURCE, TagLookupRequest, Comm, &Flag, &Status);
-        if (Flag) {
-          handleLookupRequest(Status);
-          continue;
-        }
-        break;
+      if (Tag == MPITag::Shutdown) {
+        MPI_Recv(nullptr, 0, MPI_BYTE, Status.MPI_SOURCE,
+                 static_cast<int>(MPITag::Shutdown), Comm, MPI_STATUS_IGNORE);
+        ++ShutdownCount;
+        if (ShutdownCount == Size)
+          break;
+      } else if (Tag == MPITag::Store) {
+        handleStoreMessage(Status);
+      } else if (Tag == MPITag::LookupRequest) {
+        handleLookupRequest(Status);
       }
-      CommThread.waitOrShutdown(std::chrono::milliseconds(1));
     }
+  } catch (const std::exception &E) {
+    reportFatalError(std::string("[MPIRemoteLookup] Communication thread "
+                                 "encountered an exception: ") +
+                     E.what());
   }
 
   if (Config::get().ProteusTraceOutput >= 1) {
@@ -132,8 +126,8 @@ void MPIRemoteLookupCache::handleStoreMessage(MPI_Status &Status) {
   MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
 
   std::vector<char> Buffer(MsgSize);
-  MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE, StoreTag, Comm,
-           MPI_STATUS_IGNORE);
+  MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE,
+           static_cast<int>(MPITag::Store), Comm, MPI_STATUS_IGNORE);
 
   auto Msg = unpackStoreMessage(Comm, Buffer);
   saveToDisk(Msg.Hash, Msg.Data.data(), Msg.Data.size(), Msg.IsDynLib);
@@ -146,8 +140,8 @@ void MPIRemoteLookupCache::handleLookupRequest(MPI_Status &Status) {
   int MsgSize = 0;
   MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
   std::vector<char> Buffer(MsgSize);
-  MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, SourceRank, TagLookupRequest, Comm,
-           MPI_STATUS_IGNORE);
+  MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, SourceRank,
+           static_cast<int>(MPITag::LookupRequest), Comm, MPI_STATUS_IGNORE);
 
   auto Req = unpackLookupRequest(Buffer);
 
@@ -176,7 +170,7 @@ void MPIRemoteLookupCache::handleLookupRequest(MPI_Status &Status) {
 
   auto RespBuf = packLookupResponse(Found, IsDynLib, Data);
   MPI_Send(RespBuf.data(), static_cast<int>(RespBuf.size()), MPI_BYTE,
-           SourceRank, TagLookupResponse, Comm);
+           SourceRank, static_cast<int>(MPITag::LookupResponse), Comm);
 }
 
 std::vector<char>

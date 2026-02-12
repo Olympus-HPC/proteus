@@ -18,15 +18,19 @@
 
 #include <mpi.h>
 
-#include <atomic>
-#include <chrono>
-#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <thread>
 #include <vector>
 
 namespace proteus {
+
+enum class MPITag : int {
+  Store = 0,
+  LookupRequest = 1,
+  LookupResponse = 2,
+  Shutdown = 3
+};
 
 void validateMPIConfig();
 
@@ -40,28 +44,20 @@ public:
   CommThreadHandle &operator=(const CommThreadHandle &) = delete;
 
   template <typename Callable> void start(Callable &&ThreadFunc) {
-    if (Running.load())
+    if (isRunning())
       return;
 
-    ShutdownFlag.store(false, std::memory_order_release);
     Thread = std::make_unique<std::thread>(std::forward<Callable>(ThreadFunc));
-    Running.store(true, std::memory_order_release);
+    Running = true;
   }
 
-  void stop();
+  void join();
 
   bool isRunning() const;
 
-  bool shutdownRequested() const;
-
-  bool waitOrShutdown(std::chrono::milliseconds Timeout);
-
 private:
   std::unique_ptr<std::thread> Thread;
-  mutable std::mutex Mutex;
-  std::condition_variable CondVar;
-  std::atomic<bool> ShutdownFlag{false};
-  std::atomic<bool> Running{false};
+  bool Running = false;
 };
 
 /// RAII wrapper for MPI communicator with thread safety checks.

@@ -30,12 +30,22 @@ namespace proteus {
 
 using namespace llvm;
 
-MPIStorageCache::MPIStorageCache(const std::string &Label, int StoreTag)
+static int mpiCleanupCallback(MPI_Comm, int, void *Attr, void *) {
+  static_cast<MPIStorageCache *>(Attr)->finalize();
+  return MPI_SUCCESS;
+}
+
+MPIStorageCache::MPIStorageCache(const std::string &Label)
     : StorageDirectory(Config::get().ProteusCacheDir
                            ? Config::get().ProteusCacheDir.value()
                            : ".proteus"),
-      Label(Label), StoreTag(StoreTag) {
+      Label(Label) {
   std::filesystem::create_directories(StorageDirectory);
+
+  int Keyval = MPI_KEYVAL_INVALID;
+  MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN, mpiCleanupCallback, &Keyval,
+                         nullptr);
+  MPI_Comm_set_attr(MPI_COMM_SELF, Keyval, this);
 }
 
 MPIStorageCache::~MPIStorageCache() { finalize(); }
@@ -47,14 +57,9 @@ void MPIStorageCache::finalize() {
   int MPIFinalized = 0;
   MPI_Finalized(&MPIFinalized);
   if (MPIFinalized) {
-    if (!PendingSends.empty()) {
-      Logger::trace("[" + getName() +
-                    "] Warning: MPI already finalized, cannot complete " +
-                    std::to_string(PendingSends.size()) + " pending sends\n");
-    }
-    CommThread.stop();
-    Finalized = true;
-    return;
+    reportFatalError("[" + getName() +
+                     "] MPI already finalized before cache cleanup. Ensure "
+                     "proteus::finalize() is called before MPI_Finalize().");
   }
 
   if (Config::get().ProteusTraceOutput >= 1) {
@@ -68,9 +73,9 @@ void MPIStorageCache::finalize() {
 
   completeAllPendingSends();
 
-  MPI_Barrier(Comm);
+  MPI_Ssend(nullptr, 0, MPI_BYTE, 0, static_cast<int>(MPITag::Shutdown), Comm);
 
-  CommThread.stop();
+  CommThread.join();
 
   MPI_Barrier(Comm);
 
@@ -84,10 +89,6 @@ void MPIStorageCache::store(const HashT &HashValue, const CacheEntry &Entry) {
 }
 
 void MPIStorageCache::startCommThread() {
-  if (Finalized)
-    reportFatalError("Cannot start MPIStorageCache communication thread after "
-                     "finalize().");
-
   if (CommHandle.getRank() != 0)
     return;
   CommThread.start([this] { communicationThreadMain(); });
@@ -107,7 +108,8 @@ void MPIStorageCache::forwardToWriter(const HashT &HashValue,
   MPI_Comm Comm = CommHandle.get();
   int Err = MPI_Isend(Pending->Buffer.data(),
                       static_cast<int>(Pending->Buffer.size()), MPI_BYTE,
-                      /*dest=*/0, StoreTag, Comm, &Pending->Request);
+                      /*dest=*/0, static_cast<int>(MPITag::Store), Comm,
+                      &Pending->Request);
   if (Err != MPI_SUCCESS) {
     reportFatalError("MPI_Isend failed with error code " + std::to_string(Err));
   }
