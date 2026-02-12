@@ -220,35 +220,43 @@ void MPISharedStorageCache::communicationThreadMain() {
   int ShutdownCount = 0;
   int TotalExpected = Size - 1;
 
-  while (true) {
-    MPI_Status Status;
-    MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, Comm, &Status);
+  try {
+    while (true) {
+      MPI_Status Status;
+      MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, Comm, &Status);
 
-    if (Status.MPI_TAG == ShutdownTag) {
-      // Shutdown sentinel from a non-zero rank.
-      MPI_Recv(nullptr, 0, MPI_BYTE, Status.MPI_SOURCE, ShutdownTag, Comm,
-               MPI_STATUS_IGNORE);
-      ShutdownCount++;
+      if (Status.MPI_TAG == ShutdownTag) {
+        // Shutdown sentinel from a non-zero rank.
+        MPI_Recv(nullptr, 0, MPI_BYTE, Status.MPI_SOURCE, ShutdownTag, Comm,
+                 MPI_STATUS_IGNORE);
+        ShutdownCount++;
 
-      if (ShutdownCount >= TotalExpected) {
-        // All non-zero ranks have sent their shutdown sentinels. Due to MPI
-        // non-overtaking (per-source message ordering), all data messages
-        // from each source precede its sentinel, so all data has been
-        // received.
-        break;
+        if (ShutdownCount >= TotalExpected) {
+          // All non-zero ranks have sent their shutdown sentinels. Due to MPI
+          // non-overtaking (per-source message ordering), all data messages
+          // from each source precede its sentinel, so all data has been
+          // received.
+          break;
+        }
+      } else {
+        // Data message.
+        int MsgSize = 0;
+        MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
+
+        std::vector<char> Buffer(MsgSize);
+        MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE,
+                 Status.MPI_TAG, Comm, MPI_STATUS_IGNORE);
+
+        auto Msg = unpackMessage(Buffer);
+        saveToDisk(Msg.Hash, Msg.Data.data(), Msg.Data.size(), Msg.IsDynLib);
       }
-    } else {
-      // Data message.
-      int MsgSize = 0;
-      MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
-
-      std::vector<char> Buffer(MsgSize);
-      MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE,
-               Status.MPI_TAG, Comm, MPI_STATUS_IGNORE);
-
-      auto Msg = unpackMessage(Buffer);
-      saveToDisk(Msg.Hash, Msg.Data.data(), Msg.Data.size(), Msg.IsDynLib);
     }
+  } catch (const std::exception &E) {
+    reportFatalError("[MPISharedStorageCache:" + Label +
+                     "] Communication thread error: " + E.what() + "\n");
+  } catch (...) {
+    reportFatalError("[MPISharedStorageCache:" + Label +
+                     "] Communication thread unknown error\n");
   }
 
   if (Config::get().ProteusTraceOutput >= 1) {
