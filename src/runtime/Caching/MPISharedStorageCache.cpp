@@ -160,14 +160,10 @@ void MPISharedStorageCache::finalize() {
   completeAllPendingSends();
 
   MPI_Comm Comm = CommHandle.get();
-  int Rank = CommHandle.getRank();
-
-  if (Rank != 0) {
-    // Signal rank 0 that this rank has completed all data sends.
-    // MPI_Ssend (synchronous) blocks until rank 0 starts the matching
-    // receive, ensuring the sentinel is not just buffered locally.
-    MPI_Ssend(nullptr, 0, MPI_BYTE, /*dest=*/0, ShutdownTag, Comm);
-  }
+  // Signal rank 0 comm thread that this rank has completed all data sends.
+  // MPI_Ssend (synchronous) blocks until rank 0 comm thread starts the matching
+  // receive, ensuring the sentinel is not just buffered locally.
+  MPI_Ssend(nullptr, 0, MPI_BYTE, /*dest=*/0, ShutdownTag, Comm);
 
   // On rank 0, the comm thread exits naturally after receiving Size-1
   // shutdown sentinels. On non-zero ranks, the thread was never started.
@@ -218,7 +214,8 @@ void MPISharedStorageCache::communicationThreadMain() {
   MPI_Comm Comm = CommHandle.get();
   int Size = CommHandle.getSize();
   int ShutdownCount = 0;
-  int TotalExpected = Size - 1;
+  // Expect shutdown sentinels from all ranks, including rank 0 main thread.
+  int TotalExpected = Size;
 
   try {
     while (true) {
