@@ -1,3 +1,14 @@
+//===-- JitEngineInfoRegistry.h -- JIT engine info registry --===//
+//
+// Part of the Proteus Project, under the Apache License v2.0 with LLVM
+// Exceptions. See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+// Registry for JIT engine information: tracks registered fat binaries,
+// linked binaries, functions, and variables used by Proteus JIT engines.
+//===----------------------------------------------------------------------===//
+
 #ifndef PROTEUS_JIT_ENGINE_INFO_REGISTRY_H
 #define PROTEUS_JIT_ENGINE_INFO_REGISTRY_H
 
@@ -68,7 +79,7 @@ public:
   }
   void registerFatBinaryEnd(void *Handle) {
     if (CurHandle != Handle)
-      reportFatalError("Expected matching handle in JIT engine info registery");
+      reportFatalError("Expected matching handle in JIT engine info registry");
     CurHandle = nullptr;
   }
 

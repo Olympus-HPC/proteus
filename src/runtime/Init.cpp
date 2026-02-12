@@ -17,8 +17,8 @@ extern "C" void __jit_disable_device();
 
 namespace proteus {
 
-void init() {};
-void finalize() {};
+void init() {}
+void finalize() {}
 
 void enable() {
   __jit_enable_host();

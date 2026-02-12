@@ -13,8 +13,7 @@ namespace proteus {
 
 [[deprecated("it is a no-op and will be removed in a future version.")]]
 void init();
-[[deprecated("it is a no-op and will be removed in a "
-             "future version.")]]
+[[deprecated("it is a no-op and will be removed in a future version.")]]
 void finalize();
 
 void enable();
