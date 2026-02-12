@@ -1,6 +1,6 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_TRACE_OUTPUT=1 PROTEUS_CACHE_DIR="%t.$$.proteus" %build/global_var_register.%ext | %FILECHECK %s --check-prefixes=CHECK
+// RUN: PROTEUS_TRACE_OUTPUT="specialization" PROTEUS_CACHE_DIR="%t.$$.proteus" %build/global_var_register.%ext | %FILECHECK %s --check-prefixes=CHECK
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 

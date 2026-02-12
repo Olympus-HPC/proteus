@@ -6,7 +6,7 @@
 // RUN: rm -rf "%t.$$.proteus"
 // Test buildFromConfig parsing with explicit PROTEUS_OBJECT_CACHE_CHAIN.
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_OBJECT_CACHE_CHAIN="storage" PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 %build/kernel_cache.%ext 2>&1 | %FILECHECK %s --check-prefix=CHECK-CONFIG
+// RUN: PROTEUS_OBJECT_CACHE_CHAIN="storage" PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="specialization" %build/kernel_cache.%ext 2>&1 | %FILECHECK %s --check-prefix=CHECK-CONFIG
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 

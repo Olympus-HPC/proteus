@@ -21,7 +21,7 @@
 
 #include <cstdint>
 #include <iostream>
-#include <map>
+#include <unordered_map>
 
 namespace proteus {
 
@@ -72,7 +72,7 @@ public:
   }
 
   void printKernelTrace() {
-    if (!Config::get().ProteusKernelTrace)
+    if (!Config::get().traceKernels())
       return;
 
     if (CacheMap.empty())
@@ -82,7 +82,7 @@ public:
       size_t Specializations = 0;
       uint64_t TotalLaunches = 0;
     };
-    std::map<std::string, KernelStats> Grouped;
+    std::unordered_map<std::string, KernelStats> Grouped;
     for (const auto &[HashValue, JCE] : CacheMap) {
       auto &KS = Grouped[JCE.FnName];
       KS.Specializations++;
