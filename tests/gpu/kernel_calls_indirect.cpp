@@ -22,12 +22,9 @@ __global__ __attribute__((annotate("jit"))) void kernel(int Item) {
 }
 
 int main() {
-  proteus::init();
-
   kernel<<<1, 1>>>(42);
   gpuErrCheck(gpuDeviceSynchronize());
 
-  proteus::finalize();
   return 0;
 }
 

@@ -17,12 +17,9 @@ __global__ __attribute__((annotate("jit"))) __launch_bounds__(128,
 }
 
 int main() {
-  proteus::init();
-
   kernel<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
 
-  proteus::finalize();
   return 0;
 }
 

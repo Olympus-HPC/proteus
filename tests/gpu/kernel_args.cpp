@@ -17,12 +17,9 @@ kernel(int Arg1, int Arg2, int Arg3) {
 }
 
 int main() {
-  proteus::init();
-
   kernel<<<1, 1>>>(3, 2, 1);
   gpuErrCheck(gpuDeviceSynchronize());
 
-  proteus::finalize();
   return 0;
 }
 // clang-format off

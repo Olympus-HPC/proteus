@@ -52,12 +52,9 @@ static auto getTiledMatmulFunction(int N, int TileI, int TileJ, int TileK) {
 }
 
 int main(int argc, char **argv) {
-  proteus::init();
-
   if (argc != 3 && argc != 5) {
     std::cerr << "Usage: " << argv[0]
               << " <N> <Tile> | <N> <TileI> <TileJ> <TileK>\n";
-    proteus::finalize();
     return 1;
   }
 
@@ -105,7 +102,6 @@ int main(int argc, char **argv) {
     std::cout << "Verification successful\n";
   }
 
-  proteus::finalize();
   return 0;
 }
 

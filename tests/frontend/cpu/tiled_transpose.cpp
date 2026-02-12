@@ -57,11 +57,8 @@ static auto getTiled2DTransposeFunction(int ROWS, int COLS, int TileSize) {
 }
 
 int main(int argc, char **argv) {
-  proteus::init();
-
   if (argc < 4) {
     std::cerr << "Usage: " << argv[0] << " <ROWS> <COLS> <TileSize>\n";
-    proteus::finalize();
     return 1;
   }
 
@@ -104,7 +101,6 @@ int main(int argc, char **argv) {
   delete[] A;
   delete[] B;
 
-  proteus::finalize();
   return 0;
 }
 

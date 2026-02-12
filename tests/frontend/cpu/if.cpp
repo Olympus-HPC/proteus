@@ -11,8 +11,6 @@
 #include <proteus/JitFrontend.h>
 
 int main() {
-  proteus::init();
-
   auto J = proteus::JitModule();
   auto &LT = J.addFunction<double(double, double)>("if.lt");
   {
@@ -172,7 +170,6 @@ int main() {
   Ret = NE(2.0, 2.0);
   std::cout << "R NE " << Ret << "\n";
 
-  proteus::finalize();
   return 0;
 }
 

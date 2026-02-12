@@ -127,9 +127,8 @@ void JitEngineHost::notifyLoaded(MaterializationResponsibility & /*R*/,
 
 JitEngineHost::~JitEngineHost() {
   CodeCache.printStats();
-  if (!CacheChain)
-    CacheChain = &ObjectCacheRegistry::instance().get("JitEngineHost");
-  CacheChain->printStats();
+  if (CacheChain)
+    CacheChain->printStats();
 }
 
 void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
@@ -199,7 +198,6 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
                               void **Args,
                               ArrayRef<RuntimeConstantInfo *> RCInfoArray) {
   TIMESCOPE("compileAndLink");
-  ensureProteusInitialized();
 
   StringRef StrIR(IR, IRSize);
   auto Ctx = std::make_unique<LLVMContext>();
@@ -241,8 +239,7 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 
   // Lookup the code library in the object cache chain to load without
   // compiling, if found.
-  auto CacheOpt = getLibraryCache();
-  if (CacheOpt && (Library = CacheOpt->get().lookup(HashValue))) {
+  if (CacheChain && (Library = CacheChain->lookup(HashValue))) {
     loadCompiledLibrary(*Library);
   } else {
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".input.ll", *M));
@@ -252,8 +249,8 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
     // Compile the object.
     auto ObjectModule = compileOnly(*M);
 
-    if (CacheOpt)
-      CacheOpt->get().store(
+    if (CacheChain)
+      CacheChain->store(
           HashValue, CacheEntry::staticObject(ObjectModule->getMemBufferRef()));
 
     // Create the compiled library and load it.
@@ -411,4 +408,7 @@ JitEngineHost::JitEngineHost() {
 
   // Add static library functions to the main JIT dynamic library.
   addStaticLibrarySymbols();
+
+  if (Config::get().ProteusUseStoredCache)
+    CacheChain.emplace("JitEngineHost");
 }

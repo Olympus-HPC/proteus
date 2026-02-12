@@ -18,13 +18,10 @@ __global__ __attribute__((annotate("jit"))) static void kernel() {
 
 void foo();
 int main() {
-  proteus::init();
-
   kernel<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
   foo();
 
-  proteus::finalize();
   return 0;
 }
 

@@ -13,8 +13,6 @@
 using namespace proteus;
 
 int main() {
-  proteus::init();
-
   auto J = JitModule();
   auto &F =
       J.addFunction<void(float *, float *, float *, float *, float *, float *,
@@ -74,7 +72,6 @@ int main() {
   std::cout << "cos = " << RCos << "\n";
   std::cout << "fabs = " << RFabs << "\n";
 
-  proteus::finalize();
   return 0;
 }
 

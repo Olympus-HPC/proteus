@@ -104,7 +104,6 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int TileSize) {
 }
 
 int main() {
-  proteus::init();
   constexpr int DI = 4, DJ = 2, DK = 2;
   constexpr int TileI = 2, TileJ = 1, TileK = 2;
   constexpr int UniformTile = 2;
@@ -153,7 +152,6 @@ int main() {
   delete[] A2;
   delete[] B2;
 
-  proteus::finalize();
   return 0;
 }
 

@@ -53,8 +53,6 @@ inline void launch(double C, double *X) {
 }
 
 int main() {
-  proteus::init();
-
   double A{3.14};
   double B{1.23};
   double C{4.56};
@@ -79,7 +77,6 @@ int main() {
 
   launch(C, X);
   gpuErrCheck(gpuFree(X));
-  proteus::finalize();
 }
 
 // clang-format off

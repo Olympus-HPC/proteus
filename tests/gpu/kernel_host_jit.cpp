@@ -20,13 +20,10 @@ __attribute__((annotate("jit"))) gpuError_t launcher(T KernelIn) {
 }
 
 int main() {
-  proteus::init();
-
   kernel<<<1, 1>>>();
   gpuErrCheck(launcher(kernel));
   gpuErrCheck(gpuDeviceSynchronize());
 
-  proteus::finalize();
   return 0;
 }
 

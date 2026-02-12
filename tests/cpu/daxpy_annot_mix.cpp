@@ -20,7 +20,6 @@ myDaxpy(double A, double *X, double *Y, size_t N) {
 }
 
 int main() {
-  proteus::init();
 
   size_t N = 1024;
   double *X = static_cast<double *>(malloc(sizeof(double) * N));
@@ -40,7 +39,6 @@ int main() {
   free(X);
   free(Y);
 
-  proteus::finalize();
   return 0;
 }
 

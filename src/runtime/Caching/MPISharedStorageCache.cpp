@@ -38,9 +38,9 @@ void validateMPIConfig() {
   int MPIInitialized = 0;
   MPI_Initialized(&MPIInitialized);
   if (!MPIInitialized) {
-    reportFatalError("proteus::init() with mpi-storage cache requires MPI to "
+    reportFatalError("mpi-storage cache requires MPI to "
                      "be initialized. Call MPI_Init_thread() before "
-                     "proteus::init()");
+                     "any JIT compilation.");
   }
 
   int Provided = 0;
@@ -90,49 +90,48 @@ MPICommHandle::~MPICommHandle() {
 // CommThreadHandle implementation
 //===----------------------------------------------------------------------===//
 
-CommThreadHandle::~CommThreadHandle() { stop(); }
+CommThreadHandle::~CommThreadHandle() { join(); }
 
-void CommThreadHandle::stop() {
+void CommThreadHandle::join() {
   if (!Thread)
     return;
-
-  {
-    std::lock_guard<std::mutex> Lock(Mutex);
-    ShutdownFlag.store(true, std::memory_order_release);
-  }
-  CondVar.notify_all();
 
   if (Thread->joinable())
     Thread->join();
   Thread.reset();
-  Running.store(false, std::memory_order_release);
+  Running = false;
 }
 
-bool CommThreadHandle::isRunning() const {
-  return Running.load(std::memory_order_acquire);
-}
-
-bool CommThreadHandle::shutdownRequested() const {
-  return ShutdownFlag.load(std::memory_order_acquire);
-}
-
-bool CommThreadHandle::waitOrShutdown(std::chrono::milliseconds Timeout) {
-  std::unique_lock<std::mutex> Lock(Mutex);
-  return CondVar.wait_for(Lock, Timeout,
-                          [this] { return ShutdownFlag.load(); });
-}
+bool CommThreadHandle::isRunning() const { return Running; }
 
 //===----------------------------------------------------------------------===//
 // MPISharedStorageCache implementation
 //===----------------------------------------------------------------------===//
 
-int MPISharedStorageCache::computeTag(const std::string &Label) { return 0; }
+int MPISharedStorageCache::computeTag(const std::string &) { return 0; }
+
+static int cleanup(MPI_Comm, int, void *AttributeVal, void *) {
+  MPISharedStorageCache *MSS =
+      static_cast<MPISharedStorageCache *>(AttributeVal);
+  MSS->finalize();
+  return MPI_SUCCESS;
+}
 
 MPISharedStorageCache::MPISharedStorageCache(const std::string &Label)
     : StorageDirectory(Config::get().ProteusCacheDir
                            ? Config::get().ProteusCacheDir.value()
                            : ".proteus"),
-      Label(Label), Tag(computeTag(Label)) {
+      Label(Label), Tag(computeTag(Label)), ShutdownTag(Tag + 1) {
+  // Register a cleanup callback on MPI_COMM_SELF. Its attribute-delete
+  // function fires during MPI_Finalize on each rank independently while MPI
+  // is still active. The finalize() method uses sentinels to shut down the
+  // comm thread, followed by a barrier on the duped communicator to ensure
+  // all ranks complete cleanup before any proceeds to transport teardown.
+  int Keyval;
+  MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN, cleanup, &Keyval, nullptr);
+  MPI_Comm_set_attr(MPI_COMM_SELF, Keyval, this);
+  MPI_Comm_free_keyval(&Keyval);
+
   std::filesystem::create_directories(StorageDirectory);
   startCommThread();
 }
@@ -146,14 +145,9 @@ void MPISharedStorageCache::finalize() {
   int MPIFinalized = 0;
   MPI_Finalized(&MPIFinalized);
   if (MPIFinalized) {
-    if (!PendingSends.empty()) {
-      Logger::trace("[MPISharedStorageCache] Warning: MPI already finalized, "
-                    "cannot complete " +
-                    std::to_string(PendingSends.size()) + " pending sends\n");
-    }
-    CommThread.stop();
-    Finalized = true;
-    return;
+    reportFatalError(
+        "MPI already finalized before MPISharedStorageCache cleanup. "
+        "This should never occur.");
   }
 
   if (Config::get().ProteusTraceOutput >= 1) {
@@ -163,16 +157,20 @@ void MPISharedStorageCache::finalize() {
                   std::to_string(PendingSends.size()) + "\n");
   }
 
-  MPI_Comm Comm = CommHandle.get();
-
   completeAllPendingSends();
 
-  MPI_Barrier(Comm);
+  MPI_Comm Comm = CommHandle.get();
+  // Signal rank 0 comm thread that this rank has completed all data sends.
+  // MPI_Ssend (synchronous) blocks until rank 0 comm thread starts the matching
+  // receive, ensuring the sentinel is not just buffered locally.
+  MPI_Ssend(nullptr, 0, MPI_BYTE, /*dest=*/0, ShutdownTag, Comm);
 
-  // Phase 2: Stop the communication thread (rank 0).
-  // Thread drains remaining messages before exiting.
-  CommThread.stop();
+  // On rank 0, the comm thread exits naturally after receiving Size-1
+  // shutdown sentinels. On non-zero ranks, the thread was never started.
+  CommThread.join();
 
+  // Barrier ensures all ranks have completed cleanup before any rank returns
+  // from this callback. Barrier on the duped communicator should be safe.
   MPI_Barrier(Comm);
 
   Finalized = true;
@@ -214,32 +212,48 @@ void MPISharedStorageCache::communicationThreadMain() {
   }
 
   MPI_Comm Comm = CommHandle.get();
+  int Size = CommHandle.getSize();
+  int ShutdownCount = 0;
+  // Expect shutdown sentinels from all ranks, including rank 0 main thread.
+  int TotalExpected = Size;
 
-  while (true) {
-    int Flag = 0;
-    MPI_Status Status;
-    MPI_Iprobe(MPI_ANY_SOURCE, Tag, Comm, &Flag, &Status);
+  try {
+    while (true) {
+      MPI_Status Status;
+      MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, Comm, &Status);
 
-    if (Flag) {
-      int MsgSize = 0;
-      MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
+      if (Status.MPI_TAG == ShutdownTag) {
+        // Shutdown sentinel from a non-zero rank.
+        MPI_Recv(nullptr, 0, MPI_BYTE, Status.MPI_SOURCE, ShutdownTag, Comm,
+                 MPI_STATUS_IGNORE);
+        ShutdownCount++;
 
-      std::vector<char> Buffer(MsgSize);
-      MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE, Tag, Comm,
-               MPI_STATUS_IGNORE);
-
-      auto Msg = unpackMessage(Buffer);
-      saveToDisk(Msg.Hash, Msg.Data.data(), Msg.Data.size(), Msg.IsDynLib);
-    } else {
-      if (CommThread.shutdownRequested()) {
-        // Final drain: one more probe to ensure queue is empty.
-        MPI_Iprobe(MPI_ANY_SOURCE, Tag, Comm, &Flag, &Status);
-        if (!Flag)
+        if (ShutdownCount >= TotalExpected) {
+          // All non-zero ranks have sent their shutdown sentinels. Due to MPI
+          // non-overtaking (per-source message ordering), all data messages
+          // from each source precede its sentinel, so all data has been
+          // received.
           break;
+        }
       } else {
-        CommThread.waitOrShutdown(std::chrono::milliseconds(1));
+        // Data message.
+        int MsgSize = 0;
+        MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
+
+        std::vector<char> Buffer(MsgSize);
+        MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE,
+                 Status.MPI_TAG, Comm, MPI_STATUS_IGNORE);
+
+        auto Msg = unpackMessage(Buffer);
+        saveToDisk(Msg.Hash, Msg.Data.data(), Msg.Data.size(), Msg.IsDynLib);
       }
     }
+  } catch (const std::exception &E) {
+    reportFatalError("[MPISharedStorageCache:" + Label +
+                     "] Communication thread error: " + E.what() + "\n");
+  } catch (...) {
+    reportFatalError("[MPISharedStorageCache:" + Label +
+                     "] Communication thread unknown error\n");
   }
 
   if (Config::get().ProteusTraceOutput >= 1) {

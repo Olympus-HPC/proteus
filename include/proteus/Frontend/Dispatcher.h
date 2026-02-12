@@ -76,7 +76,7 @@ struct DispatchResult;
 class Dispatcher {
 protected:
   TargetModelType TargetModel;
-  ObjectCacheChain *ObjectCache = nullptr;
+  std::unique_ptr<ObjectCacheChain> ObjectCache;
 
   Dispatcher(const std::string &Name, TargetModelType TM);
 

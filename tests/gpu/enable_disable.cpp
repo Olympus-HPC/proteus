@@ -17,8 +17,6 @@ __global__ __attribute__((annotate("jit"))) void kernel() {
 }
 
 int main() {
-  proteus::init();
-
   proteus::enable();
   kernel<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
@@ -29,7 +27,6 @@ int main() {
   kernel<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
 
-  proteus::finalize();
   return 0;
 }
 
@@ -37,9 +34,9 @@ int main() {
 // CHECK: Kernel
 // CHECK: Kernel
 // CHECK: Kernel
-// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 hits 0 accesses 0
-// CHECK: [proteus][JitEngineHost] StorageCache rank 0 hits 0 accesses 0
 // CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 1 accesses 2
 // CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 2 NumHits 1
 // CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 1
 // CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 1 accesses 1
+// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 hits 0 accesses 0
+// CHECK: [proteus][JitEngineHost] StorageCache rank 0 hits 0 accesses 0

@@ -26,13 +26,10 @@ gpuError_t launcher(const void *KernelIn, int A) {
 }
 
 int main() {
-  proteus::init();
-
   gpuErrCheck(launcher((const void *)kernel, 42));
   gpuErrCheck(launcher((const void *)kernelTwo, 24));
   gpuErrCheck(gpuDeviceSynchronize());
 
-  proteus::finalize();
   return 0;
 }
 

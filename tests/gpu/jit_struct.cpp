@@ -74,8 +74,6 @@ template <typename DimT> void launcher(int Init) {
 }
 
 int main() {
-  proteus::init();
-
   launcher<DimInt>(0);
   launcher<DimFloat>(0);
   launcher<DimDouble>(0);
@@ -87,7 +85,6 @@ int main() {
   launcher<DimDouble>(100);
   launcher<DimFill>(100);
 
-  proteus::finalize();
   return 0;
 }
 

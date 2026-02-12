@@ -42,8 +42,6 @@ auto createJitFunction(size_t N) {
 }
 
 int main() {
-  proteus::init();
-
   // Allocate and initialize input vectors A and B, and specify their size N.
   size_t N = 1024;           // Number of elements in each vector
   double *A = new double[N]; // Pointer to vector A
@@ -71,7 +69,6 @@ int main() {
   delete[] A;
   delete[] B;
 
-  proteus::finalize();
   return 0;
 }
 

@@ -23,8 +23,6 @@
 using namespace proteus;
 
 int main() {
-  proteus::init();
-
   auto J = proteus::JitModule(TARGET);
   auto KernelHandle = J.addKernel<void(
       const double *, const double *, double *, double *, double *, double *,
@@ -175,7 +173,6 @@ int main() {
   gpuErrCheck(gpuFree(R16));
   gpuErrCheck(gpuFree(R17));
 
-  proteus::finalize();
   return 0;
 }
 

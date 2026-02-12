@@ -44,8 +44,6 @@ int main(int argc, char **argv) {
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
   // Init proteus AFTER MPI.
-  proteus::init();
-
   int Rank, Size;
   MPI_Comm_rank(MPI_COMM_WORLD, &Rank);
   MPI_Comm_size(MPI_COMM_WORLD, &Size);
@@ -119,7 +117,6 @@ int main(int argc, char **argv) {
     }
   }
 
-  proteus::finalize();
   MPI_Finalize();
   return ExitCode;
 }

@@ -25,8 +25,6 @@ __global__ __attribute__((annotate("jit"))) void kernel() {
 }
 
 int main() {
-  proteus::init();
-
   // Maximum BlockSize in the z-dimension is 64 for CUDA, hence the reduced
   // iteration space.
   for (int Tid = 4; Tid <= 64; Tid *= 2) {
@@ -36,7 +34,6 @@ int main() {
     gpuErrCheck(gpuDeviceSynchronize());
   }
 
-  proteus::finalize();
   return 0;
 }
 

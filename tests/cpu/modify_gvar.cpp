@@ -24,8 +24,6 @@ template <typename F> void run(F &&Func) {
 __attribute__((annotate("jit"))) void modifyGVar() { GVar += 1; }
 
 int main() {
-  proteus::init();
-
   std::cout << "GVar " << GVar << std::endl;
 
   run([=]() __attribute__((annotate("jit"))) { GVar += 1; });
@@ -36,7 +34,6 @@ int main() {
 
   std::cout << "GVar " << GVar << std::endl;
 
-  proteus::finalize();
   return 0;
 }
 

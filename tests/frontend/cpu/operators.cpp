@@ -13,8 +13,6 @@
 using namespace proteus;
 
 int main() {
-  proteus::init();
-
   auto J = proteus::JitModule();
   auto &F = J.addFunction<void(
       const double *, const double *, double *, double *, double *, double *,
@@ -122,7 +120,6 @@ int main() {
   std::cout << "R18 = " << R18 << "\n";
   std::cout << "R19 = " << R19 << "\n";
 
-  proteus::finalize();
   return 0;
 }
 

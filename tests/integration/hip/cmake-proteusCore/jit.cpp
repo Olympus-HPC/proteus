@@ -18,8 +18,6 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  proteus::init();
-
   std::string BitcodeFN(argv[1]);
   const char *KernelSym = argv[2];
 
@@ -67,6 +65,5 @@ int main(int argc, char **argv) {
 
   std::cout << "Success \n";
 
-  proteus::finalize();
   return 0;
 }

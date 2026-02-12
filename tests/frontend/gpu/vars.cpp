@@ -23,8 +23,6 @@
 #endif
 
 int main() {
-  proteus::init();
-
   // Test declVars with anonymous variables.
   {
     auto J = proteus::JitModule(TARGET);
@@ -250,7 +248,6 @@ int main() {
     gpuErrCheck(gpuFree(Result));
   }
 
-  proteus::finalize();
   return 0;
 }
 

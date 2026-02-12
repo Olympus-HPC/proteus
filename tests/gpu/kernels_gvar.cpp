@@ -30,8 +30,6 @@ __global__ void kernel3() {
 }
 
 int main() {
-  proteus::init();
-
   kernel<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
   kernel2<<<1, 1>>>();
@@ -39,7 +37,6 @@ int main() {
   kernel3<<<1, 1>>>();
   gpuErrCheck(gpuDeviceSynchronize());
 
-  proteus::finalize();
   return 0;
 }
 

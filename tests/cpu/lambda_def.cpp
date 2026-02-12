@@ -16,8 +16,6 @@ template <typename F> void run(F &&Func) {
 }
 
 int main() {
-  proteus::init();
-
   int A = 42;
   auto Lambda =
       [ =, A = proteus::jit_variable(A) ]() __attribute__((annotate("jit"))) {
@@ -27,7 +25,6 @@ int main() {
   run(Lambda);
   run(Lambda);
 
-  proteus::finalize();
   return 0;
 }
 

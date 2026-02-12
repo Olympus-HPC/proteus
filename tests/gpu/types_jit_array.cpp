@@ -66,8 +66,6 @@ template <typename T> void launcher() {
 }
 
 int main() {
-  proteus::init();
-
   launcher<int>();
   launcher<long>();
   launcher<unsigned>();
@@ -83,7 +81,6 @@ int main() {
   // TODO: support array of pointers if there is a compelling use case.
   // launcher<int *>();
 
-  proteus::finalize();
   return 0;
 }
 

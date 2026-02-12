@@ -11,8 +11,6 @@
 #include <proteus/JitFrontend.h>
 
 int main() {
-  proteus::init();
-
   auto J = proteus::JitModule();
   auto &F =
       J.addFunction<void(double *, int *, float *, double *, int *, float *)>(
@@ -70,7 +68,6 @@ int main() {
   std::cout << "IntFromFloat = " << IntFromFloat << "\n";
   std::cout << "FloatFromDouble = " << FloatFromDouble << "\n";
 
-  proteus::finalize();
   return 0;
 }
 

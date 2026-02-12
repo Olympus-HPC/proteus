@@ -21,8 +21,6 @@
 #endif
 
 int main() {
-  proteus::init();
-
   auto J = proteus::JitModule(TARGET);
   auto KernelHandleLT = J.addKernel<void(double, double, double *)>("if_lt");
   auto &LT = KernelHandleLT.F;
@@ -220,7 +218,6 @@ int main() {
 
   gpuErrCheck(gpuFree(Ret));
 
-  proteus::finalize();
   return 0;
 }
 

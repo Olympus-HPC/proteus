@@ -54,8 +54,6 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int Tile) {
 }
 
 int main(int argc, char **argv) {
-  proteus::init();
-
   int DI = 8, DJ = 8, DK = 2;
   int Tile = 4;
 
@@ -70,7 +68,6 @@ int main(int argc, char **argv) {
     Tile = std::atoi(argv[4]);
   } else if (argc != 1) {
     std::cerr << "Usage: " << argv[0] << " [DI DJ DK [Tile]]\n";
-    proteus::finalize();
     return 1;
   }
 
@@ -110,7 +107,6 @@ int main(int argc, char **argv) {
   }
 
   delete[] A;
-  proteus::finalize();
   return 0;
 }
 

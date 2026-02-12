@@ -23,9 +23,7 @@
 __attribute__((annotate("jit"))) void foo() { std::cout << "foo" << "\n"; }
 
 int main() {
-  proteus::init();
   foo();
-  proteus::finalize();
   return 0;
 }
 

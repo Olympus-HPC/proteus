@@ -21,8 +21,6 @@
 #endif
 
 int main() {
-  proteus::init();
-
   auto J = proteus::JitModule(TARGET);
   auto KernelHandle = J.addKernel<void(double *, int)>("for_unroll");
   auto &F = KernelHandle.F;
@@ -66,7 +64,6 @@ int main() {
 
   gpuErrCheck(gpuFree(X));
 
-  proteus::finalize();
   return 0;
 }
 

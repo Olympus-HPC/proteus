@@ -34,8 +34,6 @@ void run(BODY &&Body, IndexType Length, Params Param) {
 }
 
 int main() {
-  proteus::init();
-
   int *Param = nullptr;
   run(
       [=] __device__(size_t I) {
@@ -44,13 +42,10 @@ int main() {
       },
       1024UL, Param);
 
-  proteus::finalize();
   return 0;
 }
 
 // clang-format off
-// CHECK-FIRST: [ObjectCacheChain] Added cache level: storage
-// CHECK-FIRST-NEXT: [ObjectCacheChain] Chain for JitEngineHost: Storage
 // CHECK-FIRST: [ObjectCacheChain] Added cache level: storage
 // CHECK-FIRST-NEXT: [ObjectCacheChain] Chain for JitEngineDevice: Storage
 // CHECK-FIRST: [ArgSpec] Replaced Function _Z6kernelIZ4mainEUlmE_mPiEvT_T0_T1_{{[^ ]*}} ArgNo 1 with value i64 1024

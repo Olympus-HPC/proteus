@@ -31,7 +31,6 @@ __global__ __attribute__((annotate("jit"))) void kernel(int *Output) {
 
 // Host function to demonstrate usage
 int main() {
-  proteus::init();
   int *Output;
 
   // Allocate managed device memory
@@ -54,7 +53,6 @@ int main() {
   // Cleanup
   gpuErrCheck(gpuFree(Output));
 
-  proteus::finalize();
   return 0;
 }
 
