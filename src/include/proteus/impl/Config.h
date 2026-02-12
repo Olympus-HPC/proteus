@@ -9,7 +9,6 @@
 #include <llvm/Support/MemoryBuffer.h>
 
 #include <algorithm>
-#include <cctype>
 #include <sstream>
 #include <string>
 namespace proteus {
@@ -123,16 +122,6 @@ inline unsigned parseTraceConfig(const char *VarName) {
   std::istringstream Stream(EnvValue);
   std::string Token;
   while (std::getline(Stream, Token, ';')) {
-    // Trim whitespace.
-    auto Start = Token.find_first_not_of(" \t");
-    if (Start == std::string::npos)
-      continue;
-    Token = Token.substr(Start, Token.find_last_not_of(" \t") - Start + 1);
-
-    // Lowercase.
-    std::transform(Token.begin(), Token.end(), Token.begin(),
-                   [](unsigned char C) { return std::tolower(C); });
-
     if (Token == "specialization")
       Mask |= static_cast<unsigned>(TraceOption::Specialization);
     else if (Token == "ir-dump")
