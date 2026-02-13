@@ -80,6 +80,7 @@ void MPIStorageCache::finalize() {
 
   MPI_Barrier(Comm);
 
+  CommHandle.free();
   Finalized = true;
 }
 
@@ -161,7 +162,8 @@ void MPIStorageCache::communicationThreadMain() {
       if (Tag == MPITag::Shutdown) {
         MPI_Recv(nullptr, 0, MPI_BYTE, Status.MPI_SOURCE,
                  static_cast<int>(MPITag::Shutdown), Comm, MPI_STATUS_IGNORE);
-        if (++ShutdownCount == Size)
+        ShutdownCount++;
+        if (ShutdownCount == Size)
           break;
       } else {
         handleMessage(Status, Tag);

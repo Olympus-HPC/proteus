@@ -25,10 +25,10 @@
 namespace proteus {
 
 enum class MPITag : int {
-  Store = 0,
-  LookupRequest = 1,
-  LookupResponse = 2,
-  Shutdown = 3
+  Store = 1,
+  LookupRequest = 2,
+  LookupResponse = 3,
+  Shutdown = 4
 };
 
 void validateMPIConfig();
@@ -71,6 +71,8 @@ public:
   MPI_Comm get() const;
   int getRank() const;
   int getSize() const;
+
+  void free();
 
 private:
   MPI_Comm Comm = MPI_COMM_NULL;

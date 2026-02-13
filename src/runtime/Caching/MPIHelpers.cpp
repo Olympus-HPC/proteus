@@ -68,8 +68,11 @@ MPICommHandle::~MPICommHandle() {
 
   int MPIFinalized = 0;
   MPI_Finalized(&MPIFinalized);
-  if (!MPIFinalized)
-    MPI_Comm_free(&Comm);
+  if (MPIFinalized)
+    reportFatalError(
+        "[MPICommHandle] MPI finalized before communicator cleanup.");
+
+  MPI_Comm_free(&Comm);
 }
 
 MPI_Comm MPICommHandle::get() const { return Comm; }
@@ -77,6 +80,14 @@ MPI_Comm MPICommHandle::get() const { return Comm; }
 int MPICommHandle::getRank() const { return Rank; }
 
 int MPICommHandle::getSize() const { return Size; }
+
+void MPICommHandle::free() {
+  if (Comm == MPI_COMM_NULL)
+    return;
+
+  MPI_Comm_free(&Comm);
+  Comm = MPI_COMM_NULL;
+}
 
 CommThreadHandle::~CommThreadHandle() { join(); }
 
