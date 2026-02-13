@@ -116,9 +116,9 @@ if(LLVM_LINK_LLVM_DYLIB)
   if(NOT TARGET LLVM)
     message(FATAL_ERROR "Missing LLVM target. Check LLVM cmake targets")
   endif()
-  set(libs LLVM)
+  set(llvm_libs LLVM)
 else()
-  llvm_map_components_to_libnames(libs
+  llvm_map_components_to_libnames(llvm_libs
     Analysis
     BitReader
     BitWriter
@@ -136,6 +136,10 @@ else()
     Target
   )
 endif()
+message(STATUS "Found LLVM libraries: ${llvm_libs}")
+foreach(proteus_target ${PROTEUS_TARGETS})
+  target_link_libraries(${proteus_target} PRIVATE ${llvm_libs})
+endforeach()
 
 if(NOT LLVM_ENABLE_RTTI)
   target_compile_options(proteusCore INTERFACE -fno-rtti)
@@ -144,6 +148,7 @@ endif()
 if(PROTEUS_ENABLE_HIP)
   foreach(proteus_target ${PROTEUS_TARGETS})
     target_include_directories(${proteus_target} SYSTEM PRIVATE ${hip_INCLUDE_DIRS})
+    target_link_libraries(${proteus_target} PRIVATE hip::host hiprtc::hiprtc)
   endforeach()
   target_include_directories(proteusCore SYSTEM INTERFACE ${hip_INCLUDE_DIRS})
 
@@ -152,7 +157,6 @@ if(PROTEUS_ENABLE_HIP)
   # macro for HIP compilation in our headers to avoid forcing HIP compilation.
   # target_compile_options(proteus PRIVATE -x hip)
   # target_compile_options(proteusCore INTERFACE -x hip)
-  list(APPEND libs hip::host hiprtc::hiprtc)
 
 
   if(NOT TARGET lldCommon)
@@ -162,31 +166,36 @@ if(PROTEUS_ENABLE_HIP)
     message(FATAL_ERROR "Missing lldELF target. Check LLD cmake targets")
   endif()
 
-  list(APPEND libs lldCommon lldELF)
+  set(lld_libs lldCommon lldELF)
+  message(STATUS "Found LLD libraries: ${lld_libs}")
+  foreach(proteus_target ${PROTEUS_TARGETS})
+    target_link_libraries(${proteus_target} PRIVATE ${lld_libs})
+  endforeach()
 endif()
 
 if(PROTEUS_ENABLE_CUDA)
-  foreach(proteus_target ${PROTEUS_TARGETS})
-    target_include_directories(${proteus_target} SYSTEM PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
-  endforeach()
-  target_include_directories(proteusCore SYSTEM INTERFACE ${CUDAToolkit_INCLUDE_DIRS})
-
-  # list(APPEND libs CUDA::cuda_driver CUDA::cudart)
-  list(APPEND libs CUDA::cuda_driver CUDA::cudart_static)
   # TODO: update cmake requirement to > 3.26 to supports the nvPTXCompiler target.
-  # list(APPEND libs CUDA::cuda_driver CUDA::cudart_static CUDA::nvptxcompiler_static)
+  # target_link_libraries(... CUDA::nvptxcompiler_static)
   find_library(LIBNVPTXCOMPILER
     NAMES nvptxcompiler nvptxcompiler_static libnvptxcompiler_static
     REQUIRED
     NO_DEFAULT_PATH
     PATHS ${CUDAToolkit_LIBRARY_DIR}
   )
-  list(APPEND libs "${LIBNVPTXCOMPILER}")
   message(STATUS "Found libnvptxcompiler: ${LIBNVPTXCOMPILER}")
+
+  foreach(proteus_target ${PROTEUS_TARGETS})
+    target_include_directories(${proteus_target} SYSTEM PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+    target_link_libraries(${proteus_target} PRIVATE CUDA::cuda_driver CUDA::cudart_static "${LIBNVPTXCOMPILER}")
+  endforeach()
+  target_include_directories(proteusCore SYSTEM INTERFACE ${CUDAToolkit_INCLUDE_DIRS})
+
 endif()
 
 if(PROTEUS_ENABLE_MPI)
-  list(APPEND libs MPI::MPI_CXX)
+  foreach(proteus_target ${PROTEUS_TARGETS})
+    target_link_libraries(${proteus_target} PRIVATE MPI::MPI_CXX)
+  endforeach()
 endif()
 
 find_program(CLANGXX
@@ -212,27 +221,21 @@ else()
 
   list(APPEND clang_libs clangFrontend clangCodeGen)
 endif()
-
-# Print what we found for debugging
-message(STATUS "Found LLVM libraries: ${libs}")
 message(STATUS "Found Clang libraries: ${clang_libs}")
-
-# Enclose linked libraries in a link group to avoid linker errors due to unresolved symbols.
 foreach(proteus_target ${PROTEUS_TARGETS})
-  target_link_libraries(${proteus_target} PRIVATE
-    "$<$<PLATFORM_ID:Linux>:-Wl,--start-group>"
-    ${libs} ${clang_libs}
-    "$<$<PLATFORM_ID:Linux>:-Wl,--end-group>"
-    "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>"
-  )
+  target_link_libraries(${proteus_target} PRIVATE ${clang_libs})
 
-  # Use a version script to hide internal symbols, especially from LLVM static
-  # libraries, on Linux.
+  # Add the clangxx binary path as a compile definition for use in the runtime,
+  # which needs it for the CPP frontend to resolve system path.
+  target_compile_definitions(${proteus_target} PRIVATE PROTEUS_CLANGXX_BIN="${CLANGXX}")
+endforeach()
+
+# Use a version script to hide internal symbols, especially from LLVM static
+# libraries, on Linux.
+foreach(proteus_target ${PROTEUS_TARGETS})
   if(UNIX AND NOT APPLE)
     target_link_options(${proteus_target} PRIVATE "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
   endif()
-
-  target_compile_definitions(${proteus_target} PRIVATE PROTEUS_CLANGXX_BIN="${CLANGXX}")
 endforeach()
 
 target_link_libraries(proteusFrontend INTERFACE proteus "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
