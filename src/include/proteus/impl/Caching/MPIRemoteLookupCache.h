@@ -40,7 +40,7 @@ public:
   std::unique_ptr<CompiledLibrary> lookup(const HashT &HashValue) override;
 
 protected:
-  void communicationThreadMain() override;
+  void handleMessage(MPI_Status &Status, MPITag Tag) override;
 
 private:
   std::unique_ptr<CompiledLibrary> lookupRemote(const HashT &HashValue);

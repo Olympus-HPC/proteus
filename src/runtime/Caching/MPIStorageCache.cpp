@@ -141,6 +141,52 @@ void MPIStorageCache::completeAllPendingSends() {
   PendingSends.clear();
 }
 
+void MPIStorageCache::communicationThreadMain() {
+  if (Config::get().ProteusTraceOutput >= 1) {
+    Logger::trace("[" + getName() + ":" + Label +
+                  "] Communication thread started\n");
+  }
+
+  MPI_Comm Comm = CommHandle.get();
+  int Size = CommHandle.getSize();
+  int ShutdownCount = 0;
+
+  try {
+    while (true) {
+      MPI_Status Status;
+      MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, Comm, &Status);
+
+      auto Tag = static_cast<MPITag>(Status.MPI_TAG);
+
+      if (Tag == MPITag::Shutdown) {
+        MPI_Recv(nullptr, 0, MPI_BYTE, Status.MPI_SOURCE,
+                 static_cast<int>(MPITag::Shutdown), Comm, MPI_STATUS_IGNORE);
+        if (++ShutdownCount == Size)
+          break;
+      } else {
+        handleMessage(Status, Tag);
+      }
+    }
+  } catch (const std::exception &E) {
+    reportFatalError(
+        "[" + getName() +
+        "] Communication thread encountered an exception: " + E.what());
+  }
+
+  if (Config::get().ProteusTraceOutput >= 1) {
+    Logger::trace("[" + getName() + ":" + Label +
+                  "] Communication thread exiting\n");
+  }
+}
+
+void MPIStorageCache::handleMessage(MPI_Status &Status, MPITag Tag) {
+  if (Tag == MPITag::Store)
+    handleStoreMessage(Status);
+  else
+    reportFatalError("[" + getName() + "] Unexpected MPI tag: " +
+                     std::to_string(static_cast<int>(Tag)));
+}
+
 void MPIStorageCache::handleStoreMessage(MPI_Status &Status) {
   MPI_Comm Comm = CommHandle.get();
   int MsgSize = 0;

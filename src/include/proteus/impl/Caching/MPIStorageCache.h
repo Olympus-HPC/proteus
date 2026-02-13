@@ -8,8 +8,8 @@
 //
 // Base class for MPI-based storage caches. Provides shared infrastructure for
 // store forwarding, disk persistence, pending-send management, and
-// communication thread lifecycle. Subclasses implement lookup() and
-// communicationThreadMain().
+// communication thread lifecycle. Subclasses implement lookup() and optionally
+// override handleMessage() to handle additional message types.
 //
 //===----------------------------------------------------------------------===//
 
@@ -42,12 +42,11 @@ public:
 protected:
   void startCommThread();
   std::unique_ptr<CompiledLibrary> lookupFromDisk(const HashT &HashValue);
-  virtual void communicationThreadMain() = 0;
+  virtual void handleMessage(MPI_Status &Status, MPITag Tag);
 
   void forwardToWriter(const HashT &HashValue, const CacheEntry &Entry);
   void saveToDisk(const HashT &HashValue, const char *Data, size_t Size,
                   bool IsDynLib);
-  void handleStoreMessage(MPI_Status &Status);
 
   uint64_t Hits = 0;
   uint64_t Accesses = 0;
@@ -57,6 +56,8 @@ protected:
   CommThreadHandle CommThread;
 
 private:
+  void communicationThreadMain();
+  void handleStoreMessage(MPI_Status &Status);
   void pollPendingSends();
   void completeAllPendingSends();
 

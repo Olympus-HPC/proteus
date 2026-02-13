@@ -10,9 +10,6 @@
 
 #include "proteus/impl/Caching/MPIRemoteLookupCache.h"
 
-#include "proteus/Error.h"
-#include "proteus/impl/Config.h"
-#include "proteus/impl/Logger.h"
 #include "proteus/impl/TimeTracing.h"
 #include "proteus/impl/Utils.h"
 
@@ -81,48 +78,11 @@ MPIRemoteLookupCache::lookupRemote(const HashT &HashValue) {
   return std::make_unique<CompiledLibrary>(std::move(MemBuf));
 }
 
-void MPIRemoteLookupCache::communicationThreadMain() {
-  if (Config::get().ProteusTraceOutput >= 1) {
-    Logger::trace("[MPIRemoteLookup:" + Label +
-                  "] Communication thread started\n");
-  }
-
-  MPI_Comm Comm = CommHandle.get();
-  int Size = CommHandle.getSize();
-  int ShutdownCount = 0;
-
-  try {
-    while (true) {
-      MPI_Status Status;
-      MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, Comm, &Status);
-
-      auto Tag = static_cast<MPITag>(Status.MPI_TAG);
-
-      if (Tag == MPITag::Shutdown) {
-        MPI_Recv(nullptr, 0, MPI_BYTE, Status.MPI_SOURCE,
-                 static_cast<int>(MPITag::Shutdown), Comm, MPI_STATUS_IGNORE);
-        ++ShutdownCount;
-        if (ShutdownCount == Size)
-          break;
-      } else if (Tag == MPITag::Store) {
-        handleStoreMessage(Status);
-      } else if (Tag == MPITag::LookupRequest) {
-        handleLookupRequest(Status);
-      } else {
-        reportFatalError("[MPIRemoteLookup] Unexpected MPI tag: " +
-                         std::to_string(static_cast<int>(Tag)));
-      }
-    }
-  } catch (const std::exception &E) {
-    reportFatalError(std::string("[MPIRemoteLookup] Communication thread "
-                                 "encountered an exception: ") +
-                     E.what());
-  }
-
-  if (Config::get().ProteusTraceOutput >= 1) {
-    Logger::trace("[MPIRemoteLookup:" + Label +
-                  "] Communication thread exiting\n");
-  }
+void MPIRemoteLookupCache::handleMessage(MPI_Status &Status, MPITag Tag) {
+  if (Tag == MPITag::LookupRequest)
+    handleLookupRequest(Status);
+  else
+    MPIStorageCache::handleMessage(Status, Tag);
 }
 
 void MPIRemoteLookupCache::handleLookupRequest(MPI_Status &Status) {

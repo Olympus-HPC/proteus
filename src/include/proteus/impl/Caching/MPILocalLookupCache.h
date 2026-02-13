@@ -25,9 +25,6 @@ public:
   std::string getName() const override { return "MPILocalLookup"; }
 
   std::unique_ptr<CompiledLibrary> lookup(const HashT &HashValue) override;
-
-protected:
-  void communicationThreadMain() override;
 };
 
 } // namespace proteus
