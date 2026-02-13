@@ -59,8 +59,8 @@ void MPIStorageCache::finalize() {
   MPI_Finalized(&MPIFinalized);
   if (MPIFinalized) {
     reportFatalError("[" + getName() +
-                     "] MPI already finalized before cache cleanup. Ensure "
-                     "proteus::finalize() is called before MPI_Finalize().");
+                     "] MPI already finalized before cache finalized. This "
+                     "should never happen");
   }
 
   if (Config::get().ProteusTraceOutput >= 1) {
@@ -71,14 +71,18 @@ void MPIStorageCache::finalize() {
   }
 
   MPI_Comm Comm = CommHandle.get();
+  int Rank = CommHandle.getRank();
 
   completeAllPendingSends();
 
-  MPI_Ssend(nullptr, 0, MPI_BYTE, 0, static_cast<int>(MPITag::Shutdown), Comm);
+  // Only non-zero ranks send shutdown to the comm thread of rank 0.
+  if (Rank != 0)
+    MPI_Ssend(nullptr, 0, MPI_BYTE, 0, static_cast<int>(MPITag::Shutdown),
+              Comm);
 
   CommThread.join();
 
-  MPI_Barrier(Comm);
+  // MPI_Barrier(Comm);
 
   CommHandle.free();
   Finalized = true;
@@ -87,6 +91,13 @@ void MPIStorageCache::finalize() {
 void MPIStorageCache::store(const HashT &HashValue, const CacheEntry &Entry) {
   TIMESCOPE(getName() + "::store");
 
+  // Rank 0 main thread directly saves to disk, other ranks forward to rank 0's
+  // communication thread.
+  if (CommHandle.getRank() == 0) {
+    saveToDisk(HashValue, Entry.Buffer.getBufferStart(),
+               Entry.Buffer.getBufferSize(), Entry.IsDynLib);
+    return;
+  }
   forwardToWriter(HashValue, Entry);
 }
 
@@ -150,12 +161,20 @@ void MPIStorageCache::communicationThreadMain() {
 
   MPI_Comm Comm = CommHandle.get();
   int Size = CommHandle.getSize();
+
+  // No rank to receive from, so exit.
+  if (Size <= 1)
+    return;
+
   int ShutdownCount = 0;
 
   try {
     while (true) {
       MPI_Status Status;
       MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, Comm, &Status);
+      if (Status.MPI_SOURCE == 0)
+        reportFatalError("Rank 0 should not receive messages on its own "
+                         "communication thread.");
 
       auto Tag = static_cast<MPITag>(Status.MPI_TAG);
 
@@ -163,7 +182,8 @@ void MPIStorageCache::communicationThreadMain() {
         MPI_Recv(nullptr, 0, MPI_BYTE, Status.MPI_SOURCE,
                  static_cast<int>(MPITag::Shutdown), Comm, MPI_STATUS_IGNORE);
         ShutdownCount++;
-        if (ShutdownCount == Size)
+        // Check all other ranks have sent shutdown to exit.
+        if (ShutdownCount >= (Size - 1))
           break;
       } else {
         handleMessage(Status, Tag);

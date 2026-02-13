@@ -81,7 +81,6 @@ void MPICommHandle::free() {
         "[MPICommHandle] MPI finalized before communicator cleanup.");
 
   MPI_Comm_free(&Comm);
-  Comm = MPI_COMM_NULL;
 }
 
 CommThreadHandle::~CommThreadHandle() { join(); }
