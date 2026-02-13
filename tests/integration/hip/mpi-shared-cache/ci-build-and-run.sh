@@ -45,10 +45,20 @@ PROTEUS_CACHE_DIR=${CACHE_DIR} \
 PROTEUS_OBJECT_CACHE_CHAIN="mpi-local-lookup" \
 run_mpi 4 ./build/mpi_shared_cache
 
+# Hot cache rerun: verify caches work with existing cache files.
+PROTEUS_CACHE_DIR=${CACHE_DIR} \
+PROTEUS_OBJECT_CACHE_CHAIN="mpi-local-lookup" \
+run_mpi 4 ./build/mpi_shared_cache
+
 rm -rf ${CACHE_DIR}/*
 echo "=> PASSED mpi-shared-cache (mpi-local-lookup)"
 
 # Run the MPI shared cache test with mpi-remote-lookup backend.
+PROTEUS_CACHE_DIR=${CACHE_DIR} \
+PROTEUS_OBJECT_CACHE_CHAIN="mpi-remote-lookup" \
+run_mpi 4 ./build/mpi_shared_cache
+
+# Hot cache rerun: verify caches work with existing cache files.
 PROTEUS_CACHE_DIR=${CACHE_DIR} \
 PROTEUS_OBJECT_CACHE_CHAIN="mpi-remote-lookup" \
 run_mpi 4 ./build/mpi_shared_cache
