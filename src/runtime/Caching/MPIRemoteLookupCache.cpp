@@ -36,7 +36,10 @@ MPIRemoteLookupCache::lookup(const HashT &HashValue) {
   TIMESCOPE("MPIRemoteLookupCache::lookup");
   Accesses++;
 
-  auto Result = lookupRemote(HashValue);
+  // Rank 0 reads directly from disk to avoid sending a LookupRequest to its
+  // own comm thread, which would race with MPI_Probe(ANY_TAG).
+  auto Result = CommHandle.getRank() == 0 ? lookupFromDisk(HashValue)
+                                          : lookupRemote(HashValue);
   if (Result)
     Hits++;
 
