@@ -37,13 +37,47 @@ pushd build
 make -j
 popd
 
-# Run the MPI shared cache test.
+# Run the MPI shared cache test with mpi-local-lookup backend.
 CACHE_DIR=$(mktemp -d)
 echo "Using temporary cache directory: ${CACHE_DIR}"
 
 PROTEUS_CACHE_DIR=${CACHE_DIR} \
-PROTEUS_OBJECT_CACHE_CHAIN="mpi-storage" \
+PROTEUS_OBJECT_CACHE_CHAIN="mpi-local-lookup" \
 run_mpi 4 ./build/mpi_shared_cache
 
+# Hot cache rerun: verify caches work with existing cache files.
+PROTEUS_CACHE_DIR=${CACHE_DIR} \
+PROTEUS_OBJECT_CACHE_CHAIN="mpi-local-lookup" \
+run_mpi 4 ./build/mpi_shared_cache
+
+rm -rf ${CACHE_DIR}/*
+echo "=> PASSED mpi-shared-cache (mpi-local-lookup)"
+
+# Single-rank case for mpi-local-lookup.
+PROTEUS_CACHE_DIR=${CACHE_DIR} \
+PROTEUS_OBJECT_CACHE_CHAIN="mpi-local-lookup" \
+run_mpi 1 ./build/mpi_shared_cache
+
+rm -rf ${CACHE_DIR}/*
+echo "=> PASSED mpi-shared-cache (mpi-local-lookup, single rank)"
+
+# Run the MPI shared cache test with mpi-remote-lookup backend.
+PROTEUS_CACHE_DIR=${CACHE_DIR} \
+PROTEUS_OBJECT_CACHE_CHAIN="mpi-remote-lookup" \
+run_mpi 4 ./build/mpi_shared_cache
+
+# Hot cache rerun: verify caches work with existing cache files.
+PROTEUS_CACHE_DIR=${CACHE_DIR} \
+PROTEUS_OBJECT_CACHE_CHAIN="mpi-remote-lookup" \
+run_mpi 4 ./build/mpi_shared_cache
+
+rm -rf ${CACHE_DIR}/*
+echo "=> PASSED mpi-shared-cache (mpi-remote-lookup)"
+
+# Single-rank corner case for mpi-remote-lookup.
+PROTEUS_CACHE_DIR=${CACHE_DIR} \
+PROTEUS_OBJECT_CACHE_CHAIN="mpi-remote-lookup" \
+run_mpi 1 ./build/mpi_shared_cache
+
 rm -rf ${CACHE_DIR}
-echo "=> PASSED mpi-shared-cache"
+echo "=> PASSED mpi-shared-cache (mpi-remote-lookup, single rank)"
