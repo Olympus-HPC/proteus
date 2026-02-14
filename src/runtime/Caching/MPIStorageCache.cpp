@@ -82,8 +82,6 @@ void MPIStorageCache::finalize() {
 
   CommThread.join();
 
-  // MPI_Barrier(Comm);
-
   CommHandle.free();
   Finalized = true;
 }
