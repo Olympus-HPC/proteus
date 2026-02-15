@@ -52,22 +52,38 @@ public:
     return It;
   }
 
-  void pushJitVariable(RuntimeConstant &RC) {
-    PendingJitVariables.emplace_back(RC);
+  void dump() {
+    llvm::outs() << "DUMPING TMP REGISTRY \n";
+    for (const auto &[Key, Value] : PendingJitVariableMap) {
+      llvm::outs() << Key << "\n";
+      for (const auto &V : Value) {
+        llvm::outs() << "   " << V.Value.DoubleVal << "\n";
+      }
+    }
+    llvm::outs() << "DUMPING REGISTRY \n";
+    for (const auto &[Key, Value] : JitVariableMap) {
+      llvm::outs() << Key << "\n";
+      for (const auto &V : Value) {
+        llvm::outs() << "   " << V.Value.DoubleVal << "\n";
+      }
+    }
   }
 
-  // The LambdaType input argument is created as a global variable in the
-  // ProteusPass, thus it has program-wide lifetime. Hence it is valid for
-  // LambdaTypeRef to store a reference to it.
+  void setJitVariable(const char *LambdaType, RuntimeConstant &RC) {
+    assert(PendingJitVariableMap.contains(LambdaType) &&
+           "Lambda must be registered prior to register JIT variable!");
+    PendingJitVariableMap[LambdaType].emplace_back(RC);
+  }
+
   inline void registerLambda(const char *LambdaType) {
     const StringRef LambdaTypeRef{LambdaType};
     PROTEUS_DBG(Logger::logs("proteus")
                 << "=> RegisterLambda " << LambdaTypeRef << "\n");
     // Copy PendingJitVariables if there were changed, otherwise the runtime
     // values for the lambda definition have not changed.
-    if (!PendingJitVariables.empty()) {
-      JitVariableMap[LambdaTypeRef] = PendingJitVariables;
-      PendingJitVariables.clear();
+    if (!PendingJitVariableMap[LambdaTypeRef].empty()) {
+      JitVariableMap[LambdaTypeRef] = PendingJitVariableMap[LambdaTypeRef];
+      PendingJitVariableMap[LambdaTypeRef].clear();
     }
   }
 
@@ -79,8 +95,8 @@ public:
 
 private:
   explicit LambdaRegistry() = default;
-  SmallVector<RuntimeConstant> PendingJitVariables;
   DenseMap<StringRef, SmallVector<RuntimeConstant>> JitVariableMap;
+  DenseMap<StringRef, SmallVector<RuntimeConstant>> PendingJitVariableMap;
 };
 
 } // namespace proteus

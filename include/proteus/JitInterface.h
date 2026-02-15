@@ -20,8 +20,18 @@
 #include <cstring>
 #include <utility>
 
-extern "C" void __jit_push_variable(proteus::RuntimeConstant RC);
+extern "C" void __jit_register_variable(proteus::RuntimeConstant RC,
+                                        const char *AssociatedLambda);
 extern "C" void __jit_register_lambda(const char *Symbol);
+extern "C" void __jit_init_host();
+extern "C" void __jit_init_device();
+extern "C" void __jit_finalize_host();
+extern "C" void __jit_finalize_device();
+extern "C" void __jit_enable_host();
+extern "C" void __jit_enable_device();
+extern "C" void __jit_disable_host();
+extern "C" void __jit_disable_device();
+extern "C" void __jit_take_address(void const *);
 
 namespace proteus {
 
@@ -95,21 +105,27 @@ template <typename T> inline static RuntimeConstantType convertCTypeToRCType() {
 }
 
 template <typename T>
-static __attribute__((noinline)) T jit_variable(T V, int Pos = -1,
-                                                int Offset = -1) noexcept {
+static __attribute__((noinline)) T
+jit_variable(T V, int Pos = -1, int Offset = -1,
+             const char *AssociatedLambda = "") noexcept {
   RuntimeConstant RC{convertCTypeToRCType<T>(), Pos, Offset};
   std::memcpy(static_cast<void *>(&RC), &V, sizeof(T));
-  __jit_push_variable(RC);
+  __jit_register_variable(RC, AssociatedLambda);
 
   return V;
 }
 
 template <typename T>
-static __attribute__((noinline)) T &&
-register_lambda(T &&t, const char *Symbol = "") noexcept {
+static __attribute__((noinline)) T
+register_lambda(const T &t, const char *Symbol = "") noexcept {
   assert(Symbol && "Expected non-null Symbol");
   __jit_register_lambda(Symbol);
-  return std::forward<T>(t);
+  // Force LLVM to generate an AllocaInst of the underlying Clang--generated
+  // anonymous class for T.  We remove this after recording the demangled
+  // lambda name.
+  T local = t;
+  __jit_take_address(&local);
+  return t;
 }
 
 #if defined(__CUDACC__) || defined(__HIP__)
