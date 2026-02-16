@@ -122,6 +122,8 @@ inline unsigned parseTraceConfig(const char *VarName) {
   std::istringstream Stream(EnvValue);
   std::string Token;
   while (std::getline(Stream, Token, ';')) {
+    if (Token.empty())
+      continue;
     if (Token == "specialization")
       Mask |= static_cast<unsigned>(TraceOption::Specialization);
     else if (Token == "ir-dump")
