@@ -56,7 +56,7 @@ MPICommHandle::MPICommHandle() {
   MPI_Comm_rank(Comm, &Rank);
   MPI_Comm_size(Comm, &Size);
 
-  if (Config::get().ProteusTraceOutput >= 1) {
+  if (Config::get().traceSpecializations()) {
     Logger::trace("[MPICommHandle] Initialized communicator for rank " +
                   std::to_string(Rank) + "/" + std::to_string(Size) + "\n");
   }

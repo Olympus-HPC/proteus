@@ -63,7 +63,7 @@ void MPIStorageCache::finalize() {
                      "should never happen");
   }
 
-  if (Config::get().ProteusTraceOutput >= 1) {
+  if (Config::get().traceSpecializations()) {
     Logger::trace("[" + getName() + ":" + Label + "] Rank " +
                   std::to_string(CommHandle.getRank()) +
                   " flushing, PendingSends=" +
@@ -152,7 +152,7 @@ void MPIStorageCache::completeAllPendingSends() {
 }
 
 void MPIStorageCache::communicationThreadMain() {
-  if (Config::get().ProteusTraceOutput >= 1) {
+  if (Config::get().traceSpecializations()) {
     Logger::trace("[" + getName() + ":" + Label +
                   "] Communication thread started\n");
   }
@@ -193,7 +193,7 @@ void MPIStorageCache::communicationThreadMain() {
         "] Communication thread encountered an exception: " + E.what());
   }
 
-  if (Config::get().ProteusTraceOutput >= 1) {
+  if (Config::get().traceSpecializations()) {
     Logger::trace("[" + getName() + ":" + Label +
                   "] Communication thread exiting\n");
   }
@@ -232,7 +232,7 @@ void MPIStorageCache::saveToDisk(const HashT &HashValue, const char *Data,
 
   saveToFileAtomic(Filepath, StringRef{Data, Size});
 
-  if (Config::get().ProteusTraceOutput >= 1) {
+  if (Config::get().traceSpecializations()) {
     Logger::trace("[" + getName() + "] Saved " + Filepath + " (" +
                   std::to_string(Size) + " bytes)\n");
   }
