@@ -19,8 +19,8 @@ __device__ int getGlobalThreadIdX() {
 
 __device__ int getThreadIdX() { return threadIdx.x; }
 
-__attribute__((annotate("jit", 3, 4))) __global__ void
-stencil1d(float *Out, float *In, size_t N, int Radius, float *Weights) {
+__attribute__((annotate("jit", 2, 3))) __global__ void
+stencil1d(float *Out, float *In, int Radius, float *Weights) {
   proteus::jit_array(Weights, NWeights);
   float *Tile = proteus::shared_array<float, 10>(68);
   int Gid = getGlobalThreadIdX();
@@ -66,10 +66,9 @@ int main() {
 
 #if PROTEUS_ENABLE_HIP
   hipLaunchKernelGGL(stencil1d, dim3(NumBlocks), dim3(BlockSize), SharedMemSize,
-                     0, Out, In, N, Radius, Weights);
+                     0, Out, In, Radius, Weights);
 #elif PROTEUS_ENABLE_CUDA
-  stencil1d<<<NumBlocks, BlockSize, SharedMemSize>>>(Out, In, N, Radius,
-                                                     Weights);
+  stencil1d<<<NumBlocks, BlockSize, SharedMemSize>>>(Out, In, Radius, Weights);
 #endif
   gpuErrCheck(gpuDeviceSynchronize());
 
@@ -96,8 +95,7 @@ int main() {
 }
 
 // clang-format off
-// CHECK-FIRST: [ArgSpec] Replaced Function {{.*}}stencil1d{{.*}} ArgNo 2 with value i64 256
-// CHECK-FIRST: [ArgSpec] Replaced Function {{.*}}stencil1d{{.*}} ArgNo 3 with value i32 2
+// CHECK-FIRST: [ArgSpec] Replaced Function {{.*}}stencil1d{{.*}} ArgNo 2 with value i32 2
 // CHECK: PASSED
 // CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 1
 // CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 1 accesses 1
