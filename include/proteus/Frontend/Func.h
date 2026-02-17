@@ -485,11 +485,6 @@ public:
 
   template <typename... LoopBuilders>
   auto buildLoopNest(LoopBuilders &&...Loops) {
-    static_assert(sizeof...(LoopBuilders) > 0,
-                  "buildLoopNest requires at least one loop builder");
-    static_assert((IsForLoopBuilder<std::decay_t<LoopBuilders>>::value && ...),
-                  "buildLoopNest only accepts results of forLoop with "
-                  "EmissionPolicy::Lazy");
     using FirstBuilder = std::remove_reference_t<
         std::tuple_element_t<0, std::tuple<LoopBuilders...>>>;
     using T = typename FirstBuilder::LoopIndexType;
