@@ -17,9 +17,11 @@
 #include "proteus/impl/Utils.h"
 
 #include <llvm/ADT/StringRef.h>
+#include <llvm/Demangle/Demangle.h>
 
 #include <cstdint>
 #include <iostream>
+#include <unordered_map>
 
 namespace proteus {
 
@@ -53,10 +55,7 @@ public:
     CacheEntry.FunctionPtr = FunctionPtr;
     CacheEntry.NumExecs = 1;
     CacheEntry.NumHits = 0;
-
-    if (Config::get().ProteusDebugOutput) {
-      CacheEntry.FnName = FnName.str();
-    }
+    CacheEntry.FnName = FnName.str();
   }
 
   void printStats() {
@@ -66,11 +65,39 @@ public:
       std::cout << "[proteus][" << Label << "] MemoryCache rank "
                 << DistributedRank << " HashValue " << HashValue.toString()
                 << " NumExecs " << JCE.NumExecs << " NumHits " << JCE.NumHits;
-      if (Config::get().ProteusDebugOutput) {
-        printf(" FnName %s", JCE.FnName.c_str());
-      }
-      printf("\n");
+      if (Config::get().ProteusDebugOutput)
+        std::cout << " FnName " << JCE.FnName;
+      std::cout << "\n";
     }
+  }
+
+  void printKernelTrace() {
+    if (!Config::get().traceKernels())
+      return;
+
+    if (CacheMap.empty())
+      return;
+
+    struct KernelStats {
+      size_t Specializations = 0;
+      uint64_t TotalLaunches = 0;
+    };
+    std::unordered_map<std::string, KernelStats> Grouped;
+    for (const auto &[HashValue, JCE] : CacheMap) {
+      auto &KS = Grouped[JCE.FnName];
+      KS.Specializations++;
+      KS.TotalLaunches += JCE.NumExecs;
+    }
+
+    printf("[proteus][%s] === Kernel Trace (rank %s) ===\n", Label.c_str(),
+           DistributedRank.c_str());
+    for (const auto &[MangledName, KS] : Grouped) {
+      std::string Name = llvm::demangle(MangledName);
+      printf("[proteus][%s]   %s  rank=%s  specializations=%zu  launches=%lu\n",
+             Label.c_str(), Name.c_str(), DistributedRank.c_str(),
+             KS.Specializations, KS.TotalLaunches);
+    }
+    printf("[proteus][%s] === End Kernel Trace ===\n", Label.c_str());
   }
 
 private:

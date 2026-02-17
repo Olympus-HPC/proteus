@@ -208,7 +208,7 @@ public:
       return S;
     };
 
-    if (Config::get().ProteusTraceOutput >= 1)
+    if (Config::get().traceSpecializations())
       Logger::trace(TraceOut());
   }
 
@@ -552,6 +552,7 @@ protected:
       AsyncCompiler->joinAllThreads();
 
     CodeCache.printStats();
+    CodeCache.printKernelTrace();
     if (CacheChain)
       CacheChain->printStats();
   }

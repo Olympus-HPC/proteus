@@ -85,6 +85,7 @@ protected:
 
   ~DispatcherHost() {
     CodeCache.printStats();
+    CodeCache.printKernelTrace();
     ObjectCache->printStats();
   }
 

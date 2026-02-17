@@ -43,14 +43,14 @@ void ObjectCacheChain::buildFromConfig(const std::string &ConfigStr) {
     std::string TrimmedName = Name.trim().str();
     if (auto Cache = createCache(TrimmedName)) {
       addCache(std::move(Cache));
-      if (Config::get().ProteusTraceOutput >= 1) {
+      if (Config::get().traceSpecializations()) {
         Logger::trace("[ObjectCacheChain] Added cache level: " + TrimmedName +
                       "\n");
       }
     }
   }
 
-  if (Config::get().ProteusTraceOutput >= 1) {
+  if (Config::get().traceSpecializations()) {
     std::string ChainDesc = "[ObjectCacheChain] Chain for " + Label + ": ";
     for (size_t I = 0; I < Caches.size(); ++I) {
       if (I > 0)
@@ -133,7 +133,7 @@ ObjectCacheChain::lookup(const HashT &HashValue) {
         }
       }
 
-      if (Config::get().ProteusTraceOutput >= 1) {
+      if (Config::get().traceSpecializations()) {
         Logger::trace("[ObjectCacheChain] Hit at level " + std::to_string(I) +
                       " (" + Caches[I]->getName() + ") for hash " +
                       HashValue.toString() + "\n");

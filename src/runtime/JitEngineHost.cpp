@@ -127,6 +127,7 @@ void JitEngineHost::notifyLoaded(MaterializationResponsibility & /*R*/,
 
 JitEngineHost::~JitEngineHost() {
   CodeCache.printStats();
+  CodeCache.printKernelTrace();
   if (CacheChain)
     CacheChain->printStats();
 }
@@ -300,7 +301,7 @@ std::unique_ptr<MemoryBuffer> JitEngineHost::compileOnly(Module &M,
       optimizeIR(M, sys::getHostCPUName(), CGConfig.optLevel(),
                  CGConfig.codeGenOptLevel());
   } else {
-    if (Config::get().ProteusTraceOutput >= 1)
+    if (Config::get().traceSpecializations())
       Logger::trace("[SkipOpt] Skipping JitEngine IR optimization\n");
   }
 

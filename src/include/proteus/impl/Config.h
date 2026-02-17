@@ -8,6 +8,8 @@
 #include <llvm/Support/JSON.h>
 #include <llvm/Support/MemoryBuffer.h>
 
+#include <algorithm>
+#include <sstream>
 #include <string>
 namespace proteus {
 
@@ -103,6 +105,35 @@ T getDefaultValueFromOptional(std::optional<T> JSONValue, T Default) {
   if (JSONValue)
     return JSONValue.value();
   return Default;
+}
+
+enum class TraceOption : unsigned {
+  Specialization = 0x1,
+  IRDump = 0x2,
+  KernelTrace = 0x4,
+};
+
+inline unsigned parseTraceConfig(const char *VarName) {
+  const char *EnvValue = std::getenv(VarName);
+  if (!EnvValue)
+    return 0;
+
+  unsigned Mask = 0;
+  std::istringstream Stream(EnvValue);
+  std::string Token;
+  while (std::getline(Stream, Token, ';')) {
+    if (Token.empty())
+      continue;
+    if (Token == "specialization")
+      Mask |= static_cast<unsigned>(TraceOption::Specialization);
+    else if (Token == "ir-dump")
+      Mask |= static_cast<unsigned>(TraceOption::IRDump);
+    else if (Token == "kernel-trace")
+      Mask |= static_cast<unsigned>(TraceOption::KernelTrace);
+    else
+      reportFatalError("Unknown PROTEUS_TRACE_OUTPUT token: " + Token);
+  }
+  return Mask;
 }
 
 inline KernelCloneOption getEnvOrDefaultKC(const char *VarName,
@@ -312,7 +343,7 @@ public:
   bool ProteusAsyncTestBlocking;
   KernelCloneOption ProteusKernelClone;
   bool ProteusEnableTimers;
-  int ProteusTraceOutput;
+  unsigned ProteusTraceConfig;
   bool ProteusDebugOutput;
   std::optional<const std::string> ProteusCacheDir;
   std::string ProteusObjectCacheChain;
@@ -328,6 +359,17 @@ public:
       return It->second;
 
     return GlobalCodeGenConfig;
+  }
+
+  bool traceSpecializations() const {
+    return ProteusTraceConfig &
+           static_cast<unsigned>(TraceOption::Specialization);
+  }
+  bool traceIRDump() const {
+    return ProteusTraceConfig & static_cast<unsigned>(TraceOption::IRDump);
+  }
+  bool traceKernels() const {
+    return ProteusTraceConfig & static_cast<unsigned>(TraceOption::KernelTrace);
   }
 
   void dump(llvm::raw_ostream &OS) const {
@@ -369,7 +411,7 @@ private:
     ProteusKernelClone = getEnvOrDefaultKC("PROTEUS_KERNEL_CLONE",
                                            KernelCloneOption::CrossClone);
     ProteusEnableTimers = getEnvOrDefaultBool("PROTEUS_ENABLE_TIMERS", false);
-    ProteusTraceOutput = getEnvOrDefaultInt("PROTEUS_TRACE_OUTPUT", 0);
+    ProteusTraceConfig = parseTraceConfig("PROTEUS_TRACE_OUTPUT");
     ProteusDebugOutput = getEnvOrDefaultBool("PROTEUS_DEBUG_OUTPUT", false);
     ProteusObjectCacheChain =
         getEnvOrDefaultString("PROTEUS_OBJECT_CACHE_CHAIN").value_or("storage");
