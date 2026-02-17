@@ -57,6 +57,8 @@ struct EmptyLambda {
 
 enum class EmissionPolicy { Eager, Lazy };
 
+struct EmittedLoopTag {};
+
 template <typename T> struct IsForLoopBuilder : std::false_type {};
 template <typename T, typename BodyLambda>
 struct IsForLoopBuilder<ForLoopBuilder<T, BodyLambda>> : std::true_type {};
@@ -473,6 +475,7 @@ public:
       beginFor(Iter, Init, Upper, Inc);
       std::forward<BodyLambda>(Body)();
       endFor();
+      return EmittedLoopTag{};
     } else {
       LoopBoundInfo<IterT> BoundsInfo{Iter, Init, Upper, Inc};
       return ForLoopBuilder<IterT, BodyLambda>(BoundsInfo, *this,
