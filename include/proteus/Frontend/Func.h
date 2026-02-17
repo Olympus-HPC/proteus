@@ -57,6 +57,8 @@ struct EmptyLambda {
 
 enum class EmissionPolicy { Eager, Lazy };
 
+// Returned by forLoop<Eager> so that buildLoopNest's static_assert fires with
+// a clear message instead of a generic "cannot form a reference to void" error.
 struct EmittedLoopTag {};
 
 template <typename T> struct IsForLoopBuilder : std::false_type {};
