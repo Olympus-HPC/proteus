@@ -40,8 +40,6 @@ stencil1d(float *Out, float *In, size_t N, int Radius, float *Weights) {
 }
 
 int main() {
-  proteus::init();
-
   const size_t N = 256;
   const int Radius = 2;
   const int BlockSize = 64;
@@ -94,7 +92,6 @@ int main() {
   gpuErrCheck(gpuFree(Out));
   gpuErrCheck(gpuFree(Weights));
 
-  proteus::finalize();
   return Passed ? 0 : 1;
 }
 
