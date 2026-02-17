@@ -289,6 +289,8 @@ CREATE_GPU_TEST(kernel_tuning kernel_tuning.cpp)
 CREATE_GPU_TEST(gvar_tracking gvar_driver.cpp gvar1.cpp gvar2.cpp)
 CREATE_GPU_TEST(kernel_lambda kernel_lambda.cpp)
 CREATE_GPU_TEST(kernel_lambda_api kernel_lambda_api.cpp)
+CREATE_GPU_TEST(stencil stencil.cpp)
+CREATE_GPU_TEST(stencil_lambda stencil_lambda.cpp)
 
 CREATE_GPU_TEST_FORCE(force_annotations force_annotations.cpp)
 
@@ -355,6 +357,8 @@ CREATE_GPU_TEST_RDC(jit_struct jit_struct.cpp)
 CREATE_GPU_TEST_RDC(kernel_tuning kernel_tuning.cpp)
 CREATE_GPU_TEST_RDC(kernel_lambda kernel_lambda.cpp)
 CREATE_GPU_TEST_RDC(kernel_lambda_api kernel_lambda_api.cpp)
+CREATE_GPU_TEST_RDC(stencil stencil.cpp)
+CREATE_GPU_TEST_RDC(stencil_lambda stencil_lambda.cpp)
 
 CREATE_GPU_TEST_RDC_FORCE(force_annotations force_annotations.cpp)
 
