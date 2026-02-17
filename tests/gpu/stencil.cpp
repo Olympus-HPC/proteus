@@ -25,11 +25,15 @@ stencil1d(float *Out, float *In, int Radius, float *Weights) {
   float *Tile = proteus::shared_array<float, 10>(68);
   int Gid = getGlobalThreadIdX();
   int Tid = getThreadIdX();
+  int NumElements = gridDim.x * blockDim.x;
 
   Tile[Tid + Radius] = In[Gid];
   if (Tid < Radius) {
-    Tile[Tid] = In[Gid - Radius];
-    Tile[Tid + blockDim.x + Radius] = In[Gid + blockDim.x];
+    int LeftGid = Gid - Radius;
+    int RightGid = Gid + blockDim.x;
+    Tile[Tid] = LeftGid >= 0 ? In[LeftGid] : 0.0f;
+    Tile[Tid + blockDim.x + Radius] =
+        RightGid < NumElements ? In[RightGid] : 0.0f;
   }
   __syncthreads();
 
