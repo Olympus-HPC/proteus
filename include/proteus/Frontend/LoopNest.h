@@ -22,7 +22,7 @@ public:
       : IterVar(IterVar), Init(Init), UpperBound(UpperBound), Inc(Inc) {}
 };
 
-template <typename T, typename BodyLambda> class ForLoopBuilder {
+template <typename T, typename BodyLambda> class [[nodiscard]] ForLoopBuilder {
 public:
   LoopBoundInfo<T> Bounds;
   using LoopIndexType = T;
@@ -76,16 +76,11 @@ public:
   }
 };
 
-template <typename T> struct IsLoopNestBuilderInput : std::false_type {};
-template <typename T, typename BodyLambda>
-struct IsLoopNestBuilderInput<ForLoopBuilder<T, BodyLambda>> : std::true_type {
-};
-
 template <typename T, typename... LoopBuilders> class LoopNestBuilder {
 private:
   static_assert(sizeof...(LoopBuilders) > 0,
                 "LoopNestBuilder requires at least one loop builder");
-  static_assert((IsLoopNestBuilderInput<LoopBuilders>::value && ...),
+  static_assert((IsForLoopBuilder<LoopBuilders>::value && ...),
                 "LoopNestBuilder requires ForLoopBuilder inputs");
   static_assert((std::is_same_v<T, typename LoopBuilders::LoopIndexType> &&
                  ...),

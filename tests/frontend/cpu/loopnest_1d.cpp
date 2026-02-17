@@ -9,6 +9,8 @@
 #include <iostream>
 #include <proteus/JitFrontend.h>
 
+constexpr auto Lazy = proteus::EmissionPolicy::Lazy;
+
 static auto get1DLoopNestFunction(int N, int TileSize) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
   auto &F = JitMod->addFunction<void(double *, double *)>("loopnest_1d");
@@ -28,7 +30,7 @@ static auto get1DLoopNestFunction(int N, int TileSize) {
     auto Zero = F.declVar<int>("zero");
     Zero = 0;
 
-    F.forLoop(I, Zero, UB, IncOne, [&]() { A[I] = B[I] * 3.0; })
+    F.forLoop<Lazy>(I, Zero, UB, IncOne, [&]() { A[I] = B[I] * 3.0; })
         .tile(TileSize)
         .emit();
 
@@ -59,7 +61,7 @@ static auto get1DSimpleLoopNestFunction(int N) {
     Zero = 0;
 
     // Test non-tiled version.
-    F.forLoop(I, Zero, UB, IncOne, [&]() { A[I] = B[I] * 3.0; }).emit();
+    F.forLoop<Lazy>(I, Zero, UB, IncOne, [&]() { A[I] = B[I] * 3.0; }).emit();
 
     F.ret();
   }

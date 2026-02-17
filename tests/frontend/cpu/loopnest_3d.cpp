@@ -9,6 +9,8 @@
 #include <iostream>
 #include <proteus/JitFrontend.h>
 
+constexpr auto Lazy = proteus::EmissionPolicy::Lazy;
+
 static auto get3DLoopNestFunction(int DI, int DJ, int DK, int TileI, int TileJ,
                                   int TileK) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
@@ -39,13 +41,14 @@ static auto get3DLoopNestFunction(int DI, int DJ, int DK, int TileI, int TileJ,
     auto RowBias = F.defVar<int>(0, "row_bias");
 
     F.buildLoopNest(
-         F.forLoop(I, Zero, UBI, IncOne).tile(TileI),
-         F.forLoop(J, Zero, UBJ, IncOne, [&]() { RowBias = J; }).tile(TileJ),
-         F.forLoop(K, Zero, UBK, IncOne,
-                   [&]() {
-                     auto Idx = I * DJ * DK + J * DK + K;
-                     A[Idx] = B[Idx] + I + J + K + RowBias;
-                   })
+         F.forLoop<Lazy>(I, Zero, UBI, IncOne).tile(TileI),
+         F.forLoop<Lazy>(J, Zero, UBJ, IncOne, [&]() { RowBias = J; })
+             .tile(TileJ),
+         F.forLoop<Lazy>(K, Zero, UBK, IncOne,
+                         [&]() {
+                           auto Idx = I * DJ * DK + J * DK + K;
+                           A[Idx] = B[Idx] + I + J + K + RowBias;
+                         })
              .tile(TileK))
         .emit();
 
@@ -86,13 +89,14 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int TileSize) {
     auto RowBias = F.defVar<int>(0, "row_bias");
 
     F.buildLoopNest(
-         F.forLoop(I, Zero, UBI, IncOne).tile(TileSize),
-         F.forLoop(J, Zero, UBJ, IncOne, [&]() { RowBias = J; }).tile(TileSize),
-         F.forLoop(K, Zero, UBK, IncOne,
-                   [&]() {
-                     auto Idx = I * DJ * DK + J * DK + K;
-                     A[Idx] = B[Idx] + I + J + K + RowBias;
-                   })
+         F.forLoop<Lazy>(I, Zero, UBI, IncOne).tile(TileSize),
+         F.forLoop<Lazy>(J, Zero, UBJ, IncOne, [&]() { RowBias = J; })
+             .tile(TileSize),
+         F.forLoop<Lazy>(K, Zero, UBK, IncOne,
+                         [&]() {
+                           auto Idx = I * DJ * DK + J * DK + K;
+                           A[Idx] = B[Idx] + I + J + K + RowBias;
+                         })
              .tile(TileSize))
         .emit();
 

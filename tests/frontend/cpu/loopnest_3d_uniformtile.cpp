@@ -10,6 +10,8 @@
 #include <iostream>
 #include <proteus/JitFrontend.h>
 
+constexpr auto Lazy = proteus::EmissionPolicy::Lazy;
+
 static auto get3DUniformTileFunction(int DI, int DJ, int DK, int Tile) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
   auto &F = JitMod->addFunction<void(double *)>("loopnest_3d_uniformtile");
@@ -36,13 +38,13 @@ static auto get3DUniformTileFunction(int DI, int DJ, int DK, int Tile) {
     auto Zero = F.declVar<int>("zero");
     Zero = 0;
 
-    F.buildLoopNest(F.forLoop(I, Zero, UBI, IncOne),
-                    F.forLoop(J, Zero, UBJ, IncOne),
-                    F.forLoop(K, Zero, UBK, IncOne,
-                              [&]() {
-                                auto Idx = I * DJ * DK + J * DK + K;
-                                A[Idx] = I * 10000 + J * 100 + K;
-                              }))
+    F.buildLoopNest(F.forLoop<Lazy>(I, Zero, UBI, IncOne),
+                    F.forLoop<Lazy>(J, Zero, UBJ, IncOne),
+                    F.forLoop<Lazy>(K, Zero, UBK, IncOne,
+                                    [&]() {
+                                      auto Idx = I * DJ * DK + J * DK + K;
+                                      A[Idx] = I * 10000 + J * 100 + K;
+                                    }))
         .tile(Tile)
         .emit();
 

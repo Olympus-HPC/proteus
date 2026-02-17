@@ -462,19 +462,19 @@ public:
   std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
   atomicMin(const Var<T *> &Addr, const Var<T> &Val);
 
-  template <EmissionPolicy Policy = EmissionPolicy::Lazy, typename IterT,
+  template <EmissionPolicy Policy = EmissionPolicy::Eager, typename IterT,
             typename InitT, typename UpperT, typename IncT,
             typename BodyLambda = EmptyLambda>
   auto forLoop(Var<IterT> &Iter, const Var<InitT> &Init,
-               const Var<UpperT> &UpperBound, const Var<IncT> &Inc,
+               const Var<UpperT> &Upper, const Var<IncT> &Inc,
                BodyLambda &&Body = {}) {
     static_assert(is_mutable_v<IterT>, "Loop iterator must be mutable");
     if constexpr (Policy == EmissionPolicy::Eager) {
-      beginFor(Iter, Init, UpperBound, Inc);
+      beginFor(Iter, Init, Upper, Inc);
       std::forward<BodyLambda>(Body)();
       endFor();
     } else {
-      LoopBoundInfo<IterT> BoundsInfo{Iter, Init, UpperBound, Inc};
+      LoopBoundInfo<IterT> BoundsInfo{Iter, Init, Upper, Inc};
       return ForLoopBuilder<IterT, BodyLambda>(BoundsInfo, *this,
                                                std::forward<BodyLambda>(Body));
     }

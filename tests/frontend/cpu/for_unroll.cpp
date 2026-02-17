@@ -9,6 +9,8 @@
 #include <iostream>
 #include <proteus/JitFrontend.h>
 
+constexpr auto Lazy = proteus::EmissionPolicy::Lazy;
+
 // Test unroll() without count.
 static auto getUnrollEnableFunction(int N) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
@@ -29,7 +31,7 @@ static auto getUnrollEnableFunction(int N) {
     auto Zero = F.declVar<int>("zero");
     Zero = 0;
 
-    F.forLoop(I, Zero, UB, IncOne, [&]() { A[I] = B[I] * 2.0; })
+    F.forLoop<Lazy>(I, Zero, UB, IncOne, [&]() { A[I] = B[I] * 2.0; })
         .unroll()
         .emit();
 
@@ -60,7 +62,7 @@ static auto getUnrollCountFunction(int N) {
     auto Zero = F.declVar<int>("zero");
     Zero = 0;
 
-    F.forLoop(I, Zero, UB, IncOne, [&]() { A[I] = B[I] * 3.0; })
+    F.forLoop<Lazy>(I, Zero, UB, IncOne, [&]() { A[I] = B[I] * 3.0; })
         .unroll(4)
         .emit();
 
