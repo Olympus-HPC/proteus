@@ -20,82 +20,82 @@ __device__ int getGlobalThreadIdX() {
 __device__ int getThreadIdX() { return threadIdx.x; }
 
 __attribute__((annotate("jit", 3, 4))) __global__ void
-stencil1d(float *out, float *in, size_t N, int radius, float *weights) {
-  proteus::jit_array(weights, NWeights);
-  float *tile = proteus::shared_array<float, 10>(68);
-  int gid = getGlobalThreadIdX();
-  int tid = getThreadIdX();
+stencil1d(float *Out, float *In, size_t N, int Radius, float *Weights) {
+  proteus::jit_array(Weights, NWeights);
+  float *Tile = proteus::shared_array<float, 10>(68);
+  int Gid = getGlobalThreadIdX();
+  int Tid = getThreadIdX();
 
-  tile[tid + radius] = in[gid];
-  if (tid < radius) {
-    tile[tid] = in[gid - radius];
-    tile[tid + blockDim.x + radius] = in[gid + blockDim.x];
+  Tile[Tid + Radius] = In[Gid];
+  if (Tid < Radius) {
+    Tile[Tid] = In[Gid - Radius];
+    Tile[Tid + blockDim.x + Radius] = In[Gid + blockDim.x];
   }
   __syncthreads();
 
-  float sum = 0.0f;
-  for (int j = -radius; j <= radius; j++)
-    sum += tile[tid + radius + j] * weights[radius + j];
-  out[gid] = sum;
+  float Sum = 0.0f;
+  for (int J = -Radius; J <= Radius; J++)
+    Sum += Tile[Tid + Radius + J] * Weights[Radius + J];
+  Out[Gid] = Sum;
 }
 
 int main() {
   proteus::init();
 
   const size_t N = 256;
-  const int radius = 2;
-  const int blockSize = 64;
-  const int numWeights = 2 * radius + 1;
+  const int Radius = 2;
+  const int BlockSize = 64;
+  const int NumWeights = 2 * Radius + 1;
 
-  float *in, *out, *weights;
-  gpuErrCheck(gpuMallocManaged(&in, sizeof(float) * N));
-  gpuErrCheck(gpuMallocManaged(&out, sizeof(float) * N));
-  gpuErrCheck(gpuMallocManaged(&weights, sizeof(float) * numWeights));
+  float *In, *Out, *Weights;
+  gpuErrCheck(gpuMallocManaged(&In, sizeof(float) * N));
+  gpuErrCheck(gpuMallocManaged(&Out, sizeof(float) * N));
+  gpuErrCheck(gpuMallocManaged(&Weights, sizeof(float) * NumWeights));
 
   // Initialize input array.
-  for (size_t i = 0; i < N; i++) {
-    in[i] = 1.0f;
+  for (size_t I = 0; I < N; I++) {
+    In[I] = 1.0f;
   }
 
   // Initialize weights for a simple averaging stencil.
-  for (int i = 0; i < numWeights; i++) {
-    weights[i] = 1.0f / numWeights;
+  for (int I = 0; I < NumWeights; I++) {
+    Weights[I] = 1.0f / NumWeights;
   }
 
-  // Calculate shared memory size: blockSize + 2*radius elements.
-  size_t sharedMemSize = (blockSize + 2 * radius) * sizeof(float);
-  int numBlocks = (N + blockSize - 1) / blockSize;
+  // Calculate shared memory size: BlockSize + 2*Radius elements.
+  size_t SharedMemSize = (BlockSize + 2 * Radius) * sizeof(float);
+  int NumBlocks = (N + BlockSize - 1) / BlockSize;
 
 #if PROTEUS_ENABLE_HIP
-  hipLaunchKernelGGL(stencil1d, dim3(numBlocks), dim3(blockSize), sharedMemSize,
-                     0, out, in, N, radius, weights);
+  hipLaunchKernelGGL(stencil1d, dim3(NumBlocks), dim3(BlockSize), SharedMemSize,
+                     0, Out, In, N, Radius, Weights);
 #elif PROTEUS_ENABLE_CUDA
-  stencil1d<<<numBlocks, blockSize, sharedMemSize>>>(out, in, N, radius,
-                                                     weights);
+  stencil1d<<<NumBlocks, BlockSize, SharedMemSize>>>(Out, In, N, Radius,
+                                                     Weights);
 #endif
   gpuErrCheck(gpuDeviceSynchronize());
 
   // Verify results. With all 1s input and averaging weights, output should be
   // ~1.0.
-  bool passed = true;
-  for (size_t i = radius; i < N - radius; i++) {
-    if (out[i] < 0.99f || out[i] > 1.01f) {
-      printf("FAIL: out[%zu] = %f, expected ~1.0\n", i, out[i]);
-      passed = false;
+  bool Passed = true;
+  for (size_t I = Radius; I < N - Radius; I++) {
+    if (Out[I] < 0.99f || Out[I] > 1.01f) {
+      printf("FAIL: Out[%zu] = %f, expected ~1.0\n", I, Out[I]);
+      Passed = false;
       break;
     }
   }
 
-  if (passed) {
+  if (Passed) {
     printf("PASSED\n");
   }
 
-  gpuErrCheck(gpuFree(in));
-  gpuErrCheck(gpuFree(out));
-  gpuErrCheck(gpuFree(weights));
+  gpuErrCheck(gpuFree(In));
+  gpuErrCheck(gpuFree(Out));
+  gpuErrCheck(gpuFree(Weights));
 
   proteus::finalize();
-  return passed ? 0 : 1;
+  return Passed ? 0 : 1;
 }
 
 // clang-format off
