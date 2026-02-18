@@ -21,8 +21,6 @@
 #include <atomic>
 #include <filesystem>
 #include <string>
-#include <thread>
-#include <unistd.h>
 
 template <typename T>
 inline void saveToFile(llvm::StringRef Filepath, T &&Data) {
@@ -41,9 +39,8 @@ template <typename T>
 void saveToFileAtomic(llvm::StringRef Filepath, T &&Data) {
   static std::atomic<uint64_t> TempCounter{0};
   std::string TempPath =
-      Filepath.str() + ".tmp." + std::to_string(getpid()) + "." +
-      std::to_string(std::hash<std::thread::id>{}(std::this_thread::get_id())) +
-      "." + std::to_string(TempCounter.fetch_add(1, std::memory_order_relaxed));
+      Filepath.str() + ".tmp." +
+      std::to_string(TempCounter.fetch_add(1, std::memory_order_relaxed));
 
   std::error_code EC;
   llvm::raw_fd_ostream Out(TempPath, EC);
