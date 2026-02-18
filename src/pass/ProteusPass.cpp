@@ -136,8 +136,9 @@ public:
     findJitVariables(M);
     registerLambdaFunctions(M);
 
+    instrumentRegisterFunction(M);
+
     if (hasDeviceLaunchKernelCalls(M)) {
-      instrumentRegisterFunction(M);
       emitJitLaunchKernelCall(M);
     }
 
@@ -1162,10 +1163,9 @@ private:
           "EnableCUDA set.");
       return;
     }
-
     Function *RegisterFunction = M.getFunction(RegisterFunctionName);
-    assert(RegisterFunction &&
-           "Expected register function to be called at least once.");
+    if (!RegisterFunction)
+      return;
 
     for (User *RegisterFunctionUser : RegisterFunction->users()) {
       CallBase *RegisterCB = dyn_cast<CallBase>(RegisterFunctionUser);
