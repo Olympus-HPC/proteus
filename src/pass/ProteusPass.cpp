@@ -1165,12 +1165,9 @@ private:
   /// instrumentRegisterFunction instruments kernel functions following GPU
   /// runtime registration with __jit_register_function.
   void instrumentRegisterFunction(Module &M) {
-    if (!RegisterFunctionName) {
-      reportFatalError(
-          "instrumentRegisterJITFunc only callable with `EnableHIP or "
-          "EnableCUDA set.");
+    if (!RegisterFunctionName)
       return;
-    }
+
     Function *RegisterFunction = M.getFunction(RegisterFunctionName);
     if (!RegisterFunction)
       return;
