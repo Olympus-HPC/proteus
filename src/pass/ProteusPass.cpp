@@ -133,10 +133,10 @@ public:
     instrumentRegisterFatBinary(M);
     instrumentRegisterFatBinaryEnd(M);
     instrumentRegisterVar(M);
+    instrumentRegisterFunction(M);
+
     findJitVariables(M);
     registerLambdaFunctions(M);
-
-    instrumentRegisterFunction(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
       emitJitLaunchKernelCall(M);
