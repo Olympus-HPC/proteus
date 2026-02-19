@@ -377,30 +377,51 @@ JitEngineHost::JitEngineHost() {
   // TODO: Fix support for debugging jitted code. This appears to be
   // the correct interface (see orcv2 examples) but it does not work.
   // By dumpSymbolInfo() the debug sections are not populated. Why?
-  LLJITPtr =
-      ExitOnErr(LLJITBuilder()
-                    .setObjectLinkingLayerCreator([&](ExecutionSession &ES,
-                                                      const Triple & /*TT*/) {
-                      auto GetMemMgr = []() {
-                        return std::make_unique<SectionMemoryManager>();
-                      };
-                      auto ObjLinkingLayer =
-                          std::make_unique<RTDyldObjectLinkingLayer>(
-                              ES, std::move(GetMemMgr));
+  LLJITPtr = ExitOnErr(
+      LLJITBuilder()
+#if LLVM_VERSION_MAJOR >= 22
+          .setObjectLinkingLayerCreator([&](ExecutionSession &ES) {
+            auto GetMemMgr = [](const MemoryBuffer &) {
+              return std::make_unique<SectionMemoryManager>();
+            };
+            auto ObjLinkingLayer =
+                std::make_unique<RTDyldObjectLinkingLayer>(ES, GetMemMgr);
 
-                      // Register the event listener.
-                      ObjLinkingLayer->registerJITEventListener(
-                          *JITEventListener::createGDBRegistrationListener());
+            // Register the event listener.
+            ObjLinkingLayer->registerJITEventListener(
+                *JITEventListener::createGDBRegistrationListener());
 
-                      // Make sure the debug info sections aren't stripped.
-                      ObjLinkingLayer->setProcessAllSections(true);
+            // Make sure the debug info sections aren't stripped.
+            ObjLinkingLayer->setProcessAllSections(true);
 
-                      if (Config::get().ProteusDebugOutput) {
-                        ObjLinkingLayer->setNotifyLoaded(notifyLoaded);
-                      }
-                      return ObjLinkingLayer;
-                    })
-                    .create());
+            if (Config::get().ProteusDebugOutput) {
+              ObjLinkingLayer->setNotifyLoaded(notifyLoaded);
+            }
+            return ObjLinkingLayer;
+          })
+#else
+          .setObjectLinkingLayerCreator([&](ExecutionSession &ES,
+                                            const Triple &) {
+            auto GetMemMgr = []() {
+              return std::make_unique<SectionMemoryManager>();
+            };
+            auto ObjLinkingLayer =
+                std::make_unique<RTDyldObjectLinkingLayer>(ES, GetMemMgr);
+
+            // Register the event listener.
+            ObjLinkingLayer->registerJITEventListener(
+                *JITEventListener::createGDBRegistrationListener());
+
+            // Make sure the debug info sections aren't stripped.
+            ObjLinkingLayer->setProcessAllSections(true);
+
+            if (Config::get().ProteusDebugOutput) {
+              ObjLinkingLayer->setNotifyLoaded(notifyLoaded);
+            }
+            return ObjLinkingLayer;
+          })
+#endif
+          .create());
   // Use the main JIT dynamic library to add a generator for host process
   // symbols.
   orc::MangleAndInterner Mangle(LLJITPtr->getExecutionSession(),

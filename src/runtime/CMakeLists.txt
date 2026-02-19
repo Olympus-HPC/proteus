@@ -150,6 +150,7 @@ if(PROTEUS_ENABLE_MLIR)
 	  MLIRControlFlowDialect
 	  MLIRControlFlowToLLVM
 	  MLIRLLVMDialect
+	  MLIRIndexToLLVM
 	  MLIRMathDialect
 	  MLIRMathToLLVM
 	  MLIRMemRefDialect
@@ -158,12 +159,12 @@ if(PROTEUS_ENABLE_MLIR)
 	  MLIRReconcileUnrealizedCasts
 	  MLIRSCFDialect
 	  MLIRSCFToControlFlow
-    MLIRBuiltinToLLVMIRTranslation
-    MLIRLLVMToLLVMIRTranslation
-    MLIRIR
-    MLIRSupport
-    MLIRTargetLLVM
-    MLIRTargetLLVMIRExport
+	  MLIRBuiltinToLLVMIRTranslation
+	  MLIRLLVMToLLVMIRTranslation
+	  MLIRIR
+	  MLIRSupport
+	  MLIRTargetLLVM
+	  MLIRTargetLLVMIRExport
   )
 
   # MLIR GPU lowering/translation for CUDA/HIP requires target-specific

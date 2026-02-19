@@ -23,7 +23,7 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, StringRef Name,
   KernelModuleTmp->setDataLayout(M.getDataLayout());
   KernelModuleTmp->setTargetTriple(M.getTargetTriple());
   KernelModuleTmp->setModuleInlineAsm(M.getModuleInlineAsm());
-#if LLVM_VERSION_MAJOR >= 18
+#if LLVM_VERSION_MAJOR >= 18 && LLVM_VERSION_MAJOR < 22
   KernelModuleTmp->IsNewDbgInfoFormat = M.IsNewDbgInfoFormat;
 #endif
 
@@ -365,7 +365,7 @@ struct LinkingCloner {
     ModuleOut->setDataLayout(M.getDataLayout());
     ModuleOut->setTargetTriple(M.getTargetTriple());
     ModuleOut->setModuleInlineAsm(M.getModuleInlineAsm());
-#if LLVM_VERSION_MAJOR >= 18
+#if LLVM_VERSION_MAJOR >= 18 && LLVM_VERSION_MAJOR < 22
     ModuleOut->IsNewDbgInfoFormat = M.IsNewDbgInfoFormat;
 #endif
 

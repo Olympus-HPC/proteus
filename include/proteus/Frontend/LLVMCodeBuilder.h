@@ -83,8 +83,8 @@ public:
   // -----------------------------------------------------------------------
   // Type accessors.
   // -----------------------------------------------------------------------
-  llvm::Type *getPointerType(llvm::Type *ElemTy, unsigned AS);
-  llvm::Type *getPointerTypeUnqual(llvm::Type *ElemTy);
+  llvm::Type *getPointerType(unsigned AS);
+  llvm::Type *getPointerTypeUnqual();
   llvm::Type *getInt16Ty();
   llvm::Type *getInt32Ty();
   llvm::Type *getInt64Ty();

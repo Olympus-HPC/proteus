@@ -61,7 +61,15 @@
 #include <llvm/Linker/Linker.h>
 #include <llvm/Object/ELF.h>
 #include <llvm/Passes/PassBuilder.h>
+// Upstream LLVM 22.1.0 moved PassPlugin.h from llvm/Passes to llvm/Plugins,
+// while ROCm-packaged LLVM still uses the older include path.
+#if __has_include(<llvm/Plugins/PassPlugin.h>)
+#include <llvm/Plugins/PassPlugin.h>
+#elif __has_include(<llvm/Passes/PassPlugin.h>)
 #include <llvm/Passes/PassPlugin.h>
+#else
+#error "Cannot find LLVM PassPlugin.h"
+#endif
 #include <llvm/Support/Debug.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Support/ErrorHandling.h>
@@ -339,7 +347,7 @@ private:
     LinkedModule->setDataLayout(LTOModule.getDataLayout());
     LinkedModule->setTargetTriple(LTOModule.getTargetTriple());
     LinkedModule->setModuleInlineAsm(LTOModule.getModuleInlineAsm());
-#if LLVM_VERSION_MAJOR >= 18
+#if LLVM_VERSION_MAJOR >= 18 && LLVM_VERSION_MAJOR < 22
     LinkedModule->IsNewDbgInfoFormat = LTOModule.IsNewDbgInfoFormat;
 #endif
 
@@ -815,7 +823,7 @@ private:
         }
       }
     } else {
-      ArgPtrs = Constant::getNullValue(PointerType::getUnqual(ArgPtrsTy));
+      ArgPtrs = Constant::getNullValue(PointerType::getUnqual(M.getContext()));
     }
 
     auto *JitFnPtr =
