@@ -29,14 +29,14 @@ namespace proteus {
 
 void validateMPIConfig() {
   int MPIInitialized = 0;
-  MPI_Initialized(&MPIInitialized);
+  proteusMpiCheck(MPI_Initialized(&MPIInitialized));
   if (!MPIInitialized) {
     reportFatalError("MPI caching requires MPI to be initialized. Call "
                      "MPI_Init_thread() before any JIT compilation.");
   }
 
   int Provided = 0;
-  MPI_Query_thread(&Provided);
+  proteusMpiCheck(MPI_Query_thread(&Provided));
   if (Provided != MPI_THREAD_MULTIPLE) {
     reportFatalError("MPI caching requires MPI_THREAD_MULTIPLE "
                      "(provided level: " +
@@ -52,9 +52,9 @@ void validateMPIConfig() {
 MPICommHandle::MPICommHandle() {
   validateMPIConfig();
 
-  MPI_Comm_dup(MPI_COMM_WORLD, &Comm);
-  MPI_Comm_rank(Comm, &Rank);
-  MPI_Comm_size(Comm, &Size);
+  proteusMpiCheck(MPI_Comm_dup(MPI_COMM_WORLD, &Comm));
+  proteusMpiCheck(MPI_Comm_rank(Comm, &Rank));
+  proteusMpiCheck(MPI_Comm_size(Comm, &Size));
 
   if (Config::get().traceSpecializations()) {
     Logger::trace("[MPICommHandle] Initialized communicator for rank " +
@@ -75,12 +75,12 @@ void MPICommHandle::free() {
     return;
 
   int MPIFinalized = 0;
-  MPI_Finalized(&MPIFinalized);
+  proteusMpiCheck(MPI_Finalized(&MPIFinalized));
   if (MPIFinalized)
     reportFatalError(
         "[MPICommHandle] MPI finalized before communicator cleanup.");
 
-  MPI_Comm_free(&Comm);
+  proteusMpiCheck(MPI_Comm_free(&Comm));
 }
 
 CommThreadHandle::~CommThreadHandle() { join(); }
@@ -110,30 +110,34 @@ std::vector<char> packStoreMessage(MPI_Comm Comm, const HashT &HashValue,
   }
 
   int HashSizeBytes, HashStrBytes, FlagBytes, BufSizeBytes, DataBytes;
-  MPI_Pack_size(1, MPI_UINT32_T, Comm, &HashSizeBytes);
-  MPI_Pack_size(static_cast<int>(HashSize), MPI_CHAR, Comm, &HashStrBytes);
-  MPI_Pack_size(1, MPI_BYTE, Comm, &FlagBytes);
-  MPI_Pack_size(1, MPI_UINT64_T, Comm, &BufSizeBytes);
-  MPI_Pack_size(static_cast<int>(BufferSize), MPI_BYTE, Comm, &DataBytes);
+  proteusMpiCheck(MPI_Pack_size(1, MPI_UINT32_T, Comm, &HashSizeBytes));
+  proteusMpiCheck(
+      MPI_Pack_size(static_cast<int>(HashSize), MPI_CHAR, Comm, &HashStrBytes));
+  proteusMpiCheck(MPI_Pack_size(1, MPI_BYTE, Comm, &FlagBytes));
+  proteusMpiCheck(MPI_Pack_size(1, MPI_UINT64_T, Comm, &BufSizeBytes));
+  proteusMpiCheck(
+      MPI_Pack_size(static_cast<int>(BufferSize), MPI_BYTE, Comm, &DataBytes));
 
   int TotalSize =
       HashSizeBytes + HashStrBytes + FlagBytes + BufSizeBytes + DataBytes;
   std::vector<char> Packed(TotalSize);
   int Position = 0;
 
-  MPI_Pack(&HashSize, 1, MPI_UINT32_T, Packed.data(), TotalSize, &Position,
-           Comm);
+  proteusMpiCheck(MPI_Pack(&HashSize, 1, MPI_UINT32_T, Packed.data(), TotalSize,
+                           &Position, Comm));
 
-  MPI_Pack(HashStr.data(), static_cast<int>(HashSize), MPI_CHAR, Packed.data(),
-           TotalSize, &Position, Comm);
+  proteusMpiCheck(MPI_Pack(HashStr.data(), static_cast<int>(HashSize), MPI_CHAR,
+                           Packed.data(), TotalSize, &Position, Comm));
 
-  MPI_Pack(&IsDynLib, 1, MPI_BYTE, Packed.data(), TotalSize, &Position, Comm);
+  proteusMpiCheck(MPI_Pack(&IsDynLib, 1, MPI_BYTE, Packed.data(), TotalSize,
+                           &Position, Comm));
 
-  MPI_Pack(&BufferSize, 1, MPI_UINT64_T, Packed.data(), TotalSize, &Position,
-           Comm);
+  proteusMpiCheck(MPI_Pack(&BufferSize, 1, MPI_UINT64_T, Packed.data(),
+                           TotalSize, &Position, Comm));
 
-  MPI_Pack(Entry.Buffer.getBufferStart(), static_cast<int>(BufferSize),
-           MPI_BYTE, Packed.data(), TotalSize, &Position, Comm);
+  proteusMpiCheck(MPI_Pack(Entry.Buffer.getBufferStart(),
+                           static_cast<int>(BufferSize), MPI_BYTE,
+                           Packed.data(), TotalSize, &Position, Comm));
 
   return Packed;
 }
@@ -144,23 +148,25 @@ StoreMessage unpackStoreMessage(MPI_Comm Comm,
   int TotalSize = static_cast<int>(Buffer.size());
 
   uint32_t HashSize = 0;
-  MPI_Unpack(Buffer.data(), TotalSize, &Position, &HashSize, 1, MPI_UINT32_T,
-             Comm);
+  proteusMpiCheck(MPI_Unpack(Buffer.data(), TotalSize, &Position, &HashSize, 1,
+                             MPI_UINT32_T, Comm));
 
   std::string HashStr(HashSize, '\0');
-  MPI_Unpack(Buffer.data(), TotalSize, &Position, HashStr.data(),
-             static_cast<int>(HashSize), MPI_CHAR, Comm);
+  proteusMpiCheck(MPI_Unpack(Buffer.data(), TotalSize, &Position,
+                             HashStr.data(), static_cast<int>(HashSize),
+                             MPI_CHAR, Comm));
 
   uint8_t IsDynLib = 0;
-  MPI_Unpack(Buffer.data(), TotalSize, &Position, &IsDynLib, 1, MPI_BYTE, Comm);
+  proteusMpiCheck(MPI_Unpack(Buffer.data(), TotalSize, &Position, &IsDynLib, 1,
+                             MPI_BYTE, Comm));
 
   uint64_t DataSize = 0;
-  MPI_Unpack(Buffer.data(), TotalSize, &Position, &DataSize, 1, MPI_UINT64_T,
-             Comm);
+  proteusMpiCheck(MPI_Unpack(Buffer.data(), TotalSize, &Position, &DataSize, 1,
+                             MPI_UINT64_T, Comm));
 
   std::vector<char> Data(DataSize);
-  MPI_Unpack(Buffer.data(), TotalSize, &Position, Data.data(),
-             static_cast<int>(DataSize), MPI_BYTE, Comm);
+  proteusMpiCheck(MPI_Unpack(Buffer.data(), TotalSize, &Position, Data.data(),
+                             static_cast<int>(DataSize), MPI_BYTE, Comm));
 
   return StoreMessage{HashT(llvm::StringRef(HashStr)), std::move(Data),
                       IsDynLib != 0};

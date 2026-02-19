@@ -13,14 +13,33 @@
 #ifndef PROTEUS_MPIHELPERS_H
 #define PROTEUS_MPIHELPERS_H
 
+#include "proteus/Error.h"
 #include "proteus/impl/Caching/ObjectCache.h"
 #include "proteus/impl/Hashing.h"
 
 #include <mpi.h>
 
 #include <memory>
+#include <string>
 #include <thread>
 #include <vector>
+
+// Check an MPI call's return code. On failure, format a human-readable error
+// message using MPI_Error_string and report it as a fatal error.
+#define proteusMpiCheck(CALL)                                                  \
+  do {                                                                         \
+    int proteus_mpi_err_ = (CALL);                                             \
+    if (proteus_mpi_err_ != MPI_SUCCESS) {                                     \
+      char proteus_mpi_str_[MPI_MAX_ERROR_STRING];                             \
+      int proteus_mpi_len_ = 0;                                                \
+      MPI_Error_string(proteus_mpi_err_, proteus_mpi_str_, &proteus_mpi_len_); \
+      std::string proteus_mpi_msg_ =                                           \
+          std::string(#CALL) +                                                 \
+          " failed: " + std::string(proteus_mpi_str_, proteus_mpi_len_) +      \
+          " at " + __FILE__ + ":" + std::to_string(__LINE__);                  \
+      reportFatalError(proteus_mpi_msg_);                                      \
+    }                                                                          \
+  } while (0)
 
 namespace proteus {
 
