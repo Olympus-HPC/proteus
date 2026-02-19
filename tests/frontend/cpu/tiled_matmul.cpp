@@ -11,6 +11,8 @@
 
 #include <proteus/JitFrontend.h>
 
+constexpr auto Lazy = proteus::EmissionPolicy::Lazy;
+
 static auto getTiledMatmulFunction(int N, int TileI, int TileJ, int TileK) {
   auto JitMod = std::make_unique<proteus::JitModule>("host");
   auto &F =
@@ -32,15 +34,15 @@ static auto getTiledMatmulFunction(int N, int TileI, int TileJ, int TileK) {
       auto IncOne = F.defRuntimeConst<int>(1, "inc");
       auto Zero = F.defRuntimeConst<int>(0, "zero");
 
-      F.buildLoopNest(F.forLoop(I, Zero, UbnI, IncOne).tile(TileI),
-                      F.forLoop(J, Zero, UbnJ, IncOne).tile(TileJ),
-                      F.forLoop(K, Zero, UbnK, IncOne,
-                                [&]() {
-                                  auto CIdx = I * N + J;
-                                  auto AIdx = I * N + K;
-                                  auto BIdx = K * N + J;
-                                  C[CIdx] += A[AIdx] * B[BIdx];
-                                })
+      F.buildLoopNest(F.forLoop<Lazy>(I, Zero, UbnI, IncOne).tile(TileI),
+                      F.forLoop<Lazy>(J, Zero, UbnJ, IncOne).tile(TileJ),
+                      F.forLoop<Lazy>(K, Zero, UbnK, IncOne,
+                                      [&]() {
+                                        auto CIdx = I * N + J;
+                                        auto AIdx = I * N + K;
+                                        auto BIdx = K * N + J;
+                                        C[CIdx] += A[AIdx] * B[BIdx];
+                                      })
                           .tile(TileK))
           .emit();
 

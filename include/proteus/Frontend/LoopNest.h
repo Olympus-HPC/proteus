@@ -22,7 +22,7 @@ public:
       : IterVar(IterVar), Init(Init), UpperBound(UpperBound), Inc(Inc) {}
 };
 
-template <typename T, typename BodyLambda> class ForLoopBuilder {
+template <typename T, typename BodyLambda> class [[nodiscard]] ForLoopBuilder {
 public:
   LoopBoundInfo<T> Bounds;
   using LoopIndexType = T;
@@ -78,6 +78,14 @@ public:
 
 template <typename T, typename... LoopBuilders> class LoopNestBuilder {
 private:
+  static_assert(sizeof...(LoopBuilders) > 0,
+                "LoopNestBuilder requires at least one loop builder");
+  static_assert((IsForLoopBuilder<LoopBuilders>::value && ...),
+                "LoopNestBuilder requires ForLoopBuilder inputs");
+  static_assert((std::is_same_v<T, typename LoopBuilders::LoopIndexType> &&
+                 ...),
+                "All loops in a loop nest must use the same loop index type");
+
   std::tuple<LoopBuilders...> Loops;
   std::array<std::unique_ptr<LoopBoundInfo<T>>,
              std::tuple_size_v<decltype(Loops)>>

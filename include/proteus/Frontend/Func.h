@@ -55,6 +55,16 @@ struct EmptyLambda {
   void operator()() const {}
 };
 
+enum class EmissionPolicy { Eager, Lazy };
+
+// Returned by forLoop<Eager> so that buildLoopNest's static_assert fires with
+// a clear message instead of a generic "cannot form a reference to void" error.
+struct EmittedLoopTag {};
+
+template <typename T> struct IsForLoopBuilder : std::false_type {};
+template <typename T, typename BodyLambda>
+struct IsForLoopBuilder<ForLoopBuilder<T, BodyLambda>> : std::true_type {};
+
 class FuncBase {
 public:
   struct Impl;
@@ -373,9 +383,26 @@ public:
                      int Line = __builtin_LINE());
   void endFunction();
 
+  template <typename BodyLambda>
+  void function(BodyLambda &&Body, const char *File = __builtin_FILE(),
+                int Line = __builtin_LINE()) {
+    beginFunction(File, Line);
+    std::forward<BodyLambda>(Body)();
+    endFunction();
+  }
+
   void beginIf(const Var<bool> &CondVar, const char *File = __builtin_FILE(),
                int Line = __builtin_LINE());
   void endIf();
+
+  template <typename BodyLambda>
+  void ifThen(const Var<bool> &CondVar, BodyLambda &&Body,
+              const char *File = __builtin_FILE(),
+              int Line = __builtin_LINE()) {
+    beginIf(CondVar, File, Line);
+    std::forward<BodyLambda>(Body)();
+    endIf();
+  }
 
   template <typename IterT, typename InitT, typename UpperT, typename IncT>
   void beginFor(Var<IterT> &IterVar, const Var<InitT> &InitVar,
@@ -388,6 +415,15 @@ public:
   void beginWhile(CondLambda &&Cond, const char *File = __builtin_FILE(),
                   int Line = __builtin_LINE());
   void endWhile();
+
+  template <typename CondLambda, typename BodyLambda>
+  void whileLoop(CondLambda &&Cond, BodyLambda &&Body,
+                 const char *File = __builtin_FILE(),
+                 int Line = __builtin_LINE()) {
+    beginWhile(std::forward<CondLambda>(Cond), File, Line);
+    std::forward<BodyLambda>(Body)();
+    endWhile();
+  }
 
   template <typename Sig>
   std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>,
@@ -430,15 +466,23 @@ public:
   std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
   atomicMin(const Var<T *> &Addr, const Var<T> &Val);
 
-  template <typename IterT, typename InitT, typename UpperT, typename IncT,
+  template <EmissionPolicy Policy = EmissionPolicy::Eager, typename IterT,
+            typename InitT, typename UpperT, typename IncT,
             typename BodyLambda = EmptyLambda>
   auto forLoop(Var<IterT> &Iter, const Var<InitT> &Init,
                const Var<UpperT> &Upper, const Var<IncT> &Inc,
                BodyLambda &&Body = {}) {
     static_assert(is_mutable_v<IterT>, "Loop iterator must be mutable");
-    LoopBoundInfo<IterT> BoundsInfo{Iter, Init, Upper, Inc};
-    return ForLoopBuilder<IterT, BodyLambda>(BoundsInfo, *this,
-                                             std::forward<BodyLambda>(Body));
+    if constexpr (Policy == EmissionPolicy::Eager) {
+      beginFor(Iter, Init, Upper, Inc);
+      std::forward<BodyLambda>(Body)();
+      endFor();
+      return EmittedLoopTag{};
+    } else {
+      LoopBoundInfo<IterT> BoundsInfo{Iter, Init, Upper, Inc};
+      return ForLoopBuilder<IterT, BodyLambda>(BoundsInfo, *this,
+                                               std::forward<BodyLambda>(Body));
+    }
   }
 
   template <typename... LoopBuilders>
