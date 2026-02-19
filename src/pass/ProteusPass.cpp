@@ -133,11 +133,12 @@ public:
     instrumentRegisterFatBinary(M);
     instrumentRegisterFatBinaryEnd(M);
     instrumentRegisterVar(M);
+    instrumentRegisterFunction(M);
+
     findJitVariables(M);
     registerLambdaFunctions(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
-      instrumentRegisterFunction(M);
       emitJitLaunchKernelCall(M);
     }
 
@@ -1164,16 +1165,12 @@ private:
   /// instrumentRegisterFunction instruments kernel functions following GPU
   /// runtime registration with __jit_register_function.
   void instrumentRegisterFunction(Module &M) {
-    if (!RegisterFunctionName) {
-      reportFatalError(
-          "instrumentRegisterJITFunc only callable with `EnableHIP or "
-          "EnableCUDA set.");
+    if (!RegisterFunctionName)
       return;
-    }
 
     Function *RegisterFunction = M.getFunction(RegisterFunctionName);
-    assert(RegisterFunction &&
-           "Expected register function to be called at least once.");
+    if (!RegisterFunction)
+      return;
 
     for (User *RegisterFunctionUser : RegisterFunction->users()) {
       CallBase *RegisterCB = dyn_cast<CallBase>(RegisterFunctionUser);
