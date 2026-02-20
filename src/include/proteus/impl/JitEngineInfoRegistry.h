@@ -94,13 +94,6 @@ public:
     RegisteredLinkedBinaries.clear();
   }
 
-  SmallVector<RegisterFatBinaryInfo> getRegisteredFatBinaries() {
-    SmallVector<RegisterFatBinaryInfo> Result;
-    for (auto &[_, FatbinInfo] : FatbinaryMap)
-      Result.push_back(FatbinInfo);
-    return Result;
-  }
-
 private:
   JitEngineInfoRegistry() = default;
 };
