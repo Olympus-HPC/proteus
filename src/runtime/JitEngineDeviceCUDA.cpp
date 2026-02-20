@@ -91,9 +91,6 @@ HashT JitEngineDeviceCUDA::getModuleHash(BinaryInfo &BinInfo) {
   for (auto &ModuleId : LinkedModuleIds)
     BinInfo.updateModuleHash(ExtractLinkedBitcodeHash(ModuleId));
 
-  for (auto &ModuleId : GlobalLinkedModuleIds)
-    BinInfo.updateModuleHash(ExtractLinkedBitcodeHash(ModuleId));
-
   proteusCuErrCheck(cuModuleUnload(CUMod));
 
   return BinInfo.getModuleHash();
@@ -123,9 +120,6 @@ void JitEngineDeviceCUDA::extractModules(BinaryInfo &BinInfo) {
   proteusCuErrCheck(cuModuleLoadData(&CUMod, FatbinWrapper->Binary));
 
   for (auto &ModuleId : LinkedModuleIds)
-    extractLinkedBitcode(Ctx, CUMod, LinkedModules, ModuleId);
-
-  for (auto &ModuleId : GlobalLinkedModuleIds)
     extractLinkedBitcode(Ctx, CUMod, LinkedModules, ModuleId);
 
   proteusCuErrCheck(cuModuleUnload(CUMod));

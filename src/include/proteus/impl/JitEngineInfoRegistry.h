@@ -17,6 +17,7 @@
 #include <llvm/ADT/SmallVector.h>
 
 #include <cstdint>
+#include <unordered_map>
 
 namespace proteus {
 
@@ -27,14 +28,7 @@ struct RegisterVarInfo {
   uint64_t VarSize;
 };
 
-struct RegisterFatBinaryInfo {
-  void *Handle;
-  void *FatbinWrapper;
-  const char *ModuleId;
-};
-
 struct RegisterLinkedBinaryInfo {
-  void *Handle;
   void *FatbinWrapper;
   const char *ModuleId;
 };
@@ -46,6 +40,19 @@ struct RegisterFunctionInfo {
   ArrayRef<RuntimeConstantInfo *> RCInfoArray;
 };
 
+struct RegisterFatBinaryInfo {
+  void *Handle;
+  void *FatbinWrapper;
+  const char *ModuleId;
+
+  SmallVector<RegisterVarInfo> Vars;
+  SmallVector<RegisterLinkedBinaryInfo> LinkedBinaries;
+  SmallVector<RegisterFunctionInfo> Functions;
+
+  RegisterFatBinaryInfo(void *Handle, void *FatbinWrapper, const char *ModuleId)
+      : Handle(Handle), FatbinWrapper(FatbinWrapper), ModuleId(ModuleId) {}
+};
+
 class JitEngineInfoRegistry {
 public:
   static JitEngineInfoRegistry &instance() {
@@ -53,41 +60,49 @@ public:
     return Instance;
   }
 
-  SmallVector<RegisterVarInfo> RegisteredVars;
-  SmallVector<RegisterFatBinaryInfo> RegisteredFatBinaries;
+  std::unordered_map<void *, RegisterFatBinaryInfo> FatbinaryMap;
   SmallVector<RegisterLinkedBinaryInfo> RegisteredLinkedBinaries;
-  SmallVector<RegisterFunctionInfo> RegisteredFunctions;
 
   void registerFatBinary(void *Handle, void *FatbinWrapper,
                          const char *ModuleId) {
-    RegisteredFatBinaries.push_back({Handle, FatbinWrapper, ModuleId});
-    CurHandle = Handle;
+    FatbinaryMap.emplace(
+        Handle, RegisterFatBinaryInfo(Handle, FatbinWrapper, ModuleId));
   }
 
+  // Register linked binary is CUDA specific.
   void registerLinkedBinary(void *FatbinWrapper, const char *ModuleId) {
-    RegisteredLinkedBinaries.push_back({CurHandle, FatbinWrapper, ModuleId});
+    RegisteredLinkedBinaries.push_back({FatbinWrapper, ModuleId});
   }
 
   void registerFunction(void *Handle, void *Kernel, char *KernelName,
                         ArrayRef<RuntimeConstantInfo *> RCInfoArray) {
-    RegisteredFunctions.push_back({Handle, Kernel, KernelName, RCInfoArray});
+    auto &FatbinInfo = FatbinaryMap.at(Handle);
+    FatbinInfo.Functions.push_back({Handle, Kernel, KernelName, RCInfoArray});
   }
 
   void registerVar(void *Handle, const void *HostAddr, const char *VarName,
                    uint64_t VarSize) {
-    RegisteredVars.push_back({Handle, HostAddr, VarName, VarSize});
+    auto &FatbinInfo = FatbinaryMap.at(Handle);
+    FatbinInfo.Vars.push_back({Handle, HostAddr, VarName, VarSize});
   }
+
   void registerFatBinaryEnd(void *Handle) {
-    if (CurHandle != Handle)
-      reportFatalError("Expected matching handle in JIT engine info registry");
-    CurHandle = nullptr;
+    // CUDA specific: associate any registered linked binary with this fat
+    // binary.
+    auto &FatbinInfo = FatbinaryMap.at(Handle);
+    FatbinInfo.LinkedBinaries = RegisteredLinkedBinaries;
+    RegisteredLinkedBinaries.clear();
+  }
+
+  SmallVector<RegisterFatBinaryInfo> getRegisteredFatBinaries() {
+    SmallVector<RegisterFatBinaryInfo> Result;
+    for (auto &[_, FatbinInfo] : FatbinaryMap)
+      Result.push_back(FatbinInfo);
+    return Result;
   }
 
 private:
   JitEngineInfoRegistry() = default;
-  // Track the current fat binary handle being registered, used to associate
-  // linked binaries.
-  void *CurHandle = nullptr;
 };
 
 } // namespace proteus
