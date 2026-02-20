@@ -466,13 +466,12 @@ public:
                             const char *ModuleId);
   void registerFatBinary(void *Handle, FatbinWrapperT *FatbinWrapper,
                          const char *ModuleId);
-  void registerFatBinaryEnd();
+  void finalizeRegistration();
   void registerFunction(void *Handle, void *Kernel, char *KernelName,
                         ArrayRef<RuntimeConstantInfo *> RCInfoArray);
 
   std::unordered_map<std::string, FatbinWrapperT *> ModuleIdToFatBinary;
   std::unordered_map<const void *, BinaryInfo> HandleToBinaryInfo;
-  SmallVector<std::string> GlobalLinkedModuleIds;
   SmallPtrSet<void *, 8> GlobalLinkedBinaries;
 
   bool containsJITKernelInfo(const void *Func) {
@@ -511,30 +510,25 @@ protected:
   JitEngineDevice() {
     auto &JitEngineInfo = JitEngineInfoRegistry::instance();
 
-    for (auto &Fatbin : JitEngineInfo.RegisteredFatBinaries) {
+    for (auto &[Handle, FatbinInfo] : JitEngineInfo.FatbinaryMap) {
       registerFatBinary(
-          Fatbin.Handle,
-          reinterpret_cast<FatbinWrapperT *>(Fatbin.FatbinWrapper),
-          Fatbin.ModuleId);
+          Handle, reinterpret_cast<FatbinWrapperT *>(FatbinInfo.FatbinWrapper),
+          FatbinInfo.ModuleId);
+
+      for (auto &LinkedBin : FatbinInfo.LinkedBinaries)
+        registerLinkedBinary(
+            Handle, reinterpret_cast<FatbinWrapperT *>(LinkedBin.FatbinWrapper),
+            LinkedBin.ModuleId);
+
+      for (auto &Func : FatbinInfo.Functions)
+        registerFunction(Handle, Func.Kernel, Func.KernelName,
+                         Func.RCInfoArray);
+
+      for (auto &Var : FatbinInfo.Vars)
+        registerVar(Var.Handle, Var.VarName, Var.HostAddr, Var.VarSize);
     }
 
-    for (auto &LinkedBin : JitEngineInfo.RegisteredLinkedBinaries) {
-      registerLinkedBinary(
-          LinkedBin.Handle,
-          reinterpret_cast<FatbinWrapperT *>(LinkedBin.FatbinWrapper),
-          LinkedBin.ModuleId);
-    }
-
-    for (auto &Func : JitEngineInfo.RegisteredFunctions) {
-      registerFunction(Func.Handle, Func.Kernel, Func.KernelName,
-                       Func.RCInfoArray);
-    }
-
-    for (auto &Var : JitEngineInfo.RegisteredVars) {
-      registerVar(Var.Handle, Var.VarName, Var.HostAddr, Var.VarSize);
-    }
-
-    registerFatBinaryEnd();
+    finalizeRegistration();
 
     if (Config::get().ProteusUseStoredCache)
       CacheChain.emplace("JitEngineDevice");
@@ -703,8 +697,8 @@ void JitEngineDevice<ImplT>::registerFatBinary(void *Handle,
   }
 }
 
-template <typename ImplT> void JitEngineDevice<ImplT>::registerFatBinaryEnd() {
-  PROTEUS_DBG(Logger::logs("proteus") << "Register fatbinary end\n");
+template <typename ImplT> void JitEngineDevice<ImplT>::finalizeRegistration() {
+  PROTEUS_DBG(Logger::logs("proteus") << "Finalize registration\n");
   // Erase linked binaries for which we have LLVM IR code, those binaries are
   // stored in the ModuleIdToFatBinary map.
   for (auto &[ModuleId, FatbinWrapper] : ModuleIdToFatBinary)
@@ -749,15 +743,10 @@ void JitEngineDevice<ImplT>::registerLinkedBinary(void *Handle,
               << "Register linked binary FatBinary " << FatbinWrapper
               << " Binary " << (void *)FatbinWrapper->Binary << " ModuleId "
               << ModuleId << "\n");
-  if (Handle) {
-    if (!HandleToBinaryInfo.count(Handle))
-      reportFatalError("Expected Handle in map");
+  if (!HandleToBinaryInfo.count(Handle))
+    reportFatalError("Expected Handle in map");
 
-    HandleToBinaryInfo[Handle].addModuleId(ModuleId);
-  } else {
-    GlobalLinkedModuleIds.push_back(ModuleId);
-  }
-
+  HandleToBinaryInfo[Handle].addModuleId(ModuleId);
   ModuleIdToFatBinary[ModuleId] = FatbinWrapper;
 }
 
