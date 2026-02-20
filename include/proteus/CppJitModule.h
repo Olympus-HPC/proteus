@@ -38,15 +38,17 @@ private:
   struct CodeInstance {
     TargetModelType TargetModel;
     const std::string &TemplateCode;
+    std::vector<std::string> ExtraArgs;
     std::string InstanceName;
     std::unique_ptr<CppJitModule> InstanceModule;
     std::string EntryFuncName;
     void *FuncPtr = nullptr;
 
     CodeInstance(TargetModelType TargetModel, const std::string &TemplateCode,
+                 const std::vector<std::string> &ExtraArgs,
                  const std::string &InstanceName)
         : TargetModel(TargetModel), TemplateCode(TemplateCode),
-          InstanceName(InstanceName) {
+          ExtraArgs(ExtraArgs), InstanceName(InstanceName) {
       EntryFuncName = "__jit_instance_" + this->InstanceName;
       // Replace characters '<', '>', ',' with $ to create a unique for the
       // entry function.
@@ -137,7 +139,7 @@ private:
     template <typename RetT, typename... ArgT> void compile() {
       std::string InstanceCode = buildCode<RetT, ArgT...>();
       InstanceModule =
-          std::make_unique<CppJitModule>(TargetModel, InstanceCode);
+          std::make_unique<CppJitModule>(TargetModel, InstanceCode, ExtraArgs);
       InstanceModule->compile();
 
       FuncPtr = InstanceModule->getFunctionAddress(EntryFuncName);
@@ -219,7 +221,7 @@ public:
 
     InstanceName += ">";
 
-    return CodeInstance{TargetModel, Code, InstanceName};
+    return CodeInstance{TargetModel, Code, ExtraArgs, InstanceName};
   }
 
   template <typename Sig> struct FunctionHandle;
