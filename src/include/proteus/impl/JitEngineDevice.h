@@ -551,6 +551,14 @@ protected:
     if (AsyncCompiler)
       AsyncCompiler->joinAllThreads();
 
+    // Finalize the cache chain before printing stats or destroying members.
+    // This runs the MPI shutdown handshake (non-zero ranks send Shutdown to
+    // rank 0's comm thread, rank 0 joins the comm thread) while MPI is still
+    // alive. MPI is guaranteed alive here because the Mpi singleton was
+    // constructed before this singleton, so it destructs after us.
+    if (CacheChain)
+      CacheChain->finalize();
+
     CodeCache.printStats();
     CodeCache.printKernelTrace();
     if (CacheChain)
