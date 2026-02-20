@@ -48,6 +48,7 @@ MPIRemoteLookupCache::lookup(const HashT &HashValue) {
 
 std::unique_ptr<CompiledLibrary>
 MPIRemoteLookupCache::lookupRemote(const HashT &HashValue) {
+  TIMESCOPE("MPIRemoteLookupCache::lookupRemote");
   MPI_Comm Comm = CommHandle.get();
 
   auto ReqBuf = packLookupRequest(HashValue);

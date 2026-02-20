@@ -39,7 +39,7 @@ StorageCache::StorageCache(const std::string &Label)
 }
 
 std::unique_ptr<CompiledLibrary> StorageCache::lookup(const HashT &HashValue) {
-  TIMESCOPE("object lookup");
+  TIMESCOPE("StorageCache::lookup");
   Accesses++;
 
   std::string Filebase = StorageDirectory + "/" + DistributedRank +
@@ -63,7 +63,7 @@ std::unique_ptr<CompiledLibrary> StorageCache::lookup(const HashT &HashValue) {
 }
 
 void StorageCache::store(const HashT &HashValue, const CacheEntry &Entry) {
-  TIMESCOPE("Store cache");
+  TIMESCOPE("StorageCache::store");
 
   std::string Filebase = StorageDirectory + "/" + DistributedRank +
                          "-cache-jit-" + HashValue.toString();

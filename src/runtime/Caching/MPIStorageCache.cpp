@@ -208,6 +208,7 @@ void MPIStorageCache::handleMessage(MPI_Status &Status, MPITag Tag) {
 }
 
 void MPIStorageCache::handleStoreMessage(MPI_Status &Status) {
+  TIMESCOPE("MPIStorageCache::handleStoreMessage");
   MPI_Comm Comm = CommHandle.get();
   int MsgSize = 0;
   MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
@@ -222,6 +223,7 @@ void MPIStorageCache::handleStoreMessage(MPI_Status &Status) {
 
 void MPIStorageCache::saveToDisk(const HashT &HashValue, const char *Data,
                                  size_t Size, bool IsDynLib) {
+  TIMESCOPE("MPIStorageCache::saveToDisk");
   std::string Filebase =
       StorageDirectory + "/cache-jit-" + HashValue.toString();
   std::string Extension = IsDynLib ? ".so" : ".o";
@@ -240,6 +242,7 @@ void MPIStorageCache::saveToDisk(const HashT &HashValue, const char *Data,
 
 std::unique_ptr<CompiledLibrary>
 MPIStorageCache::lookupFromDisk(const HashT &HashValue) {
+  TIMESCOPE("MPIStorageCache::lookupFromDisk");
   std::string Filebase =
       StorageDirectory + "/cache-jit-" + HashValue.toString();
 
