@@ -30,12 +30,21 @@ namespace proteus {
 
 using namespace llvm;
 
+static int mpiCleanupCallback(MPI_Comm, int, void *Attr, void *) {
+  static_cast<MPIStorageCache *>(Attr)->finalize();
+  return MPI_SUCCESS;
+}
+
 MPIStorageCache::MPIStorageCache(const std::string &Label)
     : StorageDirectory(Config::get().ProteusCacheDir
                            ? Config::get().ProteusCacheDir.value()
                            : ".proteus"),
       Label(Label) {
   std::filesystem::create_directories(StorageDirectory);
+
+  proteusMpiCheck(MPI_Comm_create_keyval(
+      MPI_COMM_NULL_COPY_FN, mpiCleanupCallback, &AttrKeyval, nullptr));
+  proteusMpiCheck(MPI_Comm_set_attr(MPI_COMM_SELF, AttrKeyval, this));
 }
 
 MPIStorageCache::~MPIStorageCache() = default;
@@ -47,9 +56,12 @@ void MPIStorageCache::finalize() {
   int MPIFinalized = 0;
   proteusMpiCheck(MPI_Finalized(&MPIFinalized));
   if (MPIFinalized) {
-    reportFatalError("[" + getName() +
-                     "] MPI already finalized before cache finalized. This "
-                     "should never happen");
+    // MPI is gone — nothing we can do. This can happen if
+    // ~JitEngineDevice() runs after MPI_Finalize() and the
+    // MPI_COMM_SELF callback did not fire (should not occur, but
+    // guard defensively).
+    Finalized = true;
+    return;
   }
 
   if (Config::get().traceSpecializations()) {
@@ -72,7 +84,18 @@ void MPIStorageCache::finalize() {
   CommThread.join();
 
   CommHandle.free();
+
+  // Mark finalized BEFORE deregistering the callback. MPI_Comm_delete_attr
+  // triggers the delete callback, so Finalized must already be true to
+  // prevent re-entrant finalize().
   Finalized = true;
+
+  // Deregister the MPI_COMM_SELF callback so it does not fire on a
+  // dangling pointer if this object is destroyed before MPI_Finalize().
+  if (AttrKeyval != MPI_KEYVAL_INVALID) {
+    MPI_Comm_delete_attr(MPI_COMM_SELF, AttrKeyval);
+    MPI_Comm_free_keyval(&AttrKeyval);
+  }
 }
 
 void MPIStorageCache::store(const HashT &HashValue, const CacheEntry &Entry) {

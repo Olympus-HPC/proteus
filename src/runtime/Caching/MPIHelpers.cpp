@@ -76,9 +76,13 @@ void MPICommHandle::free() {
 
   int MPIFinalized = 0;
   proteusMpiCheck(MPI_Finalized(&MPIFinalized));
-  if (MPIFinalized)
-    reportFatalError(
-        "[MPICommHandle] MPI finalized before communicator cleanup.");
+  if (MPIFinalized) {
+    // MPI is gone — we can no longer free the communicator.
+    // This is expected when finalize() already freed it via the
+    // MPI_COMM_SELF callback path and this destructor runs later.
+    Comm = MPI_COMM_NULL;
+    return;
+  }
 
   proteusMpiCheck(MPI_Comm_free(&Comm));
 }

@@ -62,6 +62,7 @@ private:
   void completeAllPendingSends();
 
   bool Finalized = false;
+  int AttrKeyval = MPI_KEYVAL_INVALID;
   std::vector<std::unique_ptr<PendingSend>> PendingSends;
 };
 
