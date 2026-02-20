@@ -34,6 +34,7 @@ void validateMPIConfig() {
     reportFatalError("MPI caching requires MPI to be initialized. Call "
                      "MPI_Init_thread() before any JIT compilation.");
   }
+
   int Provided = 0;
   proteusMpiCheck(MPI_Query_thread(&Provided));
   if (Provided != MPI_THREAD_MULTIPLE) {
