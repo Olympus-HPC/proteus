@@ -36,7 +36,6 @@ void validateMPIConfig() {
   }
 
   int Provided = 0;
-
   proteusMpiCheck(MPI_Query_thread(&Provided));
   if (Provided != MPI_THREAD_MULTIPLE) {
     reportFatalError("MPI caching requires MPI_THREAD_MULTIPLE "
