@@ -421,7 +421,7 @@ private:
     ProteusTimeTraceFile =
         getEnvOrDefaultString("PROTEUS_TIME_TRACE_FILE").value_or("");
     ProteusCommThreadPollMs =
-        getEnvOrDefaultInt("PROTEUS_COMM_THREAD_POLL_MS", 50);
+        getEnvOrDefaultInt("PROTEUS_COMM_THREAD_POLL_MS", 25);
   }
 };
 } // namespace proteus
