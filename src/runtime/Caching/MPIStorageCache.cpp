@@ -21,9 +21,12 @@
 
 #include <mpi.h>
 
+#include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <filesystem>
 #include <limits>
+#include <thread>
 
 namespace proteus {
 
@@ -135,7 +138,14 @@ void MPIStorageCache::communicationThreadMain() {
   try {
     while (true) {
       MPI_Status Status;
-      MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, Comm, &Status);
+      int Flag = 0;
+      MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, Comm, &Flag, &Status);
+
+      if (!Flag) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        continue;
+      }
+
       if (Status.MPI_SOURCE == 0)
         reportFatalError("Rank 0 should not receive messages on its own "
                          "communication thread.");
