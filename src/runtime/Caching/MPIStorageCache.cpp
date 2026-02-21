@@ -142,7 +142,8 @@ void MPIStorageCache::communicationThreadMain() {
       MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, Comm, &Flag, &Status);
 
       if (!Flag) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(
+            std::chrono::milliseconds(Config::get().ProteusCommThreadPollMs));
         continue;
       }
 
