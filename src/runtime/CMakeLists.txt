@@ -226,8 +226,13 @@ set_target_properties(proteus PROPERTIES
   INTERFACE_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}"
 )
 
+set(PROTEUS_INSTALL_TARGETS proteus proteusCore proteusFrontend)
+if(PROTEUS_ENABLE_CUDA)
+    list(APPEND PROTEUS_INSTALL_TARGETS proteus_cudart_builtins)
+endif()
+
 install(
-  TARGETS proteus proteus_cudart_builtins proteusCore proteusFrontend
+  TARGETS ${PROTEUS_INSTALL_TARGETS}
   EXPORT proteusTargets
   RUNTIME DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
