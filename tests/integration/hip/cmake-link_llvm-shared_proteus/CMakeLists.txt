@@ -12,7 +12,7 @@ set_source_files_properties(main.cpp PROPERTIES LANGUAGE HIP)
 target_link_options(main PRIVATE --no-undefined)
 set_target_properties(main PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
 
-add_proteus(main LINK_SHARED)
+add_proteus(main)
 
 llvm_map_components_to_libnames(LLVM_LIBS Core ${LLVM_TARGETS_TO_BUILD} Support Target)
 target_link_libraries(main PRIVATE ${LLVM_LIBS})
