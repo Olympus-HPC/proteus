@@ -128,26 +128,32 @@ void JitEngineDeviceCUDA::extractModules(BinaryInfo &BinInfo) {
 }
 
 JitEngineDeviceCUDA::JitEngineDeviceCUDA() {
-  // Initialize CUDA and retrieve the compute capability, needed for later
-  // operations.
+  proteusCuErrCheck(cuInit(0));
+
   CUdevice CUDev;
   CUcontext CUCtx;
 
-  proteusCuErrCheck(cuInit(0));
+  // Try to get the device from an existing context first.
+  CUresult CURes = cuCtxGetCurrent(&CUCtx);
+  if (CURes == CUDA_SUCCESS && CUCtx) {
+    // There is already an active context, use its device.
+    proteusCuErrCheck(cuCtxGetDevice(&CUDev));
+  } else {
+    // No active context, retain the primary context for device 0.
+    // NOTE: We intentionally do not call cuDevicePrimaryCtxRelease.
+    // The primary context is shared with the host application and will
+    // be cleaned up at process exit. Releasing during static destruction
+    // risks ordering issues with other CUDA users.
 
-  CUresult CURes = cuCtxGetDevice(&CUDev);
-  if (CURes == CUDA_ERROR_INVALID_CONTEXT or !CUDev)
-    // TODO: is selecting device 0 correct?
+    // TODO: support device selection.
     proteusCuErrCheck(cuDeviceGet(&CUDev, 0));
+    proteusCuErrCheck(cuDevicePrimaryCtxRetain(&CUCtx, CUDev));
+    proteusCuErrCheck(cuCtxSetCurrent(CUCtx));
+  }
 
-  proteusCuErrCheck(cuCtxGetCurrent(&CUCtx));
-  if (!CUCtx)
-    proteusCuErrCheck(cuCtxCreate(&CUCtx, 0, CUDev));
-
-  int CCMajor;
+  int CCMajor, CCMinor;
   proteusCuErrCheck(cuDeviceGetAttribute(
       &CCMajor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, CUDev));
-  int CCMinor;
   proteusCuErrCheck(cuDeviceGetAttribute(
       &CCMinor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, CUDev));
   DeviceArch = "sm_" + std::to_string(CCMajor * 10 + CCMinor);

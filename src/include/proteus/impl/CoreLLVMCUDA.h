@@ -215,18 +215,16 @@ codegenObject(Module &M, StringRef DeviceArch,
 
   std::unique_ptr<MemoryBuffer> FinalObjBuf;
   if (!GlobalLinkedBinaries.empty()) {
-    // Create CUDA context if needed. This is required by threaded async
-    // compilation.
+    // Retain the primary CUDA context if needed. This is required by threaded
+    // async compilation for ensuring a valid CUDA context is set when linking
+    // with the CUDA API.
     CUcontext CUCtx;
     proteusCuErrCheck(cuCtxGetCurrent(&CUCtx));
     if (!CUCtx) {
       CUdevice CUDev;
-      CUresult CURes = cuCtxGetDevice(&CUDev);
-      if (CURes == CUDA_ERROR_INVALID_CONTEXT or !CUDev)
-        proteusCuErrCheck(cuDeviceGet(&CUDev, 0));
-
-      proteusCuErrCheck(cuCtxGetCurrent(&CUCtx));
-      proteusCuErrCheck(cuCtxCreate(&CUCtx, 0, CUDev));
+      proteusCuErrCheck(cuDeviceGet(&CUDev, 0));
+      proteusCuErrCheck(cuDevicePrimaryCtxRetain(&CUCtx, CUDev));
+      proteusCuErrCheck(cuCtxSetCurrent(CUCtx));
     }
 
     // TODO: re-implement using the more recent nvJitLink interface.

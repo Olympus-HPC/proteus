@@ -1,0 +1,33 @@
+set -e
+
+cmake -S ${CI_PROJECT_DIR} -B build-proteus \
+    -DLLVM_INSTALL_DIR="${LLVM_INSTALL_DIR}" \
+    -DCMAKE_C_COMPILER="${LLVM_INSTALL_DIR}/bin/clang" \
+    -DCMAKE_CXX_COMPILER="${LLVM_INSTALL_DIR}/bin/clang++" \
+    -DCMAKE_CUDA_COMPILER="${LLVM_INSTALL_DIR}/bin/clang++" \
+    -DCMAKE_INSTALL_PREFIX=${PWD}/install-proteus \
+    -DPROTEUS_ENABLE_CUDA=on \
+    -DCMAKE_CUDA_ARCHITECTURES=90 \
+    -DENABLE_TESTS=off \
+    -DBUILD_SHARED=off \
+    -DCMAKE_BUILD_TYPE=Debug \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=on
+
+pushd build-proteus
+make -j install
+popd
+
+cmake -S ${TEST_DIR} -B build \
+    -DCMAKE_C_COMPILER="${LLVM_INSTALL_DIR}/bin/clang" \
+    -DCMAKE_CXX_COMPILER="${LLVM_INSTALL_DIR}/bin/clang++" \
+    -DCMAKE_CUDA_COMPILER="${LLVM_INSTALL_DIR}/bin/clang++" \
+    -DCMAKE_CUDA_ARCHITECTURES=90 \
+    -Dproteus_DIR="${PWD}/install-proteus" \
+    -DCMAKE_INSTALL_PREFIX="${PWD}/install"
+pushd build
+make -j install VERBOSE=1
+# Run from build directory.
+./main
+popd
+
+install/bin/main

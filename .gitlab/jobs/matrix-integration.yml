@@ -1,0 +1,28 @@
+.base-job:
+  extends: .job_on_matrix
+  before_script:
+    - echo "=== Start CI Integration Tests ==="
+  after_script:
+    - rm -rf ${CI_BUILDS_DIR}
+    - echo "=== End CI Integration Tests ==="
+
+.variants:
+  parallel:
+    matrix:
+      - PROTEUS_CI_INTEGRATION_TEST:
+        - cmake-shared_libs-shared_proteus
+        - cmake-shared_proteus
+        - cmake-shared_libs-static_proteus
+        - cmake-static_proteus
+        - make-static_proteus
+        - make-shared_proteus
+        - cmake-proteusCore
+        - cmake-shared_lib_and_exe-static_proteus
+        - cmake-proteusFrontend
+        - cmake-clang_plugin-proteusFrontend
+        - cmake-proteusFrontend-gcc
+        - cmake-link_llvm-shared_proteus
+        - mpi-shared-cache
+
+test-integration-matrix:
+  extends: [.base-job, .variants]

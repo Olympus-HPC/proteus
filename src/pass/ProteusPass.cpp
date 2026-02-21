@@ -142,6 +142,10 @@ public:
       emitJitLaunchKernelCall(M);
     }
 
+    // Initialize Proteus CUDA runtime builtins if this is a CUDA module.
+    if (isCUDAModule(M))
+      emitProteusCUDARuntimeBuiltinsInit(M);
+
     for (auto &JFI : JitFunctionInfoMap) {
       Function *JITFn = JFI.first;
       DEBUG(Logger::logs("proteus-pass")
@@ -1374,6 +1378,22 @@ private:
         CB->setArgOperand(1, LambdaNameGlobal);
       }
     }
+  }
+
+  // Detect a CUDA module by the presence of the __cuda_register_globals
+  // function.
+  bool isCUDAModule(Module &M) {
+    return M.getFunction("__cuda_register_globals") != nullptr;
+  }
+
+  // Add a call to __proteus_cudart_builtins_init to the global constructors of
+  // the module to initialize the Proteus CUDA runtime builtins.
+  void emitProteusCUDARuntimeBuiltinsInit(Module &M) {
+    FunctionCallee InitFn =
+        M.getOrInsertFunction("__proteus_cudart_builtins_init",
+                              FunctionType::get(Types.VoidTy, false));
+
+    appendToGlobalCtors(M, cast<Function>(InitFn.getCallee()), 65535);
   }
 };
 
