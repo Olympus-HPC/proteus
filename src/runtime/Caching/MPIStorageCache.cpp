@@ -30,8 +30,21 @@ namespace proteus {
 
 using namespace llvm;
 
+/// Weak pointer used by the MPI_COMM_SELF cleanup callback.
+/// The callback stores a raw pointer to the MPIStorageCache, but the
+/// cache may be destroyed before MPI_Finalize() runs (Laghos destruction
+/// order). To avoid a dangling-pointer dereference we add a layer of
+/// indirection: the attribute points to a shared control block, and the
+/// destructor nulls the pointer inside it.
+struct MPICleanupControl {
+  MPIStorageCache *Cache;
+};
+
 static int mpiCleanupCallback(MPI_Comm, int, void *Attr, void *) {
-  static_cast<MPIStorageCache *>(Attr)->finalize();
+  auto *Ctrl = static_cast<MPICleanupControl *>(Attr);
+  if (Ctrl->Cache)
+    Ctrl->Cache->finalize();
+  delete Ctrl;
   return MPI_SUCCESS;
 }
 
@@ -42,25 +55,32 @@ MPIStorageCache::MPIStorageCache(const std::string &Label)
       Label(Label) {
   std::filesystem::create_directories(StorageDirectory);
 
-  proteusMpiCheck(MPI_Comm_create_keyval(
-      MPI_COMM_NULL_COPY_FN, mpiCleanupCallback, &AttrKeyval, nullptr));
-  proteusMpiCheck(MPI_Comm_set_attr(MPI_COMM_SELF, AttrKeyval, this));
+  CleanupCtrl = new MPICleanupControl{this};
+  int Keyval = MPI_KEYVAL_INVALID;
+  proteusMpiCheck(MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN,
+                                         mpiCleanupCallback, &Keyval, nullptr));
+  proteusMpiCheck(MPI_Comm_set_attr(MPI_COMM_SELF, Keyval, CleanupCtrl));
+  proteusMpiCheck(MPI_Comm_free_keyval(&Keyval));
 }
 
-MPIStorageCache::~MPIStorageCache() = default;
+MPIStorageCache::~MPIStorageCache() {
+  // Only null out the callback if finalize() didn't run.
+  // If finalize() ran directly (Path A), it already nulled Cache.
+  // If finalize() ran from the callback (Path B), CleanupCtrl was
+  // deleted by the callback — we must not dereference it.
+  if (!Finalized && CleanupCtrl)
+    CleanupCtrl->Cache = nullptr;
+}
 
 void MPIStorageCache::finalize() {
   if (Finalized)
     return;
+  Finalized = true;
 
   int MPIFinalized = 0;
   proteusMpiCheck(MPI_Finalized(&MPIFinalized));
   if (MPIFinalized) {
-    // MPI is gone — nothing we can do. This can happen if
-    // ~JitEngineDevice() runs after MPI_Finalize() and the
-    // MPI_COMM_SELF callback did not fire (should not occur, but
-    // guard defensively).
-    Finalized = true;
+    // MPI is gone — nothing we can do.
     return;
   }
 
@@ -83,19 +103,13 @@ void MPIStorageCache::finalize() {
 
   CommThread.join();
 
+  // Disable the MPI_COMM_SELF callback so it becomes a no-op when it
+  // fires during MPI_Finalize.  Must happen while CleanupCtrl is still
+  // valid (i.e. before the callback deletes it).
+  if (CleanupCtrl)
+    CleanupCtrl->Cache = nullptr;
+
   CommHandle.free();
-
-  // Mark finalized BEFORE deregistering the callback. MPI_Comm_delete_attr
-  // triggers the delete callback, so Finalized must already be true to
-  // prevent re-entrant finalize().
-  Finalized = true;
-
-  // Deregister the MPI_COMM_SELF callback so it does not fire on a
-  // dangling pointer if this object is destroyed before MPI_Finalize().
-  if (AttrKeyval != MPI_KEYVAL_INVALID) {
-    MPI_Comm_delete_attr(MPI_COMM_SELF, AttrKeyval);
-    MPI_Comm_free_keyval(&AttrKeyval);
-  }
 }
 
 void MPIStorageCache::store(const HashT &HashValue, const CacheEntry &Entry) {
