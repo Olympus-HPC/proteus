@@ -62,6 +62,7 @@ private:
   void completeAllPendingSends();
 
   bool Finalized = false;
+  struct MPICleanupControl *CleanupCtrl = nullptr;
   std::vector<std::unique_ptr<PendingSend>> PendingSends;
 };
 

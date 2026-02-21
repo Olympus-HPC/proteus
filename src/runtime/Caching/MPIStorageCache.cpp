@@ -30,8 +30,21 @@ namespace proteus {
 
 using namespace llvm;
 
+/// Weak pointer used by the MPI_COMM_SELF cleanup callback.
+/// The callback stores a raw pointer to the MPIStorageCache, but the
+/// cache may be destroyed before MPI_Finalize() runs (Laghos destruction
+/// order). To avoid a dangling-pointer dereference we add a layer of
+/// indirection: the attribute points to a shared control block, and the
+/// destructor nulls the pointer inside it.
+struct MPICleanupControl {
+  MPIStorageCache *Cache;
+};
+
 static int mpiCleanupCallback(MPI_Comm, int, void *Attr, void *) {
-  static_cast<MPIStorageCache *>(Attr)->finalize();
+  auto *Ctrl = static_cast<MPICleanupControl *>(Attr);
+  if (Ctrl->Cache)
+    Ctrl->Cache->finalize();
+  delete Ctrl;
   return MPI_SUCCESS;
 }
 
@@ -42,25 +55,33 @@ MPIStorageCache::MPIStorageCache(const std::string &Label)
       Label(Label) {
   std::filesystem::create_directories(StorageDirectory);
 
+  CleanupCtrl = new MPICleanupControl{this};
   int Keyval = MPI_KEYVAL_INVALID;
-  MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN, mpiCleanupCallback, &Keyval,
-                         nullptr);
-  MPI_Comm_set_attr(MPI_COMM_SELF, Keyval, this);
-  MPI_Comm_free_keyval(&Keyval);
+  proteusMpiCheck(MPI_Comm_create_keyval(MPI_COMM_NULL_COPY_FN,
+                                         mpiCleanupCallback, &Keyval, nullptr));
+  proteusMpiCheck(MPI_Comm_set_attr(MPI_COMM_SELF, Keyval, CleanupCtrl));
+  proteusMpiCheck(MPI_Comm_free_keyval(&Keyval));
 }
 
-MPIStorageCache::~MPIStorageCache() = default;
+MPIStorageCache::~MPIStorageCache() {
+  // Only null out the callback if finalize() didn't run.
+  // If finalize() ran directly (Path A), it already nulled Cache.
+  // If finalize() ran from the callback (Path B), CleanupCtrl was
+  // deleted by the callback — we must not dereference it.
+  if (!Finalized && CleanupCtrl)
+    CleanupCtrl->Cache = nullptr;
+}
 
 void MPIStorageCache::finalize() {
   if (Finalized)
     return;
+  Finalized = true;
 
   int MPIFinalized = 0;
-  MPI_Finalized(&MPIFinalized);
+  proteusMpiCheck(MPI_Finalized(&MPIFinalized));
   if (MPIFinalized) {
-    reportFatalError("[" + getName() +
-                     "] MPI already finalized before cache finalized. This "
-                     "should never happen");
+    // MPI is gone — nothing we can do.
+    return;
   }
 
   if (Config::get().traceSpecializations()) {
@@ -77,13 +98,18 @@ void MPIStorageCache::finalize() {
 
   // Only non-zero ranks send shutdown to the comm thread of rank 0.
   if (Rank != 0)
-    MPI_Ssend(nullptr, 0, MPI_BYTE, 0, static_cast<int>(MPITag::Shutdown),
-              Comm);
+    proteusMpiCheck(MPI_Ssend(nullptr, 0, MPI_BYTE, 0,
+                              static_cast<int>(MPITag::Shutdown), Comm));
 
   CommThread.join();
 
+  // Disable the MPI_COMM_SELF callback so it becomes a no-op when it
+  // fires during MPI_Finalize.  Must happen while CleanupCtrl is still
+  // valid (i.e. before the callback deletes it).
+  if (CleanupCtrl)
+    CleanupCtrl->Cache = nullptr;
+
   CommHandle.free();
-  Finalized = true;
 }
 
 void MPIStorageCache::store(const HashT &HashValue, const CacheEntry &Entry) {
@@ -117,13 +143,10 @@ void MPIStorageCache::forwardToWriter(const HashT &HashValue,
   }
 
   MPI_Comm Comm = CommHandle.get();
-  int Err = MPI_Isend(Pending->Buffer.data(),
-                      static_cast<int>(Pending->Buffer.size()), MPI_BYTE,
-                      /*dest=*/0, static_cast<int>(MPITag::Store), Comm,
-                      &Pending->Request);
-  if (Err != MPI_SUCCESS) {
-    reportFatalError("MPI_Isend failed with error code " + std::to_string(Err));
-  }
+  proteusMpiCheck(MPI_Isend(Pending->Buffer.data(),
+                            static_cast<int>(Pending->Buffer.size()), MPI_BYTE,
+                            /*dest=*/0, static_cast<int>(MPITag::Store), Comm,
+                            &Pending->Request));
 
   PendingSends.push_back(std::move(Pending));
   pollPendingSends();
@@ -135,7 +158,7 @@ void MPIStorageCache::pollPendingSends() {
 
   auto IsDone = [](const std::unique_ptr<PendingSend> &Pending) {
     int Done = 0;
-    MPI_Test(&Pending->Request, &Done, MPI_STATUS_IGNORE);
+    proteusMpiCheck(MPI_Test(&Pending->Request, &Done, MPI_STATUS_IGNORE));
     return Done != 0;
   };
 
@@ -146,7 +169,7 @@ void MPIStorageCache::pollPendingSends() {
 
 void MPIStorageCache::completeAllPendingSends() {
   for (auto &Pending : PendingSends) {
-    MPI_Wait(&Pending->Request, MPI_STATUS_IGNORE);
+    proteusMpiCheck(MPI_Wait(&Pending->Request, MPI_STATUS_IGNORE));
   }
   PendingSends.clear();
 }
@@ -169,7 +192,7 @@ void MPIStorageCache::communicationThreadMain() {
   try {
     while (true) {
       MPI_Status Status;
-      MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, Comm, &Status);
+      proteusMpiCheck(MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, Comm, &Status));
       if (Status.MPI_SOURCE == 0)
         reportFatalError("Rank 0 should not receive messages on its own "
                          "communication thread.");
@@ -177,8 +200,9 @@ void MPIStorageCache::communicationThreadMain() {
       auto Tag = static_cast<MPITag>(Status.MPI_TAG);
 
       if (Tag == MPITag::Shutdown) {
-        MPI_Recv(nullptr, 0, MPI_BYTE, Status.MPI_SOURCE,
-                 static_cast<int>(MPITag::Shutdown), Comm, MPI_STATUS_IGNORE);
+        proteusMpiCheck(MPI_Recv(nullptr, 0, MPI_BYTE, Status.MPI_SOURCE,
+                                 static_cast<int>(MPITag::Shutdown), Comm,
+                                 MPI_STATUS_IGNORE));
         ShutdownCount++;
         // Check all other ranks have sent shutdown to exit.
         if (ShutdownCount >= (Size - 1))
@@ -210,11 +234,12 @@ void MPIStorageCache::handleMessage(MPI_Status &Status, MPITag Tag) {
 void MPIStorageCache::handleStoreMessage(MPI_Status &Status) {
   MPI_Comm Comm = CommHandle.get();
   int MsgSize = 0;
-  MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
+  proteusMpiCheck(MPI_Get_count(&Status, MPI_BYTE, &MsgSize));
 
   std::vector<char> Buffer(MsgSize);
-  MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE,
-           static_cast<int>(MPITag::Store), Comm, MPI_STATUS_IGNORE);
+  proteusMpiCheck(MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, Status.MPI_SOURCE,
+                           static_cast<int>(MPITag::Store), Comm,
+                           MPI_STATUS_IGNORE));
 
   auto Msg = unpackStoreMessage(Comm, Buffer);
   saveToDisk(Msg.Hash, Msg.Data.data(), Msg.Data.size(), Msg.IsDynLib);

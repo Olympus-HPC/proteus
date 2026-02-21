@@ -51,17 +51,20 @@ MPIRemoteLookupCache::lookupRemote(const HashT &HashValue) {
   MPI_Comm Comm = CommHandle.get();
 
   auto ReqBuf = packLookupRequest(HashValue);
-  MPI_Send(ReqBuf.data(), static_cast<int>(ReqBuf.size()), MPI_BYTE, 0,
-           static_cast<int>(MPITag::LookupRequest), Comm);
+  proteusMpiCheck(MPI_Send(ReqBuf.data(), static_cast<int>(ReqBuf.size()),
+                           MPI_BYTE, 0, static_cast<int>(MPITag::LookupRequest),
+                           Comm));
 
   MPI_Status Status;
-  MPI_Probe(0, static_cast<int>(MPITag::LookupResponse), Comm, &Status);
+  proteusMpiCheck(
+      MPI_Probe(0, static_cast<int>(MPITag::LookupResponse), Comm, &Status));
 
   int RespSize = 0;
-  MPI_Get_count(&Status, MPI_BYTE, &RespSize);
+  proteusMpiCheck(MPI_Get_count(&Status, MPI_BYTE, &RespSize));
   std::vector<char> RespBuf(RespSize);
-  MPI_Recv(RespBuf.data(), RespSize, MPI_BYTE, 0,
-           static_cast<int>(MPITag::LookupResponse), Comm, MPI_STATUS_IGNORE);
+  proteusMpiCheck(MPI_Recv(RespBuf.data(), RespSize, MPI_BYTE, 0,
+                           static_cast<int>(MPITag::LookupResponse), Comm,
+                           MPI_STATUS_IGNORE));
 
   auto Resp = unpackLookupResponse(RespBuf);
 
@@ -93,10 +96,11 @@ void MPIRemoteLookupCache::handleLookupRequest(MPI_Status &Status) {
   int SourceRank = Status.MPI_SOURCE;
 
   int MsgSize = 0;
-  MPI_Get_count(&Status, MPI_BYTE, &MsgSize);
+  proteusMpiCheck(MPI_Get_count(&Status, MPI_BYTE, &MsgSize));
   std::vector<char> Buffer(MsgSize);
-  MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, SourceRank,
-           static_cast<int>(MPITag::LookupRequest), Comm, MPI_STATUS_IGNORE);
+  proteusMpiCheck(MPI_Recv(Buffer.data(), MsgSize, MPI_BYTE, SourceRank,
+                           static_cast<int>(MPITag::LookupRequest), Comm,
+                           MPI_STATUS_IGNORE));
 
   auto Req = unpackLookupRequest(Buffer);
 
@@ -124,8 +128,9 @@ void MPIRemoteLookupCache::handleLookupRequest(MPI_Status &Status) {
   }
 
   auto RespBuf = packLookupResponse(Found, IsDynLib, Data);
-  MPI_Send(RespBuf.data(), static_cast<int>(RespBuf.size()), MPI_BYTE,
-           SourceRank, static_cast<int>(MPITag::LookupResponse), Comm);
+  proteusMpiCheck(MPI_Send(RespBuf.data(), static_cast<int>(RespBuf.size()),
+                           MPI_BYTE, SourceRank,
+                           static_cast<int>(MPITag::LookupResponse), Comm));
 }
 
 std::vector<char>
@@ -135,17 +140,18 @@ MPIRemoteLookupCache::packLookupRequest(const HashT &HashValue) {
   uint32_t HashSize = static_cast<uint32_t>(HashStr.size());
 
   int HashSizeBytes, HashStrBytes;
-  MPI_Pack_size(1, MPI_UINT32_T, Comm, &HashSizeBytes);
-  MPI_Pack_size(static_cast<int>(HashSize), MPI_CHAR, Comm, &HashStrBytes);
+  proteusMpiCheck(MPI_Pack_size(1, MPI_UINT32_T, Comm, &HashSizeBytes));
+  proteusMpiCheck(
+      MPI_Pack_size(static_cast<int>(HashSize), MPI_CHAR, Comm, &HashStrBytes));
 
   int TotalSize = HashSizeBytes + HashStrBytes;
   std::vector<char> Packed(TotalSize);
   int Position = 0;
 
-  MPI_Pack(&HashSize, 1, MPI_UINT32_T, Packed.data(), TotalSize, &Position,
-           Comm);
-  MPI_Pack(HashStr.data(), static_cast<int>(HashSize), MPI_CHAR, Packed.data(),
-           TotalSize, &Position, Comm);
+  proteusMpiCheck(MPI_Pack(&HashSize, 1, MPI_UINT32_T, Packed.data(), TotalSize,
+                           &Position, Comm));
+  proteusMpiCheck(MPI_Pack(HashStr.data(), static_cast<int>(HashSize), MPI_CHAR,
+                           Packed.data(), TotalSize, &Position, Comm));
 
   return Packed;
 }
@@ -164,23 +170,25 @@ MPIRemoteLookupCache::packLookupResponse(bool Found, bool IsDynLib,
   }
 
   int FoundBytes, IsDynLibBytes, DataSizeBytes, DataBytes;
-  MPI_Pack_size(1, MPI_BYTE, Comm, &FoundBytes);
-  MPI_Pack_size(1, MPI_BYTE, Comm, &IsDynLibBytes);
-  MPI_Pack_size(1, MPI_UINT64_T, Comm, &DataSizeBytes);
-  MPI_Pack_size(static_cast<int>(DataSize), MPI_BYTE, Comm, &DataBytes);
+  proteusMpiCheck(MPI_Pack_size(1, MPI_BYTE, Comm, &FoundBytes));
+  proteusMpiCheck(MPI_Pack_size(1, MPI_BYTE, Comm, &IsDynLibBytes));
+  proteusMpiCheck(MPI_Pack_size(1, MPI_UINT64_T, Comm, &DataSizeBytes));
+  proteusMpiCheck(
+      MPI_Pack_size(static_cast<int>(DataSize), MPI_BYTE, Comm, &DataBytes));
 
   int TotalSize = FoundBytes + IsDynLibBytes + DataSizeBytes + DataBytes;
   std::vector<char> Packed(TotalSize);
   int Position = 0;
 
-  MPI_Pack(&FoundByte, 1, MPI_BYTE, Packed.data(), TotalSize, &Position, Comm);
-  MPI_Pack(&IsDynLibByte, 1, MPI_BYTE, Packed.data(), TotalSize, &Position,
-           Comm);
-  MPI_Pack(&DataSize, 1, MPI_UINT64_T, Packed.data(), TotalSize, &Position,
-           Comm);
+  proteusMpiCheck(MPI_Pack(&FoundByte, 1, MPI_BYTE, Packed.data(), TotalSize,
+                           &Position, Comm));
+  proteusMpiCheck(MPI_Pack(&IsDynLibByte, 1, MPI_BYTE, Packed.data(), TotalSize,
+                           &Position, Comm));
+  proteusMpiCheck(MPI_Pack(&DataSize, 1, MPI_UINT64_T, Packed.data(), TotalSize,
+                           &Position, Comm));
   if (!Data.empty()) {
-    MPI_Pack(Data.data(), static_cast<int>(DataSize), MPI_BYTE, Packed.data(),
-             TotalSize, &Position, Comm);
+    proteusMpiCheck(MPI_Pack(Data.data(), static_cast<int>(DataSize), MPI_BYTE,
+                             Packed.data(), TotalSize, &Position, Comm));
   }
 
   return Packed;
@@ -193,12 +201,13 @@ MPIRemoteLookupCache::unpackLookupRequest(const std::vector<char> &Buffer) {
   int TotalSize = static_cast<int>(Buffer.size());
 
   uint32_t HashSize = 0;
-  MPI_Unpack(Buffer.data(), TotalSize, &Position, &HashSize, 1, MPI_UINT32_T,
-             Comm);
+  proteusMpiCheck(MPI_Unpack(Buffer.data(), TotalSize, &Position, &HashSize, 1,
+                             MPI_UINT32_T, Comm));
 
   std::string HashStr(HashSize, '\0');
-  MPI_Unpack(Buffer.data(), TotalSize, &Position, HashStr.data(),
-             static_cast<int>(HashSize), MPI_CHAR, Comm);
+  proteusMpiCheck(MPI_Unpack(Buffer.data(), TotalSize, &Position,
+                             HashStr.data(), static_cast<int>(HashSize),
+                             MPI_CHAR, Comm));
 
   return LookupRequest{HashT(StringRef(HashStr))};
 }
@@ -210,16 +219,16 @@ MPIRemoteLookupCache::unpackLookupResponse(const std::vector<char> &Buffer) {
   int TotalSize = static_cast<int>(Buffer.size());
 
   uint8_t FoundByte = 0;
-  MPI_Unpack(Buffer.data(), TotalSize, &Position, &FoundByte, 1, MPI_BYTE,
-             Comm);
+  proteusMpiCheck(MPI_Unpack(Buffer.data(), TotalSize, &Position, &FoundByte, 1,
+                             MPI_BYTE, Comm));
 
   uint8_t IsDynLibByte = 0;
-  MPI_Unpack(Buffer.data(), TotalSize, &Position, &IsDynLibByte, 1, MPI_BYTE,
-             Comm);
+  proteusMpiCheck(MPI_Unpack(Buffer.data(), TotalSize, &Position, &IsDynLibByte,
+                             1, MPI_BYTE, Comm));
 
   uint64_t DataSize = 0;
-  MPI_Unpack(Buffer.data(), TotalSize, &Position, &DataSize, 1, MPI_UINT64_T,
-             Comm);
+  proteusMpiCheck(MPI_Unpack(Buffer.data(), TotalSize, &Position, &DataSize, 1,
+                             MPI_UINT64_T, Comm));
 
   if (DataSize > static_cast<size_t>(std::numeric_limits<int>::max())) {
     reportFatalError("Lookup response size exceeds MPI int limit: " +
@@ -228,8 +237,8 @@ MPIRemoteLookupCache::unpackLookupResponse(const std::vector<char> &Buffer) {
 
   std::vector<char> Data(DataSize);
   if (DataSize > 0) {
-    MPI_Unpack(Buffer.data(), TotalSize, &Position, Data.data(),
-               static_cast<int>(DataSize), MPI_BYTE, Comm);
+    proteusMpiCheck(MPI_Unpack(Buffer.data(), TotalSize, &Position, Data.data(),
+                               static_cast<int>(DataSize), MPI_BYTE, Comm));
   }
 
   return LookupResponse{FoundByte != 0, IsDynLibByte != 0, std::move(Data)};
