@@ -10,7 +10,7 @@ run_mpi() {
         # allocated resources.
         # USe --cpu-bind=none to disable CPU binding, which can interfere with
         # the outer srun.
-        srun --overlap --cpu-bind=none -n$np "$@"
+        srun --overlap --cpu-bind=none --gpus-per-task=1  -n$np "$@"
     else
         echo "ERROR: No supported MPI launcher found (flux or slurm)"
         exit 1
