@@ -123,13 +123,13 @@ matrix-proteus-benchmarks:
   extends: [.run-benchmarks]
 
 matrix-test-integration:
-variables:
-  CI_MACHINE: "matrix"
-  JOB_CMD:
-    value: "tests/integration/cuda/ci-test-integration.sh"
-    expand: false
-needs: [matrix-up-check]
-extends: [.test-integration]
+  variables:
+    CI_MACHINE: "matrix"
+    JOB_CMD:
+      value: "tests/integration/cuda/ci-test-integration.sh"
+      expand: false
+  needs: [matrix-up-check]
+  extends: [.test-integration]
 
 # TIOGA
 tioga-up-check:
