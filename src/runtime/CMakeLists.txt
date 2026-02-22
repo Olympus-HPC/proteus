@@ -218,9 +218,10 @@ if(BUILD_SHARED)
     target_link_options(proteus PRIVATE "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
   endif()
 else()
-  # When proteus is static and links LLVM/Clang/LLD statically, propagate
+  # When proteus is static and links other libraries statically, propagate
   # --exclude-libs for those specific archives so that consuming shared
-  # libraries don't export duplicate LLVM global state.
+  # libraries don't export duplicate global state from those libraries.
+  # Possible static library deps: LLVM, Clang, LLD, nvptxcompiler.
   if(UNIX AND NOT APPLE)
     set(_exclude_archives "")
 
@@ -240,6 +241,11 @@ else()
       foreach(lib ${lld_libs})
         list(APPEND _exclude_archives "lib${lib}.a")
       endforeach()
+    endif()
+
+    if(PROTEUS_ENABLE_CUDA)
+      get_filename_component(_nvptxcompiler_name ${LIBNVPTXCOMPILER} NAME)
+      list(APPEND _exclude_archives ${_nvptxcompiler_name})
     endif()
 
     if(_exclude_archives)
