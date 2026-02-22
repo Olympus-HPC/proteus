@@ -5,10 +5,10 @@ set -e
 run_mpi() {
     local np=$1
     shift
-    if [[ -n "$SLURM_JOB_ID" ]] || command -v srun &>/dev/null; then
-        srun -n$np "$@"
+    if command -v flux &>/dev/null; then
+        flux run -n$np "$@"
     else
-        echo "ERROR: No supported MPI launcher found (flux or slurm)"
+        echo "ERROR: flux MPI launcher not found"
         exit 1
     fi
 }
@@ -38,6 +38,16 @@ cmake -S ${TEST_DIR} -B build \
 pushd build
 make -j
 popd
+
+# We cannot nest an srun inside this script because it will hang as resources
+# are allready occupied by the outer srun. Starting a flux instance allows us to
+# use flux run to launch the test without nesting.
+if command -v flux &>/dev/null; then
+    flux start
+    echo "Started flux instance with ID: ${FLUX_INSTANCE_ID}"
+else
+    echo "flux not found"
+fi
 
 # Run the MPI shared cache test with mpi-local-lookup backend.
 CACHE_DIR=$(mktemp -d)
