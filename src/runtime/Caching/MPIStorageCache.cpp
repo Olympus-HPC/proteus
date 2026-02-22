@@ -55,6 +55,7 @@ void MPIStorageCache::finalize() {
     return;
 
   int MPIFinalized = 0;
+
   MPI_Finalized(&MPIFinalized);
   if (MPIFinalized) {
     reportFatalError("[" + getName() +
