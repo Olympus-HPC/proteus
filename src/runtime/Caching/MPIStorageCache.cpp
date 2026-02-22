@@ -21,7 +21,6 @@
 
 #include <mpi.h>
 
-#include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <limits>
@@ -65,15 +64,11 @@ void MPIStorageCache::finalize() {
 
   if (Config::get().traceSpecializations()) {
     Logger::trace("[" + getName() + ":" + Label + "] Rank " +
-                  std::to_string(CommHandle.getRank()) +
-                  " flushing, PendingSends=" +
-                  std::to_string(PendingSends.size()) + "\n");
+                  std::to_string(CommHandle.getRank()) + " flushing\n");
   }
 
   MPI_Comm Comm = CommHandle.get();
   int Rank = CommHandle.getRank();
-
-  completeAllPendingSends();
 
   // Only non-zero ranks send shutdown to the comm thread of rank 0.
   if (Rank != 0)
@@ -107,48 +102,19 @@ void MPIStorageCache::startCommThread() {
 
 void MPIStorageCache::forwardToWriter(const HashT &HashValue,
                                       const CacheEntry &Entry) {
-  auto Pending = std::make_unique<PendingSend>();
-  Pending->Buffer = packStoreMessage(CommHandle.get(), HashValue, Entry);
+  auto Buffer = packStoreMessage(CommHandle.get(), HashValue, Entry);
 
-  if (Pending->Buffer.size() >
-      static_cast<size_t>(std::numeric_limits<int>::max())) {
+  if (Buffer.size() > static_cast<size_t>(std::numeric_limits<int>::max())) {
     reportFatalError("MPI message size exceeds INT_MAX: " +
-                     std::to_string(Pending->Buffer.size()) + " bytes");
+                     std::to_string(Buffer.size()) + " bytes");
   }
 
   MPI_Comm Comm = CommHandle.get();
-  int Err = MPI_Isend(Pending->Buffer.data(),
-                      static_cast<int>(Pending->Buffer.size()), MPI_BYTE,
-                      /*dest=*/0, static_cast<int>(MPITag::Store), Comm,
-                      &Pending->Request);
+  int Err = MPI_Send(Buffer.data(), static_cast<int>(Buffer.size()), MPI_BYTE,
+                     /*dest=*/0, static_cast<int>(MPITag::Store), Comm);
   if (Err != MPI_SUCCESS) {
-    reportFatalError("MPI_Isend failed with error code " + std::to_string(Err));
+    reportFatalError("MPI_Send failed with error code " + std::to_string(Err));
   }
-
-  PendingSends.push_back(std::move(Pending));
-  pollPendingSends();
-}
-
-void MPIStorageCache::pollPendingSends() {
-  if (PendingSends.empty())
-    return;
-
-  auto IsDone = [](const std::unique_ptr<PendingSend> &Pending) {
-    int Done = 0;
-    MPI_Test(&Pending->Request, &Done, MPI_STATUS_IGNORE);
-    return Done != 0;
-  };
-
-  PendingSends.erase(
-      std::remove_if(PendingSends.begin(), PendingSends.end(), IsDone),
-      PendingSends.end());
-}
-
-void MPIStorageCache::completeAllPendingSends() {
-  for (auto &Pending : PendingSends) {
-    MPI_Wait(&Pending->Request, MPI_STATUS_IGNORE);
-  }
-  PendingSends.clear();
 }
 
 void MPIStorageCache::communicationThreadMain() {

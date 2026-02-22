@@ -7,9 +7,9 @@
 //===----------------------------------------------------------------------===//
 //
 // Base class for MPI-based storage caches. Provides shared infrastructure for
-// store forwarding, disk persistence, pending-send management, and
-// communication thread lifecycle. Subclasses implement lookup() and optionally
-// override handleMessage() to handle additional message types.
+// store forwarding, disk persistence, and communication thread lifecycle.
+// Subclasses implement lookup() and optionally override handleMessage() to
+// handle additional message types.
 //
 //===----------------------------------------------------------------------===//
 
@@ -24,7 +24,6 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <vector>
 
 namespace proteus {
 
@@ -58,11 +57,8 @@ protected:
 private:
   void communicationThreadMain();
   void handleStoreMessage(MPI_Status &Status);
-  void pollPendingSends();
-  void completeAllPendingSends();
 
   bool Finalized = false;
-  std::vector<std::unique_ptr<PendingSend>> PendingSends;
 };
 
 } // namespace proteus
