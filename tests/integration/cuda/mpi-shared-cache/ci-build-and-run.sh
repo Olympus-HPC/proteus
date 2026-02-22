@@ -6,8 +6,11 @@ run_mpi() {
     local np=$1
     shift
     if [[ -n "$SLURM_JOB_ID" ]] || command -v srun &>/dev/null; then
-        # Use --overlap to allow srun to run nested within the CI job's allocated resources.
-        srun --overlap -n$np "$@"
+        # Use --overlap to allow srun to run nested within the CI job's
+        # allocated resources.
+        # USe --cpu-bind=none to disable CPU binding, which can interfere with
+        # the outer srun.
+        srun --overlap --cpu-bind=none -n$np "$@"
     else
         echo "ERROR: No supported MPI launcher found (flux or slurm)"
         exit 1
