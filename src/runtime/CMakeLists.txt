@@ -211,10 +211,43 @@ target_compile_definitions(proteus PRIVATE PROTEUS_CLANGXX_BIN="${CLANGXX}")
 find_package(Threads REQUIRED)
 target_link_libraries(proteus PRIVATE Threads::Threads)
 
+if(BUILD_SHARED)
 # Use a version script to hide internal symbols, especially from LLVM static
-# libraries, on Linux.
-if(UNIX AND NOT APPLE)
-  target_link_options(proteus PRIVATE "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
+# libraries, on Linux. Only effective for shared proteus builds.
+  if(UNIX AND NOT APPLE)
+    target_link_options(proteus PRIVATE "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
+  endif()
+else()
+  # When proteus is static and links LLVM/Clang/LLD statically, propagate
+  # --exclude-libs for those specific archives so that consuming shared
+  # libraries don't export duplicate LLVM global state.
+  if(UNIX AND NOT APPLE)
+    set(_exclude_archives "")
+
+    if(NOT LLVM_LINK_LLVM_DYLIB)
+      foreach(lib ${llvm_libs})
+        list(APPEND _exclude_archives "lib${lib}.a")
+      endforeach()
+    endif()
+
+    if(NOT CLANG_LINK_CLANG_DYLIB)
+      foreach(lib ${clang_libs})
+        list(APPEND _exclude_archives "lib${lib}.a")
+      endforeach()
+    endif()
+
+    if(PROTEUS_ENABLE_HIP)
+      foreach(lib ${lld_libs})
+        list(APPEND _exclude_archives "lib${lib}.a")
+      endforeach()
+    endif()
+
+    if(_exclude_archives)
+      list(JOIN _exclude_archives ":" _exclude_libs_str)
+      target_link_options(proteus INTERFACE
+        "-Wl,--exclude-libs,${_exclude_libs_str}")
+    endif()
+  endif()
 endif()
 
 target_link_libraries(proteusFrontend INTERFACE proteus "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
