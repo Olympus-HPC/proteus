@@ -4,12 +4,8 @@ set -e
 
 echo "Run Integration Test ${PROTEUS_CI_INTEGRATION_TEST}"
 
-# Use pre-install LLVM 20 in matrix.
+# Use pre-installed LLVM 20 on matrix.
 export LLVM_INSTALL_DIR=/usr/lib64/llvm20
-if [ -z "${LLVM_INSTALL_DIR}" ]; then
-    echo "Expected non-empty LLVM_INSTALL_DIR env var"
-    exit 1
-fi
 echo "LLVM_INSTALL_DIR ${LLVM_INSTALL_DIR}"
 
 # Load cuda module.
