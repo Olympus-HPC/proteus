@@ -17,5 +17,3 @@ add_proteus(main)
 
 install(TARGETS main)
 set_property(TARGET main PROPERTY CUDA_RUNTIME_LIBRARY Static)
-
-#message(FATAL_ERROR "Configured target 'main' with libproteus")
