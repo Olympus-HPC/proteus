@@ -28,7 +28,6 @@ enum class MPITag : int {
   Store = 1,
   LookupRequest = 2,
   LookupResponse = 3,
-  Shutdown = 4
 };
 
 void validateMPIConfig();
@@ -78,12 +77,6 @@ private:
   MPI_Comm Comm = MPI_COMM_NULL;
   int Rank = -1;
   int Size = -1;
-};
-
-/// Tracks an asynchronous MPI send operation.
-struct PendingSend {
-  std::vector<char> Buffer;
-  MPI_Request Request;
 };
 
 /// Wire-format message for store operations: [HashSize, HashStr, IsDynLib,

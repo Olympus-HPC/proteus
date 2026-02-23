@@ -70,15 +70,10 @@ void MPIStorageCache::finalize() {
                   std::to_string(CommHandle.getRank()) + " flushing\n");
   }
 
-  MPI_Comm Comm = CommHandle.get();
-  int Rank = CommHandle.getRank();
-
-  // Only non-zero ranks send shutdown to the comm thread of rank 0.
-  if (Rank != 0)
-    MPI_Ssend(nullptr, 0, MPI_BYTE, 0, static_cast<int>(MPITag::Shutdown),
-              Comm);
-
-  CommThread.join();
+  if (CommHandle.getRank() == 0) {
+    ShutdownRequested.store(true);
+    CommThread.join();
+  }
 
   CommHandle.free();
   Finalized = true;
@@ -133,8 +128,6 @@ void MPIStorageCache::communicationThreadMain() {
   if (Size <= 1)
     return;
 
-  int ShutdownCount = 0;
-
   try {
     while (true) {
       MPI_Status Status;
@@ -142,27 +135,14 @@ void MPIStorageCache::communicationThreadMain() {
       MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, Comm, &Flag, &Status);
 
       if (!Flag) {
+        if (ShutdownRequested.load())
+          break;
         std::this_thread::sleep_for(
             std::chrono::milliseconds(Config::get().ProteusCommThreadPollMs));
         continue;
       }
 
-      if (Status.MPI_SOURCE == 0)
-        reportFatalError("Rank 0 should not receive messages on its own "
-                         "communication thread.");
-
-      auto Tag = static_cast<MPITag>(Status.MPI_TAG);
-
-      if (Tag == MPITag::Shutdown) {
-        MPI_Recv(nullptr, 0, MPI_BYTE, Status.MPI_SOURCE,
-                 static_cast<int>(MPITag::Shutdown), Comm, MPI_STATUS_IGNORE);
-        ShutdownCount++;
-        // Check all other ranks have sent shutdown to exit.
-        if (ShutdownCount >= (Size - 1))
-          break;
-      } else {
-        handleMessage(Status, Tag);
-      }
+      handleMessage(Status, static_cast<MPITag>(Status.MPI_TAG));
     }
   } catch (const std::exception &E) {
     reportFatalError(

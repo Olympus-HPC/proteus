@@ -21,6 +21,7 @@
 #include "proteus/impl/CompiledLibrary.h"
 #include "proteus/impl/Hashing.h"
 
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -58,6 +59,7 @@ private:
   void communicationThreadMain();
   void handleStoreMessage(MPI_Status &Status);
 
+  std::atomic<bool> ShutdownRequested{false};
   bool Finalized = false;
 };
 
