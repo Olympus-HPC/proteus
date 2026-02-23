@@ -29,8 +29,8 @@ inline void *resolveDeviceGlobalAddr(const void *Addr) {
     return DevPtr;
   }
 
-  reportFatalError(
-      "No implementation for __proteus_builtin_get_symbol_address");
+  reportFatalError("__proteus_cudaGetSymbolAddress_ptr is not initialized. "
+                   "Ensure the CUDA runtime is properly linked.");
 }
 
 inline cudaError_t launchKernelDirect(void *KernelFunc, dim3 GridDim,
@@ -41,7 +41,8 @@ inline cudaError_t launchKernelDirect(void *KernelFunc, dim3 GridDim,
                                           KernelArgs, ShmemSize, Stream);
   }
 
-  reportFatalError("No implementation for __proteus_builtin_launch_kernel");
+  reportFatalError("__proteus_cudaLaunchKernel_ptr is not initialized. Ensure "
+                   "the CUDA runtime is properly linked.");
 }
 
 inline CUfunction getKernelFunctionFromImage(

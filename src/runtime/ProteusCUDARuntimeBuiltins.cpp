@@ -20,7 +20,7 @@ static cudaError_t checkCudaGetSymbolAddress(void **DevPtr,
 }
 
 extern "C" {
-// External funciton pointers for the CUDA runtime symbols used by the Proteus
+// External function pointers for the CUDA runtime symbols used by the Proteus
 // CUDA runtime.
 extern cudaError_t (*__proteus_cudaGetSymbolAddress_ptr)(void **, const void *);
 extern cudaError_t (*__proteus_cudaLaunchKernel_ptr)(const void *, dim3, dim3,
