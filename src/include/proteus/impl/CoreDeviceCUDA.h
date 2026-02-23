@@ -14,12 +14,14 @@ namespace proteus {
 extern "C" {
 // Definitions for function pointers to CUDA APIs that we will resolve at
 // runtime using builtins.
+// NOLINTBEGIN(readability-identifier-naming)
 inline cudaError_t (*__proteus_cudaGetSymbolAddress_ptr)(
     void **, const void *) = nullptr;
 inline cudaError_t (*__proteus_cudaLaunchKernel_ptr)(const void *, dim3, dim3,
                                                      void **, size_t,
                                                      cudaStream_t) = nullptr;
 }
+// NOLINTEND(readability-identifier-naming)
 
 inline void *resolveDeviceGlobalAddr(const void *Addr) {
   void *DevPtr = nullptr;
