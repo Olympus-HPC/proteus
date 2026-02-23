@@ -9,6 +9,6 @@ find_package(MPI REQUIRED)
 add_executable(mpi_shared_cache mpi_shared_cache.cpp)
 set_source_files_properties(mpi_shared_cache.cpp PROPERTIES LANGUAGE CUDA)
 target_link_libraries(mpi_shared_cache PRIVATE MPI::MPI_CXX)
-target_compile_definitions(mpi_shared_cache PRIVATE PROTEUS_ENABLE_HIP=1)
+target_compile_definitions(mpi_shared_cache PRIVATE PROTEUS_ENABLE_CUDA=1)
 
 add_proteus(mpi_shared_cache)
