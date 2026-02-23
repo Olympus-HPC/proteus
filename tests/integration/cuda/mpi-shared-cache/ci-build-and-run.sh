@@ -6,11 +6,17 @@ run_mpi() {
     local np=$1
     shift
     if [[ -n "$SLURM_JOB_ID" ]] || command -v srun &>/dev/null; then
-        # Use --overlap to allow srun to run nested within the CI job's
-        # allocated resources.
-        # Use --cpu-bind=none to disable CPU binding, which can interfere with
-        # the outer srun.
-        srun --overlap --cpu-bind=none --export=ALL,CUDA_VISIBLE_DEVICES=0 -n$np "$@"
+        # Nested srun within the CI job's outer srun allocation:
+        #   --overlap    : allow nested step to share the parent step's resources
+        #   --cpu-bind=none : disable CPU binding to avoid conflicts with the
+        #                     outer step's CPU cgroup constraints
+        #   env CUDA_VISIBLE_DEVICES=0 : force GPU visibility after srun step
+        #                     setup, because Slurm's GPU binding logic re-derives
+        #                     CUDA_VISIBLE_DEVICES from the job-level allocation
+        #                     during step initialization, overwriting any value
+        #                     set via --export
+        srun --overlap --cpu-bind=none -n$np env CUDA_VISIBLE_DEVICES=0 "$@"
+
     else
         echo "ERROR: No supported MPI launcher found (flux or slurm)"
         exit 1
