@@ -1,6 +1,3 @@
-# NOTE: For CUDA, the proteus library must be built as a static library to
-# prevent symbol resolution issues with cudaGetSymbolAddress when linking device
-# globals in the target application.
 set(SOURCES
   CompilerInterfaceHost.cpp
   CompilerInterfaceRuntimeConstantInfo.cpp
@@ -49,27 +46,16 @@ if(PROTEUS_ENABLE_MPI)
   )
 endif()
 
-add_library(proteus STATIC ${SOURCES})
-set(PROTEUS_TARGETS proteus)
-
 if(BUILD_SHARED)
-  if(PROTEUS_ENABLE_CUDA)
-    message(FATAL_ERROR "For CUDA, using libproteus as SHARED fails for device globals")
-  endif()
-
-  add_library(proteus_shared SHARED ${SOURCES})
-  set_target_properties(proteus_shared PROPERTIES OUTPUT_NAME proteus)
-  list(APPEND PROTEUS_TARGETS proteus_shared)
+  add_library(proteus SHARED ${SOURCES})
+else()
+  add_library(proteus STATIC ${SOURCES})
 endif()
 
 add_library(proteusCore INTERFACE)
 add_library(proteusFrontend INTERFACE)
 
-foreach(proteus_target ${PROTEUS_TARGETS})
-  target_compile_definitions(${proteus_target} PRIVATE ${LLVM_DEFINITIONS})
-endforeach()
-target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
-
+target_compile_definitions(proteus PRIVATE ${LLVM_DEFINITIONS})
 target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
 
 if(PROTEUS_ENABLE_MPI)
@@ -78,35 +64,25 @@ if(PROTEUS_ENABLE_MPI)
 endif()
 
 if(PROTEUS_ENABLE_HIP)
-  foreach(proteus_target ${PROTEUS_TARGETS})
-    target_compile_definitions(${proteus_target} PUBLIC PROTEUS_ENABLE_HIP)
-  endforeach()
+  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_HIP)
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_HIP)
 elseif(PROTEUS_ENABLE_CUDA)
-  foreach(proteus_target ${PROTEUS_TARGETS})
-    target_compile_definitions(${proteus_target} PUBLIC PROTEUS_ENABLE_CUDA)
-    target_compile_definitions(${proteus_target} PRIVATE LIBDEVICE_BC_PATH="${LIBDEVICE_BC_FILE}")
-    target_compile_definitions(${proteus_target} PRIVATE PROTEUS_CUDA_LIBDIR="${CUDAToolkit_LIBRARY_DIR}")
-  endforeach()
+  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_CUDA)
+  target_compile_definitions(proteus PRIVATE LIBDEVICE_BC_PATH="${LIBDEVICE_BC_FILE}")
+  target_compile_definitions(proteus PRIVATE PROTEUS_CUDA_LIBDIR="${CUDAToolkit_LIBRARY_DIR}")
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_CUDA)
 endif()
 
-foreach(proteus_target ${PROTEUS_TARGETS})
-  target_include_directories(${proteus_target}
-    SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
-endforeach()
-target_include_directories(proteusCore
-  SYSTEM INTERFACE ${LLVM_INCLUDE_DIRS})
+target_include_directories(proteus SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
+target_include_directories(proteusCore SYSTEM INTERFACE ${LLVM_INCLUDE_DIRS})
 
-foreach(proteus_target ${PROTEUS_TARGETS})
-  target_include_directories(${proteus_target}
-    PUBLIC
-    $<BUILD_INTERFACE:${PROTEUS_PROJECT_INCLUDE_DIR}>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-    PRIVATE
-    ${PROJECT_SOURCE_DIR}/src/include
-  )
-endforeach()
+target_include_directories(proteus
+  PUBLIC
+  $<BUILD_INTERFACE:${PROTEUS_PROJECT_INCLUDE_DIR}>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+  PRIVATE
+  ${PROJECT_SOURCE_DIR}/src/include
+)
 
 target_include_directories(proteusCore
   INTERFACE
@@ -140,19 +116,15 @@ else()
   )
 endif()
 message(STATUS "Found LLVM libraries: ${llvm_libs}")
-foreach(proteus_target ${PROTEUS_TARGETS})
-  target_link_libraries(${proteus_target} PRIVATE ${llvm_libs})
-endforeach()
+target_link_libraries(proteus PRIVATE ${llvm_libs})
 
 if(NOT LLVM_ENABLE_RTTI)
   target_compile_options(proteusCore INTERFACE -fno-rtti)
 endif()
 
 if(PROTEUS_ENABLE_HIP)
-  foreach(proteus_target ${PROTEUS_TARGETS})
-    target_include_directories(${proteus_target} SYSTEM PRIVATE ${hip_INCLUDE_DIRS})
-    target_link_libraries(${proteus_target} PRIVATE hip::host hiprtc::hiprtc)
-  endforeach()
+  target_include_directories(proteus SYSTEM PRIVATE ${hip_INCLUDE_DIRS})
+  target_link_libraries(proteus PRIVATE hip::host hiprtc::hiprtc)
   target_include_directories(proteusCore SYSTEM INTERFACE ${hip_INCLUDE_DIRS})
 
   # NOTE: HIP compilation (-x hip) is needed to include the HIP_SYMBOL macro,
@@ -171,12 +143,17 @@ if(PROTEUS_ENABLE_HIP)
 
   set(lld_libs lldCommon lldELF)
   message(STATUS "Found LLD libraries: ${lld_libs}")
-  foreach(proteus_target ${PROTEUS_TARGETS})
-    target_link_libraries(${proteus_target} PRIVATE ${lld_libs})
-  endforeach()
+  target_link_libraries(proteus PRIVATE ${lld_libs})
 endif()
 
 if(PROTEUS_ENABLE_CUDA)
+  add_library(proteus_cudart_builtins STATIC ProteusCUDARuntimeBuiltins.cpp)
+  # Compiling builtins needs only the headers.
+  target_include_directories(proteus_cudart_builtins PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+  set_target_properties(proteus_cudart_builtins PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+  target_link_libraries(proteus INTERFACE proteus_cudart_builtins)
+
   # TODO: update cmake requirement to > 3.26 to supports the nvPTXCompiler target.
   # target_link_libraries(... CUDA::nvptxcompiler_static)
   find_library(LIBNVPTXCOMPILER
@@ -187,18 +164,18 @@ if(PROTEUS_ENABLE_CUDA)
   )
   message(STATUS "Found libnvptxcompiler: ${LIBNVPTXCOMPILER}")
 
-  foreach(proteus_target ${PROTEUS_TARGETS})
-    target_include_directories(${proteus_target} SYSTEM PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
-    target_link_libraries(${proteus_target} PRIVATE CUDA::cuda_driver CUDA::cudart_static "${LIBNVPTXCOMPILER}")
-  endforeach()
+  target_include_directories(proteus SYSTEM PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
+  # Link just with the CUDA driver, leave the CUDA runtime to be linked by the
+  # application static or shared. Proteus resolves its CUDA runtimes
+  # dependencies at runtime through proteus builtins.
+  target_link_libraries(proteus PUBLIC CUDA::cuda_driver)
+  target_link_libraries(proteus PRIVATE "${LIBNVPTXCOMPILER}")
   target_include_directories(proteusCore SYSTEM INTERFACE ${CUDAToolkit_INCLUDE_DIRS})
 
 endif()
 
 if(PROTEUS_ENABLE_MPI)
-  foreach(proteus_target ${PROTEUS_TARGETS})
-    target_link_libraries(${proteus_target} PRIVATE MPI::MPI_CXX)
-  endforeach()
+  target_link_libraries(proteus PRIVATE MPI::MPI_CXX)
 endif()
 
 find_program(CLANGXX
@@ -225,35 +202,77 @@ else()
   list(APPEND clang_libs clangFrontend clangCodeGen)
 endif()
 message(STATUS "Found Clang libraries: ${clang_libs}")
-foreach(proteus_target ${PROTEUS_TARGETS})
-  target_link_libraries(${proteus_target} PRIVATE ${clang_libs})
+target_link_libraries(proteus PRIVATE ${clang_libs})
 
-  # Add the clangxx binary path as a compile definition for use in the runtime,
-  # which needs it for the CPP frontend to resolve system path.
-  target_compile_definitions(${proteus_target} PRIVATE PROTEUS_CLANGXX_BIN="${CLANGXX}")
-endforeach()
+# Add the clangxx binary path as a compile definition for use in the runtime,
+# which needs it for the CPP frontend to resolve system path.
+target_compile_definitions(proteus PRIVATE PROTEUS_CLANGXX_BIN="${CLANGXX}")
 
+find_package(Threads REQUIRED)
+target_link_libraries(proteus PRIVATE Threads::Threads)
+
+if(BUILD_SHARED)
 # Use a version script to hide internal symbols, especially from LLVM static
-# libraries, on Linux.
-foreach(proteus_target ${PROTEUS_TARGETS})
+# libraries, on Linux. Only effective for shared proteus builds.
   if(UNIX AND NOT APPLE)
-    target_link_options(${proteus_target} PRIVATE "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
+    target_link_options(proteus PRIVATE "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map")
   endif()
-endforeach()
+else()
+  # When proteus is static and links other libraries statically, propagate
+  # --exclude-libs for those specific archives so that consuming shared
+  # libraries don't export duplicate global state from those libraries.
+  # Possible static library deps: LLVM, Clang, LLD, nvptxcompiler.
+  if(UNIX AND NOT APPLE)
+    set(_exclude_archives "")
+
+    if(NOT LLVM_LINK_LLVM_DYLIB)
+      foreach(lib ${llvm_libs})
+        list(APPEND _exclude_archives "lib${lib}.a")
+      endforeach()
+    endif()
+
+    if(NOT CLANG_LINK_CLANG_DYLIB)
+      foreach(lib ${clang_libs})
+        list(APPEND _exclude_archives "lib${lib}.a")
+      endforeach()
+    endif()
+
+    if(PROTEUS_ENABLE_HIP)
+      foreach(lib ${lld_libs})
+        list(APPEND _exclude_archives "lib${lib}.a")
+      endforeach()
+    endif()
+
+    if(PROTEUS_ENABLE_CUDA)
+      get_filename_component(_nvptxcompiler_name ${LIBNVPTXCOMPILER} NAME)
+      list(APPEND _exclude_archives ${_nvptxcompiler_name})
+    endif()
+
+    if(_exclude_archives)
+      list(JOIN _exclude_archives ":" _exclude_libs_str)
+      target_link_options(proteus INTERFACE
+        "$<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,SHARED_LIBRARY>:-Wl,--exclude-libs,${_exclude_libs_str}>"
+      )
+    endif()
+  endif()
+endif()
 
 target_link_libraries(proteusFrontend INTERFACE proteus "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 
 target_link_libraries(proteusCore INTERFACE proteus "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 
-foreach(proteus_target ${PROTEUS_TARGETS})
-  set_target_properties(${proteus_target} PROPERTIES
-    INSTALL_RPATH_USE_LINK_PATH TRUE
-    INTERFACE_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}"
-  )
-endforeach()
+set_target_properties(proteus PROPERTIES
+  INSTALL_RPATH_USE_LINK_PATH TRUE
+  INTERFACE_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}"
+)
+
+set(PROTEUS_INSTALL_TARGETS proteus proteusCore proteusFrontend)
+if(PROTEUS_ENABLE_CUDA)
+    list(APPEND PROTEUS_INSTALL_TARGETS proteus_cudart_builtins)
+endif()
 
 install(
-  TARGETS ${PROTEUS_TARGETS} proteusCore proteusFrontend
+  TARGETS ${PROTEUS_INSTALL_TARGETS}
   EXPORT proteusTargets
   RUNTIME DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"

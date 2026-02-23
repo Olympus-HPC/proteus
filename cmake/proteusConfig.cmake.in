@@ -27,6 +27,11 @@ if(PROTEUS_ENABLE_HIP)
     message(STATUS "LLD DIR = ${LLD_DIR}")
 endif()
 
+set(PROTEUS_ENABLE_CUDA "@PROTEUS_ENABLE_CUDA@")
+if(PROTEUS_ENABLE_CUDA)
+    find_dependency(CUDAToolkit REQUIRED)
+endif()
+
 set(PROTEUS_ENABLE_MPI "@PROTEUS_ENABLE_MPI@")
 if(PROTEUS_ENABLE_MPI)
     find_dependency(MPI REQUIRED)

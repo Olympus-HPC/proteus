@@ -5,7 +5,7 @@ cmake -S ${CI_PROJECT_DIR} -B build-proteus \
     -DCMAKE_C_COMPILER="gcc" \
     -DCMAKE_CXX_COMPILER="g++" \
     -DCMAKE_INSTALL_PREFIX=${PWD}/install-proteus \
-    -DPROTEUS_ENABLE_HIP=on \
+    -DPROTEUS_ENABLE_CUDA=on \
     -DENABLE_TESTS=off \
     -DBUILD_SHARED=off
 

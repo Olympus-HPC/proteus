@@ -1,0 +1,30 @@
+cmake_minimum_required(VERSION 3.18)
+
+project(
+    main VERSION 0.0.1
+    LANGUAGES CUDA CXX C)
+
+set(CMAKE_CXX_STANDARD 17)
+find_package(CUDAToolkit REQUIRED)
+find_package(proteus REQUIRED CONFIG HINTS ${proteus_DIR})
+
+set(CLANG_EXECUTABLE "${LLVM_INSTALL_DIR}/bin/clang++")
+set(SRC_FILE "${CMAKE_CURRENT_SOURCE_DIR}/test.cu")
+set(BC_FILE "${CMAKE_CURRENT_BINARY_DIR}/test.bc")
+
+add_custom_command(
+    OUTPUT ${BC_FILE}
+    COMMAND ${CLANG_EXECUTABLE} -emit-llvm --offload-arch=sm_90 --offload-device-only -c ${SRC_FILE} -o ${BC_FILE}
+    DEPENDS ${SRC_FILE}
+    COMMENT "Generating LLVM bitcode for ${SRC_FILE}"
+    VERBATIM
+)
+
+add_custom_target(generate_bc ALL DEPENDS ${BC_FILE})
+
+add_executable(main jit.cpp)
+target_link_libraries(main PRIVATE proteusCore CUDA::cudart)
+target_link_options(main PRIVATE --no-undefined)
+set_target_properties(main PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+install(TARGETS main)

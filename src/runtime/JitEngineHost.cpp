@@ -54,14 +54,14 @@ void JitEngineHost::addStaticLibrarySymbols() {
   // global variables. So, if the host JIT module uses CUDA functions, we
   // need to resolve them statically in the JIT module's linker.
 
-  // Insert symbols in the SymbolMap, disambiguate if needed.
-  using CudaLaunchKernelFn =
-      cudaError_t (*)(const void *, dim3, dim3, void **, size_t, cudaStream_t);
-  auto CudaLaunchKernel = static_cast<CudaLaunchKernelFn>(&cudaLaunchKernel);
-  SymbolMap[LLJITPtr->mangleAndIntern("cudaLaunchKernel")] =
-      orc::ExecutorSymbolDef(
-          orc::ExecutorAddr{reinterpret_cast<uintptr_t>(CudaLaunchKernel)},
-          JITSymbolFlags::Exported);
+  // Insert cudaLaunchKernel if available, using the Proteus CUDA runtime
+  // builtin initialization to avoid dependencies on the CUDA runtime library.
+  if (__proteus_cudaLaunchKernel_ptr) {
+    SymbolMap[LLJITPtr->mangleAndIntern("cudaLaunchKernel")] =
+        orc::ExecutorSymbolDef(orc::ExecutorAddr{reinterpret_cast<uintptr_t>(
+                                   __proteus_cudaLaunchKernel_ptr)},
+                               JITSymbolFlags::Exported);
+  }
 
 #endif
 

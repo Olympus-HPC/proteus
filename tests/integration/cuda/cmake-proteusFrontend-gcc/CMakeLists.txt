@@ -2,16 +2,14 @@ cmake_minimum_required(VERSION 3.18)
 
 project(
     main VERSION 0.0.1
-    LANGUAGES HIP CXX C)
+    LANGUAGES CXX)
 
-find_package(hip REQUIRED CONFIG)
+set(CMAKE_CXX_STANDARD 17)
+find_package(CUDAToolkit REQUIRED)
 find_package(proteus REQUIRED CONFIG HINTS ${proteus_DIR})
 
 add_executable(main main.cpp)
-set_source_files_properties(main.cpp PROPERTIES LANGUAGE HIP)
-target_link_options(main PRIVATE --no-undefined)
+target_link_libraries(main PRIVATE proteusFrontend CUDA::cudart)
 set_target_properties(main PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
-
-add_proteus(main)
 
 install(TARGETS main)
