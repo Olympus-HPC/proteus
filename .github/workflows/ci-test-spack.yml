@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+
+jobs:
+  build-and-test:
+    name: proteus ${{ matrix.os }} LLVM ${{ matrix.llvm }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        llvm: [18.1.8, 19.1.7, 20.1.8]
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+      # Install Clang/LLVM using conda and lit, filecheck utilities.
+      - name: Create environment
+        run: |
+          conda install -y -c conda-forge \
+            clang=${{ matrix.llvm }} \
+            clangxx=${{ matrix.llvm }} \
+            clangdev=${{ matrix.llvm }} \
+            llvmdev=${{ matrix.llvm }} \
+            lit=${{ matrix.llvm }} \
+            zlib zstd
+      - name: Run spack test
+        run: |
+          export SPACK_DISABLE_LOCAL_CONFIG=true
+          export SPACK_USER_CACHE_PATH=/tmp/spack/user_cache
+          git clone --depth=2 https://github.com/spack/spack.git /tmp/spack
+          source /tmp/spack/share/spack/setup-env.sh
+          spack env create -d /tmp/proteus-spack-env
+          spack env activate /tmp/proteus-spack-env
+          spack external find
+          spack repo add ${GITHUB_WORKSPACE}/packaging/spack
+          spack add proteus@git.${GITHUB_SHA}
+          spack concretize -f
+          # TODO: remove, testing
+          exit 1
+          spack install -v
