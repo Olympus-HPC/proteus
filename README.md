@@ -38,10 +38,45 @@ compilation and optimization using LLVM as a library.
 
 In all cases, you link your application against the Proteus runtime library—details are provided [later](#integrating-with-your-build-system).
 
-## Building
-The project uses `cmake` for building and requires an LLVM installation
-(CI tests currently cover LLVM 18, 19, 20 with CUDA versions 12.2, and AMD ROCm versions
-6.3.1, 6.4.1, 7.1.0).
+## Installation
+Proteus can be installed from source or via [spack](https://github.com/spack/spack).
+
+### Spack
+We provide a packaging recipe for Spack in the subdirectory`packaging/spack`.
+
+Assuming you have a Spack installation and preferrably using an isolated Spack
+environment, you can add the spack repo by cloning Proteus and then install it
+by running:
+```bash
+git clone https://github.com/Olympus-HPC/proteus.git
+spack repo add proteus/packaging/spack
+spack install proteus
+```
+
+We provide several variants to match different configurations, including CUDA,
+ROCm, and MPI support.
+A complete list of variants and their descriptions is available in the Spack
+package file, or viewable through:
+```bash
+spack info proteus
+```
+
+Some typical examples:
+```bash
+# Install the latest version with CUDA support for sm_90 arch.
+spack install proteus +cuda cuda_arch=90
+
+# Install the latest version with ROCm support for gfx942 arch.
+spack install proteus +rocm amdgpu_target=gfx942
+
+# Install the latest version with MPI support.
+spack install proteus +mpi
+```
+
+### Building from source
+The project uses `cmake` and requires an LLVM installation (CI tests currently
+cover LLVM 18, 19, 20 with CUDA versions 12.2, and AMD ROCm versions 6.3.1,
+6.4.1, 7.1.0).
 
 See the top-level `CMakeLists.txt` for the available build options.
 A typical build looks like this:

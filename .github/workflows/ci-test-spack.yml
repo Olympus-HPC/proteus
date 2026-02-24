@@ -1,16 +1,16 @@
-name: CI
+name: spack CI
 
 on:
   pull_request:
 
 jobs:
   build-and-test:
-    name: proteus ${{ matrix.os }} LLVM ${{ matrix.llvm }}
+    name: spack ${{ matrix.os }} LLVM ${{ matrix.llvm }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest]
-        llvm: [18.1.8, 19.1.7, 20.1.8]
+        llvm: [18, 19, 20]
     defaults:
       run:
         shell: bash -el {0}
@@ -21,27 +21,26 @@ jobs:
         with:
           miniforge-version: latest
       # Install Clang/LLVM using conda and lit, filecheck utilities.
-      - name: Create environment
+      - name: Install LLVM ${{ matrix.llvm }}
         run: |
-          conda install -y -c conda-forge \
-            clang=${{ matrix.llvm }} \
-            clangxx=${{ matrix.llvm }} \
-            clangdev=${{ matrix.llvm }} \
-            llvmdev=${{ matrix.llvm }} \
-            lit=${{ matrix.llvm }} \
-            zlib zstd
+          sudo apt-get update
+          # Remove existing LLVM/Clang packages to avoid conflics with spack external package configuration.
+          sudo apt-get remove -y clang-[0-9]* llvm-[0-9]*-dev libclang-[0-9]*-dev 2>/dev/null || true
+          sudo apt-get install -y llvm-${{ matrix.llvm }}-dev libclang-${{ matrix.llvm }}-dev clang-${{ matrix.llvm }}
       - name: Run spack test
         run: |
+          # Install spack
           export SPACK_DISABLE_LOCAL_CONFIG=true
           export SPACK_USER_CACHE_PATH=/tmp/spack/user_cache
-          git clone --depth=2 https://github.com/spack/spack.git /tmp/spack
+          git clone --quiet --depth=2 https://github.com/spack/spack.git /tmp/spack
           source /tmp/spack/share/spack/setup-env.sh
+          # Create spack environment
           spack env create -d /tmp/proteus-spack-env
           spack env activate /tmp/proteus-spack-env
+          # Find external dependencies
           spack external find
+          # Add proteus package and install
           spack repo add ${GITHUB_WORKSPACE}/packaging/spack
-          spack add proteus@git.${GITHUB_SHA}
+          spack add proteus@git.${{ github.event.pull_request.head.sha }} ^llvm@${{ matrix.llvm }}
           spack concretize -f
-          # TODO: remove, testing
-          exit 1
           spack install -v
