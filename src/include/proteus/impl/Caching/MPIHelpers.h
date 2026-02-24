@@ -71,7 +71,7 @@ public:
   int getRank() const;
   int getSize() const;
 
-  void free();
+  void finalize();
 
 private:
   MPI_Comm Comm = MPI_COMM_NULL;

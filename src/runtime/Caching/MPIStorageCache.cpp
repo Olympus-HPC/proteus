@@ -75,7 +75,7 @@ void MPIStorageCache::finalize() {
     CommThread.join();
   }
 
-  CommHandle.free();
+  CommHandle.finalize();
   Finalized = true;
 }
 
