@@ -12,7 +12,7 @@ spack external find
 spack external find cuda
 
 spack repo add ${CI_PROJECT_DIR}/packaging/spack
-spack add proteus@main +cuda cuda_arch=${PROTEUS_CI_CUDA_ARCH} ^cuda@${PROTEUS_CI_CUDA_VERSION}
+spack add proteus@git.${CI_COMMIT_SHA} +cuda cuda_arch=${PROTEUS_CI_CUDA_ARCH} ^cuda@${PROTEUS_CI_CUDA_VERSION}
 
 spack concretize -f
 spack install -v
