@@ -1,4 +1,4 @@
-# Copyright 2024-2025 Lawrence Livermore National Security, LLC and
+# Copyright 2024-2026 Lawrence Livermore National Security, LLC and
 # Proteus developers. See the top-level COPYRIGHT file for details.
 #
 # SPDX-License-Identifier: (Apache-2.0 WITH LLVM-exception)
@@ -24,6 +24,7 @@ class Proteus(CMakePackage, CudaPackage, ROCmPackage):
     license("Apache-2.0 WITH LLVM-exception")
 
     version("main", branch="main")
+    version("2026.01.0", tag="v2026.01.0")
 
     # Variants to control build options.
     variant(
@@ -39,6 +40,8 @@ class Proteus(CMakePackage, CudaPackage, ROCmPackage):
         default=False,
         description="Enable developer flags (ENABLE_DEVELOPER_COMPILER_FLAGS)",
     )
+    variant("mpi", default=False, description="Enable MPI support")
+    variant("impl_headers", default=False, description="Install implementation headers")
 
     # Disallow enabling both CUDA and HIP at the same time.
     conflicts(
@@ -53,7 +56,7 @@ class Proteus(CMakePackage, CudaPackage, ROCmPackage):
         "due to JIT compilation issues with device globals",
     )
     # Require the Clang compiler since tests use the Proteus LLVM plugin.
-    requires("%clang@18:19", when="+tests")
+    requires("%clang@18:20", when="+tests")
 
     # Build Dependencies.
     depends_on("c", type="build")
@@ -62,23 +65,26 @@ class Proteus(CMakePackage, CudaPackage, ROCmPackage):
 
     # Proteus LLVM and Clang dependencies.
     # CUDA enabled.
-    depends_on("llvm@18:19 +clang targets=all", when="+cuda")
+    depends_on("llvm@18:20 +clang targets=all", when="+cuda")
 
     # ROCm enabled, use the AMDGPU LLVM build.
-    depends_on("llvm-amdgpu@6.2:6.4", when="+rocm")
+    depends_on("llvm-amdgpu@6.2:", when="+rocm")
 
     # Host-only (no CUDA or HIP).
-    depends_on("llvm@18:19 +clang", when="~rocm ~cuda")
+    depends_on("llvm@18:20+clang", when="~rocm ~cuda")
 
     # CUDA and HIP dependencies.
     depends_on("cuda@12:", when="+cuda")
-    depends_on("hip@6.2:6.4", when="+rocm")
+    depends_on("hip@6.2:", when="+rocm")
+
+    # MPI dependency.
+    depends_on("mpi", when="+mpi")
 
     def cmake_args(self):
         # Enforce clang when building tests
         if "+tests" in self.spec and not self.spec.satisfies("%clang"):
             raise InstallError(
-                "Building Proteus with +tests requires the Clang compiler (%clang18:19), "
+                "Building Proteus with +tests requires the Clang compiler, "
                 f"but spec: {self.spec} is using the compiler: {self.spec.compiler}."
             )
 
@@ -111,6 +117,14 @@ class Proteus(CMakePackage, CudaPackage, ROCmPackage):
             self.define_from_variant(
                 "ENABLE_DEVELOPER_COMPILER_FLAGS", "developer_flags"
             )
+        )
+
+        # MPI support.
+        args.append(self.define_from_variant("PROTEUS_ENABLE_MPI", "mpi"))
+
+        # Install implementation headers if requested.
+        args.append(
+            self.define_from_variant("PROTEUS_INSTALL_IMPL_HEADERS", "impl_headers")
         )
 
         return args
