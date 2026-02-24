@@ -1,0 +1,21 @@
+.base-job:
+  extends: .job_on_matrix
+  before_script:
+    - echo "=== Start CI spack Tests ==="
+    - export SPACK_DISABLE_LOCAL_CONFIG=true
+    - export SPACK_USER_CACHE_PATH=/tmp/spack/user_cache
+    - export PROTEUS_CI_CUDA_ARCH="90"
+    - git clone --depth=2 https://github.com/spack/spack.git /tmp/spack
+  after_script:
+    - rm -rf ${CI_BUILDS_DIR}
+    - rm -rf ${SPACK_USER_CACHE_PATH}
+    - echo "=== End CI spack Tests ==="
+
+.variants:
+  parallel:
+    matrix:
+      PROTEUS_CI_CUDA_VERSION: ["12.9"]
+      PROTEUS_CI_LLVM_VERSION: ["19.1.3"]
+
+test-integration-matrix:
+  extends: [.base-job, .variants]

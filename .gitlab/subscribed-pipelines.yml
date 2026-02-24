@@ -122,6 +122,15 @@ matrix-proteus-benchmarks:
   needs: [matrix-up-check]
   extends: [.run-benchmarks]
 
+matrix-test-spack:
+  variables:
+    CI_MACHINE: "matrix"
+    JOB_CMD:
+      value: "tests/spack/cuda/ci-test-spack.sh"
+      expand: false
+  needs: [matrix-up-check]
+  extends: [.test-spack]
+
 matrix-test-integration:
   variables:
     CI_MACHINE: "matrix"
@@ -152,6 +161,15 @@ tioga-test-integration:
   needs: [tioga-up-check]
   extends: [.test-integration]
 
+tioga-test-spack:
+  variables:
+    CI_MACHINE: "tioga"
+    JOB_CMD:
+      value: "tests/spack/hip/ci-test-spack.sh"
+      expand: false
+  needs: [tioga-up-check]
+  extends: [.test-spack]
+
 tioga-proteus-benchmarks:
   variables:
     CI_MACHINE: "tioga"
@@ -181,6 +199,15 @@ tuolumne-test-integration:
       expand: false
   needs: [tuolumne-up-check]
   extends: [.test-integration]
+
+tuolumne-test-spack:
+  variables:
+    CI_MACHINE: "tuolumne"
+    JOB_CMD:
+      value: "tests/spack/hip/ci-test-spack.sh"
+      expand: false
+  needs: [tuolumne-up-check]
+  extends: [.test-spack]
 
 tuolumne-proteus-benchmarks:
   variables:

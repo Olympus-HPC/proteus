@@ -1,0 +1,20 @@
+.base-job:
+  extends: .job_on_tioga
+  before_script:
+    - echo "=== Start CI spack Tests ==="
+    - export SPACK_DISABLE_LOCAL_CONFIG=true
+    - export SPACK_USER_CACHE_PATH=/tmp/spack/user_cache
+    - export PROTEUS_CI_AMDGPU_TARGET="gfx90a"
+    - git clone --depth=2 https://github.com/spack/spack.git /tmp/spack
+  after_script:
+    - rm -rf ${CI_BUILDS_DIR}
+    - rm -rf ${SPACK_USER_CACHE_PATH}
+    - echo "=== End CI spack Tests ==="
+
+.variants:
+  parallel:
+    matrix:
+      PROTEUS_CI_ROCM_VERSION: ["6.3.1", "6.4.3", "7.1.0"]
+
+test-integration-tioga:
+  extends: [.base-job, .variants]
