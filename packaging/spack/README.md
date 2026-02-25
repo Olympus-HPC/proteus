@@ -4,7 +4,8 @@
 
 Add this repository:
 ```bash
-spack repo add https://github.com/Olympus-HPC/proteus/tree/main/packaging/spack
+git clone https://github.com/Olympus-HPC/proteus.git
+spack repo add proteus/packaging/spack
 ```
 
 Install the latest main branch:
