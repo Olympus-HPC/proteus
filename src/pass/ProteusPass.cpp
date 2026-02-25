@@ -138,7 +138,7 @@ public:
     findJitVariables(M);
     registerJitVariablesWithLambda(M);
     registerLambdaFunctions(M);
-    // removeJitTakeAddress(M);
+
 
     if (hasDeviceLaunchKernelCalls(M)) {
       emitJitLaunchKernelCall(M);
@@ -1305,68 +1305,84 @@ private:
     }
 
     // Inject lambda's Clang-generated name into the jit_variable callsite.
+    // While we're at the alloc site, we record its location
+    // to delete later
+    DenseSet<AllocaInst *> AllocaToErase;
     for (auto &[CB, LambdaType] : CallBaseToLambda) {
       bool FoundLambda = false;
       for (auto &F : M.getFunctionList()) {
-        if (StringRef{demangle(F.getName().str())}.contains(
+        // if (FoundLambda)
+        //   continue;
+        // if (!StringRef{demangle(F.getName().str())}.contains(
+        //         "proteus::register_lambda"))
+        //   continue;
+      if (StringRef{demangle(F.getName().str())}.contains(
                 "proteus::register_lambda") &&
             !FoundLambda) {
-          for (BasicBlock &BB : F) {
-            for (Instruction &I : BB) {
-              if (auto *Alloc = dyn_cast<AllocaInst>(&I);
-                  Alloc && Alloc->getAllocatedType() == LambdaType) {
-                // Demangle the register_lambda instantiation containing
-                // demangled name
-                std::string DemangledName = demangle(F.getName().str());
-                StringRef DemangledLambdaType =
-                    parseLambdaType(DemangledName, "proteus::register_lambda");
-                // Inject the demangled name back into the callsite
-                IRBuilder<> Builder(CB);
-                auto *LambdaNameGlobal =
-                    Builder.CreateGlobalString(DemangledLambdaType);
-                CB->setArgOperand(3, LambdaNameGlobal);
-                FoundLambda = true;
-              }
-            }
-          }
-        }
-      }
-      assert(FoundLambda && "Expected register_lambda call contained in Module "
-                            "corresponding to jit_variable");
-    }
-  }
-
-  void removeJitTakeAddress(Module &M) {
-    SmallVector<CallBase *, 8> ToErase;
-    for (Function &F : M.getFunctionList()) {
-      if (StringRef{demangle(F.getName().str())}.contains(
-              "proteus::register_lambda")) {
         for (BasicBlock &BB : F) {
           for (Instruction &I : BB) {
-            if (CallBase *CB = dyn_cast<CallBase>(&I);
-                CB && CB->getCalledFunction() &&
-                StringRef{demangle(CB->getCalledFunction()->getName().str())} ==
-                    "__jit_take_address") {
-              assert(CB->users().size() == 0 && "");
-              // If CB is the last instruction in the block, add a safe
-              // terminator
-              if (!CB->getNextNode()) {
-                IRBuilder<> Builder(CB);
-                Builder.CreateUnreachable();
-              }
-              ToErase.push_back(CB);
-            }
+            // auto *Alloc = dyn_cast<AllocaInst>(&I);
+            // if (!Alloc || Alloc->getAllocatedType() != LambdaType)
+            //   continue;
+            if (auto *Alloc = dyn_cast<AllocaInst>(&I);
+                  Alloc && Alloc->getAllocatedType() == LambdaType) {
+            // Demangle the register_lambda instantiation containing
+            // demangled name
+            std::string DemangledName = demangle(F.getName().str());
+            StringRef DemangledLambdaType =
+                parseLambdaType(DemangledName, "proteus::register_lambda");
+            // Inject the demangled name back into the callsite
+            IRBuilder<> Builder(CB);
+            auto *LambdaNameGlobal =
+                Builder.CreateGlobalString(DemangledLambdaType);
+            CB->setArgOperand(3, LambdaNameGlobal);
+            FoundLambda = true;
+            // Record Alloca instructions to erase later
+            AllocaToErase.insert(Alloc);
+            } // if alloc
+          }
+        }
+      } //if
+      }
+        assert(FoundLambda && "Expected register_lambda call contained in Module "
+                              "corresponding to jit_variable");
+      }
+                            // removeJitTakeAddress(M, AllocaToErase);
+    }
+
+
+
+  void removeJitTakeAddress(Module &M, DenseSet<AllocaInst *>& LambdaAlloca) {
+    for (AllocaInst* Alloca : LambdaAlloca) {
+      SmallVector<Instruction*, 8> ToErase;
+      for (auto *Usr : Alloca->users()) {
+        if (auto *CB = dyn_cast<CallBase>(Usr); CB && CB->getCalledFunction() && CB->getCalledFunction()->getName() == "__jit_take_address") {
+          ToErase.push_back(CB);
+        }
+      }
+      for (User *Usr : Alloca->users()) {
+        if (auto *LI = dyn_cast<CallInst>(Usr)) {
+          if (LI->getCalledFunction()->getName().starts_with("llvm.lifetime.")) {
+
+            // LI->eraseFromParent();
+            ToErase.push_back(LI);
           }
         }
       }
-    }
-    // Erase the calls, downstream optimization passes should erase the alloca
-    // as well
-    for (CallBase *CB : ToErase) {
-      CB->eraseFromParent();
+      // We need to process this last
+      ToErase.push_back(Alloca);
+      DenseSet<Instruction*> Deleted;
+      for (Instruction* I : ToErase) {
+        if (!Deleted.contains(I) && !I->isTerminator()) {
+          llvm::outs() << "erasing " << *I << "\n";
+          I->eraseFromParent();
+          Deleted.insert(I);
+        }
+      }
     }
   }
 
+  /// findJitVariables modifies calls to proteus::jit_variable by injecting
   void findJitVariables(Module &M) {
     DEBUG(Logger::logs("proteus-pass") << "finding jit variables" << "\n");
     DEBUG(Logger::logs("proteus-pass") << "users..." << "\n");
