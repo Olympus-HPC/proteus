@@ -53,19 +53,21 @@ public:
   }
 
   void dump() {
-    llvm::outs() << "DUMPING TMP REGISTRY \n";
+    Logger::logs("proteus") << "Dumping pending registry \n";
     for (const auto &[Key, Value] : PendingJitVariableMap) {
-      llvm::outs() << Key << "\n";
+      Logger::logs("proteus") << Key << " : " << "\n";
       for (const auto &V : Value) {
-        llvm::outs() << "   " << V.Value.DoubleVal << "\n";
+        Logger::logs("proteus") << ", " << V.Value.DoubleVal;
       }
+      Logger::logs("proteus") << "\n";
     }
-    llvm::outs() << "DUMPING REGISTRY \n";
+    Logger::logs("proteus") << "Dumping finalized registry \n";
     for (const auto &[Key, Value] : JitVariableMap) {
-      llvm::outs() << Key << "\n";
+      Logger::logs("proteus") << Key << " : " << "\n";
       for (const auto &V : Value) {
-        llvm::outs() << "   " << V.Value.DoubleVal << "\n";
+        Logger::logs("proteus") << ", " << V.Value.DoubleVal;
       }
+      Logger::logs("proteus") << "\n";
     }
   }
 
