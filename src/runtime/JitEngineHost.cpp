@@ -160,7 +160,7 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
   if (!LambdaRegistry::instance().empty()) {
     if (auto OptionalMapIt =
             LambdaRegistry::instance().matchJitVariableMap(F->getName())) {
-      auto &RCVec = OptionalMapIt.value()->second;
+      auto &RCVec = OptionalMapIt.value()->getSecond();
       TransformLambdaSpecialization::transform(M, *F, RCVec);
     }
   }
@@ -178,7 +178,6 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
 void getLambdaJitValues(StringRef FnName,
                         SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
   LambdaRegistry &LR = LambdaRegistry::instance();
-
   if (LR.empty())
     return;
 
@@ -193,7 +192,7 @@ void getLambdaJitValues(StringRef FnName,
   if (!OptionalMapIt)
     return;
 
-  LambdaJitValuesVec = OptionalMapIt.value()->second;
+  LambdaJitValuesVec = OptionalMapIt.value()->getSecond();
 }
 
 void *

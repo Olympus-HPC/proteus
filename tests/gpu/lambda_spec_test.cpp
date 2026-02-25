@@ -1,8 +1,8 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_DEBUG_OUTPUT=1 %build/lambda_spec_test.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_TRACE_OUTPUT="specialization" %build/lambda_spec_test.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_DEBUG_OUTPUT=1 %build/lambda_spec_test.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_TRACE_OUTPUT="specialization" %build/lambda_spec_test.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
@@ -26,24 +26,22 @@ template <typename T> void run(T &&LB) {
 }
 
 int main() {
-  proteus::init();
-  int zero = 0;
-  int one = 1;
-  int two = 2;
+  int Zero = 0;
+  int One = 1;
+  int Two = 2;
 
-  auto zero_lambda = [=, c = proteus::jit_variable(zero)] __device__()
-                         __attribute__((annotate("jit"))) { printInt(c); };
+  auto ZeroLambda = [=, C = proteus::jit_variable(Zero)] ()
+                         __attribute__((annotate("jit"))) { printInt(C); };
 
-  auto one_lambda = [=, c = proteus::jit_variable(one)] __device__()
-                        __attribute__((annotate("jit"))) { printInt(c); };
+  auto OneLambda = [=, C = proteus::jit_variable(One)] ()
+                        __attribute__((annotate("jit"))) { printInt(C); };
 
-  auto two_lambda = [=, c = proteus::jit_variable(two)] __device__()
-                        __attribute__((annotate("jit"))) { printInt(c); };
+  auto TwoLambda = [=, C = proteus::jit_variable(Two)] ()
+                        __attribute__((annotate("jit"))) { printInt(C); };
 
-  run(zero_lambda);
-  run(one_lambda);
-  run(two_lambda);
-  proteus::finalize();
+  run(ZeroLambda);
+  run(OneLambda);
+  run(TwoLambda);
 
   return 0;
 }
