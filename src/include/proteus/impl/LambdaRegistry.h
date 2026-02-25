@@ -52,22 +52,40 @@ public:
     return It;
   }
 
-  void pushJitVariable(RuntimeConstant &RC) {
-    PendingJitVariables.emplace_back(RC);
+  void dump() {
+    Logger::logs("proteus") << "Dumping pending registry \n";
+    for (const auto &[Key, Value] : PendingJitVariableMap) {
+      Logger::logs("proteus") << Key << " : " << "\n";
+      for (const auto &V : Value) {
+        Logger::logs("proteus") << ", " << V.Value.DoubleVal;
+      }
+      Logger::logs("proteus") << "\n";
+    }
+    Logger::logs("proteus") << "Dumping finalized registry \n";
+    for (const auto &[Key, Value] : JitVariableMap) {
+      Logger::logs("proteus") << Key << " : " << "\n";
+      for (const auto &V : Value) {
+        Logger::logs("proteus") << ", " << V.Value.DoubleVal;
+      }
+      Logger::logs("proteus") << "\n";
+    }
   }
 
-  // The LambdaType input argument is created as a global variable in the
-  // ProteusPass, thus it has program-wide lifetime. Hence it is valid for
-  // LambdaTypeRef to store a reference to it.
+  void setJitVariable(const char *LambdaType, RuntimeConstant &RC) {
+    assert(PendingJitVariableMap.contains(LambdaType) &&
+           "Lambda must be registered prior to register JIT variable!");
+    PendingJitVariableMap[LambdaType].emplace_back(RC);
+  }
+
   inline void registerLambda(const char *LambdaType) {
     const StringRef LambdaTypeRef{LambdaType};
     PROTEUS_DBG(Logger::logs("proteus")
                 << "=> RegisterLambda " << LambdaTypeRef << "\n");
     // Copy PendingJitVariables if there were changed, otherwise the runtime
     // values for the lambda definition have not changed.
-    if (!PendingJitVariables.empty()) {
-      JitVariableMap[LambdaTypeRef] = PendingJitVariables;
-      PendingJitVariables.clear();
+    if (!PendingJitVariableMap[LambdaTypeRef].empty()) {
+      JitVariableMap[LambdaTypeRef] = PendingJitVariableMap[LambdaTypeRef];
+      PendingJitVariableMap[LambdaTypeRef].clear();
     }
   }
 
@@ -79,8 +97,8 @@ public:
 
 private:
   explicit LambdaRegistry() = default;
-  SmallVector<RuntimeConstant> PendingJitVariables;
   DenseMap<StringRef, SmallVector<RuntimeConstant>> JitVariableMap;
+  DenseMap<StringRef, SmallVector<RuntimeConstant>> PendingJitVariableMap;
 };
 
 } // namespace proteus

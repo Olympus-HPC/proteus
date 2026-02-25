@@ -176,7 +176,7 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
 
 void getLambdaJitValues(StringRef FnName,
                         SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
-  LambdaRegistry LR = LambdaRegistry::instance();
+  LambdaRegistry &LR = LambdaRegistry::instance();
   if (LR.empty())
     return;
 
@@ -187,7 +187,7 @@ void getLambdaJitValues(StringRef FnName,
   SmallVector<StringRef> LambdaCalleeInfo;
   PROTEUS_DBG(Logger::logs("proteus")
               << " Trying F " << demangle(FnName.str()) << "\n ");
-  auto OptionalMapIt = LambdaRegistry::instance().matchJitVariableMap(FnName);
+  auto OptionalMapIt = LR.matchJitVariableMap(FnName);
   if (!OptionalMapIt)
     return;
 
