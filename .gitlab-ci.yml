@@ -66,6 +66,7 @@ stages:
   - prerequisites
   - build-and-test
   - test-integration
+  - test-spack
   - run-benchmarks
 
 # Template for jobs triggering a build-and-test sub-pipeline:
@@ -122,6 +123,19 @@ stages:
         ref: 'v2025.09.1'
         file: 'pipelines/${CI_MACHINE}.yml'
       - local: '.gitlab/jobs/${CI_MACHINE}-integration.yml'
+    strategy: depend
+    forward:
+      pipeline_variables: true
+
+.test-spack:
+  stage: test-spack
+  trigger:
+    include:
+      - local: '.gitlab/custom-jobs-and-variables.yml'
+      - project: 'radiuss/radiuss-shared-ci'
+        ref: 'v2025.09.1'
+        file: 'pipelines/${CI_MACHINE}.yml'
+      - local: '.gitlab/jobs/${CI_MACHINE}-spack.yml'
     strategy: depend
     forward:
       pipeline_variables: true

@@ -1,0 +1,17 @@
+.base-job:
+  extends: .job_on_tuolumne
+  before_script:
+    - echo "=== Start CI spack Tests ==="
+  after_script:
+    - rm -rf ${CI_BUILDS_DIR}
+    - echo "=== End CI spack Tests ==="
+
+.variants:
+  parallel:
+    matrix:
+      - PROTEUS_CI_ROCM_VERSION: ["6.3.1", "6.4.3", "7.1.0"]
+
+test-spack-tuolumne:
+  extends: [.base-job, .variants]
+  variables:
+    PROTEUS_CI_AMDGPU_TARGET: "gfx942"
