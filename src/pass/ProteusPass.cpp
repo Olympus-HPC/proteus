@@ -36,6 +36,7 @@
 #include "proteus/impl/RuntimeConstantTypeHelpers.h"
 
 #include <llvm/ADT/SmallPtrSet.h>
+#include <llvm/ADT/StringMap.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/ADT/StringSet.h>
 #include <llvm/Analysis/CallGraph.h>
@@ -1303,6 +1304,8 @@ private:
       }
     }
 
+    // Keep track of global strings corresponding to lambdas
+    StringMap<GlobalVariable *> LambdaNameToGlobal;
     // Inject lambda's Clang-generated name into the jit_variable callsite.
     // While we're at the alloc site, we record its location
     // to delete later
@@ -1320,12 +1323,22 @@ private:
             // Demangle the register_lambda instantiation containing
             // demangled name
             std::string DemangledName = demangle(F.getName().str());
-            StringRef DemangledLambdaType =
-                parseLambdaType(DemangledName, "proteus::register_lambda");
+            // We need what is below to be a string and not a StringRef so that
+            // the DenseMap's keys have lifespan longer than this current scope.
+            std::string DemangledLambdaType = std::string(
+                parseLambdaType(DemangledName, "proteus::register_lambda"));
+            // Fetch the global variable from the cache if it's already been
+            // created
+            GlobalVariable *LambdaNameGlobal = nullptr;
+            if (LambdaNameToGlobal.contains(DemangledLambdaType)) {
+              LambdaNameGlobal = LambdaNameToGlobal[DemangledLambdaType];
+            } else {
+              IRBuilder<> Builder(CB);
+              LambdaNameGlobal =
+                  Builder.CreateGlobalString(DemangledLambdaType);
+              LambdaNameToGlobal[DemangledLambdaType] = LambdaNameGlobal;
+            }
             // Inject the demangled name back into the callsite
-            IRBuilder<> Builder(CB);
-            auto *LambdaNameGlobal =
-                Builder.CreateGlobalString(DemangledLambdaType);
             CB->setArgOperand(3, LambdaNameGlobal);
             FoundLambda = true;
           }
