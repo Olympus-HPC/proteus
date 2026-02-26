@@ -8,16 +8,11 @@
 
 namespace proteus {
 
-FuncBase::FuncBase(JitModule &J, const std::string &Name, Type *RetTy,
+FuncBase::FuncBase(JitModule &J, LLVMCodeBuilder &CBParam,
+                   const std::string &Name, Type *RetTy,
                    const std::vector<Type *> &ArgTys)
-    : J(J), Name(Name) {
-  auto FC = J.getModule().getOrInsertFunction(
-      Name, FunctionType::get(RetTy, ArgTys, false));
-  Function *F = dyn_cast<Function>(FC.getCallee());
-  if (!F)
-    reportFatalError("Expected LLVM Function");
-  BasicBlock::Create(F->getContext(), "entry", F);
-  CB = std::make_unique<LLVMCodeBuilder>(*F);
+    : J(J), Name(Name), CB(&CBParam) {
+  LLVMFunc = CBParam.addFunction(Name, RetTy, ArgTys);
 }
 
 FuncBase::~FuncBase() = default;
@@ -128,12 +123,12 @@ bool FuncBase::isIntegerTy(Type *Ty) { return CB->isIntegerTy(Ty); }
 bool FuncBase::isFloatingPointTy(Type *Ty) { return CB->isFloatingPointTy(Ty); }
 
 void FuncBase::beginFunction(const char *File, int Line) {
-  CB->beginFunction(File, Line);
+  CB->beginFunction(*LLVMFunc, File, Line);
 }
 
 void FuncBase::endFunction() { CB->endFunction(); }
 
-Function *FuncBase::getFunction() { return &CB->getFunction(); }
+Function *FuncBase::getFunction() { return LLVMFunc; }
 
 void FuncBase::beginIf(const Var<bool> &CondVar, const char *File, int Line) {
   Value *Cond = CondVar.loadValue();

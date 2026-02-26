@@ -145,11 +145,12 @@ protected:
   JitModule &J;
 
   std::string Name;
-  std::unique_ptr<LLVMCodeBuilder> CB;
+  LLVMCodeBuilder *CB;
+  llvm::Function *LLVMFunc;
 
 public:
-  FuncBase(JitModule &J, const std::string &Name, Type *RetTy,
-           const std::vector<Type *> &ArgTys);
+  FuncBase(JitModule &J, LLVMCodeBuilder &CB, const std::string &Name,
+           Type *RetTy, const std::vector<Type *> &ArgTys);
   ~FuncBase();
 
   TargetModelType getTargetModel() const;
@@ -420,10 +421,10 @@ private:
   }
 
 public:
-  Func(JitModule &J, LLVMContext &Ctx, const std::string &Name,
+  Func(JitModule &J, LLVMCodeBuilder &CB, const std::string &Name,
        Dispatcher &Dispatch)
-      : FuncBase(J, Name, TypeMap<RetT>::get(Ctx),
-                 {TypeMap<ArgT>::get(Ctx)...}),
+      : FuncBase(J, CB, Name, TypeMap<RetT>::get(CB.getContext()),
+                 {TypeMap<ArgT>::get(CB.getContext())...}),
         Dispatch(Dispatch) {}
 
   RetT operator()(ArgT... Args);

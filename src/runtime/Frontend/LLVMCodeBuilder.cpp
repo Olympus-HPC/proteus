@@ -8,6 +8,10 @@ namespace proteus {
 using namespace llvm;
 
 struct LLVMCodeBuilder::Impl {
+  // Owned context and module (only set via the owning constructor).
+  std::unique_ptr<LLVMContext> OwnedCtx;
+  std::unique_ptr<Module> OwnedMod;
+
   IRBuilder<> IRB;
   IRBuilderBase::InsertPoint IP;
 
@@ -22,7 +26,14 @@ struct LLVMCodeBuilder::Impl {
   };
   std::vector<Scope> Scopes;
 
-  Impl(LLVMContext &Ctx) : IRB{Ctx} {
+  explicit Impl(LLVMContext &Ctx) : IRB{Ctx} { init(); }
+
+  Impl(std::unique_ptr<LLVMContext> Ctx, std::unique_ptr<Module> Mod)
+      : OwnedCtx{std::move(Ctx)}, OwnedMod{std::move(Mod)}, IRB{*OwnedCtx} {
+    init();
+  }
+
+  void init() {
     // Initialize IP.
     IP = IRB.saveIP();
     // Clang enables the 'contract' rewrite rule by default to enable FMA
@@ -37,18 +48,58 @@ struct LLVMCodeBuilder::Impl {
   }
 };
 
-LLVMCodeBuilder::LLVMCodeBuilder(Function &F)
-    : PImpl{std::make_unique<Impl>(F.getContext())}, F(F) {}
+LLVMCodeBuilder::LLVMCodeBuilder(std::unique_ptr<LLVMContext> Ctx,
+                                 std::unique_ptr<Module> Mod)
+    : PImpl{std::make_unique<Impl>(std::move(Ctx), std::move(Mod))},
+      F(nullptr) {}
 
 LLVMCodeBuilder::~LLVMCodeBuilder() = default;
 
 IRBuilderBase &LLVMCodeBuilder::getIRBuilder() { return PImpl->IRB; }
 
-Function &LLVMCodeBuilder::getFunction() { return F; }
+Function &LLVMCodeBuilder::getFunction() {
+  if (!F)
+    reportFatalError("LLVMCodeBuilder: no active function");
+  return *F;
+}
 
-Module &LLVMCodeBuilder::getModule() { return *F.getParent(); }
+Module &LLVMCodeBuilder::getModule() {
+  if (PImpl->OwnedMod)
+    return *PImpl->OwnedMod;
+  if (!F)
+    reportFatalError("LLVMCodeBuilder: no active function or owned module");
+  return *F->getParent();
+}
 
-LLVMContext &LLVMCodeBuilder::getContext() { return F.getContext(); }
+LLVMContext &LLVMCodeBuilder::getContext() {
+  if (PImpl->OwnedCtx)
+    return *PImpl->OwnedCtx;
+  if (!F)
+    reportFatalError("LLVMCodeBuilder: no active function or owned context");
+  return F->getContext();
+}
+
+Function *LLVMCodeBuilder::addFunction(const std::string &Name, Type *RetTy,
+                                       const std::vector<Type *> &ArgTys) {
+  if (!PImpl->OwnedMod)
+    reportFatalError("addFunction requires an owning LLVMCodeBuilder");
+  auto FC = PImpl->OwnedMod->getOrInsertFunction(
+      Name, FunctionType::get(RetTy, ArgTys, false));
+  Function *Fn = dyn_cast<Function>(FC.getCallee());
+  if (!Fn)
+    reportFatalError("Expected LLVM Function");
+  BasicBlock::Create(Fn->getContext(), "entry", Fn);
+  F = Fn;
+  return Fn;
+}
+
+std::unique_ptr<LLVMContext> LLVMCodeBuilder::takeLLVMContext() {
+  return std::move(PImpl->OwnedCtx);
+}
+
+std::unique_ptr<Module> LLVMCodeBuilder::takeModule() {
+  return std::move(PImpl->OwnedMod);
+}
 
 // Insert point management.
 void LLVMCodeBuilder::setInsertPoint(BasicBlock *BB) {
@@ -61,7 +112,7 @@ void LLVMCodeBuilder::setInsertPointBegin(BasicBlock *BB) {
 }
 
 void LLVMCodeBuilder::setInsertPointAtEntry() {
-  auto &EntryBB = F.getEntryBlock();
+  auto &EntryBB = F->getEntryBlock();
   PImpl->IP = IRBuilderBase::InsertPoint(&EntryBB, EntryBB.end());
   PImpl->IRB.restoreIP(PImpl->IP);
 }
@@ -82,7 +133,7 @@ std::tuple<BasicBlock *, BasicBlock *> LLVMCodeBuilder::splitCurrentBlock() {
 
 BasicBlock *LLVMCodeBuilder::createBasicBlock(const std::string &Name,
                                               BasicBlock *InsertBefore) {
-  BasicBlock *BB = BasicBlock::Create(getContext(), Name, &F, InsertBefore);
+  BasicBlock *BB = BasicBlock::Create(getContext(), Name, F, InsertBefore);
   return BB;
 }
 
@@ -109,11 +160,12 @@ void LLVMCodeBuilder::pushScope(const char *File, int Line, ScopeKind Kind,
 }
 
 // High-level scope operations.
-void LLVMCodeBuilder::beginFunction(const char *File, int Line) {
-  BasicBlock *BodyBB = BasicBlock::Create(F.getContext(), "body", &F);
-  BasicBlock *ExitBB = BasicBlock::Create(F.getContext(), "exit", &F);
+void LLVMCodeBuilder::beginFunction(Function &Fn, const char *File, int Line) {
+  F = &Fn;
+  BasicBlock *BodyBB = BasicBlock::Create(F->getContext(), "body", F);
+  BasicBlock *ExitBB = BasicBlock::Create(F->getContext(), "exit", F);
   PImpl->IP =
-      IRBuilderBase::InsertPoint(&F.getEntryBlock(), F.getEntryBlock().end());
+      IRBuilderBase::InsertPoint(&F->getEntryBlock(), F->getEntryBlock().end());
   PImpl->IRB.restoreIP(PImpl->IP);
   PImpl->IRB.CreateBr(BodyBB);
 
@@ -156,9 +208,9 @@ void LLVMCodeBuilder::beginIf(Value *Cond, const char *File, int Line) {
   PImpl->Scopes.emplace_back(File, Line, ScopeKind::IF, ContIP);
 
   BasicBlock *ThenBlock =
-      BasicBlock::Create(F.getContext(), "if.then", &F, NextBlock);
+      BasicBlock::Create(F->getContext(), "if.then", F, NextBlock);
   BasicBlock *ExitBlock =
-      BasicBlock::Create(F.getContext(), "if.cont", &F, NextBlock);
+      BasicBlock::Create(F->getContext(), "if.cont", F, NextBlock);
 
   CurBlock->getTerminator()->eraseFromParent();
   PImpl->IRB.SetInsertPoint(CurBlock);
@@ -499,14 +551,14 @@ bool LLVMCodeBuilder::isFloatingPointTy(Type *Ty) {
 Value *LLVMCodeBuilder::createCall(const std::string &FName, Type *RetTy,
                                    const std::vector<Type *> &ArgTys,
                                    const std::vector<Value *> &Args) {
-  Module *M = F.getParent();
+  Module *M = &getModule();
   FunctionType *FnTy = FunctionType::get(RetTy, ArgTys, false);
   FunctionCallee Callee = M->getOrInsertFunction(FName, FnTy);
   return PImpl->IRB.CreateCall(Callee, Args);
 }
 
 Value *LLVMCodeBuilder::createCall(const std::string &FName, Type *RetTy) {
-  Module *M = F.getParent();
+  Module *M = &getModule();
   FunctionType *FnTy = FunctionType::get(RetTy, {}, false);
   FunctionCallee Callee = M->getOrInsertFunction(FName, FnTy);
   return PImpl->IRB.CreateCall(Callee);
@@ -516,8 +568,8 @@ Value *LLVMCodeBuilder::createCall(const std::string &FName, Type *RetTy) {
 AllocaInst *LLVMCodeBuilder::emitAlloca(Type *Ty, const std::string &Name,
                                         AddressSpace AS) {
   auto SaveIP = PImpl->IRB.saveIP();
-  auto AllocaIP =
-      IRBuilderBase::InsertPoint(&F.getEntryBlock(), F.getEntryBlock().begin());
+  auto AllocaIP = IRBuilderBase::InsertPoint(&F->getEntryBlock(),
+                                             F->getEntryBlock().begin());
   PImpl->IRB.restoreIP(AllocaIP);
   auto *Alloca =
       PImpl->IRB.CreateAlloca(Ty, static_cast<unsigned>(AS), nullptr, Name);
@@ -536,7 +588,7 @@ Value *LLVMCodeBuilder::emitArrayCreate(Type *Ty, AddressSpace AT,
   switch (AT) {
   case AddressSpace::SHARED:
   case AddressSpace::GLOBAL: {
-    Module *M = F.getParent();
+    Module *M = &getModule();
     auto *GV = new GlobalVariable(
         *M, ArrTy, /*isConstant=*/false, GlobalValue::InternalLinkage,
         UndefValue::get(ArrTy), Name, /*InsertBefore=*/nullptr,

@@ -17,8 +17,7 @@ struct CompiledLibrary;
 
 class JitModule {
 private:
-  std::unique_ptr<LLVMContext> Ctx;
-  std::unique_ptr<Module> Mod;
+  std::unique_ptr<LLVMCodeBuilder> CB;
   std::unique_ptr<CompiledLibrary> Library;
 
   std::deque<std::unique_ptr<FuncBase>> Functions;
@@ -35,7 +34,7 @@ private:
   Func<RetT, ArgT...> &buildFuncFromArgsList(const std::string &Name,
                                              ArgTypeList<ArgT...>) {
     auto TypedFn =
-        std::make_unique<Func<RetT, ArgT...>>(*this, *Ctx, Name, Dispatch);
+        std::make_unique<Func<RetT, ArgT...>>(*this, *CB, Name, Dispatch);
     Func<RetT, ArgT...> &TypedFnRef = *TypedFn;
     Functions.emplace_back(std::move(TypedFn));
     TypedFnRef.declArgs();
@@ -46,7 +45,7 @@ private:
   KernelHandle<ArgT...> buildKernelFromArgsList(const std::string &Name,
                                                 ArgTypeList<ArgT...>) {
     auto TypedFn =
-        std::make_unique<Func<void, ArgT...>>(*this, *Ctx, Name, Dispatch);
+        std::make_unique<Func<void, ArgT...>>(*this, *CB, Name, Dispatch);
     Func<void, ArgT...> &TypedFnRef = *TypedFn;
     TypedFn->declArgs();
 
@@ -141,8 +140,8 @@ public:
 
   bool isCompiled() const { return IsCompiled; }
 
-  const Module &getModule() const { return *Mod; }
-  Module &getModule() { return *Mod; }
+  const Module &getModule() const { return CB->getModule(); }
+  Module &getModule() { return CB->getModule(); }
 
   template <typename Sig> auto addKernel(const std::string &Name) {
     using RetT = typename FnSig<Sig>::RetT;

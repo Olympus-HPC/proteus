@@ -47,7 +47,9 @@ inline std::string toString(ScopeKind Kind) {
 /// creating LLVM IR instructions.
 class LLVMCodeBuilder {
 public:
-  explicit LLVMCodeBuilder(llvm::Function &F);
+  /// Construct as owner of LLVMContext and Module.
+  LLVMCodeBuilder(std::unique_ptr<llvm::LLVMContext> Ctx,
+                  std::unique_ptr<llvm::Module> Mod);
   ~LLVMCodeBuilder();
 
   LLVMCodeBuilder(const LLVMCodeBuilder &) = delete;
@@ -59,6 +61,17 @@ public:
   llvm::Function &getFunction();
   llvm::Module &getModule();
   llvm::LLVMContext &getContext();
+
+  /// Create a new Function in the owned Module, initialise its entry block,
+  /// and make it the current active function.  Only valid on the owning
+  /// constructor variant.
+  llvm::Function *addFunction(const std::string &Name, llvm::Type *RetTy,
+                              const std::vector<llvm::Type *> &ArgTys);
+
+  /// Transfer ownership of the LLVMContext (leaves internal pointer null).
+  std::unique_ptr<llvm::LLVMContext> takeLLVMContext();
+  /// Transfer ownership of the Module (leaves internal pointer null).
+  std::unique_ptr<llvm::Module> takeModule();
 
   // Insertion point management.
   void setInsertPoint(llvm::BasicBlock *BB);
@@ -79,7 +92,8 @@ public:
                  llvm::BasicBlock *NextBlock);
 
   // High-level scope operations.
-  void beginFunction(const char *File, int Line);
+  /// Begin code generation for Fn.  Sets the active function to Fn.
+  void beginFunction(llvm::Function &Fn, const char *File, int Line);
   void endFunction();
   void beginIf(llvm::Value *Cond, const char *File, int Line);
   void endIf();
@@ -198,7 +212,7 @@ public:
 private:
   struct Impl;
   std::unique_ptr<Impl> PImpl;
-  llvm::Function &F;
+  llvm::Function *F;
 };
 
 } // namespace proteus
