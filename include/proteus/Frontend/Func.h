@@ -125,10 +125,6 @@ public:
     reportFatalError("Unsupported conversion");
   }
 
-  // Constant creation.
-  llvm::Value *getConstantInt(llvm::Type *Ty, uint64_t Val);
-  llvm::Value *getConstantFP(llvm::Type *Ty, double Val);
-
 protected:
   JitModule &J;
 
@@ -631,9 +627,9 @@ compoundAssignConst(Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &LHS,
 
   llvm::Value *RHS = nullptr;
   if constexpr (std::is_integral_v<remove_cvref_t<U>>) {
-    RHS = LHS.Fn.getConstantInt(RHSType, ConstValue);
+    RHS = LHS.Fn.getCodeBuilder().getConstantInt(RHSType, ConstValue);
   } else {
-    RHS = LHS.Fn.getConstantFP(RHSType, ConstValue);
+    RHS = LHS.Fn.getCodeBuilder().getConstantFP(RHSType, ConstValue);
   }
 
   llvm::Value *LHSVal = LHS.loadValue();
@@ -769,9 +765,9 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator=(
   llvm::Type *LHSType = getValueType();
 
   if (Fn.getCodeBuilder().isIntegerTy(LHSType)) {
-    storeValue(Fn.getConstantInt(LHSType, ConstValue));
+    storeValue(Fn.getCodeBuilder().getConstantInt(LHSType, ConstValue));
   } else if (Fn.getCodeBuilder().isFloatingPointTy(LHSType)) {
-    storeValue(Fn.getConstantFP(LHSType, ConstValue));
+    storeValue(Fn.getCodeBuilder().getConstantFP(LHSType, ConstValue));
   } else {
     reportFatalError("Unsupported type");
   }
@@ -1072,10 +1068,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator!() const {
   if constexpr (std::is_same_v<remove_cvref_t<T>, bool>) {
     ResV = Fn.getCodeBuilder().createNot(V);
   } else if constexpr (std::is_integral_v<remove_cvref_t<T>>) {
-    llvm::Value *Zero = Fn.getConstantInt(getValueType(), 0);
+    llvm::Value *Zero = Fn.getCodeBuilder().getConstantInt(getValueType(), 0);
     ResV = Fn.getCodeBuilder().createICmpEQ(V, Zero);
   } else {
-    llvm::Value *Zero = Fn.getConstantFP(getValueType(), 0.0);
+    llvm::Value *Zero = Fn.getCodeBuilder().getConstantFP(getValueType(), 0.0);
     ResV = Fn.getCodeBuilder().createFCmpOEQ(V, Zero);
   }
   auto Ret = Fn.declVar<bool>("not.");
@@ -1113,7 +1109,8 @@ Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](
   auto *BasePointer = getSlot();
 
   llvm::Value *IdxVal = Index.loadValue();
-  llvm::Value *Zero = Fn.getConstantInt(Index.getValueType(), 0);
+  llvm::Value *Zero =
+      Fn.getCodeBuilder().getConstantInt(Index.getValueType(), 0);
   auto *GEP = Fn.getCodeBuilder().createInBoundsGEP(ArrayTy, BasePointer,
                                                     {Zero, IdxVal});
   llvm::Type *ElemTy = getValueType();
@@ -1244,7 +1241,7 @@ std::enable_if_t<std::is_arithmetic_v<OffsetT>,
 Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator+(
     OffsetT Offset) const {
   auto *IntTy = Fn.getCodeBuilder().getInt64Ty();
-  llvm::Value *IdxVal = Fn.getConstantInt(IntTy, Offset);
+  llvm::Value *IdxVal = Fn.getCodeBuilder().getConstantInt(IntTy, Offset);
 
   auto *BasePtr = loadPointer();
   auto *ElemTy = getValueType();

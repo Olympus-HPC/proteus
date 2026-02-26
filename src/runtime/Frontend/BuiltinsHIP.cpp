@@ -25,8 +25,11 @@ static inline Value *getGridDim(FuncBase &Fn, unsigned Offset) {
       "llvm.amdgcn.implicitarg.ptr",
       PointerType::get(Ctx, ConstantAddressSpace));
   auto *GEP = Fn.getCodeBuilder().createInBoundsGEP(
-      Fn.getCodeBuilder().getInt32Ty(), Call, {Fn.getConstantInt(Fn.getCodeBuilder().getInt64Ty(), Offset)});
-  auto *Load = Fn.getCodeBuilder().createLoad(Fn.getCodeBuilder().getInt32Ty(), GEP);
+      Fn.getCodeBuilder().getInt32Ty(), Call,
+      {Fn.getCodeBuilder().getConstantInt(Fn.getCodeBuilder().getInt64Ty(),
+                                          Offset)});
+  auto *Load =
+      Fn.getCodeBuilder().createLoad(Fn.getCodeBuilder().getInt32Ty(), GEP);
 
   return Load;
 }
@@ -45,9 +48,13 @@ static inline Value *getBlockDim(FuncBase &Fn, unsigned Offset) {
       "llvm.amdgcn.implicitarg.ptr",
       PointerType::get(Ctx, ConstantAddressSpace));
   auto *GEP = Fn.getCodeBuilder().createInBoundsGEP(
-      Fn.getCodeBuilder().getInt16Ty(), Call, {Fn.getConstantInt(Fn.getCodeBuilder().getInt64Ty(), Offset)});
-  auto *Load = Fn.getCodeBuilder().createLoad(Fn.getCodeBuilder().getInt16Ty(), GEP);
-  auto *Conv = Fn.getCodeBuilder().createZExt(Load, Fn.getCodeBuilder().getInt32Ty());
+      Fn.getCodeBuilder().getInt16Ty(), Call,
+      {Fn.getCodeBuilder().getConstantInt(Fn.getCodeBuilder().getInt64Ty(),
+                                          Offset)});
+  auto *Load =
+      Fn.getCodeBuilder().createLoad(Fn.getCodeBuilder().getInt16Ty(), GEP);
+  auto *Conv =
+      Fn.getCodeBuilder().createZExt(Load, Fn.getCodeBuilder().getInt32Ty());
 
   return Conv;
 }

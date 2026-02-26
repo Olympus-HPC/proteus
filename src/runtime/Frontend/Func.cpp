@@ -95,13 +95,6 @@ FuncBase::createArrayStorage(const std::string &Name, AddressSpace AS,
 // Delegating methods to LLVMCodeBuilder.
 LLVMCodeBuilder &FuncBase::getCodeBuilder() { return *CB; }
 
-Value *FuncBase::getConstantInt(Type *Ty, uint64_t Val) {
-  return CB->getConstantInt(Ty, Val);
-}
-Value *FuncBase::getConstantFP(Type *Ty, double Val) {
-  return CB->getConstantFP(Ty, Val);
-}
-
 void FuncBase::beginFunction(const char *File, int Line) {
   CB->beginFunction(*LLVMFunc, File, Line);
 }
