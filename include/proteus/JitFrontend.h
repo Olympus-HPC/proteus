@@ -187,7 +187,8 @@ std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>,
 FuncBase::call(const std::string &Name) {
   using RetT = typename FnSig<Sig>::RetT;
 
-  auto *Call = createCall(Name, TypeMap<RetT>::get(getContext()));
+  auto *Call =
+      getCodeBuilder().createCall(Name, TypeMap<RetT>::get(getContext()));
   Var<RetT> Ret = declVar<RetT>("ret");
   Ret.storeValue(Call);
   return Ret;
@@ -197,7 +198,7 @@ template <typename Sig>
 std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
 FuncBase::call(const std::string &Name) {
   using RetT = typename FnSig<Sig>::RetT;
-  createCall(Name, TypeMap<RetT>::get(getContext()));
+  getCodeBuilder().createCall(Name, TypeMap<RetT>::get(getContext()));
 }
 
 template <typename... Ts>
@@ -224,7 +225,8 @@ FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
   std::vector<Type *> ArgTys = unpackArgTypes(ArgT{}, Ctx);
   std::vector<Value *> ArgVals = {GetArgVal(ArgsVars)...};
 
-  auto *Call = createCall(Name, TypeMap<RetT>::get(Ctx), ArgTys, ArgVals);
+  auto *Call = getCodeBuilder().createCall(Name, TypeMap<RetT>::get(Ctx),
+                                           ArgTys, ArgVals);
 
   Var<RetT> Ret = declVar<RetT>("ret");
   Ret.storeValue(Call);
@@ -247,8 +249,8 @@ FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
 
   auto &Ctx = getContext();
   std::vector<Type *> ArgTys = unpackArgTypes(ArgT{}, Ctx);
-  createCall(Name, TypeMap<RetT>::get(getContext()), ArgTys,
-             {GetArgVal(ArgsVars)...});
+  getCodeBuilder().createCall(Name, TypeMap<RetT>::get(getContext()), ArgTys,
+                              {GetArgVal(ArgsVars)...});
 }
 
 template <typename RetT, typename... ArgT>

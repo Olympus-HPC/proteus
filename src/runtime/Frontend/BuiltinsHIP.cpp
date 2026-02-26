@@ -19,11 +19,12 @@ static inline Value *getGridDim(FuncBase &Fn, unsigned Offset) {
   // hip bitcode libraries.
   constexpr int ConstantAddressSpace = 4;
   auto &Ctx = Fn.getFunction()->getContext();
-  auto *Call = Fn.createCall("llvm.amdgcn.implicitarg.ptr",
-                             PointerType::get(Ctx, ConstantAddressSpace));
-  auto *GEP = Fn.createInBoundsGEP(
+  auto *Call = Fn.getCodeBuilder().createCall(
+      "llvm.amdgcn.implicitarg.ptr",
+      PointerType::get(Ctx, ConstantAddressSpace));
+  auto *GEP = Fn.getCodeBuilder().createInBoundsGEP(
       Fn.getInt32Ty(), Call, {Fn.getConstantInt(Fn.getInt64Ty(), Offset)});
-  auto *Load = Fn.createLoad(Fn.getInt32Ty(), GEP);
+  auto *Load = Fn.getCodeBuilder().createLoad(Fn.getInt32Ty(), GEP);
 
   return Load;
 }
@@ -38,12 +39,13 @@ static inline Value *getBlockDim(FuncBase &Fn, unsigned Offset) {
   // hip bitcode libraries.
   constexpr int ConstantAddressSpace = 4;
   auto &Ctx = Fn.getFunction()->getContext();
-  auto *Call = Fn.createCall("llvm.amdgcn.implicitarg.ptr",
-                             PointerType::get(Ctx, ConstantAddressSpace));
-  auto *GEP = Fn.createInBoundsGEP(
+  auto *Call = Fn.getCodeBuilder().createCall(
+      "llvm.amdgcn.implicitarg.ptr",
+      PointerType::get(Ctx, ConstantAddressSpace));
+  auto *GEP = Fn.getCodeBuilder().createInBoundsGEP(
       Fn.getInt16Ty(), Call, {Fn.getConstantInt(Fn.getInt64Ty(), Offset)});
-  auto *Load = Fn.createLoad(Fn.getInt16Ty(), GEP);
-  auto *Conv = Fn.createZExt(Load, Fn.getInt32Ty());
+  auto *Load = Fn.getCodeBuilder().createLoad(Fn.getInt16Ty(), GEP);
+  auto *Conv = Fn.getCodeBuilder().createZExt(Load, Fn.getInt32Ty());
 
   return Conv;
 }
@@ -55,8 +57,8 @@ Var<unsigned int> getThreadIdX(FuncBase &Fn) {
 
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("threadIdx.x");
 
-  auto *Call = Fn.createCall("llvm.amdgcn.workitem.id.x",
-                             TypeMap<unsigned int>::get(Ctx));
+  auto *Call = Fn.getCodeBuilder().createCall("llvm.amdgcn.workitem.id.x",
+                                              TypeMap<unsigned int>::get(Ctx));
   Ret.storeValue(Call);
 
   return Ret;
@@ -67,8 +69,8 @@ Var<unsigned int> getBlockIdX(FuncBase &Fn) {
 
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("blockIdx.x");
 
-  auto *Call = Fn.createCall("llvm.amdgcn.workgroup.id.x",
-                             TypeMap<unsigned int>::get(Ctx));
+  auto *Call = Fn.getCodeBuilder().createCall("llvm.amdgcn.workgroup.id.x",
+                                              TypeMap<unsigned int>::get(Ctx));
   Ret.storeValue(Call);
 
   return Ret;
@@ -97,8 +99,8 @@ Var<unsigned int> getThreadIdY(FuncBase &Fn) {
 
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("threadIdx.y");
 
-  auto *Call = Fn.createCall("llvm.amdgcn.workitem.id.y",
-                             TypeMap<unsigned int>::get(Ctx));
+  auto *Call = Fn.getCodeBuilder().createCall("llvm.amdgcn.workitem.id.y",
+                                              TypeMap<unsigned int>::get(Ctx));
   Ret.storeValue(Call);
 
   return Ret;
@@ -109,8 +111,8 @@ Var<unsigned int> getThreadIdZ(FuncBase &Fn) {
 
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("threadIdx.z");
 
-  auto *Call = Fn.createCall("llvm.amdgcn.workitem.id.z",
-                             TypeMap<unsigned int>::get(Ctx));
+  auto *Call = Fn.getCodeBuilder().createCall("llvm.amdgcn.workitem.id.z",
+                                              TypeMap<unsigned int>::get(Ctx));
   Ret.storeValue(Call);
 
   return Ret;
@@ -121,8 +123,8 @@ Var<unsigned int> getBlockIdY(FuncBase &Fn) {
 
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("blockIdx.y");
 
-  auto *Call = Fn.createCall("llvm.amdgcn.workgroup.id.y",
-                             TypeMap<unsigned int>::get(Ctx));
+  auto *Call = Fn.getCodeBuilder().createCall("llvm.amdgcn.workgroup.id.y",
+                                              TypeMap<unsigned int>::get(Ctx));
   Ret.storeValue(Call);
 
   return Ret;
@@ -133,8 +135,8 @@ Var<unsigned int> getBlockIdZ(FuncBase &Fn) {
 
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("blockIdx.z");
 
-  auto *Call = Fn.createCall("llvm.amdgcn.workgroup.id.z",
-                             TypeMap<unsigned int>::get(Ctx));
+  auto *Call = Fn.getCodeBuilder().createCall("llvm.amdgcn.workgroup.id.z",
+                                              TypeMap<unsigned int>::get(Ctx));
   Ret.storeValue(Call);
 
   return Ret;
@@ -178,7 +180,8 @@ Var<unsigned int> getGridDimZ(FuncBase &Fn) {
 
 void syncThreads(FuncBase &Fn) {
   auto &Ctx = Fn.getFunction()->getContext();
-  Fn.createCall("llvm.amdgcn.s.barrier", TypeMap<void>::get(Ctx));
+  Fn.getCodeBuilder().createCall("llvm.amdgcn.s.barrier",
+                                 TypeMap<void>::get(Ctx));
 }
 
 } // namespace gpu
