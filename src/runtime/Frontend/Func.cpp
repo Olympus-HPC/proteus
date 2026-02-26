@@ -100,16 +100,6 @@ FuncBase::createArrayStorage(const std::string &Name, AddressSpace AS,
 // Delegating methods to LLVMCodeBuilder.
 LLVMCodeBuilder &FuncBase::getCodeBuilder() { return *CB; }
 
-std::tuple<BasicBlock *, BasicBlock *> FuncBase::splitCurrentBlock() {
-  return CB->splitCurrentBlock();
-}
-
-void FuncBase::eraseTerminator(BasicBlock *BB) { CB->eraseTerminator(BB); }
-
-BasicBlock *FuncBase::getUniqueSuccessor(BasicBlock *BB) {
-  return CB->getUniqueSuccessor(BB);
-}
-
 void FuncBase::pushScope(const char *File, const int Line, ScopeKind Kind,
                          BasicBlock *NextBlock) {
   CB->pushScope(File, Line, Kind, NextBlock);

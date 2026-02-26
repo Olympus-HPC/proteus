@@ -80,11 +80,6 @@ public:
   std::unique_ptr<ArrayStorage>
   createArrayStorage(const std::string &Name, AddressSpace AS, Type *ArrTy);
 
-  // Basic block management.
-  std::tuple<BasicBlock *, BasicBlock *> splitCurrentBlock();
-  void eraseTerminator(BasicBlock *BB);
-  BasicBlock *getUniqueSuccessor(BasicBlock *BB);
-
   // Type operations.
   unsigned getAddressSpace(Type *Ty);
   unsigned getAddressSpaceFromValue(Value *PtrVal);
@@ -463,7 +458,7 @@ void FuncBase::beginFor(Var<IterT> &IterVar, const Var<InitT> &Init,
 
   // Update the terminator of the current basic block due to the split
   // control-flow.
-  auto [CurBlock, NextBlock] = splitCurrentBlock();
+  auto [CurBlock, NextBlock] = CB->splitCurrentBlock();
   pushScope(File, Line, ScopeKind::FOR, NextBlock);
 
   BasicBlock *Header = CB->createBasicBlock("loop.header", NextBlock);
@@ -473,7 +468,7 @@ void FuncBase::beginFor(Var<IterT> &IterVar, const Var<InitT> &Init,
   BasicBlock *LoopExit = CB->createBasicBlock("loop.end", NextBlock);
 
   // Erase the old terminator and branch to the header.
-  eraseTerminator(CurBlock);
+  CB->eraseTerminator(CurBlock);
   CB->setInsertPoint(CurBlock);
   { CB->createBr(Header); }
 
@@ -509,14 +504,14 @@ template <typename CondLambda>
 void FuncBase::beginWhile(CondLambda &&Cond, const char *File, int Line) {
   // Update the terminator of the current basic block due to the split
   // control-flow.
-  auto [CurBlock, NextBlock] = splitCurrentBlock();
+  auto [CurBlock, NextBlock] = CB->splitCurrentBlock();
   pushScope(File, Line, ScopeKind::WHILE, NextBlock);
 
   BasicBlock *LoopCond = CB->createBasicBlock("while.cond", NextBlock);
   BasicBlock *Body = CB->createBasicBlock("while.body", NextBlock);
   BasicBlock *LoopExit = CB->createBasicBlock("while.end", NextBlock);
 
-  eraseTerminator(CurBlock);
+  CB->eraseTerminator(CurBlock);
   CB->setInsertPoint(CurBlock);
   { CB->createBr(LoopCond); }
 

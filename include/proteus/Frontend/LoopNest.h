@@ -64,7 +64,7 @@ public:
 
     // Capture the latch block before body execution may change IR structure.
     llvm::BasicBlock *BodyBB = Fn.getCodeBuilder().getInsertBlock();
-    auto *LatchBB = Fn.getUniqueSuccessor(BodyBB);
+    auto *LatchBB = Fn.getCodeBuilder().getUniqueSuccessor(BodyBB);
     if (!LatchBB)
       reportFatalError("Expected unique successor for loop latch block");
 
