@@ -179,8 +179,6 @@ public:
   void setLaunchBoundsForKernel(int MaxThreadsPerBlock, int MinBlocksPerSM);
 #endif
 
-  Value *emitArrayCreate(Type *Ty, AddressSpace AT, const std::string &Name);
-
   template <typename T> Var<T> declVar(const std::string &Name = "var") {
     static_assert(!std::is_array_v<T>, "Expected non-array type");
     static_assert(!std::is_reference_v<T>,

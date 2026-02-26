@@ -158,11 +158,6 @@ void FuncBase::endFunction() { CB->endFunction(); }
 
 Function *FuncBase::getFunction() { return &CB->getFunction(); }
 
-Value *FuncBase::emitArrayCreate(Type *Ty, AddressSpace AT,
-                                 const std::string &Name) {
-  return CB->emitArrayCreate(Ty, AT, Name);
-}
-
 void FuncBase::beginIf(const Var<bool> &CondVar, const char *File, int Line) {
   Value *Cond = CondVar.loadValue();
   CB->beginIf(Cond, File, Line);
