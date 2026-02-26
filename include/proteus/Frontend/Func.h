@@ -80,18 +80,6 @@ public:
                                                    AddressSpace AS,
                                                    llvm::Type *ArrTy);
 
-  // Type operations.
-  unsigned getAddressSpace(llvm::Type *Ty);
-  unsigned getAddressSpaceFromValue(llvm::Value *PtrVal);
-  llvm::Type *getPointerType(llvm::Type *ElemTy, unsigned AS);
-  llvm::Type *getPointerTypeUnqual(llvm::Type *ElemTy);
-  llvm::Type *getInt32Ty();
-  llvm::Type *getInt16Ty();
-  llvm::Type *getInt64Ty();
-  llvm::Type *getFloatTy();
-  bool isIntegerTy(llvm::Type *Ty);
-  bool isFloatingPointTy(llvm::Type *Ty);
-
   // Conversion operations.
   template <typename FromT, typename ToT> llvm::Value *convert(llvm::Value *V) {
     using From = remove_cvref_t<FromT>;
@@ -732,8 +720,8 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::getAddress() {
     auto *PtrStorage = static_cast<PointerStorage *>(Storage.get());
     llvm::Value *PtrVal = PtrStorage->loadPointer();
     llvm::Type *ElemTy = PtrStorage->getValueType();
-    unsigned AddrSpace = Fn.getAddressSpaceFromValue(PtrVal);
-    llvm::Type *PtrTy = Fn.getPointerType(ElemTy, AddrSpace);
+    unsigned AddrSpace = Fn.getCodeBuilder().getAddressSpaceFromValue(PtrVal);
+    llvm::Type *PtrTy = Fn.getCodeBuilder().getPointerType(ElemTy, AddrSpace);
     PtrVal = Fn.getCodeBuilder().createBitCast(PtrVal, PtrTy);
 
     std::unique_ptr<PointerStorage> ResultStorage =
@@ -746,8 +734,8 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::getAddress() {
   llvm::Value *Slot = getSlot();
   llvm::Type *ElemTy = getAllocatedType();
 
-  unsigned AddrSpace = Fn.getAddressSpace(getSlotType());
-  llvm::Type *PtrTy = Fn.getPointerType(ElemTy, AddrSpace);
+  unsigned AddrSpace = Fn.getCodeBuilder().getAddressSpace(getSlotType());
+  llvm::Type *PtrTy = Fn.getCodeBuilder().getPointerType(ElemTy, AddrSpace);
   llvm::Value *PtrVal = Slot;
   PtrVal = Fn.getCodeBuilder().createBitCast(Slot, PtrTy);
 
@@ -780,9 +768,9 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator=(
 
   llvm::Type *LHSType = getValueType();
 
-  if (Fn.isIntegerTy(LHSType)) {
+  if (Fn.getCodeBuilder().isIntegerTy(LHSType)) {
     storeValue(Fn.getConstantInt(LHSType, ConstValue));
-  } else if (Fn.isFloatingPointTy(LHSType)) {
+  } else if (Fn.getCodeBuilder().isFloatingPointTy(LHSType)) {
     storeValue(Fn.getConstantFP(LHSType, ConstValue));
   } else {
     reportFatalError("Unsupported type");
@@ -1105,8 +1093,8 @@ Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](size_t Index) {
   auto *GEP = Fn.getCodeBuilder().createConstInBoundsGEP2_64(
       ArrayTy, BasePointer, 0, Index);
   llvm::Type *ElemTy = getValueType();
-  unsigned AddrSpace = Fn.getAddressSpace(getSlotType());
-  llvm::Type *ElemPtrTy = Fn.getPointerType(ElemTy, AddrSpace);
+  unsigned AddrSpace = Fn.getCodeBuilder().getAddressSpace(getSlotType());
+  llvm::Type *ElemPtrTy = Fn.getCodeBuilder().getPointerType(ElemTy, AddrSpace);
 
   std::unique_ptr<PointerStorage> ResultStorage =
       Fn.createPointerStorage("elem.ptr", ElemPtrTy, ElemTy);
@@ -1129,8 +1117,8 @@ Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](
   auto *GEP = Fn.getCodeBuilder().createInBoundsGEP(ArrayTy, BasePointer,
                                                     {Zero, IdxVal});
   llvm::Type *ElemTy = getValueType();
-  unsigned AddrSpace = Fn.getAddressSpace(getSlotType());
-  llvm::Type *ElemPtrTy = Fn.getPointerType(ElemTy, AddrSpace);
+  unsigned AddrSpace = Fn.getCodeBuilder().getAddressSpace(getSlotType());
+  llvm::Type *ElemPtrTy = Fn.getCodeBuilder().getPointerType(ElemTy, AddrSpace);
 
   std::unique_ptr<VarStorage> ResultStorage =
       Fn.createPointerStorage("elem.ptr", ElemPtrTy, ElemTy);
@@ -1150,8 +1138,9 @@ Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator[](size_t Index) {
   auto *Ptr = loadPointer();
   auto *GEP =
       Fn.getCodeBuilder().createConstInBoundsGEP1_64(PointerElemTy, Ptr, Index);
-  unsigned AddrSpace = Fn.getAddressSpace(getAllocatedType());
-  llvm::Type *ElemPtrTy = Fn.getPointerType(PointerElemTy, AddrSpace);
+  unsigned AddrSpace = Fn.getCodeBuilder().getAddressSpace(getAllocatedType());
+  llvm::Type *ElemPtrTy =
+      Fn.getCodeBuilder().getPointerType(PointerElemTy, AddrSpace);
 
   // Create a pointer storage to hold the LValue for the Array[Index].
   std::unique_ptr<PointerStorage> ResultStorage =
@@ -1178,8 +1167,9 @@ Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator[](
   auto *IdxValue = Index.loadValue();
   auto *GEP =
       Fn.getCodeBuilder().createInBoundsGEP(PointeeType, Ptr, {IdxValue});
-  unsigned AddrSpace = Fn.getAddressSpace(getAllocatedType());
-  llvm::Type *ElemPtrTy = Fn.getPointerType(PointeeType, AddrSpace);
+  unsigned AddrSpace = Fn.getCodeBuilder().getAddressSpace(getAllocatedType());
+  llvm::Type *ElemPtrTy =
+      Fn.getCodeBuilder().getPointerType(PointeeType, AddrSpace);
 
   // Create a pointer storage to hold the LValue for the Array[Index].
   std::unique_ptr<PointerStorage> ResultStorage =
@@ -1205,9 +1195,11 @@ Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::getAddress() {
   llvm::Value *PtrVal = loadPointer();
   llvm::Type *ElemTy = getValueType();
 
-  unsigned AddrSpace = Fn.getAddressSpace(getAllocatedType());
-  llvm::Type *PointeePtrTy = Fn.getPointerType(ElemTy, AddrSpace);
-  llvm::Type *TargetPtrTy = Fn.getPointerTypeUnqual(PointeePtrTy);
+  unsigned AddrSpace = Fn.getCodeBuilder().getAddressSpace(getAllocatedType());
+  llvm::Type *PointeePtrTy =
+      Fn.getCodeBuilder().getPointerType(ElemTy, AddrSpace);
+  llvm::Type *TargetPtrTy =
+      Fn.getCodeBuilder().getPointerTypeUnqual(PointeePtrTy);
 
   PtrVal = Fn.getCodeBuilder().createBitCast(PtrVal, PointeePtrTy);
 
@@ -1233,8 +1225,8 @@ Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator+(
   auto *GEP =
       Fn.getCodeBuilder().createInBoundsGEP(ElemTy, BasePtr, IdxVal, "ptr.add");
 
-  unsigned AddrSpace = Fn.getAddressSpace(getAllocatedType());
-  auto *ElemPtrTy = Fn.getPointerType(ElemTy, AddrSpace);
+  unsigned AddrSpace = Fn.getCodeBuilder().getAddressSpace(getAllocatedType());
+  auto *ElemPtrTy = Fn.getCodeBuilder().getPointerType(ElemTy, AddrSpace);
 
   std::unique_ptr<PointerStorage> ResultStorage =
       Fn.createPointerStorage("ptr.add.tmp", ElemPtrTy, ElemTy);
@@ -1251,7 +1243,7 @@ std::enable_if_t<std::is_arithmetic_v<OffsetT>,
                  Var<T, std::enable_if_t<is_pointer_unref_v<T>>>>
 Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator+(
     OffsetT Offset) const {
-  auto *IntTy = Fn.getInt64Ty();
+  auto *IntTy = Fn.getCodeBuilder().getInt64Ty();
   llvm::Value *IdxVal = Fn.getConstantInt(IntTy, Offset);
 
   auto *BasePtr = loadPointer();
@@ -1260,8 +1252,8 @@ Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator+(
   auto *GEP = Fn.getCodeBuilder().createInBoundsGEP(ElemTy, BasePtr, {IdxVal},
                                                     "ptr.add");
 
-  unsigned AddrSpace = Fn.getAddressSpace(getAllocatedType());
-  auto *ElemPtrTy = Fn.getPointerType(ElemTy, AddrSpace);
+  unsigned AddrSpace = Fn.getCodeBuilder().getAddressSpace(getAllocatedType());
+  auto *ElemPtrTy = Fn.getCodeBuilder().getPointerType(ElemTy, AddrSpace);
 
   std::unique_ptr<PointerStorage> ResultStorage =
       Fn.createPointerStorage("ptr.add.tmp", ElemPtrTy, ElemTy);
@@ -1555,7 +1547,7 @@ template <typename T> Var<float> powf(const Var<float> &L, const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "powf requires floating-point type");
 
-  auto *ResultType = R.Fn.getFloatTy();
+  auto *ResultType = R.Fn.getCodeBuilder().getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.pow.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1570,7 +1562,7 @@ template <typename T> Var<float> sqrtf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "sqrtf requires floating-point type");
 
-  auto *ResultType = R.Fn.getFloatTy();
+  auto *ResultType = R.Fn.getCodeBuilder().getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.sqrt.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1585,7 +1577,7 @@ template <typename T> Var<float> expf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "expf requires floating-point type");
 
-  auto *ResultType = R.Fn.getFloatTy();
+  auto *ResultType = R.Fn.getCodeBuilder().getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.exp.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1600,7 +1592,7 @@ template <typename T> Var<float> sinf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "sinf requires floating-point type");
 
-  auto *ResultType = R.Fn.getFloatTy();
+  auto *ResultType = R.Fn.getCodeBuilder().getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.sin.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1615,7 +1607,7 @@ template <typename T> Var<float> cosf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "cosf requires floating-point type");
 
-  auto *ResultType = R.Fn.getFloatTy();
+  auto *ResultType = R.Fn.getCodeBuilder().getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.cos.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1630,7 +1622,7 @@ template <typename T> Var<float> fabs(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "fabs requires floating-point type");
 
-  auto *ResultType = R.Fn.getFloatTy();
+  auto *ResultType = R.Fn.getCodeBuilder().getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.fabs.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1645,7 +1637,7 @@ template <typename T> Var<float> truncf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "truncf requires floating-point type");
 
-  auto *ResultType = R.Fn.getFloatTy();
+  auto *ResultType = R.Fn.getCodeBuilder().getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.trunc.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1660,7 +1652,7 @@ template <typename T> Var<float> logf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "logf requires floating-point type");
 
-  auto *ResultType = R.Fn.getFloatTy();
+  auto *ResultType = R.Fn.getCodeBuilder().getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.log.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1675,7 +1667,7 @@ template <typename T> Var<float> absf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "absf requires floating-point type");
 
-  auto *ResultType = R.Fn.getFloatTy();
+  auto *ResultType = R.Fn.getCodeBuilder().getFloatTy();
   auto RFloat = R.Fn.template convert<float>(R);
   std::string IntrinsicName = "llvm.fabs.f32";
 #if PROTEUS_ENABLE_CUDA

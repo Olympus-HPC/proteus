@@ -102,26 +102,6 @@ Value *FuncBase::getConstantFP(Type *Ty, double Val) {
   return CB->getConstantFP(Ty, Val);
 }
 
-// Type accessors.
-unsigned FuncBase::getAddressSpace(Type *Ty) { return CB->getAddressSpace(Ty); }
-
-unsigned FuncBase::getAddressSpaceFromValue(Value *PtrVal) {
-  return CB->getAddressSpaceFromValue(PtrVal);
-}
-
-Type *FuncBase::getPointerType(Type *ElemTy, unsigned AS) {
-  return CB->getPointerType(ElemTy, AS);
-}
-Type *FuncBase::getPointerTypeUnqual(Type *ElemTy) {
-  return CB->getPointerTypeUnqual(ElemTy);
-}
-Type *FuncBase::getInt16Ty() { return CB->getInt16Ty(); }
-Type *FuncBase::getInt32Ty() { return CB->getInt32Ty(); }
-Type *FuncBase::getInt64Ty() { return CB->getInt64Ty(); }
-Type *FuncBase::getFloatTy() { return CB->getFloatTy(); }
-bool FuncBase::isIntegerTy(Type *Ty) { return CB->isIntegerTy(Ty); }
-bool FuncBase::isFloatingPointTy(Type *Ty) { return CB->isFloatingPointTy(Ty); }
-
 void FuncBase::beginFunction(const char *File, int Line) {
   CB->beginFunction(*LLVMFunc, File, Line);
 }
