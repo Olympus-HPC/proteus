@@ -49,8 +49,6 @@ template <typename R, typename... Args> struct sig_traits<R(Args...)> {
   using argument_types = std::tuple<Args...>;
 };
 
-using namespace llvm;
-
 struct DispatchResult {
   int Ret;
 
@@ -84,9 +82,10 @@ public:
   static Dispatcher &getDispatcher(TargetModelType TargetModel);
   virtual ~Dispatcher() = default;
 
-  virtual std::unique_ptr<MemoryBuffer>
-  compile(std::unique_ptr<LLVMContext> Ctx, std::unique_ptr<Module> M,
-          const HashT &ModuleHash, bool DisableIROpt = false) = 0;
+  virtual std::unique_ptr<llvm::MemoryBuffer>
+  compile(std::unique_ptr<llvm::LLVMContext> Ctx,
+          std::unique_ptr<llvm::Module> M, const HashT &ModuleHash,
+          bool DisableIROpt = false) = 0;
 
   virtual std::unique_ptr<CompiledLibrary>
   lookupCompiledLibrary(const HashT &ModuleHash) = 0;
@@ -95,7 +94,7 @@ public:
                                 LaunchDims BlockDim, void *KernelArgs[],
                                 uint64_t ShmemSize, void *Stream) = 0;
 
-  virtual StringRef getDeviceArch() const = 0;
+  virtual llvm::StringRef getDeviceArch() const = 0;
 
   template <typename Sig, typename... ArgT>
   typename sig_traits<Sig>::return_type run(void *FuncPtr, ArgT &&...Args) {

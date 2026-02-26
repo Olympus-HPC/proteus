@@ -140,8 +140,8 @@ public:
 
   bool isCompiled() const { return IsCompiled; }
 
-  const Module &getModule() const { return CB->getModule(); }
-  Module &getModule() { return CB->getModule(); }
+  const llvm::Module &getModule() const { return CB->getModule(); }
+  llvm::Module &getModule() { return CB->getModule(); }
 
   template <typename Sig> auto addKernel(const std::string &Name) {
     using RetT = typename FnSig<Sig>::RetT;

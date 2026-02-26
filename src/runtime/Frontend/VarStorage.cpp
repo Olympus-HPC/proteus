@@ -5,6 +5,8 @@
 
 namespace proteus {
 
+using namespace llvm;
+
 Value *ScalarStorage::getSlot() const { return Slot; }
 
 Value *ScalarStorage::loadValue() const {

@@ -9,6 +9,8 @@ namespace gpu {
 
 namespace detail {
 
+using namespace llvm;
+
 // Offsets in implicit arg pts in i32 step.
 constexpr unsigned OffsetGridDimX = 0;
 constexpr unsigned OffsetGridDimY = 1;
@@ -79,7 +81,7 @@ Var<unsigned int> getBlockIdX(FuncBase &Fn) {
 Var<unsigned int> getBlockDimX(FuncBase &Fn) {
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("blockDim.x");
 
-  Value *Conv = detail::getBlockDim(Fn, detail::OffsetBlockDimX);
+  llvm::Value *Conv = detail::getBlockDim(Fn, detail::OffsetBlockDimX);
   Ret.storeValue(Conv);
 
   return Ret;
@@ -88,7 +90,7 @@ Var<unsigned int> getBlockDimX(FuncBase &Fn) {
 Var<unsigned int> getGridDimX(FuncBase &Fn) {
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("gridDim.x");
 
-  Value *Conv = detail::getGridDim(Fn, detail::OffsetGridDimX);
+  llvm::Value *Conv = detail::getGridDim(Fn, detail::OffsetGridDimX);
   Ret.storeValue(Conv);
 
   return Ret;
@@ -145,7 +147,7 @@ Var<unsigned int> getBlockIdZ(FuncBase &Fn) {
 Var<unsigned int> getBlockDimY(FuncBase &Fn) {
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("blockDim.y");
 
-  Value *Conv = detail::getBlockDim(Fn, detail::OffsetBlockDimY);
+  llvm::Value *Conv = detail::getBlockDim(Fn, detail::OffsetBlockDimY);
   Ret.storeValue(Conv);
 
   return Ret;
@@ -154,7 +156,7 @@ Var<unsigned int> getBlockDimY(FuncBase &Fn) {
 Var<unsigned int> getBlockDimZ(FuncBase &Fn) {
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("blockDim.z");
 
-  Value *Conv = detail::getBlockDim(Fn, detail::OffsetBlockDimZ);
+  llvm::Value *Conv = detail::getBlockDim(Fn, detail::OffsetBlockDimZ);
   Ret.storeValue(Conv);
 
   return Ret;
@@ -163,7 +165,7 @@ Var<unsigned int> getBlockDimZ(FuncBase &Fn) {
 Var<unsigned int> getGridDimY(FuncBase &Fn) {
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("gridDim.y");
 
-  Value *Conv = detail::getGridDim(Fn, detail::OffsetGridDimY);
+  llvm::Value *Conv = detail::getGridDim(Fn, detail::OffsetGridDimY);
   Ret.storeValue(Conv);
 
   return Ret;
@@ -172,7 +174,7 @@ Var<unsigned int> getGridDimY(FuncBase &Fn) {
 Var<unsigned int> getGridDimZ(FuncBase &Fn) {
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("gridDim.z");
 
-  Value *Conv = detail::getGridDim(Fn, detail::OffsetGridDimZ);
+  llvm::Value *Conv = detail::getGridDim(Fn, detail::OffsetGridDimZ);
   Ret.storeValue(Conv);
 
   return Ret;

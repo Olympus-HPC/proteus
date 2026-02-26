@@ -11,8 +11,6 @@ namespace proteus {
 
 class FuncBase;
 
-using namespace llvm;
-
 // Mixin that owns storage and exposes common helpers for Var specializations
 template <typename StorageT> struct VarStorageOwner {
   FuncBase &Fn;
@@ -24,14 +22,14 @@ template <typename StorageT> struct VarStorageOwner {
   VarStorageOwner(FuncBase &FnIn) : Fn(FnIn) {}
 
   // Storage accessor helpers
-  Value *loadValue() const { return Storage->loadValue(); }
+  llvm::Value *loadValue() const { return Storage->loadValue(); }
 
-  void storeValue(Value *Val) { Storage->storeValue(Val); }
+  void storeValue(llvm::Value *Val) { Storage->storeValue(Val); }
 
-  Value *getSlot() const { return Storage->getSlot(); }
-  Type *getSlotType() const { return Storage->getSlotType(); }
-  Type *getValueType() const { return Storage->getValueType(); }
-  Type *getAllocatedType() const { return Storage->getAllocatedType(); }
+  llvm::Value *getSlot() const { return Storage->getSlot(); }
+  llvm::Type *getSlotType() const { return Storage->getSlotType(); }
+  llvm::Type *getValueType() const { return Storage->getValueType(); }
+  llvm::Type *getAllocatedType() const { return Storage->getAllocatedType(); }
 };
 
 // Primary template declaration
@@ -215,8 +213,8 @@ struct Var<T, std::enable_if_t<is_pointer_unref_v<T>>>
       : VarStorageOwner<PointerStorage>(std::move(Storage), Fn) {}
 
   // Load/store the pointer value itself from/to the pointer slot.
-  Value *loadPointer() const { return this->Storage->loadPointer(); }
-  void storePointer(Value *Ptr) { this->Storage->storePointer(Ptr); }
+  llvm::Value *loadPointer() const { return this->Storage->loadPointer(); }
+  void storePointer(llvm::Value *Ptr) { this->Storage->storePointer(Ptr); }
 
   Var<std::add_lvalue_reference_t<ElemType>> operator[](size_t Index);
 

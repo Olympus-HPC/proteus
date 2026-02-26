@@ -47,8 +47,6 @@ template <typename RetT_, typename... ArgT> struct FnSig<RetT_(ArgT...)> {
   using RetT = RetT_;
 };
 
-using namespace llvm;
-
 struct EmptyLambda {
   void operator()() const {}
 };
@@ -67,33 +65,35 @@ class FuncBase {
 public:
   JitModule &getJitModule() { return J; }
 
-  LLVMContext &getContext();
+  llvm::LLVMContext &getContext();
 
   /// Get the underlying LLVMCodeBuilder for direct IR generation.
   LLVMCodeBuilder &getCodeBuilder();
 
   // Storage creation operations.
   std::unique_ptr<ScalarStorage> createScalarStorage(const std::string &Name,
-                                                     Type *AllocaTy);
-  std::unique_ptr<PointerStorage>
-  createPointerStorage(const std::string &Name, Type *AllocaTy, Type *ElemTy);
-  std::unique_ptr<ArrayStorage>
-  createArrayStorage(const std::string &Name, AddressSpace AS, Type *ArrTy);
+                                                     llvm::Type *AllocaTy);
+  std::unique_ptr<PointerStorage> createPointerStorage(const std::string &Name,
+                                                       llvm::Type *AllocaTy,
+                                                       llvm::Type *ElemTy);
+  std::unique_ptr<ArrayStorage> createArrayStorage(const std::string &Name,
+                                                   AddressSpace AS,
+                                                   llvm::Type *ArrTy);
 
   // Type operations.
-  unsigned getAddressSpace(Type *Ty);
-  unsigned getAddressSpaceFromValue(Value *PtrVal);
-  Type *getPointerType(Type *ElemTy, unsigned AS);
-  Type *getPointerTypeUnqual(Type *ElemTy);
-  Type *getInt32Ty();
-  Type *getInt16Ty();
-  Type *getInt64Ty();
-  Type *getFloatTy();
-  bool isIntegerTy(Type *Ty);
-  bool isFloatingPointTy(Type *Ty);
+  unsigned getAddressSpace(llvm::Type *Ty);
+  unsigned getAddressSpaceFromValue(llvm::Value *PtrVal);
+  llvm::Type *getPointerType(llvm::Type *ElemTy, unsigned AS);
+  llvm::Type *getPointerTypeUnqual(llvm::Type *ElemTy);
+  llvm::Type *getInt32Ty();
+  llvm::Type *getInt16Ty();
+  llvm::Type *getInt64Ty();
+  llvm::Type *getFloatTy();
+  bool isIntegerTy(llvm::Type *Ty);
+  bool isFloatingPointTy(llvm::Type *Ty);
 
   // Conversion operations.
-  template <typename FromT, typename ToT> Value *convert(Value *V) {
+  template <typename FromT, typename ToT> llvm::Value *convert(llvm::Value *V) {
     using From = remove_cvref_t<FromT>;
     using To = remove_cvref_t<ToT>;
     static_assert(std::is_arithmetic_v<From>, "From type must be arithmetic");
@@ -105,7 +105,7 @@ public:
       return V;
     }
 
-    Type *DestTy = TypeMap<To>::get(Ctx);
+    llvm::Type *DestTy = TypeMap<To>::get(Ctx);
 
     if constexpr (std::is_integral_v<From> && std::is_floating_point_v<To>) {
       if constexpr (std::is_signed_v<From>) {
@@ -150,13 +150,13 @@ protected:
 
 public:
   FuncBase(JitModule &J, LLVMCodeBuilder &CB, const std::string &Name,
-           Type *RetTy, const std::vector<Type *> &ArgTys);
+           llvm::Type *RetTy, const std::vector<llvm::Type *> &ArgTys);
   ~FuncBase();
 
   TargetModelType getTargetModel() const;
 
-  Function *getFunction();
-  Value *getArg(size_t Idx);
+  llvm::Function *getFunction();
+  llvm::Value *getArg(size_t Idx);
 
 #if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
   // Kernel management.
@@ -170,10 +170,10 @@ public:
                   "declVar does not support reference types");
 
     auto &Ctx = getContext();
-    Type *AllocaTy = TypeMap<T>::get(Ctx);
+    llvm::Type *AllocaTy = TypeMap<T>::get(Ctx);
 
     if constexpr (std::is_pointer_v<T>) {
-      Type *PtrElemTy = TypeMap<T>::getPointerElemType(Ctx);
+      llvm::Type *PtrElemTy = TypeMap<T>::getPointerElemType(Ctx);
       return Var<T>{createPointerStorage(Name, AllocaTy, PtrElemTy), *this};
     } else {
       return Var<T>{createScalarStorage(Name, AllocaTy), *this};
@@ -384,7 +384,7 @@ public:
   convert(const Var<T> &V) {
     using ResultT = std::remove_reference_t<U>;
     Var<ResultT> Res = declVar<ResultT>("convert.");
-    Value *Converted = convert<T, U>(V.loadValue());
+    llvm::Value *Converted = convert<T, U>(V.loadValue());
     Res.storeValue(Converted);
     return Res;
   }
@@ -458,11 +458,11 @@ void FuncBase::beginFor(Var<IterT> &IterVar, const Var<InitT> &Init,
   auto [CurBlock, NextBlock] = CB->splitCurrentBlock();
   CB->pushScope(File, Line, ScopeKind::FOR, NextBlock);
 
-  BasicBlock *Header = CB->createBasicBlock("loop.header", NextBlock);
-  BasicBlock *LoopCond = CB->createBasicBlock("loop.cond", NextBlock);
-  BasicBlock *Body = CB->createBasicBlock("loop.body", NextBlock);
-  BasicBlock *Latch = CB->createBasicBlock("loop.inc", NextBlock);
-  BasicBlock *LoopExit = CB->createBasicBlock("loop.end", NextBlock);
+  llvm::BasicBlock *Header = CB->createBasicBlock("loop.header", NextBlock);
+  llvm::BasicBlock *LoopCond = CB->createBasicBlock("loop.cond", NextBlock);
+  llvm::BasicBlock *Body = CB->createBasicBlock("loop.body", NextBlock);
+  llvm::BasicBlock *Latch = CB->createBasicBlock("loop.inc", NextBlock);
+  llvm::BasicBlock *LoopExit = CB->createBasicBlock("loop.end", NextBlock);
 
   // Erase the old terminator and branch to the header.
   CB->eraseTerminator(CurBlock);
@@ -478,7 +478,7 @@ void FuncBase::beginFor(Var<IterT> &IterVar, const Var<InitT> &Init,
   CB->setInsertPoint(LoopCond);
   {
     auto CondVar = IterVar < UpperBound;
-    Value *Cond = CondVar.loadValue();
+    llvm::Value *Cond = CondVar.loadValue();
     CB->createCondBr(Cond, Body, LoopExit);
   }
 
@@ -504,9 +504,9 @@ void FuncBase::beginWhile(CondLambda &&Cond, const char *File, int Line) {
   auto [CurBlock, NextBlock] = CB->splitCurrentBlock();
   CB->pushScope(File, Line, ScopeKind::WHILE, NextBlock);
 
-  BasicBlock *LoopCond = CB->createBasicBlock("while.cond", NextBlock);
-  BasicBlock *Body = CB->createBasicBlock("while.body", NextBlock);
-  BasicBlock *LoopExit = CB->createBasicBlock("while.end", NextBlock);
+  llvm::BasicBlock *LoopCond = CB->createBasicBlock("while.cond", NextBlock);
+  llvm::BasicBlock *Body = CB->createBasicBlock("while.body", NextBlock);
+  llvm::BasicBlock *LoopExit = CB->createBasicBlock("while.end", NextBlock);
 
   CB->eraseTerminator(CurBlock);
   CB->setInsertPoint(CurBlock);
@@ -515,7 +515,7 @@ void FuncBase::beginWhile(CondLambda &&Cond, const char *File, int Line) {
   CB->setInsertPoint(LoopCond);
   {
     auto CondVar = Cond();
-    Value *CondV = CondVar.loadValue();
+    llvm::Value *CondV = CondVar.loadValue();
     CB->createCondBr(CondV, Body, LoopExit);
   }
 
@@ -543,7 +543,7 @@ FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
   };
 
   auto &Ctx = getContext();
-  std::vector<Type *> ArgTys = unpackArgTypes(ArgT{}, Ctx);
+  std::vector<llvm::Type *> ArgTys = unpackArgTypes(ArgT{}, Ctx);
   getCodeBuilder().createCall(Name, TypeMap<RetT>::get(getContext()), ArgTys,
                               {GetArgVal(ArgsVars)...});
 }
@@ -569,7 +569,8 @@ FuncBase::call(const std::string &Name) {
 }
 
 template <typename... Ts>
-std::vector<Type *> unpackArgTypes(ArgTypeList<Ts...>, LLVMContext &Ctx) {
+std::vector<llvm::Type *> unpackArgTypes(ArgTypeList<Ts...>,
+                                         llvm::LLVMContext &Ctx) {
   return {TypeMap<Ts>::get(Ctx)...};
 }
 
@@ -589,8 +590,8 @@ FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
   };
 
   auto &Ctx = getContext();
-  std::vector<Type *> ArgTys = unpackArgTypes(ArgT{}, Ctx);
-  std::vector<Value *> ArgVals = {GetArgVal(ArgsVars)...};
+  std::vector<llvm::Type *> ArgTys = unpackArgTypes(ArgT{}, Ctx);
+  std::vector<llvm::Value *> ArgVals = {GetArgVal(ArgsVars)...};
 
   auto *Call = getCodeBuilder().createCall(Name, TypeMap<RetT>::get(Ctx),
                                            ArgTys, ArgVals);
@@ -613,10 +614,10 @@ binOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
   if (&Fn != &R.Fn)
     reportFatalError("Variables should belong to the same function");
 
-  Value *LHS = Fn.convert<T, CommonT>(L.loadValue());
-  Value *RHS = Fn.convert<U, CommonT>(R.loadValue());
+  llvm::Value *LHS = Fn.convert<T, CommonT>(L.loadValue());
+  llvm::Value *RHS = Fn.convert<U, CommonT>(R.loadValue());
 
-  Value *Result = nullptr;
+  llvm::Value *Result = nullptr;
   if constexpr (std::is_integral_v<CommonT>) {
     Result = IOp(Fn.getCodeBuilder(), LHS, RHS);
   } else {
@@ -638,19 +639,19 @@ compoundAssignConst(Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &LHS,
                 "U must be convertible to T");
 
   auto &Ctx = LHS.Fn.getContext();
-  Type *RHSType = TypeMap<remove_cvref_t<U>>::get(Ctx);
+  llvm::Type *RHSType = TypeMap<remove_cvref_t<U>>::get(Ctx);
 
-  Value *RHS = nullptr;
+  llvm::Value *RHS = nullptr;
   if constexpr (std::is_integral_v<remove_cvref_t<U>>) {
     RHS = LHS.Fn.getConstantInt(RHSType, ConstValue);
   } else {
     RHS = LHS.Fn.getConstantFP(RHSType, ConstValue);
   }
 
-  Value *LHSVal = LHS.loadValue();
+  llvm::Value *LHSVal = LHS.loadValue();
 
   RHS = LHS.Fn.template convert<U, T>(RHS);
-  Value *Result = nullptr;
+  llvm::Value *Result = nullptr;
 
   if constexpr (std::is_integral_v<remove_cvref_t<T>>) {
     Result = IOp(LHS.Fn.getCodeBuilder(), LHSVal, RHS);
@@ -671,10 +672,10 @@ Var<bool> cmpOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
   if (&Fn != &R.Fn)
     reportFatalError("Variables should belong to the same function");
 
-  Value *LHS = L.loadValue();
-  Value *RHS = Fn.convert<U, T>(R.loadValue());
+  llvm::Value *LHS = L.loadValue();
+  llvm::Value *RHS = Fn.convert<U, T>(R.loadValue());
 
-  Value *Result = nullptr;
+  llvm::Value *Result = nullptr;
   if constexpr (std::is_integral_v<remove_cvref_t<T>>) {
     Result = IOp(Fn.getCodeBuilder(), LHS, RHS);
   } else {
@@ -694,7 +695,7 @@ template <typename U, typename>
 Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::Var(const Var<U> &V)
     : VarStorageOwner<VarStorage>(V.Fn) {
   // Allocate storage for the target type T.
-  Type *TargetTy = TypeMap<remove_cvref_t<T>>::get(Fn.getContext());
+  llvm::Type *TargetTy = TypeMap<remove_cvref_t<T>>::get(Fn.getContext());
   Storage = Fn.createScalarStorage("conv.var", TargetTy);
 
   auto *Converted = Fn.convert<U, T>(V.loadValue());
@@ -729,10 +730,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::getAddress() {
   if constexpr (std::is_reference_v<T>) {
     // For references, load the pointer to create a T*.
     auto *PtrStorage = static_cast<PointerStorage *>(Storage.get());
-    Value *PtrVal = PtrStorage->loadPointer();
-    Type *ElemTy = PtrStorage->getValueType();
+    llvm::Value *PtrVal = PtrStorage->loadPointer();
+    llvm::Type *ElemTy = PtrStorage->getValueType();
     unsigned AddrSpace = Fn.getAddressSpaceFromValue(PtrVal);
-    Type *PtrTy = Fn.getPointerType(ElemTy, AddrSpace);
+    llvm::Type *PtrTy = Fn.getPointerType(ElemTy, AddrSpace);
     PtrVal = Fn.getCodeBuilder().createBitCast(PtrVal, PtrTy);
 
     std::unique_ptr<PointerStorage> ResultStorage =
@@ -742,12 +743,12 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::getAddress() {
     return Var<std::add_pointer_t<T>>(std::move(ResultStorage), Fn);
   }
 
-  Value *Slot = getSlot();
-  Type *ElemTy = getAllocatedType();
+  llvm::Value *Slot = getSlot();
+  llvm::Type *ElemTy = getAllocatedType();
 
   unsigned AddrSpace = Fn.getAddressSpace(getSlotType());
-  Type *PtrTy = Fn.getPointerType(ElemTy, AddrSpace);
-  Value *PtrVal = Slot;
+  llvm::Type *PtrTy = Fn.getPointerType(ElemTy, AddrSpace);
+  llvm::Value *PtrVal = Slot;
   PtrVal = Fn.getCodeBuilder().createBitCast(Slot, PtrTy);
 
   std::unique_ptr<PointerStorage> ResultStorage =
@@ -777,7 +778,7 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator=(
   static_assert(std::is_arithmetic_v<U>,
                 "Can only assign arithmetic types to Var");
 
-  Type *LHSType = getValueType();
+  llvm::Type *LHSType = getValueType();
 
   if (Fn.isIntegerTy(LHSType)) {
     storeValue(Fn.getConstantInt(LHSType, ConstValue));
@@ -797,10 +798,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator+(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createAdd(L, R);
       },
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createFAdd(L, R);
       });
 }
@@ -812,10 +813,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator-(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createSub(L, R);
       },
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createFSub(L, R);
       });
 }
@@ -827,10 +828,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator*(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createMul(L, R);
       },
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createFMul(L, R);
       });
 }
@@ -842,10 +843,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator/(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createSDiv(L, R);
       },
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createFDiv(L, R);
       });
 }
@@ -857,10 +858,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator%(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createSRem(L, R);
       },
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createFRem(L, R);
       });
 }
@@ -943,10 +944,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator+=(
                 "Can only add arithmetic types to Var");
   return compoundAssignConst(
       *this, ConstValue,
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createAdd(L, R);
       },
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createFAdd(L, R);
       });
 }
@@ -972,10 +973,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator-=(
                 "Can only subtract arithmetic types from Var");
   return compoundAssignConst(
       *this, ConstValue,
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createSub(L, R);
       },
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createFSub(L, R);
       });
 }
@@ -1001,10 +1002,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator*=(
                 "Can only multiply Var by arithmetic types");
   return compoundAssignConst(
       *this, ConstValue,
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createMul(L, R);
       },
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createFMul(L, R);
       });
 }
@@ -1030,10 +1031,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator/=(
                 "Can only divide Var by arithmetic types");
   return compoundAssignConst(
       *this, ConstValue,
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createSDiv(L, R);
       },
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createFDiv(L, R);
       });
 }
@@ -1059,10 +1060,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator%=(
                 "Can only modulo Var by arithmetic types");
   return compoundAssignConst(
       *this, ConstValue,
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createSRem(L, R);
       },
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createFRem(L, R);
       });
 }
@@ -1078,15 +1079,15 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator-() const {
 template <typename T>
 Var<bool>
 Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator!() const {
-  Value *V = loadValue();
-  Value *ResV = nullptr;
+  llvm::Value *V = loadValue();
+  llvm::Value *ResV = nullptr;
   if constexpr (std::is_same_v<remove_cvref_t<T>, bool>) {
     ResV = Fn.getCodeBuilder().createNot(V);
   } else if constexpr (std::is_integral_v<remove_cvref_t<T>>) {
-    Value *Zero = Fn.getConstantInt(getValueType(), 0);
+    llvm::Value *Zero = Fn.getConstantInt(getValueType(), 0);
     ResV = Fn.getCodeBuilder().createICmpEQ(V, Zero);
   } else {
-    Value *Zero = Fn.getConstantFP(getValueType(), 0.0);
+    llvm::Value *Zero = Fn.getConstantFP(getValueType(), 0.0);
     ResV = Fn.getCodeBuilder().createFCmpOEQ(V, Zero);
   }
   auto Ret = Fn.declVar<bool>("not.");
@@ -1103,9 +1104,9 @@ Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](size_t Index) {
   // GEP into the array aggregate: [0, Index]
   auto *GEP = Fn.getCodeBuilder().createConstInBoundsGEP2_64(
       ArrayTy, BasePointer, 0, Index);
-  Type *ElemTy = getValueType();
+  llvm::Type *ElemTy = getValueType();
   unsigned AddrSpace = Fn.getAddressSpace(getSlotType());
-  Type *ElemPtrTy = Fn.getPointerType(ElemTy, AddrSpace);
+  llvm::Type *ElemPtrTy = Fn.getPointerType(ElemTy, AddrSpace);
 
   std::unique_ptr<PointerStorage> ResultStorage =
       Fn.createPointerStorage("elem.ptr", ElemPtrTy, ElemTy);
@@ -1123,13 +1124,13 @@ Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](
   auto *ArrayTy = getAllocatedType();
   auto *BasePointer = getSlot();
 
-  Value *IdxVal = Index.loadValue();
-  Value *Zero = Fn.getConstantInt(Index.getValueType(), 0);
+  llvm::Value *IdxVal = Index.loadValue();
+  llvm::Value *Zero = Fn.getConstantInt(Index.getValueType(), 0);
   auto *GEP = Fn.getCodeBuilder().createInBoundsGEP(ArrayTy, BasePointer,
                                                     {Zero, IdxVal});
-  Type *ElemTy = getValueType();
+  llvm::Type *ElemTy = getValueType();
   unsigned AddrSpace = Fn.getAddressSpace(getSlotType());
-  Type *ElemPtrTy = Fn.getPointerType(ElemTy, AddrSpace);
+  llvm::Type *ElemPtrTy = Fn.getPointerType(ElemTy, AddrSpace);
 
   std::unique_ptr<VarStorage> ResultStorage =
       Fn.createPointerStorage("elem.ptr", ElemPtrTy, ElemTy);
@@ -1150,7 +1151,7 @@ Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator[](size_t Index) {
   auto *GEP =
       Fn.getCodeBuilder().createConstInBoundsGEP1_64(PointerElemTy, Ptr, Index);
   unsigned AddrSpace = Fn.getAddressSpace(getAllocatedType());
-  Type *ElemPtrTy = Fn.getPointerType(PointerElemTy, AddrSpace);
+  llvm::Type *ElemPtrTy = Fn.getPointerType(PointerElemTy, AddrSpace);
 
   // Create a pointer storage to hold the LValue for the Array[Index].
   std::unique_ptr<PointerStorage> ResultStorage =
@@ -1178,7 +1179,7 @@ Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator[](
   auto *GEP =
       Fn.getCodeBuilder().createInBoundsGEP(PointeeType, Ptr, {IdxValue});
   unsigned AddrSpace = Fn.getAddressSpace(getAllocatedType());
-  Type *ElemPtrTy = Fn.getPointerType(PointeeType, AddrSpace);
+  llvm::Type *ElemPtrTy = Fn.getPointerType(PointeeType, AddrSpace);
 
   // Create a pointer storage to hold the LValue for the Array[Index].
   std::unique_ptr<PointerStorage> ResultStorage =
@@ -1201,12 +1202,12 @@ Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator*() {
 template <typename T>
 Var<std::add_pointer_t<T>>
 Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::getAddress() {
-  Value *PtrVal = loadPointer();
-  Type *ElemTy = getValueType();
+  llvm::Value *PtrVal = loadPointer();
+  llvm::Type *ElemTy = getValueType();
 
   unsigned AddrSpace = Fn.getAddressSpace(getAllocatedType());
-  Type *PointeePtrTy = Fn.getPointerType(ElemTy, AddrSpace);
-  Type *TargetPtrTy = Fn.getPointerTypeUnqual(PointeePtrTy);
+  llvm::Type *PointeePtrTy = Fn.getPointerType(ElemTy, AddrSpace);
+  llvm::Type *TargetPtrTy = Fn.getPointerTypeUnqual(PointeePtrTy);
 
   PtrVal = Fn.getCodeBuilder().createBitCast(PtrVal, PointeePtrTy);
 
@@ -1251,7 +1252,7 @@ std::enable_if_t<std::is_arithmetic_v<OffsetT>,
 Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator+(
     OffsetT Offset) const {
   auto *IntTy = Fn.getInt64Ty();
-  Value *IdxVal = Fn.getConstantInt(IntTy, Offset);
+  llvm::Value *IdxVal = Fn.getConstantInt(IntTy, Offset);
 
   auto *BasePtr = loadPointer();
   auto *ElemTy = getValueType();
@@ -1278,10 +1279,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator>(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createICmpSGT(L, R);
       },
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createFCmpOGT(L, R);
       });
 }
@@ -1293,10 +1294,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator>=(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createICmpSGE(L, R);
       },
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createFCmpOGE(L, R);
       });
 }
@@ -1308,10 +1309,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator<(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createICmpSLT(L, R);
       },
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createFCmpOLT(L, R);
       });
 }
@@ -1323,10 +1324,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator<=(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createICmpSLE(L, R);
       },
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createFCmpOLE(L, R);
       });
 }
@@ -1338,10 +1339,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator==(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createICmpEQ(L, R);
       },
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createFCmpOEQ(L, R);
       });
 }
@@ -1353,10 +1354,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator!=(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createICmpNE(L, R);
       },
-      [](LLVMCodeBuilder &CB, Value *L, Value *R) {
+      [](LLVMCodeBuilder &CB, llvm::Value *L, llvm::Value *R) {
         return CB.createFCmpONE(L, R);
       });
 }
@@ -1462,7 +1463,8 @@ std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicAdd(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicAdd requires arithmetic type");
 
-  Value *Result = CB->createAtomicAdd(Addr.loadPointer(), Val.loadValue());
+  llvm::Value *Result =
+      CB->createAtomicAdd(Addr.loadPointer(), Val.loadValue());
   auto Ret = declVar<T>("atomic.add.res.");
   Ret.storeValue(Result);
   return Ret;
@@ -1473,7 +1475,8 @@ std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicSub(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicSub requires arithmetic type");
 
-  Value *Result = CB->createAtomicSub(Addr.loadPointer(), Val.loadValue());
+  llvm::Value *Result =
+      CB->createAtomicSub(Addr.loadPointer(), Val.loadValue());
   auto Ret = declVar<T>("atomic.sub.res.");
   Ret.storeValue(Result);
   return Ret;
@@ -1484,7 +1487,8 @@ std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicMax(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicMax requires arithmetic type");
 
-  Value *Result = CB->createAtomicMax(Addr.loadPointer(), Val.loadValue());
+  llvm::Value *Result =
+      CB->createAtomicMax(Addr.loadPointer(), Val.loadValue());
   auto Ret = declVar<T>("atomic.max.res.");
   Ret.storeValue(Result);
   return Ret;
@@ -1495,7 +1499,8 @@ std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicMin(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicMin requires arithmetic type");
 
-  Value *Result = CB->createAtomicMin(Addr.loadPointer(), Val.loadValue());
+  llvm::Value *Result =
+      CB->createAtomicMin(Addr.loadPointer(), Val.loadValue());
   auto Ret = declVar<T>("atomic.min.res.");
   Ret.storeValue(Result);
   return Ret;
@@ -1504,7 +1509,7 @@ FuncBase::atomicMin(const Var<T *> &Addr, const Var<T> &Val) {
 inline void FuncBase::ret() { CB->createRetVoid(); }
 
 template <typename T> void FuncBase::ret(const Var<T> &RetVal) {
-  Value *RetValue = RetVal.loadValue();
+  llvm::Value *RetValue = RetVal.loadValue();
   CB->createRet(RetValue);
 }
 
@@ -1515,15 +1520,15 @@ template <typename T> void FuncBase::ret(const Var<T> &RetVal) {
 template <typename T> struct IntrinsicOperandConverter {
   FuncBase &Fn;
 
-  template <typename U> Value *operator()(const Var<U> &Operand) const {
+  template <typename U> llvm::Value *operator()(const Var<U> &Operand) const {
     return Fn.convert<U, T>(Operand.loadValue());
   }
 };
 
 // Helper for emitting intrinsics with Var
 template <typename T, typename... Operands>
-static Var<T> emitIntrinsic(const std::string &IntrinsicName, Type *ResultType,
-                            const Operands &...Ops) {
+static Var<T> emitIntrinsic(const std::string &IntrinsicName,
+                            llvm::Type *ResultType, const Operands &...Ops) {
   static_assert(sizeof...(Ops) > 0, "Intrinsic requires at least one operand");
 
   auto &Fn = std::get<0>(std::tie(Ops...)).Fn;
@@ -1536,8 +1541,8 @@ static Var<T> emitIntrinsic(const std::string &IntrinsicName, Type *ResultType,
   IntrinsicOperandConverter<T> ConvertOperand{Fn};
 
   // All operands are converted to the result type.
-  std::vector<Type *> ArgTys(sizeof...(Ops), ResultType);
-  Value *Call = Fn.getCodeBuilder().createCall(
+  std::vector<llvm::Type *> ArgTys(sizeof...(Ops), ResultType);
+  llvm::Value *Call = Fn.getCodeBuilder().createCall(
       IntrinsicName, ResultType, ArgTys, {ConvertOperand(Ops)...});
 
   auto ResultVar = Fn.template declVar<T>("res.");
