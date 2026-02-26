@@ -20,12 +20,10 @@
 namespace llvm {
 class BasicBlock;
 class Function;
-class FunctionCallee;
 class AllocaInst;
 class Type;
 class Value;
 class LLVMContext;
-class ArrayType;
 } // namespace llvm
 
 namespace proteus {
@@ -549,6 +547,78 @@ void FuncBase::beginWhile(CondLambda &&Cond, const char *File, int Line) {
   { CB->createBr(NextBlock); }
 
   setInsertPointBegin(Body);
+}
+
+template <typename Sig, typename... ArgVars>
+std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
+FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
+  using RetT = typename FnSig<Sig>::RetT;
+  using ArgT = typename FnSig<Sig>::ArgsTList;
+
+  auto GetArgVal = [](auto &&Arg) {
+    using ArgVarT = std::decay_t<decltype(Arg)>;
+    if constexpr (std::is_pointer_v<typename ArgVarT::ValueType>)
+      return Arg.loadPointer();
+    else
+      return Arg.loadValue();
+  };
+
+  auto &Ctx = getContext();
+  std::vector<Type *> ArgTys = unpackArgTypes(ArgT{}, Ctx);
+  getCodeBuilder().createCall(Name, TypeMap<RetT>::get(getContext()), ArgTys,
+                              {GetArgVal(ArgsVars)...});
+}
+
+template <typename Sig>
+std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>,
+                 Var<typename FnSig<Sig>::RetT>>
+FuncBase::call(const std::string &Name) {
+  using RetT = typename FnSig<Sig>::RetT;
+
+  auto *Call =
+      getCodeBuilder().createCall(Name, TypeMap<RetT>::get(getContext()));
+  Var<RetT> Ret = declVar<RetT>("ret");
+  Ret.storeValue(Call);
+  return Ret;
+}
+
+template <typename Sig>
+std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
+FuncBase::call(const std::string &Name) {
+  using RetT = typename FnSig<Sig>::RetT;
+  getCodeBuilder().createCall(Name, TypeMap<RetT>::get(getContext()));
+}
+
+template <typename... Ts>
+std::vector<Type *> unpackArgTypes(ArgTypeList<Ts...>, LLVMContext &Ctx) {
+  return {TypeMap<Ts>::get(Ctx)...};
+}
+
+template <typename Sig, typename... ArgVars>
+std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>,
+                 Var<typename FnSig<Sig>::RetT>>
+FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
+  using RetT = typename FnSig<Sig>::RetT;
+  using ArgT = typename FnSig<Sig>::ArgsTList;
+
+  auto GetArgVal = [](auto &&Arg) {
+    using ArgVarT = std::decay_t<decltype(Arg)>;
+    if constexpr (std::is_pointer_v<typename ArgVarT::ValueType>)
+      return Arg.loadPointer();
+    else
+      return Arg.loadValue();
+  };
+
+  auto &Ctx = getContext();
+  std::vector<Type *> ArgTys = unpackArgTypes(ArgT{}, Ctx);
+  std::vector<Value *> ArgVals = {GetArgVal(ArgsVars)...};
+
+  auto *Call = getCodeBuilder().createCall(Name, TypeMap<RetT>::get(Ctx),
+                                           ArgTys, ArgVals);
+
+  Var<RetT> Ret = declVar<RetT>("ret");
+  Ret.storeValue(Call);
+  return Ret;
 }
 
 // Var implementations (defined here after FuncBase is
