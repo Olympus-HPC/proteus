@@ -4,6 +4,7 @@
 #include "proteus/AddressSpace.h"
 #include "proteus/Error.h"
 #include "proteus/Frontend/TargetModel.h"
+#include "proteus/Frontend/VarStorage.h"
 
 #include <cstdint>
 #include <memory>
@@ -50,8 +51,11 @@ class LLVMCodeBuilder {
 public:
   /// Construct as owner of LLVMContext and Module.
   LLVMCodeBuilder(std::unique_ptr<llvm::LLVMContext> Ctx,
-                  std::unique_ptr<llvm::Module> Mod);
+                  std::unique_ptr<llvm::Module> Mod,
+                  TargetModelType TM = TargetModelType::HOST);
   ~LLVMCodeBuilder();
+
+  TargetModelType getTargetModel() const { return TargetModel; }
 
   LLVMCodeBuilder(const LLVMCodeBuilder &) = delete;
   LLVMCodeBuilder &operator=(const LLVMCodeBuilder &) = delete;
@@ -205,12 +209,20 @@ public:
   llvm::Value *createCall(const std::string &FName, llvm::Type *RetTy);
 
   // Alloca/array emission.
-  llvm::AllocaInst *emitAlloca(llvm::Type *Ty, const std::string &Name,
-                               AddressSpace AS = AddressSpace::DEFAULT);
+  llvm::Value *emitAlloca(llvm::Type *Ty, const std::string &Name,
+                          AddressSpace AS = AddressSpace::DEFAULT);
   llvm::Value *emitArrayCreate(llvm::Type *Ty, AddressSpace AT,
                                const std::string &Name);
+  std::unique_ptr<ScalarStorage> createScalarStorage(const std::string &Name,
+                                                     llvm::Type *AllocaTy);
+  std::unique_ptr<PointerStorage> createPointerStorage(const std::string &Name,
+                                                       llvm::Type *AllocaTy,
+                                                       llvm::Type *ElemTy);
+  std::unique_ptr<ArrayStorage> createArrayStorage(const std::string &Name,
+                                                   AddressSpace AS,
+                                                   llvm::Type *ArrTy);
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
-  void setKernel(llvm::Function &Fn, const TargetModelType &TM);
+  void setKernel(llvm::Function &Fn);
   void setLaunchBoundsForKernel(llvm::Function &Fn, int MaxThreadsPerBlock,
                                 int MinBlocksPerSM);
 #endif
@@ -219,6 +231,7 @@ private:
   struct Impl;
   std::unique_ptr<Impl> PImpl;
   llvm::Function *F;
+  TargetModelType TargetModel;
 };
 
 } // namespace proteus

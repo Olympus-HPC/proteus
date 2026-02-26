@@ -33,7 +33,7 @@ Value *FuncBase::getArg(size_t Idx) {
 }
 
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
-void FuncBase::setKernel() { CB->setKernel(*getFunction(), getTargetModel()); }
+void FuncBase::setKernel() { CB->setKernel(*getFunction()); }
 
 void FuncBase::setLaunchBoundsForKernel(int MaxThreadsPerBlock,
                                         int MinBlocksPerSM) {
@@ -41,30 +41,6 @@ void FuncBase::setLaunchBoundsForKernel(int MaxThreadsPerBlock,
                                MinBlocksPerSM);
 }
 #endif
-
-std::unique_ptr<ScalarStorage>
-FuncBase::createScalarStorage(const std::string &Name, Type *AllocaTy) {
-  auto *Alloca = CB->emitAlloca(AllocaTy, Name);
-
-  return std::make_unique<ScalarStorage>(Alloca, CB->getIRBuilder());
-}
-
-std::unique_ptr<PointerStorage>
-FuncBase::createPointerStorage(const std::string &Name, Type *AllocaTy,
-                               Type *ElemTy) {
-  auto *Alloca = CB->emitAlloca(AllocaTy, Name);
-
-  return std::make_unique<PointerStorage>(Alloca, CB->getIRBuilder(), ElemTy);
-}
-
-std::unique_ptr<ArrayStorage>
-FuncBase::createArrayStorage(const std::string &Name, AddressSpace AS,
-                             Type *Ty) {
-  ArrayType *ArrTy = cast<ArrayType>(Ty);
-  Value *BasePointer = CB->emitArrayCreate(ArrTy, AS, Name);
-
-  return std::make_unique<ArrayStorage>(BasePointer, CB->getIRBuilder(), ArrTy);
-}
 
 // Delegating methods to LLVMCodeBuilder.
 LLVMCodeBuilder &FuncBase::getCodeBuilder() { return *CB; }

@@ -13,12 +13,11 @@ namespace proteus {
 
 JitModule::JitModule(const std::string &Target)
     : TargetModel{parseTargetModel(Target)},
-      TargetTriple(::proteus::getTargetTriple(TargetModel)),
       Dispatch(Dispatcher::getDispatcher(TargetModel)) {
   auto Ctx = std::make_unique<LLVMContext>();
   auto Mod = std::make_unique<Module>("JitModule", *Ctx);
-  Mod->setTargetTriple(TargetTriple);
-  CB = std::make_unique<LLVMCodeBuilder>(std::move(Ctx), std::move(Mod));
+  CB = std::make_unique<LLVMCodeBuilder>(std::move(Ctx), std::move(Mod),
+                                         TargetModel);
 }
 
 void JitModule::compile(bool Verify) {

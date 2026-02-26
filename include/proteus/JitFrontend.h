@@ -22,7 +22,6 @@ private:
 
   std::deque<std::unique_ptr<FuncBase>> Functions;
   TargetModelType TargetModel;
-  std::string TargetTriple;
   Dispatcher &Dispatch;
 
   std::unique_ptr<HashT> ModuleHash;
@@ -161,8 +160,6 @@ public:
   Dispatcher &getDispatcher() const { return Dispatch; }
 
   TargetModelType getTargetModel() const { return TargetModel; }
-
-  const std::string &getTargetTriple() const { return TargetTriple; }
 
   CompiledLibrary &getLibrary() {
     if (!IsCompiled)

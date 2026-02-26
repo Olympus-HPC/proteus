@@ -51,9 +51,12 @@ struct LLVMCodeBuilder::Impl {
 };
 
 LLVMCodeBuilder::LLVMCodeBuilder(std::unique_ptr<LLVMContext> Ctx,
-                                 std::unique_ptr<Module> Mod)
-    : PImpl{std::make_unique<Impl>(std::move(Ctx), std::move(Mod))},
-      F(nullptr) {}
+                                 std::unique_ptr<Module> Mod,
+                                 TargetModelType TM)
+    : PImpl{std::make_unique<Impl>(std::move(Ctx), std::move(Mod))}, F(nullptr),
+      TargetModel(TM) {
+  getModule().setTargetTriple(getTargetTriple(TM));
+}
 
 LLVMCodeBuilder::~LLVMCodeBuilder() = default;
 
@@ -567,8 +570,8 @@ Value *LLVMCodeBuilder::createCall(const std::string &FName, Type *RetTy) {
 }
 
 // Alloca/array emission.
-AllocaInst *LLVMCodeBuilder::emitAlloca(Type *Ty, const std::string &Name,
-                                        AddressSpace AS) {
+Value *LLVMCodeBuilder::emitAlloca(Type *Ty, const std::string &Name,
+                                   AddressSpace AS) {
   auto SaveIP = PImpl->IRB.saveIP();
   auto AllocaIP = IRBuilderBase::InsertPoint(&F->getEntryBlock(),
                                              F->getEntryBlock().begin());
@@ -612,9 +615,9 @@ Value *LLVMCodeBuilder::emitArrayCreate(Type *Ty, AddressSpace AT,
 }
 
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
-void LLVMCodeBuilder::setKernel(Function &Fn, const TargetModelType &TM) {
+void LLVMCodeBuilder::setKernel(Function &Fn) {
   LLVMContext &Ctx = getContext();
-  switch (TM) {
+  switch (TargetModel) {
   case TargetModelType::CUDA: {
     NamedMDNode *MD = getModule().getOrInsertNamedMetadata("nvvm.annotations");
 
@@ -633,7 +636,7 @@ void LLVMCodeBuilder::setKernel(Function &Fn, const TargetModelType &TM) {
   case TargetModelType::HOST:
     reportFatalError("Host does not support setKernel");
   default:
-    reportFatalError("Unsupported target " + getTargetTriple(TM) +
+    reportFatalError("Unsupported target " + getTargetTriple(TargetModel) +
                      " for setKernel");
   }
 }
@@ -644,5 +647,26 @@ void LLVMCodeBuilder::setLaunchBoundsForKernel(Function &Fn,
   proteus::setLaunchBoundsForKernel(Fn, MaxThreadsPerBlock, MinBlocksPerSM);
 }
 #endif
+
+std::unique_ptr<ScalarStorage>
+LLVMCodeBuilder::createScalarStorage(const std::string &Name, Type *AllocaTy) {
+  return std::make_unique<ScalarStorage>(emitAlloca(AllocaTy, Name),
+                                         getIRBuilder());
+}
+
+std::unique_ptr<PointerStorage>
+LLVMCodeBuilder::createPointerStorage(const std::string &Name, Type *AllocaTy,
+                                      Type *ElemTy) {
+  return std::make_unique<PointerStorage>(emitAlloca(AllocaTy, Name),
+                                          getIRBuilder(), ElemTy);
+}
+
+std::unique_ptr<ArrayStorage>
+LLVMCodeBuilder::createArrayStorage(const std::string &Name, AddressSpace AS,
+                                    Type *ArrTy) {
+  Value *BasePointer = emitArrayCreate(ArrTy, AS, Name);
+  return std::make_unique<ArrayStorage>(BasePointer, getIRBuilder(),
+                                        cast<ArrayType>(ArrTy));
+}
 
 } // namespace proteus
