@@ -147,10 +147,6 @@ protected:
   std::string Name;
   std::unique_ptr<LLVMCodeBuilder> CB;
 
-  // Scope management.
-  void pushScope(const char *File, const int Line, ScopeKind Kind,
-                 BasicBlock *NextBlock);
-
 public:
   FuncBase(JitModule &J, const std::string &Name, Type *RetTy,
            const std::vector<Type *> &ArgTys);
@@ -459,7 +455,7 @@ void FuncBase::beginFor(Var<IterT> &IterVar, const Var<InitT> &Init,
   // Update the terminator of the current basic block due to the split
   // control-flow.
   auto [CurBlock, NextBlock] = CB->splitCurrentBlock();
-  pushScope(File, Line, ScopeKind::FOR, NextBlock);
+  CB->pushScope(File, Line, ScopeKind::FOR, NextBlock);
 
   BasicBlock *Header = CB->createBasicBlock("loop.header", NextBlock);
   BasicBlock *LoopCond = CB->createBasicBlock("loop.cond", NextBlock);
@@ -505,7 +501,7 @@ void FuncBase::beginWhile(CondLambda &&Cond, const char *File, int Line) {
   // Update the terminator of the current basic block due to the split
   // control-flow.
   auto [CurBlock, NextBlock] = CB->splitCurrentBlock();
-  pushScope(File, Line, ScopeKind::WHILE, NextBlock);
+  CB->pushScope(File, Line, ScopeKind::WHILE, NextBlock);
 
   BasicBlock *LoopCond = CB->createBasicBlock("while.cond", NextBlock);
   BasicBlock *Body = CB->createBasicBlock("while.body", NextBlock);
