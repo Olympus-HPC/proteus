@@ -100,14 +100,6 @@ FuncBase::createArrayStorage(const std::string &Name, AddressSpace AS,
 // Delegating methods to LLVMCodeBuilder.
 LLVMCodeBuilder &FuncBase::getCodeBuilder() { return *CB; }
 
-void FuncBase::setInsertPoint(BasicBlock *BB) { CB->setInsertPoint(BB); }
-void FuncBase::setInsertPointBegin(BasicBlock *BB) {
-  CB->setInsertPointBegin(BB);
-}
-void FuncBase::setInsertPointAtEntry() { CB->setInsertPointAtEntry(); }
-void FuncBase::clearInsertPoint() { CB->clearInsertPoint(); }
-BasicBlock *FuncBase::getInsertBlock() { return CB->getInsertBlock(); }
-
 std::tuple<BasicBlock *, BasicBlock *> FuncBase::splitCurrentBlock() {
   return CB->splitCurrentBlock();
 }

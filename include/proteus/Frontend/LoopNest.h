@@ -63,7 +63,7 @@ public:
     Fn.beginFor(Bounds.IterVar, Bounds.Init, Bounds.UpperBound, Bounds.Inc);
 
     // Capture the latch block before body execution may change IR structure.
-    llvm::BasicBlock *BodyBB = Fn.getInsertBlock();
+    llvm::BasicBlock *BodyBB = Fn.getCodeBuilder().getInsertBlock();
     auto *LatchBB = Fn.getUniqueSuccessor(BodyBB);
     if (!LatchBB)
       reportFatalError("Expected unique successor for loop latch block");

@@ -80,13 +80,6 @@ public:
   std::unique_ptr<ArrayStorage>
   createArrayStorage(const std::string &Name, AddressSpace AS, Type *ArrTy);
 
-  // Insertion point management.
-  void setInsertPoint(BasicBlock *BB);
-  void setInsertPointBegin(BasicBlock *BB);
-  void setInsertPointAtEntry();
-  void clearInsertPoint();
-  BasicBlock *getInsertBlock();
-
   // Basic block management.
   std::tuple<BasicBlock *, BasicBlock *> splitCurrentBlock();
   void eraseTerminator(BasicBlock *BB);
@@ -424,11 +417,11 @@ private:
   }
 
   template <std::size_t... Is> void declArgsImpl(std::index_sequence<Is...>) {
-    setInsertPointAtEntry();
+    CB->setInsertPointAtEntry();
 
     (std::get<Is>(ArgumentsT).emplace(createArg<ArgT, Is>()), ...);
 
-    clearInsertPoint();
+    CB->clearInsertPoint();
   }
 
   template <std::size_t... Is> auto getArgsImpl(std::index_sequence<Is...>) {
@@ -481,35 +474,35 @@ void FuncBase::beginFor(Var<IterT> &IterVar, const Var<InitT> &Init,
 
   // Erase the old terminator and branch to the header.
   eraseTerminator(CurBlock);
-  setInsertPoint(CurBlock);
+  CB->setInsertPoint(CurBlock);
   { CB->createBr(Header); }
 
-  setInsertPoint(Header);
+  CB->setInsertPoint(Header);
   {
     IterVar = Init;
     CB->createBr(LoopCond);
   }
 
-  setInsertPoint(LoopCond);
+  CB->setInsertPoint(LoopCond);
   {
     auto CondVar = IterVar < UpperBound;
     Value *Cond = CondVar.loadValue();
     CB->createCondBr(Cond, Body, LoopExit);
   }
 
-  setInsertPoint(Body);
+  CB->setInsertPoint(Body);
   CB->createBr(Latch);
 
-  setInsertPoint(Latch);
+  CB->setInsertPoint(Latch);
   {
     IterVar = IterVar + Inc;
     CB->createBr(LoopCond);
   }
 
-  setInsertPoint(LoopExit);
+  CB->setInsertPoint(LoopExit);
   { CB->createBr(NextBlock); }
 
-  setInsertPointBegin(Body);
+  CB->setInsertPointBegin(Body);
 }
 
 template <typename CondLambda>
@@ -524,23 +517,23 @@ void FuncBase::beginWhile(CondLambda &&Cond, const char *File, int Line) {
   BasicBlock *LoopExit = CB->createBasicBlock("while.end", NextBlock);
 
   eraseTerminator(CurBlock);
-  setInsertPoint(CurBlock);
+  CB->setInsertPoint(CurBlock);
   { CB->createBr(LoopCond); }
 
-  setInsertPoint(LoopCond);
+  CB->setInsertPoint(LoopCond);
   {
     auto CondVar = Cond();
     Value *CondV = CondVar.loadValue();
     CB->createCondBr(CondV, Body, LoopExit);
   }
 
-  setInsertPoint(Body);
+  CB->setInsertPoint(Body);
   CB->createBr(LoopCond);
 
-  setInsertPoint(LoopExit);
+  CB->setInsertPoint(LoopExit);
   { CB->createBr(NextBlock); }
 
-  setInsertPointBegin(Body);
+  CB->setInsertPointBegin(Body);
 }
 
 template <typename Sig, typename... ArgVars>
