@@ -74,6 +74,11 @@ struct Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>
 
   Var<std::add_pointer_t<T>> getAddress();
 
+  /// Convert this variable's value to arithmetic type U and return a new Var
+  /// holding the converted value. Preserves cv-qualifiers but drops
+  /// references.
+  template <typename U> auto convert() const;
+
   // Arithmetic operators
   template <typename U>
   Var<std::common_type_t<T, U>> operator+(const Var<U> &Other) const;
@@ -278,7 +283,9 @@ operator%(const T &ConstValue, const Var<U> &V);
 // Free helper functions (type conversion)
 // ---------------------------------------------------------------------------
 
-// Value-level type conversion (mirrors FuncBase::convert<FromT,ToT>).
+// Value-level type conversion — internal implementation detail.
+// Use Var::convert<U>() for user-facing type conversions.
+namespace detail {
 template <typename FromT, typename ToT>
 llvm::Value *convert(LLVMCodeBuilder &CB, llvm::Value *V) {
   using From = remove_cvref_t<FromT>;
@@ -319,6 +326,7 @@ llvm::Value *convert(LLVMCodeBuilder &CB, llvm::Value *V) {
 
   reportFatalError("Unsupported conversion");
 }
+} // namespace detail
 
 // Allocate a new Var of type T using CB.
 template <typename T>
@@ -348,19 +356,6 @@ Var<T> defVar(LLVMCodeBuilder &CB, const T &Val,
   return Var<T>(V);
 }
 
-// Var-level conversion: allocate a new Var<U> and convert V into it.
-template <typename U, typename T>
-std::enable_if_t<std::is_convertible_v<std::remove_reference_t<T>,
-                                       std::remove_reference_t<U>>,
-                 Var<std::remove_reference_t<U>>>
-convertVar(LLVMCodeBuilder &CB, const Var<T> &V) {
-  using ResultT = std::remove_reference_t<U>;
-  Var<ResultT> Res = declVar<ResultT>(CB, "convert.");
-  llvm::Value *Converted = convert<T, U>(CB, V.loadValue());
-  Res.storeValue(Converted);
-  return Res;
-}
-
 // ---------------------------------------------------------------------------
 // Operator implementation helpers
 // ---------------------------------------------------------------------------
@@ -374,8 +369,8 @@ binOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
   if (&CB != &R.CB)
     reportFatalError("Variables should belong to the same function");
 
-  llvm::Value *LHS = convert<T, CommonT>(CB, L.loadValue());
-  llvm::Value *RHS = convert<U, CommonT>(CB, R.loadValue());
+  llvm::Value *LHS = detail::convert<T, CommonT>(CB, L.loadValue());
+  llvm::Value *RHS = detail::convert<U, CommonT>(CB, R.loadValue());
 
   llvm::Value *Result = nullptr;
   if constexpr (std::is_integral_v<CommonT>) {
@@ -409,7 +404,7 @@ compoundAssignConst(Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &LHS,
 
   llvm::Value *LHSVal = LHS.loadValue();
 
-  RHS = convert<U, T>(LHS.CB, RHS);
+  RHS = detail::convert<U, T>(LHS.CB, RHS);
   llvm::Value *Result = nullptr;
 
   if constexpr (std::is_integral_v<remove_cvref_t<T>>) {
@@ -431,7 +426,7 @@ Var<bool> cmpOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
     reportFatalError("Variables should belong to the same function");
 
   llvm::Value *LHS = L.loadValue();
-  llvm::Value *RHS = convert<U, T>(CB, R.loadValue());
+  llvm::Value *RHS = detail::convert<U, T>(CB, R.loadValue());
 
   llvm::Value *Result = nullptr;
   if constexpr (std::is_integral_v<remove_cvref_t<T>>) {
@@ -453,13 +448,23 @@ Var<bool> cmpOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
 // ---------------------------------------------------------------------------
 
 template <typename T>
+template <typename U>
+auto Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::convert() const {
+  using ResultT = std::remove_reference_t<U>;
+  Var<ResultT> Res = declVar<ResultT>(this->CB, "convert.");
+  llvm::Value *Converted = detail::convert<T, U>(this->CB, this->loadValue());
+  Res.storeValue(Converted);
+  return Res;
+}
+
+template <typename T>
 template <typename U, typename>
 Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::Var(const Var<U> &V)
     : VarStorageOwner<VarStorage>(V.CB) {
   llvm::Type *TargetTy = TypeMap<remove_cvref_t<T>>::get(CB.getContext());
   Storage = CB.createScalarStorage("conv.var", TargetTy);
 
-  auto *Converted = convert<U, T>(CB, V.loadValue());
+  auto *Converted = detail::convert<U, T>(CB, V.loadValue());
   storeValue(Converted);
 }
 
@@ -521,7 +526,7 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &
 Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator=(
     const Var<U> &V) {
   static_assert(is_mutable_v<T>, "Cannot assign to Var<const T>");
-  auto *Converted = convert<U, T>(CB, V.loadValue());
+  auto *Converted = detail::convert<U, T>(CB, V.loadValue());
   storeValue(Converted);
   return *this;
 }
@@ -974,7 +979,7 @@ std::enable_if_t<std::is_arithmetic_v<OffsetT>,
 Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator+(
     const Var<OffsetT> &Offset) const {
   auto *OffsetVal = Offset.loadValue();
-  auto *IdxVal = convert<OffsetT, int64_t>(CB, OffsetVal);
+  auto *IdxVal = detail::convert<OffsetT, int64_t>(CB, OffsetVal);
 
   auto *BasePtr = loadPointer();
   auto *ElemTy = getValueType();
@@ -1213,7 +1218,7 @@ template <typename T> struct IntrinsicOperandConverter {
   LLVMCodeBuilder &CB;
 
   template <typename U> llvm::Value *operator()(const Var<U> &Operand) const {
-    return convert<U, T>(CB, Operand.loadValue());
+    return detail::convert<U, T>(CB, Operand.loadValue());
   }
 };
 
@@ -1249,7 +1254,7 @@ template <typename T> Var<float> powf(const Var<float> &L, const Var<T> &R) {
                 "powf requires floating-point type");
 
   auto *ResultType = R.CB.getFloatTy();
-  auto RFloat = convertVar<float>(R.CB, R);
+  auto RFloat = R.template convert<float>();
   std::string IntrinsicName = "llvm.pow.f32";
 #if PROTEUS_ENABLE_CUDA
   if (L.CB.getTargetModel() == TargetModelType::CUDA)
@@ -1264,7 +1269,7 @@ template <typename T> Var<float> sqrtf(const Var<T> &R) {
                 "sqrtf requires floating-point type");
 
   auto *ResultType = R.CB.getFloatTy();
-  auto RFloat = convertVar<float>(R.CB, R);
+  auto RFloat = R.template convert<float>();
   std::string IntrinsicName = "llvm.sqrt.f32";
 #if PROTEUS_ENABLE_CUDA
   if (R.CB.getTargetModel() == TargetModelType::CUDA)
@@ -1279,7 +1284,7 @@ template <typename T> Var<float> expf(const Var<T> &R) {
                 "expf requires floating-point type");
 
   auto *ResultType = R.CB.getFloatTy();
-  auto RFloat = convertVar<float>(R.CB, R);
+  auto RFloat = R.template convert<float>();
   std::string IntrinsicName = "llvm.exp.f32";
 #if PROTEUS_ENABLE_CUDA
   if (R.CB.getTargetModel() == TargetModelType::CUDA)
@@ -1294,7 +1299,7 @@ template <typename T> Var<float> sinf(const Var<T> &R) {
                 "sinf requires floating-point type");
 
   auto *ResultType = R.CB.getFloatTy();
-  auto RFloat = convertVar<float>(R.CB, R);
+  auto RFloat = R.template convert<float>();
   std::string IntrinsicName = "llvm.sin.f32";
 #if PROTEUS_ENABLE_CUDA
   if (R.CB.getTargetModel() == TargetModelType::CUDA)
@@ -1309,7 +1314,7 @@ template <typename T> Var<float> cosf(const Var<T> &R) {
                 "cosf requires floating-point type");
 
   auto *ResultType = R.CB.getFloatTy();
-  auto RFloat = convertVar<float>(R.CB, R);
+  auto RFloat = R.template convert<float>();
   std::string IntrinsicName = "llvm.cos.f32";
 #if PROTEUS_ENABLE_CUDA
   if (R.CB.getTargetModel() == TargetModelType::CUDA)
@@ -1324,7 +1329,7 @@ template <typename T> Var<float> fabs(const Var<T> &R) {
                 "fabs requires floating-point type");
 
   auto *ResultType = R.CB.getFloatTy();
-  auto RFloat = convertVar<float>(R.CB, R);
+  auto RFloat = R.template convert<float>();
   std::string IntrinsicName = "llvm.fabs.f32";
 #if PROTEUS_ENABLE_CUDA
   if (R.CB.getTargetModel() == TargetModelType::CUDA)
@@ -1339,7 +1344,7 @@ template <typename T> Var<float> truncf(const Var<T> &R) {
                 "truncf requires floating-point type");
 
   auto *ResultType = R.CB.getFloatTy();
-  auto RFloat = convertVar<float>(R.CB, R);
+  auto RFloat = R.template convert<float>();
   std::string IntrinsicName = "llvm.trunc.f32";
 #if PROTEUS_ENABLE_CUDA
   if (R.CB.getTargetModel() == TargetModelType::CUDA)
@@ -1354,7 +1359,7 @@ template <typename T> Var<float> logf(const Var<T> &R) {
                 "logf requires floating-point type");
 
   auto *ResultType = R.CB.getFloatTy();
-  auto RFloat = convertVar<float>(R.CB, R);
+  auto RFloat = R.template convert<float>();
   std::string IntrinsicName = "llvm.log.f32";
 #if PROTEUS_ENABLE_CUDA
   if (R.CB.getTargetModel() == TargetModelType::CUDA)
@@ -1369,7 +1374,7 @@ template <typename T> Var<float> absf(const Var<T> &R) {
                 "absf requires floating-point type");
 
   auto *ResultType = R.CB.getFloatTy();
-  auto RFloat = convertVar<float>(R.CB, R);
+  auto RFloat = R.template convert<float>();
   std::string IntrinsicName = "llvm.fabs.f32";
 #if PROTEUS_ENABLE_CUDA
   if (R.CB.getTargetModel() == TargetModelType::CUDA)

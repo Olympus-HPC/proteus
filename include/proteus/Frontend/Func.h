@@ -300,8 +300,9 @@ public:
 
   // Convert the given Var's value to type U and return a new Var holding
   // the converted value. Preserves cv-qualifiers but drops references.
+  // Note: prefer calling var.convert<U>() directly on the Var.
   template <typename U, typename T> auto convert(const Var<T> &V) {
-    return proteus::convertVar<U>(*CB, V);
+    return V.template convert<U>();
   }
 };
 
