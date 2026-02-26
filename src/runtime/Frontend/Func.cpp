@@ -158,11 +158,6 @@ void FuncBase::endFunction() { CB->endFunction(); }
 
 Function *FuncBase::getFunction() { return &CB->getFunction(); }
 
-AllocaInst *FuncBase::emitAlloca(Type *Ty, const std::string &Name,
-                                 AddressSpace AS) {
-  return CB->emitAlloca(Ty, Name, AS);
-}
-
 Value *FuncBase::emitArrayCreate(Type *Ty, AddressSpace AT,
                                  const std::string &Name) {
   return CB->emitArrayCreate(Ty, AT, Name);

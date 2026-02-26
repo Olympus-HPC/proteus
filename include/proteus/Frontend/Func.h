@@ -20,7 +20,6 @@
 namespace llvm {
 class BasicBlock;
 class Function;
-class AllocaInst;
 class Type;
 class Value;
 class LLVMContext;
@@ -179,9 +178,6 @@ public:
   void setKernel();
   void setLaunchBoundsForKernel(int MaxThreadsPerBlock, int MinBlocksPerSM);
 #endif
-
-  AllocaInst *emitAlloca(Type *Ty, const std::string &Name,
-                         AddressSpace AS = AddressSpace::DEFAULT);
 
   Value *emitArrayCreate(Type *Ty, AddressSpace AT, const std::string &Name);
 
