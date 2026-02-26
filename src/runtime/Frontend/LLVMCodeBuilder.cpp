@@ -1,6 +1,6 @@
 #include "proteus/Frontend/LLVMCodeBuilder.h"
 #include "proteus/Frontend/TargetModel.h"
-#include "proteus/impl/CoreLLVMHIP.h"
+#include "proteus/impl/CoreLLVMDevice.h"
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
@@ -628,6 +628,9 @@ void LLVMCodeBuilder::setKernel(Function &Fn) {
 
     // Add a function attribute for the kernel.
     Fn.addFnAttr(Attribute::get(Ctx, "kernel"));
+#if LLVM_VERSION_MAJOR >= 20
+    Fn.setCallingConv(CallingConv::PTX_Kernel);
+#endif
     return;
   }
   case TargetModelType::HIP:

@@ -6,6 +6,8 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
 
+using namespace llvm;
+
 namespace proteus {
 
 FuncBase::FuncBase(JitModule &J, LLVMCodeBuilder &CBParam,
