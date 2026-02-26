@@ -33,38 +33,12 @@ Value *FuncBase::getArg(size_t Idx) {
 }
 
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
-void FuncBase::setKernel() {
-  LLVMContext &Ctx = J.getModule().getContext();
-  switch (getTargetModel()) {
-  case TargetModelType::CUDA: {
-    NamedMDNode *MD =
-        J.getModule().getOrInsertNamedMetadata("nvvm.annotations");
-
-    Metadata *MDVals[] = {
-        ConstantAsMetadata::get(getFunction()), MDString::get(Ctx, "kernel"),
-        ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 1))};
-    // Append metadata to nvvm.annotations.
-    MD->addOperand(MDNode::get(Ctx, MDVals));
-
-    // Add a function attribute for the kernel.
-    getFunction()->addFnAttr(Attribute::get(Ctx, "kernel"));
-    return;
-  }
-  case TargetModelType::HIP:
-    getFunction()->setCallingConv(CallingConv::AMDGPU_KERNEL);
-    return;
-  case TargetModelType::HOST:
-    reportFatalError("Host does not support setKernel");
-  default:
-    reportFatalError("Unsupported target " + J.getTargetTriple() +
-                     " for setKernel");
-  }
-}
+void FuncBase::setKernel() { CB->setKernel(*getFunction(), getTargetModel()); }
 
 void FuncBase::setLaunchBoundsForKernel(int MaxThreadsPerBlock,
                                         int MinBlocksPerSM) {
-  proteus::setLaunchBoundsForKernel(*getFunction(), MaxThreadsPerBlock,
-                                    MinBlocksPerSM);
+  CB->setLaunchBoundsForKernel(*getFunction(), MaxThreadsPerBlock,
+                               MinBlocksPerSM);
 }
 #endif
 

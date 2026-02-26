@@ -3,6 +3,7 @@
 
 #include "proteus/AddressSpace.h"
 #include "proteus/Error.h"
+#include "proteus/Frontend/TargetModel.h"
 
 #include <cstdint>
 #include <memory>
@@ -208,6 +209,11 @@ public:
                                AddressSpace AS = AddressSpace::DEFAULT);
   llvm::Value *emitArrayCreate(llvm::Type *Ty, AddressSpace AT,
                                const std::string &Name);
+#if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
+  void setKernel(llvm::Function &Fn, const TargetModelType &TM);
+  void setLaunchBoundsForKernel(llvm::Function &Fn, int MaxThreadsPerBlock,
+                                int MinBlocksPerSM);
+#endif
 
 private:
   struct Impl;

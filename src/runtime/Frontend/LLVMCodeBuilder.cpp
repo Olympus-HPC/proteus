@@ -1,4 +1,6 @@
 #include "proteus/Frontend/LLVMCodeBuilder.h"
+#include "proteus/Frontend/TargetModel.h"
+#include "proteus/impl/CoreLLVMHIP.h"
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Module.h>
@@ -608,5 +610,39 @@ Value *LLVMCodeBuilder::emitArrayCreate(Type *Ty, AddressSpace AT,
     reportFatalError("Unsupported AddressSpace");
   }
 }
+
+#if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
+void LLVMCodeBuilder::setKernel(Function &Fn, const TargetModelType &TM) {
+  LLVMContext &Ctx = getContext();
+  switch (TM) {
+  case TargetModelType::CUDA: {
+    NamedMDNode *MD = getModule().getOrInsertNamedMetadata("nvvm.annotations");
+
+    Metadata *MDVals[] = {
+        ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 1))};
+    // Append metadata to nvvm.annotations.
+    MD->addOperand(MDNode::get(Ctx, MDVals));
+
+    // Add a function attribute for the kernel.
+    Fn.addFnAttr(Attribute::get(Ctx, "kernel"));
+    return;
+  }
+  case TargetModelType::HIP:
+    Fn.setCallingConv(CallingConv::AMDGPU_KERNEL);
+    return;
+  case TargetModelType::HOST:
+    reportFatalError("Host does not support setKernel");
+  default:
+    reportFatalError("Unsupported target " + getTargetTriple(TM) +
+                     " for setKernel");
+  }
+}
+
+void LLVMCodeBuilder::setLaunchBoundsForKernel(Function &Fn,
+                                               int MaxThreadsPerBlock,
+                                               int MinBlocksPerSM) {
+  proteus::setLaunchBoundsForKernel(Fn, MaxThreadsPerBlock, MinBlocksPerSM);
+}
+#endif
 
 } // namespace proteus

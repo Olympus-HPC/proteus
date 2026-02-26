@@ -140,9 +140,6 @@ public:
 
   bool isCompiled() const { return IsCompiled; }
 
-  const llvm::Module &getModule() const { return CB->getModule(); }
-  llvm::Module &getModule() { return CB->getModule(); }
-
   template <typename Sig> auto addKernel(const std::string &Name) {
     using RetT = typename FnSig<Sig>::RetT;
     static_assert(std::is_void_v<RetT>, "Kernels must have void return type");
