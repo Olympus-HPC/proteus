@@ -4,6 +4,7 @@
 #include "proteus/AddressSpace.h"
 #include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.h"
+#include "proteus/Frontend/LLVMCodeBuilder.h"
 #include "proteus/Frontend/TargetModel.h"
 #include "proteus/Frontend/TypeMap.h"
 #include "proteus/Frontend/TypeTraits.h"
@@ -67,8 +68,6 @@ struct IsForLoopBuilder<ForLoopBuilder<T, BodyLambda>> : std::true_type {};
 
 class FuncBase {
 public:
-  struct Impl;
-
   JitModule &getJitModule() { return J; }
 
   LLVMContext &getContext();
@@ -239,25 +238,7 @@ protected:
   JitModule &J;
 
   std::string Name;
-  std::unique_ptr<Impl> PImpl;
-
-  enum class ScopeKind { FUNCTION, IF, FOR, WHILE };
-
-  std::string toString(ScopeKind Kind) {
-    switch (Kind) {
-    case ScopeKind::FUNCTION:
-      return "FUNCTION";
-    case ScopeKind::IF:
-      return "IF";
-    case ScopeKind::FOR:
-      return "FOR";
-    case ScopeKind::WHILE:
-      return "WHILE";
-    default:
-      reportFatalError("Unsupported Kind " +
-                       std::to_string(static_cast<int>(Kind)));
-    }
-  }
+  std::unique_ptr<LLVMCodeBuilder> CB;
 
   // Control flow operations.
   void createBr(llvm::BasicBlock *Dest);
