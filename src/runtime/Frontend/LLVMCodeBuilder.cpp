@@ -622,6 +622,7 @@ void LLVMCodeBuilder::setKernel(Function &Fn) {
     NamedMDNode *MD = getModule().getOrInsertNamedMetadata("nvvm.annotations");
 
     Metadata *MDVals[] = {
+        ConstantAsMetadata::get(&Fn), MDString::get(Ctx, "kernel"),
         ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 1))};
     // Append metadata to nvvm.annotations.
     MD->addOperand(MDNode::get(Ctx, MDVals));
