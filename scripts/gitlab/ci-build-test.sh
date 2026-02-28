@@ -12,6 +12,8 @@ if [ "${CI_MACHINE}" == "matrix" ]; then
   ml load cuda/12.2.2
   PYTHON_VERSION=3.12
 
+  # Force using the first GPU to avoid static init overhead of multiple GPUs.
+  export CUDA_VISIBLE_DEVICES=0
   # Print GPU information for debugging.
   echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} SLURM_STEP_GPUS=${SLURM_STEP_GPUS}"
 
