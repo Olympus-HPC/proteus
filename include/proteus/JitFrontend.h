@@ -17,13 +17,11 @@ struct CompiledLibrary;
 
 class JitModule {
 private:
-  std::unique_ptr<LLVMContext> Ctx;
-  std::unique_ptr<Module> Mod;
+  std::unique_ptr<LLVMCodeBuilder> CB;
   std::unique_ptr<CompiledLibrary> Library;
 
   std::deque<std::unique_ptr<FuncBase>> Functions;
   TargetModelType TargetModel;
-  std::string TargetTriple;
   Dispatcher &Dispatch;
 
   std::unique_ptr<HashT> ModuleHash;
@@ -35,7 +33,7 @@ private:
   Func<RetT, ArgT...> &buildFuncFromArgsList(const std::string &Name,
                                              ArgTypeList<ArgT...>) {
     auto TypedFn =
-        std::make_unique<Func<RetT, ArgT...>>(*this, *Ctx, Name, Dispatch);
+        std::make_unique<Func<RetT, ArgT...>>(*this, *CB, Name, Dispatch);
     Func<RetT, ArgT...> &TypedFnRef = *TypedFn;
     Functions.emplace_back(std::move(TypedFn));
     TypedFnRef.declArgs();
@@ -46,7 +44,7 @@ private:
   KernelHandle<ArgT...> buildKernelFromArgsList(const std::string &Name,
                                                 ArgTypeList<ArgT...>) {
     auto TypedFn =
-        std::make_unique<Func<void, ArgT...>>(*this, *Ctx, Name, Dispatch);
+        std::make_unique<Func<void, ArgT...>>(*this, *CB, Name, Dispatch);
     Func<void, ArgT...> &TypedFnRef = *TypedFn;
     TypedFn->declArgs();
 
@@ -141,9 +139,6 @@ public:
 
   bool isCompiled() const { return IsCompiled; }
 
-  const Module &getModule() const { return *Mod; }
-  Module &getModule() { return *Mod; }
-
   template <typename Sig> auto addKernel(const std::string &Name) {
     using RetT = typename FnSig<Sig>::RetT;
     static_assert(std::is_void_v<RetT>, "Kernels must have void return type");
@@ -166,8 +161,6 @@ public:
 
   TargetModelType getTargetModel() const { return TargetModel; }
 
-  const std::string &getTargetTriple() const { return TargetTriple; }
-
   CompiledLibrary &getLibrary() {
     if (!IsCompiled)
       compile();
@@ -180,76 +173,6 @@ public:
 
   void print();
 };
-
-template <typename Sig>
-std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>,
-                 Var<typename FnSig<Sig>::RetT>>
-FuncBase::call(const std::string &Name) {
-  using RetT = typename FnSig<Sig>::RetT;
-
-  auto *Call = createCall(Name, TypeMap<RetT>::get(getContext()));
-  Var<RetT> Ret = declVar<RetT>("ret");
-  Ret.storeValue(Call);
-  return Ret;
-}
-
-template <typename Sig>
-std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
-FuncBase::call(const std::string &Name) {
-  using RetT = typename FnSig<Sig>::RetT;
-  createCall(Name, TypeMap<RetT>::get(getContext()));
-}
-
-template <typename... Ts>
-std::vector<Type *> unpackArgTypes(ArgTypeList<Ts...>, LLVMContext &Ctx) {
-  return {TypeMap<Ts>::get(Ctx)...};
-}
-
-template <typename Sig, typename... ArgVars>
-std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>,
-                 Var<typename FnSig<Sig>::RetT>>
-FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
-  using RetT = typename FnSig<Sig>::RetT;
-  using ArgT = typename FnSig<Sig>::ArgsTList;
-
-  auto GetArgVal = [](auto &&Arg) {
-    using ArgVarT = std::decay_t<decltype(Arg)>;
-    if constexpr (std::is_pointer_v<typename ArgVarT::ValueType>)
-      return Arg.loadPointer();
-    else
-      return Arg.loadValue();
-  };
-
-  auto &Ctx = getContext();
-  std::vector<Type *> ArgTys = unpackArgTypes(ArgT{}, Ctx);
-  std::vector<Value *> ArgVals = {GetArgVal(ArgsVars)...};
-
-  auto *Call = createCall(Name, TypeMap<RetT>::get(Ctx), ArgTys, ArgVals);
-
-  Var<RetT> Ret = declVar<RetT>("ret");
-  Ret.storeValue(Call);
-  return Ret;
-}
-
-template <typename Sig, typename... ArgVars>
-std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
-FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
-  using RetT = typename FnSig<Sig>::RetT;
-  using ArgT = typename FnSig<Sig>::ArgsTList;
-
-  auto GetArgVal = [](auto &&Arg) {
-    using ArgVarT = std::decay_t<decltype(Arg)>;
-    if constexpr (std::is_pointer_v<typename ArgVarT::ValueType>)
-      return Arg.loadPointer();
-    else
-      return Arg.loadValue();
-  };
-
-  auto &Ctx = getContext();
-  std::vector<Type *> ArgTys = unpackArgTypes(ArgT{}, Ctx);
-  createCall(Name, TypeMap<RetT>::get(getContext()), ArgTys,
-             {GetArgVal(ArgsVars)...});
-}
 
 template <typename RetT, typename... ArgT>
 RetT Func<RetT, ArgT...>::operator()(ArgT... Args) {

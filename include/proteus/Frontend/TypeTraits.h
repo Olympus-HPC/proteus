@@ -30,6 +30,11 @@ inline constexpr bool is_scalar_arithmetic_v =
     !std::is_pointer_v<std::remove_reference_t<T>> &&
     !std::is_array_v<std::remove_reference_t<T>>;
 
+// True if T (after removing cv-qualifiers and references) is mutable.
+template <typename T>
+inline constexpr bool is_mutable_v =
+    !std::is_const_v<std::remove_reference_t<T>>;
+
 // NOLINTEND(readability-identifier-naming)
 
 } // namespace proteus

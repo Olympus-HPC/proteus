@@ -11,86 +11,87 @@ class ArrayType;
 } // namespace llvm
 
 namespace proteus {
-using namespace llvm;
 
 class VarStorage {
 
 protected:
-  IRBuilderBase &IRB;
+  llvm::IRBuilderBase &IRB;
 
 public:
-  VarStorage(IRBuilderBase &IRB) : IRB(IRB) {}
+  VarStorage(llvm::IRBuilderBase &IRB) : IRB(IRB) {}
   virtual ~VarStorage() = default;
 
-  virtual Value *getSlot() const = 0;
+  virtual llvm::Value *getSlot() const = 0;
   // Load/store the logical value represented by this storage.
-  virtual Value *loadValue() const = 0;
-  virtual void storeValue(Value *Val) = 0;
-  virtual Type *getSlotType() const = 0;
-  virtual Type *getAllocatedType() const = 0;
-  virtual Type *getValueType() const = 0;
+  virtual llvm::Value *loadValue() const = 0;
+  virtual void storeValue(llvm::Value *Val) = 0;
+  virtual llvm::Type *getSlotType() const = 0;
+  virtual llvm::Type *getAllocatedType() const = 0;
+  virtual llvm::Type *getValueType() const = 0;
   virtual std::unique_ptr<VarStorage> clone() const = 0;
 };
 
 class ScalarStorage : public VarStorage {
-  Value *Slot = nullptr;
+  llvm::Value *Slot = nullptr;
 
 public:
-  ScalarStorage(Value *Slot, IRBuilderBase &IRB)
+  ScalarStorage(llvm::Value *Slot, llvm::IRBuilderBase &IRB)
       : VarStorage(IRB), Slot(Slot) {}
   std::unique_ptr<VarStorage> clone() const override {
     return std::make_unique<ScalarStorage>(Slot, IRB);
   }
 
-  Value *getSlot() const override;
-  Value *loadValue() const override;
-  void storeValue(Value *Val) override;
-  Type *getSlotType() const override;
-  Type *getAllocatedType() const override;
-  Type *getValueType() const override;
+  llvm::Value *getSlot() const override;
+  llvm::Value *loadValue() const override;
+  void storeValue(llvm::Value *Val) override;
+  llvm::Type *getSlotType() const override;
+  llvm::Type *getAllocatedType() const override;
+  llvm::Type *getValueType() const override;
 };
 
 class PointerStorage : public VarStorage {
 
-  Value *PtrSlot = nullptr;
-  Type *PointerElemTy = nullptr;
+  llvm::Value *PtrSlot = nullptr;
+  llvm::Type *PointerElemTy = nullptr;
 
 public:
-  PointerStorage(Value *PtrSlot, IRBuilderBase &IRB, Type *PointerElemTy)
+  PointerStorage(llvm::Value *PtrSlot, llvm::IRBuilderBase &IRB,
+                 llvm::Type *PointerElemTy)
       : VarStorage(IRB), PtrSlot(PtrSlot), PointerElemTy(PointerElemTy) {}
   std::unique_ptr<VarStorage> clone() const override {
     return std::make_unique<PointerStorage>(PtrSlot, IRB, PointerElemTy);
   }
 
-  Value *getSlot() const override;
+  llvm::Value *getSlot() const override;
   // Load/store the pointee value through the pointer stored in PtrSlot.
-  Value *loadValue() const override;
-  void storeValue(Value *Val) override;
+  llvm::Value *loadValue() const override;
+  void storeValue(llvm::Value *Val) override;
   // Load/store the pointer value itself from/to PtrSlot.
-  Value *loadPointer() const;
-  void storePointer(Value *Ptr);
-  Type *getSlotType() const override;
-  Type *getAllocatedType() const override;
-  Type *getValueType() const override;
+  llvm::Value *loadPointer() const;
+  void storePointer(llvm::Value *Ptr);
+  llvm::Type *getSlotType() const override;
+  llvm::Type *getAllocatedType() const override;
+  llvm::Type *getValueType() const override;
 };
 
 class ArrayStorage : public VarStorage {
 
-  Value *BasePointer = nullptr;
-  ArrayType *ArrayTy = nullptr;
+  llvm::Value *BasePointer = nullptr;
+  llvm::ArrayType *ArrayTy = nullptr;
 
 public:
-  ArrayStorage(Value *BasePointer, IRBuilderBase &IRB, ArrayType *ArrayTy)
+  ArrayStorage(llvm::Value *BasePointer, llvm::IRBuilderBase &IRB,
+               llvm::ArrayType *ArrayTy)
       : VarStorage(IRB), BasePointer(BasePointer), ArrayTy(ArrayTy) {}
   std::unique_ptr<VarStorage> clone() const override {
     return std::make_unique<ArrayStorage>(BasePointer, IRB, ArrayTy);
   }
-  Value *getSlot() const override;
-  Value *loadValue() const override;
-  void storeValue(Value *Val) override;
-  Type *getSlotType() const override;
-  Type *getAllocatedType() const override;
-  Type *getValueType() const override;
+  llvm::Value *getSlot() const override;
+  llvm::Value *loadValue() const override;
+  void storeValue(llvm::Value *Val) override;
+  llvm::Type *getSlotType() const override;
+  llvm::Type *getAllocatedType() const override;
+  llvm::Type *getValueType() const override;
 };
 
 } // namespace proteus

@@ -12,26 +12,28 @@
 namespace proteus {
 
 JitModule::JitModule(const std::string &Target)
-    : Ctx{std::make_unique<LLVMContext>()},
-      Mod{std::make_unique<Module>("JitModule", *Ctx)},
-      TargetModel{parseTargetModel(Target)},
-      TargetTriple(::proteus::getTargetTriple(TargetModel)),
+    : TargetModel{parseTargetModel(Target)},
       Dispatch(Dispatcher::getDispatcher(TargetModel)) {
-  Mod->setTargetTriple(TargetTriple);
+  auto Ctx = std::make_unique<LLVMContext>();
+  auto Mod = std::make_unique<Module>("JitModule", *Ctx);
+  CB = std::make_unique<LLVMCodeBuilder>(std::move(Ctx), std::move(Mod),
+                                         TargetModel);
 }
 
 void JitModule::compile(bool Verify) {
   if (IsCompiled)
     return;
 
+  auto &Mod = CB->getModule();
+
   if (Verify)
-    if (verifyModule(*Mod, &errs())) {
+    if (verifyModule(Mod, &errs())) {
       reportFatalError("Broken module found, JIT compilation aborted!");
     }
 
   SmallVector<char, 0> Buffer;
   raw_svector_ostream OS(Buffer);
-  WriteBitcodeToFile(*Mod, OS);
+  WriteBitcodeToFile(Mod, OS);
 
   // Create a unique module hash based on the bitcode and append to all
   // function names to make them unique.
@@ -48,11 +50,11 @@ void JitModule::compile(bool Verify) {
   }
 
   Library = std::make_unique<CompiledLibrary>(
-      Dispatch.compile(std::move(Ctx), std::move(Mod), *ModuleHash));
+      Dispatch.compile(CB->takeLLVMContext(), CB->takeModule(), *ModuleHash));
   IsCompiled = true;
 }
 
-void JitModule::print() { Mod->print(outs(), nullptr); }
+void JitModule::print() { CB->getModule().print(outs(), nullptr); }
 
 JitModule::~JitModule() = default;
 

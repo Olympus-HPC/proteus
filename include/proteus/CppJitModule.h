@@ -177,8 +177,8 @@ private:
 
   struct CompilationResult {
     // Declare Ctx first to ensure it is destroyed after Mod.
-    std::unique_ptr<LLVMContext> Ctx;
-    std::unique_ptr<Module> Mod;
+    std::unique_ptr<llvm::LLVMContext> Ctx;
+    std::unique_ptr<llvm::Module> Mod;
 
     ~CompilationResult();
   };
