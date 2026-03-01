@@ -19,15 +19,11 @@ FuncBase::FuncBase(JitModule &J, LLVMCodeBuilder &CBParam,
 
 FuncBase::~FuncBase() = default;
 
-LLVMContext &FuncBase::getContext() { return CB->getContext(); }
-
 void FuncBase::setName(const std::string &NewName) {
   Name = NewName;
   Function *F = getFunction();
   F->setName(Name);
 }
-
-TargetModelType FuncBase::getTargetModel() const { return J.getTargetModel(); }
 
 Value *FuncBase::getArg(size_t Idx) {
   Function *F = getFunction();

@@ -5,7 +5,6 @@
 #include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.h"
 #include "proteus/Frontend/LLVMCodeBuilder.h"
-#include "proteus/Frontend/TargetModel.h"
 #include "proteus/Frontend/TypeMap.h"
 #include "proteus/Frontend/TypeTraits.h"
 #include "proteus/Frontend/Var.h"
@@ -58,8 +57,6 @@ class FuncBase {
 public:
   JitModule &getJitModule() { return J; }
 
-  llvm::LLVMContext &getContext();
-
   /// Get the underlying LLVMCodeBuilder for direct IR generation.
   LLVMCodeBuilder &getCodeBuilder();
 
@@ -75,8 +72,6 @@ public:
            llvm::Type *RetTy, const std::vector<llvm::Type *> &ArgTys);
   ~FuncBase();
 
-  TargetModelType getTargetModel() const;
-
   llvm::Function *getFunction();
   llvm::Value *getArg(size_t Idx);
 
@@ -91,7 +86,7 @@ public:
     static_assert(!std::is_reference_v<T>,
                   "declVar does not support reference types");
 
-    auto &Ctx = getContext();
+    auto &Ctx = CB->getContext();
     llvm::Type *AllocaTy = TypeMap<T>::get(Ctx);
 
     if constexpr (std::is_pointer_v<T>) {
@@ -107,7 +102,7 @@ public:
                  const std::string &Name = "array_var") {
     static_assert(std::is_array_v<T>, "Expected array type");
 
-    auto *ArrTy = TypeMap<T>::get(getContext(), NElem);
+    auto *ArrTy = TypeMap<T>::get(CB->getContext(), NElem);
 
     return Var<T>{CB->createArrayStorage(Name, AS, ArrTy), *CB};
   }
@@ -394,9 +389,9 @@ FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
       return Arg.loadValue();
   };
 
-  auto &Ctx = getContext();
+  auto &Ctx = CB->getContext();
   std::vector<llvm::Type *> ArgTys = unpackArgTypes(ArgT{}, Ctx);
-  getCodeBuilder().createCall(Name, TypeMap<RetT>::get(getContext()), ArgTys,
+  getCodeBuilder().createCall(Name, TypeMap<RetT>::get(Ctx), ArgTys,
                               {GetArgVal(ArgsVars)...});
 }
 
@@ -407,7 +402,7 @@ FuncBase::call(const std::string &Name) {
   using RetT = typename FnSig<Sig>::RetT;
 
   auto *Call =
-      getCodeBuilder().createCall(Name, TypeMap<RetT>::get(getContext()));
+      getCodeBuilder().createCall(Name, TypeMap<RetT>::get(CB->getContext()));
   Var<RetT> Ret = declVar<RetT>("ret");
   Ret.storeValue(Call);
   return Ret;
@@ -417,7 +412,7 @@ template <typename Sig>
 std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
 FuncBase::call(const std::string &Name) {
   using RetT = typename FnSig<Sig>::RetT;
-  getCodeBuilder().createCall(Name, TypeMap<RetT>::get(getContext()));
+  getCodeBuilder().createCall(Name, TypeMap<RetT>::get(CB->getContext()));
 }
 
 template <typename... Ts>
@@ -441,7 +436,7 @@ FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
       return Arg.loadValue();
   };
 
-  auto &Ctx = getContext();
+  auto &Ctx = CB->getContext();
   std::vector<llvm::Type *> ArgTys = unpackArgTypes(ArgT{}, Ctx);
   std::vector<llvm::Value *> ArgVals = {GetArgVal(ArgsVars)...};
 
