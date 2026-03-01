@@ -18,7 +18,6 @@
 #include <vector>
 
 namespace llvm {
-class BasicBlock;
 class Function;
 class Type;
 class Value;
@@ -369,79 +368,16 @@ void FuncBase::beginFor(Var<IterT> &IterVar, const Var<InitT> &Init,
                 "Loop iterator must be an integral type");
   static_assert(is_mutable_v<IterT>, "Loop iterator must be mutable");
 
-  // Update the terminator of the current basic block due to the split
-  // control-flow.
-  auto [CurBlock, NextBlock] = CB->splitCurrentBlock();
-  CB->pushScope(File, Line, ScopeKind::FOR, NextBlock);
-
-  llvm::BasicBlock *Header = CB->createBasicBlock("loop.header", NextBlock);
-  llvm::BasicBlock *LoopCond = CB->createBasicBlock("loop.cond", NextBlock);
-  llvm::BasicBlock *Body = CB->createBasicBlock("loop.body", NextBlock);
-  llvm::BasicBlock *Latch = CB->createBasicBlock("loop.inc", NextBlock);
-  llvm::BasicBlock *LoopExit = CB->createBasicBlock("loop.end", NextBlock);
-
-  // Erase the old terminator and branch to the header.
-  CB->eraseTerminator(CurBlock);
-  CB->setInsertPoint(CurBlock);
-  { CB->createBr(Header); }
-
-  CB->setInsertPoint(Header);
-  {
-    IterVar = Init;
-    CB->createBr(LoopCond);
-  }
-
-  CB->setInsertPoint(LoopCond);
-  {
-    auto CondVar = IterVar < UpperBound;
-    llvm::Value *Cond = CondVar.loadValue();
-    CB->createCondBr(Cond, Body, LoopExit);
-  }
-
-  CB->setInsertPoint(Body);
-  CB->createBr(Latch);
-
-  CB->setInsertPoint(Latch);
-  {
-    IterVar = IterVar + Inc;
-    CB->createBr(LoopCond);
-  }
-
-  CB->setInsertPoint(LoopExit);
-  { CB->createBr(NextBlock); }
-
-  CB->setInsertPointBegin(Body);
+  CB->beginFor(IterVar.getSlot(), IterVar.getValueType(), Init.loadValue(),
+               UpperBound.loadValue(), Inc.loadValue(),
+               std::is_signed_v<std::remove_const_t<IterT>>, File, Line);
 }
 
 template <typename CondLambda>
 void FuncBase::beginWhile(CondLambda &&Cond, const char *File, int Line) {
-  // Update the terminator of the current basic block due to the split
-  // control-flow.
-  auto [CurBlock, NextBlock] = CB->splitCurrentBlock();
-  CB->pushScope(File, Line, ScopeKind::WHILE, NextBlock);
-
-  llvm::BasicBlock *LoopCond = CB->createBasicBlock("while.cond", NextBlock);
-  llvm::BasicBlock *Body = CB->createBasicBlock("while.body", NextBlock);
-  llvm::BasicBlock *LoopExit = CB->createBasicBlock("while.end", NextBlock);
-
-  CB->eraseTerminator(CurBlock);
-  CB->setInsertPoint(CurBlock);
-  { CB->createBr(LoopCond); }
-
-  CB->setInsertPoint(LoopCond);
-  {
-    auto CondVar = Cond();
-    llvm::Value *CondV = CondVar.loadValue();
-    CB->createCondBr(CondV, Body, LoopExit);
-  }
-
-  CB->setInsertPoint(Body);
-  CB->createBr(LoopCond);
-
-  CB->setInsertPoint(LoopExit);
-  { CB->createBr(NextBlock); }
-
-  CB->setInsertPointBegin(Body);
+  CB->beginWhile([Cond = std::forward<CondLambda>(
+                      Cond)]() -> llvm::Value * { return Cond().loadValue(); },
+                 File, Line);
 }
 
 template <typename Sig, typename... ArgVars>

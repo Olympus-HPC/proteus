@@ -7,6 +7,7 @@
 #include "proteus/Frontend/VarStorage.h"
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <tuple>
@@ -102,7 +103,20 @@ public:
   void endFunction();
   void beginIf(llvm::Value *Cond, const char *File, int Line);
   void endIf();
+  /// IterSlot : alloca holding the loop iterator.
+  /// IterTy   : value type of the iterator (must be an integer type).
+  /// InitVal  : initial value to store into IterSlot.
+  /// UpperBoundVal : exclusive upper bound for the loop condition.
+  /// IncVal   : increment added to the iterator on each iteration.
+  /// IsSigned : true → ICmpSLT, false → ICmpULT.
+  void beginFor(llvm::Value *IterSlot, llvm::Type *IterTy, llvm::Value *InitVal,
+                llvm::Value *UpperBoundVal, llvm::Value *IncVal, bool IsSigned,
+                const char *File, int Line);
   void endFor();
+  /// CondFn : callable that emits the condition IR at the current insert point
+  ///          and returns the resulting i1 Value (true → continue loop).
+  void beginWhile(std::function<llvm::Value *()> CondFn, const char *File,
+                  int Line);
   void endWhile();
 
   // Arithmetic operations.

@@ -247,6 +247,57 @@ void LLVMCodeBuilder::endIf() {
   PImpl->IRB.restoreIP(PImpl->IP);
 }
 
+void LLVMCodeBuilder::beginFor(llvm::Value *IterSlot, llvm::Type *IterTy,
+                               llvm::Value *InitVal, llvm::Value *UpperBoundVal,
+                               llvm::Value *IncVal, bool IsSigned,
+                               const char *File, int Line) {
+  // Update the terminator of the current basic block due to the split
+  // control-flow.
+  auto [CurBlock, NextBlock] = splitCurrentBlock();
+  pushScope(File, Line, ScopeKind::FOR, NextBlock);
+
+  llvm::BasicBlock *Header = createBasicBlock("loop.header", NextBlock);
+  llvm::BasicBlock *LoopCond = createBasicBlock("loop.cond", NextBlock);
+  llvm::BasicBlock *Body = createBasicBlock("loop.body", NextBlock);
+  llvm::BasicBlock *Latch = createBasicBlock("loop.inc", NextBlock);
+  llvm::BasicBlock *LoopExit = createBasicBlock("loop.end", NextBlock);
+
+  // Erase the old terminator and branch to the header.
+  eraseTerminator(CurBlock);
+  setInsertPoint(CurBlock);
+  { createBr(Header); }
+
+  setInsertPoint(Header);
+  {
+    createStore(InitVal, IterSlot);
+    createBr(LoopCond);
+  }
+
+  setInsertPoint(LoopCond);
+  {
+    llvm::Value *Iter = createLoad(IterTy, IterSlot);
+    llvm::Value *Cond = IsSigned ? createICmpSLT(Iter, UpperBoundVal)
+                                 : createICmpULT(Iter, UpperBoundVal);
+    createCondBr(Cond, Body, LoopExit);
+  }
+
+  setInsertPoint(Body);
+  createBr(Latch);
+
+  setInsertPoint(Latch);
+  {
+    llvm::Value *Iter = createLoad(IterTy, IterSlot);
+    llvm::Value *Next = createAdd(Iter, IncVal);
+    createStore(Next, IterSlot);
+    createBr(LoopCond);
+  }
+
+  setInsertPoint(LoopExit);
+  { createBr(NextBlock); }
+
+  setInsertPointBegin(Body);
+}
+
 void LLVMCodeBuilder::endFor() {
   if (PImpl->Scopes.empty())
     reportFatalError("Expected FOR scope");
@@ -262,6 +313,36 @@ void LLVMCodeBuilder::endFor() {
   PImpl->Scopes.pop_back();
 
   PImpl->IRB.restoreIP(PImpl->IP);
+}
+
+void LLVMCodeBuilder::beginWhile(std::function<llvm::Value *()> CondFn,
+                                 const char *File, int Line) {
+  // Update the terminator of the current basic block due to the split
+  // control-flow.
+  auto [CurBlock, NextBlock] = splitCurrentBlock();
+  pushScope(File, Line, ScopeKind::WHILE, NextBlock);
+
+  llvm::BasicBlock *LoopCond = createBasicBlock("while.cond", NextBlock);
+  llvm::BasicBlock *Body = createBasicBlock("while.body", NextBlock);
+  llvm::BasicBlock *LoopExit = createBasicBlock("while.end", NextBlock);
+
+  eraseTerminator(CurBlock);
+  setInsertPoint(CurBlock);
+  { createBr(LoopCond); }
+
+  setInsertPoint(LoopCond);
+  {
+    llvm::Value *CondV = CondFn();
+    createCondBr(CondV, Body, LoopExit);
+  }
+
+  setInsertPoint(Body);
+  createBr(LoopCond);
+
+  setInsertPoint(LoopExit);
+  { createBr(NextBlock); }
+
+  setInsertPointBegin(Body);
 }
 
 void LLVMCodeBuilder::endWhile() {
