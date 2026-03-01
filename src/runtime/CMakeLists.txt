@@ -17,6 +17,7 @@ set(SOURCES
   Frontend/LoopUnroller.cpp
   Frontend/TargetModel.cpp
   Frontend/TypeMap.cpp
+  Frontend/LLVMTypeMap.cpp
   Frontend/VarStorage.cpp
 )
 

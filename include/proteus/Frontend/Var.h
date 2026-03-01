@@ -31,8 +31,8 @@ template <typename StorageT> struct VarStorageOwner {
 
   llvm::Value *getSlot() const { return Storage->getSlot(); }
   llvm::Type *getSlotType() const { return Storage->getSlotType(); }
-  llvm::Type *getValueType() const { return Storage->getValueType(); }
-  llvm::Type *getAllocatedType() const { return Storage->getAllocatedType(); }
+  IRType getValueType() const { return Storage->getValueType(); }
+  IRType getAllocatedType() const { return Storage->getAllocatedType(); }
 };
 
 // Primary template declaration
@@ -293,13 +293,11 @@ llvm::Value *convert(LLVMCodeBuilder &CB, llvm::Value *V) {
   static_assert(std::is_arithmetic_v<From>, "From type must be arithmetic");
   static_assert(std::is_arithmetic_v<To>, "To type must be arithmetic");
 
-  auto &Ctx = CB.getContext();
-
   if constexpr (std::is_same_v<From, To>) {
     return V;
   }
 
-  llvm::Type *DestTy = TypeMap<To>::get(Ctx);
+  IRType DestTy = TypeMap<To>::get();
 
   if constexpr (std::is_integral_v<From> && std::is_floating_point_v<To>) {
     if constexpr (std::is_signed_v<From>) {
@@ -335,14 +333,12 @@ Var<T> declVar(LLVMCodeBuilder &CB, const std::string &Name = "var") {
   static_assert(!std::is_reference_v<T>,
                 "declVar does not support reference types");
 
-  auto &Ctx = CB.getContext();
-  llvm::Type *AllocaTy = TypeMap<T>::get(Ctx);
-
   if constexpr (std::is_pointer_v<T>) {
-    llvm::Type *PtrElemTy = TypeMap<T>::getPointerElemType(Ctx);
-    return Var<T>{CB.createPointerStorage(Name, AllocaTy, PtrElemTy), CB};
+    IRType ElemIRTy = *TypeMap<T>::getPointerElemType();
+    return Var<T>{CB.createPointerStorage(Name, ElemIRTy), CB};
   } else {
-    return Var<T>{CB.createScalarStorage(Name, AllocaTy), CB};
+    IRType AllocaIRTy = TypeMap<T>::get();
+    return Var<T>{CB.createScalarStorage(Name, AllocaIRTy), CB};
   }
 }
 
@@ -392,8 +388,7 @@ compoundAssignConst(Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &LHS,
   static_assert(std::is_convertible_v<remove_cvref_t<U>, remove_cvref_t<T>>,
                 "U must be convertible to T");
 
-  auto &Ctx = LHS.CB.getContext();
-  llvm::Type *RHSType = TypeMap<remove_cvref_t<U>>::get(Ctx);
+  IRType RHSType = TypeMap<remove_cvref_t<U>>::get();
 
   llvm::Value *RHS = nullptr;
   if constexpr (std::is_integral_v<remove_cvref_t<U>>) {
@@ -461,8 +456,8 @@ template <typename T>
 template <typename U, typename>
 Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::Var(const Var<U> &V)
     : VarStorageOwner<VarStorage>(V.CB) {
-  llvm::Type *TargetTy = TypeMap<remove_cvref_t<T>>::get(CB.getContext());
-  Storage = CB.createScalarStorage("conv.var", TargetTy);
+  IRType TargetIRTy = TypeMap<remove_cvref_t<T>>::get();
+  Storage = CB.createScalarStorage("conv.var", TargetIRTy);
 
   auto *Converted = detail::convert<U, T>(CB, V.loadValue());
   storeValue(Converted);
@@ -494,28 +489,23 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::getAddress() {
   if constexpr (std::is_reference_v<T>) {
     auto *PtrStorage = static_cast<PointerStorage *>(Storage.get());
     llvm::Value *PtrVal = PtrStorage->loadPointer();
-    llvm::Type *ElemTy = PtrStorage->getValueType();
+    IRType ElemIRTy = PtrStorage->getValueType();
     unsigned AddrSpace = CB.getAddressSpaceFromValue(PtrVal);
-    llvm::Type *PtrTy = CB.getPointerType(ElemTy, AddrSpace);
-    PtrVal = CB.createBitCast(PtrVal, PtrTy);
 
     std::unique_ptr<PointerStorage> ResultStorage =
-        CB.createPointerStorage("addr.ref.tmp", PtrTy, ElemTy);
+        CB.createPointerStorage("addr.ref.tmp", ElemIRTy, AddrSpace);
     CB.createStore(PtrVal, ResultStorage->getSlot());
 
     return Var<std::add_pointer_t<T>>(std::move(ResultStorage), CB);
   }
 
   llvm::Value *Slot = getSlot();
-  llvm::Type *ElemTy = getAllocatedType();
-
-  unsigned AddrSpace = CB.getAddressSpace(getSlotType());
-  llvm::Type *PtrTy = CB.getPointerType(ElemTy, AddrSpace);
-  llvm::Value *PtrVal = CB.createBitCast(Slot, PtrTy);
+  IRType ElemIRTy = getAllocatedType();
+  unsigned AddrSpace = CB.getAddressSpaceFromValue(Slot);
 
   std::unique_ptr<PointerStorage> ResultStorage =
-      CB.createPointerStorage("addr.tmp", PtrTy, ElemTy);
-  CB.createStore(PtrVal, ResultStorage->getSlot());
+      CB.createPointerStorage("addr.tmp", ElemIRTy, AddrSpace);
+  CB.createStore(Slot, ResultStorage->getSlot());
 
   return Var<std::add_pointer_t<T>>(std::move(ResultStorage), CB);
 }
@@ -540,11 +530,11 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator=(
   static_assert(std::is_arithmetic_v<U>,
                 "Can only assign arithmetic types to Var");
 
-  llvm::Type *LHSType = getValueType();
+  IRType LHSType = getValueType();
 
-  if (CB.isIntegerTy(LHSType)) {
+  if (isIntegerKind(LHSType)) {
     storeValue(CB.getConstantInt(LHSType, ConstValue));
-  } else if (CB.isFloatingPointTy(LHSType)) {
+  } else if (isFloatingPointKind(LHSType)) {
     storeValue(CB.getConstantFP(LHSType, ConstValue));
   } else {
     reportFatalError("Unsupported type");
@@ -860,16 +850,15 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator!() const {
 template <typename T>
 Var<std::add_lvalue_reference_t<std::remove_extent_t<T>>>
 Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](size_t Index) {
-  auto *ArrayTy = getAllocatedType();
-  auto *BasePointer = getSlot();
+  IRType ArrayIRTy = getAllocatedType();
+  llvm::Value *BasePointer = getSlot();
 
-  auto *GEP = CB.createConstInBoundsGEP2_64(ArrayTy, BasePointer, 0, Index);
-  llvm::Type *ElemTy = getValueType();
-  unsigned AddrSpace = CB.getAddressSpace(getSlotType());
-  llvm::Type *ElemPtrTy = CB.getPointerType(ElemTy, AddrSpace);
+  auto *GEP = CB.createConstInBoundsGEP2_64(ArrayIRTy, BasePointer, 0, Index);
+  IRType ElemIRTy = getValueType();
+  unsigned AddrSpace = CB.getAddressSpaceFromValue(BasePointer);
 
   std::unique_ptr<PointerStorage> ResultStorage =
-      CB.createPointerStorage("elem.ptr", ElemPtrTy, ElemTy);
+      CB.createPointerStorage("elem.ptr", ElemIRTy, AddrSpace);
   CB.createStore(GEP, ResultStorage->getSlot());
   return Var<std::add_lvalue_reference_t<std::remove_extent_t<T>>>(
       std::move(ResultStorage), CB);
@@ -881,18 +870,17 @@ std::enable_if_t<std::is_integral_v<IdxT>,
                  Var<std::add_lvalue_reference_t<std::remove_extent_t<T>>>>
 Var<T, std::enable_if_t<std::is_array_v<T>>>::operator[](
     const Var<IdxT> &Index) {
-  auto *ArrayTy = getAllocatedType();
-  auto *BasePointer = getSlot();
+  IRType ArrayIRTy = getAllocatedType();
+  llvm::Value *BasePointer = getSlot();
 
   llvm::Value *IdxVal = Index.loadValue();
   llvm::Value *Zero = CB.getConstantInt(Index.getValueType(), 0);
-  auto *GEP = CB.createInBoundsGEP(ArrayTy, BasePointer, {Zero, IdxVal});
-  llvm::Type *ElemTy = getValueType();
-  unsigned AddrSpace = CB.getAddressSpace(getSlotType());
-  llvm::Type *ElemPtrTy = CB.getPointerType(ElemTy, AddrSpace);
+  auto *GEP = CB.createInBoundsGEP(ArrayIRTy, BasePointer, {Zero, IdxVal});
+  IRType ElemIRTy = getValueType();
+  unsigned AddrSpace = CB.getAddressSpaceFromValue(BasePointer);
 
   std::unique_ptr<PointerStorage> ResultStorage =
-      CB.createPointerStorage("elem.ptr", ElemPtrTy, ElemTy);
+      CB.createPointerStorage("elem.ptr", ElemIRTy, AddrSpace);
   CB.createStore(GEP, ResultStorage->getSlot());
 
   return Var<std::add_lvalue_reference_t<std::remove_extent_t<T>>>(
@@ -903,16 +891,14 @@ template <typename T>
 Var<std::add_lvalue_reference_t<
     std::remove_pointer_t<std::remove_reference_t<T>>>>
 Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator[](size_t Index) {
-  auto *PointerElemTy =
-      TypeMap<std::remove_pointer_t<std::remove_reference_t<T>>>::get(
-          CB.getContext());
+  using ElemT = std::remove_pointer_t<std::remove_reference_t<T>>;
+  IRType PointerElemIRTy = TypeMap<ElemT>::get();
   auto *Ptr = loadPointer();
-  auto *GEP = CB.createConstInBoundsGEP1_64(PointerElemTy, Ptr, Index);
-  unsigned AddrSpace = CB.getAddressSpace(getAllocatedType());
-  llvm::Type *ElemPtrTy = CB.getPointerType(PointerElemTy, AddrSpace);
+  auto *GEP = CB.createConstInBoundsGEP1_64(PointerElemIRTy, Ptr, Index);
+  unsigned AddrSpace = CB.getAddressSpaceFromValue(Ptr);
 
   std::unique_ptr<PointerStorage> ResultStorage =
-      CB.createPointerStorage("elem.ptr", ElemPtrTy, PointerElemTy);
+      CB.createPointerStorage("elem.ptr", PointerElemIRTy, AddrSpace);
   CB.createStore(GEP, ResultStorage->getSlot());
 
   return Var<std::add_lvalue_reference_t<
@@ -927,18 +913,15 @@ std::enable_if_t<std::is_arithmetic_v<IdxT>,
                      std::remove_pointer_t<std::remove_reference_t<T>>>>>
 Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator[](
     const Var<IdxT> &Index) {
-
-  auto *PointeeType =
-      TypeMap<std::remove_pointer_t<std::remove_reference_t<T>>>::get(
-          CB.getContext());
+  using ElemT = std::remove_pointer_t<std::remove_reference_t<T>>;
+  IRType PointeeIRTy = TypeMap<ElemT>::get();
   auto *Ptr = loadPointer();
   auto *IdxValue = Index.loadValue();
-  auto *GEP = CB.createInBoundsGEP(PointeeType, Ptr, {IdxValue});
-  unsigned AddrSpace = CB.getAddressSpace(getAllocatedType());
-  llvm::Type *ElemPtrTy = CB.getPointerType(PointeeType, AddrSpace);
+  auto *GEP = CB.createInBoundsGEP(PointeeIRTy, Ptr, {IdxValue});
+  unsigned AddrSpace = CB.getAddressSpaceFromValue(Ptr);
 
   std::unique_ptr<PointerStorage> ResultStorage =
-      CB.createPointerStorage("elem.ptr", ElemPtrTy, PointeeType);
+      CB.createPointerStorage("elem.ptr", PointeeIRTy, AddrSpace);
   CB.createStore(GEP, ResultStorage->getSlot());
 
   return Var<std::add_lvalue_reference_t<
@@ -957,16 +940,13 @@ template <typename T>
 Var<std::add_pointer_t<T>>
 Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::getAddress() {
   llvm::Value *PtrVal = loadPointer();
-  llvm::Type *ElemTy = getValueType();
+  IRType ElemIRTy = getValueType();
 
-  unsigned AddrSpace = CB.getAddressSpace(getAllocatedType());
-  llvm::Type *PointeePtrTy = CB.getPointerType(ElemTy, AddrSpace);
-  llvm::Type *TargetPtrTy = CB.getPointerTypeUnqual(PointeePtrTy);
-
-  PtrVal = CB.createBitCast(PtrVal, PointeePtrTy);
+  // Result holds a pointer-to-(pointer-to-ElemIRTy)
+  IRType PointeePtrIRTy{IRTypeKind::Pointer, ElemIRTy.Signed, 0, ElemIRTy.Kind};
 
   std::unique_ptr<PointerStorage> ResultStorage =
-      CB.createPointerStorage("addr.ptr.tmp", TargetPtrTy, PointeePtrTy);
+      CB.createPointerStorage("addr.ptr.tmp", PointeePtrIRTy, 0);
   CB.createStore(PtrVal, ResultStorage->getSlot());
 
   return Var<std::add_pointer_t<T>>(std::move(ResultStorage), CB);
@@ -982,15 +962,14 @@ Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator+(
   auto *IdxVal = detail::convert<OffsetT, int64_t>(CB, OffsetVal);
 
   auto *BasePtr = loadPointer();
-  auto *ElemTy = getValueType();
+  IRType ElemIRTy = getValueType();
 
-  auto *GEP = CB.createInBoundsGEP(ElemTy, BasePtr, IdxVal, "ptr.add");
+  auto *GEP = CB.createInBoundsGEP(ElemIRTy, BasePtr, {IdxVal}, "ptr.add");
 
-  unsigned AddrSpace = CB.getAddressSpace(getAllocatedType());
-  auto *ElemPtrTy = CB.getPointerType(ElemTy, AddrSpace);
+  unsigned AddrSpace = CB.getAddressSpaceFromValue(loadPointer());
 
   std::unique_ptr<PointerStorage> ResultStorage =
-      CB.createPointerStorage("ptr.add.tmp", ElemPtrTy, ElemTy);
+      CB.createPointerStorage("ptr.add.tmp", ElemIRTy, AddrSpace);
   CB.createStore(GEP, ResultStorage->getSlot());
 
   return Var<T, std::enable_if_t<is_pointer_unref_v<T>>>(
@@ -1003,19 +982,18 @@ std::enable_if_t<std::is_arithmetic_v<OffsetT>,
                  Var<T, std::enable_if_t<is_pointer_unref_v<T>>>>
 Var<T, std::enable_if_t<is_pointer_unref_v<T>>>::operator+(
     OffsetT Offset) const {
-  auto *IntTy = CB.getInt64Ty();
-  llvm::Value *IdxVal = CB.getConstantInt(IntTy, Offset);
+  llvm::Value *IdxVal = CB.getConstantInt(IRType{IRTypeKind::Int64},
+                                          static_cast<uint64_t>(Offset));
 
   auto *BasePtr = loadPointer();
-  auto *ElemTy = getValueType();
+  IRType ElemIRTy = getValueType();
 
-  auto *GEP = CB.createInBoundsGEP(ElemTy, BasePtr, {IdxVal}, "ptr.add");
+  auto *GEP = CB.createInBoundsGEP(ElemIRTy, BasePtr, {IdxVal}, "ptr.add");
 
-  unsigned AddrSpace = CB.getAddressSpace(getAllocatedType());
-  auto *ElemPtrTy = CB.getPointerType(ElemTy, AddrSpace);
+  unsigned AddrSpace = CB.getAddressSpaceFromValue(loadPointer());
 
   std::unique_ptr<PointerStorage> ResultStorage =
-      CB.createPointerStorage("ptr.add.tmp", ElemPtrTy, ElemTy);
+      CB.createPointerStorage("ptr.add.tmp", ElemIRTy, AddrSpace);
   CB.createStore(GEP, ResultStorage->getSlot());
 
   return Var<T, std::enable_if_t<is_pointer_unref_v<T>>>(
@@ -1224,7 +1202,7 @@ template <typename T> struct IntrinsicOperandConverter {
 
 template <typename T, typename... Operands>
 static Var<T> emitIntrinsic(const std::string &IntrinsicName,
-                            llvm::Type *ResultType, const Operands &...Ops) {
+                            const Operands &...Ops) {
   static_assert(sizeof...(Ops) > 0, "Intrinsic requires at least one operand");
 
   LLVMCodeBuilder &CB = std::get<0>(std::tie(Ops...)).CB;
@@ -1236,8 +1214,9 @@ static Var<T> emitIntrinsic(const std::string &IntrinsicName,
 
   IntrinsicOperandConverter<T> ConvertOperand{CB};
 
-  std::vector<llvm::Type *> ArgTys(sizeof...(Ops), ResultType);
-  llvm::Value *Call = CB.createCall(IntrinsicName, ResultType, ArgTys,
+  IRType ResultIRTy = TypeMap<T>::get();
+  std::vector<IRType> ArgTys(sizeof...(Ops), ResultIRTy);
+  llvm::Value *Call = CB.createCall(IntrinsicName, ResultIRTy, ArgTys,
                                     {ConvertOperand(Ops)...});
 
   auto ResultVar = declVar<T>(CB, "res.");
@@ -1253,7 +1232,6 @@ template <typename T> Var<float> powf(const Var<float> &L, const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "powf requires floating-point type");
 
-  auto *ResultType = R.CB.getFloatTy();
   auto RFloat = R.template convert<float>();
   std::string IntrinsicName = "llvm.pow.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1261,14 +1239,13 @@ template <typename T> Var<float> powf(const Var<float> &L, const Var<T> &R) {
     IntrinsicName = "__nv_powf";
 #endif
 
-  return emitIntrinsic<float>(IntrinsicName, ResultType, L, RFloat);
+  return emitIntrinsic<float>(IntrinsicName, L, RFloat);
 }
 
 template <typename T> Var<float> sqrtf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "sqrtf requires floating-point type");
 
-  auto *ResultType = R.CB.getFloatTy();
   auto RFloat = R.template convert<float>();
   std::string IntrinsicName = "llvm.sqrt.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1276,14 +1253,13 @@ template <typename T> Var<float> sqrtf(const Var<T> &R) {
     IntrinsicName = "__nv_sqrtf";
 #endif
 
-  return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
+  return emitIntrinsic<float>(IntrinsicName, RFloat);
 }
 
 template <typename T> Var<float> expf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "expf requires floating-point type");
 
-  auto *ResultType = R.CB.getFloatTy();
   auto RFloat = R.template convert<float>();
   std::string IntrinsicName = "llvm.exp.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1291,14 +1267,13 @@ template <typename T> Var<float> expf(const Var<T> &R) {
     IntrinsicName = "__nv_expf";
 #endif
 
-  return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
+  return emitIntrinsic<float>(IntrinsicName, RFloat);
 }
 
 template <typename T> Var<float> sinf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "sinf requires floating-point type");
 
-  auto *ResultType = R.CB.getFloatTy();
   auto RFloat = R.template convert<float>();
   std::string IntrinsicName = "llvm.sin.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1306,14 +1281,13 @@ template <typename T> Var<float> sinf(const Var<T> &R) {
     IntrinsicName = "__nv_sinf";
 #endif
 
-  return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
+  return emitIntrinsic<float>(IntrinsicName, RFloat);
 }
 
 template <typename T> Var<float> cosf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "cosf requires floating-point type");
 
-  auto *ResultType = R.CB.getFloatTy();
   auto RFloat = R.template convert<float>();
   std::string IntrinsicName = "llvm.cos.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1321,14 +1295,13 @@ template <typename T> Var<float> cosf(const Var<T> &R) {
     IntrinsicName = "__nv_cosf";
 #endif
 
-  return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
+  return emitIntrinsic<float>(IntrinsicName, RFloat);
 }
 
 template <typename T> Var<float> fabs(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "fabs requires floating-point type");
 
-  auto *ResultType = R.CB.getFloatTy();
   auto RFloat = R.template convert<float>();
   std::string IntrinsicName = "llvm.fabs.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1336,14 +1309,13 @@ template <typename T> Var<float> fabs(const Var<T> &R) {
     IntrinsicName = "__nv_fabsf";
 #endif
 
-  return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
+  return emitIntrinsic<float>(IntrinsicName, RFloat);
 }
 
 template <typename T> Var<float> truncf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "truncf requires floating-point type");
 
-  auto *ResultType = R.CB.getFloatTy();
   auto RFloat = R.template convert<float>();
   std::string IntrinsicName = "llvm.trunc.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1351,14 +1323,13 @@ template <typename T> Var<float> truncf(const Var<T> &R) {
     IntrinsicName = "__nv_truncf";
 #endif
 
-  return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
+  return emitIntrinsic<float>(IntrinsicName, RFloat);
 }
 
 template <typename T> Var<float> logf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "logf requires floating-point type");
 
-  auto *ResultType = R.CB.getFloatTy();
   auto RFloat = R.template convert<float>();
   std::string IntrinsicName = "llvm.log.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1366,14 +1337,13 @@ template <typename T> Var<float> logf(const Var<T> &R) {
     IntrinsicName = "__nv_logf";
 #endif
 
-  return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
+  return emitIntrinsic<float>(IntrinsicName, RFloat);
 }
 
 template <typename T> Var<float> absf(const Var<T> &R) {
   static_assert(std::is_convertible_v<T, float>,
                 "absf requires floating-point type");
 
-  auto *ResultType = R.CB.getFloatTy();
   auto RFloat = R.template convert<float>();
   std::string IntrinsicName = "llvm.fabs.f32";
 #if PROTEUS_ENABLE_CUDA
@@ -1381,7 +1351,7 @@ template <typename T> Var<float> absf(const Var<T> &R) {
     IntrinsicName = "__nv_fabsf";
 #endif
 
-  return emitIntrinsic<float>(IntrinsicName, ResultType, RFloat);
+  return emitIntrinsic<float>(IntrinsicName, RFloat);
 }
 
 template <typename T>

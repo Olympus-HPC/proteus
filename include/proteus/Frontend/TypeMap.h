@@ -1,117 +1,121 @@
 #ifndef PROTEUS_FRONTEND_TYPEMAP_H
 #define PROTEUS_FRONTEND_TYPEMAP_H
 
-#include <cstddef>
+#include "proteus/Frontend/IRType.h"
 
-namespace llvm {
-class LLVMContext;
-class Type;
-} // namespace llvm
+#include <cstddef>
+#include <optional>
 
 namespace proteus {
 
+/// Maps a C++ type \c T to a backend-independent \c IRType descriptor.
+///
+/// This header has no dependency on any IR backend (LLVM, MLIR, …).
+/// Backend-specific conversions live in dedicated headers such as
+/// \c LLVMTypeMap.h.
 template <typename T> struct TypeMap;
 
-// Specialization declarations, definitions are in TypeMap.cpp.
+// Specialization declarations; definitions are in TypeMap.cpp.
+
 template <> struct TypeMap<void> {
-  static llvm::Type *get(llvm::LLVMContext &Ctx, std::size_t NElem = 0);
-  static llvm::Type *getPointerElemType(llvm::LLVMContext &Ctx);
+  static IRType get(std::size_t NElem = 0);
+  static std::optional<IRType> getPointerElemType();
   static bool isSigned();
 };
 
 template <> struct TypeMap<float> {
-  static llvm::Type *get(llvm::LLVMContext &Ctx, std::size_t NElem = 0);
-  static llvm::Type *getPointerElemType(llvm::LLVMContext &Ctx);
+  static IRType get(std::size_t NElem = 0);
+  static std::optional<IRType> getPointerElemType();
   static bool isSigned();
 };
 
 template <> struct TypeMap<float[]> {
-  static llvm::Type *get(llvm::LLVMContext &Ctx, std::size_t NElem);
-  static llvm::Type *getPointerElemType(llvm::LLVMContext &Ctx);
+  static IRType get(std::size_t NElem);
+  static std::optional<IRType> getPointerElemType();
   static bool isSigned();
 };
 
 template <> struct TypeMap<double> {
-  static llvm::Type *get(llvm::LLVMContext &Ctx, std::size_t NElem = 0);
-  static llvm::Type *getPointerElemType(llvm::LLVMContext &Ctx);
+  static IRType get(std::size_t NElem = 0);
+  static std::optional<IRType> getPointerElemType();
   static bool isSigned();
 };
 
 template <> struct TypeMap<double[]> {
-  static llvm::Type *get(llvm::LLVMContext &Ctx, std::size_t NElem);
-  static llvm::Type *getPointerElemType(llvm::LLVMContext &Ctx);
+  static IRType get(std::size_t NElem);
+  static std::optional<IRType> getPointerElemType();
   static bool isSigned();
 };
 
 template <> struct TypeMap<size_t> {
-  static llvm::Type *get(llvm::LLVMContext &Ctx, std::size_t NElem = 0);
-  static llvm::Type *getPointerElemType(llvm::LLVMContext &Ctx);
+  static IRType get(std::size_t NElem = 0);
+  static std::optional<IRType> getPointerElemType();
   static bool isSigned();
 };
 
 template <> struct TypeMap<size_t[]> {
-  static llvm::Type *get(llvm::LLVMContext &Ctx, std::size_t NElem);
-  static llvm::Type *getPointerElemType(llvm::LLVMContext &Ctx);
+  static IRType get(std::size_t NElem);
+  static std::optional<IRType> getPointerElemType();
   static bool isSigned();
 };
 
 template <> struct TypeMap<int> {
-  static llvm::Type *get(llvm::LLVMContext &Ctx, std::size_t NElem = 0);
-  static llvm::Type *getPointerElemType(llvm::LLVMContext &Ctx);
+  static IRType get(std::size_t NElem = 0);
+  static std::optional<IRType> getPointerElemType();
   static bool isSigned();
 };
 
 template <> struct TypeMap<int[]> {
-  static llvm::Type *get(llvm::LLVMContext &Ctx, std::size_t NElem);
-  static llvm::Type *getPointerElemType(llvm::LLVMContext &Ctx);
+  static IRType get(std::size_t NElem);
+  static std::optional<IRType> getPointerElemType();
   static bool isSigned();
 };
 
 template <> struct TypeMap<unsigned int> {
-  static llvm::Type *get(llvm::LLVMContext &Ctx, std::size_t NElem = 0);
-  static llvm::Type *getPointerElemType(llvm::LLVMContext &Ctx);
+  static IRType get(std::size_t NElem = 0);
+  static std::optional<IRType> getPointerElemType();
   static bool isSigned();
 };
 
 template <> struct TypeMap<unsigned int[]> {
-  static llvm::Type *get(llvm::LLVMContext &Ctx, std::size_t NElem);
-  static llvm::Type *getPointerElemType(llvm::LLVMContext &Ctx);
+  static IRType get(std::size_t NElem);
+  static std::optional<IRType> getPointerElemType();
   static bool isSigned();
 };
 
 template <> struct TypeMap<int *> {
-  static llvm::Type *get(llvm::LLVMContext &Ctx, std::size_t NElem = 0);
-  static llvm::Type *getPointerElemType(llvm::LLVMContext &Ctx);
+  static IRType get(std::size_t NElem = 0);
+  static std::optional<IRType> getPointerElemType();
   static bool isSigned();
 };
 
 template <> struct TypeMap<unsigned int *> {
-  static llvm::Type *get(llvm::LLVMContext &Ctx, std::size_t NElem = 0);
-  static llvm::Type *getPointerElemType(llvm::LLVMContext &Ctx);
+  static IRType get(std::size_t NElem = 0);
+  static std::optional<IRType> getPointerElemType();
   static bool isSigned();
 };
 
 template <> struct TypeMap<bool> {
-  static llvm::Type *get(llvm::LLVMContext &Ctx, std::size_t NElem = 0);
-  static llvm::Type *getPointerElemType(llvm::LLVMContext &Ctx);
+  static IRType get(std::size_t NElem = 0);
+  static std::optional<IRType> getPointerElemType();
   static bool isSigned();
 };
 
 template <> struct TypeMap<bool[]> {
-  static llvm::Type *get(llvm::LLVMContext &Ctx, std::size_t NElem);
-  static llvm::Type *getPointerElemType(llvm::LLVMContext &Ctx);
+  static IRType get(std::size_t NElem);
+  static std::optional<IRType> getPointerElemType();
   static bool isSigned();
 };
 
 template <> struct TypeMap<double *> {
-  static llvm::Type *get(llvm::LLVMContext &Ctx, std::size_t NElem = 0);
-  static llvm::Type *getPointerElemType(llvm::LLVMContext &Ctx);
+  static IRType get(std::size_t NElem = 0);
+  static std::optional<IRType> getPointerElemType();
   static bool isSigned();
 };
 
 template <> struct TypeMap<float *> {
-  static llvm::Type *get(llvm::LLVMContext &Ctx, std::size_t NElem = 0);
-  static llvm::Type *getPointerElemType(llvm::LLVMContext &Ctx);
+  static IRType get(std::size_t NElem = 0);
+  static std::optional<IRType> getPointerElemType();
   static bool isSigned();
 };
 
