@@ -1,6 +1,7 @@
 #include "proteus/Frontend/VarStorage.h"
 #include "proteus/Error.h"
 #include "proteus/Frontend/LLVMTypeMap.h"
+#include "proteus/Frontend/LLVMValueMap.h"
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instructions.h>
@@ -24,13 +25,17 @@ static Type *getAllocaType(Value *SlotVal, const char *StorageKind) {
 // ScalarStorage
 // ---------------------------------------------------------------------------
 
-Value *ScalarStorage::getSlot() const { return Slot; }
+IRValue ScalarStorage::getSlot() const { return Slot; }
 
-Value *ScalarStorage::loadValue() const {
-  return IRB.CreateLoad(getAllocaType(Slot, "ScalarStorage"), Slot);
+IRValue ScalarStorage::loadValue() const {
+  Value *LLVMSlot = toLLVMValue(Slot);
+  return fromLLVMValue(
+      IRB.CreateLoad(getAllocaType(LLVMSlot, "ScalarStorage"), LLVMSlot));
 }
 
-void ScalarStorage::storeValue(Value *Val) { IRB.CreateStore(Val, Slot); }
+void ScalarStorage::storeValue(IRValue Val) {
+  IRB.CreateStore(toLLVMValue(Val), toLLVMValue(Slot));
+}
 
 IRType ScalarStorage::getAllocatedType() const { return IRValTy; }
 
@@ -40,28 +45,34 @@ IRType ScalarStorage::getValueType() const { return IRValTy; }
 // PointerStorage
 // ---------------------------------------------------------------------------
 
-Value *PointerStorage::getSlot() const { return PtrSlot; }
+IRValue PointerStorage::getSlot() const { return PtrSlot; }
 
 // Load/store the pointee value through the pointer stored in PtrSlot.
-Value *PointerStorage::loadValue() const {
+IRValue PointerStorage::loadValue() const {
+  Value *LLVMPtrSlot = toLLVMValue(PtrSlot);
   Type *ElemLLVMTy = toLLVMType(ElemIRTy, IRB.getContext());
   Value *Ptr =
-      IRB.CreateLoad(getAllocaType(PtrSlot, "PointerStorage"), PtrSlot);
-  return IRB.CreateLoad(ElemLLVMTy, Ptr);
+      IRB.CreateLoad(getAllocaType(LLVMPtrSlot, "PointerStorage"), LLVMPtrSlot);
+  return fromLLVMValue(IRB.CreateLoad(ElemLLVMTy, Ptr));
 }
 
-void PointerStorage::storeValue(Value *Val) {
+void PointerStorage::storeValue(IRValue Val) {
+  Value *LLVMPtrSlot = toLLVMValue(PtrSlot);
   Value *Ptr =
-      IRB.CreateLoad(getAllocaType(PtrSlot, "PointerStorage"), PtrSlot);
-  IRB.CreateStore(Val, Ptr);
+      IRB.CreateLoad(getAllocaType(LLVMPtrSlot, "PointerStorage"), LLVMPtrSlot);
+  IRB.CreateStore(toLLVMValue(Val), Ptr);
 }
 
 // Load/store the pointer value itself from/to PtrSlot.
-Value *PointerStorage::loadPointer() const {
-  return IRB.CreateLoad(getAllocaType(PtrSlot, "PointerStorage"), PtrSlot);
+IRValue PointerStorage::loadPointer() const {
+  Value *LLVMPtrSlot = toLLVMValue(PtrSlot);
+  return fromLLVMValue(IRB.CreateLoad(
+      getAllocaType(LLVMPtrSlot, "PointerStorage"), LLVMPtrSlot));
 }
 
-void PointerStorage::storePointer(Value *Val) { IRB.CreateStore(Val, PtrSlot); }
+void PointerStorage::storePointer(IRValue Val) {
+  IRB.CreateStore(toLLVMValue(Val), toLLVMValue(PtrSlot));
+}
 
 IRType PointerStorage::getAllocatedType() const {
   return IRType{IRTypeKind::Pointer, ElemIRTy.Signed, 0, ElemIRTy.Kind};
@@ -73,13 +84,13 @@ IRType PointerStorage::getValueType() const { return ElemIRTy; }
 // ArrayStorage
 // ---------------------------------------------------------------------------
 
-Value *ArrayStorage::getSlot() const { return BasePointer; }
+IRValue ArrayStorage::getSlot() const { return BasePointer; }
 
-Value *ArrayStorage::loadValue() const {
+IRValue ArrayStorage::loadValue() const {
   reportFatalError("Cannot load entire array as a value");
 }
 
-void ArrayStorage::storeValue(Value *Val) {
+void ArrayStorage::storeValue(IRValue Val) {
   (void)Val;
   reportFatalError("Cannot store value to entire array");
 }

@@ -1,5 +1,6 @@
 #include "proteus/Frontend/LLVMCodeBuilder.h"
 #include "proteus/Frontend/LLVMTypeMap.h"
+#include "proteus/Frontend/LLVMValueMap.h"
 #include "proteus/Frontend/TargetModel.h"
 #include "proteus/impl/CoreLLVMDevice.h"
 
@@ -209,7 +210,7 @@ void LLVMCodeBuilder::endFunction() {
   PImpl->Scopes.pop_back();
 }
 
-void LLVMCodeBuilder::beginIf(Value *Cond, const char *File, int Line) {
+void LLVMCodeBuilder::beginIf(IRValue Cond, const char *File, int Line) {
   // Update the terminator of the current basic block due to the split
   // control-flow.
   BasicBlock *CurBlock = PImpl->IP.getBlock();
@@ -226,7 +227,7 @@ void LLVMCodeBuilder::beginIf(Value *Cond, const char *File, int Line) {
 
   CurBlock->getTerminator()->eraseFromParent();
   PImpl->IRB.SetInsertPoint(CurBlock);
-  { PImpl->IRB.CreateCondBr(Cond, ThenBlock, ExitBlock); }
+  { PImpl->IRB.CreateCondBr(toLLVMValue(Cond), ThenBlock, ExitBlock); }
 
   PImpl->IRB.SetInsertPoint(ThenBlock);
   { PImpl->IRB.CreateBr(ExitBlock); }
@@ -254,11 +255,9 @@ void LLVMCodeBuilder::endIf() {
   PImpl->IRB.restoreIP(PImpl->IP);
 }
 
-void LLVMCodeBuilder::beginFor(llvm::Value *IterSlot, IRType IterTy,
-                               llvm::Value *InitVal, llvm::Value *UpperBoundVal,
-                               llvm::Value *IncVal, bool IsSigned,
-                               const char *File, int Line) {
-  auto *LLVMIterTy = toLLVMType(IterTy, getContext());
+void LLVMCodeBuilder::beginFor(IRValue IterSlot, IRType IterTy, IRValue InitVal,
+                               IRValue UpperBoundVal, IRValue IncVal,
+                               bool IsSigned, const char *File, int Line) {
   // Update the terminator of the current basic block due to the split
   // control-flow.
   auto [CurBlock, NextBlock] = splitCurrentBlock();
@@ -283,9 +282,9 @@ void LLVMCodeBuilder::beginFor(llvm::Value *IterSlot, IRType IterTy,
 
   setInsertPoint(LoopCond);
   {
-    llvm::Value *Iter = createLoad(LLVMIterTy, IterSlot);
-    llvm::Value *Cond = IsSigned ? createICmpSLT(Iter, UpperBoundVal)
-                                 : createICmpULT(Iter, UpperBoundVal);
+    IRValue Iter = createLoad(IterTy, IterSlot);
+    IRValue Cond = IsSigned ? createICmpSLT(Iter, UpperBoundVal)
+                            : createICmpULT(Iter, UpperBoundVal);
     createCondBr(Cond, Body, LoopExit);
   }
 
@@ -294,8 +293,8 @@ void LLVMCodeBuilder::beginFor(llvm::Value *IterSlot, IRType IterTy,
 
   setInsertPoint(Latch);
   {
-    llvm::Value *Iter = createLoad(LLVMIterTy, IterSlot);
-    llvm::Value *Next = createAdd(Iter, IncVal);
+    IRValue Iter = createLoad(IterTy, IterSlot);
+    IRValue Next = createAdd(Iter, IncVal);
     createStore(Next, IterSlot);
     createBr(LoopCond);
   }
@@ -323,7 +322,7 @@ void LLVMCodeBuilder::endFor() {
   PImpl->IRB.restoreIP(PImpl->IP);
 }
 
-void LLVMCodeBuilder::beginWhile(std::function<llvm::Value *()> CondFn,
+void LLVMCodeBuilder::beginWhile(std::function<IRValue()> CondFn,
                                  const char *File, int Line) {
   // Update the terminator of the current basic block due to the split
   // control-flow.
@@ -340,7 +339,7 @@ void LLVMCodeBuilder::beginWhile(std::function<llvm::Value *()> CondFn,
 
   setInsertPoint(LoopCond);
   {
-    llvm::Value *CondV = CondFn();
+    IRValue CondV = CondFn();
     createCondBr(CondV, Body, LoopExit);
   }
 
@@ -371,166 +370,203 @@ void LLVMCodeBuilder::endWhile() {
 }
 
 // Arithmetic operations.
-Value *LLVMCodeBuilder::createAdd(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateAdd(LHS, RHS);
+IRValue LLVMCodeBuilder::createAdd(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateAdd(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createFAdd(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateFAdd(LHS, RHS);
+IRValue LLVMCodeBuilder::createFAdd(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateFAdd(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createSub(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateSub(LHS, RHS);
+IRValue LLVMCodeBuilder::createSub(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateSub(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createFSub(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateFSub(LHS, RHS);
+IRValue LLVMCodeBuilder::createFSub(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateFSub(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createMul(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateMul(LHS, RHS);
+IRValue LLVMCodeBuilder::createMul(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateMul(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createFMul(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateFMul(LHS, RHS);
+IRValue LLVMCodeBuilder::createFMul(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateFMul(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createUDiv(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateUDiv(LHS, RHS);
+IRValue LLVMCodeBuilder::createUDiv(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateUDiv(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createSDiv(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateSDiv(LHS, RHS);
+IRValue LLVMCodeBuilder::createSDiv(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateSDiv(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createFDiv(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateFDiv(LHS, RHS);
+IRValue LLVMCodeBuilder::createFDiv(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateFDiv(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createURem(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateURem(LHS, RHS);
+IRValue LLVMCodeBuilder::createURem(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateURem(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createSRem(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateSRem(LHS, RHS);
+IRValue LLVMCodeBuilder::createSRem(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateSRem(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createFRem(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateFRem(LHS, RHS);
+IRValue LLVMCodeBuilder::createFRem(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateFRem(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
 
 // Atomic operations.
-Value *LLVMCodeBuilder::createAtomicAdd(Value *Addr, Value *Val) {
-  auto Op = Val->getType()->isFloatingPointTy() ? AtomicRMWInst::FAdd
-                                                : AtomicRMWInst::Add;
+IRValue LLVMCodeBuilder::createAtomicAdd(IRValue Addr, IRValue Val) {
+  Value *LLVMVal = toLLVMValue(Val);
+  auto Op = LLVMVal->getType()->isFloatingPointTy() ? AtomicRMWInst::FAdd
+                                                    : AtomicRMWInst::Add;
 
-  return PImpl->IRB.CreateAtomicRMW(Op, Addr, Val, MaybeAlign(),
-                                    AtomicOrdering::SequentiallyConsistent,
-                                    SyncScope::SingleThread);
+  return fromLLVMValue(PImpl->IRB.CreateAtomicRMW(
+      Op, toLLVMValue(Addr), LLVMVal, MaybeAlign(),
+      AtomicOrdering::SequentiallyConsistent, SyncScope::SingleThread));
 }
 
-Value *LLVMCodeBuilder::createAtomicSub(Value *Addr, Value *Val) {
-  auto Op = Val->getType()->isFloatingPointTy() ? AtomicRMWInst::FSub
-                                                : AtomicRMWInst::Sub;
+IRValue LLVMCodeBuilder::createAtomicSub(IRValue Addr, IRValue Val) {
+  Value *LLVMVal = toLLVMValue(Val);
+  auto Op = LLVMVal->getType()->isFloatingPointTy() ? AtomicRMWInst::FSub
+                                                    : AtomicRMWInst::Sub;
 
-  return PImpl->IRB.CreateAtomicRMW(Op, Addr, Val, MaybeAlign(),
-                                    AtomicOrdering::SequentiallyConsistent,
-                                    SyncScope::SingleThread);
+  return fromLLVMValue(PImpl->IRB.CreateAtomicRMW(
+      Op, toLLVMValue(Addr), LLVMVal, MaybeAlign(),
+      AtomicOrdering::SequentiallyConsistent, SyncScope::SingleThread));
 }
 
-Value *LLVMCodeBuilder::createAtomicMax(Value *Addr, Value *Val) {
-  auto Op = Val->getType()->isFloatingPointTy() ? AtomicRMWInst::FMax
-                                                : AtomicRMWInst::Max;
+IRValue LLVMCodeBuilder::createAtomicMax(IRValue Addr, IRValue Val) {
+  Value *LLVMVal = toLLVMValue(Val);
+  auto Op = LLVMVal->getType()->isFloatingPointTy() ? AtomicRMWInst::FMax
+                                                    : AtomicRMWInst::Max;
 
-  return PImpl->IRB.CreateAtomicRMW(Op, Addr, Val, MaybeAlign(),
-                                    AtomicOrdering::SequentiallyConsistent,
-                                    SyncScope::SingleThread);
+  return fromLLVMValue(PImpl->IRB.CreateAtomicRMW(
+      Op, toLLVMValue(Addr), LLVMVal, MaybeAlign(),
+      AtomicOrdering::SequentiallyConsistent, SyncScope::SingleThread));
 }
 
-Value *LLVMCodeBuilder::createAtomicMin(Value *Addr, Value *Val) {
-  auto Op = Val->getType()->isFloatingPointTy() ? AtomicRMWInst::FMin
-                                                : AtomicRMWInst::Min;
+IRValue LLVMCodeBuilder::createAtomicMin(IRValue Addr, IRValue Val) {
+  Value *LLVMVal = toLLVMValue(Val);
+  auto Op = LLVMVal->getType()->isFloatingPointTy() ? AtomicRMWInst::FMin
+                                                    : AtomicRMWInst::Min;
 
-  return PImpl->IRB.CreateAtomicRMW(Op, Addr, Val, MaybeAlign(),
-                                    AtomicOrdering::SequentiallyConsistent,
-                                    SyncScope::SingleThread);
+  return fromLLVMValue(PImpl->IRB.CreateAtomicRMW(
+      Op, toLLVMValue(Addr), LLVMVal, MaybeAlign(),
+      AtomicOrdering::SequentiallyConsistent, SyncScope::SingleThread));
 }
 
 // Comparison operations.
-Value *LLVMCodeBuilder::createICmpEQ(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateICmpEQ(LHS, RHS);
+IRValue LLVMCodeBuilder::createICmpEQ(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateICmpEQ(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createICmpNE(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateICmpNE(LHS, RHS);
+IRValue LLVMCodeBuilder::createICmpNE(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateICmpNE(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createICmpSLT(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateICmpSLT(LHS, RHS);
+IRValue LLVMCodeBuilder::createICmpSLT(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateICmpSLT(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createICmpSGT(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateICmpSGT(LHS, RHS);
+IRValue LLVMCodeBuilder::createICmpSGT(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateICmpSGT(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createICmpSGE(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateICmpSGE(LHS, RHS);
+IRValue LLVMCodeBuilder::createICmpSGE(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateICmpSGE(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createICmpSLE(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateICmpSLE(LHS, RHS);
+IRValue LLVMCodeBuilder::createICmpSLE(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateICmpSLE(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createICmpUGT(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateICmpUGT(LHS, RHS);
+IRValue LLVMCodeBuilder::createICmpUGT(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateICmpUGT(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createICmpUGE(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateICmpUGE(LHS, RHS);
+IRValue LLVMCodeBuilder::createICmpUGE(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateICmpUGE(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createICmpULT(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateICmpULT(LHS, RHS);
+IRValue LLVMCodeBuilder::createICmpULT(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateICmpULT(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createICmpULE(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateICmpULE(LHS, RHS);
+IRValue LLVMCodeBuilder::createICmpULE(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateICmpULE(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createFCmpOEQ(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateFCmpOEQ(LHS, RHS);
+IRValue LLVMCodeBuilder::createFCmpOEQ(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateFCmpOEQ(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createFCmpONE(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateFCmpONE(LHS, RHS);
+IRValue LLVMCodeBuilder::createFCmpONE(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateFCmpONE(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createFCmpOLT(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateFCmpOLT(LHS, RHS);
+IRValue LLVMCodeBuilder::createFCmpOLT(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateFCmpOLT(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createFCmpOLE(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateFCmpOLE(LHS, RHS);
+IRValue LLVMCodeBuilder::createFCmpOLE(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateFCmpOLE(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createFCmpOGT(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateFCmpOGT(LHS, RHS);
+IRValue LLVMCodeBuilder::createFCmpOGT(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateFCmpOGT(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createFCmpOGE(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateFCmpOGE(LHS, RHS);
+IRValue LLVMCodeBuilder::createFCmpOGE(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateFCmpOGE(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createFCmpULT(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateFCmpULT(LHS, RHS);
+IRValue LLVMCodeBuilder::createFCmpULT(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateFCmpULT(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createFCmpULE(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateFCmpULE(LHS, RHS);
+IRValue LLVMCodeBuilder::createFCmpULE(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateFCmpULE(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
 
 // Logical operations.
-Value *LLVMCodeBuilder::createAnd(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateAnd(LHS, RHS);
+IRValue LLVMCodeBuilder::createAnd(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateAnd(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createOr(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateOr(LHS, RHS);
+IRValue LLVMCodeBuilder::createOr(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(PImpl->IRB.CreateOr(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createXor(Value *LHS, Value *RHS) {
-  return PImpl->IRB.CreateXor(LHS, RHS);
+IRValue LLVMCodeBuilder::createXor(IRValue LHS, IRValue RHS) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateXor(toLLVMValue(LHS), toLLVMValue(RHS)));
 }
-Value *LLVMCodeBuilder::createNot(Value *Val) {
-  return PImpl->IRB.CreateNot(Val);
+IRValue LLVMCodeBuilder::createNot(IRValue Val) {
+  return fromLLVMValue(PImpl->IRB.CreateNot(toLLVMValue(Val)));
 }
 
 // Load/Store operations.
-Value *LLVMCodeBuilder::createLoad(Type *Ty, Value *Ptr,
-                                   const std::string &Name) {
-  return PImpl->IRB.CreateLoad(Ty, Ptr, Name);
+IRValue LLVMCodeBuilder::createLoad(IRType Ty, IRValue Ptr,
+                                    const std::string &Name) {
+  return fromLLVMValue(PImpl->IRB.CreateLoad(toLLVMType(Ty, getContext()),
+                                             toLLVMValue(Ptr), Name));
 }
 
-void LLVMCodeBuilder::createStore(Value *Val, Value *Ptr) {
-  PImpl->IRB.CreateStore(Val, Ptr);
+void LLVMCodeBuilder::createStore(IRValue Val, IRValue Ptr) {
+  PImpl->IRB.CreateStore(toLLVMValue(Val), toLLVMValue(Ptr));
 }
 
 // Control flow operations.
 void LLVMCodeBuilder::createBr(BasicBlock *Dest) { PImpl->IRB.CreateBr(Dest); }
 
-void LLVMCodeBuilder::createCondBr(Value *Cond, BasicBlock *True,
+void LLVMCodeBuilder::createCondBr(IRValue Cond, BasicBlock *True,
                                    BasicBlock *False) {
-  PImpl->IRB.CreateCondBr(Cond, True, False);
+  PImpl->IRB.CreateCondBr(toLLVMValue(Cond), True, False);
 }
 
 void LLVMCodeBuilder::createRetVoid() {
@@ -544,75 +580,88 @@ void LLVMCodeBuilder::createRetVoid() {
   TermI->eraseFromParent();
 }
 
-void LLVMCodeBuilder::createRet(Value *V) {
+void LLVMCodeBuilder::createRet(IRValue V) {
   auto *CurBB = PImpl->IP.getBlock();
   if (!CurBB->getSingleSuccessor())
     reportFatalError("Expected single successor for current block");
   auto *TermI = CurBB->getTerminator();
 
-  PImpl->IRB.CreateRet(V);
+  PImpl->IRB.CreateRet(toLLVMValue(V));
 
   TermI->eraseFromParent();
 }
 
 // Cast operations.
-Value *LLVMCodeBuilder::createIntCast(Value *V, IRType DestTy, bool IsSigned) {
-  return PImpl->IRB.CreateIntCast(V, toLLVMType(DestTy, getContext()),
-                                  IsSigned);
+IRValue LLVMCodeBuilder::createIntCast(IRValue V, IRType DestTy,
+                                       bool IsSigned) {
+  return fromLLVMValue(PImpl->IRB.CreateIntCast(
+      toLLVMValue(V), toLLVMType(DestTy, getContext()), IsSigned));
 }
 
-Value *LLVMCodeBuilder::createFPCast(Value *V, IRType DestTy) {
-  return PImpl->IRB.CreateFPCast(V, toLLVMType(DestTy, getContext()));
+IRValue LLVMCodeBuilder::createFPCast(IRValue V, IRType DestTy) {
+  return fromLLVMValue(PImpl->IRB.CreateFPCast(
+      toLLVMValue(V), toLLVMType(DestTy, getContext())));
 }
 
-Value *LLVMCodeBuilder::createSIToFP(Value *V, IRType DestTy) {
-  return PImpl->IRB.CreateSIToFP(V, toLLVMType(DestTy, getContext()));
+IRValue LLVMCodeBuilder::createSIToFP(IRValue V, IRType DestTy) {
+  return fromLLVMValue(PImpl->IRB.CreateSIToFP(
+      toLLVMValue(V), toLLVMType(DestTy, getContext())));
 }
-Value *LLVMCodeBuilder::createUIToFP(Value *V, IRType DestTy) {
-  return PImpl->IRB.CreateUIToFP(V, toLLVMType(DestTy, getContext()));
+IRValue LLVMCodeBuilder::createUIToFP(IRValue V, IRType DestTy) {
+  return fromLLVMValue(PImpl->IRB.CreateUIToFP(
+      toLLVMValue(V), toLLVMType(DestTy, getContext())));
 }
-Value *LLVMCodeBuilder::createFPToSI(Value *V, IRType DestTy) {
-  return PImpl->IRB.CreateFPToSI(V, toLLVMType(DestTy, getContext()));
+IRValue LLVMCodeBuilder::createFPToSI(IRValue V, IRType DestTy) {
+  return fromLLVMValue(PImpl->IRB.CreateFPToSI(
+      toLLVMValue(V), toLLVMType(DestTy, getContext())));
 }
-Value *LLVMCodeBuilder::createFPToUI(Value *V, IRType DestTy) {
-  return PImpl->IRB.CreateFPToUI(V, toLLVMType(DestTy, getContext()));
+IRValue LLVMCodeBuilder::createFPToUI(IRValue V, IRType DestTy) {
+  return fromLLVMValue(PImpl->IRB.CreateFPToUI(
+      toLLVMValue(V), toLLVMType(DestTy, getContext())));
 }
-Value *LLVMCodeBuilder::createBitCast(Value *V, Type *DestTy) {
-  if (V->getType() == DestTy)
+IRValue LLVMCodeBuilder::createBitCast(IRValue V, IRType DestTy) {
+  Value *LLVMv = toLLVMValue(V);
+  Type *DestLLVMTy = toLLVMType(DestTy, getContext());
+  if (LLVMv->getType() == DestLLVMTy)
     return V;
 
-  return PImpl->IRB.CreateBitCast(V, DestTy);
+  return fromLLVMValue(PImpl->IRB.CreateBitCast(LLVMv, DestLLVMTy));
 }
 
-Value *LLVMCodeBuilder::createZExt(Value *V, IRType DestTy) {
-  return PImpl->IRB.CreateZExt(V, toLLVMType(DestTy, getContext()));
+IRValue LLVMCodeBuilder::createZExt(IRValue V, IRType DestTy) {
+  return fromLLVMValue(
+      PImpl->IRB.CreateZExt(toLLVMValue(V), toLLVMType(DestTy, getContext())));
 }
 
 // Constant creation.
-Value *LLVMCodeBuilder::getConstantInt(IRType Ty, uint64_t Val) {
-  return ConstantInt::get(toLLVMType(Ty, getContext()), Val);
+IRValue LLVMCodeBuilder::getConstantInt(IRType Ty, uint64_t Val) {
+  return fromLLVMValue(ConstantInt::get(toLLVMType(Ty, getContext()), Val));
 }
-Value *LLVMCodeBuilder::getConstantFP(IRType Ty, double Val) {
-  return ConstantFP::get(toLLVMType(Ty, getContext()), Val);
+IRValue LLVMCodeBuilder::getConstantFP(IRType Ty, double Val) {
+  return fromLLVMValue(ConstantFP::get(toLLVMType(Ty, getContext()), Val));
 }
 
 // GEP operations.
-Value *LLVMCodeBuilder::createInBoundsGEP(IRType Ty, Value *Ptr,
-                                          const std::vector<Value *> IdxList,
-                                          const std::string &Name) {
-  return PImpl->IRB.CreateInBoundsGEP(toLLVMType(Ty, getContext()), Ptr,
-                                      IdxList, Name);
+IRValue LLVMCodeBuilder::createInBoundsGEP(IRType Ty, IRValue Ptr,
+                                           const std::vector<IRValue> IdxList,
+                                           const std::string &Name) {
+  std::vector<Value *> LLVMIdxList;
+  LLVMIdxList.reserve(IdxList.size());
+  for (const auto &I : IdxList)
+    LLVMIdxList.push_back(toLLVMValue(I));
+  return fromLLVMValue(PImpl->IRB.CreateInBoundsGEP(
+      toLLVMType(Ty, getContext()), toLLVMValue(Ptr), LLVMIdxList, Name));
 }
-Value *LLVMCodeBuilder::createConstInBoundsGEP1_64(IRType Ty, Value *Ptr,
-                                                   size_t Idx) {
-  return PImpl->IRB.CreateConstInBoundsGEP1_64(toLLVMType(Ty, getContext()),
-                                               Ptr, Idx);
+IRValue LLVMCodeBuilder::createConstInBoundsGEP1_64(IRType Ty, IRValue Ptr,
+                                                    size_t Idx) {
+  return fromLLVMValue(PImpl->IRB.CreateConstInBoundsGEP1_64(
+      toLLVMType(Ty, getContext()), toLLVMValue(Ptr), Idx));
 }
 
-Value *LLVMCodeBuilder::createConstInBoundsGEP2_64(IRType Ty, Value *Ptr,
-                                                   size_t Idx0, size_t Idx1) {
-  return PImpl->IRB.CreateConstInBoundsGEP2_64(toLLVMType(Ty, getContext()),
-                                               Ptr, Idx0, Idx1);
+IRValue LLVMCodeBuilder::createConstInBoundsGEP2_64(IRType Ty, IRValue Ptr,
+                                                    size_t Idx0, size_t Idx1) {
+  return fromLLVMValue(PImpl->IRB.CreateConstInBoundsGEP2_64(
+      toLLVMType(Ty, getContext()), toLLVMValue(Ptr), Idx0, Idx1));
 }
 
 // Type accessors.
@@ -636,8 +685,8 @@ unsigned LLVMCodeBuilder::getAddressSpace(Type *Ty) {
   return PtrTy->getAddressSpace();
 }
 
-unsigned LLVMCodeBuilder::getAddressSpaceFromValue(Value *PtrVal) {
-  return getAddressSpace(PtrVal->getType());
+unsigned LLVMCodeBuilder::getAddressSpaceFromValue(IRValue PtrVal) {
+  return getAddressSpace(toLLVMValue(PtrVal)->getType());
 }
 
 bool LLVMCodeBuilder::isIntegerTy(Type *Ty) { return Ty->isIntegerTy(); }
@@ -646,32 +695,36 @@ bool LLVMCodeBuilder::isFloatingPointTy(Type *Ty) {
 }
 
 // Call operations.
-Value *LLVMCodeBuilder::createCall(const std::string &FName, IRType RetTy,
-                                   const std::vector<IRType> &ArgTys,
-                                   const std::vector<Value *> &Args) {
+IRValue LLVMCodeBuilder::createCall(const std::string &FName, IRType RetTy,
+                                    const std::vector<IRType> &ArgTys,
+                                    const std::vector<IRValue> &Args) {
   auto &Ctx = getContext();
   Type *LLVMRetTy = toLLVMType(RetTy, Ctx);
   std::vector<Type *> LLVMArgTys;
   LLVMArgTys.reserve(ArgTys.size());
   for (const auto &T : ArgTys)
     LLVMArgTys.push_back(toLLVMType(T, Ctx));
+  std::vector<Value *> LLVMArgs;
+  LLVMArgs.reserve(Args.size());
+  for (const auto &A : Args)
+    LLVMArgs.push_back(toLLVMValue(A));
   Module *M = &getModule();
   FunctionType *FnTy = FunctionType::get(LLVMRetTy, LLVMArgTys, false);
   FunctionCallee Callee = M->getOrInsertFunction(FName, FnTy);
-  return PImpl->IRB.CreateCall(Callee, Args);
+  return fromLLVMValue(PImpl->IRB.CreateCall(Callee, LLVMArgs));
 }
 
-Value *LLVMCodeBuilder::createCall(const std::string &FName, IRType RetTy) {
+IRValue LLVMCodeBuilder::createCall(const std::string &FName, IRType RetTy) {
   Type *LLVMRetTy = toLLVMType(RetTy, getContext());
   Module *M = &getModule();
   FunctionType *FnTy = FunctionType::get(LLVMRetTy, {}, false);
   FunctionCallee Callee = M->getOrInsertFunction(FName, FnTy);
-  return PImpl->IRB.CreateCall(Callee);
+  return fromLLVMValue(PImpl->IRB.CreateCall(Callee));
 }
 
 // Alloca/array emission.
-Value *LLVMCodeBuilder::emitAlloca(Type *Ty, const std::string &Name,
-                                   AddressSpace AS) {
+IRValue LLVMCodeBuilder::emitAlloca(Type *Ty, const std::string &Name,
+                                    AddressSpace AS) {
   auto SaveIP = PImpl->IRB.saveIP();
   auto AllocaIP = IRBuilderBase::InsertPoint(&F->getEntryBlock(),
                                              F->getEntryBlock().begin());
@@ -680,11 +733,11 @@ Value *LLVMCodeBuilder::emitAlloca(Type *Ty, const std::string &Name,
       PImpl->IRB.CreateAlloca(Ty, static_cast<unsigned>(AS), nullptr, Name);
 
   PImpl->IRB.restoreIP(SaveIP);
-  return Alloca;
+  return fromLLVMValue(Alloca);
 }
 
-Value *LLVMCodeBuilder::emitArrayCreate(Type *Ty, AddressSpace AT,
-                                        const std::string &Name) {
+IRValue LLVMCodeBuilder::emitArrayCreate(Type *Ty, AddressSpace AT,
+                                         const std::string &Name) {
   if (!Ty || !Ty->isArrayTy())
     reportFatalError("Expected LLVM ArrayType for emitArrayCreate");
 
@@ -700,12 +753,11 @@ Value *LLVMCodeBuilder::emitArrayCreate(Type *Ty, AddressSpace AT,
         GlobalValue::NotThreadLocal, static_cast<unsigned>(AT),
         /*ExternallyInitialized=*/false);
 
-    return GV;
+    return fromLLVMValue(GV);
   }
   case AddressSpace::DEFAULT:
   case AddressSpace::LOCAL: {
-    auto *Alloca = emitAlloca(ArrTy, Name, AT);
-    return Alloca;
+    return emitAlloca(ArrTy, Name, AT);
   }
   case AddressSpace::CONSTANT:
     reportFatalError("Constant arrays are not supported");
@@ -776,7 +828,7 @@ LLVMCodeBuilder::createArrayStorage(const std::string &Name, AddressSpace AS,
   Type *ElemLLVMTy = toLLVMType(IRType{ArrIRTy.ElemKind}, Ctx);
   Type *ArrTy = ArrayType::get(ElemLLVMTy, ArrIRTy.NElem);
   IRType ElemIRTy{ArrIRTy.ElemKind, ArrIRTy.Signed};
-  Value *BasePointer = emitArrayCreate(ArrTy, AS, Name);
+  IRValue BasePointer = emitArrayCreate(ArrTy, AS, Name);
   return std::make_unique<ArrayStorage>(BasePointer, getIRBuilder(),
                                         ArrIRTy.NElem, ElemIRTy);
 }

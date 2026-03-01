@@ -18,7 +18,6 @@
 
 namespace llvm {
 class Function;
-class Value;
 } // namespace llvm
 
 namespace proteus {
@@ -71,7 +70,7 @@ public:
   ~FuncBase();
 
   llvm::Function *getFunction();
-  llvm::Value *getArg(size_t Idx);
+  IRValue getArg(size_t Idx);
 
 #if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
   // Kernel management.
@@ -365,7 +364,7 @@ void FuncBase::beginFor(Var<IterT> &IterVar, const Var<InitT> &Init,
 template <typename CondLambda>
 void FuncBase::beginWhile(CondLambda &&Cond, const char *File, int Line) {
   CB->beginWhile([Cond = std::forward<CondLambda>(
-                      Cond)]() -> llvm::Value * { return Cond().loadValue(); },
+                      Cond)]() -> IRValue { return Cond().loadValue(); },
                  File, Line);
 }
 
@@ -394,7 +393,7 @@ std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>,
 FuncBase::call(const std::string &Name) {
   using RetT = typename FnSig<Sig>::RetT;
 
-  auto *Call = getCodeBuilder().createCall(Name, TypeMap<RetT>::get());
+  auto Call = getCodeBuilder().createCall(Name, TypeMap<RetT>::get());
   Var<RetT> Ret = declVar<RetT>("ret");
   Ret.storeValue(Call);
   return Ret;
@@ -428,9 +427,9 @@ FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
   };
 
   std::vector<IRType> ArgTys = unpackArgTypes(ArgT{});
-  std::vector<llvm::Value *> ArgVals = {GetArgVal(ArgsVars)...};
+  std::vector<IRValue> ArgVals = {GetArgVal(ArgsVars)...};
 
-  auto *Call =
+  auto Call =
       getCodeBuilder().createCall(Name, TypeMap<RetT>::get(), ArgTys, ArgVals);
 
   Var<RetT> Ret = declVar<RetT>("ret");
@@ -443,8 +442,7 @@ std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicAdd(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicAdd requires arithmetic type");
 
-  llvm::Value *Result =
-      CB->createAtomicAdd(Addr.loadPointer(), Val.loadValue());
+  IRValue Result = CB->createAtomicAdd(Addr.loadPointer(), Val.loadValue());
   auto Ret = declVar<T>("atomic.add.res.");
   Ret.storeValue(Result);
   return Ret;
@@ -455,8 +453,7 @@ std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicSub(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicSub requires arithmetic type");
 
-  llvm::Value *Result =
-      CB->createAtomicSub(Addr.loadPointer(), Val.loadValue());
+  IRValue Result = CB->createAtomicSub(Addr.loadPointer(), Val.loadValue());
   auto Ret = declVar<T>("atomic.sub.res.");
   Ret.storeValue(Result);
   return Ret;
@@ -467,8 +464,7 @@ std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicMax(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicMax requires arithmetic type");
 
-  llvm::Value *Result =
-      CB->createAtomicMax(Addr.loadPointer(), Val.loadValue());
+  IRValue Result = CB->createAtomicMax(Addr.loadPointer(), Val.loadValue());
   auto Ret = declVar<T>("atomic.max.res.");
   Ret.storeValue(Result);
   return Ret;
@@ -479,8 +475,7 @@ std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicMin(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicMin requires arithmetic type");
 
-  llvm::Value *Result =
-      CB->createAtomicMin(Addr.loadPointer(), Val.loadValue());
+  IRValue Result = CB->createAtomicMin(Addr.loadPointer(), Val.loadValue());
   auto Ret = declVar<T>("atomic.min.res.");
   Ret.storeValue(Result);
   return Ret;
@@ -489,7 +484,7 @@ FuncBase::atomicMin(const Var<T *> &Addr, const Var<T> &Val) {
 inline void FuncBase::ret() { CB->createRetVoid(); }
 
 template <typename T> void FuncBase::ret(const Var<T> &RetVal) {
-  llvm::Value *RetValue = RetVal.loadValue();
+  IRValue RetValue = RetVal.loadValue();
   CB->createRet(RetValue);
 }
 } // namespace proteus

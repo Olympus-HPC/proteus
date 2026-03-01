@@ -4,6 +4,7 @@
 #include "proteus/AddressSpace.h"
 #include "proteus/Error.h"
 #include "proteus/Frontend/IRType.h"
+#include "proteus/Frontend/IRValue.h"
 #include "proteus/Frontend/TargetModel.h"
 #include "proteus/Frontend/VarStorage.h"
 
@@ -23,7 +24,6 @@ class IRBuilderBase;
 class LLVMContext;
 class Module;
 class Type;
-class Value;
 } // namespace llvm
 
 namespace proteus {
@@ -102,7 +102,7 @@ public:
   /// Begin code generation for Fn.  Sets the active function to Fn.
   void beginFunction(llvm::Function &Fn, const char *File, int Line);
   void endFunction();
-  void beginIf(llvm::Value *Cond, const char *File, int Line);
+  void beginIf(IRValue Cond, const char *File, int Line);
   void endIf();
   /// IterSlot : alloca holding the loop iterator.
   /// IterTy   : value type of the iterator (must be an integer type).
@@ -110,98 +110,95 @@ public:
   /// UpperBoundVal : exclusive upper bound for the loop condition.
   /// IncVal   : increment added to the iterator on each iteration.
   /// IsSigned : true → ICmpSLT, false → ICmpULT.
-  void beginFor(llvm::Value *IterSlot, IRType IterTy, llvm::Value *InitVal,
-                llvm::Value *UpperBoundVal, llvm::Value *IncVal, bool IsSigned,
+  void beginFor(IRValue IterSlot, IRType IterTy, IRValue InitVal,
+                IRValue UpperBoundVal, IRValue IncVal, bool IsSigned,
                 const char *File, int Line);
   void endFor();
   /// CondFn : callable that emits the condition IR at the current insert point
   ///          and returns the resulting i1 Value (true → continue loop).
-  void beginWhile(std::function<llvm::Value *()> CondFn, const char *File,
-                  int Line);
+  void beginWhile(std::function<IRValue()> CondFn, const char *File, int Line);
   void endWhile();
 
   // Arithmetic operations.
-  llvm::Value *createAdd(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFAdd(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createSub(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFSub(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createMul(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFMul(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createUDiv(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createSDiv(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFDiv(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createURem(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createSRem(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFRem(llvm::Value *LHS, llvm::Value *RHS);
+  IRValue createAdd(IRValue LHS, IRValue RHS);
+  IRValue createFAdd(IRValue LHS, IRValue RHS);
+  IRValue createSub(IRValue LHS, IRValue RHS);
+  IRValue createFSub(IRValue LHS, IRValue RHS);
+  IRValue createMul(IRValue LHS, IRValue RHS);
+  IRValue createFMul(IRValue LHS, IRValue RHS);
+  IRValue createUDiv(IRValue LHS, IRValue RHS);
+  IRValue createSDiv(IRValue LHS, IRValue RHS);
+  IRValue createFDiv(IRValue LHS, IRValue RHS);
+  IRValue createURem(IRValue LHS, IRValue RHS);
+  IRValue createSRem(IRValue LHS, IRValue RHS);
+  IRValue createFRem(IRValue LHS, IRValue RHS);
 
   // Atomic operations.
-  llvm::Value *createAtomicAdd(llvm::Value *Addr, llvm::Value *Val);
-  llvm::Value *createAtomicSub(llvm::Value *Addr, llvm::Value *Val);
-  llvm::Value *createAtomicMax(llvm::Value *Addr, llvm::Value *Val);
-  llvm::Value *createAtomicMin(llvm::Value *Addr, llvm::Value *Val);
+  IRValue createAtomicAdd(IRValue Addr, IRValue Val);
+  IRValue createAtomicSub(IRValue Addr, IRValue Val);
+  IRValue createAtomicMax(IRValue Addr, IRValue Val);
+  IRValue createAtomicMin(IRValue Addr, IRValue Val);
 
   // Comparison operations.
-  llvm::Value *createICmpEQ(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createICmpNE(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createICmpSLT(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createICmpSGT(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createICmpSGE(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createICmpSLE(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createICmpUGT(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createICmpUGE(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createICmpULT(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createICmpULE(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFCmpOEQ(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFCmpONE(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFCmpOLT(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFCmpOLE(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFCmpOGT(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFCmpOGE(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFCmpULT(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFCmpULE(llvm::Value *LHS, llvm::Value *RHS);
+  IRValue createICmpEQ(IRValue LHS, IRValue RHS);
+  IRValue createICmpNE(IRValue LHS, IRValue RHS);
+  IRValue createICmpSLT(IRValue LHS, IRValue RHS);
+  IRValue createICmpSGT(IRValue LHS, IRValue RHS);
+  IRValue createICmpSGE(IRValue LHS, IRValue RHS);
+  IRValue createICmpSLE(IRValue LHS, IRValue RHS);
+  IRValue createICmpUGT(IRValue LHS, IRValue RHS);
+  IRValue createICmpUGE(IRValue LHS, IRValue RHS);
+  IRValue createICmpULT(IRValue LHS, IRValue RHS);
+  IRValue createICmpULE(IRValue LHS, IRValue RHS);
+  IRValue createFCmpOEQ(IRValue LHS, IRValue RHS);
+  IRValue createFCmpONE(IRValue LHS, IRValue RHS);
+  IRValue createFCmpOLT(IRValue LHS, IRValue RHS);
+  IRValue createFCmpOLE(IRValue LHS, IRValue RHS);
+  IRValue createFCmpOGT(IRValue LHS, IRValue RHS);
+  IRValue createFCmpOGE(IRValue LHS, IRValue RHS);
+  IRValue createFCmpULT(IRValue LHS, IRValue RHS);
+  IRValue createFCmpULE(IRValue LHS, IRValue RHS);
 
   // Logical operations.
-  llvm::Value *createAnd(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createOr(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createXor(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createNot(llvm::Value *Val);
+  IRValue createAnd(IRValue LHS, IRValue RHS);
+  IRValue createOr(IRValue LHS, IRValue RHS);
+  IRValue createXor(IRValue LHS, IRValue RHS);
+  IRValue createNot(IRValue Val);
 
   // Load/Store operations.
-  llvm::Value *createLoad(llvm::Type *Ty, llvm::Value *Ptr,
-                          const std::string &Name = "");
-  void createStore(llvm::Value *Val, llvm::Value *Ptr);
+  IRValue createLoad(IRType Ty, IRValue Ptr, const std::string &Name = "");
+  void createStore(IRValue Val, IRValue Ptr);
 
   // Control flow operations.
   void createBr(llvm::BasicBlock *Dest);
-  void createCondBr(llvm::Value *Cond, llvm::BasicBlock *True,
+  void createCondBr(IRValue Cond, llvm::BasicBlock *True,
                     llvm::BasicBlock *False);
   void createRetVoid();
-  void createRet(llvm::Value *V);
+  void createRet(IRValue V);
 
   // Cast operations.
-  llvm::Value *createIntCast(llvm::Value *V, IRType DestTy, bool IsSigned);
-  llvm::Value *createFPCast(llvm::Value *V, IRType DestTy);
-  llvm::Value *createSIToFP(llvm::Value *V, IRType DestTy);
-  llvm::Value *createUIToFP(llvm::Value *V, IRType DestTy);
-  llvm::Value *createFPToSI(llvm::Value *V, IRType DestTy);
-  llvm::Value *createFPToUI(llvm::Value *V, IRType DestTy);
-  llvm::Value *createBitCast(llvm::Value *V, llvm::Type *DestTy);
-  llvm::Value *createZExt(llvm::Value *V, IRType DestTy);
+  IRValue createIntCast(IRValue V, IRType DestTy, bool IsSigned);
+  IRValue createFPCast(IRValue V, IRType DestTy);
+  IRValue createSIToFP(IRValue V, IRType DestTy);
+  IRValue createUIToFP(IRValue V, IRType DestTy);
+  IRValue createFPToSI(IRValue V, IRType DestTy);
+  IRValue createFPToUI(IRValue V, IRType DestTy);
+  IRValue createBitCast(IRValue V, IRType DestTy);
+  IRValue createZExt(IRValue V, IRType DestTy);
 
   // Constant creation.
-  llvm::Value *getConstantInt(IRType Ty, uint64_t Val);
-  llvm::Value *getConstantFP(IRType Ty, double Val);
+  IRValue getConstantInt(IRType Ty, uint64_t Val);
+  IRValue getConstantFP(IRType Ty, double Val);
 
   // GEP operations.
-  llvm::Value *createInBoundsGEP(IRType Ty, llvm::Value *Ptr,
-                                 const std::vector<llvm::Value *> IdxList,
-                                 const std::string &Name = "");
+  IRValue createInBoundsGEP(IRType Ty, IRValue Ptr,
+                            const std::vector<IRValue> IdxList,
+                            const std::string &Name = "");
   // NOLINTNEXTLINE
-  llvm::Value *createConstInBoundsGEP1_64(IRType Ty, llvm::Value *Ptr,
-                                          size_t Idx);
+  IRValue createConstInBoundsGEP1_64(IRType Ty, IRValue Ptr, size_t Idx);
   // NOLINTNEXTLINE
-  llvm::Value *createConstInBoundsGEP2_64(IRType Ty, llvm::Value *Ptr,
-                                          size_t Idx0, size_t Idx1);
+  IRValue createConstInBoundsGEP2_64(IRType Ty, IRValue Ptr, size_t Idx0,
+                                     size_t Idx1);
 
   // Type accessors.
   llvm::Type *getPointerType(llvm::Type *ElemTy, unsigned AS);
@@ -213,21 +210,21 @@ public:
 
   // Type queries.
   unsigned getAddressSpace(llvm::Type *Ty);
-  unsigned getAddressSpaceFromValue(llvm::Value *PtrVal);
+  unsigned getAddressSpaceFromValue(IRValue PtrVal);
   bool isIntegerTy(llvm::Type *Ty);
   bool isFloatingPointTy(llvm::Type *Ty);
 
   // Call operations.
-  llvm::Value *createCall(const std::string &FName, IRType RetTy,
-                          const std::vector<IRType> &ArgTys,
-                          const std::vector<llvm::Value *> &Args);
-  llvm::Value *createCall(const std::string &FName, IRType RetTy);
+  IRValue createCall(const std::string &FName, IRType RetTy,
+                     const std::vector<IRType> &ArgTys,
+                     const std::vector<IRValue> &Args);
+  IRValue createCall(const std::string &FName, IRType RetTy);
 
   // Alloca/array emission.
-  llvm::Value *emitAlloca(llvm::Type *Ty, const std::string &Name,
-                          AddressSpace AS = AddressSpace::DEFAULT);
-  llvm::Value *emitArrayCreate(llvm::Type *Ty, AddressSpace AT,
-                               const std::string &Name);
+  IRValue emitAlloca(llvm::Type *Ty, const std::string &Name,
+                     AddressSpace AS = AddressSpace::DEFAULT);
+  IRValue emitArrayCreate(llvm::Type *Ty, AddressSpace AT,
+                          const std::string &Name);
   std::unique_ptr<ScalarStorage> createScalarStorage(const std::string &Name,
                                                      IRType AllocaIRTy);
   std::unique_ptr<PointerStorage> createPointerStorage(const std::string &Name,

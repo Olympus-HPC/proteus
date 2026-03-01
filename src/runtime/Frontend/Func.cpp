@@ -1,5 +1,6 @@
 #include "proteus/Frontend/Func.h"
 #include "proteus/Frontend/LLVMCodeBuilder.h"
+#include "proteus/Frontend/LLVMValueMap.h"
 #include "proteus/JitFrontend.h"
 #include "proteus/impl/CoreLLVMDevice.h"
 
@@ -25,9 +26,9 @@ void FuncBase::setName(const std::string &NewName) {
   F->setName(Name);
 }
 
-Value *FuncBase::getArg(size_t Idx) {
+IRValue FuncBase::getArg(size_t Idx) {
   Function *F = getFunction();
-  return F->getArg(Idx);
+  return fromLLVMValue(F->getArg(Idx));
 }
 
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
@@ -52,7 +53,7 @@ void FuncBase::endFunction() { CB->endFunction(); }
 Function *FuncBase::getFunction() { return LLVMFunc; }
 
 void FuncBase::beginIf(const Var<bool> &CondVar, const char *File, int Line) {
-  Value *Cond = CondVar.loadValue();
+  IRValue Cond = CondVar.loadValue();
   CB->beginIf(Cond, File, Line);
 }
 
