@@ -13,10 +13,10 @@ using namespace llvm;
 // Local helper
 // ---------------------------------------------------------------------------
 
-static Type *getAllocaType(Value *SlotVal, const char *Context) {
+static Type *getAllocaType(Value *SlotVal, const char *StorageKind) {
   AllocaInst *Alloca = dyn_cast<AllocaInst>(SlotVal);
   if (!Alloca)
-    reportFatalError(std::string("Expected AllocaInst in ") + Context);
+    reportFatalError(std::string("Expected AllocaInst in ") + StorageKind);
   return Alloca->getAllocatedType();
 }
 
