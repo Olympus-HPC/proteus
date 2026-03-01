@@ -1,61 +1,77 @@
 #include "proteus/Frontend/VarStorage.h"
 #include "proteus/Error.h"
+#include "proteus/Frontend/LLVMTypeMap.h"
 
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Instructions.h>
 
 namespace proteus {
 
 using namespace llvm;
 
+// ---------------------------------------------------------------------------
+// Local helper
+// ---------------------------------------------------------------------------
+
+static Type *getAllocaType(Value *SlotVal, const char *StorageKind) {
+  AllocaInst *Alloca = dyn_cast<AllocaInst>(SlotVal);
+  if (!Alloca)
+    reportFatalError(std::string("Expected AllocaInst in ") + StorageKind);
+  return Alloca->getAllocatedType();
+}
+
+// ---------------------------------------------------------------------------
+// ScalarStorage
+// ---------------------------------------------------------------------------
+
 Value *ScalarStorage::getSlot() const { return Slot; }
 
 Value *ScalarStorage::loadValue() const {
-  return IRB.CreateLoad(getAllocatedType(), Slot);
+  return IRB.CreateLoad(getAllocaType(Slot, "ScalarStorage"), Slot);
 }
 
 void ScalarStorage::storeValue(Value *Val) { IRB.CreateStore(Val, Slot); }
 
-Type *ScalarStorage::getSlotType() const { return Slot->getType(); }
+IRType ScalarStorage::getAllocatedType() const { return IRValTy; }
 
-Type *ScalarStorage::getAllocatedType() const {
-  AllocaInst *Alloca = dyn_cast<AllocaInst>(Slot);
-  if (!Alloca)
-    reportFatalError("Expected AllocaInst in ScalarStorage::loadValue");
-  return Alloca->getAllocatedType();
-}
+IRType ScalarStorage::getValueType() const { return IRValTy; }
 
-Type *ScalarStorage::getValueType() const { return getAllocatedType(); }
+// ---------------------------------------------------------------------------
+// PointerStorage
+// ---------------------------------------------------------------------------
 
 Value *PointerStorage::getSlot() const { return PtrSlot; }
 
-Type *PointerStorage::getSlotType() const { return PtrSlot->getType(); }
-
 // Load/store the pointee value through the pointer stored in PtrSlot.
 Value *PointerStorage::loadValue() const {
-  Value *Ptr = IRB.CreateLoad(getAllocatedType(), PtrSlot);
-  return IRB.CreateLoad(PointerElemTy, Ptr);
+  Type *ElemLLVMTy = toLLVMType(ElemIRTy, IRB.getContext());
+  Value *Ptr =
+      IRB.CreateLoad(getAllocaType(PtrSlot, "PointerStorage"), PtrSlot);
+  return IRB.CreateLoad(ElemLLVMTy, Ptr);
 }
 
 void PointerStorage::storeValue(Value *Val) {
-  Value *Ptr = IRB.CreateLoad(getAllocatedType(), PtrSlot);
+  Value *Ptr =
+      IRB.CreateLoad(getAllocaType(PtrSlot, "PointerStorage"), PtrSlot);
   IRB.CreateStore(Val, Ptr);
 }
 
 // Load/store the pointer value itself from/to PtrSlot.
 Value *PointerStorage::loadPointer() const {
-  return IRB.CreateLoad(getAllocatedType(), PtrSlot);
+  return IRB.CreateLoad(getAllocaType(PtrSlot, "PointerStorage"), PtrSlot);
 }
 
 void PointerStorage::storePointer(Value *Val) { IRB.CreateStore(Val, PtrSlot); }
 
-Type *PointerStorage::getAllocatedType() const {
-  AllocaInst *Alloca = dyn_cast<AllocaInst>(PtrSlot);
-  if (!Alloca)
-    reportFatalError("Expected AllocaInst in PointerStorage::getAllocatedType");
-  return Alloca->getAllocatedType();
+IRType PointerStorage::getAllocatedType() const {
+  return IRType{IRTypeKind::Pointer, ElemIRTy.Signed, 0, ElemIRTy.Kind};
 }
 
-Type *PointerStorage::getValueType() const { return PointerElemTy; }
+IRType PointerStorage::getValueType() const { return ElemIRTy; }
+
+// ---------------------------------------------------------------------------
+// ArrayStorage
+// ---------------------------------------------------------------------------
 
 Value *ArrayStorage::getSlot() const { return BasePointer; }
 
@@ -67,10 +83,11 @@ void ArrayStorage::storeValue(Value *Val) {
   (void)Val;
   reportFatalError("Cannot store value to entire array");
 }
-Type *ArrayStorage::getSlotType() const { return BasePointer->getType(); }
 
-Type *ArrayStorage::getAllocatedType() const { return ArrayTy; }
+IRType ArrayStorage::getAllocatedType() const {
+  return IRType{IRTypeKind::Array, ElemIRTy.Signed, NElem, ElemIRTy.Kind};
+}
 
-Type *ArrayStorage::getValueType() const { return ArrayTy->getElementType(); }
+IRType ArrayStorage::getValueType() const { return ElemIRTy; }
 
 } // namespace proteus

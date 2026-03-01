@@ -19,15 +19,16 @@ constexpr unsigned OffsetGridDimZ = 2;
 static inline Value *getGridDim(FuncBase &Fn, unsigned Offset) {
   // An alternative way is by using __ockl_get_num_groups but needs to link with
   // hip bitcode libraries.
-  constexpr int ConstantAddressSpace = 4;
-  auto &Ctx = Fn.getFunction()->getContext();
-  auto *Call = Fn.getCodeBuilder().createCall(
-      "llvm.amdgcn.implicitarg.ptr",
-      PointerType::get(Ctx, ConstantAddressSpace));
+  // Address space 4 is the AMDGPU constant/readonly address space used by
+  // the implicit kernel argument pointer ABI.
+  constexpr unsigned ConstantAddressSpace = 4;
+  auto *Call = Fn.getCodeBuilder().createCall("llvm.amdgcn.implicitarg.ptr",
+                                              IRType{IRTypeKind::Pointer, false,
+                                                     0, IRTypeKind::Void,
+                                                     ConstantAddressSpace});
   auto *GEP = Fn.getCodeBuilder().createInBoundsGEP(
-      Fn.getCodeBuilder().getInt32Ty(), Call,
-      {Fn.getCodeBuilder().getConstantInt(Fn.getCodeBuilder().getInt64Ty(),
-                                          Offset)});
+      IRType{IRTypeKind::Int32}, Call,
+      {Fn.getCodeBuilder().getConstantInt(IRType{IRTypeKind::Int64}, Offset)});
   auto *Load =
       Fn.getCodeBuilder().createLoad(Fn.getCodeBuilder().getInt32Ty(), GEP);
 
@@ -42,19 +43,19 @@ constexpr unsigned OffsetBlockDimZ = 8;
 static inline Value *getBlockDim(FuncBase &Fn, unsigned Offset) {
   // An alternative way is by using __ockl_get_local_size but needs to link with
   // hip bitcode libraries.
-  constexpr int ConstantAddressSpace = 4;
-  auto &Ctx = Fn.getFunction()->getContext();
-  auto *Call = Fn.getCodeBuilder().createCall(
-      "llvm.amdgcn.implicitarg.ptr",
-      PointerType::get(Ctx, ConstantAddressSpace));
+  // Address space 4 is the AMDGPU constant/readonly address space used by
+  // the implicit kernel argument pointer ABI.
+  constexpr unsigned ConstantAddressSpace = 4;
+  auto *Call = Fn.getCodeBuilder().createCall("llvm.amdgcn.implicitarg.ptr",
+                                              IRType{IRTypeKind::Pointer, false,
+                                                     0, IRTypeKind::Void,
+                                                     ConstantAddressSpace});
   auto *GEP = Fn.getCodeBuilder().createInBoundsGEP(
-      Fn.getCodeBuilder().getInt16Ty(), Call,
-      {Fn.getCodeBuilder().getConstantInt(Fn.getCodeBuilder().getInt64Ty(),
-                                          Offset)});
+      IRType{IRTypeKind::Int16}, Call,
+      {Fn.getCodeBuilder().getConstantInt(IRType{IRTypeKind::Int64}, Offset)});
   auto *Load =
       Fn.getCodeBuilder().createLoad(Fn.getCodeBuilder().getInt16Ty(), GEP);
-  auto *Conv =
-      Fn.getCodeBuilder().createZExt(Load, Fn.getCodeBuilder().getInt32Ty());
+  auto *Conv = Fn.getCodeBuilder().createZExt(Load, IRType{IRTypeKind::Int32});
 
   return Conv;
 }
@@ -62,24 +63,22 @@ static inline Value *getBlockDim(FuncBase &Fn, unsigned Offset) {
 } // namespace detail
 
 Var<unsigned int> getThreadIdX(FuncBase &Fn) {
-  auto &Ctx = Fn.getFunction()->getContext();
 
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("threadIdx.x");
 
   auto *Call = Fn.getCodeBuilder().createCall("llvm.amdgcn.workitem.id.x",
-                                              TypeMap<unsigned int>::get(Ctx));
+                                              TypeMap<unsigned int>::get());
   Ret.storeValue(Call);
 
   return Ret;
 }
 
 Var<unsigned int> getBlockIdX(FuncBase &Fn) {
-  auto &Ctx = Fn.getFunction()->getContext();
 
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("blockIdx.x");
 
   auto *Call = Fn.getCodeBuilder().createCall("llvm.amdgcn.workgroup.id.x",
-                                              TypeMap<unsigned int>::get(Ctx));
+                                              TypeMap<unsigned int>::get());
   Ret.storeValue(Call);
 
   return Ret;
@@ -104,48 +103,44 @@ Var<unsigned int> getGridDimX(FuncBase &Fn) {
 }
 
 Var<unsigned int> getThreadIdY(FuncBase &Fn) {
-  auto &Ctx = Fn.getFunction()->getContext();
 
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("threadIdx.y");
 
   auto *Call = Fn.getCodeBuilder().createCall("llvm.amdgcn.workitem.id.y",
-                                              TypeMap<unsigned int>::get(Ctx));
+                                              TypeMap<unsigned int>::get());
   Ret.storeValue(Call);
 
   return Ret;
 }
 
 Var<unsigned int> getThreadIdZ(FuncBase &Fn) {
-  auto &Ctx = Fn.getFunction()->getContext();
 
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("threadIdx.z");
 
   auto *Call = Fn.getCodeBuilder().createCall("llvm.amdgcn.workitem.id.z",
-                                              TypeMap<unsigned int>::get(Ctx));
+                                              TypeMap<unsigned int>::get());
   Ret.storeValue(Call);
 
   return Ret;
 }
 
 Var<unsigned int> getBlockIdY(FuncBase &Fn) {
-  auto &Ctx = Fn.getFunction()->getContext();
 
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("blockIdx.y");
 
   auto *Call = Fn.getCodeBuilder().createCall("llvm.amdgcn.workgroup.id.y",
-                                              TypeMap<unsigned int>::get(Ctx));
+                                              TypeMap<unsigned int>::get());
   Ret.storeValue(Call);
 
   return Ret;
 }
 
 Var<unsigned int> getBlockIdZ(FuncBase &Fn) {
-  auto &Ctx = Fn.getFunction()->getContext();
 
   Var<unsigned int> Ret = Fn.declVar<unsigned int>("blockIdx.z");
 
   auto *Call = Fn.getCodeBuilder().createCall("llvm.amdgcn.workgroup.id.z",
-                                              TypeMap<unsigned int>::get(Ctx));
+                                              TypeMap<unsigned int>::get());
   Ret.storeValue(Call);
 
   return Ret;
@@ -188,9 +183,7 @@ Var<unsigned int> getGridDimZ(FuncBase &Fn) {
 }
 
 void syncThreads(FuncBase &Fn) {
-  auto &Ctx = Fn.getFunction()->getContext();
-  Fn.getCodeBuilder().createCall("llvm.amdgcn.s.barrier",
-                                 TypeMap<void>::get(Ctx));
+  Fn.getCodeBuilder().createCall("llvm.amdgcn.s.barrier", TypeMap<void>::get());
 }
 
 } // namespace gpu

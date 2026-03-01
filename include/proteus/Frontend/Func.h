@@ -18,9 +18,7 @@
 
 namespace llvm {
 class Function;
-class Type;
 class Value;
-class LLVMContext;
 } // namespace llvm
 
 namespace proteus {
@@ -69,7 +67,7 @@ protected:
 
 public:
   FuncBase(JitModule &J, LLVMCodeBuilder &CB, const std::string &Name,
-           llvm::Type *RetTy, const std::vector<llvm::Type *> &ArgTys);
+           IRType RetTy, const std::vector<IRType> &ArgTys);
   ~FuncBase();
 
   llvm::Function *getFunction();
@@ -86,14 +84,12 @@ public:
     static_assert(!std::is_reference_v<T>,
                   "declVar does not support reference types");
 
-    auto &Ctx = CB->getContext();
-    llvm::Type *AllocaTy = TypeMap<T>::get(Ctx);
-
     if constexpr (std::is_pointer_v<T>) {
-      llvm::Type *PtrElemTy = TypeMap<T>::getPointerElemType(Ctx);
-      return Var<T>{CB->createPointerStorage(Name, AllocaTy, PtrElemTy), *CB};
+      IRType ElemIRTy = *TypeMap<T>::getPointerElemType();
+      return Var<T>{CB->createPointerStorage(Name, ElemIRTy), *CB};
     } else {
-      return Var<T>{CB->createScalarStorage(Name, AllocaTy), *CB};
+      IRType AllocaIRTy = TypeMap<T>::get();
+      return Var<T>{CB->createScalarStorage(Name, AllocaIRTy), *CB};
     }
   }
 
@@ -102,9 +98,8 @@ public:
                  const std::string &Name = "array_var") {
     static_assert(std::is_array_v<T>, "Expected array type");
 
-    auto *ArrTy = TypeMap<T>::get(CB->getContext(), NElem);
-
-    return Var<T>{CB->createArrayStorage(Name, AS, ArrTy), *CB};
+    IRType ArrIRTy = TypeMap<T>::get(NElem);
+    return Var<T>{CB->createArrayStorage(Name, AS, ArrIRTy), *CB};
   }
 
   template <typename... Ts> auto declVars() {
@@ -333,8 +328,7 @@ private:
 public:
   Func(JitModule &J, LLVMCodeBuilder &CB, const std::string &Name,
        Dispatcher &Dispatch)
-      : FuncBase(J, CB, Name, TypeMap<RetT>::get(CB.getContext()),
-                 {TypeMap<ArgT>::get(CB.getContext())...}),
+      : FuncBase(J, CB, Name, TypeMap<RetT>::get(), {TypeMap<ArgT>::get()...}),
         Dispatch(Dispatch) {}
 
   RetT operator()(ArgT... Args);
@@ -389,9 +383,8 @@ FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
       return Arg.loadValue();
   };
 
-  auto &Ctx = CB->getContext();
-  std::vector<llvm::Type *> ArgTys = unpackArgTypes(ArgT{}, Ctx);
-  getCodeBuilder().createCall(Name, TypeMap<RetT>::get(Ctx), ArgTys,
+  std::vector<IRType> ArgTys = unpackArgTypes(ArgT{});
+  getCodeBuilder().createCall(Name, TypeMap<RetT>::get(), ArgTys,
                               {GetArgVal(ArgsVars)...});
 }
 
@@ -401,8 +394,7 @@ std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>,
 FuncBase::call(const std::string &Name) {
   using RetT = typename FnSig<Sig>::RetT;
 
-  auto *Call =
-      getCodeBuilder().createCall(Name, TypeMap<RetT>::get(CB->getContext()));
+  auto *Call = getCodeBuilder().createCall(Name, TypeMap<RetT>::get());
   Var<RetT> Ret = declVar<RetT>("ret");
   Ret.storeValue(Call);
   return Ret;
@@ -412,13 +404,12 @@ template <typename Sig>
 std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
 FuncBase::call(const std::string &Name) {
   using RetT = typename FnSig<Sig>::RetT;
-  getCodeBuilder().createCall(Name, TypeMap<RetT>::get(CB->getContext()));
+  getCodeBuilder().createCall(Name, TypeMap<RetT>::get());
 }
 
 template <typename... Ts>
-std::vector<llvm::Type *> unpackArgTypes(ArgTypeList<Ts...>,
-                                         llvm::LLVMContext &Ctx) {
-  return {TypeMap<Ts>::get(Ctx)...};
+std::vector<IRType> unpackArgTypes(ArgTypeList<Ts...>) {
+  return {TypeMap<Ts>::get()...};
 }
 
 template <typename Sig, typename... ArgVars>
@@ -436,12 +427,11 @@ FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
       return Arg.loadValue();
   };
 
-  auto &Ctx = CB->getContext();
-  std::vector<llvm::Type *> ArgTys = unpackArgTypes(ArgT{}, Ctx);
+  std::vector<IRType> ArgTys = unpackArgTypes(ArgT{});
   std::vector<llvm::Value *> ArgVals = {GetArgVal(ArgsVars)...};
 
-  auto *Call = getCodeBuilder().createCall(Name, TypeMap<RetT>::get(Ctx),
-                                           ArgTys, ArgVals);
+  auto *Call =
+      getCodeBuilder().createCall(Name, TypeMap<RetT>::get(), ArgTys, ArgVals);
 
   Var<RetT> Ret = declVar<RetT>("ret");
   Ret.storeValue(Call);

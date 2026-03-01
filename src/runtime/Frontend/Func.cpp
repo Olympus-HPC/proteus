@@ -11,8 +11,8 @@ using namespace llvm;
 namespace proteus {
 
 FuncBase::FuncBase(JitModule &J, LLVMCodeBuilder &CBParam,
-                   const std::string &Name, Type *RetTy,
-                   const std::vector<Type *> &ArgTys)
+                   const std::string &Name, IRType RetTy,
+                   const std::vector<IRType> &ArgTys)
     : J(J), Name(Name), CB(&CBParam) {
   LLVMFunc = CBParam.addFunction(Name, RetTy, ArgTys);
 }

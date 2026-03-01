@@ -3,6 +3,7 @@
 
 #include "proteus/AddressSpace.h"
 #include "proteus/Error.h"
+#include "proteus/Frontend/IRType.h"
 #include "proteus/Frontend/TargetModel.h"
 #include "proteus/Frontend/VarStorage.h"
 
@@ -71,8 +72,8 @@ public:
   /// Create a new Function in the owned Module, initialise its entry block,
   /// and make it the current active function.  Only valid on the owning
   /// constructor variant.
-  llvm::Function *addFunction(const std::string &Name, llvm::Type *RetTy,
-                              const std::vector<llvm::Type *> &ArgTys);
+  llvm::Function *addFunction(const std::string &Name, IRType RetTy,
+                              const std::vector<IRType> &ArgTys);
 
   /// Transfer ownership of the LLVMContext (leaves internal pointer null).
   std::unique_ptr<llvm::LLVMContext> takeLLVMContext();
@@ -109,7 +110,7 @@ public:
   /// UpperBoundVal : exclusive upper bound for the loop condition.
   /// IncVal   : increment added to the iterator on each iteration.
   /// IsSigned : true → ICmpSLT, false → ICmpULT.
-  void beginFor(llvm::Value *IterSlot, llvm::Type *IterTy, llvm::Value *InitVal,
+  void beginFor(llvm::Value *IterSlot, IRType IterTy, llvm::Value *InitVal,
                 llvm::Value *UpperBoundVal, llvm::Value *IncVal, bool IsSigned,
                 const char *File, int Line);
   void endFor();
@@ -178,28 +179,28 @@ public:
   void createRet(llvm::Value *V);
 
   // Cast operations.
-  llvm::Value *createIntCast(llvm::Value *V, llvm::Type *DestTy, bool IsSigned);
-  llvm::Value *createFPCast(llvm::Value *V, llvm::Type *DestTy);
-  llvm::Value *createSIToFP(llvm::Value *V, llvm::Type *DestTy);
-  llvm::Value *createUIToFP(llvm::Value *V, llvm::Type *DestTy);
-  llvm::Value *createFPToSI(llvm::Value *V, llvm::Type *DestTy);
-  llvm::Value *createFPToUI(llvm::Value *V, llvm::Type *DestTy);
+  llvm::Value *createIntCast(llvm::Value *V, IRType DestTy, bool IsSigned);
+  llvm::Value *createFPCast(llvm::Value *V, IRType DestTy);
+  llvm::Value *createSIToFP(llvm::Value *V, IRType DestTy);
+  llvm::Value *createUIToFP(llvm::Value *V, IRType DestTy);
+  llvm::Value *createFPToSI(llvm::Value *V, IRType DestTy);
+  llvm::Value *createFPToUI(llvm::Value *V, IRType DestTy);
   llvm::Value *createBitCast(llvm::Value *V, llvm::Type *DestTy);
-  llvm::Value *createZExt(llvm::Value *V, llvm::Type *DestTy);
+  llvm::Value *createZExt(llvm::Value *V, IRType DestTy);
 
   // Constant creation.
-  llvm::Value *getConstantInt(llvm::Type *Ty, uint64_t Val);
-  llvm::Value *getConstantFP(llvm::Type *Ty, double Val);
+  llvm::Value *getConstantInt(IRType Ty, uint64_t Val);
+  llvm::Value *getConstantFP(IRType Ty, double Val);
 
   // GEP operations.
-  llvm::Value *createInBoundsGEP(llvm::Type *Ty, llvm::Value *Ptr,
+  llvm::Value *createInBoundsGEP(IRType Ty, llvm::Value *Ptr,
                                  const std::vector<llvm::Value *> IdxList,
                                  const std::string &Name = "");
   // NOLINTNEXTLINE
-  llvm::Value *createConstInBoundsGEP1_64(llvm::Type *Ty, llvm::Value *Ptr,
+  llvm::Value *createConstInBoundsGEP1_64(IRType Ty, llvm::Value *Ptr,
                                           size_t Idx);
   // NOLINTNEXTLINE
-  llvm::Value *createConstInBoundsGEP2_64(llvm::Type *Ty, llvm::Value *Ptr,
+  llvm::Value *createConstInBoundsGEP2_64(IRType Ty, llvm::Value *Ptr,
                                           size_t Idx0, size_t Idx1);
 
   // Type accessors.
@@ -217,10 +218,10 @@ public:
   bool isFloatingPointTy(llvm::Type *Ty);
 
   // Call operations.
-  llvm::Value *createCall(const std::string &FName, llvm::Type *RetTy,
-                          const std::vector<llvm::Type *> &ArgTys,
+  llvm::Value *createCall(const std::string &FName, IRType RetTy,
+                          const std::vector<IRType> &ArgTys,
                           const std::vector<llvm::Value *> &Args);
-  llvm::Value *createCall(const std::string &FName, llvm::Type *RetTy);
+  llvm::Value *createCall(const std::string &FName, IRType RetTy);
 
   // Alloca/array emission.
   llvm::Value *emitAlloca(llvm::Type *Ty, const std::string &Name,
@@ -228,13 +229,12 @@ public:
   llvm::Value *emitArrayCreate(llvm::Type *Ty, AddressSpace AT,
                                const std::string &Name);
   std::unique_ptr<ScalarStorage> createScalarStorage(const std::string &Name,
-                                                     llvm::Type *AllocaTy);
+                                                     IRType AllocaIRTy);
   std::unique_ptr<PointerStorage> createPointerStorage(const std::string &Name,
-                                                       llvm::Type *AllocaTy,
-                                                       llvm::Type *ElemTy);
-  std::unique_ptr<ArrayStorage> createArrayStorage(const std::string &Name,
-                                                   AddressSpace AS,
-                                                   llvm::Type *ArrTy);
+                                                       IRType ElemIRTy,
+                                                       unsigned AddrSpace = 0);
+  std::unique_ptr<ArrayStorage>
+  createArrayStorage(const std::string &Name, AddressSpace AS, IRType ArrIRTy);
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
   void setKernel(llvm::Function &Fn);
   void setLaunchBoundsForKernel(llvm::Function &Fn, int MaxThreadsPerBlock,
