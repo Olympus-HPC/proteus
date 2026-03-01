@@ -45,12 +45,14 @@ Value *PointerStorage::getSlot() const { return PtrSlot; }
 // Load/store the pointee value through the pointer stored in PtrSlot.
 Value *PointerStorage::loadValue() const {
   Type *ElemLLVMTy = toLLVMType(ElemIRTy, IRB.getContext());
-  Value *Ptr = IRB.CreateLoad(getAllocaType(PtrSlot, "PointerStorage"), PtrSlot);
+  Value *Ptr =
+      IRB.CreateLoad(getAllocaType(PtrSlot, "PointerStorage"), PtrSlot);
   return IRB.CreateLoad(ElemLLVMTy, Ptr);
 }
 
 void PointerStorage::storeValue(Value *Val) {
-  Value *Ptr = IRB.CreateLoad(getAllocaType(PtrSlot, "PointerStorage"), PtrSlot);
+  Value *Ptr =
+      IRB.CreateLoad(getAllocaType(PtrSlot, "PointerStorage"), PtrSlot);
   IRB.CreateStore(Val, Ptr);
 }
 
