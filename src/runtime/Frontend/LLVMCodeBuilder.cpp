@@ -765,9 +765,8 @@ LLVMCodeBuilder::createPointerStorage(const std::string &Name, IRType ElemIRTy,
                                       unsigned AddrSpace) {
   auto &Ctx = getContext();
   Type *AllocaTy = PointerType::get(Ctx, AddrSpace);
-  Type *ElemLLVMTy = toLLVMType(ElemIRTy, Ctx);
   return std::make_unique<PointerStorage>(emitAlloca(AllocaTy, Name),
-                                          getIRBuilder(), ElemLLVMTy, ElemIRTy);
+                                          getIRBuilder(), ElemIRTy);
 }
 
 std::unique_ptr<ArrayStorage>
@@ -779,7 +778,7 @@ LLVMCodeBuilder::createArrayStorage(const std::string &Name, AddressSpace AS,
   IRType ElemIRTy{ArrIRTy.ElemKind, ArrIRTy.Signed};
   Value *BasePointer = emitArrayCreate(ArrTy, AS, Name);
   return std::make_unique<ArrayStorage>(BasePointer, getIRBuilder(),
-                                        cast<ArrayType>(ArrTy), ElemIRTy);
+                                        ArrIRTy.NElem, ElemIRTy);
 }
 
 } // namespace proteus

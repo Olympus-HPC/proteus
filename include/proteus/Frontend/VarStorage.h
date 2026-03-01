@@ -8,8 +8,6 @@
 namespace llvm {
 class Value;
 class IRBuilderBase;
-class Type;
-class ArrayType;
 } // namespace llvm
 
 namespace proteus {
@@ -27,7 +25,6 @@ public:
   // Load/store the logical value represented by this storage.
   virtual llvm::Value *loadValue() const = 0;
   virtual void storeValue(llvm::Value *Val) = 0;
-  virtual llvm::Type *getSlotType() const = 0;
   virtual IRType getAllocatedType() const = 0;
   virtual IRType getValueType() const = 0;
   virtual std::unique_ptr<VarStorage> clone() const = 0;
@@ -36,8 +33,6 @@ public:
 class ScalarStorage : public VarStorage {
   llvm::Value *Slot = nullptr;
   IRType IRValTy;
-
-  llvm::Type *llvmAllocaType() const;
 
 public:
   ScalarStorage(llvm::Value *Slot, llvm::IRBuilderBase &IRB, IRType IRValTy)
@@ -49,7 +44,6 @@ public:
   llvm::Value *getSlot() const override;
   llvm::Value *loadValue() const override;
   void storeValue(llvm::Value *Val) override;
-  llvm::Type *getSlotType() const override;
   IRType getAllocatedType() const override;
   IRType getValueType() const override;
 };
@@ -57,19 +51,14 @@ public:
 class PointerStorage : public VarStorage {
 
   llvm::Value *PtrSlot = nullptr;
-  llvm::Type *PointerElemTy = nullptr;
   IRType ElemIRTy;
-
-  llvm::Type *llvmAllocaType() const;
 
 public:
   PointerStorage(llvm::Value *PtrSlot, llvm::IRBuilderBase &IRB,
-                 llvm::Type *PointerElemTy, IRType ElemIRTy)
-      : VarStorage(IRB), PtrSlot(PtrSlot), PointerElemTy(PointerElemTy),
-        ElemIRTy(ElemIRTy) {}
+                 IRType ElemIRTy)
+      : VarStorage(IRB), PtrSlot(PtrSlot), ElemIRTy(ElemIRTy) {}
   std::unique_ptr<VarStorage> clone() const override {
-    return std::make_unique<PointerStorage>(PtrSlot, IRB, PointerElemTy,
-                                            ElemIRTy);
+    return std::make_unique<PointerStorage>(PtrSlot, IRB, ElemIRTy);
   }
 
   llvm::Value *getSlot() const override;
@@ -79,7 +68,6 @@ public:
   // Load/store the pointer value itself from/to PtrSlot.
   llvm::Value *loadPointer() const;
   void storePointer(llvm::Value *Ptr);
-  llvm::Type *getSlotType() const override;
   IRType getAllocatedType() const override;
   IRType getValueType() const override;
 };
@@ -87,21 +75,20 @@ public:
 class ArrayStorage : public VarStorage {
 
   llvm::Value *BasePointer = nullptr;
-  llvm::ArrayType *ArrayTy = nullptr;
+  std::size_t NElem = 0;
   IRType ElemIRTy;
 
 public:
   ArrayStorage(llvm::Value *BasePointer, llvm::IRBuilderBase &IRB,
-               llvm::ArrayType *ArrayTy, IRType ElemIRTy)
-      : VarStorage(IRB), BasePointer(BasePointer), ArrayTy(ArrayTy),
+               std::size_t NElem, IRType ElemIRTy)
+      : VarStorage(IRB), BasePointer(BasePointer), NElem(NElem),
         ElemIRTy(ElemIRTy) {}
   std::unique_ptr<VarStorage> clone() const override {
-    return std::make_unique<ArrayStorage>(BasePointer, IRB, ArrayTy, ElemIRTy);
+    return std::make_unique<ArrayStorage>(BasePointer, IRB, NElem, ElemIRTy);
   }
   llvm::Value *getSlot() const override;
   llvm::Value *loadValue() const override;
   void storeValue(llvm::Value *Val) override;
-  llvm::Type *getSlotType() const override;
   IRType getAllocatedType() const override;
   IRType getValueType() const override;
 };

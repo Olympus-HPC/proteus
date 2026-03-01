@@ -30,7 +30,6 @@ template <typename StorageT> struct VarStorageOwner {
   void storeValue(llvm::Value *Val) { Storage->storeValue(Val); }
 
   llvm::Value *getSlot() const { return Storage->getSlot(); }
-  llvm::Type *getSlotType() const { return Storage->getSlotType(); }
   IRType getValueType() const { return Storage->getValueType(); }
   IRType getAllocatedType() const { return Storage->getAllocatedType(); }
 };
