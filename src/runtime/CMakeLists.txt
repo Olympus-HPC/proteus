@@ -18,7 +18,6 @@ set(SOURCES
   Frontend/TargetModel.cpp
   Frontend/TypeMap.cpp
   Frontend/LLVMTypeMap.cpp
-  Frontend/VarStorage.cpp
 )
 
 set(PROTEUS_PROJECT_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")

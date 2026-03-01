@@ -2,23 +2,18 @@
 #define PROTEUS_FRONTEND_FUNC_H
 
 #include "proteus/AddressSpace.h"
-#include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.h"
 #include "proteus/Frontend/LLVMCodeBuilder.h"
 #include "proteus/Frontend/TypeMap.h"
 #include "proteus/Frontend/TypeTraits.h"
 #include "proteus/Frontend/Var.h"
-#include "proteus/Frontend/VarStorage.h"
 
-#include <cstdint>
 #include <functional>
-#include <memory>
 #include <optional>
 #include <vector>
 
 namespace llvm {
 class Function;
-class Value;
 } // namespace llvm
 
 namespace proteus {
@@ -71,7 +66,7 @@ public:
   ~FuncBase();
 
   llvm::Function *getFunction();
-  llvm::Value *getArg(size_t Idx);
+  IRValue *getArg(size_t Idx);
 
 #if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
   // Kernel management.
@@ -86,10 +81,10 @@ public:
 
     if constexpr (std::is_pointer_v<T>) {
       IRType ElemIRTy = *TypeMap<T>::getPointerElemType();
-      return Var<T>{CB->createPointerStorage(Name, ElemIRTy), *CB};
+      return Var<T>{CB->allocPointer(Name, ElemIRTy), *CB};
     } else {
       IRType AllocaIRTy = TypeMap<T>::get();
-      return Var<T>{CB->createScalarStorage(Name, AllocaIRTy), *CB};
+      return Var<T>{CB->allocScalar(Name, AllocaIRTy), *CB};
     }
   }
 
@@ -99,7 +94,8 @@ public:
     static_assert(std::is_array_v<T>, "Expected array type");
 
     IRType ArrIRTy = TypeMap<T>::get(NElem);
-    return Var<T>{CB->createArrayStorage(Name, AS, ArrIRTy), *CB};
+    IRType ElemIRTy{ArrIRTy.ElemKind, ArrIRTy.Signed};
+    return Var<T>{CB->allocArray(Name, AS, ElemIRTy, ArrIRTy.NElem), *CB};
   }
 
   template <typename... Ts> auto declVars() {
@@ -306,7 +302,7 @@ private:
   template <typename T, std::size_t ArgIdx> Var<T> createArg() {
     auto Var = declVar<T>("arg." + std::to_string(ArgIdx));
     if constexpr (std::is_pointer_v<T>) {
-      Var.storePointer(FuncBase::getArg(ArgIdx));
+      Var.storeAddress(FuncBase::getArg(ArgIdx));
     } else {
       Var.storeValue(FuncBase::getArg(ArgIdx));
     }
@@ -365,7 +361,7 @@ void FuncBase::beginFor(Var<IterT> &IterVar, const Var<InitT> &Init,
 template <typename CondLambda>
 void FuncBase::beginWhile(CondLambda &&Cond, const char *File, int Line) {
   CB->beginWhile([Cond = std::forward<CondLambda>(
-                      Cond)]() -> llvm::Value * { return Cond().loadValue(); },
+                      Cond)]() -> IRValue * { return Cond().loadValue(); },
                  File, Line);
 }
 
@@ -378,7 +374,7 @@ FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
   auto GetArgVal = [](auto &&Arg) {
     using ArgVarT = std::decay_t<decltype(Arg)>;
     if constexpr (std::is_pointer_v<typename ArgVarT::ValueType>)
-      return Arg.loadPointer();
+      return Arg.loadAddress();
     else
       return Arg.loadValue();
   };
@@ -394,7 +390,7 @@ std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>,
 FuncBase::call(const std::string &Name) {
   using RetT = typename FnSig<Sig>::RetT;
 
-  auto *Call = getCodeBuilder().createCall(Name, TypeMap<RetT>::get());
+  auto Call = getCodeBuilder().createCall(Name, TypeMap<RetT>::get());
   Var<RetT> Ret = declVar<RetT>("ret");
   Ret.storeValue(Call);
   return Ret;
@@ -422,15 +418,15 @@ FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
   auto GetArgVal = [](auto &&Arg) {
     using ArgVarT = std::decay_t<decltype(Arg)>;
     if constexpr (std::is_pointer_v<typename ArgVarT::ValueType>)
-      return Arg.loadPointer();
+      return Arg.loadAddress();
     else
       return Arg.loadValue();
   };
 
   std::vector<IRType> ArgTys = unpackArgTypes(ArgT{});
-  std::vector<llvm::Value *> ArgVals = {GetArgVal(ArgsVars)...};
+  std::vector<IRValue *> ArgVals = {GetArgVal(ArgsVars)...};
 
-  auto *Call =
+  auto Call =
       getCodeBuilder().createCall(Name, TypeMap<RetT>::get(), ArgTys, ArgVals);
 
   Var<RetT> Ret = declVar<RetT>("ret");
@@ -443,8 +439,7 @@ std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicAdd(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicAdd requires arithmetic type");
 
-  llvm::Value *Result =
-      CB->createAtomicAdd(Addr.loadPointer(), Val.loadValue());
+  IRValue *Result = CB->createAtomicAdd(Addr.loadAddress(), Val.loadValue());
   auto Ret = declVar<T>("atomic.add.res.");
   Ret.storeValue(Result);
   return Ret;
@@ -455,8 +450,7 @@ std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicSub(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicSub requires arithmetic type");
 
-  llvm::Value *Result =
-      CB->createAtomicSub(Addr.loadPointer(), Val.loadValue());
+  IRValue *Result = CB->createAtomicSub(Addr.loadAddress(), Val.loadValue());
   auto Ret = declVar<T>("atomic.sub.res.");
   Ret.storeValue(Result);
   return Ret;
@@ -467,8 +461,7 @@ std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicMax(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicMax requires arithmetic type");
 
-  llvm::Value *Result =
-      CB->createAtomicMax(Addr.loadPointer(), Val.loadValue());
+  IRValue *Result = CB->createAtomicMax(Addr.loadAddress(), Val.loadValue());
   auto Ret = declVar<T>("atomic.max.res.");
   Ret.storeValue(Result);
   return Ret;
@@ -479,8 +472,7 @@ std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicMin(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicMin requires arithmetic type");
 
-  llvm::Value *Result =
-      CB->createAtomicMin(Addr.loadPointer(), Val.loadValue());
+  IRValue *Result = CB->createAtomicMin(Addr.loadAddress(), Val.loadValue());
   auto Ret = declVar<T>("atomic.min.res.");
   Ret.storeValue(Result);
   return Ret;
@@ -489,7 +481,7 @@ FuncBase::atomicMin(const Var<T *> &Addr, const Var<T> &Val) {
 inline void FuncBase::ret() { CB->createRetVoid(); }
 
 template <typename T> void FuncBase::ret(const Var<T> &RetVal) {
-  llvm::Value *RetValue = RetVal.loadValue();
+  IRValue *RetValue = RetVal.loadValue();
   CB->createRet(RetValue);
 }
 } // namespace proteus
