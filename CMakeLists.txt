@@ -15,6 +15,7 @@ endif()
 option(PROTEUS_ENABLE_HIP "Enable HIP" OFF)
 option(PROTEUS_ENABLE_CUDA "Enable CUDA" OFF)
 option(PROTEUS_ENABLE_MPI "Enable MPI support for shared caching" OFF)
+option(PROTEUS_ENABLE_MLIR "Enable MLIR backend" OFF)
 option(BUILD_SHARED "Builds the JIT library as shared" OFF)
 option(ENABLE_TESTS "Enable tests" OFF)
 option(ENABLE_DEVELOPER_COMPILER_FLAGS "Enable developer compiler flags: -Wall -Wextra -Werror" OFF)
@@ -47,7 +48,24 @@ if(PROTEUS_ENABLE_HIP)
   message(STATUS "hiprtc Version: ${hiprtc_VERSION}")
   if(hip_VERSION VERSION_LESS "6.2.0")
     message(FATAL_ERROR "HIP found: ${hip_VERSION} is less than minimum required version 6.2.0.")
-  endif()
+	endif()
+
+	# Find ROCm device library bitcode (ocml/ockl/oclc_*), typically under
+	# <ROCm>/amdgcn/bitcode. Restrict lookup to the ROCm installation rooted at
+	# LLVM_INSTALL_DIR. We use them to link DSL generated code for AMDGCN targets.
+	get_filename_component(PROTEUS_ROCM_ROOT_FROM_LLVM "${LLVM_INSTALL_DIR}" DIRECTORY)
+	find_path(PROTEUS_ROCM_AMDGCN_BITCODE_DIR
+	          NAMES ocml.bc
+	          PATH_SUFFIXES amdgcn/bitcode
+	          PATHS "${PROTEUS_ROCM_ROOT_FROM_LLVM}"
+	          NO_DEFAULT_PATH)
+	if(NOT PROTEUS_ROCM_AMDGCN_BITCODE_DIR)
+	  message(FATAL_ERROR
+	    "Could not find ROCm AMDGCN device bitcode directory containing ocml.bc. "
+	    "Expected under <ROCm>/amdgcn/bitcode relative to LLVM_INSTALL_DIR. "
+	    "Ensure LLVM_INSTALL_DIR points into a ROCm install (e.g. /opt/rocm-6.4.1/llvm).")
+	endif()
+  message(STATUS "Found ROCm AMDGCN bitcode dir: ${PROTEUS_ROCM_AMDGCN_BITCODE_DIR}")
 endif()
 
 if(PROTEUS_ENABLE_MPI)

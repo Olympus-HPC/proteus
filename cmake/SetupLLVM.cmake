@@ -20,6 +20,14 @@ if(PROTEUS_ENABLE_HIP)
   message(STATUS "LLD Version: ${LLD_VERSION}")
 endif()
 
+if(PROTEUS_ENABLE_MLIR)
+  find_package(MLIR REQUIRED CONFIG NO_DEFAULT_PATH
+    HINTS "${LLVM_INSTALL_DIR}"
+  )
+  message(STATUS "Found MLIR package in: ${MLIR_DIR}")
+  message(STATUS "MLIR Version: ${MLIR_VERSION}")
+endif()
+
 if(NOT LLVM_ENABLE_RTTI)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
 endif()

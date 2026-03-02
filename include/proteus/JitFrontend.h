@@ -2,6 +2,7 @@
 #define PROTEUS_JIT_DEV_H
 
 #include "proteus/Error.h"
+#include "proteus/Frontend/CodeBuilder.h"
 #include "proteus/Frontend/Dispatcher.h"
 #include "proteus/Frontend/Func.h"
 #include "proteus/Frontend/LLVMCodeBuilder.h"
@@ -17,7 +18,7 @@ struct CompiledLibrary;
 
 class JitModule {
 private:
-  std::unique_ptr<LLVMCodeBuilder> CB;
+  std::unique_ptr<CodeBuilder> CB;
   std::unique_ptr<CompiledLibrary> Library;
 
   std::deque<std::unique_ptr<FuncBase>> Functions;
@@ -33,7 +34,8 @@ private:
   Func<RetT, ArgT...> &buildFuncFromArgsList(const std::string &Name,
                                              ArgTypeList<ArgT...>) {
     auto TypedFn =
-        std::make_unique<Func<RetT, ArgT...>>(*this, *CB, Name, Dispatch);
+        std::make_unique<Func<RetT, ArgT...>>(*this, *CB, Name, Dispatch,
+                                              /*IsKernel=*/false);
     Func<RetT, ArgT...> &TypedFnRef = *TypedFn;
     Functions.emplace_back(std::move(TypedFn));
     TypedFnRef.declArgs();
@@ -44,16 +46,12 @@ private:
   KernelHandle<ArgT...> buildKernelFromArgsList(const std::string &Name,
                                                 ArgTypeList<ArgT...>) {
     auto TypedFn =
-        std::make_unique<Func<void, ArgT...>>(*this, *CB, Name, Dispatch);
+        std::make_unique<Func<void, ArgT...>>(*this, *CB, Name, Dispatch,
+                                              /*IsKernel=*/true);
     Func<void, ArgT...> &TypedFnRef = *TypedFn;
     TypedFn->declArgs();
 
-#if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
-    std::unique_ptr<FuncBase> &Fn = Functions.emplace_back(std::move(TypedFn));
-    Fn->setKernel();
-#else
-    reportFatalError("setKernel() is only supported for CUDA/HIP");
-#endif
+    Functions.emplace_back(std::move(TypedFn));
     return KernelHandle<ArgT...>{TypedFnRef, *this};
   }
 
@@ -117,7 +115,8 @@ private:
   }
 
 public:
-  JitModule(const std::string &Target = "host");
+  JitModule(const std::string &Target = "host",
+            const std::string &Backend = "llvm");
 
   // Disable copy and move constructors.
   JitModule(const JitModule &) = delete;
@@ -172,6 +171,7 @@ public:
   }
 
   void print();
+  void printLLVMIR();
 };
 
 template <typename RetT, typename... ArgT>
