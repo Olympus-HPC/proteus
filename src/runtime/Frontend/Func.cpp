@@ -1,54 +1,55 @@
 #include "proteus/Frontend/Func.h"
 #include "proteus/Frontend/LLVMCodeBuilder.h"
+#include "proteus/Frontend/LoopUnroller.h"
 #include "proteus/JitFrontend.h"
-
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/Module.h>
-
-using namespace llvm;
 
 namespace proteus {
 
-FuncBase::FuncBase(JitModule &J, LLVMCodeBuilder &CBParam,
-                   const std::string &Name, IRType RetTy,
-                   const std::vector<IRType> &ArgTys)
+FuncBase::FuncBase(JitModule &J, CodeBuilder &CBParam, const std::string &Name,
+                   IRType RetTy, const std::vector<IRType> &ArgTys)
     : J(J), Name(Name), CB(&CBParam) {
-  LLVMFunc = CBParam.addFunction(Name, RetTy, ArgTys);
+  Func = CBParam.addFunction(Name, RetTy, ArgTys);
 }
 
 FuncBase::~FuncBase() = default;
 
 void FuncBase::setName(const std::string &NewName) {
   Name = NewName;
-  Function *F = getFunction();
-  F->setName(Name);
+  CB->setFunctionName(Func, Name);
 }
 
-IRValue *FuncBase::getArg(size_t Idx) {
-  Function *F = getFunction();
-  return CB->getArg(F, Idx);
-}
+IRValue *FuncBase::getArg(size_t Idx) { return CB->getArg(Func, Idx); }
 
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
-void FuncBase::setKernel() { CB->setKernel(*getFunction()); }
+void FuncBase::setKernel() { CB->setKernel(Func); }
 
 void FuncBase::setLaunchBoundsForKernel(int MaxThreadsPerBlock,
                                         int MinBlocksPerSM) {
-  CB->setLaunchBoundsForKernel(*getFunction(), MaxThreadsPerBlock,
-                               MinBlocksPerSM);
+  CB->setLaunchBoundsForKernel(Func, MaxThreadsPerBlock, MinBlocksPerSM);
 }
 #endif
 
-// Delegating methods to LLVMCodeBuilder.
-LLVMCodeBuilder &FuncBase::getCodeBuilder() { return *CB; }
+// Delegating methods to CodeBuilder.
+CodeBuilder &FuncBase::getCodeBuilder() { return *CB; }
 
 void FuncBase::beginFunction(const char *File, int Line) {
-  CB->beginFunction(*LLVMFunc, File, Line);
+  CB->beginFunction(Func, File, Line);
 }
 
 void FuncBase::endFunction() { CB->endFunction(); }
 
-Function *FuncBase::getFunction() { return LLVMFunc; }
+IRFunction *FuncBase::getFunction() { return Func; }
+
+void FuncBase::captureForLoopLatch() {
+  auto &LCB = static_cast<LLVMCodeBuilder &>(*CB);
+  llvm::BasicBlock *BodyBB = LCB.getInsertBlock();
+  PendingLatchBB = LCB.getUniqueSuccessor(BodyBB);
+}
+
+void FuncBase::attachLoopUnrollMetadata(LoopUnroller &U) {
+  if (U.isEnabled() && PendingLatchBB)
+    U.attachMetadata(static_cast<llvm::BasicBlock *>(PendingLatchBB));
+}
 
 void FuncBase::beginIf(const Var<bool> &CondVar, const char *File, int Line) {
   IRValue *Cond = CondVar.loadValue();

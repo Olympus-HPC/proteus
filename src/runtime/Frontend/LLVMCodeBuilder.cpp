@@ -2,6 +2,7 @@
 #include "proteus/Frontend/LLVMTypeMap.h"
 #include "proteus/Frontend/TargetModel.h"
 #include "proteus/impl/CoreLLVMDevice.h"
+#include "proteus/impl/LLVMIRFunction.h"
 #include "proteus/impl/LLVMIRValue.h"
 
 #include <llvm/IR/IRBuilder.h>
@@ -34,10 +35,17 @@ struct LLVMCodeBuilder::Impl {
 
   // Value table — deque guarantees pointer stability on growth.
   std::deque<LLVMIRValue> Values;
+  // Function handle table — same stability guarantee.
+  std::deque<LLVMIRFunction> Functions;
 
   IRValue *wrap(llvm::Value *V) {
     Values.emplace_back(V);
     return &Values.back();
+  }
+
+  IRFunction *wrapFunction(llvm::Function *Fn) {
+    Functions.emplace_back(Fn);
+    return &Functions.back();
   }
 
   static llvm::Value *unwrap(IRValue *V) {
@@ -100,8 +108,8 @@ LLVMContext &LLVMCodeBuilder::getContext() {
   return F->getContext();
 }
 
-Function *LLVMCodeBuilder::addFunction(const std::string &Name, IRType RetTy,
-                                       const std::vector<IRType> &ArgTys) {
+IRFunction *LLVMCodeBuilder::addFunction(const std::string &Name, IRType RetTy,
+                                         const std::vector<IRType> &ArgTys) {
   if (!PImpl->OwnedMod)
     reportFatalError("addFunction requires an owning LLVMCodeBuilder");
   auto &Ctx = getContext();
@@ -117,7 +125,12 @@ Function *LLVMCodeBuilder::addFunction(const std::string &Name, IRType RetTy,
     reportFatalError("Expected LLVM Function");
   BasicBlock::Create(Fn->getContext(), "entry", Fn);
   F = Fn;
-  return Fn;
+  return PImpl->wrapFunction(Fn);
+}
+
+void LLVMCodeBuilder::setFunctionName(IRFunction *IRF,
+                                      const std::string &Name) {
+  unwrapFunction(IRF)->setName(Name);
 }
 
 std::unique_ptr<LLVMContext> LLVMCodeBuilder::takeLLVMContext() {
@@ -187,8 +200,9 @@ void LLVMCodeBuilder::pushScope(const char *File, int Line, ScopeKind Kind,
 }
 
 // High-level scope operations.
-void LLVMCodeBuilder::beginFunction(Function &Fn, const char *File, int Line) {
-  F = &Fn;
+void LLVMCodeBuilder::beginFunction(IRFunction *IRF, const char *File,
+                                    int Line) {
+  F = unwrapFunction(IRF);
   BasicBlock *BodyBB = BasicBlock::Create(F->getContext(), "body", F);
   BasicBlock *ExitBB = BasicBlock::Create(F->getContext(), "exit", F);
   PImpl->IP =
@@ -784,7 +798,8 @@ IRValue *LLVMCodeBuilder::emitArrayCreate(Type *Ty, AddressSpace AT,
 }
 
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
-void LLVMCodeBuilder::setKernel(Function &Fn) {
+void LLVMCodeBuilder::setKernel(IRFunction *IRF) {
+  Function &Fn = *unwrapFunction(IRF);
   LLVMContext &Ctx = getContext();
   switch (TargetModel) {
   case TargetModelType::CUDA: {
@@ -814,10 +829,11 @@ void LLVMCodeBuilder::setKernel(Function &Fn) {
   }
 }
 
-void LLVMCodeBuilder::setLaunchBoundsForKernel(Function &Fn,
+void LLVMCodeBuilder::setLaunchBoundsForKernel(IRFunction *IRF,
                                                int MaxThreadsPerBlock,
                                                int MinBlocksPerSM) {
-  proteus::setLaunchBoundsForKernel(Fn, MaxThreadsPerBlock, MinBlocksPerSM);
+  proteus::setLaunchBoundsForKernel(*unwrapFunction(IRF), MaxThreadsPerBlock,
+                                    MinBlocksPerSM);
 }
 #endif
 
@@ -887,8 +903,12 @@ VarAlloc LLVMCodeBuilder::allocArray(const std::string &Name, AddressSpace AS,
   return {Slot, ElemTy, AllocTy, static_cast<unsigned>(AS)};
 }
 
-IRValue *LLVMCodeBuilder::getArg(llvm::Function *Fn, size_t Idx) {
-  return PImpl->wrap(Fn->getArg(Idx));
+IRValue *LLVMCodeBuilder::getArg(IRFunction *IRF, size_t Idx) {
+  return PImpl->wrap(unwrapFunction(IRF)->getArg(Idx));
+}
+
+llvm::Function *LLVMCodeBuilder::unwrapFunction(IRFunction *IRF) {
+  return static_cast<LLVMIRFunction *>(IRF)->F;
 }
 
 } // namespace proteus

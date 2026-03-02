@@ -2,7 +2,7 @@
 #define PROTEUS_FRONTEND_VAR_H
 
 #include "proteus/Error.h"
-#include "proteus/Frontend/LLVMCodeBuilder.h"
+#include "proteus/Frontend/CodeBuilder.h"
 #include "proteus/Frontend/TypeMap.h"
 #include "proteus/Frontend/TypeTraits.h"
 
@@ -19,7 +19,7 @@ template <typename T, typename = void> struct Var;
 // types).
 template <typename T>
 struct Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> {
-  LLVMCodeBuilder &CB;
+  CodeBuilder &CB;
   IRValue *Slot;
   IRType ValueTy;
   IRType AllocTy;
@@ -28,7 +28,7 @@ struct Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> {
   using ValueType = T;
   using ElemType = T;
 
-  Var(VarAlloc A, LLVMCodeBuilder &CBIn)
+  Var(VarAlloc A, CodeBuilder &CBIn)
       : CB(CBIn), Slot(A.Slot), ValueTy(A.ValueTy), AllocTy(A.AllocTy),
         AddrSpace(A.AddrSpace) {}
 
@@ -189,7 +189,7 @@ struct Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> {
 
 // Specialization for array types
 template <typename T> struct Var<T, std::enable_if_t<std::is_array_v<T>>> {
-  LLVMCodeBuilder &CB;
+  CodeBuilder &CB;
   IRValue *Slot;
   IRType ValueTy; ///< Element type.
   IRType AllocTy; ///< Array type.
@@ -198,7 +198,7 @@ template <typename T> struct Var<T, std::enable_if_t<std::is_array_v<T>>> {
   using ValueType = T;
   using ElemType = std::remove_extent_t<T>;
 
-  Var(VarAlloc A, LLVMCodeBuilder &CBIn)
+  Var(VarAlloc A, CodeBuilder &CBIn)
       : CB(CBIn), Slot(A.Slot), ValueTy(A.ValueTy), AllocTy(A.AllocTy),
         AddrSpace(A.AddrSpace) {}
 
@@ -227,7 +227,7 @@ template <typename T> struct Var<T, std::enable_if_t<std::is_array_v<T>>> {
 
 // Specialization for pointer types (including references to pointers)
 template <typename T> struct Var<T, std::enable_if_t<is_pointer_unref_v<T>>> {
-  LLVMCodeBuilder &CB;
+  CodeBuilder &CB;
   IRValue *Slot;
   IRType ValueTy; ///< Pointee (element) type.
   IRType AllocTy; ///< Type of the pointer alloca.
@@ -236,7 +236,7 @@ template <typename T> struct Var<T, std::enable_if_t<is_pointer_unref_v<T>>> {
   using ValueType = T;
   using ElemType = std::remove_pointer_t<std::remove_reference_t<T>>;
 
-  Var(VarAlloc A, LLVMCodeBuilder &CBIn)
+  Var(VarAlloc A, CodeBuilder &CBIn)
       : CB(CBIn), Slot(A.Slot), ValueTy(A.ValueTy), AllocTy(A.AllocTy),
         AddrSpace(A.AddrSpace) {}
 
@@ -317,7 +317,7 @@ operator%(const T &ConstValue, const Var<U> &V);
 // Use Var::convert<U>() for user-facing type conversions.
 namespace detail {
 template <typename FromT, typename ToT>
-IRValue *convert(LLVMCodeBuilder &CB, IRValue *V) {
+IRValue *convert(CodeBuilder &CB, IRValue *V) {
   using From = remove_cvref_t<FromT>;
   using To = remove_cvref_t<ToT>;
   static_assert(std::is_arithmetic_v<From>, "From type must be arithmetic");
@@ -359,7 +359,7 @@ IRValue *convert(LLVMCodeBuilder &CB, IRValue *V) {
 
 // Allocate a new Var of type T using CB.
 template <typename T>
-Var<T> declVar(LLVMCodeBuilder &CB, const std::string &Name = "var") {
+Var<T> declVar(CodeBuilder &CB, const std::string &Name = "var") {
   static_assert(!std::is_array_v<T>, "Expected non-array type");
   static_assert(!std::is_reference_v<T>,
                 "declVar does not support reference types");
@@ -375,7 +375,7 @@ Var<T> declVar(LLVMCodeBuilder &CB, const std::string &Name = "var") {
 
 // Allocate and initialize a Var of type T.
 template <typename T>
-Var<T> defVar(LLVMCodeBuilder &CB, const T &Val,
+Var<T> defVar(CodeBuilder &CB, const T &Val,
               const std::string &Name = "var") {
   using RawT = std::remove_const_t<T>;
   Var<RawT> V = declVar<RawT>(CB, Name);
@@ -392,7 +392,7 @@ Var<std::common_type_t<remove_cvref_t<T>, remove_cvref_t<U>>>
 binOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
   using CommonT = std::common_type_t<remove_cvref_t<T>, remove_cvref_t<U>>;
 
-  LLVMCodeBuilder &CB = L.CB;
+  CodeBuilder &CB = L.CB;
   if (&CB != &R.CB)
     reportFatalError("Variables should belong to the same function");
 
@@ -447,7 +447,7 @@ compoundAssignConst(Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>> &LHS,
 
 template <typename T, typename U, typename IntOp, typename FPOp>
 Var<bool> cmpOp(const Var<T> &L, const Var<U> &R, IntOp IOp, FPOp FOp) {
-  LLVMCodeBuilder &CB = L.CB;
+  CodeBuilder &CB = L.CB;
   if (&CB != &R.CB)
     reportFatalError("Variables should belong to the same function");
 
@@ -569,10 +569,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator+(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createAdd(L, R);
       },
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createFAdd(L, R);
       });
 }
@@ -584,10 +584,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator-(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createSub(L, R);
       },
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createFSub(L, R);
       });
 }
@@ -599,10 +599,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator*(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createMul(L, R);
       },
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createFMul(L, R);
       });
 }
@@ -614,10 +614,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator/(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createSDiv(L, R);
       },
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createFDiv(L, R);
       });
 }
@@ -629,10 +629,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator%(
     const Var<U> &Other) const {
   return binOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createSRem(L, R);
       },
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createFRem(L, R);
       });
 }
@@ -715,10 +715,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator+=(
                 "Can only add arithmetic types to Var");
   return compoundAssignConst(
       *this, ConstValue,
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createAdd(L, R);
       },
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createFAdd(L, R);
       });
 }
@@ -744,10 +744,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator-=(
                 "Can only subtract arithmetic types from Var");
   return compoundAssignConst(
       *this, ConstValue,
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createSub(L, R);
       },
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createFSub(L, R);
       });
 }
@@ -773,10 +773,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator*=(
                 "Can only multiply Var by arithmetic types");
   return compoundAssignConst(
       *this, ConstValue,
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createMul(L, R);
       },
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createFMul(L, R);
       });
 }
@@ -802,10 +802,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator/=(
                 "Can only divide Var by arithmetic types");
   return compoundAssignConst(
       *this, ConstValue,
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createSDiv(L, R);
       },
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createFDiv(L, R);
       });
 }
@@ -831,10 +831,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator%=(
                 "Can only modulo Var by arithmetic types");
   return compoundAssignConst(
       *this, ConstValue,
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createSRem(L, R);
       },
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createFRem(L, R);
       });
 }
@@ -991,10 +991,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator>(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createICmpSGT(L, R);
       },
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createFCmpOGT(L, R);
       });
 }
@@ -1006,10 +1006,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator>=(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createICmpSGE(L, R);
       },
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createFCmpOGE(L, R);
       });
 }
@@ -1021,10 +1021,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator<(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createICmpSLT(L, R);
       },
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createFCmpOLT(L, R);
       });
 }
@@ -1036,10 +1036,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator<=(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createICmpSLE(L, R);
       },
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createFCmpOLE(L, R);
       });
 }
@@ -1051,10 +1051,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator==(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createICmpEQ(L, R);
       },
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createFCmpOEQ(L, R);
       });
 }
@@ -1066,10 +1066,10 @@ Var<T, std::enable_if_t<is_scalar_arithmetic_v<T>>>::operator!=(
     const Var<U> &Other) const {
   return cmpOp(
       *this, Other,
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createICmpNE(L, R);
       },
-      [](LLVMCodeBuilder &CB, IRValue *L, IRValue *R) {
+      [](CodeBuilder &CB, IRValue *L, IRValue *R) {
         return CB.createFCmpONE(L, R);
       });
 }
@@ -1176,7 +1176,7 @@ operator%(const T &ConstValue, const Var<U> &V) {
 
 // Helper struct to convert Var operands to a target type T.
 template <typename T> struct IntrinsicOperandConverter {
-  LLVMCodeBuilder &CB;
+  CodeBuilder &CB;
 
   template <typename U> IRValue *operator()(const Var<U> &Operand) const {
     return detail::convert<U, T>(CB, Operand.loadValue());
@@ -1188,7 +1188,7 @@ static Var<T> emitIntrinsic(const std::string &IntrinsicName,
                             const Operands &...Ops) {
   static_assert(sizeof...(Ops) > 0, "Intrinsic requires at least one operand");
 
-  LLVMCodeBuilder &CB = std::get<0>(std::tie(Ops...)).CB;
+  CodeBuilder &CB = std::get<0>(std::tie(Ops...)).CB;
   auto CheckFn = [&CB](const auto &Operand) {
     if (&Operand.CB != &CB)
       reportFatalError("Variables should belong to the same function");
@@ -1340,7 +1340,7 @@ template <typename T> Var<float> absf(const Var<T> &R) {
 template <typename T>
 std::enable_if_t<is_arithmetic_unref_v<T>, Var<remove_cvref_t<T>>>
 min(const Var<T> &L, const Var<T> &R) {
-  LLVMCodeBuilder &CB = L.CB;
+  CodeBuilder &CB = L.CB;
   if (&CB != &R.CB)
     reportFatalError("Variables should belong to the same function");
 
@@ -1356,7 +1356,7 @@ min(const Var<T> &L, const Var<T> &R) {
 template <typename T>
 std::enable_if_t<is_arithmetic_unref_v<T>, Var<remove_cvref_t<T>>>
 max(const Var<T> &L, const Var<T> &R) {
-  LLVMCodeBuilder &CB = L.CB;
+  CodeBuilder &CB = L.CB;
   if (&CB != &R.CB)
     reportFatalError("Variables should belong to the same function");
 

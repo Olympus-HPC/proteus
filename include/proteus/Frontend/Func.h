@@ -2,8 +2,8 @@
 #define PROTEUS_FRONTEND_FUNC_H
 
 #include "proteus/AddressSpace.h"
+#include "proteus/Frontend/CodeBuilder.h"
 #include "proteus/Frontend/Dispatcher.h"
-#include "proteus/Frontend/LLVMCodeBuilder.h"
 #include "proteus/Frontend/TypeMap.h"
 #include "proteus/Frontend/TypeTraits.h"
 #include "proteus/Frontend/Var.h"
@@ -12,16 +12,13 @@
 #include <optional>
 #include <vector>
 
-namespace llvm {
-class Function;
-} // namespace llvm
-
 namespace proteus {
 
 class JitModule;
 template <typename T> class LoopBoundInfo;
 template <typename T, typename... ForLoopBuilders> class LoopNestBuilder;
 template <typename T, typename BodyLambda> class ForLoopBuilder;
+class LoopUnroller;
 
 // Helper struct to represent the signature of a function.
 // Useful to partially-specialize function templates.
@@ -50,22 +47,26 @@ class FuncBase {
 public:
   JitModule &getJitModule() { return J; }
 
-  /// Get the underlying LLVMCodeBuilder for direct IR generation.
-  LLVMCodeBuilder &getCodeBuilder();
+  /// Get the underlying CodeBuilder for direct IR generation.
+  CodeBuilder &getCodeBuilder();
 
 protected:
   JitModule &J;
 
   std::string Name;
-  LLVMCodeBuilder *CB;
-  llvm::Function *LLVMFunc;
+  CodeBuilder *CB;
+  IRFunction *Func;
+
+  /// Backend-specific latch block captured between beginFor/endFor.
+  /// Stored as void* to avoid exposing LLVM types in this header.
+  void *PendingLatchBB = nullptr;
 
 public:
-  FuncBase(JitModule &J, LLVMCodeBuilder &CB, const std::string &Name,
-           IRType RetTy, const std::vector<IRType> &ArgTys);
+  FuncBase(JitModule &J, CodeBuilder &CB, const std::string &Name, IRType RetTy,
+           const std::vector<IRType> &ArgTys);
   ~FuncBase();
 
-  llvm::Function *getFunction();
+  IRFunction *getFunction();
   IRValue *getArg(size_t Idx);
 
 #if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
@@ -163,6 +164,11 @@ public:
   void beginFunction(const char *File = __builtin_FILE(),
                      int Line = __builtin_LINE());
   void endFunction();
+
+  // LoopNest escape hatch: capture the latch block right after beginFor
+  // so LLVM-specific unroll metadata can be attached after endFor.
+  void captureForLoopLatch();
+  void attachLoopUnrollMetadata(LoopUnroller &U);
 
   template <typename BodyLambda>
   void function(BodyLambda &&Body, const char *File = __builtin_FILE(),
@@ -322,7 +328,7 @@ private:
   }
 
 public:
-  Func(JitModule &J, LLVMCodeBuilder &CB, const std::string &Name,
+  Func(JitModule &J, CodeBuilder &CB, const std::string &Name,
        Dispatcher &Dispatch)
       : FuncBase(J, CB, Name, TypeMap<RetT>::get(), {TypeMap<ArgT>::get()...}),
         Dispatch(Dispatch) {}
