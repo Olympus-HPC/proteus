@@ -35,6 +35,12 @@ struct VarAlloc {
 
 enum class ScopeKind { FUNCTION, IF, FOR, WHILE };
 
+/// Semantic arithmetic operation selector.
+enum class ArithOp { Add, Sub, Mul, Div, Rem };
+
+/// Semantic comparison operation selector.
+enum class CmpOp { EQ, NE, LT, LE, GT, GE };
+
 inline std::string toString(ScopeKind Kind) {
   switch (Kind) {
   case ScopeKind::FUNCTION:
@@ -113,18 +119,8 @@ public:
   // -----------------------------------------------------------------------
   // Arithmetic.
   // -----------------------------------------------------------------------
-  virtual IRValue *createAdd(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createFAdd(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createSub(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createFSub(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createMul(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createFMul(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createUDiv(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createSDiv(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createFDiv(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createURem(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createSRem(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createFRem(IRValue *LHS, IRValue *RHS) = 0;
+  virtual IRValue *createArith(ArithOp Op, IRValue *LHS, IRValue *RHS,
+                               IRType Ty) = 0;
 
   // -----------------------------------------------------------------------
   // Atomics.
@@ -137,24 +133,8 @@ public:
   // -----------------------------------------------------------------------
   // Comparisons.
   // -----------------------------------------------------------------------
-  virtual IRValue *createICmpEQ(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createICmpNE(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createICmpSLT(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createICmpSGT(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createICmpSGE(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createICmpSLE(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createICmpUGT(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createICmpUGE(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createICmpULT(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createICmpULE(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createFCmpOEQ(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createFCmpONE(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createFCmpOLT(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createFCmpOLE(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createFCmpOGT(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createFCmpOGE(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createFCmpULT(IRValue *LHS, IRValue *RHS) = 0;
-  virtual IRValue *createFCmpULE(IRValue *LHS, IRValue *RHS) = 0;
+  virtual IRValue *createCmp(CmpOp Op, IRValue *LHS, IRValue *RHS,
+                             IRType Ty) = 0;
 
   // -----------------------------------------------------------------------
   // Logical.
@@ -174,12 +154,7 @@ public:
   // -----------------------------------------------------------------------
   // Casts.
   // -----------------------------------------------------------------------
-  virtual IRValue *createIntCast(IRValue *V, IRType DestTy, bool IsSigned) = 0;
-  virtual IRValue *createFPCast(IRValue *V, IRType DestTy) = 0;
-  virtual IRValue *createSIToFP(IRValue *V, IRType DestTy) = 0;
-  virtual IRValue *createUIToFP(IRValue *V, IRType DestTy) = 0;
-  virtual IRValue *createFPToSI(IRValue *V, IRType DestTy) = 0;
-  virtual IRValue *createFPToUI(IRValue *V, IRType DestTy) = 0;
+  virtual IRValue *createCast(IRValue *V, IRType FromTy, IRType ToTy) = 0;
   virtual IRValue *createBitCast(IRValue *V, IRType DestTy) = 0;
   virtual IRValue *createZExt(IRValue *V, IRType DestTy) = 0;
 
@@ -190,22 +165,13 @@ public:
   virtual IRValue *getConstantFP(IRType Ty, double Val) = 0;
 
   // -----------------------------------------------------------------------
-  // GEP.
+  // GEP — semantic element-pointer operations.
   // -----------------------------------------------------------------------
-  virtual IRValue *createInBoundsGEP(IRType Ty, IRValue *Ptr,
-                                     const std::vector<IRValue *> IdxList,
-                                     const std::string &Name = "") = 0;
+  virtual VarAlloc getElementPtr(IRValue *Base, IRType BaseTy, IRValue *Index,
+                                 IRType ElemTy) = 0;
   // NOLINTNEXTLINE
-  virtual IRValue *createConstInBoundsGEP1_64(IRType Ty, IRValue *Ptr,
-                                              size_t Idx) = 0;
-  // NOLINTNEXTLINE
-  virtual IRValue *createConstInBoundsGEP2_64(IRType Ty, IRValue *Ptr,
-                                              size_t Idx0, size_t Idx1) = 0;
-
-  // -----------------------------------------------------------------------
-  // Address-space query.
-  // -----------------------------------------------------------------------
-  virtual unsigned getAddressSpaceFromValue(IRValue *PtrVal) = 0;
+  virtual VarAlloc getElementPtr(IRValue *Base, IRType BaseTy, size_t Index,
+                                 IRType ElemTy) = 0;
 
   // -----------------------------------------------------------------------
   // Calls.

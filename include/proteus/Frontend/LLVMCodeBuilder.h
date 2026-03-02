@@ -143,18 +143,8 @@ public:
   // -----------------------------------------------------------------------
   // CodeBuilder overrides — arithmetic.
   // -----------------------------------------------------------------------
-  IRValue *createAdd(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createFAdd(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createSub(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createFSub(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createMul(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createFMul(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createUDiv(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createSDiv(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createFDiv(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createURem(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createSRem(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createFRem(IRValue *LHS, IRValue *RHS) override;
+  IRValue *createArith(ArithOp Op, IRValue *LHS, IRValue *RHS,
+                       IRType Ty) override;
 
   // -----------------------------------------------------------------------
   // CodeBuilder overrides — atomics.
@@ -167,24 +157,7 @@ public:
   // -----------------------------------------------------------------------
   // CodeBuilder overrides — comparisons.
   // -----------------------------------------------------------------------
-  IRValue *createICmpEQ(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createICmpNE(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createICmpSLT(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createICmpSGT(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createICmpSGE(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createICmpSLE(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createICmpUGT(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createICmpUGE(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createICmpULT(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createICmpULE(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createFCmpOEQ(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createFCmpONE(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createFCmpOLT(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createFCmpOLE(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createFCmpOGT(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createFCmpOGE(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createFCmpULT(IRValue *LHS, IRValue *RHS) override;
-  IRValue *createFCmpULE(IRValue *LHS, IRValue *RHS) override;
+  IRValue *createCmp(CmpOp Op, IRValue *LHS, IRValue *RHS, IRType Ty) override;
 
   // -----------------------------------------------------------------------
   // CodeBuilder overrides — logical.
@@ -204,12 +177,7 @@ public:
   // -----------------------------------------------------------------------
   // CodeBuilder overrides — casts.
   // -----------------------------------------------------------------------
-  IRValue *createIntCast(IRValue *V, IRType DestTy, bool IsSigned) override;
-  IRValue *createFPCast(IRValue *V, IRType DestTy) override;
-  IRValue *createSIToFP(IRValue *V, IRType DestTy) override;
-  IRValue *createUIToFP(IRValue *V, IRType DestTy) override;
-  IRValue *createFPToSI(IRValue *V, IRType DestTy) override;
-  IRValue *createFPToUI(IRValue *V, IRType DestTy) override;
+  IRValue *createCast(IRValue *V, IRType FromTy, IRType ToTy) override;
   IRValue *createBitCast(IRValue *V, IRType DestTy) override;
   IRValue *createZExt(IRValue *V, IRType DestTy) override;
 
@@ -222,20 +190,11 @@ public:
   // -----------------------------------------------------------------------
   // CodeBuilder overrides — GEP.
   // -----------------------------------------------------------------------
-  IRValue *createInBoundsGEP(IRType Ty, IRValue *Ptr,
-                             const std::vector<IRValue *> IdxList,
-                             const std::string &Name = "") override;
+  VarAlloc getElementPtr(IRValue *Base, IRType BaseTy, IRValue *Index,
+                         IRType ElemTy) override;
   // NOLINTNEXTLINE
-  IRValue *createConstInBoundsGEP1_64(IRType Ty, IRValue *Ptr,
-                                      size_t Idx) override;
-  // NOLINTNEXTLINE
-  IRValue *createConstInBoundsGEP2_64(IRType Ty, IRValue *Ptr, size_t Idx0,
-                                      size_t Idx1) override;
-
-  // -----------------------------------------------------------------------
-  // CodeBuilder overrides — address-space query.
-  // -----------------------------------------------------------------------
-  unsigned getAddressSpaceFromValue(IRValue *PtrVal) override;
+  VarAlloc getElementPtr(IRValue *Base, IRType BaseTy, size_t Index,
+                         IRType ElemTy) override;
 
   // -----------------------------------------------------------------------
   // CodeBuilder overrides — calls.
@@ -282,6 +241,67 @@ private:
 
   /// Unwrap an opaque IRFunction back to a raw llvm::Function pointer.
   llvm::Function *unwrapFunction(IRFunction *IRF);
+
+  // -----------------------------------------------------------------------
+  // Private low-level arithmetic dispatch (called by createArith).
+  // -----------------------------------------------------------------------
+  IRValue *createAdd(IRValue *LHS, IRValue *RHS);
+  IRValue *createFAdd(IRValue *LHS, IRValue *RHS);
+  IRValue *createSub(IRValue *LHS, IRValue *RHS);
+  IRValue *createFSub(IRValue *LHS, IRValue *RHS);
+  IRValue *createMul(IRValue *LHS, IRValue *RHS);
+  IRValue *createFMul(IRValue *LHS, IRValue *RHS);
+  IRValue *createUDiv(IRValue *LHS, IRValue *RHS);
+  IRValue *createSDiv(IRValue *LHS, IRValue *RHS);
+  IRValue *createFDiv(IRValue *LHS, IRValue *RHS);
+  IRValue *createURem(IRValue *LHS, IRValue *RHS);
+  IRValue *createSRem(IRValue *LHS, IRValue *RHS);
+  IRValue *createFRem(IRValue *LHS, IRValue *RHS);
+
+  // -----------------------------------------------------------------------
+  // Private low-level comparison dispatch (called by createCmp).
+  // -----------------------------------------------------------------------
+  IRValue *createICmpEQ(IRValue *LHS, IRValue *RHS);
+  IRValue *createICmpNE(IRValue *LHS, IRValue *RHS);
+  IRValue *createICmpSLT(IRValue *LHS, IRValue *RHS);
+  IRValue *createICmpSGT(IRValue *LHS, IRValue *RHS);
+  IRValue *createICmpSGE(IRValue *LHS, IRValue *RHS);
+  IRValue *createICmpSLE(IRValue *LHS, IRValue *RHS);
+  IRValue *createICmpUGT(IRValue *LHS, IRValue *RHS);
+  IRValue *createICmpUGE(IRValue *LHS, IRValue *RHS);
+  IRValue *createICmpULT(IRValue *LHS, IRValue *RHS);
+  IRValue *createICmpULE(IRValue *LHS, IRValue *RHS);
+  IRValue *createFCmpOEQ(IRValue *LHS, IRValue *RHS);
+  IRValue *createFCmpONE(IRValue *LHS, IRValue *RHS);
+  IRValue *createFCmpOLT(IRValue *LHS, IRValue *RHS);
+  IRValue *createFCmpOLE(IRValue *LHS, IRValue *RHS);
+  IRValue *createFCmpOGT(IRValue *LHS, IRValue *RHS);
+  IRValue *createFCmpOGE(IRValue *LHS, IRValue *RHS);
+  IRValue *createFCmpULT(IRValue *LHS, IRValue *RHS);
+  IRValue *createFCmpULE(IRValue *LHS, IRValue *RHS);
+
+  // -----------------------------------------------------------------------
+  // Private low-level cast dispatch (called by createCast).
+  // -----------------------------------------------------------------------
+  IRValue *createIntCast(IRValue *V, IRType DestTy, bool IsSigned);
+  IRValue *createFPCast(IRValue *V, IRType DestTy);
+  IRValue *createSIToFP(IRValue *V, IRType DestTy);
+  IRValue *createUIToFP(IRValue *V, IRType DestTy);
+  IRValue *createFPToSI(IRValue *V, IRType DestTy);
+  IRValue *createFPToUI(IRValue *V, IRType DestTy);
+
+  // -----------------------------------------------------------------------
+  // Private GEP helpers (called by getElementPtr).
+  // -----------------------------------------------------------------------
+  IRValue *createInBoundsGEP(IRType Ty, IRValue *Ptr,
+                             const std::vector<IRValue *> IdxList,
+                             const std::string &Name = "");
+  // NOLINTNEXTLINE
+  IRValue *createConstInBoundsGEP1_64(IRType Ty, IRValue *Ptr, size_t Idx);
+  // NOLINTNEXTLINE
+  IRValue *createConstInBoundsGEP2_64(IRType Ty, IRValue *Ptr, size_t Idx0,
+                                      size_t Idx1);
+  unsigned getAddressSpaceFromValue(IRValue *PtrVal);
 };
 
 } // namespace proteus

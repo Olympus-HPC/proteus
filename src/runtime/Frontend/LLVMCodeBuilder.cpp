@@ -724,6 +724,130 @@ IRValue *LLVMCodeBuilder::createConstInBoundsGEP2_64(IRType Ty, IRValue *Ptr,
       toLLVMType(Ty, getContext()), PImpl->unwrap(Ptr), Idx0, Idx1));
 }
 
+// ---------------------------------------------------------------------------
+// Semantic arithmetic / comparison / cast dispatch
+// ---------------------------------------------------------------------------
+
+IRValue *LLVMCodeBuilder::createArith(ArithOp Op, IRValue *LHS, IRValue *RHS,
+                                      IRType Ty) {
+  if (isIntegerKind(Ty)) {
+    switch (Op) {
+    case ArithOp::Add:
+      return createAdd(LHS, RHS);
+    case ArithOp::Sub:
+      return createSub(LHS, RHS);
+    case ArithOp::Mul:
+      return createMul(LHS, RHS);
+    case ArithOp::Div:
+      return Ty.Signed ? createSDiv(LHS, RHS) : createUDiv(LHS, RHS);
+    case ArithOp::Rem:
+      return Ty.Signed ? createSRem(LHS, RHS) : createURem(LHS, RHS);
+    }
+  } else if (isFloatingPointKind(Ty)) {
+    switch (Op) {
+    case ArithOp::Add:
+      return createFAdd(LHS, RHS);
+    case ArithOp::Sub:
+      return createFSub(LHS, RHS);
+    case ArithOp::Mul:
+      return createFMul(LHS, RHS);
+    case ArithOp::Div:
+      return createFDiv(LHS, RHS);
+    case ArithOp::Rem:
+      return createFRem(LHS, RHS);
+    }
+  }
+  reportFatalError("createArith: unsupported type kind");
+}
+
+IRValue *LLVMCodeBuilder::createCmp(CmpOp Op, IRValue *LHS, IRValue *RHS,
+                                    IRType Ty) {
+  if (isIntegerKind(Ty)) {
+    switch (Op) {
+    case CmpOp::EQ:
+      return createICmpEQ(LHS, RHS);
+    case CmpOp::NE:
+      return createICmpNE(LHS, RHS);
+    case CmpOp::LT:
+      return Ty.Signed ? createICmpSLT(LHS, RHS) : createICmpULT(LHS, RHS);
+    case CmpOp::LE:
+      return Ty.Signed ? createICmpSLE(LHS, RHS) : createICmpULE(LHS, RHS);
+    case CmpOp::GT:
+      return Ty.Signed ? createICmpSGT(LHS, RHS) : createICmpUGT(LHS, RHS);
+    case CmpOp::GE:
+      return Ty.Signed ? createICmpSGE(LHS, RHS) : createICmpUGE(LHS, RHS);
+    }
+  } else if (isFloatingPointKind(Ty)) {
+    switch (Op) {
+    case CmpOp::EQ:
+      return createFCmpOEQ(LHS, RHS);
+    case CmpOp::NE:
+      return createFCmpONE(LHS, RHS);
+    case CmpOp::LT:
+      return createFCmpOLT(LHS, RHS);
+    case CmpOp::LE:
+      return createFCmpOLE(LHS, RHS);
+    case CmpOp::GT:
+      return createFCmpOGT(LHS, RHS);
+    case CmpOp::GE:
+      return createFCmpOGE(LHS, RHS);
+    }
+  }
+  reportFatalError("createCmp: unsupported type kind");
+}
+
+IRValue *LLVMCodeBuilder::createCast(IRValue *V, IRType FromTy, IRType ToTy) {
+  if (isIntegerKind(FromTy) && isFloatingPointKind(ToTy))
+    return FromTy.Signed ? createSIToFP(V, ToTy) : createUIToFP(V, ToTy);
+  if (isFloatingPointKind(FromTy) && isIntegerKind(ToTy))
+    return ToTy.Signed ? createFPToSI(V, ToTy) : createFPToUI(V, ToTy);
+  if (isIntegerKind(FromTy) && isIntegerKind(ToTy))
+    return createIntCast(V, ToTy, FromTy.Signed);
+  if (isFloatingPointKind(FromTy) && isFloatingPointKind(ToTy))
+    return createFPCast(V, ToTy);
+  reportFatalError("createCast: unsupported type combination");
+}
+
+VarAlloc LLVMCodeBuilder::getElementPtr(IRValue *Base, IRType BaseTy,
+                                        IRValue *Index, IRType ElemTy) {
+  if (BaseTy.Kind == IRTypeKind::Pointer) {
+    unsigned AS = BaseTy.AddrSpace;
+    IRValue *GEP = createInBoundsGEP(ElemTy, Base, {Index});
+    auto A = allocPointer("elem.ptr", ElemTy, AS);
+    storeAddress(A.Slot, GEP);
+    return A;
+  }
+  if (BaseTy.Kind == IRTypeKind::Array) {
+    unsigned AS = getAddressSpaceFromValue(Base);
+    IRValue *Zero = getConstantInt(IRType{IRTypeKind::Int64}, 0);
+    IRValue *GEP = createInBoundsGEP(BaseTy, Base, {Zero, Index});
+    auto A = allocPointer("elem.ptr", ElemTy, AS);
+    storeAddress(A.Slot, GEP);
+    return A;
+  }
+  reportFatalError("getElementPtr: unsupported base type kind");
+}
+
+// NOLINTNEXTLINE
+VarAlloc LLVMCodeBuilder::getElementPtr(IRValue *Base, IRType BaseTy,
+                                        size_t Index, IRType ElemTy) {
+  if (BaseTy.Kind == IRTypeKind::Pointer) {
+    unsigned AS = BaseTy.AddrSpace;
+    IRValue *GEP = createConstInBoundsGEP1_64(ElemTy, Base, Index);
+    auto A = allocPointer("elem.ptr", ElemTy, AS);
+    storeAddress(A.Slot, GEP);
+    return A;
+  }
+  if (BaseTy.Kind == IRTypeKind::Array) {
+    unsigned AS = getAddressSpaceFromValue(Base);
+    IRValue *GEP = createConstInBoundsGEP2_64(BaseTy, Base, 0, Index);
+    auto A = allocPointer("elem.ptr", ElemTy, AS);
+    storeAddress(A.Slot, GEP);
+    return A;
+  }
+  reportFatalError("getElementPtr: unsupported base type kind");
+}
+
 // Type accessors.
 Type *LLVMCodeBuilder::getPointerType(Type *ElemTy, unsigned AS) {
   return PointerType::get(ElemTy, AS);

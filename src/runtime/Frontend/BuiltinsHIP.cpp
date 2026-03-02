@@ -26,9 +26,13 @@ static inline IRValue *getGridDim(FuncBase &Fn, unsigned Offset) {
                                               IRType{IRTypeKind::Pointer, false,
                                                      0, IRTypeKind::Void,
                                                      ConstantAddressSpace});
-  auto *GEP = Fn.getCodeBuilder().createInBoundsGEP(
-      IRType{IRTypeKind::Int32}, Call,
-      {Fn.getCodeBuilder().getConstantInt(IRType{IRTypeKind::Int64}, Offset)});
+  IRValue *OffsetVal =
+      Fn.getCodeBuilder().getConstantInt(IRType{IRTypeKind::Int64}, Offset);
+  IRType PtrTy{IRTypeKind::Pointer, false, 0, IRTypeKind::Int32,
+               ConstantAddressSpace};
+  auto A = Fn.getCodeBuilder().getElementPtr(Call, PtrTy, OffsetVal,
+                                             IRType{IRTypeKind::Int32});
+  auto *GEP = Fn.getCodeBuilder().loadAddress(A.Slot, A.AllocTy);
   auto *Load = Fn.getCodeBuilder().createLoad(IRType{IRTypeKind::Int32}, GEP);
 
   return Load;
@@ -49,9 +53,13 @@ static inline IRValue *getBlockDim(FuncBase &Fn, unsigned Offset) {
                                               IRType{IRTypeKind::Pointer, false,
                                                      0, IRTypeKind::Void,
                                                      ConstantAddressSpace});
-  auto *GEP = Fn.getCodeBuilder().createInBoundsGEP(
-      IRType{IRTypeKind::Int16}, Call,
-      {Fn.getCodeBuilder().getConstantInt(IRType{IRTypeKind::Int64}, Offset)});
+  IRValue *OffsetVal =
+      Fn.getCodeBuilder().getConstantInt(IRType{IRTypeKind::Int64}, Offset);
+  IRType PtrTy{IRTypeKind::Pointer, false, 0, IRTypeKind::Int16,
+               ConstantAddressSpace};
+  auto A = Fn.getCodeBuilder().getElementPtr(Call, PtrTy, OffsetVal,
+                                             IRType{IRTypeKind::Int16});
+  auto *GEP = Fn.getCodeBuilder().loadAddress(A.Slot, A.AllocTy);
   auto *Load = Fn.getCodeBuilder().createLoad(IRType{IRTypeKind::Int16}, GEP);
   auto *Conv = Fn.getCodeBuilder().createZExt(Load, IRType{IRTypeKind::Int32});
 
