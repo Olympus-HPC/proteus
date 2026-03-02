@@ -5,7 +5,11 @@
 #include "proteus/impl/LLVMIRFunction.h"
 #include "proteus/impl/LLVMIRValue.h"
 
+#include <llvm/ADT/SmallVector.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
 
 #include <deque>
@@ -286,7 +290,7 @@ void LLVMCodeBuilder::endIf() {
 void LLVMCodeBuilder::beginFor(IRValue *IterSlot, IRType IterTy,
                                IRValue *InitVal, IRValue *UpperBoundVal,
                                IRValue *IncVal, bool IsSigned, const char *File,
-                               int Line) {
+                               int Line, LoopHints Hints) {
   // Update the terminator of the current basic block due to the split
   // control-flow.
   auto [CurBlock, NextBlock] = splitCurrentBlock();
@@ -326,6 +330,31 @@ void LLVMCodeBuilder::beginFor(IRValue *IterSlot, IRType IterTy,
     IRValue *Next = createAdd(Iter, IncVal);
     createStore(Next, IterSlot);
     createBr(LoopCond);
+  }
+
+  if (Hints.Unroll) {
+    auto *BackEdgeBr = dyn_cast<BranchInst>(Latch->getTerminator());
+    LLVMContext &Ctx = BackEdgeBr->getContext();
+
+    SmallVector<Metadata *, 4> LoopMDOperands;
+    LoopMDOperands.push_back(nullptr); // self-reference placeholder
+
+    MDNode *UnrollEnableMD =
+        MDNode::get(Ctx, MDString::get(Ctx, "llvm.loop.unroll.enable"));
+    LoopMDOperands.push_back(UnrollEnableMD);
+
+    if (Hints.UnrollCount.has_value()) {
+      Metadata *CountOperands[] = {
+          MDString::get(Ctx, "llvm.loop.unroll.count"),
+          ConstantAsMetadata::get(
+              ConstantInt::get(Type::getInt32Ty(Ctx), *Hints.UnrollCount))};
+      MDNode *UnrollCountMD = MDNode::get(Ctx, CountOperands);
+      LoopMDOperands.push_back(UnrollCountMD);
+    }
+
+    MDNode *LoopMD = MDNode::getDistinct(Ctx, LoopMDOperands);
+    LoopMD->replaceOperandWith(0, LoopMD);
+    BackEdgeBr->setMetadata(LLVMContext::MD_loop, LoopMD);
   }
 
   setInsertPoint(LoopExit);

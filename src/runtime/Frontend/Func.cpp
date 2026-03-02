@@ -1,6 +1,4 @@
 #include "proteus/Frontend/Func.h"
-#include "proteus/Frontend/LLVMCodeBuilder.h"
-#include "proteus/Frontend/LoopUnroller.h"
 #include "proteus/JitFrontend.h"
 
 namespace proteus {
@@ -39,17 +37,6 @@ void FuncBase::beginFunction(const char *File, int Line) {
 void FuncBase::endFunction() { CB->endFunction(); }
 
 IRFunction *FuncBase::getFunction() { return Func; }
-
-void FuncBase::captureForLoopLatch() {
-  auto &LCB = static_cast<LLVMCodeBuilder &>(*CB);
-  llvm::BasicBlock *BodyBB = LCB.getInsertBlock();
-  PendingLatchBB = LCB.getUniqueSuccessor(BodyBB);
-}
-
-void FuncBase::attachLoopUnrollMetadata(LoopUnroller &U) {
-  if (U.isEnabled() && PendingLatchBB)
-    U.attachMetadata(static_cast<llvm::BasicBlock *>(PendingLatchBB));
-}
 
 void FuncBase::beginIf(const Var<bool> &CondVar, const char *File, int Line) {
   IRValue *Cond = CondVar.loadValue();

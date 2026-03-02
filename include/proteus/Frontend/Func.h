@@ -18,7 +18,6 @@ class JitModule;
 template <typename T> class LoopBoundInfo;
 template <typename T, typename... ForLoopBuilders> class LoopNestBuilder;
 template <typename T, typename BodyLambda> class ForLoopBuilder;
-class LoopUnroller;
 
 // Helper struct to represent the signature of a function.
 // Useful to partially-specialize function templates.
@@ -56,10 +55,6 @@ protected:
   std::string Name;
   CodeBuilder *CB;
   IRFunction *Func;
-
-  /// Backend-specific latch block captured between beginFor/endFor.
-  /// Stored as void* to avoid exposing LLVM types in this header.
-  void *PendingLatchBB = nullptr;
 
 public:
   FuncBase(JitModule &J, CodeBuilder &CB, const std::string &Name, IRType RetTy,
@@ -165,11 +160,6 @@ public:
                      int Line = __builtin_LINE());
   void endFunction();
 
-  // LoopNest escape hatch: capture the latch block right after beginFor
-  // so LLVM-specific unroll metadata can be attached after endFor.
-  void captureForLoopLatch();
-  void attachLoopUnrollMetadata(LoopUnroller &U);
-
   template <typename BodyLambda>
   void function(BodyLambda &&Body, const char *File = __builtin_FILE(),
                 int Line = __builtin_LINE()) {
@@ -195,7 +185,7 @@ public:
   void beginFor(Var<IterT> &IterVar, const Var<InitT> &InitVar,
                 const Var<UpperT> &UpperBound, const Var<IncT> &IncVar,
                 const char *File = __builtin_FILE(),
-                int Line = __builtin_LINE());
+                int Line = __builtin_LINE(), LoopHints Hints = {});
   void endFor();
 
   template <typename CondLambda>
@@ -354,14 +344,14 @@ public:
 template <typename IterT, typename InitT, typename UpperT, typename IncT>
 void FuncBase::beginFor(Var<IterT> &IterVar, const Var<InitT> &Init,
                         const Var<UpperT> &UpperBound, const Var<IncT> &Inc,
-                        const char *File, int Line) {
+                        const char *File, int Line, LoopHints Hints) {
   static_assert(std::is_integral_v<std::remove_const_t<IterT>>,
                 "Loop iterator must be an integral type");
   static_assert(is_mutable_v<IterT>, "Loop iterator must be mutable");
 
   CB->beginFor(IterVar.getSlot(), IterVar.getValueType(), Init.loadValue(),
                UpperBound.loadValue(), Inc.loadValue(),
-               std::is_signed_v<std::remove_const_t<IterT>>, File, Line);
+               std::is_signed_v<std::remove_const_t<IterT>>, File, Line, Hints);
 }
 
 template <typename CondLambda>

@@ -10,10 +10,18 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
 namespace proteus {
+
+/// Hints that control loop transformation metadata emitted by the code
+/// builder. Extensible for future hints (tiling, vectorization, etc.).
+struct LoopHints {
+  bool Unroll = false;
+  std::optional<int> UnrollCount;
+};
 
 /// Lightweight aggregate returned by the alloc* factory methods.  Each
 /// Var specialization stores these fields directly instead of a
@@ -90,7 +98,7 @@ public:
   /// IsSigned : true → ICmpSLT, false → ICmpULT.
   virtual void beginFor(IRValue *IterSlot, IRType IterTy, IRValue *InitVal,
                         IRValue *UpperBoundVal, IRValue *IncVal, bool IsSigned,
-                        const char *File, int Line) = 0;
+                        const char *File, int Line, LoopHints Hints = {}) = 0;
   virtual void endFor() = 0;
 
   /// CondFn : callable that emits the condition IR at the current insert point

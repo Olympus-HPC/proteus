@@ -3,7 +3,6 @@
 
 #include "proteus/Error.h"
 #include "proteus/Frontend/Func.h"
-#include "proteus/Frontend/LoopUnroller.h"
 #include "proteus/Frontend/Var.h"
 
 #include <memory>
@@ -27,7 +26,8 @@ public:
   LoopBoundInfo<T> Bounds;
   using LoopIndexType = T;
   std::optional<int> TileSize;
-  LoopUnroller Unroller;
+  bool UnrollEnabled = false;
+  std::optional<int> UnrollCount;
   BodyLambda Body;
   FuncBase &Fn;
 
@@ -36,7 +36,7 @@ public:
       : Bounds(Bounds), Body(std::move(Body)), Fn(Fn) {}
 
   ForLoopBuilder &tile(int Tile) {
-    if (Unroller.isEnabled())
+    if (UnrollEnabled)
       reportFatalError(
           "Cannot tile a loop that is already marked for unrolling");
     TileSize = Tile;
@@ -47,7 +47,7 @@ public:
     if (TileSize.has_value())
       reportFatalError(
           "Cannot unroll a loop that is already marked for tiling");
-    Unroller.enable();
+    UnrollEnabled = true;
     return *this;
   }
 
@@ -55,20 +55,21 @@ public:
     if (TileSize.has_value())
       reportFatalError(
           "Cannot unroll a loop that is already marked for tiling");
-    Unroller.enable(Count);
+    UnrollEnabled = true;
+    UnrollCount = Count;
     return *this;
   }
 
   void emit() {
-    Fn.beginFor(Bounds.IterVar, Bounds.Init, Bounds.UpperBound, Bounds.Inc);
-
-    // Capture the latch block before body execution may change IR structure.
-    Fn.captureForLoopLatch();
-
+    LoopHints Hints;
+    if (UnrollEnabled) {
+      Hints.Unroll = true;
+      Hints.UnrollCount = UnrollCount;
+    }
+    Fn.beginFor(Bounds.IterVar, Bounds.Init, Bounds.UpperBound, Bounds.Inc,
+                __builtin_FILE(), __builtin_LINE(), Hints);
     Body();
     Fn.endFor();
-
-    Fn.attachLoopUnrollMetadata(Unroller);
   }
 };
 
@@ -171,7 +172,7 @@ private:
 
   template <std::size_t... Is>
   void validateNoUnroll(std::index_sequence<Is...>) const {
-    bool AnyUnrolled = (std::get<Is>(Loops).Unroller.isEnabled() || ...);
+    bool AnyUnrolled = (std::get<Is>(Loops).UnrollEnabled || ...);
     if (AnyUnrolled)
       reportFatalError(
           "Cannot tile a loop nest containing loops marked for unrolling");

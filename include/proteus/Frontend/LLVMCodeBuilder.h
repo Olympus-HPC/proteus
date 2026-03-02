@@ -132,7 +132,7 @@ public:
   void endIf() override;
   void beginFor(IRValue *IterSlot, IRType IterTy, IRValue *InitVal,
                 IRValue *UpperBoundVal, IRValue *IncVal, bool IsSigned,
-                const char *File, int Line) override;
+                const char *File, int Line, LoopHints Hints = {}) override;
   void endFor() override;
   void beginWhile(std::function<IRValue *()> CondFn, const char *File,
                   int Line) override;
