@@ -4,3 +4,7 @@ if(PROTEUS_ENABLE_CUDA OR PROTEUS_ENABLE_HIP)
     add_subdirectory(gpu)
     add_subdirectory(host_device)
 endif()
+
+if(PROTEUS_ENABLE_MLIR)
+    add_subdirectory(mlir)
+endif()

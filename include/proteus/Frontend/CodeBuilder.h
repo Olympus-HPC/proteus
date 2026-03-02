@@ -61,6 +61,10 @@ inline std::string toString(ScopeKind Kind) {
   }
 }
 
+/// Identifies the concrete backend implementation, enabling static_cast
+/// dispatch without RTTI.
+enum class CodeBuilderKind { LLVM, MLIR };
+
 /// Abstract code-builder interface.  The frontend (Var.h, Func.h, LoopNest.h)
 /// depends only on this class.
 class CodeBuilder {
@@ -68,6 +72,7 @@ public:
   virtual ~CodeBuilder() = default;
 
   virtual TargetModelType getTargetModel() const = 0;
+  virtual CodeBuilderKind getBackendKind() const = 0;
 
   // -----------------------------------------------------------------------
   // Function management.

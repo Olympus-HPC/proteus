@@ -37,6 +37,12 @@ if(PROTEUS_ENABLE_HIP)
   )
 endif()
 
+if(PROTEUS_ENABLE_MLIR)
+  list(APPEND SOURCES
+    Frontend/MLIRCodeBuilder.cpp
+  )
+endif()
+
 if(PROTEUS_ENABLE_MPI)
   list(APPEND SOURCES
     Caching/MPIHelpers.cpp
@@ -73,8 +79,18 @@ elseif(PROTEUS_ENABLE_CUDA)
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_CUDA)
 endif()
 
+if(PROTEUS_ENABLE_MLIR)
+  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_MLIR)
+  target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_MLIR)
+endif()
+
 target_include_directories(proteus SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
 target_include_directories(proteusCore SYSTEM INTERFACE ${LLVM_INCLUDE_DIRS})
+
+if(PROTEUS_ENABLE_MLIR)
+  target_include_directories(proteus SYSTEM PRIVATE ${MLIR_INCLUDE_DIRS})
+  target_include_directories(proteusCore SYSTEM INTERFACE ${MLIR_INCLUDE_DIRS})
+endif()
 
 target_include_directories(proteus
   PUBLIC
@@ -117,6 +133,18 @@ else()
 endif()
 message(STATUS "Found LLVM libraries: ${llvm_libs}")
 target_link_libraries(proteus PRIVATE ${llvm_libs})
+
+if(PROTEUS_ENABLE_MLIR)
+  set(mlir_libs
+    MLIRFuncDialect
+    MLIRArithDialect
+    MLIRMemRefDialect
+    MLIRIR
+    MLIRSupport
+  )
+  message(STATUS "Linking MLIR libraries: ${mlir_libs}")
+  target_link_libraries(proteus PRIVATE ${mlir_libs})
+endif()
 
 if(NOT LLVM_ENABLE_RTTI)
   target_compile_options(proteusCore INTERFACE -fno-rtti)

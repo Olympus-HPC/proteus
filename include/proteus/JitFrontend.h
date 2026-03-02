@@ -2,6 +2,7 @@
 #define PROTEUS_JIT_DEV_H
 
 #include "proteus/Error.h"
+#include "proteus/Frontend/CodeBuilder.h"
 #include "proteus/Frontend/Dispatcher.h"
 #include "proteus/Frontend/Func.h"
 #include "proteus/Frontend/LLVMCodeBuilder.h"
@@ -17,7 +18,7 @@ struct CompiledLibrary;
 
 class JitModule {
 private:
-  std::unique_ptr<LLVMCodeBuilder> CB;
+  std::unique_ptr<CodeBuilder> CB;
   std::unique_ptr<CompiledLibrary> Library;
 
   std::deque<std::unique_ptr<FuncBase>> Functions;
@@ -117,7 +118,8 @@ private:
   }
 
 public:
-  JitModule(const std::string &Target = "host");
+  JitModule(const std::string &Target = "host",
+            const std::string &Backend = "llvm");
 
   // Disable copy and move constructors.
   JitModule(const JitModule &) = delete;

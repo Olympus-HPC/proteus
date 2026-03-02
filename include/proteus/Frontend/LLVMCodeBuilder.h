@@ -35,6 +35,9 @@ public:
   ~LLVMCodeBuilder() override;
 
   TargetModelType getTargetModel() const override { return TargetModel; }
+  CodeBuilderKind getBackendKind() const override {
+    return CodeBuilderKind::LLVM;
+  }
 
   LLVMCodeBuilder(const LLVMCodeBuilder &) = delete;
   LLVMCodeBuilder &operator=(const LLVMCodeBuilder &) = delete;
