@@ -39,3 +39,7 @@ config.substitutions.append(('%build', '${CMAKE_CURRENT_BINARY_DIR}'))
 )
 
 CREATE_MLIR_FRONTEND_TEST(mlir_scalar_add mlir_scalar_add.cpp)
+CREATE_MLIR_FRONTEND_TEST(mlir_if mlir_if.cpp)
+CREATE_MLIR_FRONTEND_TEST(mlir_for mlir_for.cpp)
+CREATE_MLIR_FRONTEND_TEST(mlir_while mlir_while.cpp)
+CREATE_MLIR_FRONTEND_TEST(mlir_cmp mlir_cmp.cpp)

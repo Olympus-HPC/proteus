@@ -7,6 +7,7 @@
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
+#include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinDialect.h>
 #include <mlir/IR/BuiltinOps.h>
@@ -69,9 +70,16 @@ struct MLIRCodeBuilder::Impl {
   mlir::func::FuncOp CurrentFunc;
   Block *EntryBlock = nullptr;
 
+  // Scope stack for structured control flow (scf.if / scf.for / scf.while).
+  struct ScopeEntry {
+    ScopeKind Kind;
+    OpBuilder::InsertPoint SavedIP;
+  };
+  llvm::SmallVector<ScopeEntry> ScopeStack;
+
   explicit Impl() : Builder(&Context) {
     Context.loadDialect<mlir::func::FuncDialect, arith::ArithDialect,
-                        memref::MemRefDialect>();
+                        memref::MemRefDialect, scf::SCFDialect>();
     Module = ModuleOp::create(Builder.getUnknownLoc());
   }
 
@@ -395,25 +403,117 @@ VarAlloc MLIRCodeBuilder::allocScalar(const std::string & /*Name*/,
 // Stub implementations — report fatal error when called
 // ---------------------------------------------------------------------------
 
-void MLIRCodeBuilder::beginIf(IRValue *, const char *, int) {
-  reportFatalError("beginIf not yet implemented in MLIR backend");
+void MLIRCodeBuilder::beginIf(IRValue *Cond, const char * /*File*/,
+                              int /*Line*/) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+  Value CondV = PImpl->unwrap(Cond);
+
+  // Save the current insertion point for endIf to restore.
+  PImpl->ScopeStack.push_back(
+      {ScopeKind::IF, PImpl->Builder.saveInsertionPoint()});
+
+  // Create scf.if with no results (mutations via memref side-effects).
+  auto IfOp = PImpl->Builder.create<scf::IfOp>(Loc, /*resultTypes=*/TypeRange{},
+                                               CondV, /*withElseRegion=*/false);
+
+  // Set insertion point to the start of the then region.
+  PImpl->Builder.setInsertionPointToStart(&IfOp.getThenRegion().front());
 }
+
 void MLIRCodeBuilder::endIf() {
-  reportFatalError("endIf not yet implemented in MLIR backend");
+  // Ensure the then region has a scf.yield terminator.
+  Block *CurBlock = PImpl->Builder.getInsertionBlock();
+  if (CurBlock->empty() || !CurBlock->back().hasTrait<OpTrait::IsTerminator>())
+    PImpl->Builder.create<scf::YieldOp>(PImpl->Builder.getUnknownLoc());
+
+  // Restore insertion point to after the scf.if.
+  auto Scope = PImpl->ScopeStack.pop_back_val();
+  PImpl->Builder.restoreInsertionPoint(Scope.SavedIP);
 }
-void MLIRCodeBuilder::beginFor(IRValue *, IRType, IRValue *, IRValue *,
-                               IRValue *, bool, const char *, int, LoopHints) {
-  reportFatalError("beginFor not yet implemented in MLIR backend");
+
+void MLIRCodeBuilder::beginFor(IRValue *IterSlot, IRType IterTy,
+                               IRValue *InitVal, IRValue *UpperBoundVal,
+                               IRValue *IncVal, bool /*IsSigned*/,
+                               const char * /*File*/, int /*Line*/,
+                               LoopHints /*Hints*/) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+
+  // Cast integer bounds to index type.
+  Value LB = PImpl->Builder.create<arith::IndexCastOp>(
+      Loc, PImpl->Builder.getIndexType(), PImpl->unwrap(InitVal));
+  Value UB = PImpl->Builder.create<arith::IndexCastOp>(
+      Loc, PImpl->Builder.getIndexType(), PImpl->unwrap(UpperBoundVal));
+  Value Step = PImpl->Builder.create<arith::IndexCastOp>(
+      Loc, PImpl->Builder.getIndexType(), PImpl->unwrap(IncVal));
+
+  // Save insertion point for endFor.
+  PImpl->ScopeStack.push_back(
+      {ScopeKind::FOR, PImpl->Builder.saveInsertionPoint()});
+
+  // Create scf.for with no iter_args (mutation via memref side-effects).
+  auto ForOp = PImpl->Builder.create<scf::ForOp>(Loc, LB, UB, Step);
+
+  // Set insertion point inside the body.
+  PImpl->Builder.setInsertionPointToStart(ForOp.getBody());
+
+  // Cast the index induction variable back to the original integer type
+  // and store into IterSlot so user code can read it.
+  Value IV = ForOp.getInductionVar();
+  mlir::Type IterMLIRTy = toMLIRType(IterTy, PImpl->Context);
+  Value TypedIV =
+      PImpl->Builder.create<arith::IndexCastOp>(Loc, IterMLIRTy, IV);
+  Value Idx = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+  Value SlotV = PImpl->unwrap(IterSlot);
+  PImpl->Builder.create<memref::StoreOp>(Loc, TypedIV, SlotV, ValueRange{Idx});
 }
+
 void MLIRCodeBuilder::endFor() {
-  reportFatalError("endFor not yet implemented in MLIR backend");
+  // Ensure the scf.for body has a scf.yield terminator.
+  Block *CurBlock = PImpl->Builder.getInsertionBlock();
+  if (CurBlock->empty() || !CurBlock->back().hasTrait<OpTrait::IsTerminator>())
+    PImpl->Builder.create<scf::YieldOp>(PImpl->Builder.getUnknownLoc());
+
+  auto Scope = PImpl->ScopeStack.pop_back_val();
+  PImpl->Builder.restoreInsertionPoint(Scope.SavedIP);
 }
-void MLIRCodeBuilder::beginWhile(std::function<IRValue *()>, const char *,
-                                 int) {
-  reportFatalError("beginWhile not yet implemented in MLIR backend");
+
+void MLIRCodeBuilder::beginWhile(std::function<IRValue *()> CondFn,
+                                 const char * /*File*/, int /*Line*/) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+
+  // Save insertion point for endWhile.
+  PImpl->ScopeStack.push_back(
+      {ScopeKind::WHILE, PImpl->Builder.saveInsertionPoint()});
+
+  // Create scf.while with no iter_args and no results.
+  auto WhileOp = PImpl->Builder.create<scf::WhileOp>(
+      Loc, /*resultTypes=*/TypeRange{}, /*operands=*/ValueRange{});
+
+  // --- Fill the "before" region (condition). ---
+  Block *BeforeBlock = PImpl->Builder.createBlock(&WhileOp.getBefore());
+  PImpl->Builder.setInsertionPointToEnd(BeforeBlock);
+
+  // Call CondFn to emit the condition IR into the before region.
+  IRValue *CondIRV = CondFn();
+  Value CondV = PImpl->unwrap(CondIRV);
+
+  // Terminate the before region with scf.condition.
+  PImpl->Builder.create<scf::ConditionOp>(Loc, CondV, /*args=*/ValueRange{});
+
+  // --- Prepare the "after" region (body). ---
+  Block *AfterBlock = PImpl->Builder.createBlock(&WhileOp.getAfter());
+  PImpl->Builder.setInsertionPointToStart(AfterBlock);
+  // User body code will emit here between beginWhile/endWhile.
 }
+
 void MLIRCodeBuilder::endWhile() {
-  reportFatalError("endWhile not yet implemented in MLIR backend");
+  // Ensure the after region has a scf.yield terminator.
+  Block *CurBlock = PImpl->Builder.getInsertionBlock();
+  if (CurBlock->empty() || !CurBlock->back().hasTrait<OpTrait::IsTerminator>())
+    PImpl->Builder.create<scf::YieldOp>(PImpl->Builder.getUnknownLoc());
+
+  auto Scope = PImpl->ScopeStack.pop_back_val();
+  PImpl->Builder.restoreInsertionPoint(Scope.SavedIP);
 }
 IRValue *MLIRCodeBuilder::createAtomicAdd(IRValue *, IRValue *) {
   reportFatalError("createAtomicAdd not yet implemented in MLIR backend");
@@ -427,20 +527,96 @@ IRValue *MLIRCodeBuilder::createAtomicMax(IRValue *, IRValue *) {
 IRValue *MLIRCodeBuilder::createAtomicMin(IRValue *, IRValue *) {
   reportFatalError("createAtomicMin not yet implemented in MLIR backend");
 }
-IRValue *MLIRCodeBuilder::createCmp(CmpOp, IRValue *, IRValue *, IRType) {
-  reportFatalError("createCmp not yet implemented in MLIR backend");
+IRValue *MLIRCodeBuilder::createCmp(CmpOp Op, IRValue *LHS, IRValue *RHS,
+                                    IRType Ty) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+  Value L = PImpl->unwrap(LHS);
+  Value R = PImpl->unwrap(RHS);
+  Value Result;
+
+  if (isFloatingPointKind(Ty)) {
+    arith::CmpFPredicate Pred;
+    switch (Op) {
+    case CmpOp::EQ:
+      Pred = arith::CmpFPredicate::OEQ;
+      break;
+    case CmpOp::NE:
+      Pred = arith::CmpFPredicate::ONE;
+      break;
+    case CmpOp::LT:
+      Pred = arith::CmpFPredicate::OLT;
+      break;
+    case CmpOp::LE:
+      Pred = arith::CmpFPredicate::OLE;
+      break;
+    case CmpOp::GT:
+      Pred = arith::CmpFPredicate::OGT;
+      break;
+    case CmpOp::GE:
+      Pred = arith::CmpFPredicate::OGE;
+      break;
+    default:
+      reportFatalError("createCmp: unknown CmpOp");
+    }
+    Result = PImpl->Builder.create<arith::CmpFOp>(Loc, Pred, L, R);
+  } else {
+    arith::CmpIPredicate Pred;
+    switch (Op) {
+    case CmpOp::EQ:
+      Pred = arith::CmpIPredicate::eq;
+      break;
+    case CmpOp::NE:
+      Pred = arith::CmpIPredicate::ne;
+      break;
+    case CmpOp::LT:
+      Pred = Ty.Signed ? arith::CmpIPredicate::slt : arith::CmpIPredicate::ult;
+      break;
+    case CmpOp::LE:
+      Pred = Ty.Signed ? arith::CmpIPredicate::sle : arith::CmpIPredicate::ule;
+      break;
+    case CmpOp::GT:
+      Pred = Ty.Signed ? arith::CmpIPredicate::sgt : arith::CmpIPredicate::ugt;
+      break;
+    case CmpOp::GE:
+      Pred = Ty.Signed ? arith::CmpIPredicate::sge : arith::CmpIPredicate::uge;
+      break;
+    default:
+      reportFatalError("createCmp: unknown CmpOp");
+    }
+    Result = PImpl->Builder.create<arith::CmpIOp>(Loc, Pred, L, R);
+  }
+  return PImpl->wrap(Result);
 }
-IRValue *MLIRCodeBuilder::createAnd(IRValue *, IRValue *) {
-  reportFatalError("createAnd not yet implemented in MLIR backend");
+
+IRValue *MLIRCodeBuilder::createAnd(IRValue *LHS, IRValue *RHS) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+  Value Result = PImpl->Builder.create<arith::AndIOp>(Loc, PImpl->unwrap(LHS),
+                                                      PImpl->unwrap(RHS));
+  return PImpl->wrap(Result);
 }
-IRValue *MLIRCodeBuilder::createOr(IRValue *, IRValue *) {
-  reportFatalError("createOr not yet implemented in MLIR backend");
+
+IRValue *MLIRCodeBuilder::createOr(IRValue *LHS, IRValue *RHS) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+  Value Result = PImpl->Builder.create<arith::OrIOp>(Loc, PImpl->unwrap(LHS),
+                                                     PImpl->unwrap(RHS));
+  return PImpl->wrap(Result);
 }
-IRValue *MLIRCodeBuilder::createXor(IRValue *, IRValue *) {
-  reportFatalError("createXor not yet implemented in MLIR backend");
+
+IRValue *MLIRCodeBuilder::createXor(IRValue *LHS, IRValue *RHS) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+  Value Result = PImpl->Builder.create<arith::XOrIOp>(Loc, PImpl->unwrap(LHS),
+                                                      PImpl->unwrap(RHS));
+  return PImpl->wrap(Result);
 }
-IRValue *MLIRCodeBuilder::createNot(IRValue *) {
-  reportFatalError("createNot not yet implemented in MLIR backend");
+
+IRValue *MLIRCodeBuilder::createNot(IRValue *Val) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+  // arith.xori %val, %true  where %true is arith.constant 1 : i1
+  auto TrueAttr = IntegerAttr::get(IntegerType::get(&PImpl->Context, 1), 1);
+  Value TrueVal = PImpl->Builder.create<arith::ConstantOp>(Loc, TrueAttr);
+  Value Result =
+      PImpl->Builder.create<arith::XOrIOp>(Loc, PImpl->unwrap(Val), TrueVal);
+  return PImpl->wrap(Result);
 }
 IRValue *MLIRCodeBuilder::createLoad(IRType, IRValue *, const std::string &) {
   reportFatalError("createLoad not yet implemented in MLIR backend");

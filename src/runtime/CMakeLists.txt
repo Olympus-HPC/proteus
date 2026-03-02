@@ -139,6 +139,7 @@ if(PROTEUS_ENABLE_MLIR)
     MLIRFuncDialect
     MLIRArithDialect
     MLIRMemRefDialect
+    MLIRSCFDialect
     MLIRIR
     MLIRSupport
   )
