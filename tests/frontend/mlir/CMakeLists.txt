@@ -50,3 +50,5 @@ CREATE_MLIR_FRONTEND_TEST(mlir_int_atomics mlir_int_atomics.cpp)
 CREATE_MLIR_FRONTEND_TEST(mlir_pointer_reassign mlir_pointer_reassign.cpp)
 CREATE_MLIR_FRONTEND_TEST(mlir_pointer_reassign_dynamic
                           mlir_pointer_reassign_dynamic.cpp)
+CREATE_MLIR_FRONTEND_TEST(mlir_generic_load_store
+                          mlir_generic_load_store.cpp)

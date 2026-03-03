@@ -98,7 +98,7 @@ struct MLIRCodeBuilder::Impl {
   struct PointerInfo {
     mlir::Value BaseMemRef;
   };
-  llvm::DenseMap<IRValue *, PointerInfo> PointerMap;
+  llvm::DenseMap<mlir::Value, PointerInfo> PointerMap;
 
   enum class AtomicOp { Add, Sub, Max, Min };
 
@@ -125,7 +125,8 @@ struct MLIRCodeBuilder::Impl {
   }
 
   std::pair<mlir::Value, mlir::Value> resolveAtomicAddress(IRValue *Addr) {
-    auto It = PointerMap.find(Addr);
+    Value Slot = unwrap(Addr);
+    auto It = PointerMap.find(Slot);
     if (It == PointerMap.end())
       reportFatalError("atomic on non-pointer address");
 
@@ -133,7 +134,6 @@ struct MLIRCodeBuilder::Impl {
     if (!Base)
       reportFatalError("atomic on non-pointer address");
 
-    Value Slot = unwrap(Addr);
     auto SlotTy = dyn_cast<MemRefType>(Slot.getType());
     if (!SlotTy || SlotTy.getRank() != 1 || SlotTy.getShape()[0] != 1 ||
         !SlotTy.getElementType().isIndex())
@@ -156,11 +156,41 @@ struct MLIRCodeBuilder::Impl {
         !SlotTy.getElementType().isIndex())
       reportFatalError("expected pointer slot with PointerInfo");
 
-    auto It = PointerMap.find(Ptr);
+    auto It = PointerMap.find(Slot);
     if (It == PointerMap.end() || !It->second.BaseMemRef)
       reportFatalError("expected pointer slot with PointerInfo");
 
     return {Slot, It->second.BaseMemRef};
+  }
+
+  // Returns true if `v` is a pointer slot tracked in PointerMap.
+  bool isPointerValue(mlir::Value V) const { return PointerMap.contains(V); }
+
+  // For pointer values, resolve to {baseMemref, idx} where idx = load(slot[0]).
+  std::pair<mlir::Value, mlir::Value>
+  resolvePointerAddress(mlir::Value PtrSlot) {
+    auto It = PointerMap.find(PtrSlot);
+    if (It == PointerMap.end() || !It->second.BaseMemRef)
+      reportFatalError(
+          "MLIRCodeBuilder::resolvePointerAddress: unknown pointer slot");
+
+    auto SlotTy = dyn_cast<MemRefType>(PtrSlot.getType());
+    if (!SlotTy || SlotTy.getRank() != 1 || SlotTy.getShape()[0] != 1 ||
+        !SlotTy.getElementType().isIndex())
+      reportFatalError(
+          "MLIRCodeBuilder::resolvePointerAddress: expected memref<1xindex> "
+          "slot");
+
+    auto Loc = Builder.getUnknownLoc();
+    Value Zero = Builder.create<arith::ConstantIndexOp>(Loc, 0);
+    Value Idx = Builder.create<memref::LoadOp>(Loc, PtrSlot, ValueRange{Zero});
+    return {It->second.BaseMemRef, Idx};
+  }
+
+  // Returns true for scalar mutable-variable slots of form memref<1xElem>.
+  static bool isScalarSlotType(mlir::Type Ty) {
+    auto MemRefTy = dyn_cast<MemRefType>(Ty);
+    return MemRefTy && MemRefTy.getRank() == 1 && MemRefTy.getShape()[0] == 1;
   }
 
   mlir::Value emitAtomicRmw(AtomicOp Op, mlir::Value Base, mlir::Value Idx,
@@ -782,11 +812,67 @@ IRValue *MLIRCodeBuilder::createNot(IRValue *Val) {
       PImpl->Builder.create<arith::XOrIOp>(Loc, PImpl->unwrap(Val), TrueVal);
   return PImpl->wrap(Result);
 }
-IRValue *MLIRCodeBuilder::createLoad(IRType, IRValue *, const std::string &) {
-  reportFatalError("createLoad not yet implemented in MLIR backend");
+IRValue *MLIRCodeBuilder::createLoad(IRType Ty, IRValue *Ptr,
+                                     const std::string & /*Name*/) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+  mlir::Value PtrV = PImpl->unwrap(Ptr);
+  mlir::Type ExpectedTy = toMLIRScalarType(Ty.Kind, PImpl->Context);
+
+  // Pointer-value case: Ptr is a pointer slot (memref<1xindex>) tracked in
+  // PointerMap, so load dynamic index from slot and dereference base[idx].
+  if (PImpl->isPointerValue(PtrV)) {
+    auto [Base, Idx] = PImpl->resolvePointerAddress(PtrV);
+    Value Val =
+        PImpl->Builder.create<memref::LoadOp>(Loc, Base, ValueRange{Idx});
+    if (Val.getType() != ExpectedTy)
+      reportFatalError("MLIRCodeBuilder::createLoad: type mismatch for pointer "
+                       "dereference load");
+    return PImpl->wrap(Val);
+  }
+
+  // Scalar-slot case: Ptr is a mutable scalar slot represented as
+  // memref<1xT>; load slot[0].
+  if (Impl::isScalarSlotType(PtrV.getType())) {
+    Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+    Value Val =
+        PImpl->Builder.create<memref::LoadOp>(Loc, PtrV, ValueRange{Zero});
+    if (Val.getType() != ExpectedTy)
+      reportFatalError("MLIRCodeBuilder::createLoad: type mismatch for scalar "
+                       "slot load");
+    return PImpl->wrap(Val);
+  }
+
+  reportFatalError("MLIRCodeBuilder::createLoad: unsupported Ptr form");
 }
-void MLIRCodeBuilder::createStore(IRValue *, IRValue *) {
-  reportFatalError("createStore not yet implemented in MLIR backend");
+void MLIRCodeBuilder::createStore(IRValue *Val, IRValue *Ptr) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+  mlir::Value V = PImpl->unwrap(Val);
+  mlir::Value PtrV = PImpl->unwrap(Ptr);
+
+  // Pointer-value case: Ptr is a tracked pointer slot; store through
+  // base[idx] where idx is loaded from slot[0].
+  if (PImpl->isPointerValue(PtrV)) {
+    auto [Base, Idx] = PImpl->resolvePointerAddress(PtrV);
+    auto BaseTy = dyn_cast<MemRefType>(Base.getType());
+    if (!BaseTy || BaseTy.getElementType() != V.getType())
+      reportFatalError("MLIRCodeBuilder::createStore: pointer pointee type "
+                       "mismatch");
+    PImpl->Builder.create<memref::StoreOp>(Loc, V, Base, ValueRange{Idx});
+    return;
+  }
+
+  // Scalar-slot case: Ptr is memref<1xT>; store into slot[0].
+  if (Impl::isScalarSlotType(PtrV.getType())) {
+    auto SlotTy = cast<MemRefType>(PtrV.getType());
+    if (SlotTy.getElementType() != V.getType())
+      reportFatalError("MLIRCodeBuilder::createStore: scalar slot type "
+                       "mismatch");
+    Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+    PImpl->Builder.create<memref::StoreOp>(Loc, V, PtrV, ValueRange{Zero});
+    return;
+  }
+
+  reportFatalError("MLIRCodeBuilder::createStore: unsupported Ptr form");
 }
 IRValue *MLIRCodeBuilder::createBitCast(IRValue *, IRType) {
   reportFatalError("createBitCast not yet implemented in MLIR backend");
@@ -815,13 +901,14 @@ VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
 
   Value BaseMemRef;
   Value OffsetToStore;
-  if (auto It = PImpl->PointerMap.find(Base); It != PImpl->PointerMap.end()) {
+  Value BaseV = PImpl->unwrap(Base);
+  if (auto It = PImpl->PointerMap.find(BaseV); It != PImpl->PointerMap.end()) {
     BaseMemRef = It->second.BaseMemRef;
     if (!BaseMemRef)
       reportFatalError("getElementPtr: null pointer base");
 
     // Compose GEP offsets when Base is itself a pointer slot.
-    Value BaseSlotV = PImpl->unwrap(Base);
+    Value BaseSlotV = BaseV;
     Value Idx0 = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
     Value BaseOffset =
         PImpl->Builder.create<memref::LoadOp>(Loc, BaseSlotV, ValueRange{Idx0});
@@ -838,7 +925,7 @@ VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
 
   IRValue *SlotIRV = PImpl->wrap(OffsetSlot);
 
-  PImpl->PointerMap[SlotIRV] = {BaseMemRef};
+  PImpl->PointerMap[OffsetSlot] = {BaseMemRef};
 
   IRType AllocTy{IRTypeKind::Pointer, ElemTy.Signed, 0, ElemTy.Kind};
   return {SlotIRV, ElemTy, AllocTy, 0};
@@ -861,13 +948,14 @@ VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
 
   Value BaseMemRef;
   Value OffsetToStore;
-  if (auto It = PImpl->PointerMap.find(Base); It != PImpl->PointerMap.end()) {
+  Value BaseV = PImpl->unwrap(Base);
+  if (auto It = PImpl->PointerMap.find(BaseV); It != PImpl->PointerMap.end()) {
     BaseMemRef = It->second.BaseMemRef;
     if (!BaseMemRef)
       reportFatalError("getElementPtr: null pointer base");
 
     // Compose GEP offsets when Base is itself a pointer slot.
-    Value BaseSlotV = PImpl->unwrap(Base);
+    Value BaseSlotV = BaseV;
     Value Idx0 = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
     Value BaseOffset =
         PImpl->Builder.create<memref::LoadOp>(Loc, BaseSlotV, ValueRange{Idx0});
@@ -884,7 +972,7 @@ VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
 
   IRValue *SlotIRV = PImpl->wrap(OffsetSlot);
 
-  PImpl->PointerMap[SlotIRV] = {BaseMemRef};
+  PImpl->PointerMap[OffsetSlot] = {BaseMemRef};
 
   IRType AllocTy{IRTypeKind::Pointer, ElemTy.Signed, 0, ElemTy.Kind};
   return {SlotIRV, ElemTy, AllocTy, 0};
@@ -898,7 +986,7 @@ IRValue *MLIRCodeBuilder::createCall(const std::string &, IRType) {
   reportFatalError("createCall(noarg) not yet implemented in MLIR backend");
 }
 IRValue *MLIRCodeBuilder::loadAddress(IRValue *Slot, IRType /*AllocTy*/) {
-  auto It = PImpl->PointerMap.find(Slot);
+  auto It = PImpl->PointerMap.find(PImpl->unwrap(Slot));
   if (It == PImpl->PointerMap.end())
     reportFatalError("loadAddress: unknown pointer slot");
   if (!It->second.BaseMemRef)
@@ -915,7 +1003,7 @@ void MLIRCodeBuilder::storeAddress(IRValue *Slot, IRValue *Addr) {
       !LhsSlotTy.getElementType().isIndex())
     reportFatalError("storeAddress: expected pointer slot (memref<1xindex>)");
 
-  auto LhsIt = PImpl->PointerMap.find(Slot);
+  auto LhsIt = PImpl->PointerMap.find(LhsSlot);
   Value LhsBase =
       (LhsIt != PImpl->PointerMap.end()) ? LhsIt->second.BaseMemRef : Value{};
 
@@ -961,7 +1049,7 @@ void MLIRCodeBuilder::storeAddress(IRValue *Slot, IRValue *Addr) {
   // dereference/atomic operations observe the reassigned pointer value.
   PImpl->Builder.create<memref::StoreOp>(Loc, RhsIdx, LhsSlot,
                                          ValueRange{Zero});
-  PImpl->PointerMap[Slot] = {RhsBase};
+  PImpl->PointerMap[LhsSlot] = {RhsBase};
 }
 
 IRValue *MLIRCodeBuilder::createAtomicAdd(IRValue *Addr, IRValue *Val) {
@@ -995,13 +1083,13 @@ IRValue *MLIRCodeBuilder::createAtomicMin(IRValue *Addr, IRValue *Val) {
 IRValue *MLIRCodeBuilder::loadFromPointee(IRValue *Slot, IRType /*AllocTy*/,
                                           IRType /*ValueTy*/) {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  auto It = PImpl->PointerMap.find(Slot);
+  Value SlotV = PImpl->unwrap(Slot);
+  auto It = PImpl->PointerMap.find(SlotV);
   if (It == PImpl->PointerMap.end())
     reportFatalError("loadFromPointee: unknown pointer slot");
   Value Base = It->second.BaseMemRef;
   // Load offset from the memref<1xindex> slot.
   Value IdxZero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-  Value SlotV = PImpl->unwrap(Slot);
   Value Offset =
       PImpl->Builder.create<memref::LoadOp>(Loc, SlotV, ValueRange{IdxZero});
   // Load element from base[offset].
@@ -1013,12 +1101,12 @@ IRValue *MLIRCodeBuilder::loadFromPointee(IRValue *Slot, IRType /*AllocTy*/,
 void MLIRCodeBuilder::storeToPointee(IRValue *Slot, IRType /*AllocTy*/,
                                      IRValue *Val) {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  auto It = PImpl->PointerMap.find(Slot);
+  Value SlotV = PImpl->unwrap(Slot);
+  auto It = PImpl->PointerMap.find(SlotV);
   if (It == PImpl->PointerMap.end())
     reportFatalError("storeToPointee: unknown pointer slot");
   Value Base = It->second.BaseMemRef;
   Value IdxZero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-  Value SlotV = PImpl->unwrap(Slot);
   Value Offset =
       PImpl->Builder.create<memref::LoadOp>(Loc, SlotV, ValueRange{IdxZero});
   Value V = PImpl->unwrap(Val);
@@ -1037,7 +1125,7 @@ VarAlloc MLIRCodeBuilder::allocPointer(const std::string & /*Name*/,
   }
   IRValue *SlotIRV = PImpl->wrap(OffsetSlot);
   // Side table entry will be populated by storeAddress.
-  PImpl->PointerMap[SlotIRV] = {mlir::Value{}};
+  PImpl->PointerMap[OffsetSlot] = {mlir::Value{}};
   IRType AllocTy{IRTypeKind::Pointer, ElemTy.Signed, 0, ElemTy.Kind};
   return {SlotIRV, ElemTy, AllocTy, AddrSpace};
 }
