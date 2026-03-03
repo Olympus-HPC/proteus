@@ -16,6 +16,7 @@
 #include <mlir/IR/OpDefinition.h>
 
 #include <llvm/ADT/APFloat.h>
+#include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/Support/raw_ostream.h>
 
@@ -29,10 +30,8 @@ using namespace mlir;
 // IRType -> MLIR type helper
 // ---------------------------------------------------------------------------
 
-static mlir::Type toMLIRType(IRType Ty, MLIRContext &Ctx) {
-  switch (Ty.Kind) {
-  case IRTypeKind::Void:
-    return NoneType::get(&Ctx);
+static mlir::Type toMLIRScalarType(IRTypeKind Kind, MLIRContext &Ctx) {
+  switch (Kind) {
   case IRTypeKind::Int1:
     return IntegerType::get(&Ctx, 1);
   case IRTypeKind::Int16:
@@ -45,11 +44,25 @@ static mlir::Type toMLIRType(IRType Ty, MLIRContext &Ctx) {
     return Float32Type::get(&Ctx);
   case IRTypeKind::Double:
     return Float64Type::get(&Ctx);
-  case IRTypeKind::Pointer:
-  case IRTypeKind::Array:
-    reportFatalError("Pointer/Array IRType not yet supported in MLIR backend");
   default:
-    reportFatalError("Unsupported IRType for MLIR backend");
+    reportFatalError("Unsupported scalar IRTypeKind");
+  }
+}
+
+static mlir::Type toMLIRType(IRType Ty, MLIRContext &Ctx) {
+  switch (Ty.Kind) {
+  case IRTypeKind::Void:
+    return NoneType::get(&Ctx);
+  case IRTypeKind::Pointer: {
+    mlir::Type ElemTy = toMLIRScalarType(Ty.ElemKind, Ctx);
+    return MemRefType::get({ShapedType::kDynamic}, ElemTy);
+  }
+  case IRTypeKind::Array: {
+    mlir::Type ElemTy = toMLIRScalarType(Ty.ElemKind, Ctx);
+    return MemRefType::get({static_cast<int64_t>(Ty.NElem)}, ElemTy);
+  }
+  default:
+    return toMLIRScalarType(Ty.Kind, Ctx);
   }
 }
 
@@ -76,6 +89,12 @@ struct MLIRCodeBuilder::Impl {
     OpBuilder::InsertPoint SavedIP;
   };
   llvm::SmallVector<ScopeEntry> ScopeStack;
+
+  // Side table for pointer (base memref, offset slot) representation.
+  struct PointerInfo {
+    mlir::Value BaseMemRef;
+  };
+  llvm::DenseMap<IRValue *, PointerInfo> PointerMap;
 
   explicit Impl() : Builder(&Context) {
     Context.loadDialect<mlir::func::FuncDialect, arith::ArithDialect,
@@ -630,12 +649,70 @@ IRValue *MLIRCodeBuilder::createBitCast(IRValue *, IRType) {
 IRValue *MLIRCodeBuilder::createZExt(IRValue *, IRType) {
   reportFatalError("createZExt not yet implemented in MLIR backend");
 }
-VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *, IRType, IRValue *, IRType) {
-  reportFatalError("getElementPtr not yet implemented in MLIR backend");
+VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
+                                        IRValue *Index, IRType ElemTy) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+  Value IdxV = PImpl->unwrap(Index);
+
+  // Cast index to index type if needed.
+  if (!isa<IndexType>(IdxV.getType()))
+    IdxV = PImpl->Builder.create<arith::IndexCastOp>(
+        Loc, PImpl->Builder.getIndexType(), IdxV);
+
+  // Allocate offset slot at entry block.
+  auto IdxMemRefTy = MemRefType::get({1}, PImpl->Builder.getIndexType());
+  Value OffsetSlot;
+  {
+    OpBuilder::InsertionGuard Guard(PImpl->Builder);
+    PImpl->Builder.setInsertionPointToStart(PImpl->EntryBlock);
+    OffsetSlot = PImpl->Builder.create<memref::AllocaOp>(Loc, IdxMemRefTy);
+  }
+
+  // Store the index as offset.
+  Value Idx0 = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+  PImpl->Builder.create<memref::StoreOp>(Loc, IdxV, OffsetSlot,
+                                         ValueRange{Idx0});
+
+  IRValue *SlotIRV = PImpl->wrap(OffsetSlot);
+
+  // Determine the base memref.
+  // For Array BaseTy, Base IS the array memref (the slot itself).
+  // For Pointer BaseTy, Base is the result of loadAddress (the base memref).
+  Value BaseMemRef = PImpl->unwrap(Base);
+  PImpl->PointerMap[SlotIRV] = {BaseMemRef};
+
+  IRType AllocTy{IRTypeKind::Pointer, ElemTy.Signed, 0, ElemTy.Kind};
+  return {SlotIRV, ElemTy, AllocTy, 0};
 }
 // NOLINTNEXTLINE
-VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *, IRType, size_t, IRType) {
-  reportFatalError("getElementPtr(size_t) not yet implemented in MLIR backend");
+VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
+                                        size_t Index, IRType ElemTy) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+  Value IdxV =
+      PImpl->Builder.create<arith::ConstantIndexOp>(Loc, (int64_t)Index);
+
+  // Allocate offset slot at entry block.
+  auto IdxMemRefTy = MemRefType::get({1}, PImpl->Builder.getIndexType());
+  Value OffsetSlot;
+  {
+    OpBuilder::InsertionGuard Guard(PImpl->Builder);
+    PImpl->Builder.setInsertionPointToStart(PImpl->EntryBlock);
+    OffsetSlot = PImpl->Builder.create<memref::AllocaOp>(Loc, IdxMemRefTy);
+  }
+
+  // Store the index as offset.
+  Value Idx0 = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+  PImpl->Builder.create<memref::StoreOp>(Loc, IdxV, OffsetSlot,
+                                         ValueRange{Idx0});
+
+  IRValue *SlotIRV = PImpl->wrap(OffsetSlot);
+
+  // Determine the base memref.
+  Value BaseMemRef = PImpl->unwrap(Base);
+  PImpl->PointerMap[SlotIRV] = {BaseMemRef};
+
+  IRType AllocTy{IRTypeKind::Pointer, ElemTy.Signed, 0, ElemTy.Kind};
+  return {SlotIRV, ElemTy, AllocTy, 0};
 }
 IRValue *MLIRCodeBuilder::createCall(const std::string &, IRType,
                                      const std::vector<IRType> &,
@@ -645,24 +722,89 @@ IRValue *MLIRCodeBuilder::createCall(const std::string &, IRType,
 IRValue *MLIRCodeBuilder::createCall(const std::string &, IRType) {
   reportFatalError("createCall(noarg) not yet implemented in MLIR backend");
 }
-IRValue *MLIRCodeBuilder::loadAddress(IRValue *, IRType) {
-  reportFatalError("loadAddress not yet implemented in MLIR backend");
+IRValue *MLIRCodeBuilder::loadAddress(IRValue *Slot, IRType /*AllocTy*/) {
+  auto It = PImpl->PointerMap.find(Slot);
+  if (It == PImpl->PointerMap.end())
+    reportFatalError("loadAddress: unknown pointer slot");
+  return PImpl->wrap(It->second.BaseMemRef);
 }
-void MLIRCodeBuilder::storeAddress(IRValue *, IRValue *) {
-  reportFatalError("storeAddress not yet implemented in MLIR backend");
+
+void MLIRCodeBuilder::storeAddress(IRValue *Slot, IRValue *Addr) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+  Value AddrV = PImpl->unwrap(Addr);
+  // Record Addr as the base memref for this slot.
+  PImpl->PointerMap[Slot].BaseMemRef = AddrV;
+  // Store offset 0 into the memref<1xindex> slot.
+  Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+  Value Idx = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+  Value SlotV = PImpl->unwrap(Slot);
+  PImpl->Builder.create<memref::StoreOp>(Loc, Zero, SlotV, ValueRange{Idx});
 }
-IRValue *MLIRCodeBuilder::loadFromPointee(IRValue *, IRType, IRType) {
-  reportFatalError("loadFromPointee not yet implemented in MLIR backend");
+
+IRValue *MLIRCodeBuilder::loadFromPointee(IRValue *Slot, IRType /*AllocTy*/,
+                                          IRType /*ValueTy*/) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+  auto It = PImpl->PointerMap.find(Slot);
+  if (It == PImpl->PointerMap.end())
+    reportFatalError("loadFromPointee: unknown pointer slot");
+  Value Base = It->second.BaseMemRef;
+  // Load offset from the memref<1xindex> slot.
+  Value IdxZero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+  Value SlotV = PImpl->unwrap(Slot);
+  Value Offset =
+      PImpl->Builder.create<memref::LoadOp>(Loc, SlotV, ValueRange{IdxZero});
+  // Load element from base[offset].
+  Value Result =
+      PImpl->Builder.create<memref::LoadOp>(Loc, Base, ValueRange{Offset});
+  return PImpl->wrap(Result);
 }
-void MLIRCodeBuilder::storeToPointee(IRValue *, IRType, IRValue *) {
-  reportFatalError("storeToPointee not yet implemented in MLIR backend");
+
+void MLIRCodeBuilder::storeToPointee(IRValue *Slot, IRType /*AllocTy*/,
+                                     IRValue *Val) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+  auto It = PImpl->PointerMap.find(Slot);
+  if (It == PImpl->PointerMap.end())
+    reportFatalError("storeToPointee: unknown pointer slot");
+  Value Base = It->second.BaseMemRef;
+  Value IdxZero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+  Value SlotV = PImpl->unwrap(Slot);
+  Value Offset =
+      PImpl->Builder.create<memref::LoadOp>(Loc, SlotV, ValueRange{IdxZero});
+  Value V = PImpl->unwrap(Val);
+  PImpl->Builder.create<memref::StoreOp>(Loc, V, Base, ValueRange{Offset});
 }
-VarAlloc MLIRCodeBuilder::allocPointer(const std::string &, IRType, unsigned) {
-  reportFatalError("allocPointer not yet implemented in MLIR backend");
+
+VarAlloc MLIRCodeBuilder::allocPointer(const std::string & /*Name*/,
+                                       IRType ElemTy, unsigned AddrSpace) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+  auto IdxMemRefTy = MemRefType::get({1}, PImpl->Builder.getIndexType());
+  Value OffsetSlot;
+  {
+    OpBuilder::InsertionGuard Guard(PImpl->Builder);
+    PImpl->Builder.setInsertionPointToStart(PImpl->EntryBlock);
+    OffsetSlot = PImpl->Builder.create<memref::AllocaOp>(Loc, IdxMemRefTy);
+  }
+  IRValue *SlotIRV = PImpl->wrap(OffsetSlot);
+  // Side table entry will be populated by storeAddress.
+  PImpl->PointerMap[SlotIRV] = {mlir::Value{}};
+  IRType AllocTy{IRTypeKind::Pointer, ElemTy.Signed, 0, ElemTy.Kind};
+  return {SlotIRV, ElemTy, AllocTy, AddrSpace};
 }
-VarAlloc MLIRCodeBuilder::allocArray(const std::string &, AddressSpace, IRType,
-                                     size_t) {
-  reportFatalError("allocArray not yet implemented in MLIR backend");
+
+VarAlloc MLIRCodeBuilder::allocArray(const std::string & /*Name*/,
+                                     AddressSpace /*AS*/, IRType ElemTy,
+                                     size_t NElem) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+  mlir::Type MLIRElemTy = toMLIRScalarType(ElemTy.Kind, PImpl->Context);
+  auto ArrMemRefTy = MemRefType::get({static_cast<int64_t>(NElem)}, MLIRElemTy);
+  Value Alloca;
+  {
+    OpBuilder::InsertionGuard Guard(PImpl->Builder);
+    PImpl->Builder.setInsertionPointToStart(PImpl->EntryBlock);
+    Alloca = PImpl->Builder.create<memref::AllocaOp>(Loc, ArrMemRefTy);
+  }
+  IRType AllocTy{IRTypeKind::Array, ElemTy.Signed, NElem, ElemTy.Kind};
+  return {PImpl->wrap(Alloca), ElemTy, AllocTy, 0};
 }
 
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
