@@ -198,6 +198,10 @@ public:
                       const std::vector<IRType> &ArgTys,
                       const std::vector<IRValue *> &Args) override;
   IRValue *createCall(const std::string &FName, IRType RetTy) override;
+  IRValue *emitIntrinsic(const std::string &Name, IRType RetTy,
+                         const std::vector<IRValue *> &Args) override;
+  IRValue *emitBuiltin(const std::string &Name, IRType RetTy,
+                       const std::vector<IRValue *> &Args) override;
 
   // -----------------------------------------------------------------------
   // CodeBuilder overrides — storage-aware load/store.

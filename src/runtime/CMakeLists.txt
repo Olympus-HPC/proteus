@@ -10,6 +10,7 @@ set(SOURCES
   Caching/ObjectCacheChain.cpp
   Caching/StorageCache.cpp
   Frontend/CppJitModule.cpp
+  Frontend/Builtins.cpp
   Frontend/Dispatcher.cpp
   Frontend/Func.cpp
   Frontend/JitFrontend.cpp
@@ -25,7 +26,6 @@ if(PROTEUS_ENABLE_CUDA)
   list(APPEND SOURCES
     CompilerInterfaceDevice.cpp
     JitEngineDeviceCUDA.cpp
-    Frontend/BuiltinsCUDA.cpp
   )
 endif()
 
@@ -33,7 +33,6 @@ if(PROTEUS_ENABLE_HIP)
   list(APPEND SOURCES
     CompilerInterfaceDevice.cpp
     JitEngineDeviceHIP.cpp
-    Frontend/BuiltinsHIP.cpp
   )
 endif()
 
@@ -138,6 +137,8 @@ if(PROTEUS_ENABLE_MLIR)
   set(mlir_libs
     MLIRFuncDialect
     MLIRArithDialect
+    MLIRGPUDialect
+    MLIRMathDialect
     MLIRMemRefDialect
     MLIRSCFDialect
     MLIRIR

@@ -191,6 +191,19 @@ public:
   virtual IRValue *createCall(const std::string &FName, IRType RetTy) = 0;
 
   // -----------------------------------------------------------------------
+  // Math intrinsics and GPU builtins.
+  // -----------------------------------------------------------------------
+
+  /// Lower a frontend intrinsic name to backend IR.
+  virtual IRValue *emitIntrinsic(const std::string &Name, IRType RetTy,
+                                 const std::vector<IRValue *> &Args) = 0;
+
+  /// Lower a frontend GPU builtin name to backend IR.
+  /// Returns nullptr for void builtins (e.g. syncThreads).
+  virtual IRValue *emitBuiltin(const std::string &Name, IRType RetTy,
+                               const std::vector<IRValue *> &Args) = 0;
+
+  // -----------------------------------------------------------------------
   // Storage-aware load/store.
   // -----------------------------------------------------------------------
 

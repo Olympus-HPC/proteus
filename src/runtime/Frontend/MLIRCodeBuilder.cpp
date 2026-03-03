@@ -6,6 +6,8 @@
 
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
+#include <mlir/Dialect/GPU/IR/GPUDialect.h>
+#include <mlir/Dialect/Math/IR/Math.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
 #include <mlir/IR/Builders.h>
@@ -124,6 +126,7 @@ struct MLIRCodeBuilder::Impl {
 
   explicit Impl() : Builder(&Context) {
     Context.loadDialect<mlir::func::FuncDialect, arith::ArithDialect,
+                        gpu::GPUDialect, math::MathDialect,
                         memref::MemRefDialect, scf::SCFDialect>();
     Module = ModuleOp::create(Builder.getUnknownLoc());
   }
@@ -1121,6 +1124,159 @@ IRValue *MLIRCodeBuilder::createCall(const std::string &FName, IRType RetTy,
 IRValue *MLIRCodeBuilder::createCall(const std::string &FName, IRType RetTy) {
   return createCall(FName, RetTy, {}, {});
 }
+
+IRValue *MLIRCodeBuilder::emitIntrinsic(const std::string &Name, IRType RetTy,
+                                        const std::vector<IRValue *> &Args) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+
+  auto RequireArgCount = [&](size_t Expected) {
+    if (Args.size() != Expected)
+      reportFatalError("MLIRCodeBuilder::emitIntrinsic: wrong argument count "
+                       "for " +
+                       Name);
+  };
+
+  auto RequireFloatRetTy = [&]() {
+    if (!isFloatingPointKind(RetTy))
+      reportFatalError("MLIRCodeBuilder::emitIntrinsic: expected float return "
+                       "type for " +
+                       Name);
+  };
+
+  auto UnwrapArg = [&](size_t I) -> mlir::Value {
+    mlir::Value V = PImpl->unwrap(Args[I]);
+    if (V.getType() != toMLIRType(RetTy, PImpl->Context))
+      reportFatalError("MLIRCodeBuilder::emitIntrinsic: argument type mismatch "
+                       "for " +
+                       Name);
+    return V;
+  };
+
+  if (Name == "sinf") {
+    RequireArgCount(1);
+    RequireFloatRetTy();
+    return PImpl->wrap(PImpl->Builder.create<math::SinOp>(Loc, UnwrapArg(0)));
+  }
+  if (Name == "cosf") {
+    RequireArgCount(1);
+    RequireFloatRetTy();
+    return PImpl->wrap(PImpl->Builder.create<math::CosOp>(Loc, UnwrapArg(0)));
+  }
+  if (Name == "expf") {
+    RequireArgCount(1);
+    RequireFloatRetTy();
+    return PImpl->wrap(PImpl->Builder.create<math::ExpOp>(Loc, UnwrapArg(0)));
+  }
+  if (Name == "logf") {
+    RequireArgCount(1);
+    RequireFloatRetTy();
+    return PImpl->wrap(PImpl->Builder.create<math::LogOp>(Loc, UnwrapArg(0)));
+  }
+  if (Name == "sqrtf") {
+    RequireArgCount(1);
+    RequireFloatRetTy();
+    return PImpl->wrap(PImpl->Builder.create<math::SqrtOp>(Loc, UnwrapArg(0)));
+  }
+  if (Name == "truncf") {
+    RequireArgCount(1);
+    RequireFloatRetTy();
+    return PImpl->wrap(PImpl->Builder.create<math::TruncOp>(Loc, UnwrapArg(0)));
+  }
+  if (Name == "powf") {
+    RequireArgCount(2);
+    RequireFloatRetTy();
+    return PImpl->wrap(
+        PImpl->Builder.create<math::PowFOp>(Loc, UnwrapArg(0), UnwrapArg(1)));
+  }
+  if (Name == "fabsf" || Name == "absf") {
+    RequireArgCount(1);
+    RequireFloatRetTy();
+    auto Arg = UnwrapArg(0);
+    auto Neg = PImpl->Builder.create<arith::NegFOp>(Loc, Arg);
+    return PImpl->wrap(PImpl->Builder.create<arith::MaximumFOp>(Loc, Arg, Neg));
+  }
+
+  reportFatalError("MLIRCodeBuilder::emitIntrinsic: unsupported intrinsic " +
+                   Name);
+}
+
+IRValue *MLIRCodeBuilder::emitBuiltin(const std::string &Name, IRType RetTy,
+                                      const std::vector<IRValue *> &Args) {
+  if (!Args.empty())
+    reportFatalError("MLIRCodeBuilder::emitBuiltin: builtins do not accept "
+                     "arguments");
+
+  if (isHostTargetModel(TargetModel))
+    reportFatalError("MLIRCodeBuilder::emitBuiltin: builtin only valid in GPU "
+                     "kernel");
+  if (!PImpl->CurrentFunc || !PImpl->CurrentFunc->hasAttr("gpu.kernel"))
+    reportFatalError("MLIRCodeBuilder::emitBuiltin: builtin only valid in GPU "
+                     "kernel");
+
+  auto Loc = PImpl->Builder.getUnknownLoc();
+  auto CastIndexToRetTy = [&](mlir::Value IndexV) -> IRValue * {
+    if (RetTy.Kind == IRTypeKind::Int32 || RetTy.Kind == IRTypeKind::Int64) {
+      // gpu dialect IDs are target-agnostic index values; cast at the builder
+      // boundary to preserve the frontend's integer builtin API.
+      auto DstTy = toMLIRType(RetTy, PImpl->Context);
+      auto Cast =
+          PImpl->Builder.create<arith::IndexCastUIOp>(Loc, DstTy, IndexV);
+      return PImpl->wrap(Cast);
+    }
+    reportFatalError("MLIRCodeBuilder::emitBuiltin: unsupported return type "
+                     "for " +
+                     Name);
+  };
+
+  // MLIR lowering intentionally uses gpu dialect ops instead of CUDA/HIP
+  // special registers to keep IR architecture-agnostic until later lowering.
+  if (Name == "threadIdx.x")
+    return CastIndexToRetTy(
+        PImpl->Builder.create<gpu::ThreadIdOp>(Loc, gpu::Dimension::x));
+  if (Name == "threadIdx.y")
+    return CastIndexToRetTy(
+        PImpl->Builder.create<gpu::ThreadIdOp>(Loc, gpu::Dimension::y));
+  if (Name == "threadIdx.z")
+    return CastIndexToRetTy(
+        PImpl->Builder.create<gpu::ThreadIdOp>(Loc, gpu::Dimension::z));
+
+  if (Name == "blockIdx.x")
+    return CastIndexToRetTy(
+        PImpl->Builder.create<gpu::BlockIdOp>(Loc, gpu::Dimension::x));
+  if (Name == "blockIdx.y")
+    return CastIndexToRetTy(
+        PImpl->Builder.create<gpu::BlockIdOp>(Loc, gpu::Dimension::y));
+  if (Name == "blockIdx.z")
+    return CastIndexToRetTy(
+        PImpl->Builder.create<gpu::BlockIdOp>(Loc, gpu::Dimension::z));
+
+  if (Name == "blockDim.x")
+    return CastIndexToRetTy(
+        PImpl->Builder.create<gpu::BlockDimOp>(Loc, gpu::Dimension::x));
+  if (Name == "blockDim.y")
+    return CastIndexToRetTy(
+        PImpl->Builder.create<gpu::BlockDimOp>(Loc, gpu::Dimension::y));
+  if (Name == "blockDim.z")
+    return CastIndexToRetTy(
+        PImpl->Builder.create<gpu::BlockDimOp>(Loc, gpu::Dimension::z));
+
+  if (Name == "gridDim.x")
+    return CastIndexToRetTy(
+        PImpl->Builder.create<gpu::GridDimOp>(Loc, gpu::Dimension::x));
+  if (Name == "gridDim.y")
+    return CastIndexToRetTy(
+        PImpl->Builder.create<gpu::GridDimOp>(Loc, gpu::Dimension::y));
+  if (Name == "gridDim.z")
+    return CastIndexToRetTy(
+        PImpl->Builder.create<gpu::GridDimOp>(Loc, gpu::Dimension::z));
+
+  if (Name == "syncThreads") {
+    PImpl->Builder.create<gpu::BarrierOp>(Loc);
+    return nullptr;
+  }
+
+  reportFatalError("MLIRCodeBuilder::emitBuiltin: unsupported builtin " + Name);
+}
 IRValue *MLIRCodeBuilder::loadAddress(IRValue *Slot, IRType /*AllocTy*/) {
   auto It = PImpl->PointerMap.find(PImpl->unwrap(Slot));
   if (It == PImpl->PointerMap.end())
@@ -1283,12 +1439,22 @@ VarAlloc MLIRCodeBuilder::allocArray(const std::string & /*Name*/,
 }
 
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
-void MLIRCodeBuilder::setKernel(IRFunction *) {
-  reportFatalError("setKernel not yet implemented in MLIR backend");
+void MLIRCodeBuilder::setKernel(IRFunction *F) {
+  auto FuncOp = PImpl->unwrapFunction(F);
+  FuncOp->setAttr("gpu.kernel", UnitAttr::get(&PImpl->Context));
 }
-void MLIRCodeBuilder::setLaunchBoundsForKernel(IRFunction *, int, int) {
-  reportFatalError(
-      "setLaunchBoundsForKernel not yet implemented in MLIR backend");
+void MLIRCodeBuilder::setLaunchBoundsForKernel(IRFunction *F,
+                                               int MaxThreadsPerBlock,
+                                               int MinBlocksPerSM) {
+  auto FuncOp = PImpl->unwrapFunction(F);
+  // Keep launch-bounds on the kernel op as attributes so later GPU lowering
+  // can map them to target-specific metadata.
+  FuncOp->setAttr("proteus.launch_bounds.max_threads_per_block",
+                  IntegerAttr::get(IntegerType::get(&PImpl->Context, 32),
+                                   MaxThreadsPerBlock));
+  FuncOp->setAttr(
+      "proteus.launch_bounds.min_blocks_per_sm",
+      IntegerAttr::get(IntegerType::get(&PImpl->Context, 32), MinBlocksPerSM));
 }
 #endif
 

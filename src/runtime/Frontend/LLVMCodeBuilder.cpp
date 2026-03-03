@@ -13,10 +13,126 @@
 #include <llvm/IR/Module.h>
 
 #include <deque>
+#include <string>
 
 namespace proteus {
 
 using namespace llvm;
+
+namespace {
+
+bool isCudaDeviceTarget(TargetModelType TM) {
+  return TM == TargetModelType::CUDA;
+}
+
+bool isHipDeviceTarget(TargetModelType TM) {
+  return TM == TargetModelType::HIP;
+}
+
+IRValue *emitCudaBuiltin(LLVMCodeBuilder &CB, const std::string &Name,
+                         IRType RetTy) {
+  if (Name == "threadIdx.x")
+    return CB.createCall("llvm.nvvm.read.ptx.sreg.tid.x", RetTy);
+  if (Name == "threadIdx.y")
+    return CB.createCall("llvm.nvvm.read.ptx.sreg.tid.y", RetTy);
+  if (Name == "threadIdx.z")
+    return CB.createCall("llvm.nvvm.read.ptx.sreg.tid.z", RetTy);
+  if (Name == "blockIdx.x")
+    return CB.createCall("llvm.nvvm.read.ptx.sreg.ctaid.x", RetTy);
+  if (Name == "blockIdx.y")
+    return CB.createCall("llvm.nvvm.read.ptx.sreg.ctaid.y", RetTy);
+  if (Name == "blockIdx.z")
+    return CB.createCall("llvm.nvvm.read.ptx.sreg.ctaid.z", RetTy);
+  if (Name == "blockDim.x")
+    return CB.createCall("llvm.nvvm.read.ptx.sreg.ntid.x", RetTy);
+  if (Name == "blockDim.y")
+    return CB.createCall("llvm.nvvm.read.ptx.sreg.ntid.y", RetTy);
+  if (Name == "blockDim.z")
+    return CB.createCall("llvm.nvvm.read.ptx.sreg.ntid.z", RetTy);
+  if (Name == "gridDim.x")
+    return CB.createCall("llvm.nvvm.read.ptx.sreg.nctaid.x", RetTy);
+  if (Name == "gridDim.y")
+    return CB.createCall("llvm.nvvm.read.ptx.sreg.nctaid.y", RetTy);
+  if (Name == "gridDim.z")
+    return CB.createCall("llvm.nvvm.read.ptx.sreg.nctaid.z", RetTy);
+  if (Name == "syncThreads") {
+    CB.createCall("llvm.nvvm.barrier0", IRType{IRTypeKind::Void});
+    return nullptr;
+  }
+
+  reportFatalError("Unsupported CUDA builtin " + Name);
+}
+
+IRValue *emitHipGridDimBuiltin(LLVMCodeBuilder &CB, unsigned Offset) {
+  // HIP grid dimensions come from the implicit argument pointer ABI, which is
+  // stable across AMDGPU generations and avoids explicit OCKL bitcode linkage.
+  constexpr unsigned ConstantAddressSpace = 4;
+  auto *ImplicitArgPtr =
+      CB.createCall("llvm.amdgcn.implicitarg.ptr",
+                    IRType{IRTypeKind::Pointer, false, 0, IRTypeKind::Void,
+                           ConstantAddressSpace});
+  IRValue *OffsetVal = CB.getConstantInt(IRType{IRTypeKind::Int64}, Offset);
+  IRType PtrTy{IRTypeKind::Pointer, false, 0, IRTypeKind::Int32,
+               ConstantAddressSpace};
+  auto A = CB.getElementPtr(ImplicitArgPtr, PtrTy, OffsetVal,
+                            IRType{IRTypeKind::Int32});
+  auto *GEP = CB.loadAddress(A.Slot, A.AllocTy);
+  return CB.createLoad(IRType{IRTypeKind::Int32}, GEP);
+}
+
+IRValue *emitHipBlockDimBuiltin(LLVMCodeBuilder &CB, unsigned Offset) {
+  // HIP block dimensions are encoded as i16 in the implicit argument area;
+  // zero-extend to i32 to match the frontend builtin contract.
+  constexpr unsigned ConstantAddressSpace = 4;
+  auto *ImplicitArgPtr =
+      CB.createCall("llvm.amdgcn.implicitarg.ptr",
+                    IRType{IRTypeKind::Pointer, false, 0, IRTypeKind::Void,
+                           ConstantAddressSpace});
+  IRValue *OffsetVal = CB.getConstantInt(IRType{IRTypeKind::Int64}, Offset);
+  IRType PtrTy{IRTypeKind::Pointer, false, 0, IRTypeKind::Int16,
+               ConstantAddressSpace};
+  auto A = CB.getElementPtr(ImplicitArgPtr, PtrTy, OffsetVal,
+                            IRType{IRTypeKind::Int16});
+  auto *GEP = CB.loadAddress(A.Slot, A.AllocTy);
+  auto *Load = CB.createLoad(IRType{IRTypeKind::Int16}, GEP);
+  return CB.createZExt(Load, IRType{IRTypeKind::Int32});
+}
+
+IRValue *emitHipBuiltin(LLVMCodeBuilder &CB, const std::string &Name,
+                        IRType RetTy) {
+  if (Name == "threadIdx.x")
+    return CB.createCall("llvm.amdgcn.workitem.id.x", RetTy);
+  if (Name == "threadIdx.y")
+    return CB.createCall("llvm.amdgcn.workitem.id.y", RetTy);
+  if (Name == "threadIdx.z")
+    return CB.createCall("llvm.amdgcn.workitem.id.z", RetTy);
+  if (Name == "blockIdx.x")
+    return CB.createCall("llvm.amdgcn.workgroup.id.x", RetTy);
+  if (Name == "blockIdx.y")
+    return CB.createCall("llvm.amdgcn.workgroup.id.y", RetTy);
+  if (Name == "blockIdx.z")
+    return CB.createCall("llvm.amdgcn.workgroup.id.z", RetTy);
+  if (Name == "blockDim.x")
+    return emitHipBlockDimBuiltin(CB, 6);
+  if (Name == "blockDim.y")
+    return emitHipBlockDimBuiltin(CB, 7);
+  if (Name == "blockDim.z")
+    return emitHipBlockDimBuiltin(CB, 8);
+  if (Name == "gridDim.x")
+    return emitHipGridDimBuiltin(CB, 0);
+  if (Name == "gridDim.y")
+    return emitHipGridDimBuiltin(CB, 1);
+  if (Name == "gridDim.z")
+    return emitHipGridDimBuiltin(CB, 2);
+  if (Name == "syncThreads") {
+    CB.createCall("llvm.amdgcn.s.barrier", IRType{IRTypeKind::Void});
+    return nullptr;
+  }
+
+  reportFatalError("Unsupported HIP builtin " + Name);
+}
+
+} // namespace
 
 struct LLVMCodeBuilder::Impl {
   // Owned context and module (only set via the owning constructor).
@@ -903,6 +1019,74 @@ IRValue *LLVMCodeBuilder::createCall(const std::string &FName, IRType RetTy) {
   FunctionType *FnTy = FunctionType::get(LLVMRetTy, {}, false);
   FunctionCallee Callee = M->getOrInsertFunction(FName, FnTy);
   return PImpl->wrap(PImpl->IRB.CreateCall(Callee));
+}
+
+IRValue *LLVMCodeBuilder::emitIntrinsic(const std::string &Name, IRType RetTy,
+                                        const std::vector<IRValue *> &Args) {
+  std::vector<IRType> ArgTys(Args.size(), RetTy);
+
+  if (Name == "powf") {
+    if (Args.size() != 2)
+      reportFatalError("powf expects 2 arguments");
+    // CUDA lowers to libdevice entry points while host/HIP use LLVM intrinsics
+    // so later target-specific passes can legalize appropriately.
+    const std::string Callee =
+        isCudaDeviceTarget(TargetModel) ? "__nv_powf" : "llvm.pow.f32";
+    return createCall(Callee, RetTy, ArgTys, Args);
+  }
+
+  if (Name == "sqrtf") {
+    const std::string Callee =
+        isCudaDeviceTarget(TargetModel) ? "__nv_sqrtf" : "llvm.sqrt.f32";
+    return createCall(Callee, RetTy, ArgTys, Args);
+  }
+  if (Name == "expf") {
+    const std::string Callee =
+        isCudaDeviceTarget(TargetModel) ? "__nv_expf" : "llvm.exp.f32";
+    return createCall(Callee, RetTy, ArgTys, Args);
+  }
+  if (Name == "sinf") {
+    const std::string Callee =
+        isCudaDeviceTarget(TargetModel) ? "__nv_sinf" : "llvm.sin.f32";
+    return createCall(Callee, RetTy, ArgTys, Args);
+  }
+  if (Name == "cosf") {
+    const std::string Callee =
+        isCudaDeviceTarget(TargetModel) ? "__nv_cosf" : "llvm.cos.f32";
+    return createCall(Callee, RetTy, ArgTys, Args);
+  }
+  if (Name == "fabsf" || Name == "absf") {
+    const std::string Callee =
+        isCudaDeviceTarget(TargetModel) ? "__nv_fabsf" : "llvm.fabs.f32";
+    return createCall(Callee, RetTy, ArgTys, Args);
+  }
+  if (Name == "truncf") {
+    const std::string Callee =
+        isCudaDeviceTarget(TargetModel) ? "__nv_truncf" : "llvm.trunc.f32";
+    return createCall(Callee, RetTy, ArgTys, Args);
+  }
+  if (Name == "logf") {
+    const std::string Callee =
+        isCudaDeviceTarget(TargetModel) ? "__nv_logf" : "llvm.log.f32";
+    return createCall(Callee, RetTy, ArgTys, Args);
+  }
+
+  reportFatalError("LLVMCodeBuilder::emitIntrinsic: unsupported intrinsic " +
+                   Name);
+}
+
+IRValue *LLVMCodeBuilder::emitBuiltin(const std::string &Name, IRType RetTy,
+                                      const std::vector<IRValue *> &Args) {
+  if (!Args.empty())
+    reportFatalError("LLVMCodeBuilder::emitBuiltin expects no arguments");
+
+  if (isCudaDeviceTarget(TargetModel))
+    return emitCudaBuiltin(*this, Name, RetTy);
+  if (isHipDeviceTarget(TargetModel))
+    return emitHipBuiltin(*this, Name, RetTy);
+
+  reportFatalError("LLVMCodeBuilder::emitBuiltin: builtin not supported on "
+                   "host target model");
 }
 
 // Alloca/array emission.

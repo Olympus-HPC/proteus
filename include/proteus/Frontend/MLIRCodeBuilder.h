@@ -91,6 +91,10 @@ public:
                       const std::vector<IRType> &ArgTys,
                       const std::vector<IRValue *> &Args) override;
   IRValue *createCall(const std::string &FName, IRType RetTy) override;
+  IRValue *emitIntrinsic(const std::string &Name, IRType RetTy,
+                         const std::vector<IRValue *> &Args) override;
+  IRValue *emitBuiltin(const std::string &Name, IRType RetTy,
+                       const std::vector<IRValue *> &Args) override;
   IRValue *loadAddress(IRValue *Slot, IRType AllocTy) override;
   void storeAddress(IRValue *Slot, IRValue *Addr) override;
   IRValue *loadFromPointee(IRValue *Slot, IRType AllocTy,

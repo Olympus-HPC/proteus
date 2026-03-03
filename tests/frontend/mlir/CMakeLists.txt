@@ -54,3 +54,8 @@ CREATE_MLIR_FRONTEND_TEST(mlir_generic_load_store
                           mlir_generic_load_store.cpp)
 CREATE_MLIR_FRONTEND_TEST(mlir_casts mlir_casts.cpp)
 CREATE_MLIR_FRONTEND_TEST(mlir_calls mlir_calls.cpp)
+CREATE_MLIR_FRONTEND_TEST(mlir_intrinsics mlir_intrinsics.cpp)
+
+if(PROTEUS_ENABLE_CUDA OR PROTEUS_ENABLE_HIP)
+  CREATE_MLIR_FRONTEND_TEST(mlir_gpu_builtins mlir_gpu_builtins.cpp)
+endif()
