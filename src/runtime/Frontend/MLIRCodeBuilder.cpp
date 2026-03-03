@@ -18,6 +18,7 @@
 #include <llvm/ADT/APFloat.h>
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/SmallVector.h>
+#include <llvm/ADT/StringRef.h>
 #include <llvm/Support/raw_ostream.h>
 
 #include <deque>
@@ -184,6 +185,28 @@ struct MLIRCodeBuilder::Impl {
 
   // Returns true if `v` is a pointer slot tracked in PointerMap.
   bool isPointerValue(mlir::Value V) const { return PointerMap.contains(V); }
+
+  bool isRawPointerAbiType(IRType Ty) {
+    if (Ty.Kind != IRTypeKind::Pointer)
+      return false;
+    return true;
+  }
+
+  func::FuncOp getOrCreateFunc(StringRef Name, mlir::FunctionType FTy) {
+    if (auto Existing = Module.lookupSymbol<func::FuncOp>(Name)) {
+      if (Existing.getFunctionType() != FTy)
+        reportFatalError("createCall: function type mismatch for " +
+                         Name.str());
+      return Existing;
+    }
+
+    OpBuilder::InsertionGuard Guard(Builder);
+    Builder.setInsertionPointToStart(Module.getBody());
+    auto NewFunc =
+        Builder.create<func::FuncOp>(Builder.getUnknownLoc(), Name, FTy);
+    NewFunc.setSymVisibilityAttr(Builder.getStringAttr("private"));
+    return NewFunc;
+  }
 
   // For pointer values, resolve to {baseMemref, idx} where idx = load(slot[0]).
   std::pair<mlir::Value, mlir::Value>
@@ -1047,13 +1070,56 @@ VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
   IRType AllocTy{IRTypeKind::Pointer, ElemTy.Signed, 0, ElemTy.Kind};
   return {SlotIRV, ElemTy, AllocTy, 0};
 }
-IRValue *MLIRCodeBuilder::createCall(const std::string &, IRType,
-                                     const std::vector<IRType> &,
-                                     const std::vector<IRValue *> &) {
-  reportFatalError("createCall not yet implemented in MLIR backend");
+IRValue *MLIRCodeBuilder::createCall(const std::string &FName, IRType RetTy,
+                                     const std::vector<IRType> &ArgTys,
+                                     const std::vector<IRValue *> &Args) {
+  if (ArgTys.size() != Args.size())
+    reportFatalError("createCall: ArgTys.size() must match Args.size()");
+
+  if (PImpl->isRawPointerAbiType(RetTy))
+    reportFatalError("createCall: raw-pointer ABI calls are unsupported in "
+                     "MLIR backend (memref-only). Change extern to take "
+                     "memref or add LLVM-dialect lowering.");
+  for (const auto &ArgTy : ArgTys) {
+    if (PImpl->isRawPointerAbiType(ArgTy))
+      reportFatalError("createCall: raw-pointer ABI calls are unsupported in "
+                       "MLIR backend (memref-only). Change extern to take "
+                       "memref or add LLVM-dialect lowering.");
+  }
+
+  llvm::SmallVector<mlir::Type> MLIRArgTys;
+  MLIRArgTys.reserve(ArgTys.size());
+  for (const auto &ArgTy : ArgTys)
+    MLIRArgTys.push_back(toMLIRType(ArgTy, PImpl->Context));
+
+  llvm::SmallVector<mlir::Type> ResultTys;
+  if (RetTy.Kind != IRTypeKind::Void)
+    ResultTys.push_back(toMLIRType(RetTy, PImpl->Context));
+
+  auto FTy = PImpl->Builder.getFunctionType(MLIRArgTys, ResultTys);
+  auto Callee = PImpl->getOrCreateFunc(FName, FTy);
+
+  llvm::SmallVector<mlir::Value> CallArgs;
+  CallArgs.reserve(Args.size());
+  for (size_t I = 0; I < Args.size(); ++I) {
+    mlir::Value V = PImpl->unwrap(Args[I]);
+    if (PImpl->isPointerValue(V))
+      reportFatalError("createCall: passing internal pointer value is "
+                       "unsupported; pass a memref base instead");
+    CallArgs.push_back(V);
+  }
+
+  auto Loc = PImpl->Builder.getUnknownLoc();
+  auto Call = PImpl->Builder.create<func::CallOp>(
+      Loc, Callee.getSymName(), FTy.getResults(), ValueRange{CallArgs});
+
+  if (RetTy.Kind == IRTypeKind::Void)
+    return nullptr;
+  return PImpl->wrap(Call.getResult(0));
 }
-IRValue *MLIRCodeBuilder::createCall(const std::string &, IRType) {
-  reportFatalError("createCall(noarg) not yet implemented in MLIR backend");
+
+IRValue *MLIRCodeBuilder::createCall(const std::string &FName, IRType RetTy) {
+  return createCall(FName, RetTy, {}, {});
 }
 IRValue *MLIRCodeBuilder::loadAddress(IRValue *Slot, IRType /*AllocTy*/) {
   auto It = PImpl->PointerMap.find(PImpl->unwrap(Slot));

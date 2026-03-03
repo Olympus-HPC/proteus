@@ -53,3 +53,4 @@ CREATE_MLIR_FRONTEND_TEST(mlir_pointer_reassign_dynamic
 CREATE_MLIR_FRONTEND_TEST(mlir_generic_load_store
                           mlir_generic_load_store.cpp)
 CREATE_MLIR_FRONTEND_TEST(mlir_casts mlir_casts.cpp)
+CREATE_MLIR_FRONTEND_TEST(mlir_calls mlir_calls.cpp)
