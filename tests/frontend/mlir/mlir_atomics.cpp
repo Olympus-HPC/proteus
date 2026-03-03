@@ -35,16 +35,20 @@ int main() {
   return 0;
 }
 
+// clang-format off
 // CHECK: %[[OLDMAX:.*]] = memref.generic_atomic_rmw
-// %[[BUFMAX:.*]][%[[IDXMAX:.*]]] : memref<{{.*}}xf32> { CHECK:
-// ^bb0(%[[CURMAX:.*]]: f32): CHECK: %[[NEWMAX:.*]] = arith.maximumf
-// %[[CURMAX]], %{{.*}} : f32 CHECK: memref.atomic_yield %[[NEWMAX]] : f32
+// CHECK-SAME: : memref<{{.*}}xf32> {
+// CHECK: ^bb0(%[[CURMAX:.*]]: f32):
+// CHECK: %[[NEWMAX:.*]] = arith.maximumf %[[CURMAX]], %{{.*}} : f32
+// CHECK: memref.atomic_yield %[[NEWMAX]] : f32
 // CHECK: }
 // CHECK: memref.store %[[OLDMAX]], %[[OLDMAXSLOT:.*]]{{\[.*\]}} : memref<1xf32>
 
 // CHECK: %[[OLDMIN:.*]] = memref.generic_atomic_rmw
-// %[[BUFMIN:.*]][%[[IDXMIN:.*]]] : memref<{{.*}}xf32> { CHECK:
-// ^bb0(%[[CURMIN:.*]]: f32): CHECK: %[[NEWMIN:.*]] = arith.minimumf
-// %[[CURMIN]], %{{.*}} : f32 CHECK: memref.atomic_yield %[[NEWMIN]] : f32
+// CHECK-SAME: : memref<{{.*}}xf32> {
+// CHECK: ^bb0(%[[CURMIN:.*]]: f32):
+// CHECK: %[[NEWMIN:.*]] = arith.minimumf %[[CURMIN]], %{{.*}} : f32
+// CHECK: memref.atomic_yield %[[NEWMIN]] : f32
 // CHECK: }
 // CHECK: memref.store %[[OLDMIN]], %[[OLDMINSLOT:.*]]{{\[.*\]}} : memref<1xf32>
+// clang-format on

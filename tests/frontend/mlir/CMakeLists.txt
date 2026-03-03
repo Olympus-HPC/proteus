@@ -47,3 +47,6 @@ CREATE_MLIR_FRONTEND_TEST(mlir_add_vectors mlir_add_vectors.cpp)
 CREATE_MLIR_FRONTEND_TEST(mlir_array mlir_array.cpp)
 CREATE_MLIR_FRONTEND_TEST(mlir_atomics mlir_atomics.cpp)
 CREATE_MLIR_FRONTEND_TEST(mlir_int_atomics mlir_int_atomics.cpp)
+CREATE_MLIR_FRONTEND_TEST(mlir_pointer_reassign mlir_pointer_reassign.cpp)
+CREATE_MLIR_FRONTEND_TEST(mlir_pointer_reassign_dynamic
+                          mlir_pointer_reassign_dynamic.cpp)

@@ -145,6 +145,24 @@ struct MLIRCodeBuilder::Impl {
     return {Base, Idx};
   }
 
+  std::pair<mlir::Value, mlir::Value> resolvePointerValue(IRValue *Ptr) {
+    // Pointer values in the MLIR backend are represented as:
+    //   - slot: memref<1xindex> holding the current offset at [0]
+    //   - PointerMap[slot]: side-table entry holding the base memref
+    // This helper validates the representation and returns {slot, base}.
+    Value Slot = unwrap(Ptr);
+    auto SlotTy = dyn_cast<MemRefType>(Slot.getType());
+    if (!SlotTy || SlotTy.getRank() != 1 || SlotTy.getShape()[0] != 1 ||
+        !SlotTy.getElementType().isIndex())
+      reportFatalError("expected pointer slot with PointerInfo");
+
+    auto It = PointerMap.find(Ptr);
+    if (It == PointerMap.end() || !It->second.BaseMemRef)
+      reportFatalError("expected pointer slot with PointerInfo");
+
+    return {Slot, It->second.BaseMemRef};
+  }
+
   mlir::Value emitAtomicRmw(AtomicOp Op, mlir::Value Base, mlir::Value Idx,
                             mlir::Value Val) {
     auto Loc = Builder.getUnknownLoc();
@@ -890,14 +908,60 @@ IRValue *MLIRCodeBuilder::loadAddress(IRValue *Slot, IRType /*AllocTy*/) {
 
 void MLIRCodeBuilder::storeAddress(IRValue *Slot, IRValue *Addr) {
   auto Loc = PImpl->Builder.getUnknownLoc();
+  // LHS must be a pointer slot in our canonical representation.
+  Value LhsSlot = PImpl->unwrap(Slot);
+  auto LhsSlotTy = dyn_cast<MemRefType>(LhsSlot.getType());
+  if (!LhsSlotTy || LhsSlotTy.getRank() != 1 || LhsSlotTy.getShape()[0] != 1 ||
+      !LhsSlotTy.getElementType().isIndex())
+    reportFatalError("storeAddress: expected pointer slot (memref<1xindex>)");
+
+  auto LhsIt = PImpl->PointerMap.find(Slot);
+  Value LhsBase =
+      (LhsIt != PImpl->PointerMap.end()) ? LhsIt->second.BaseMemRef : Value{};
+
+  Value RhsIdx;
+  Value RhsBase;
+
   Value AddrV = PImpl->unwrap(Addr);
-  // Record Addr as the base memref for this slot.
-  PImpl->PointerMap[Slot].BaseMemRef = AddrV;
-  // Store offset 0 into the memref<1xindex> slot.
+  auto AddrMemRefTy = dyn_cast<MemRefType>(AddrV.getType());
+  bool IsPointerSlotTy = AddrMemRefTy && AddrMemRefTy.getRank() == 1 &&
+                         AddrMemRefTy.getShape()[0] == 1 &&
+                         AddrMemRefTy.getElementType().isIndex();
+
   Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-  Value Idx = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-  Value SlotV = PImpl->unwrap(Slot);
-  PImpl->Builder.create<memref::StoreOp>(Loc, Zero, SlotV, ValueRange{Idx});
+  if (IsPointerSlotTy) {
+    // Pointer-to-pointer assignment: copy both dynamic offset and base mapping.
+    // This is the key path for re-assignment semantics such as p = &B[i].
+    auto [RhsSlot, ResolvedBase] = PImpl->resolvePointerValue(Addr);
+    RhsBase = ResolvedBase;
+    RhsIdx =
+        PImpl->Builder.create<memref::LoadOp>(Loc, RhsSlot, ValueRange{Zero});
+  } else {
+    // Direct base assignment (e.g. scalar.getAddress() / function arg pointer):
+    // base is Addr itself and offset is reset to 0.
+    RhsBase = AddrV;
+    RhsIdx = Zero;
+  }
+
+  auto RhsBaseTy = dyn_cast<MemRefType>(RhsBase.getType());
+  if (!RhsBaseTy)
+    reportFatalError(
+        "storeAddress: expected memref base for pointer assignment");
+  if (LhsBase) {
+    // Preserve typed-pointer semantics: reject base rebinds with mismatched
+    // element types once LHS has an established base element type.
+    auto LhsBaseTy = dyn_cast<MemRefType>(LhsBase.getType());
+    if (!LhsBaseTy)
+      reportFatalError("storeAddress: invalid existing pointer base");
+    if (LhsBaseTy.getElementType() != RhsBaseTy.getElementType())
+      reportFatalError("pointer reassignment with incompatible element types");
+  }
+
+  // Update the mutable slot offset and side-table base together so later
+  // dereference/atomic operations observe the reassigned pointer value.
+  PImpl->Builder.create<memref::StoreOp>(Loc, RhsIdx, LhsSlot,
+                                         ValueRange{Zero});
+  PImpl->PointerMap[Slot] = {RhsBase};
 }
 
 IRValue *MLIRCodeBuilder::createAtomicAdd(IRValue *Addr, IRValue *Val) {

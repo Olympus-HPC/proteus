@@ -41,20 +41,20 @@ int main() {
   return 0;
 }
 
-// CHECK: %[[OLDADD:.*]] = memref.atomic_rmw addi %{{.*}}, %{{.*}}[%{{.*}}] :
-// (i32, memref<{{.*}}xi32>) -> i32 CHECK: memref.store %[[OLDADD]],
-// %[[ADDRES:.*]]{{\[.*\]}} : memref<1xi32>
+// clang-format off
+// CHECK: %[[OLDADD:.*]] = memref.atomic_rmw addi %{{.*}}, %{{.*}}[%{{.*}}] : (i32, memref<{{.*}}xi32>) -> i32
+// CHECK: memref.store %[[OLDADD]], %[[ADDRES:.*]]{{\[.*\]}} : memref<1xi32>
 
-// CHECK: %[[OLDSUB:.*]] = memref.generic_atomic_rmw %{{.*}}[%{{.*}}] :
-// memref<{{.*}}xi32> { CHECK: ^bb0(%[[CURSUB:.*]]: i32): CHECK: %[[NEWSUB:.*]]
-// = arith.subi %[[CURSUB]], %{{.*}} : i32 CHECK: memref.atomic_yield
-// %[[NEWSUB]] : i32 CHECK: } CHECK: memref.store %[[OLDSUB]],
-// %[[SUBRES:.*]]{{\[.*\]}} : memref<1xi32>
+// CHECK: %[[OLDSUB:.*]] = memref.generic_atomic_rmw %{{.*}}[%{{.*}}] : memref<{{.*}}xi32> {
+// CHECK: ^bb0(%[[CURSUB:.*]]: i32):
+// CHECK: %[[NEWSUB:.*]] = arith.subi %[[CURSUB]], %{{.*}} : i32
+// CHECK: memref.atomic_yield %[[NEWSUB]] : i32
+// CHECK: }
+// CHECK: memref.store %[[OLDSUB]], %[[SUBRES:.*]]{{\[.*\]}} : memref<1xi32>
 
-// CHECK: %[[OLDMAX:.*]] = memref.atomic_rmw maxs %{{.*}}, %{{.*}}[%{{.*}}] :
-// (i32, memref<{{.*}}xi32>) -> i32 CHECK: memref.store %[[OLDMAX]],
-// %[[MAXRES:.*]]{{\[.*\]}} : memref<1xi32>
+// CHECK: %[[OLDMAX:.*]] = memref.atomic_rmw maxs %{{.*}}, %{{.*}}[%{{.*}}] : (i32, memref<{{.*}}xi32>) -> i32
+// CHECK: memref.store %[[OLDMAX]], %[[MAXRES:.*]]{{\[.*\]}} : memref<1xi32>
 
-// CHECK: %[[OLDMIN:.*]] = memref.atomic_rmw mins %{{.*}}, %{{.*}}[%{{.*}}] :
-// (i32, memref<{{.*}}xi32>) -> i32 CHECK: memref.store %[[OLDMIN]],
-// %[[MINRES:.*]]{{\[.*\]}} : memref<1xi32>
+// CHECK: %[[OLDMIN:.*]] = memref.atomic_rmw mins %{{.*}}, %{{.*}}[%{{.*}}] : (i32, memref<{{.*}}xi32>) -> i32
+// CHECK: memref.store %[[OLDMIN]], %[[MINRES:.*]]{{\[.*\]}} : memref<1xi32>
+// clang-format on
