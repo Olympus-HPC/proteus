@@ -30,6 +30,8 @@ int main() {
   return 0;
 }
 
-// CHECK: func.func @add_vectors(%arg0: memref<?xf64>, %arg1: memref<?xf64>,
-// %arg2: i32) CHECK: scf.for CHECK: memref.load CHECK: arith.addf CHECK:
-// memref.store
+// CHECK: func.func @add_vectors
+// CHECK: scf.for
+// CHECK: memref.load
+// CHECK: arith.addf
+// CHECK: memref.store

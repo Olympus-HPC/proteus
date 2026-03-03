@@ -66,6 +66,10 @@ static mlir::Type toMLIRType(IRType Ty, MLIRContext &Ctx) {
   }
 }
 
+static bool isSupportedAtomicFloatType(mlir::Type Ty) {
+  return Ty.isF32() || Ty.isF64();
+}
+
 // ---------------------------------------------------------------------------
 // Impl
 // ---------------------------------------------------------------------------
@@ -96,6 +100,8 @@ struct MLIRCodeBuilder::Impl {
   };
   llvm::DenseMap<IRValue *, PointerInfo> PointerMap;
 
+  enum class AtomicOp { Add, Sub, Max, Min };
+
   explicit Impl() : Builder(&Context) {
     Context.loadDialect<mlir::func::FuncDialect, arith::ArithDialect,
                         memref::MemRefDialect, scf::SCFDialect>();
@@ -116,6 +122,139 @@ struct MLIRCodeBuilder::Impl {
 
   mlir::func::FuncOp unwrapFunction(IRFunction *F) {
     return static_cast<MLIRIRFunction *>(F)->F;
+  }
+
+  std::pair<mlir::Value, mlir::Value> resolveAtomicAddress(IRValue *Addr) {
+    auto It = PointerMap.find(Addr);
+    if (It == PointerMap.end())
+      reportFatalError("atomic on non-pointer address");
+
+    Value Base = It->second.BaseMemRef;
+    if (!Base)
+      reportFatalError("atomic on non-pointer address");
+
+    Value Slot = unwrap(Addr);
+    auto SlotTy = dyn_cast<MemRefType>(Slot.getType());
+    if (!SlotTy || SlotTy.getRank() != 1 || SlotTy.getShape()[0] != 1 ||
+        !SlotTy.getElementType().isIndex())
+      reportFatalError("atomic on non-pointer address");
+
+    auto Loc = Builder.getUnknownLoc();
+    Value Zero = Builder.create<arith::ConstantIndexOp>(Loc, 0);
+    Value Idx = Builder.create<memref::LoadOp>(Loc, Slot, ValueRange{Zero});
+    return {Base, Idx};
+  }
+
+  mlir::Value emitAtomicRmw(AtomicOp Op, mlir::Value Base, mlir::Value Idx,
+                            mlir::Value Val) {
+    auto Loc = Builder.getUnknownLoc();
+    auto BaseTy = dyn_cast<MemRefType>(Base.getType());
+    if (!BaseTy)
+      reportFatalError("atomic op not supported for this type");
+
+    Type ElemTy = BaseTy.getElementType();
+    if (Val.getType() != ElemTy)
+      reportFatalError("atomic op not supported for this type");
+
+    const bool IsInt = mlir::isa<IntegerType>(ElemTy);
+    const bool IsFloat = mlir::isa<FloatType>(ElemTy);
+    if (!IsInt && !IsFloat)
+      reportFatalError("atomic op not supported for this type");
+    if (IsFloat && !isSupportedAtomicFloatType(ElemTy))
+      reportFatalError("atomic op not supported for this type");
+
+    const char *KindStr = nullptr;
+    if (mlir::isa<IntegerType>(ElemTy)) {
+      switch (Op) {
+      case AtomicOp::Add:
+        KindStr = "addi";
+        break;
+      case AtomicOp::Sub:
+        KindStr = nullptr;
+        break;
+      case AtomicOp::Max:
+        KindStr = "maxs";
+        break;
+      case AtomicOp::Min:
+        KindStr = "mins";
+        break;
+      }
+    } else if (mlir::isa<FloatType>(ElemTy)) {
+      switch (Op) {
+      case AtomicOp::Add:
+        KindStr = "addf";
+        break;
+      case AtomicOp::Sub:
+        KindStr = "subf";
+        break;
+      case AtomicOp::Max:
+      case AtomicOp::Min:
+        KindStr = nullptr;
+        break;
+      }
+    }
+
+    if (KindStr) {
+      if (auto MaybeKind = arith::symbolizeAtomicRMWKind(KindStr)) {
+        auto Atomic = Builder.create<memref::AtomicRMWOp>(
+            Loc, *MaybeKind, Val, Base, ValueRange{Idx});
+        return Atomic.getResult();
+      }
+    }
+
+    auto Generic =
+        Builder.create<memref::GenericAtomicRMWOp>(Loc, Base, ValueRange{Idx});
+    {
+      OpBuilder::InsertionGuard Guard(Builder);
+      Region &AtomicBody = Generic.getAtomicBody();
+      if (AtomicBody.empty())
+        AtomicBody.push_back(new Block());
+      Block &Body = AtomicBody.front();
+      if (Body.getNumArguments() == 0)
+        Body.addArgument(ElemTy, Loc);
+      if (!Body.empty() && Body.back().hasTrait<OpTrait::IsTerminator>())
+        Body.back().erase();
+
+      Builder.setInsertionPointToEnd(&Body);
+
+      Value Cur = Body.getArgument(0);
+      Value New;
+      if (IsInt) {
+        switch (Op) {
+        case AtomicOp::Add:
+          New = Builder.create<arith::AddIOp>(Loc, Cur, Val);
+          break;
+        case AtomicOp::Sub:
+          New = Builder.create<arith::SubIOp>(Loc, Cur, Val);
+          break;
+        case AtomicOp::Max:
+          New = Builder.create<arith::MaxSIOp>(Loc, Cur, Val);
+          break;
+        case AtomicOp::Min:
+          New = Builder.create<arith::MinSIOp>(Loc, Cur, Val);
+          break;
+        }
+      } else {
+        switch (Op) {
+        case AtomicOp::Add:
+          New = Builder.create<arith::AddFOp>(Loc, Cur, Val);
+          break;
+        case AtomicOp::Sub:
+          New = Builder.create<arith::SubFOp>(Loc, Cur, Val);
+          break;
+        case AtomicOp::Max:
+          New = Builder.create<arith::MaximumFOp>(Loc, Cur, Val);
+          break;
+        case AtomicOp::Min:
+          New = Builder.create<arith::MinimumFOp>(Loc, Cur, Val);
+          break;
+        }
+      }
+
+      Builder.create<memref::AtomicYieldOp>(Loc, New);
+    }
+
+    return Generic.getResult();
   }
 };
 
@@ -534,18 +673,6 @@ void MLIRCodeBuilder::endWhile() {
   auto Scope = PImpl->ScopeStack.pop_back_val();
   PImpl->Builder.restoreInsertionPoint(Scope.SavedIP);
 }
-IRValue *MLIRCodeBuilder::createAtomicAdd(IRValue *, IRValue *) {
-  reportFatalError("createAtomicAdd not yet implemented in MLIR backend");
-}
-IRValue *MLIRCodeBuilder::createAtomicSub(IRValue *, IRValue *) {
-  reportFatalError("createAtomicSub not yet implemented in MLIR backend");
-}
-IRValue *MLIRCodeBuilder::createAtomicMax(IRValue *, IRValue *) {
-  reportFatalError("createAtomicMax not yet implemented in MLIR backend");
-}
-IRValue *MLIRCodeBuilder::createAtomicMin(IRValue *, IRValue *) {
-  reportFatalError("createAtomicMin not yet implemented in MLIR backend");
-}
 IRValue *MLIRCodeBuilder::createCmp(CmpOp Op, IRValue *LHS, IRValue *RHS,
                                     IRType Ty) {
   auto Loc = PImpl->Builder.getUnknownLoc();
@@ -668,17 +795,31 @@ VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
     OffsetSlot = PImpl->Builder.create<memref::AllocaOp>(Loc, IdxMemRefTy);
   }
 
+  Value BaseMemRef;
+  Value OffsetToStore;
+  if (auto It = PImpl->PointerMap.find(Base); It != PImpl->PointerMap.end()) {
+    BaseMemRef = It->second.BaseMemRef;
+    if (!BaseMemRef)
+      reportFatalError("getElementPtr: null pointer base");
+
+    // Compose GEP offsets when Base is itself a pointer slot.
+    Value BaseSlotV = PImpl->unwrap(Base);
+    Value Idx0 = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+    Value BaseOffset =
+        PImpl->Builder.create<memref::LoadOp>(Loc, BaseSlotV, ValueRange{Idx0});
+    OffsetToStore = PImpl->Builder.create<arith::AddIOp>(Loc, BaseOffset, IdxV);
+  } else {
+    BaseMemRef = PImpl->unwrap(Base);
+    OffsetToStore = IdxV;
+  }
+
   // Store the index as offset.
   Value Idx0 = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-  PImpl->Builder.create<memref::StoreOp>(Loc, IdxV, OffsetSlot,
+  PImpl->Builder.create<memref::StoreOp>(Loc, OffsetToStore, OffsetSlot,
                                          ValueRange{Idx0});
 
   IRValue *SlotIRV = PImpl->wrap(OffsetSlot);
 
-  // Determine the base memref.
-  // For Array BaseTy, Base IS the array memref (the slot itself).
-  // For Pointer BaseTy, Base is the result of loadAddress (the base memref).
-  Value BaseMemRef = PImpl->unwrap(Base);
   PImpl->PointerMap[SlotIRV] = {BaseMemRef};
 
   IRType AllocTy{IRTypeKind::Pointer, ElemTy.Signed, 0, ElemTy.Kind};
@@ -700,15 +841,31 @@ VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
     OffsetSlot = PImpl->Builder.create<memref::AllocaOp>(Loc, IdxMemRefTy);
   }
 
+  Value BaseMemRef;
+  Value OffsetToStore;
+  if (auto It = PImpl->PointerMap.find(Base); It != PImpl->PointerMap.end()) {
+    BaseMemRef = It->second.BaseMemRef;
+    if (!BaseMemRef)
+      reportFatalError("getElementPtr: null pointer base");
+
+    // Compose GEP offsets when Base is itself a pointer slot.
+    Value BaseSlotV = PImpl->unwrap(Base);
+    Value Idx0 = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+    Value BaseOffset =
+        PImpl->Builder.create<memref::LoadOp>(Loc, BaseSlotV, ValueRange{Idx0});
+    OffsetToStore = PImpl->Builder.create<arith::AddIOp>(Loc, BaseOffset, IdxV);
+  } else {
+    BaseMemRef = PImpl->unwrap(Base);
+    OffsetToStore = IdxV;
+  }
+
   // Store the index as offset.
   Value Idx0 = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-  PImpl->Builder.create<memref::StoreOp>(Loc, IdxV, OffsetSlot,
+  PImpl->Builder.create<memref::StoreOp>(Loc, OffsetToStore, OffsetSlot,
                                          ValueRange{Idx0});
 
   IRValue *SlotIRV = PImpl->wrap(OffsetSlot);
 
-  // Determine the base memref.
-  Value BaseMemRef = PImpl->unwrap(Base);
   PImpl->PointerMap[SlotIRV] = {BaseMemRef};
 
   IRType AllocTy{IRTypeKind::Pointer, ElemTy.Signed, 0, ElemTy.Kind};
@@ -726,7 +883,9 @@ IRValue *MLIRCodeBuilder::loadAddress(IRValue *Slot, IRType /*AllocTy*/) {
   auto It = PImpl->PointerMap.find(Slot);
   if (It == PImpl->PointerMap.end())
     reportFatalError("loadAddress: unknown pointer slot");
-  return PImpl->wrap(It->second.BaseMemRef);
+  if (!It->second.BaseMemRef)
+    reportFatalError("loadAddress: null pointer base");
+  return Slot;
 }
 
 void MLIRCodeBuilder::storeAddress(IRValue *Slot, IRValue *Addr) {
@@ -739,6 +898,34 @@ void MLIRCodeBuilder::storeAddress(IRValue *Slot, IRValue *Addr) {
   Value Idx = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
   Value SlotV = PImpl->unwrap(Slot);
   PImpl->Builder.create<memref::StoreOp>(Loc, Zero, SlotV, ValueRange{Idx});
+}
+
+IRValue *MLIRCodeBuilder::createAtomicAdd(IRValue *Addr, IRValue *Val) {
+  auto [Base, Idx] = PImpl->resolveAtomicAddress(Addr);
+  Value Old =
+      PImpl->emitAtomicRmw(Impl::AtomicOp::Add, Base, Idx, PImpl->unwrap(Val));
+  return PImpl->wrap(Old);
+}
+
+IRValue *MLIRCodeBuilder::createAtomicSub(IRValue *Addr, IRValue *Val) {
+  auto [Base, Idx] = PImpl->resolveAtomicAddress(Addr);
+  Value Old =
+      PImpl->emitAtomicRmw(Impl::AtomicOp::Sub, Base, Idx, PImpl->unwrap(Val));
+  return PImpl->wrap(Old);
+}
+
+IRValue *MLIRCodeBuilder::createAtomicMax(IRValue *Addr, IRValue *Val) {
+  auto [Base, Idx] = PImpl->resolveAtomicAddress(Addr);
+  Value Old =
+      PImpl->emitAtomicRmw(Impl::AtomicOp::Max, Base, Idx, PImpl->unwrap(Val));
+  return PImpl->wrap(Old);
+}
+
+IRValue *MLIRCodeBuilder::createAtomicMin(IRValue *Addr, IRValue *Val) {
+  auto [Base, Idx] = PImpl->resolveAtomicAddress(Addr);
+  Value Old =
+      PImpl->emitAtomicRmw(Impl::AtomicOp::Min, Base, Idx, PImpl->unwrap(Val));
+  return PImpl->wrap(Old);
 }
 
 IRValue *MLIRCodeBuilder::loadFromPointee(IRValue *Slot, IRType /*AllocTy*/,
