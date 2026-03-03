@@ -102,6 +102,25 @@ struct MLIRCodeBuilder::Impl {
 
   enum class AtomicOp { Add, Sub, Max, Min };
 
+  mlir::Type toScalarMLIRType(IRType Ty) {
+    if (Ty.Kind == IRTypeKind::Pointer || Ty.Kind == IRTypeKind::Array ||
+        Ty.Kind == IRTypeKind::Void)
+      reportFatalError("expected scalar IRType");
+    return toMLIRScalarType(Ty.Kind, Context);
+  }
+
+  static unsigned getBitWidthOrZero(mlir::Type Ty) {
+    if (auto IntTy = dyn_cast<IntegerType>(Ty))
+      return IntTy.getWidth();
+    if (auto FloatTy = dyn_cast<FloatType>(Ty))
+      return FloatTy.getWidth();
+    return 0;
+  }
+
+  static bool isScalarIntOrFloat(mlir::Type Ty) {
+    return isa<IntegerType>(Ty) || isa<FloatType>(Ty);
+  }
+
   explicit Impl() : Builder(&Context) {
     Context.loadDialect<mlir::func::FuncDialect, arith::ArithDialect,
                         memref::MemRefDialect, scf::SCFDialect>();
@@ -874,11 +893,62 @@ void MLIRCodeBuilder::createStore(IRValue *Val, IRValue *Ptr) {
 
   reportFatalError("MLIRCodeBuilder::createStore: unsupported Ptr form");
 }
-IRValue *MLIRCodeBuilder::createBitCast(IRValue *, IRType) {
-  reportFatalError("createBitCast not yet implemented in MLIR backend");
+IRValue *MLIRCodeBuilder::createBitCast(IRValue *V, IRType DestTy) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+  mlir::Value Src = PImpl->unwrap(V);
+  mlir::Type SrcTy = Src.getType();
+  mlir::Type DstTy = PImpl->toScalarMLIRType(DestTy);
+
+  if (!Impl::isScalarIntOrFloat(SrcTy) || !Impl::isScalarIntOrFloat(DstTy))
+    reportFatalError("createBitCast: only scalar int/float supported");
+
+  if (SrcTy == DstTy)
+    return V;
+
+  const unsigned BWSrc = Impl::getBitWidthOrZero(SrcTy);
+  const unsigned BWDst = Impl::getBitWidthOrZero(DstTy);
+  if (BWSrc == 0 || BWDst == 0 || BWSrc != BWDst)
+    reportFatalError("createBitCast: source and destination must have equal "
+                     "non-zero bitwidth");
+
+  Value Res = PImpl->Builder.create<arith::BitcastOp>(Loc, DstTy, Src);
+  return PImpl->wrap(Res);
 }
-IRValue *MLIRCodeBuilder::createZExt(IRValue *, IRType) {
-  reportFatalError("createZExt not yet implemented in MLIR backend");
+IRValue *MLIRCodeBuilder::createZExt(IRValue *V, IRType DestTy) {
+  auto Loc = PImpl->Builder.getUnknownLoc();
+  mlir::Value Src = PImpl->unwrap(V);
+  mlir::Type SrcTy = Src.getType();
+  mlir::Type DstTy = PImpl->toScalarMLIRType(DestTy);
+
+  if (isa<FloatType>(SrcTy) || isa<FloatType>(DstTy))
+    reportFatalError("createZExt: float types are not supported");
+
+  const bool SrcIsInt = isa<IntegerType>(SrcTy);
+  const bool DstIsInt = isa<IntegerType>(DstTy);
+  const bool SrcIsIndex = isa<IndexType>(SrcTy);
+  const bool DstIsIndex = isa<IndexType>(DstTy);
+  if ((!SrcIsInt && !SrcIsIndex) || (!DstIsInt && !DstIsIndex))
+    reportFatalError("createZExt: only integer/index types are supported");
+
+  if (SrcTy == DstTy)
+    return V;
+
+  if (SrcIsInt && DstIsInt) {
+    auto SrcIntTy = cast<IntegerType>(SrcTy);
+    auto DstIntTy = cast<IntegerType>(DstTy);
+    if (DstIntTy.getWidth() <= SrcIntTy.getWidth())
+      reportFatalError("createZExt: destination integer must be wider than "
+                       "source integer");
+    Value Res = PImpl->Builder.create<arith::ExtUIOp>(Loc, DstTy, Src);
+    return PImpl->wrap(Res);
+  }
+
+  if ((SrcIsIndex && DstIsInt) || (SrcIsInt && DstIsIndex)) {
+    Value Res = PImpl->Builder.create<arith::IndexCastUIOp>(Loc, DstTy, Src);
+    return PImpl->wrap(Res);
+  }
+
+  reportFatalError("createZExt: unsupported type combination");
 }
 VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
                                         IRValue *Index, IRType ElemTy) {
