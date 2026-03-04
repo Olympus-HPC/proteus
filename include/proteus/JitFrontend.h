@@ -4,8 +4,8 @@
 #include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.h"
 #include "proteus/Frontend/Func.h"
+#include "proteus/Frontend/LLVMCodeBuilder.h"
 #include "proteus/Frontend/LoopNest.h"
-#include "proteus/Frontend/TypeMap.h"
 #include "proteus/Init.h"
 
 #include <deque>

@@ -14,10 +14,9 @@ set(SOURCES
   Frontend/Func.cpp
   Frontend/JitFrontend.cpp
   Frontend/LLVMCodeBuilder.cpp
-  Frontend/LoopUnroller.cpp
   Frontend/TargetModel.cpp
   Frontend/TypeMap.cpp
-  Frontend/VarStorage.cpp
+  Frontend/LLVMTypeMap.cpp
 )
 
 set(PROTEUS_PROJECT_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")

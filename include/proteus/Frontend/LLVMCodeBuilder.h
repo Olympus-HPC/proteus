@@ -1,12 +1,10 @@
 #ifndef PROTEUS_FRONTEND_LLVM_CODE_BUILDER_H
 #define PROTEUS_FRONTEND_LLVM_CODE_BUILDER_H
 
-#include "proteus/AddressSpace.h"
-#include "proteus/Error.h"
-#include "proteus/Frontend/TargetModel.h"
-#include "proteus/Frontend/VarStorage.h"
+#include "proteus/Frontend/CodeBuilder.h"
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <tuple>
@@ -21,174 +19,67 @@ class IRBuilderBase;
 class LLVMContext;
 class Module;
 class Type;
-class Value;
 } // namespace llvm
 
 namespace proteus {
 
-enum class ScopeKind { FUNCTION, IF, FOR, WHILE };
-
-inline std::string toString(ScopeKind Kind) {
-  switch (Kind) {
-  case ScopeKind::FUNCTION:
-    return "FUNCTION";
-  case ScopeKind::IF:
-    return "IF";
-  case ScopeKind::FOR:
-    return "FOR";
-  case ScopeKind::WHILE:
-    return "WHILE";
-  default:
-    reportFatalError("Unsupported Kind " +
-                     std::to_string(static_cast<int>(Kind)));
-  }
-}
-
 /// LLVMCodeBuilder encapsulates LLVM IR generation using IRBuilder.
 /// It manages insertion points, scopes, and provides methods for
 /// creating LLVM IR instructions.
-class LLVMCodeBuilder {
+class LLVMCodeBuilder : public CodeBuilder {
 public:
   /// Construct as owner of LLVMContext and Module.
   LLVMCodeBuilder(std::unique_ptr<llvm::LLVMContext> Ctx,
                   std::unique_ptr<llvm::Module> Mod,
                   TargetModelType TM = TargetModelType::HOST);
-  ~LLVMCodeBuilder();
+  ~LLVMCodeBuilder() override;
 
-  TargetModelType getTargetModel() const { return TargetModel; }
+  TargetModelType getTargetModel() const override { return TargetModel; }
 
   LLVMCodeBuilder(const LLVMCodeBuilder &) = delete;
   LLVMCodeBuilder &operator=(const LLVMCodeBuilder &) = delete;
 
-  /// Get the underlying IRBuilderBase (e.g., for VarStorage construction).
+  // -----------------------------------------------------------------------
+  // LLVM-specific (non-virtual) accessors.
+  // -----------------------------------------------------------------------
+
+  /// Get the underlying IRBuilderBase (internal use only).
   llvm::IRBuilderBase &getIRBuilder();
 
   llvm::Function &getFunction();
   llvm::Module &getModule();
   llvm::LLVMContext &getContext();
 
-  /// Create a new Function in the owned Module, initialise its entry block,
-  /// and make it the current active function.  Only valid on the owning
-  /// constructor variant.
-  llvm::Function *addFunction(const std::string &Name, llvm::Type *RetTy,
-                              const std::vector<llvm::Type *> &ArgTys);
-
   /// Transfer ownership of the LLVMContext (leaves internal pointer null).
   std::unique_ptr<llvm::LLVMContext> takeLLVMContext();
   /// Transfer ownership of the Module (leaves internal pointer null).
   std::unique_ptr<llvm::Module> takeModule();
 
-  // Insertion point management.
-  void setInsertPoint(llvm::BasicBlock *BB);
-  void setInsertPointBegin(llvm::BasicBlock *BB);
-  void setInsertPointAtEntry();
-  void clearInsertPoint();
-  llvm::BasicBlock *getInsertBlock();
-
+  // -----------------------------------------------------------------------
   // Basic block operations.
+  // -----------------------------------------------------------------------
   std::tuple<llvm::BasicBlock *, llvm::BasicBlock *> splitCurrentBlock();
   llvm::BasicBlock *createBasicBlock(const std::string &Name = "",
                                      llvm::BasicBlock *InsertBefore = nullptr);
   void eraseTerminator(llvm::BasicBlock *BB);
   llvm::BasicBlock *getUniqueSuccessor(llvm::BasicBlock *BB);
 
+  // -----------------------------------------------------------------------
   // Scope management.
+  // -----------------------------------------------------------------------
   void pushScope(const char *File, int Line, ScopeKind Kind,
                  llvm::BasicBlock *NextBlock);
 
-  // High-level scope operations.
-  /// Begin code generation for Fn.  Sets the active function to Fn.
-  void beginFunction(llvm::Function &Fn, const char *File, int Line);
-  void endFunction();
-  void beginIf(llvm::Value *Cond, const char *File, int Line);
-  void endIf();
-  void endFor();
-  void endWhile();
-
-  // Arithmetic operations.
-  llvm::Value *createAdd(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFAdd(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createSub(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFSub(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createMul(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFMul(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createUDiv(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createSDiv(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFDiv(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createURem(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createSRem(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFRem(llvm::Value *LHS, llvm::Value *RHS);
-
-  // Atomic operations.
-  llvm::Value *createAtomicAdd(llvm::Value *Addr, llvm::Value *Val);
-  llvm::Value *createAtomicSub(llvm::Value *Addr, llvm::Value *Val);
-  llvm::Value *createAtomicMax(llvm::Value *Addr, llvm::Value *Val);
-  llvm::Value *createAtomicMin(llvm::Value *Addr, llvm::Value *Val);
-
-  // Comparison operations.
-  llvm::Value *createICmpEQ(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createICmpNE(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createICmpSLT(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createICmpSGT(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createICmpSGE(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createICmpSLE(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createICmpUGT(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createICmpUGE(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createICmpULT(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createICmpULE(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFCmpOEQ(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFCmpONE(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFCmpOLT(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFCmpOLE(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFCmpOGT(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFCmpOGE(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFCmpULT(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createFCmpULE(llvm::Value *LHS, llvm::Value *RHS);
-
-  // Logical operations.
-  llvm::Value *createAnd(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createOr(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createXor(llvm::Value *LHS, llvm::Value *RHS);
-  llvm::Value *createNot(llvm::Value *Val);
-
-  // Load/Store operations.
-  llvm::Value *createLoad(llvm::Type *Ty, llvm::Value *Ptr,
-                          const std::string &Name = "");
-  void createStore(llvm::Value *Val, llvm::Value *Ptr);
-
-  // Control flow operations.
+  // -----------------------------------------------------------------------
+  // Control flow (LLVM-specific overloads / extensions).
+  // -----------------------------------------------------------------------
   void createBr(llvm::BasicBlock *Dest);
-  void createCondBr(llvm::Value *Cond, llvm::BasicBlock *True,
+  void createCondBr(IRValue *Cond, llvm::BasicBlock *True,
                     llvm::BasicBlock *False);
-  void createRetVoid();
-  void createRet(llvm::Value *V);
 
-  // Cast operations.
-  llvm::Value *createIntCast(llvm::Value *V, llvm::Type *DestTy, bool IsSigned);
-  llvm::Value *createFPCast(llvm::Value *V, llvm::Type *DestTy);
-  llvm::Value *createSIToFP(llvm::Value *V, llvm::Type *DestTy);
-  llvm::Value *createUIToFP(llvm::Value *V, llvm::Type *DestTy);
-  llvm::Value *createFPToSI(llvm::Value *V, llvm::Type *DestTy);
-  llvm::Value *createFPToUI(llvm::Value *V, llvm::Type *DestTy);
-  llvm::Value *createBitCast(llvm::Value *V, llvm::Type *DestTy);
-  llvm::Value *createZExt(llvm::Value *V, llvm::Type *DestTy);
-
-  // Constant creation.
-  llvm::Value *getConstantInt(llvm::Type *Ty, uint64_t Val);
-  llvm::Value *getConstantFP(llvm::Type *Ty, double Val);
-
-  // GEP operations.
-  llvm::Value *createInBoundsGEP(llvm::Type *Ty, llvm::Value *Ptr,
-                                 const std::vector<llvm::Value *> IdxList,
-                                 const std::string &Name = "");
-  // NOLINTNEXTLINE
-  llvm::Value *createConstInBoundsGEP1_64(llvm::Type *Ty, llvm::Value *Ptr,
-                                          size_t Idx);
-  // NOLINTNEXTLINE
-  llvm::Value *createConstInBoundsGEP2_64(llvm::Type *Ty, llvm::Value *Ptr,
-                                          size_t Idx0, size_t Idx1);
-
+  // -----------------------------------------------------------------------
   // Type accessors.
+  // -----------------------------------------------------------------------
   llvm::Type *getPointerType(llvm::Type *ElemTy, unsigned AS);
   llvm::Type *getPointerTypeUnqual(llvm::Type *ElemTy);
   llvm::Type *getInt16Ty();
@@ -196,35 +87,142 @@ public:
   llvm::Type *getInt64Ty();
   llvm::Type *getFloatTy();
 
+  // -----------------------------------------------------------------------
   // Type queries.
+  // -----------------------------------------------------------------------
   unsigned getAddressSpace(llvm::Type *Ty);
-  unsigned getAddressSpaceFromValue(llvm::Value *PtrVal);
   bool isIntegerTy(llvm::Type *Ty);
   bool isFloatingPointTy(llvm::Type *Ty);
 
-  // Call operations.
-  llvm::Value *createCall(const std::string &FName, llvm::Type *RetTy,
-                          const std::vector<llvm::Type *> &ArgTys,
-                          const std::vector<llvm::Value *> &Args);
-  llvm::Value *createCall(const std::string &FName, llvm::Type *RetTy);
-
+  // -----------------------------------------------------------------------
   // Alloca/array emission.
-  llvm::Value *emitAlloca(llvm::Type *Ty, const std::string &Name,
-                          AddressSpace AS = AddressSpace::DEFAULT);
-  llvm::Value *emitArrayCreate(llvm::Type *Ty, AddressSpace AT,
-                               const std::string &Name);
-  std::unique_ptr<ScalarStorage> createScalarStorage(const std::string &Name,
-                                                     llvm::Type *AllocaTy);
-  std::unique_ptr<PointerStorage> createPointerStorage(const std::string &Name,
-                                                       llvm::Type *AllocaTy,
-                                                       llvm::Type *ElemTy);
-  std::unique_ptr<ArrayStorage> createArrayStorage(const std::string &Name,
-                                                   AddressSpace AS,
-                                                   llvm::Type *ArrTy);
+  // -----------------------------------------------------------------------
+  IRValue *emitAlloca(llvm::Type *Ty, const std::string &Name,
+                      AddressSpace AS = AddressSpace::DEFAULT);
+  IRValue *emitArrayCreate(llvm::Type *Ty, AddressSpace AT,
+                           const std::string &Name);
+
+  // -----------------------------------------------------------------------
+  // CodeBuilder overrides — function management.
+  // -----------------------------------------------------------------------
+  IRFunction *addFunction(const std::string &Name, IRType RetTy,
+                          const std::vector<IRType> &ArgTys) override;
+  void setFunctionName(IRFunction *F, const std::string &Name) override;
+  IRValue *getArg(IRFunction *F, size_t Idx) override;
+  void beginFunction(IRFunction *F, const char *File, int Line) override;
+  void endFunction() override;
+
+  // -----------------------------------------------------------------------
+  // CodeBuilder overrides — insertion point management.
+  // -----------------------------------------------------------------------
+  void setInsertPointAtEntry() override;
+  void clearInsertPoint() override;
+
+  // -----------------------------------------------------------------------
+  // CodeBuilder overrides — high-level control flow.
+  // -----------------------------------------------------------------------
+  void beginIf(IRValue *Cond, const char *File, int Line) override;
+  void endIf() override;
+  void beginFor(IRValue *IterSlot, IRType IterTy, IRValue *InitVal,
+                IRValue *UpperBoundVal, IRValue *IncVal, bool IsSigned,
+                const char *File, int Line, LoopHints Hints = {}) override;
+  void endFor() override;
+  void beginWhile(std::function<IRValue *()> CondFn, const char *File,
+                  int Line) override;
+  void endWhile() override;
+  void createRetVoid() override;
+  void createRet(IRValue *V) override;
+
+  // -----------------------------------------------------------------------
+  // CodeBuilder overrides — arithmetic.
+  // -----------------------------------------------------------------------
+  IRValue *createArith(ArithOp Op, IRValue *LHS, IRValue *RHS,
+                       IRType Ty) override;
+
+  // -----------------------------------------------------------------------
+  // CodeBuilder overrides — atomics.
+  // -----------------------------------------------------------------------
+  IRValue *createAtomicAdd(IRValue *Addr, IRValue *Val) override;
+  IRValue *createAtomicSub(IRValue *Addr, IRValue *Val) override;
+  IRValue *createAtomicMax(IRValue *Addr, IRValue *Val) override;
+  IRValue *createAtomicMin(IRValue *Addr, IRValue *Val) override;
+
+  // -----------------------------------------------------------------------
+  // CodeBuilder overrides — comparisons.
+  // -----------------------------------------------------------------------
+  IRValue *createCmp(CmpOp Op, IRValue *LHS, IRValue *RHS, IRType Ty) override;
+
+  // -----------------------------------------------------------------------
+  // CodeBuilder overrides — logical.
+  // -----------------------------------------------------------------------
+  IRValue *createAnd(IRValue *LHS, IRValue *RHS) override;
+  IRValue *createOr(IRValue *LHS, IRValue *RHS) override;
+  IRValue *createXor(IRValue *LHS, IRValue *RHS) override;
+  IRValue *createNot(IRValue *Val) override;
+
+  // -----------------------------------------------------------------------
+  // CodeBuilder overrides — load/store.
+  // -----------------------------------------------------------------------
+  IRValue *createLoad(IRType Ty, IRValue *Ptr,
+                      const std::string &Name = "") override;
+  void createStore(IRValue *Val, IRValue *Ptr) override;
+
+  // -----------------------------------------------------------------------
+  // CodeBuilder overrides — casts.
+  // -----------------------------------------------------------------------
+  IRValue *createCast(IRValue *V, IRType FromTy, IRType ToTy) override;
+  IRValue *createBitCast(IRValue *V, IRType DestTy) override;
+  IRValue *createZExt(IRValue *V, IRType DestTy) override;
+
+  // -----------------------------------------------------------------------
+  // CodeBuilder overrides — constants.
+  // -----------------------------------------------------------------------
+  IRValue *getConstantInt(IRType Ty, uint64_t Val) override;
+  IRValue *getConstantFP(IRType Ty, double Val) override;
+
+  // -----------------------------------------------------------------------
+  // CodeBuilder overrides — GEP.
+  // -----------------------------------------------------------------------
+  VarAlloc getElementPtr(IRValue *Base, IRType BaseTy, IRValue *Index,
+                         IRType ElemTy) override;
+  VarAlloc getElementPtr(IRValue *Base, IRType BaseTy, size_t Index,
+                         IRType ElemTy) override;
+
+  // -----------------------------------------------------------------------
+  // CodeBuilder overrides — calls.
+  // -----------------------------------------------------------------------
+  IRValue *createCall(const std::string &FName, IRType RetTy,
+                      const std::vector<IRType> &ArgTys,
+                      const std::vector<IRValue *> &Args) override;
+  IRValue *createCall(const std::string &FName, IRType RetTy) override;
+
+  // -----------------------------------------------------------------------
+  // CodeBuilder overrides — storage-aware load/store.
+  // -----------------------------------------------------------------------
+  IRValue *loadScalar(IRValue *Slot, IRType ValueTy) override;
+  void storeScalar(IRValue *Slot, IRValue *Val) override;
+  IRValue *loadAddress(IRValue *Slot, IRType AllocTy) override;
+  void storeAddress(IRValue *Slot, IRValue *Addr) override;
+  IRValue *loadFromPointee(IRValue *Slot, IRType AllocTy,
+                           IRType ValueTy) override;
+  void storeToPointee(IRValue *Slot, IRType AllocTy, IRValue *Val) override;
+
+  // -----------------------------------------------------------------------
+  // CodeBuilder overrides — alloc factories.
+  // -----------------------------------------------------------------------
+  VarAlloc allocScalar(const std::string &Name, IRType ValueTy) override;
+  VarAlloc allocPointer(const std::string &Name, IRType ElemTy,
+                        unsigned AddrSpace = 0) override;
+  VarAlloc allocArray(const std::string &Name, AddressSpace AS, IRType ElemTy,
+                      size_t NElem) override;
+
+  // -----------------------------------------------------------------------
+  // CodeBuilder overrides — GPU kernel support.
+  // -----------------------------------------------------------------------
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
-  void setKernel(llvm::Function &Fn);
-  void setLaunchBoundsForKernel(llvm::Function &Fn, int MaxThreadsPerBlock,
-                                int MinBlocksPerSM);
+  void setKernel(IRFunction *F) override;
+  void setLaunchBoundsForKernel(IRFunction *F, int MaxThreadsPerBlock,
+                                int MinBlocksPerSM) override;
 #endif
 
 private:
@@ -232,6 +230,77 @@ private:
   std::unique_ptr<Impl> PImpl;
   llvm::Function *F;
   TargetModelType TargetModel;
+
+  /// Unwrap an opaque IRFunction back to a raw llvm::Function pointer.
+  llvm::Function *unwrapFunction(IRFunction *IRF);
+
+  // -----------------------------------------------------------------------
+  // Insertion point management (LLVM-specific extensions).
+  // -----------------------------------------------------------------------
+  void setInsertPoint(llvm::BasicBlock *BB);
+  void setInsertPointBegin(llvm::BasicBlock *BB);
+  llvm::BasicBlock *getInsertBlock();
+
+  // -----------------------------------------------------------------------
+  // Private low-level arithmetic dispatch (called by createArith).
+  // -----------------------------------------------------------------------
+  IRValue *createAdd(IRValue *LHS, IRValue *RHS);
+  IRValue *createFAdd(IRValue *LHS, IRValue *RHS);
+  IRValue *createSub(IRValue *LHS, IRValue *RHS);
+  IRValue *createFSub(IRValue *LHS, IRValue *RHS);
+  IRValue *createMul(IRValue *LHS, IRValue *RHS);
+  IRValue *createFMul(IRValue *LHS, IRValue *RHS);
+  IRValue *createUDiv(IRValue *LHS, IRValue *RHS);
+  IRValue *createSDiv(IRValue *LHS, IRValue *RHS);
+  IRValue *createFDiv(IRValue *LHS, IRValue *RHS);
+  IRValue *createURem(IRValue *LHS, IRValue *RHS);
+  IRValue *createSRem(IRValue *LHS, IRValue *RHS);
+  IRValue *createFRem(IRValue *LHS, IRValue *RHS);
+
+  // -----------------------------------------------------------------------
+  // Private low-level comparison dispatch (called by createCmp).
+  // -----------------------------------------------------------------------
+  IRValue *createICmpEQ(IRValue *LHS, IRValue *RHS);
+  IRValue *createICmpNE(IRValue *LHS, IRValue *RHS);
+  IRValue *createICmpSLT(IRValue *LHS, IRValue *RHS);
+  IRValue *createICmpSGT(IRValue *LHS, IRValue *RHS);
+  IRValue *createICmpSGE(IRValue *LHS, IRValue *RHS);
+  IRValue *createICmpSLE(IRValue *LHS, IRValue *RHS);
+  IRValue *createICmpUGT(IRValue *LHS, IRValue *RHS);
+  IRValue *createICmpUGE(IRValue *LHS, IRValue *RHS);
+  IRValue *createICmpULT(IRValue *LHS, IRValue *RHS);
+  IRValue *createICmpULE(IRValue *LHS, IRValue *RHS);
+  IRValue *createFCmpOEQ(IRValue *LHS, IRValue *RHS);
+  IRValue *createFCmpONE(IRValue *LHS, IRValue *RHS);
+  IRValue *createFCmpOLT(IRValue *LHS, IRValue *RHS);
+  IRValue *createFCmpOLE(IRValue *LHS, IRValue *RHS);
+  IRValue *createFCmpOGT(IRValue *LHS, IRValue *RHS);
+  IRValue *createFCmpOGE(IRValue *LHS, IRValue *RHS);
+  IRValue *createFCmpULT(IRValue *LHS, IRValue *RHS);
+  IRValue *createFCmpULE(IRValue *LHS, IRValue *RHS);
+
+  // -----------------------------------------------------------------------
+  // Private low-level cast dispatch (called by createCast).
+  // -----------------------------------------------------------------------
+  IRValue *createIntCast(IRValue *V, IRType DestTy, bool IsSigned);
+  IRValue *createFPCast(IRValue *V, IRType DestTy);
+  IRValue *createSIToFP(IRValue *V, IRType DestTy);
+  IRValue *createUIToFP(IRValue *V, IRType DestTy);
+  IRValue *createFPToSI(IRValue *V, IRType DestTy);
+  IRValue *createFPToUI(IRValue *V, IRType DestTy);
+
+  // -----------------------------------------------------------------------
+  // Private GEP helpers (called by getElementPtr).
+  // -----------------------------------------------------------------------
+  IRValue *createInBoundsGEP(IRType Ty, IRValue *Ptr,
+                             const std::vector<IRValue *> &IdxList,
+                             const std::string &Name = "");
+  // NOLINTNEXTLINE
+  IRValue *createConstInBoundsGEP1_64(IRType Ty, IRValue *Ptr, size_t Idx);
+  // NOLINTNEXTLINE
+  IRValue *createConstInBoundsGEP2_64(IRType Ty, IRValue *Ptr, size_t Idx0,
+                                      size_t Idx1);
+  unsigned getAddressSpaceFromValue(IRValue *PtrVal);
 };
 
 } // namespace proteus

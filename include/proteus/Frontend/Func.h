@@ -2,28 +2,15 @@
 #define PROTEUS_FRONTEND_FUNC_H
 
 #include "proteus/AddressSpace.h"
-#include "proteus/Error.h"
+#include "proteus/Frontend/CodeBuilder.h"
 #include "proteus/Frontend/Dispatcher.h"
-#include "proteus/Frontend/LLVMCodeBuilder.h"
-#include "proteus/Frontend/TargetModel.h"
 #include "proteus/Frontend/TypeMap.h"
 #include "proteus/Frontend/TypeTraits.h"
 #include "proteus/Frontend/Var.h"
-#include "proteus/Frontend/VarStorage.h"
 
-#include <cstdint>
 #include <functional>
-#include <memory>
 #include <optional>
 #include <vector>
-
-namespace llvm {
-class BasicBlock;
-class Function;
-class Type;
-class Value;
-class LLVMContext;
-} // namespace llvm
 
 namespace proteus {
 
@@ -59,27 +46,23 @@ class FuncBase {
 public:
   JitModule &getJitModule() { return J; }
 
-  llvm::LLVMContext &getContext();
-
-  /// Get the underlying LLVMCodeBuilder for direct IR generation.
-  LLVMCodeBuilder &getCodeBuilder();
+  /// Get the underlying CodeBuilder for direct IR generation.
+  CodeBuilder &getCodeBuilder();
 
 protected:
   JitModule &J;
 
   std::string Name;
-  LLVMCodeBuilder *CB;
-  llvm::Function *LLVMFunc;
+  CodeBuilder *CB;
+  IRFunction *Func;
 
 public:
-  FuncBase(JitModule &J, LLVMCodeBuilder &CB, const std::string &Name,
-           llvm::Type *RetTy, const std::vector<llvm::Type *> &ArgTys);
+  FuncBase(JitModule &J, CodeBuilder &CB, const std::string &Name, IRType RetTy,
+           const std::vector<IRType> &ArgTys);
   ~FuncBase();
 
-  TargetModelType getTargetModel() const;
-
-  llvm::Function *getFunction();
-  llvm::Value *getArg(size_t Idx);
+  IRFunction *getFunction();
+  IRValue *getArg(size_t Idx);
 
 #if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
   // Kernel management.
@@ -92,14 +75,12 @@ public:
     static_assert(!std::is_reference_v<T>,
                   "declVar does not support reference types");
 
-    auto &Ctx = getContext();
-    llvm::Type *AllocaTy = TypeMap<T>::get(Ctx);
-
     if constexpr (std::is_pointer_v<T>) {
-      llvm::Type *PtrElemTy = TypeMap<T>::getPointerElemType(Ctx);
-      return Var<T>{CB->createPointerStorage(Name, AllocaTy, PtrElemTy), *CB};
+      IRType ElemIRTy = *TypeMap<T>::getPointerElemType();
+      return Var<T>{CB->allocPointer(Name, ElemIRTy), *CB};
     } else {
-      return Var<T>{CB->createScalarStorage(Name, AllocaTy), *CB};
+      IRType AllocaIRTy = TypeMap<T>::get();
+      return Var<T>{CB->allocScalar(Name, AllocaIRTy), *CB};
     }
   }
 
@@ -108,9 +89,9 @@ public:
                  const std::string &Name = "array_var") {
     static_assert(std::is_array_v<T>, "Expected array type");
 
-    auto *ArrTy = TypeMap<T>::get(getContext(), NElem);
-
-    return Var<T>{CB->createArrayStorage(Name, AS, ArrTy), *CB};
+    IRType ArrIRTy = TypeMap<T>::get(NElem);
+    IRType ElemIRTy{ArrIRTy.ElemKind, ArrIRTy.Signed};
+    return Var<T>{CB->allocArray(Name, AS, ElemIRTy, ArrIRTy.NElem), *CB};
   }
 
   template <typename... Ts> auto declVars() {
@@ -204,7 +185,7 @@ public:
   void beginFor(Var<IterT> &IterVar, const Var<InitT> &InitVar,
                 const Var<UpperT> &UpperBound, const Var<IncT> &IncVar,
                 const char *File = __builtin_FILE(),
-                int Line = __builtin_LINE());
+                int Line = __builtin_LINE(), LoopHints Hints = {});
   void endFor();
 
   template <typename CondLambda>
@@ -317,7 +298,7 @@ private:
   template <typename T, std::size_t ArgIdx> Var<T> createArg() {
     auto Var = declVar<T>("arg." + std::to_string(ArgIdx));
     if constexpr (std::is_pointer_v<T>) {
-      Var.storePointer(FuncBase::getArg(ArgIdx));
+      Var.storeAddress(FuncBase::getArg(ArgIdx));
     } else {
       Var.storeValue(FuncBase::getArg(ArgIdx));
     }
@@ -337,10 +318,9 @@ private:
   }
 
 public:
-  Func(JitModule &J, LLVMCodeBuilder &CB, const std::string &Name,
+  Func(JitModule &J, CodeBuilder &CB, const std::string &Name,
        Dispatcher &Dispatch)
-      : FuncBase(J, CB, Name, TypeMap<RetT>::get(CB.getContext()),
-                 {TypeMap<ArgT>::get(CB.getContext())...}),
+      : FuncBase(J, CB, Name, TypeMap<RetT>::get(), {TypeMap<ArgT>::get()...}),
         Dispatch(Dispatch) {}
 
   RetT operator()(ArgT... Args);
@@ -364,84 +344,21 @@ public:
 template <typename IterT, typename InitT, typename UpperT, typename IncT>
 void FuncBase::beginFor(Var<IterT> &IterVar, const Var<InitT> &Init,
                         const Var<UpperT> &UpperBound, const Var<IncT> &Inc,
-                        const char *File, int Line) {
+                        const char *File, int Line, LoopHints Hints) {
   static_assert(std::is_integral_v<std::remove_const_t<IterT>>,
                 "Loop iterator must be an integral type");
   static_assert(is_mutable_v<IterT>, "Loop iterator must be mutable");
 
-  // Update the terminator of the current basic block due to the split
-  // control-flow.
-  auto [CurBlock, NextBlock] = CB->splitCurrentBlock();
-  CB->pushScope(File, Line, ScopeKind::FOR, NextBlock);
-
-  llvm::BasicBlock *Header = CB->createBasicBlock("loop.header", NextBlock);
-  llvm::BasicBlock *LoopCond = CB->createBasicBlock("loop.cond", NextBlock);
-  llvm::BasicBlock *Body = CB->createBasicBlock("loop.body", NextBlock);
-  llvm::BasicBlock *Latch = CB->createBasicBlock("loop.inc", NextBlock);
-  llvm::BasicBlock *LoopExit = CB->createBasicBlock("loop.end", NextBlock);
-
-  // Erase the old terminator and branch to the header.
-  CB->eraseTerminator(CurBlock);
-  CB->setInsertPoint(CurBlock);
-  { CB->createBr(Header); }
-
-  CB->setInsertPoint(Header);
-  {
-    IterVar = Init;
-    CB->createBr(LoopCond);
-  }
-
-  CB->setInsertPoint(LoopCond);
-  {
-    auto CondVar = IterVar < UpperBound;
-    llvm::Value *Cond = CondVar.loadValue();
-    CB->createCondBr(Cond, Body, LoopExit);
-  }
-
-  CB->setInsertPoint(Body);
-  CB->createBr(Latch);
-
-  CB->setInsertPoint(Latch);
-  {
-    IterVar = IterVar + Inc;
-    CB->createBr(LoopCond);
-  }
-
-  CB->setInsertPoint(LoopExit);
-  { CB->createBr(NextBlock); }
-
-  CB->setInsertPointBegin(Body);
+  CB->beginFor(IterVar.getSlot(), IterVar.getValueType(), Init.loadValue(),
+               UpperBound.loadValue(), Inc.loadValue(),
+               std::is_signed_v<std::remove_const_t<IterT>>, File, Line, Hints);
 }
 
 template <typename CondLambda>
 void FuncBase::beginWhile(CondLambda &&Cond, const char *File, int Line) {
-  // Update the terminator of the current basic block due to the split
-  // control-flow.
-  auto [CurBlock, NextBlock] = CB->splitCurrentBlock();
-  CB->pushScope(File, Line, ScopeKind::WHILE, NextBlock);
-
-  llvm::BasicBlock *LoopCond = CB->createBasicBlock("while.cond", NextBlock);
-  llvm::BasicBlock *Body = CB->createBasicBlock("while.body", NextBlock);
-  llvm::BasicBlock *LoopExit = CB->createBasicBlock("while.end", NextBlock);
-
-  CB->eraseTerminator(CurBlock);
-  CB->setInsertPoint(CurBlock);
-  { CB->createBr(LoopCond); }
-
-  CB->setInsertPoint(LoopCond);
-  {
-    auto CondVar = Cond();
-    llvm::Value *CondV = CondVar.loadValue();
-    CB->createCondBr(CondV, Body, LoopExit);
-  }
-
-  CB->setInsertPoint(Body);
-  CB->createBr(LoopCond);
-
-  CB->setInsertPoint(LoopExit);
-  { CB->createBr(NextBlock); }
-
-  CB->setInsertPointBegin(Body);
+  CB->beginWhile([Cond = std::forward<CondLambda>(
+                      Cond)]() -> IRValue * { return Cond().loadValue(); },
+                 File, Line);
 }
 
 template <typename Sig, typename... ArgVars>
@@ -453,14 +370,13 @@ FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
   auto GetArgVal = [](auto &&Arg) {
     using ArgVarT = std::decay_t<decltype(Arg)>;
     if constexpr (std::is_pointer_v<typename ArgVarT::ValueType>)
-      return Arg.loadPointer();
+      return Arg.loadAddress();
     else
       return Arg.loadValue();
   };
 
-  auto &Ctx = getContext();
-  std::vector<llvm::Type *> ArgTys = unpackArgTypes(ArgT{}, Ctx);
-  getCodeBuilder().createCall(Name, TypeMap<RetT>::get(getContext()), ArgTys,
+  std::vector<IRType> ArgTys = unpackArgTypes(ArgT{});
+  getCodeBuilder().createCall(Name, TypeMap<RetT>::get(), ArgTys,
                               {GetArgVal(ArgsVars)...});
 }
 
@@ -470,8 +386,7 @@ std::enable_if_t<!std::is_void_v<typename FnSig<Sig>::RetT>,
 FuncBase::call(const std::string &Name) {
   using RetT = typename FnSig<Sig>::RetT;
 
-  auto *Call =
-      getCodeBuilder().createCall(Name, TypeMap<RetT>::get(getContext()));
+  auto Call = getCodeBuilder().createCall(Name, TypeMap<RetT>::get());
   Var<RetT> Ret = declVar<RetT>("ret");
   Ret.storeValue(Call);
   return Ret;
@@ -481,13 +396,12 @@ template <typename Sig>
 std::enable_if_t<std::is_void_v<typename FnSig<Sig>::RetT>, void>
 FuncBase::call(const std::string &Name) {
   using RetT = typename FnSig<Sig>::RetT;
-  getCodeBuilder().createCall(Name, TypeMap<RetT>::get(getContext()));
+  getCodeBuilder().createCall(Name, TypeMap<RetT>::get());
 }
 
 template <typename... Ts>
-std::vector<llvm::Type *> unpackArgTypes(ArgTypeList<Ts...>,
-                                         llvm::LLVMContext &Ctx) {
-  return {TypeMap<Ts>::get(Ctx)...};
+std::vector<IRType> unpackArgTypes(ArgTypeList<Ts...>) {
+  return {TypeMap<Ts>::get()...};
 }
 
 template <typename Sig, typename... ArgVars>
@@ -500,17 +414,16 @@ FuncBase::call(const std::string &Name, ArgVars &&...ArgsVars) {
   auto GetArgVal = [](auto &&Arg) {
     using ArgVarT = std::decay_t<decltype(Arg)>;
     if constexpr (std::is_pointer_v<typename ArgVarT::ValueType>)
-      return Arg.loadPointer();
+      return Arg.loadAddress();
     else
       return Arg.loadValue();
   };
 
-  auto &Ctx = getContext();
-  std::vector<llvm::Type *> ArgTys = unpackArgTypes(ArgT{}, Ctx);
-  std::vector<llvm::Value *> ArgVals = {GetArgVal(ArgsVars)...};
+  std::vector<IRType> ArgTys = unpackArgTypes(ArgT{});
+  std::vector<IRValue *> ArgVals = {GetArgVal(ArgsVars)...};
 
-  auto *Call = getCodeBuilder().createCall(Name, TypeMap<RetT>::get(Ctx),
-                                           ArgTys, ArgVals);
+  auto Call =
+      getCodeBuilder().createCall(Name, TypeMap<RetT>::get(), ArgTys, ArgVals);
 
   Var<RetT> Ret = declVar<RetT>("ret");
   Ret.storeValue(Call);
@@ -522,8 +435,7 @@ std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicAdd(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicAdd requires arithmetic type");
 
-  llvm::Value *Result =
-      CB->createAtomicAdd(Addr.loadPointer(), Val.loadValue());
+  IRValue *Result = CB->createAtomicAdd(Addr.loadAddress(), Val.loadValue());
   auto Ret = declVar<T>("atomic.add.res.");
   Ret.storeValue(Result);
   return Ret;
@@ -534,8 +446,7 @@ std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicSub(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicSub requires arithmetic type");
 
-  llvm::Value *Result =
-      CB->createAtomicSub(Addr.loadPointer(), Val.loadValue());
+  IRValue *Result = CB->createAtomicSub(Addr.loadAddress(), Val.loadValue());
   auto Ret = declVar<T>("atomic.sub.res.");
   Ret.storeValue(Result);
   return Ret;
@@ -546,8 +457,7 @@ std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicMax(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicMax requires arithmetic type");
 
-  llvm::Value *Result =
-      CB->createAtomicMax(Addr.loadPointer(), Val.loadValue());
+  IRValue *Result = CB->createAtomicMax(Addr.loadAddress(), Val.loadValue());
   auto Ret = declVar<T>("atomic.max.res.");
   Ret.storeValue(Result);
   return Ret;
@@ -558,8 +468,7 @@ std::enable_if_t<is_arithmetic_unref_v<T>, Var<T>>
 FuncBase::atomicMin(const Var<T *> &Addr, const Var<T> &Val) {
   static_assert(std::is_arithmetic_v<T>, "atomicMin requires arithmetic type");
 
-  llvm::Value *Result =
-      CB->createAtomicMin(Addr.loadPointer(), Val.loadValue());
+  IRValue *Result = CB->createAtomicMin(Addr.loadAddress(), Val.loadValue());
   auto Ret = declVar<T>("atomic.min.res.");
   Ret.storeValue(Result);
   return Ret;
@@ -568,7 +477,7 @@ FuncBase::atomicMin(const Var<T *> &Addr, const Var<T> &Val) {
 inline void FuncBase::ret() { CB->createRetVoid(); }
 
 template <typename T> void FuncBase::ret(const Var<T> &RetVal) {
-  llvm::Value *RetValue = RetVal.loadValue();
+  IRValue *RetValue = RetVal.loadValue();
   CB->createRet(RetValue);
 }
 } // namespace proteus

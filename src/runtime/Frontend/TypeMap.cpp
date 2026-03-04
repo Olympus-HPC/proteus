@@ -1,143 +1,135 @@
 #include "proteus/Frontend/TypeMap.h"
 
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/Type.h>
+#include "proteus/Frontend/IRType.h"
 
 #include <cstddef>
+#include <optional>
 
 namespace proteus {
-using namespace llvm;
 
 // Definitions for specializations.
 
-llvm::Type *TypeMap<void>::get(LLVMContext &Ctx, std::size_t) {
-  return Type::getVoidTy(Ctx);
+IRType TypeMap<void>::get(std::size_t) { return {IRTypeKind::Void}; }
+std::optional<IRType> TypeMap<void>::getPointerElemType() {
+  return std::nullopt;
 }
-llvm::Type *TypeMap<void>::getPointerElemType(LLVMContext &) { return nullptr; }
 bool TypeMap<void>::isSigned() { return false; }
 
-llvm::Type *TypeMap<float>::get(LLVMContext &Ctx, std::size_t) {
-  return Type::getFloatTy(Ctx);
-}
-llvm::Type *TypeMap<float>::getPointerElemType(LLVMContext &) {
-  return nullptr;
+IRType TypeMap<float>::get(std::size_t) { return {IRTypeKind::Float}; }
+std::optional<IRType> TypeMap<float>::getPointerElemType() {
+  return std::nullopt;
 }
 bool TypeMap<float>::isSigned() { return false; }
 
-llvm::Type *TypeMap<float[]>::get(LLVMContext &Ctx, std::size_t NElem) {
-  return ArrayType::get(Type::getFloatTy(Ctx), NElem);
+IRType TypeMap<float[]>::get(std::size_t NElem) {
+  return {IRTypeKind::Array, false, NElem, IRTypeKind::Float};
 }
-llvm::Type *TypeMap<float[]>::getPointerElemType(LLVMContext &) {
-  return nullptr;
+std::optional<IRType> TypeMap<float[]>::getPointerElemType() {
+  return std::nullopt;
 }
 bool TypeMap<float[]>::isSigned() { return false; }
 
-llvm::Type *TypeMap<double>::get(LLVMContext &Ctx, std::size_t) {
-  return Type::getDoubleTy(Ctx);
-}
-llvm::Type *TypeMap<double>::getPointerElemType(LLVMContext &) {
-  return nullptr;
+IRType TypeMap<double>::get(std::size_t) { return {IRTypeKind::Double}; }
+std::optional<IRType> TypeMap<double>::getPointerElemType() {
+  return std::nullopt;
 }
 bool TypeMap<double>::isSigned() { return false; }
 
-llvm::Type *TypeMap<double[]>::get(LLVMContext &Ctx, std::size_t NElem) {
-  return ArrayType::get(Type::getDoubleTy(Ctx), NElem);
+IRType TypeMap<double[]>::get(std::size_t NElem) {
+  return {IRTypeKind::Array, false, NElem, IRTypeKind::Double};
 }
-llvm::Type *TypeMap<double[]>::getPointerElemType(LLVMContext &) {
-  return nullptr;
+std::optional<IRType> TypeMap<double[]>::getPointerElemType() {
+  return std::nullopt;
 }
 bool TypeMap<double[]>::isSigned() { return false; }
 
-llvm::Type *TypeMap<size_t>::get(LLVMContext &Ctx, std::size_t) {
-  return Type::getInt64Ty(Ctx);
-}
-llvm::Type *TypeMap<size_t>::getPointerElemType(LLVMContext &) {
-  return nullptr;
+IRType TypeMap<size_t>::get(std::size_t) { return {IRTypeKind::Int64}; }
+std::optional<IRType> TypeMap<size_t>::getPointerElemType() {
+  return std::nullopt;
 }
 bool TypeMap<size_t>::isSigned() { return false; }
 
-llvm::Type *TypeMap<size_t[]>::get(LLVMContext &Ctx, std::size_t NElem) {
-  return ArrayType::get(Type::getInt64Ty(Ctx), NElem);
+IRType TypeMap<size_t[]>::get(std::size_t NElem) {
+  return {IRTypeKind::Array, false, NElem, IRTypeKind::Int64};
 }
-llvm::Type *TypeMap<size_t[]>::getPointerElemType(LLVMContext &) {
-  return nullptr;
+std::optional<IRType> TypeMap<size_t[]>::getPointerElemType() {
+  return std::nullopt;
 }
 bool TypeMap<size_t[]>::isSigned() { return false; }
 
-llvm::Type *TypeMap<int>::get(LLVMContext &Ctx, std::size_t) {
-  return Type::getInt32Ty(Ctx);
+IRType TypeMap<int>::get(std::size_t) {
+  return {IRTypeKind::Int32, /*Signed=*/true};
 }
-llvm::Type *TypeMap<int>::getPointerElemType(LLVMContext &) { return nullptr; }
+std::optional<IRType> TypeMap<int>::getPointerElemType() {
+  return std::nullopt;
+}
 bool TypeMap<int>::isSigned() { return true; }
 
-llvm::Type *TypeMap<int[]>::get(LLVMContext &Ctx, std::size_t NElem) {
-  return ArrayType::get(Type::getInt32Ty(Ctx), NElem);
+IRType TypeMap<int[]>::get(std::size_t NElem) {
+  return {IRTypeKind::Array, /*Signed=*/true, NElem, IRTypeKind::Int32};
 }
-llvm::Type *TypeMap<int[]>::getPointerElemType(LLVMContext &) {
-  return nullptr;
+std::optional<IRType> TypeMap<int[]>::getPointerElemType() {
+  return std::nullopt;
 }
 bool TypeMap<int[]>::isSigned() { return true; }
 
-llvm::Type *TypeMap<unsigned int>::get(LLVMContext &Ctx, std::size_t) {
-  return Type::getInt32Ty(Ctx);
-}
-llvm::Type *TypeMap<unsigned int>::getPointerElemType(LLVMContext &) {
-  return nullptr;
+IRType TypeMap<unsigned int>::get(std::size_t) { return {IRTypeKind::Int32}; }
+std::optional<IRType> TypeMap<unsigned int>::getPointerElemType() {
+  return std::nullopt;
 }
 bool TypeMap<unsigned int>::isSigned() { return false; }
 
-llvm::Type *TypeMap<unsigned int[]>::get(LLVMContext &Ctx, std::size_t NElem) {
-  return ArrayType::get(Type::getInt32Ty(Ctx), NElem);
+IRType TypeMap<unsigned int[]>::get(std::size_t NElem) {
+  return {IRTypeKind::Array, false, NElem, IRTypeKind::Int32};
 }
-llvm::Type *TypeMap<unsigned int[]>::getPointerElemType(LLVMContext &) {
-  return nullptr;
+std::optional<IRType> TypeMap<unsigned int[]>::getPointerElemType() {
+  return std::nullopt;
 }
 bool TypeMap<unsigned int[]>::isSigned() { return false; }
 
-llvm::Type *TypeMap<int *>::get(LLVMContext &Ctx, std::size_t) {
-  return PointerType::getUnqual(Ctx);
+IRType TypeMap<int *>::get(std::size_t) {
+  return {IRTypeKind::Pointer, /*Signed=*/true, 0, IRTypeKind::Int32};
 }
-llvm::Type *TypeMap<int *>::getPointerElemType(LLVMContext &Ctx) {
-  return Type::getInt32Ty(Ctx);
+std::optional<IRType> TypeMap<int *>::getPointerElemType() {
+  return IRType{IRTypeKind::Int32, /*Signed=*/true};
 }
 bool TypeMap<int *>::isSigned() { return true; }
 
-llvm::Type *TypeMap<unsigned int *>::get(LLVMContext &Ctx, std::size_t) {
-  return PointerType::getUnqual(Ctx);
+IRType TypeMap<unsigned int *>::get(std::size_t) {
+  return {IRTypeKind::Pointer, false, 0, IRTypeKind::Int32};
 }
-llvm::Type *TypeMap<unsigned int *>::getPointerElemType(LLVMContext &Ctx) {
-  return Type::getInt32Ty(Ctx);
+std::optional<IRType> TypeMap<unsigned int *>::getPointerElemType() {
+  return IRType{IRTypeKind::Int32};
 }
 bool TypeMap<unsigned int *>::isSigned() { return false; }
 
-llvm::Type *TypeMap<bool>::get(LLVMContext &Ctx, std::size_t) {
-  return Type::getInt1Ty(Ctx);
+IRType TypeMap<bool>::get(std::size_t) { return {IRTypeKind::Int1}; }
+std::optional<IRType> TypeMap<bool>::getPointerElemType() {
+  return std::nullopt;
 }
-llvm::Type *TypeMap<bool>::getPointerElemType(LLVMContext &) { return nullptr; }
 bool TypeMap<bool>::isSigned() { return false; }
 
-llvm::Type *TypeMap<bool[]>::get(LLVMContext &Ctx, std::size_t NElem) {
-  return ArrayType::get(Type::getInt1Ty(Ctx), NElem);
+IRType TypeMap<bool[]>::get(std::size_t NElem) {
+  return {IRTypeKind::Array, false, NElem, IRTypeKind::Int1};
 }
-llvm::Type *TypeMap<bool[]>::getPointerElemType(LLVMContext &) {
-  return nullptr;
+std::optional<IRType> TypeMap<bool[]>::getPointerElemType() {
+  return std::nullopt;
 }
 bool TypeMap<bool[]>::isSigned() { return false; }
 
-llvm::Type *TypeMap<double *>::get(LLVMContext &Ctx, std::size_t) {
-  return PointerType::getUnqual(Ctx);
+IRType TypeMap<double *>::get(std::size_t) {
+  return {IRTypeKind::Pointer, false, 0, IRTypeKind::Double};
 }
-llvm::Type *TypeMap<double *>::getPointerElemType(LLVMContext &Ctx) {
-  return Type::getDoubleTy(Ctx);
+std::optional<IRType> TypeMap<double *>::getPointerElemType() {
+  return IRType{IRTypeKind::Double};
 }
 bool TypeMap<double *>::isSigned() { return false; }
 
-llvm::Type *TypeMap<float *>::get(LLVMContext &Ctx, std::size_t) {
-  return PointerType::getUnqual(Ctx);
+IRType TypeMap<float *>::get(std::size_t) {
+  return {IRTypeKind::Pointer, false, 0, IRTypeKind::Float};
 }
-llvm::Type *TypeMap<float *>::getPointerElemType(LLVMContext &Ctx) {
-  return Type::getFloatTy(Ctx);
+std::optional<IRType> TypeMap<float *>::getPointerElemType() {
+  return IRType{IRTypeKind::Float};
 }
 bool TypeMap<float *>::isSigned() { return false; }
 
