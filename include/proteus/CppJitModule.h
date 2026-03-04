@@ -49,7 +49,7 @@ private:
                  const std::string &InstanceName)
         : TargetModel(TargetModel), TemplateCode(TemplateCode),
           ExtraArgs(ExtraArgs), InstanceName(InstanceName) {
-      EntryFuncName = "__jit_instance_" + this->InstanceName;
+      EntryFuncName = "__proteus_instance_" + this->InstanceName;
       // Replace characters '<', '>', ',' with $ to create a unique for the
       // entry function.
       std::replace_if(

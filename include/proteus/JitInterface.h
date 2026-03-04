@@ -20,8 +20,8 @@
 #include <cstring>
 #include <utility>
 
-extern "C" void __jit_push_variable(proteus::RuntimeConstant RC);
-extern "C" void __jit_register_lambda(const char *Symbol);
+extern "C" void __proteus_push_variable(proteus::RuntimeConstant RC);
+extern "C" void __proteus_register_lambda(const char *Symbol);
 
 namespace proteus {
 
@@ -99,7 +99,7 @@ static __attribute__((noinline)) T jit_variable(T V, int Pos = -1,
                                                 int Offset = -1) noexcept {
   RuntimeConstant RC{convertCTypeToRCType<T>(), Pos, Offset};
   std::memcpy(static_cast<void *>(&RC), &V, sizeof(T));
-  __jit_push_variable(RC);
+  __proteus_push_variable(RC);
 
   return V;
 }
@@ -108,7 +108,7 @@ template <typename T>
 static __attribute__((noinline)) T &&
 register_lambda(T &&t, const char *Symbol = "") noexcept {
   assert(Symbol && "Expected non-null Symbol");
-  __jit_register_lambda(Symbol);
+  __proteus_register_lambda(Symbol);
   return std::forward<T>(t);
 }
 
