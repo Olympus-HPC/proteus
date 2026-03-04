@@ -21,13 +21,10 @@
 #include <type_traits>
 #include <utility>
 
-extern "C" void __jit_register_variable(proteus::RuntimeConstant RC,
-                                        const char *AssociatedLambda);
-extern "C" void __jit_register_lambda(const char *Symbol);
-extern "C" void __jit_take_address(void const *) noexcept;
-
-extern "C" void __proteus_push_variable(proteus::RuntimeConstant RC);
+extern "C" void __proteus_register_variable(proteus::RuntimeConstant RC,
+                                            const char *AssociatedLambda);
 extern "C" void __proteus_register_lambda(const char *Symbol);
+extern "C" void __proteus_take_address(void const *) noexcept;
 
 namespace proteus {
 
@@ -106,7 +103,7 @@ jit_variable(T V, int Pos = -1, int Offset = -1,
              const char *AssociatedLambda = "") noexcept {
   RuntimeConstant RC{convertCTypeToRCType<T>(), Pos, Offset};
   std::memcpy(static_cast<void *>(&RC), &V, sizeof(T));
-  __jit_register_variable(RC, AssociatedLambda);
+  __proteus_register_variable(RC, AssociatedLambda);
 
   return V;
 }
@@ -115,13 +112,13 @@ template <typename T>
 static __attribute__((noinline)) T &&
 register_lambda(T &&t, const char *Symbol = "") noexcept {
   assert(Symbol && "Expected non-null Symbol");
-  __jit_register_lambda(Symbol);
+  __proteus_register_lambda(Symbol);
   // Force LLVM to generate an AllocaInst of the underlying Clang--generated
   // anonymous class for T.  We remove this after recording the demangled
   // lambda name.
   using LambdaType = std::decay_t<T>;
   LambdaType local = t;
-  __jit_take_address(&local);
+  __proteus_take_address(&local);
   return std::forward<T>(t);
 }
 
