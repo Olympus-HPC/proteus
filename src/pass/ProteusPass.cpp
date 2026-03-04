@@ -1311,25 +1311,32 @@ private:
       if (!StringRef{demangle(F.getName().str())}.contains(
               "proteus::register_lambda"))
         continue;
-      for (BasicBlock &BB : F) {
-        for (Instruction &I : BB) {
-          // By our definition, we force register_lambda to allocate a copy
-          // of the lambda struct.
-          auto *Alloc = dyn_cast<AllocaInst>(&I);
-          if (!Alloc)
-            continue;
-          std::string DemangledFuncName = demangle(F.getName().str());
-          StringRef DemangledLambdaName =
-              parseLambdaType(DemangledFuncName, "proteus::register_lambda");
-          LambdaTypeToGlobalName[Alloc->getAllocatedType()] =
-              IRB.CreateGlobalString(DemangledLambdaName, ".str", 0, &M);
-        }
+      // Alloca must be in the entry block.
+      AllocaInst *LambdaAlloca = nullptr;
+      for (Instruction &I : F.getEntryBlock()) {
+        // By our definition, we force register_lambda to allocate a copy
+        // of the lambda struct in our entry block
+        auto *Alloc = dyn_cast<AllocaInst>(&I);
+        if (!Alloc)
+          continue;
+        if (LambdaAlloca)
+          reportFatalError("Error in LLVM IR of "
+                           "proteus::register_lambda--found multiple alloca");
+        // We found the allocation site of the lambda.
+        LambdaAlloca = Alloc;
+        std::string DemangledFuncName = demangle(F.getName().str());
+        StringRef DemangledLambdaName =
+            parseLambdaType(DemangledFuncName, "proteus::register_lambda");
+        LambdaTypeToGlobalName[Alloc->getAllocatedType()] =
+            IRB.CreateGlobalString(DemangledLambdaName, ".str", 0, &M);
       }
+      if (!LambdaAlloca)
+        reportFatalError("Error in LLVM IR of proteus::register_lambda--no "
+                         "lambda alloca site found");
     }
 
     // Inject lambda's Clang-generated name into the jit_variable callsite.
     for (auto &[CB, LambdaType] : CallBaseToLambda) {
-      bool FoundLambda = false;
       auto It = LambdaTypeToGlobalName.find(LambdaType);
       if (It == LambdaTypeToGlobalName.end())
         reportFatalError("Failed to find the lambda association info");

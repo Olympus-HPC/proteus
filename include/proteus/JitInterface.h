@@ -117,7 +117,6 @@ register_lambda(T &&t, const char *Symbol = "") noexcept {
   // anonymous class for T.  We remove this after recording the demangled
   // lambda name.
   using LambdaType = std::decay_t<T>;
-  // static_assert(std::is_same_v<LambdaType,int>);
   LambdaType local = t;
   __jit_take_address(&local);
   return std::forward<T>(t);
