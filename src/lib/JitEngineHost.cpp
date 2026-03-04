@@ -14,6 +14,7 @@
 #include "proteus/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/CoreLLVM.h"
+#include "proteus/LambdaCaptureSpecialization.h"
 #include "proteus/LambdaRegistry.h"
 #include "proteus/TransformArgumentSpecialization.h"
 #include "proteus/TransformLambdaSpecialization.h"
@@ -35,8 +36,6 @@
 #include <llvm/TargetParser/Host.h>
 
 #include <memory>
-
-#include "proteus/AutoReadOnlyCaptures.h"
 
 using namespace proteus;
 using namespace llvm;
@@ -186,7 +185,6 @@ void getLambdaJitValues(Module &M, StringRef FnName, void **Args,
                                       << "Caller trigger " << FnName << " -> "
                                       << demangle(FnName.str()) << "\n");
 
-  SmallVector<StringRef> LambdaCalleeInfo;
   PROTEUS_DBG(Logger::logs("proteus")
               << " Trying F " << demangle(FnName.str()) << "\n ");
   auto OptionalMapIt = LambdaRegistry::instance().matchJitVariableMap(FnName);
@@ -197,63 +195,31 @@ void getLambdaJitValues(Module &M, StringRef FnName, void **Args,
   const SmallVector<RuntimeConstant> &ExplicitValues =
       OptionalMapIt.value()->getSecond();
 
-  // Start with explicit values
-  SmallVector<RuntimeConstant> MergedValues(ExplicitValues.begin(),
-                                            ExplicitValues.end());
-
-  // Auto-detect if enabled
-  if (Config::get().ProteusAutoReadOnlyCaptures) {
-    Function *F = M.getFunction(FnName);
-    if (F) {
-      // 1. Read pass-emitted capture metadata.
-      auto DetectedCaptures = parseAutoReadOnlyCaptureMetadata(*F);
-
-      if (!DetectedCaptures.empty()) {
-        // 2. Get lambda closure pointer - try cache first, fallback to Args.
-        const void *LambdaClosure = nullptr;
-        const auto *ClosureData =
-            LR.getClosureData(OptionalMapIt.value()->first);
-        if (ClosureData && !ClosureData->empty()) {
-          LambdaClosure = ClosureData->data();
-        } else if (Args) {
-          // Fallback to Args[0] for backward compatibility
-          // For host JIT, the lambda closure is passed as the first argument
-          // Args[0] contains a pointer-to-pointer to the lambda closure (due to
-          // ABI)
-          LambdaClosure = *static_cast<const void **>(Args[0]);
-        }
-
-        if (LambdaClosure) {
-          // 3. Extract auto-detected capture values from byte offsets.
-          std::vector<RuntimeConstant> AutoCaptures =
-              extractAutoReadOnlyCapturesFromMetadata(*F, LambdaClosure);
-
-          if (!AutoCaptures.empty()) {
-            // 4. Merge (explicit takes precedence).
-            for (const auto &RC : AutoCaptures) {
-              bool WasExplicit = false;
-              for (const auto &Explicit : ExplicitValues) {
-                if (Explicit.Pos == RC.Pos) {
-                  WasExplicit = true;
-                  break;
-                }
-              }
-
-              if (!WasExplicit)
-                MergedValues.push_back(RC);
-
-              // 5. Trace auto-detected captures that were merged.
-              if (Config::get().ProteusTraceOutput >= 1 && !WasExplicit) {
-                Logger::trace("[LambdaSpec][Auto] Replacing slot " +
-                              std::to_string(RC.Pos) + " with " +
-                              RuntimeConstantHelpers::toString(RC) + "\n");
-              }
-            }
-          }
-        }
-      }
-    }
+  if (!Config::get().ProteusAutoReadOnlyCaptures) {
+    LambdaJitValuesVec.assign(ExplicitValues.begin(), ExplicitValues.end());
+    return;
   }
+
+  Function *LambdaFn = M.getFunction(FnName);
+  if (!LambdaFn) {
+    LambdaJitValuesVec.assign(ExplicitValues.begin(), ExplicitValues.end());
+    return;
+  }
+
+  const void *LambdaClosure = nullptr;
+  const auto *ClosureData = LR.getClosureData(OptionalMapIt.value()->first);
+  if (ClosureData && !ClosureData->empty())
+    LambdaClosure = ClosureData->data();
+  else if (Args)
+    LambdaClosure = *static_cast<const void **>(Args[0]);
+
+  if (!LambdaClosure) {
+    LambdaJitValuesVec.assign(ExplicitValues.begin(), ExplicitValues.end());
+    return;
+  }
+
+  SmallVector<RuntimeConstant> MergedValues;
+  mergeExplicitAndAuto(MergedValues, ExplicitValues, LambdaFn, LambdaClosure);
 
   LambdaJitValuesVec = MergedValues;
 }

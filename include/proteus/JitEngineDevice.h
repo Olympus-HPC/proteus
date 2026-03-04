@@ -23,6 +23,7 @@
 #include "proteus/Debug.h"
 #include "proteus/Hashing.h"
 #include "proteus/JitEngine.h"
+#include "proteus/LambdaCaptureSpecialization.h"
 #include "proteus/TimeTracing.h"
 #include "proteus/Utils.h"
 
@@ -439,70 +440,44 @@ public:
       for (auto &F : KernelModule.getFunctionList()) {
         PROTEUS_DBG(Logger::logs("proteus")
                     << " Trying F " << demangle(F.getName().str()) << "\n ");
-        auto OptionalMapIt =
+        auto MapIt =
             LambdaRegistry::instance().matchJitVariableMap(F.getName());
-        if (OptionalMapIt)
-          LambdaCalleeInfo.emplace_back(F.getName(),
-                                        OptionalMapIt.value()->first);
+        if (!MapIt)
+          continue;
+        LambdaCalleeInfo.emplace_back(F.getName(), MapIt.value()->first);
       }
 
       KernelInfo.setLambdaCalleeInfo(std::move(LambdaCalleeInfo));
     }
 
+    Module &KernelModule = getModule(KernelInfo);
     for (auto &[FnName, LambdaType] : KernelInfo.getLambdaCalleeInfo()) {
-      // Get explicit jit_variable captures
       const SmallVector<RuntimeConstant> &ExplicitValues =
           LR.getJitVariables(LambdaType);
 
-      // Start with explicit values
-      SmallVector<RuntimeConstant> MergedValues(ExplicitValues.begin(),
-                                                ExplicitValues.end());
-
-      // Auto-detect if enabled
-      if (Config::get().ProteusAutoReadOnlyCaptures) {
-        Module &KernelModule = getModule(KernelInfo);
-        Function *LambdaFn = KernelModule.getFunction(FnName);
-
-        if (LambdaFn) {
-          // 1. Read pass-emitted capture metadata.
-          auto DetectedCaptures = parseAutoReadOnlyCaptureMetadata(*LambdaFn);
-
-          if (!DetectedCaptures.empty()) {
-            // 2. Get lambda closure from cached data (not KernelArgs).
-            const auto *ClosureData = LR.getClosureData(LambdaType);
-            if (ClosureData && !ClosureData->empty()) {
-              const void *LambdaClosure = ClosureData->data();
-
-              // 3. Extract auto-detected capture values from byte offsets.
-              auto AutoCaptures =
-                  extractAutoReadOnlyCapturesFromMetadata(*LambdaFn,
-                                                          LambdaClosure);
-
-              // 4. Merge (explicit takes precedence) and trace merged values.
-              for (const auto &RC : AutoCaptures) {
-                bool WasExplicit = false;
-                for (const auto &Explicit : ExplicitValues) {
-                  if (Explicit.Pos == RC.Pos) {
-                    WasExplicit = true;
-                    break;
-                  }
-                }
-
-                if (!WasExplicit)
-                  MergedValues.push_back(RC);
-
-                if (Config::get().ProteusTraceOutput >= 1 && !WasExplicit) {
-                  Logger::trace("[LambdaSpec][Auto] Replacing slot " +
-                                std::to_string(RC.Pos) + " with " +
-                                RuntimeConstantHelpers::toString(RC) + "\n");
-                }
-              }
-            }
-          }
-        }
+      if (!Config::get().ProteusAutoReadOnlyCaptures) {
+        LambdaJitValuesVec.insert(LambdaJitValuesVec.end(),
+                                  ExplicitValues.begin(), ExplicitValues.end());
+        continue;
       }
 
-      // Append merged values to output
+      Function *LambdaFn = KernelModule.getFunction(FnName);
+      if (!LambdaFn) {
+        LambdaJitValuesVec.insert(LambdaJitValuesVec.end(),
+                                  ExplicitValues.begin(), ExplicitValues.end());
+        continue;
+      }
+
+      const auto *ClosureData = LR.getClosureData(LambdaType);
+      if (!ClosureData || ClosureData->empty()) {
+        LambdaJitValuesVec.insert(LambdaJitValuesVec.end(),
+                                  ExplicitValues.begin(), ExplicitValues.end());
+        continue;
+      }
+
+      SmallVector<RuntimeConstant> MergedValues;
+      mergeExplicitAndAuto(MergedValues, ExplicitValues, LambdaFn,
+                           ClosureData->data());
       LambdaJitValuesVec.insert(LambdaJitValuesVec.end(), MergedValues.begin(),
                                 MergedValues.end());
     }
