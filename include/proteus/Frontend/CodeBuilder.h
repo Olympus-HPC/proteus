@@ -27,10 +27,14 @@ struct LoopHints {
 /// Var specialization stores these fields directly instead of a
 /// heap-allocated storage objects.
 struct VarAlloc {
-  IRValue *Slot;  ///< The alloca (or global base pointer for arrays).
-  IRType ValueTy; ///< Logical element type (pointee/element for pointer/array).
-  IRType AllocTy; ///< Type of the alloca itself.
-  unsigned AddrSpace = 0; ///< Address space (relevant for pointers/arrays).
+  /// The alloca (or global base pointer for arrays).
+  IRValue *Slot;
+  /// Logical element type (pointee/element for pointer/array).
+  IRType ValueTy;
+  /// Type of the alloca itself.
+  IRType AllocTy;
+  /// Address space (relevant for pointers/arrays).
+  unsigned AddrSpace = 0;
 };
 
 enum class ScopeKind { FUNCTION, IF, FOR, WHILE };
@@ -58,7 +62,7 @@ inline std::string toString(ScopeKind Kind) {
 }
 
 /// Abstract code-builder interface.  The frontend (Var.h, Func.h, LoopNest.h)
-/// depends only on this class — no LLVM headers are needed here.
+/// depends only on this class.
 class CodeBuilder {
 public:
   virtual ~CodeBuilder() = default;

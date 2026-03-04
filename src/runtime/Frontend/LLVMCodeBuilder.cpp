@@ -703,7 +703,7 @@ IRValue *LLVMCodeBuilder::getConstantFP(IRType Ty, double Val) {
 // GEP operations.
 IRValue *
 LLVMCodeBuilder::createInBoundsGEP(IRType Ty, IRValue *Ptr,
-                                   const std::vector<IRValue *> IdxList,
+                                   const std::vector<IRValue *> &IdxList,
                                    const std::string &Name) {
   std::vector<Value *> LLVMIdxList;
   LLVMIdxList.reserve(IdxList.size());
@@ -828,7 +828,6 @@ VarAlloc LLVMCodeBuilder::getElementPtr(IRValue *Base, IRType BaseTy,
   reportFatalError("getElementPtr: unsupported base type kind");
 }
 
-// NOLINTNEXTLINE
 VarAlloc LLVMCodeBuilder::getElementPtr(IRValue *Base, IRType BaseTy,
                                         size_t Index, IRType ElemTy) {
   if (BaseTy.Kind == IRTypeKind::Pointer) {

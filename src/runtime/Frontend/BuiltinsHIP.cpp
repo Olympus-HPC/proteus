@@ -9,8 +9,6 @@ namespace gpu {
 
 namespace detail {
 
-// (no llvm:: namespace needed here)
-
 // Offsets in implicit arg pts in i32 step.
 constexpr unsigned OffsetGridDimX = 0;
 constexpr unsigned OffsetGridDimY = 1;

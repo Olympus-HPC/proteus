@@ -10,8 +10,7 @@ namespace proteus {
 
 /// Maps a C++ type \c T to a backend-independent \c IRType descriptor.
 ///
-/// This header has no dependency on any IR backend (LLVM, MLIR, …).
-/// Backend-specific conversions live in dedicated headers such as
+/// Backend-specific conversions are in dedicated headers such as
 /// \c LLVMTypeMap.h.
 template <typename T> struct TypeMap;
 

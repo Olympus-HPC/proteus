@@ -56,13 +56,6 @@ public:
   std::unique_ptr<llvm::Module> takeModule();
 
   // -----------------------------------------------------------------------
-  // Insertion point management (LLVM-specific extensions).
-  // -----------------------------------------------------------------------
-  void setInsertPoint(llvm::BasicBlock *BB);
-  void setInsertPointBegin(llvm::BasicBlock *BB);
-  llvm::BasicBlock *getInsertBlock();
-
-  // -----------------------------------------------------------------------
   // Basic block operations.
   // -----------------------------------------------------------------------
   std::tuple<llvm::BasicBlock *, llvm::BasicBlock *> splitCurrentBlock();
@@ -192,7 +185,6 @@ public:
   // -----------------------------------------------------------------------
   VarAlloc getElementPtr(IRValue *Base, IRType BaseTy, IRValue *Index,
                          IRType ElemTy) override;
-  // NOLINTNEXTLINE
   VarAlloc getElementPtr(IRValue *Base, IRType BaseTy, size_t Index,
                          IRType ElemTy) override;
 
@@ -241,6 +233,13 @@ private:
 
   /// Unwrap an opaque IRFunction back to a raw llvm::Function pointer.
   llvm::Function *unwrapFunction(IRFunction *IRF);
+
+  // -----------------------------------------------------------------------
+  // Insertion point management (LLVM-specific extensions).
+  // -----------------------------------------------------------------------
+  void setInsertPoint(llvm::BasicBlock *BB);
+  void setInsertPointBegin(llvm::BasicBlock *BB);
+  llvm::BasicBlock *getInsertBlock();
 
   // -----------------------------------------------------------------------
   // Private low-level arithmetic dispatch (called by createArith).
@@ -294,7 +293,7 @@ private:
   // Private GEP helpers (called by getElementPtr).
   // -----------------------------------------------------------------------
   IRValue *createInBoundsGEP(IRType Ty, IRValue *Ptr,
-                             const std::vector<IRValue *> IdxList,
+                             const std::vector<IRValue *> &IdxList,
                              const std::string &Name = "");
   // NOLINTNEXTLINE
   IRValue *createConstInBoundsGEP1_64(IRType Ty, IRValue *Ptr, size_t Idx);

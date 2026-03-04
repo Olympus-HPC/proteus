@@ -7,9 +7,9 @@
 
 namespace proteus {
 
-/// LLVM-backend concrete \c IRValue.  Owned by \c LLVMCodeBuilder::Impl via
-/// a \c std::deque<LLVMIRValue>; frontend code only ever holds an
-/// \c IRValue* pointing into that deque.
+/// LLVM-backend concrete \c IRValue.  Owned by \c LLVMCodeBuilder::Impl via a
+/// \c std::deque<LLVMIRValue>. Frontend code only ever holds an \c IRValue*
+/// pointing into that deque.
 class LLVMIRValue : public IRValue {
 public:
   llvm::Value *V;
