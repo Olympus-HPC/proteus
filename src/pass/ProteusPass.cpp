@@ -521,12 +521,12 @@ private:
 
   FunctionCallee getJitEntryFn(Module &M) {
     // The prototype is
-    // __jit_entry(char *FnName,
-    //             char *IR,
-    //             int IRSize,
-    //             void **Args,
-    //             RuntimeConstantInfo **RCInfoArrayPtr,
-    //             int32_t NumRCs)
+    // __proteus_entry(char *FnName,
+    //                 char *IR,
+    //                 int IRSize,
+    //                 void **Args,
+    //                 RuntimeConstantInfo **RCInfoArrayPtr,
+    //                 int32_t NumRCs)
 
     FunctionType *JitEntryFnTy =
         FunctionType::get(Types.PtrTy,
@@ -534,7 +534,7 @@ private:
                            Types.PtrTy, Types.Int32Ty},
                           /* isVarArg=*/false);
     FunctionCallee JitEntryFn =
-        M.getOrInsertFunction("__jit_entry", JitEntryFnTy);
+        M.getOrInsertFunction("__proteus_entry", JitEntryFnTy);
 
     return JitEntryFn;
   }
@@ -913,7 +913,7 @@ private:
     Function *LaunchKernelFn = M.getFunction(LaunchFunctionName);
     assert(LaunchKernelFn && "Expected non-null launch kernel function");
 
-    // The ABI of __jit_launch_kernel mirrors the device-specific
+    // The ABI of __proteus_launch_kernel mirrors the device-specific
     // launchKernel. Note the ABI can be different depending on the host
     // architecture.
     JitLaunchKernelFnTy = LaunchKernelFn->getFunctionType();
@@ -925,7 +925,7 @@ private:
           "for ProteusPass");
 
     FunctionCallee JitLaunchKernelFn =
-        M.getOrInsertFunction("__jit_launch_kernel", JitLaunchKernelFnTy);
+        M.getOrInsertFunction("__proteus_launch_kernel", JitLaunchKernelFnTy);
 
     return JitLaunchKernelFn;
   }
@@ -996,7 +996,7 @@ private:
         FunctionType::get(Types.VoidTy, {Types.PtrTy, Types.PtrTy, Types.PtrTy},
                           /* isVarArg=*/false);
     FunctionCallee JitRegisterFatbinaryFn = M.getOrInsertFunction(
-        "__jit_register_fatbinary", JitRegisterFatbinaryFnTy);
+        "__proteus_register_fatbinary", JitRegisterFatbinaryFnTy);
 
     return JitRegisterFatbinaryFn;
   }
@@ -1036,7 +1036,7 @@ private:
         FunctionType::get(Types.VoidTy, {Types.PtrTy},
                           /* isVarArg=*/false);
     FunctionCallee JitRegisterFatBinaryEndFn = M.getOrInsertFunction(
-        "__jit_register_fatbinary_end", JitRegisterFatBinaryEndFnTy);
+        "__proteus_register_fatbinary_end", JitRegisterFatBinaryEndFnTy);
 
     return JitRegisterFatBinaryEndFn;
   }
@@ -1069,7 +1069,7 @@ private:
         FunctionType::get(Types.VoidTy, {Types.PtrTy, Types.PtrTy},
                           /* isVarArg=*/false);
     FunctionCallee JitRegisteLinkedBinaryrFn = M.getOrInsertFunction(
-        "__jit_register_linked_binary", JitRegisterLinkedBinaryFnTy);
+        "__proteus_register_linked_binary", JitRegisterLinkedBinaryFnTy);
 
     return JitRegisteLinkedBinaryrFn;
   }
@@ -1114,13 +1114,13 @@ private:
 
   FunctionCallee getJitRegisterVarFn(Module &M) {
     // The prototype is
-    // __jit_register_var(void *Handle, const void *HostAddr, const char
+    // __proteus_register_var(void *Handle, const void *HostAddr, const char
     // *VarName, uint64_t VarSize).
     FunctionType *JitRegisterVarFnTy = FunctionType::get(
         Types.VoidTy, {Types.PtrTy, Types.PtrTy, Types.PtrTy, Types.Int64Ty},
         /* isVarArg=*/false);
     FunctionCallee JitRegisterVarFn =
-        M.getOrInsertFunction("__jit_register_var", JitRegisterVarFnTy);
+        M.getOrInsertFunction("__proteus_register_var", JitRegisterVarFnTy);
 
     return JitRegisterVarFn;
   }
@@ -1151,23 +1151,23 @@ private:
 
   FunctionCallee getJitRegisterFunctionFn(Module &M) {
     // The prototype is
-    // __jit_register_function(void *Handle,
-    //                         void *Kernel,
-    //                         char const *KernelName,
-    //                         RuntimeConstantInfo **RCInfoArrayPtr,
-    //                         int32_t NumRCs)
+    // __proteus_register_function(void *Handle,
+    //                             void *Kernel,
+    //                             char const *KernelName,
+    //                             RuntimeConstantInfo **RCInfoArrayPtr,
+    //                             int32_t NumRCs)
     FunctionType *JitRegisterFunctionFnTy = FunctionType::get(
         Types.VoidTy,
         {Types.PtrTy, Types.PtrTy, Types.PtrTy, Types.PtrTy, Types.Int32Ty},
         /* isVarArg=*/false);
     FunctionCallee JitRegisterKernelFn = M.getOrInsertFunction(
-        "__jit_register_function", JitRegisterFunctionFnTy);
+        "__proteus_register_function", JitRegisterFunctionFnTy);
 
     return JitRegisterKernelFn;
   }
 
   /// instrumentRegisterFunction instruments kernel functions following GPU
-  /// runtime registration with __jit_register_function.
+  /// runtime registration with __proteus_register_function.
   void instrumentRegisterFunction(Module &M) {
     if (!RegisterFunctionName)
       return;
