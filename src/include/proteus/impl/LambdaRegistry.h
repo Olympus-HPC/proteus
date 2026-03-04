@@ -83,6 +83,7 @@ public:
                 << "=> RegisterLambda " << LambdaTypeRef << "\n");
     // Copy PendingJitVariables if there were changed, otherwise the runtime
     // values for the lambda definition have not changed.
+    PROTEUS_DBG(dump());
     if (!PendingJitVariableMap[LambdaTypeRef].empty()) {
       JitVariableMap[LambdaTypeRef] = PendingJitVariableMap[LambdaTypeRef];
       PendingJitVariableMap[LambdaTypeRef].clear();
