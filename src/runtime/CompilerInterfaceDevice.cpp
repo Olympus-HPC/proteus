@@ -78,4 +78,58 @@ extern "C" void __jit_disable_device() {
   Jit.disable();
 }
 
+extern "C" __attribute((used)) void __proteus_register_var(void *Handle,
+                                                           const void *HostAddr,
+                                                           const char *VarName,
+                                                           uint64_t VarSize) {
+  auto &JitEngineInfo = JitEngineInfoRegistry::instance();
+  JitEngineInfo.registerVar(Handle, HostAddr, VarName, VarSize);
+}
+
+extern "C" __attribute__((used)) void
+__proteus_register_fatbinary(void *Handle, void *FatbinWrapper,
+                             const char *ModuleId) {
+  auto &JitEngineInfo = JitEngineInfoRegistry::instance();
+  JitEngineInfo.registerFatBinary(Handle, FatbinWrapper, ModuleId);
+}
+
+extern "C" __attribute__((used)) void
+__proteus_register_fatbinary_end(void *Handle) {
+  auto &JitEngineInfo = JitEngineInfoRegistry::instance();
+  JitEngineInfo.registerFatBinaryEnd(Handle);
+}
+
+extern "C" __attribute__((used)) void
+__proteus_register_linked_binary(void *FatbinWrapper, const char *ModuleId) {
+  auto &JitEngineInfo = JitEngineInfoRegistry::instance();
+  JitEngineInfo.registerLinkedBinary(FatbinWrapper, ModuleId);
+}
+
+extern "C" __attribute((used)) void
+__proteus_register_function(void *Handle, void *Kernel, char *KernelName,
+                             RuntimeConstantInfo **RCInfoArrayPtr,
+                             int32_t NumRCs) {
+  ArrayRef<RuntimeConstantInfo *> RCInfoArray{RCInfoArrayPtr,
+                                              static_cast<size_t>(NumRCs)};
+  auto &JitEngineInfo = JitEngineInfoRegistry::instance();
+  JitEngineInfo.registerFunction(Handle, Kernel, KernelName, RCInfoArray);
+}
+
+extern "C" proteus::DeviceTraits<JitDeviceImplT>::DeviceError_t
+__proteus_launch_kernel(void *Kernel, dim3 GridDim, dim3 BlockDim,
+                        void **KernelArgs, uint64_t ShmemSize, void *Stream) {
+  return __jit_launch_kernel_internal(Kernel, GridDim, BlockDim, KernelArgs,
+                                      ShmemSize, Stream);
+}
+
+extern "C" void __proteus_enable_device() {
+  auto &Jit = JitDeviceImplT::instance();
+  Jit.enable();
+}
+
+extern "C" void __proteus_disable_device() {
+  auto &Jit = JitDeviceImplT::instance();
+  Jit.disable();
+}
+
 // NOLINTEND(readability-identifier-naming)

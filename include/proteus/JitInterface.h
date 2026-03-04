@@ -26,6 +26,9 @@ extern "C" void __jit_register_variable(proteus::RuntimeConstant RC,
 extern "C" void __jit_register_lambda(const char *Symbol);
 extern "C" void __jit_take_address(void const *) noexcept;
 
+extern "C" void __proteus_push_variable(proteus::RuntimeConstant RC);
+extern "C" void __proteus_register_lambda(const char *Symbol);
+
 namespace proteus {
 
 template <typename T> __attribute__((noinline)) void jit_arg(T V) noexcept;
