@@ -139,7 +139,7 @@ public:
     findJitVariables(M);
     registerJitVariablesWithLambda(M);
     registerLambdaFunctions(M);
-
+    // llvm::outs() << M;
     if (hasDeviceLaunchKernelCalls(M)) {
       emitJitLaunchKernelCall(M);
     }
@@ -1303,49 +1303,37 @@ private:
         }
       }
     }
+    IRBuilder<> IRB{M.getContext()};
 
-    // Keep track of global strings corresponding to lambdas
-    StringMap<GlobalVariable *> LambdaNameToGlobal;
-    // Inject lambda's Clang-generated name into the jit_variable callsite.
-    // While we're at the alloc site, we record its location
-    // to delete later
-    for (auto &[CB, LambdaType] : CallBaseToLambda) {
-      bool FoundLambda = false;
-      for (auto &F : M.getFunctionList()) {
-        if (FoundLambda || !StringRef{demangle(F.getName().str())}.contains(
-                               "proteus::register_lambda"))
-          continue;
-        for (BasicBlock &BB : F) {
-          for (Instruction &I : BB) {
-            auto *Alloc = dyn_cast<AllocaInst>(&I);
-            if (!Alloc || Alloc->getAllocatedType() != LambdaType)
-              continue;
-            // Demangle the register_lambda instantiation containing
-            // demangled name
-            std::string DemangledName = demangle(F.getName().str());
-            // We need what is below to be a string and not a StringRef so that
-            // the DenseMap's keys have lifespan longer than this current scope.
-            std::string DemangledLambdaType = std::string(
-                parseLambdaType(DemangledName, "proteus::register_lambda"));
-            // Fetch the global variable from the cache if it's already been
-            // created
-            GlobalVariable *LambdaNameGlobal = nullptr;
-            if (LambdaNameToGlobal.contains(DemangledLambdaType)) {
-              LambdaNameGlobal = LambdaNameToGlobal[DemangledLambdaType];
-            } else {
-              IRBuilder<> Builder(CB);
-              LambdaNameGlobal =
-                  Builder.CreateGlobalString(DemangledLambdaType);
-              LambdaNameToGlobal[DemangledLambdaType] = LambdaNameGlobal;
-            }
-            // Inject the demangled name back into the callsite
-            CB->setArgOperand(3, LambdaNameGlobal);
-            FoundLambda = true;
-          }
+    // Create a global variable for each lambda type registered
+    DenseMap<Type *, GlobalVariable *> LambdaTypeToGlobalName;
+    for (auto &F : M.getFunctionList()) {
+      if (!StringRef{demangle(F.getName().str())}.contains(
+              "proteus::register_lambda"))
+        continue;
+      for (BasicBlock &BB : F) {
+        for (Instruction &I : BB) {
+          // By our definition, we force register_lambda to allocate a copy
+          // of the lambda struct.
+          auto *Alloc = dyn_cast<AllocaInst>(&I);
+          if (!Alloc)
+            continue;
+          std::string DemangledFuncName = demangle(F.getName().str());
+          StringRef DemangledLambdaName =
+              parseLambdaType(DemangledFuncName, "proteus::register_lambda");
+          LambdaTypeToGlobalName[Alloc->getAllocatedType()] =
+              IRB.CreateGlobalString(DemangledLambdaName, ".str", 0, &M);
         }
       }
-      assert(FoundLambda && "Expected register_lambda call contained in Module "
-                            "corresponding to jit_variable");
+    }
+
+    // Inject lambda's Clang-generated name into the jit_variable callsite.
+    for (auto &[CB, LambdaType] : CallBaseToLambda) {
+      bool FoundLambda = false;
+      auto It = LambdaTypeToGlobalName.find(LambdaType);
+      if (It == LambdaTypeToGlobalName.end())
+        reportFatalError("Failed to find the lambda association info");
+      CB->setArgOperand(3, It->second);
     }
   }
 

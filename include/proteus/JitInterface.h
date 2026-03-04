@@ -108,28 +108,19 @@ jit_variable(T V, int Pos = -1, int Offset = -1,
   return V;
 }
 
-// template <typename T>
-// static __attribute__((noinline)) void
-// register_lambda(const T& t, const char *Symbol = "") noexcept {
-//   assert(Symbol && "Expected non-null Symbol");
-//   __jit_register_lambda(Symbol);
-//   // Force LLVM to generate an AllocaInst of the underlying Clang--generated
-//   // anonymous class for T.  We remove this after recording the demangled
-//   // lambda name.
-//   T local = t;
-//   __jit_take_address(&local);
-// }
-
 template <typename T>
-static __attribute__((noinline)) void
-register_lambda(const T &t, const char *Symbol = "") noexcept {
+static __attribute__((noinline)) T&&
+register_lambda(T &&t, const char *Symbol = "") noexcept {
   assert(Symbol && "Expected non-null Symbol");
   __jit_register_lambda(Symbol);
   // Force LLVM to generate an AllocaInst of the underlying Clang--generated
   // anonymous class for T.  We remove this after recording the demangled
   // lambda name.
-  T local = t;
+  using LambdaType = std::decay_t<T>;
+  // static_assert(std::is_same_v<LambdaType,int>);
+  LambdaType local = t;
   __jit_take_address(&local);
+  return std::forward<T>(t);
 }
 
 #if defined(__CUDACC__) || defined(__HIP__)

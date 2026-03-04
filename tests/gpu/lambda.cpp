@@ -41,6 +41,11 @@ template <typename T> void registerRun(int N, T &&LB) {
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
+template <typename T> void run(T &&LB) {
+  kernel<<<1, 1>>>(LB);
+  gpuErrCheck(gpuDeviceSynchronize());
+}
+
 inline void launch(double C, double *X) {
   registerRun([ =, C = proteus::jit_variable(C) ] __device__
               __attribute__((annotate("jit"))) () { X[0] = C + 2; });
@@ -65,9 +70,9 @@ int main() {
 
   std::cout << "x[0:1] = " << X[0] << "," << X[1] << "\n";
 
-  registerRun([
+  run(proteus::register_lambda([
     =, A = proteus::jit_variable(A), B = proteus::jit_variable(B)
-  ] __device__ __attribute__((annotate("jit"))) () { X[0] = A + B; });
+  ] __device__ __attribute__((annotate("jit"))) () { X[0] = A + B; }));
   std::cout << "x[0] = " << X[0] << "\n";
 
   launch(C, X);

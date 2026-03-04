@@ -21,14 +21,13 @@ __global__ __attribute__((annotate("jit"))) void kernelSimple() {
 }
 
 template <typename T> void run(T &&LB) {
-  proteus::register_lambda(LB);
   kernel<<<1, 1>>>(LB);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
 void lambdaCaller(int V) {
-  run(
-      [=, V = proteus::jit_variable(V)] __device__() { printf("V %d\n", V); });
+  run(proteus::register_lambda(
+      [=, V = proteus::jit_variable(V)] __device__() { printf("V %d\n", V); }));
 }
 
 int main() {
