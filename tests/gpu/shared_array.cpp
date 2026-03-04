@@ -22,14 +22,13 @@ __global__ __attribute__((annotate("jit"))) void kernel(Lambda &&Body) {
 }
 
 template <typename Lambda> void launcher(Lambda &&Body) {
-  proteus::register_lambda(Body);
   kernel<<<1, 1>>>(Body);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
 int main() {
   int Dims = 3;
-  launcher(
+  launcher(proteus::register_lambda(
       [=, Dims = proteus::jit_variable(Dims)] __device__() {
         double *Array = proteus::shared_array<double, 10>(Dims);
         Array[0] = 1.0;
@@ -37,7 +36,7 @@ int main() {
         Array[2] = 3.0;
         printf("Lambda Array[0] %lf Array[1] %lf Array[2] %lf\n", Array[0],
                Array[1], Array[2]);
-      });
+      }));
 
   return 0;
 }

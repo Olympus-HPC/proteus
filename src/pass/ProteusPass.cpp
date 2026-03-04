@@ -139,7 +139,7 @@ public:
     findJitVariables(M);
     registerJitVariablesWithLambda(M);
     registerLambdaFunctions(M);
-    // llvm::outs() << M;
+
     if (hasDeviceLaunchKernelCalls(M)) {
       emitJitLaunchKernelCall(M);
     }
