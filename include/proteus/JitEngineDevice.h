@@ -464,27 +464,23 @@ public:
         Function *LambdaFn = KernelModule.getFunction(FnName);
 
         if (LambdaFn) {
-          // 1. Analyze IR for read-only captures
-          auto DetectedCaptures = analyzeReadOnlyCaptures(*LambdaFn);
+          // 1. Read pass-emitted capture metadata.
+          auto DetectedCaptures = parseAutoReadOnlyCapturesMetadata(*LambdaFn);
 
           if (!DetectedCaptures.empty()) {
-            // 2. Get closure type and data layout
-            const DataLayout &DL = KernelModule.getDataLayout();
-            StructType *ClosureType = inferClosureType(*LambdaFn);
-
-            // 3. Get lambda closure from cached data (not KernelArgs)
+            // 2. Get lambda closure from cached data (not KernelArgs).
             const auto *ClosureData = LR.getClosureData(LambdaType);
             if (ClosureData && !ClosureData->empty()) {
               const void *LambdaClosure = ClosureData->data();
 
-              // 4. Extract auto-detected capture values
-              auto AutoCaptures = extractAutoDetectedCaptures(
-                  LambdaClosure, DetectedCaptures, DL, ClosureType);
+              // 3. Extract auto-detected capture values from byte offsets.
+              auto AutoCaptures = extractAutoDetectedCapturesFromMetadata(
+                  LambdaClosure, DetectedCaptures);
 
-              // 5. Merge (explicit takes precedence)
+              // 4. Merge (explicit takes precedence).
               mergeCaptures(MergedValues, AutoCaptures);
 
-              // 6. Trace auto-detected captures
+              // 5. Trace auto-detected captures.
               if (Config::get().ProteusTraceOutput >= 1) {
                 for (const auto &RC : AutoCaptures) {
                   // Only trace if it wasn't already explicit

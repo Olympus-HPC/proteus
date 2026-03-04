@@ -25,6 +25,7 @@ endif()
 # dependencies for building tests.
 set(PROTEUS_PASS_SOURCES
   ${PROJECT_SOURCE_DIR}/src/pass/AnnotationHandler.cpp
+  ${PROJECT_SOURCE_DIR}/src/pass/AutoReadOnlyCapturesAnalysis.cpp
   ${PROJECT_SOURCE_DIR}/src/pass/ProteusPass.cpp
   ${PROJECT_SOURCE_DIR}/src/lib/Error.cpp
 )

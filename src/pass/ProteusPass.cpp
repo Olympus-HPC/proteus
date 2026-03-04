@@ -26,6 +26,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "AnnotationHandler.h"
+#include "AutoReadOnlyCapturesAnalysis.h"
 #include "Helpers.h"
 
 #include "proteus/Cloning.h"
@@ -265,6 +266,9 @@ private:
     // Add metadata for the JIT function to store the argument positions for
     // runtime constants.
     emitJitFunctionArgMetadata(*JitMod, JFI, *JitF);
+
+    auto AutoCaptures = analyzeAutoReadOnlyCaptures(*JitF);
+    emitAutoReadOnlyCapturesMetadata(*JitF, AutoCaptures);
 
     if (verifyModule(*JitMod, &errs()))
       reportFatalError("Broken JIT module found, compilation aborted!");
