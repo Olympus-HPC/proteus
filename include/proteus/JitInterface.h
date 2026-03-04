@@ -14,23 +14,14 @@
 #define PROTEUS_JIT_INTERFACE_H
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Init.h"
 
 #include <cassert>
 #include <cstring>
 #include <utility>
 
 extern "C" void __jit_push_variable(proteus::RuntimeConstant RC);
-extern "C" void __jit_register_lambda(const char *Symbol,
-                                      const void *ClosurePtr,
-                                      size_t ClosureSize);
-extern "C" void __jit_init_host();
-extern "C" void __jit_init_device();
-extern "C" void __jit_finalize_host();
-extern "C" void __jit_finalize_device();
-extern "C" void __jit_enable_host();
-extern "C" void __jit_enable_device();
-extern "C" void __jit_disable_host();
-extern "C" void __jit_disable_device();
+extern "C" void __jit_register_lambda(const char *Symbol);
 
 namespace proteus {
 
@@ -60,9 +51,9 @@ jit_object(T *V, size_t Size = sizeof(std::remove_pointer_t<T>)) noexcept;
 
 #if defined(__CUDACC__) || defined(__HIP__)
 template <typename T>
-__attribute__((noinline)) __device__
-    std::enable_if_t<std::is_trivially_copyable_v<std::remove_pointer_t<T>>,
-                     void> jit_object(T *V, size_t Size = sizeof(T)) noexcept;
+__attribute__((noinline)) __device__ std::enable_if_t<
+    std::is_trivially_copyable_v<std::remove_pointer_t<T>>, void>
+jit_object(T *V, size_t Size = sizeof(T)) noexcept;
 #endif
 
 template <typename T>
@@ -77,7 +68,8 @@ template <typename T>
 __attribute__((noinline)) __device__ std::enable_if_t<
     !std::is_pointer_v<T> &&
         std::is_trivially_copyable_v<std::remove_reference_t<T>>,
-    void> jit_object(T &V, size_t Size = sizeof(T)) noexcept;
+    void>
+jit_object(T &V, size_t Size = sizeof(T)) noexcept;
 #endif
 
 template <typename T> inline static RuntimeConstantType convertCTypeToRCType() {
@@ -116,7 +108,7 @@ template <typename T>
 static __attribute__((noinline)) T &&
 register_lambda(T &&t, const char *Symbol = "") noexcept {
   assert(Symbol && "Expected non-null Symbol");
-  __jit_register_lambda(Symbol, &t, sizeof(T));
+  __jit_register_lambda(Symbol);
   return std::forward<T>(t);
 }
 
@@ -131,30 +123,6 @@ shared_array([[maybe_unused]] size_t N,
   return reinterpret_cast<T *>(shmem);
 }
 #endif
-
-inline void enable() {
-  __jit_enable_host();
-  __jit_enable_device();
-}
-
-inline void disable() {
-  __jit_disable_host();
-  __jit_disable_device();
-}
-
-inline void init() {
-  __jit_init_host();
-#if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
-  __jit_init_device();
-#endif
-}
-
-inline void finalize() {
-  __jit_finalize_host();
-#if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
-  __jit_finalize_device();
-#endif
-}
 
 } // namespace proteus
 
