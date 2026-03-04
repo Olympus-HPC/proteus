@@ -1256,20 +1256,21 @@ private:
   /// 4. Inject the demangled name into the original callbase of the
   /// `jit_variable` function.
   void registerJitVariablesWithLambda(Module &M) {
-    llvm::SmallVector<CallBase *, 16> JitVarFunctions;
+    llvm::SmallVector<CallBase *, 16> JitVarCallsites;
     llvm::DenseMap<CallBase *, Type *> CallBaseToLambda;
     for (auto &F : M.getFunctionList()) {
       std::string DemangledName = demangle(F.getName().str());
       if (StringRef{DemangledName}.contains("proteus::jit_variable")) {
         for (User *Usr : F.users()) {
-          if (CallBase *CB = dyn_cast<CallBase>(Usr)) {
-            JitVarFunctions.push_back(CB);
-          }
+          CallBase *CB = dyn_cast<CallBase>(Usr);
+          if (!CB)
+            continue;
+          JitVarCallsites.push_back(CB);
         }
       }
     }
 
-    for (CallBase *CB : JitVarFunctions) {
+    for (CallBase *CB : JitVarCallsites) {
       // traverse use-def from each callsite, the CB value will be used by the
       // allocated lambda class.
       std::queue<Value *> WorkList;
