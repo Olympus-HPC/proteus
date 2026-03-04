@@ -58,4 +58,10 @@ CREATE_MLIR_FRONTEND_TEST(mlir_intrinsics mlir_intrinsics.cpp)
 
 if(PROTEUS_ENABLE_CUDA OR PROTEUS_ENABLE_HIP)
   CREATE_MLIR_FRONTEND_TEST(mlir_gpu_builtins mlir_gpu_builtins.cpp)
+  CREATE_MLIR_FRONTEND_TEST(mlir_gpu_device_function_calls
+                            mlir_gpu_device_function_calls.cpp)
+  CREATE_MLIR_FRONTEND_TEST(mlir_gpu_kernel_representation
+                            mlir_gpu_kernel_representation.cpp)
+  CREATE_MLIR_FRONTEND_TEST(mlir_gpu_launch_bounds
+                            mlir_gpu_launch_bounds.cpp)
 endif()

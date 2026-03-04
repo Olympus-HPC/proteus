@@ -9,8 +9,9 @@
 
 namespace proteus {
 
-/// MLIRCodeBuilder implements the CodeBuilder interface using MLIR dialects
-/// (func, arith, memref) for host scalar code generation.
+/// MLIRCodeBuilder implements the CodeBuilder interface using MLIR dialects.
+/// Host mode emits func/arith/memref, while CUDA/HIP mode emits gpu.module
+/// with gpu.func kernels.
 ///
 /// Phase 1b: supports addFunction, getArg, beginFunction/endFunction,
 /// allocScalar, loadScalar/storeScalar, createArith, createCast,
@@ -37,7 +38,8 @@ public:
   // -----------------------------------------------------------------------
 
   IRFunction *addFunction(const std::string &Name, IRType RetTy,
-                          const std::vector<IRType> &ArgTys) override;
+                          const std::vector<IRType> &ArgTys,
+                          bool IsKernel = false) override;
   void setFunctionName(IRFunction *F, const std::string &Name) override;
   IRValue *getArg(IRFunction *F, size_t Idx) override;
   void beginFunction(IRFunction *F, const char *File, int Line) override;

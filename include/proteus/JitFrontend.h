@@ -34,7 +34,8 @@ private:
   Func<RetT, ArgT...> &buildFuncFromArgsList(const std::string &Name,
                                              ArgTypeList<ArgT...>) {
     auto TypedFn =
-        std::make_unique<Func<RetT, ArgT...>>(*this, *CB, Name, Dispatch);
+        std::make_unique<Func<RetT, ArgT...>>(*this, *CB, Name, Dispatch,
+                                              /*IsKernel=*/false);
     Func<RetT, ArgT...> &TypedFnRef = *TypedFn;
     Functions.emplace_back(std::move(TypedFn));
     TypedFnRef.declArgs();
@@ -45,16 +46,12 @@ private:
   KernelHandle<ArgT...> buildKernelFromArgsList(const std::string &Name,
                                                 ArgTypeList<ArgT...>) {
     auto TypedFn =
-        std::make_unique<Func<void, ArgT...>>(*this, *CB, Name, Dispatch);
+        std::make_unique<Func<void, ArgT...>>(*this, *CB, Name, Dispatch,
+                                              /*IsKernel=*/true);
     Func<void, ArgT...> &TypedFnRef = *TypedFn;
     TypedFn->declArgs();
 
-#if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
-    std::unique_ptr<FuncBase> &Fn = Functions.emplace_back(std::move(TypedFn));
-    Fn->setKernel();
-#else
-    reportFatalError("setKernel() is only supported for CUDA/HIP");
-#endif
+    Functions.emplace_back(std::move(TypedFn));
     return KernelHandle<ArgT...>{TypedFnRef, *this};
   }
 

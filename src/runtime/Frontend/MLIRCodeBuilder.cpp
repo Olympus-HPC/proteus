@@ -81,13 +81,15 @@ struct MLIRCodeBuilder::Impl {
   MLIRContext Context;
   OpBuilder Builder;
   ModuleOp Module;
+  gpu::GPUModuleOp DeviceModule;
 
   // Pointer-stable storage for returned handles.
   std::deque<MLIRIRValue> Values;
   std::deque<MLIRIRFunction> Functions;
 
   // Current function state.
-  mlir::func::FuncOp CurrentFunc;
+  mlir::Operation *CurrentFuncOp = nullptr;
+  bool CurrentIsKernel = false;
   Block *EntryBlock = nullptr;
 
   // Scope stack for structured control flow (scf.if / scf.for / scf.while).
@@ -138,13 +140,33 @@ struct MLIRCodeBuilder::Impl {
 
   Value unwrap(IRValue *V) { return static_cast<MLIRIRValue *>(V)->V; }
 
-  IRFunction *wrapFunction(mlir::func::FuncOp F) {
-    Functions.emplace_back(F);
+  IRFunction *wrapFunction(mlir::Operation *Op, bool IsKernel) {
+    Functions.emplace_back(Op, IsKernel);
     return &Functions.back();
   }
 
-  mlir::func::FuncOp unwrapFunction(IRFunction *F) {
-    return static_cast<MLIRIRFunction *>(F)->F;
+  MLIRIRFunction *unwrapFunction(IRFunction *F) {
+    return static_cast<MLIRIRFunction *>(F);
+  }
+
+  gpu::GPUModuleOp getOrCreateDeviceModule() {
+    if (DeviceModule)
+      return DeviceModule;
+
+    constexpr llvm::StringLiteral DeviceModuleName = "kernels";
+    if (auto Existing =
+            Module.lookupSymbol<gpu::GPUModuleOp>(DeviceModuleName)) {
+      DeviceModule = Existing;
+      return DeviceModule;
+    }
+
+    OpBuilder::InsertionGuard Guard(Builder);
+    Builder.setInsertionPointToStart(Module.getBody());
+    // CUDA/HIP lowering expects device kernels to live under a dedicated
+    // gpu.module symbol, mirroring separate device compilation.
+    DeviceModule = Builder.create<gpu::GPUModuleOp>(Builder.getUnknownLoc(),
+                                                    DeviceModuleName);
+    return DeviceModule;
   }
 
   std::pair<mlir::Value, mlir::Value> resolveAtomicAddress(IRValue *Addr) {
@@ -209,6 +231,12 @@ struct MLIRCodeBuilder::Impl {
         Builder.create<func::FuncOp>(Builder.getUnknownLoc(), Name, FTy);
     NewFunc.setSymVisibilityAttr(Builder.getStringAttr("private"));
     return NewFunc;
+  }
+
+  gpu::GPUFuncOp lookupDeviceFunc(StringRef Name) {
+    if (!DeviceModule)
+      return gpu::GPUFuncOp{};
+    return DeviceModule.lookupSymbol<gpu::GPUFuncOp>(Name);
   }
 
   // For pointer values, resolve to {baseMemref, idx} where idx = load(slot[0]).
@@ -371,7 +399,8 @@ void MLIRCodeBuilder::print() { PImpl->Module.print(llvm::outs()); }
 // ---------------------------------------------------------------------------
 
 IRFunction *MLIRCodeBuilder::addFunction(const std::string &Name, IRType RetTy,
-                                         const std::vector<IRType> &ArgTys) {
+                                         const std::vector<IRType> &ArgTys,
+                                         bool IsKernel) {
   auto &Ctx = PImpl->Context;
 
   llvm::SmallVector<mlir::Type> MLIRArgTys;
@@ -386,19 +415,47 @@ IRFunction *MLIRCodeBuilder::addFunction(const std::string &Name, IRType RetTy,
   auto FTy = FunctionType::get(&Ctx, MLIRArgTys, RetTys);
   auto Loc = PImpl->Builder.getUnknownLoc();
 
-  // Insert function at end of module.
+  const bool IsDeviceMode = (TargetModel == TargetModelType::CUDA ||
+                             TargetModel == TargetModelType::HIP);
+
+  if (IsDeviceMode) {
+    auto DeviceModule = PImpl->getOrCreateDeviceModule();
+    if (DeviceModule.getBodyRegion().empty())
+      DeviceModule.getBodyRegion().push_back(new Block());
+    OpBuilder::InsertionGuard Guard(PImpl->Builder);
+    PImpl->Builder.setInsertionPointToEnd(
+        &DeviceModule.getBodyRegion().front());
+
+    // In CUDA/HIP mode Proteus emits device-side IR under gpu.module;
+    // host-side orchestration remains outside MLIR. Device helpers are
+    // regular gpu.func without the gpu.kernel marker.
+    auto KernelOp = PImpl->Builder.create<gpu::GPUFuncOp>(Loc, Name, FTy);
+    if (KernelOp.getBody().empty())
+      KernelOp.addEntryBlock();
+    if (IsKernel)
+      // Keep kernel marker explicit so downstream GPU passes can identify
+      // launchable entry points before target-specific lowering.
+      KernelOp->setAttr("gpu.kernel", UnitAttr::get(&PImpl->Context));
+
+    PImpl->CurrentFuncOp = KernelOp.getOperation();
+    PImpl->CurrentIsKernel = IsKernel;
+    PImpl->EntryBlock = &KernelOp.getBody().front();
+    return PImpl->wrapFunction(KernelOp.getOperation(), IsKernel);
+  }
+
+  if (IsKernel)
+    reportFatalError("MLIRCodeBuilder::addFunction: host target does not "
+                     "support kernel functions");
+
+  // Host mode keeps plain func.func definitions in the top-level module.
   PImpl->Builder.setInsertionPointToEnd(PImpl->Module.getBody());
   auto FuncOp = PImpl->Builder.create<mlir::func::FuncOp>(Loc, Name, FTy);
-
-  // Create entry block with arguments matching the function type.
   FuncOp.addEntryBlock();
 
-  // Track the new function immediately so declArgs() (which runs before
-  // beginFunction) can call setInsertPointAtEntry() correctly.
-  PImpl->CurrentFunc = FuncOp;
+  PImpl->CurrentFuncOp = FuncOp.getOperation();
+  PImpl->CurrentIsKernel = false;
   PImpl->EntryBlock = &FuncOp.getBody().front();
-
-  return PImpl->wrapFunction(FuncOp);
+  return PImpl->wrapFunction(FuncOp.getOperation(), /*IsKernel=*/false);
 }
 
 // ---------------------------------------------------------------------------
@@ -406,7 +463,16 @@ IRFunction *MLIRCodeBuilder::addFunction(const std::string &Name, IRType RetTy,
 // ---------------------------------------------------------------------------
 
 void MLIRCodeBuilder::setFunctionName(IRFunction *F, const std::string &Name) {
-  PImpl->unwrapFunction(F).setName(Name);
+  auto *MF = PImpl->unwrapFunction(F);
+  if (auto HostFn = dyn_cast<mlir::func::FuncOp>(MF->Op)) {
+    HostFn.setName(Name);
+    return;
+  }
+  if (auto KernelFn = dyn_cast<gpu::GPUFuncOp>(MF->Op)) {
+    KernelFn.setName(Name);
+    return;
+  }
+  reportFatalError("MLIRCodeBuilder::setFunctionName: unsupported function op");
 }
 
 // ---------------------------------------------------------------------------
@@ -414,9 +480,14 @@ void MLIRCodeBuilder::setFunctionName(IRFunction *F, const std::string &Name) {
 // ---------------------------------------------------------------------------
 
 IRValue *MLIRCodeBuilder::getArg(IRFunction *F, size_t Idx) {
-  auto FuncOp = PImpl->unwrapFunction(F);
-  Value Arg = FuncOp.getBody().front().getArgument(Idx);
-  return PImpl->wrap(Arg);
+  auto *MF = PImpl->unwrapFunction(F);
+  if (auto HostFn = dyn_cast<mlir::func::FuncOp>(MF->Op)) {
+    return PImpl->wrap(HostFn.getBody().front().getArgument(Idx));
+  }
+  if (auto KernelFn = dyn_cast<gpu::GPUFuncOp>(MF->Op)) {
+    return PImpl->wrap(KernelFn.getBody().front().getArgument(Idx));
+  }
+  reportFatalError("MLIRCodeBuilder::getArg: unsupported function op");
 }
 
 // ---------------------------------------------------------------------------
@@ -425,9 +496,16 @@ IRValue *MLIRCodeBuilder::getArg(IRFunction *F, size_t Idx) {
 
 void MLIRCodeBuilder::beginFunction(IRFunction *F, const char * /*File*/,
                                     int /*Line*/) {
-  auto FuncOp = PImpl->unwrapFunction(F);
-  PImpl->CurrentFunc = FuncOp;
-  PImpl->EntryBlock = &FuncOp.getBody().front();
+  auto *MF = PImpl->unwrapFunction(F);
+  PImpl->CurrentFuncOp = MF->Op;
+  PImpl->CurrentIsKernel = MF->IsKernel;
+  if (auto HostFn = dyn_cast<mlir::func::FuncOp>(MF->Op)) {
+    PImpl->EntryBlock = &HostFn.getBody().front();
+  } else if (auto KernelFn = dyn_cast<gpu::GPUFuncOp>(MF->Op)) {
+    PImpl->EntryBlock = &KernelFn.getBody().front();
+  } else {
+    reportFatalError("MLIRCodeBuilder::beginFunction: unsupported function op");
+  }
   PImpl->Builder.setInsertionPointToEnd(PImpl->EntryBlock);
 }
 
@@ -437,9 +515,13 @@ void MLIRCodeBuilder::endFunction() {
   if (CurBlock && (CurBlock->empty() ||
                    !CurBlock->back().hasTrait<OpTrait::IsTerminator>())) {
     auto Loc = PImpl->Builder.getUnknownLoc();
-    PImpl->Builder.create<mlir::func::ReturnOp>(Loc);
+    if (PImpl->CurrentIsKernel)
+      PImpl->Builder.create<gpu::ReturnOp>(Loc);
+    else
+      PImpl->Builder.create<mlir::func::ReturnOp>(Loc);
   }
-  PImpl->CurrentFunc = {};
+  PImpl->CurrentFuncOp = nullptr;
+  PImpl->CurrentIsKernel = false;
   PImpl->EntryBlock = nullptr;
 }
 
@@ -466,10 +548,15 @@ void MLIRCodeBuilder::clearInsertPoint() {
 
 void MLIRCodeBuilder::createRetVoid() {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  PImpl->Builder.create<mlir::func::ReturnOp>(Loc);
+  if (PImpl->CurrentIsKernel)
+    PImpl->Builder.create<gpu::ReturnOp>(Loc);
+  else
+    PImpl->Builder.create<mlir::func::ReturnOp>(Loc);
 }
 
 void MLIRCodeBuilder::createRet(IRValue *V) {
+  if (PImpl->CurrentIsKernel)
+    reportFatalError("MLIRCodeBuilder::createRet: kernels must return void");
   auto Loc = PImpl->Builder.getUnknownLoc();
   PImpl->Builder.create<mlir::func::ReturnOp>(Loc, PImpl->unwrap(V));
 }
@@ -1100,7 +1187,14 @@ IRValue *MLIRCodeBuilder::createCall(const std::string &FName, IRType RetTy,
     ResultTys.push_back(toMLIRType(RetTy, PImpl->Context));
 
   auto FTy = PImpl->Builder.getFunctionType(MLIRArgTys, ResultTys);
-  auto Callee = PImpl->getOrCreateFunc(FName, FTy);
+
+  const bool InDeviceFunc =
+      PImpl->CurrentFuncOp && isa<gpu::GPUFuncOp>(PImpl->CurrentFuncOp);
+  const bool InHostFunc =
+      PImpl->CurrentFuncOp && isa<func::FuncOp>(PImpl->CurrentFuncOp);
+
+  if (!InDeviceFunc && !InHostFunc)
+    reportFatalError("createCall: no active function context");
 
   llvm::SmallVector<mlir::Value> CallArgs;
   CallArgs.reserve(Args.size());
@@ -1113,8 +1207,25 @@ IRValue *MLIRCodeBuilder::createCall(const std::string &FName, IRType RetTy,
   }
 
   auto Loc = PImpl->Builder.getUnknownLoc();
-  auto Call = PImpl->Builder.create<func::CallOp>(
-      Loc, Callee.getSymName(), FTy.getResults(), ValueRange{CallArgs});
+  func::CallOp Call;
+  if (InDeviceFunc) {
+    auto Callee = PImpl->lookupDeviceFunc(FName);
+    if (!Callee)
+      reportFatalError("createCall: unresolved device callee " + FName +
+                       " (define gpu.func before calling it)");
+    if (Callee.getFunctionType() != FTy)
+      reportFatalError("createCall: device callee type mismatch for " + FName);
+
+    // Device-side helper calls inside gpu.module are represented with
+    // func.call symbol references to sibling gpu.func symbols.
+    Call = PImpl->Builder.create<func::CallOp>(Loc, FName, FTy.getResults(),
+                                               ValueRange{CallArgs});
+  } else {
+    auto Callee = PImpl->getOrCreateFunc(FName, FTy);
+    (void)Callee;
+    Call = PImpl->Builder.create<func::CallOp>(Loc, FName, FTy.getResults(),
+                                               ValueRange{CallArgs});
+  }
 
   if (RetTy.Kind == IRTypeKind::Void)
     return nullptr;
@@ -1209,9 +1320,9 @@ IRValue *MLIRCodeBuilder::emitBuiltin(const std::string &Name, IRType RetTy,
   if (isHostTargetModel(TargetModel))
     reportFatalError("MLIRCodeBuilder::emitBuiltin: builtin only valid in GPU "
                      "kernel");
-  if (!PImpl->CurrentFunc || !PImpl->CurrentFunc->hasAttr("gpu.kernel"))
+  if (!PImpl->CurrentFuncOp || !isa<gpu::GPUFuncOp>(PImpl->CurrentFuncOp))
     reportFatalError("MLIRCodeBuilder::emitBuiltin: builtin only valid in GPU "
-                     "kernel");
+                     "device function");
 
   auto Loc = PImpl->Builder.getUnknownLoc();
   auto CastIndexToRetTy = [&](mlir::Value IndexV) -> IRValue * {
@@ -1228,8 +1339,8 @@ IRValue *MLIRCodeBuilder::emitBuiltin(const std::string &Name, IRType RetTy,
                      Name);
   };
 
-  // MLIR lowering intentionally uses gpu dialect ops instead of CUDA/HIP
-  // special registers to keep IR architecture-agnostic until later lowering.
+  // gpu dialect is architecture-agnostic; target-specific lowering to
+  // NVVM/ROCDL intrinsics happens in later conversion passes.
   if (Name == "threadIdx.x")
     return CastIndexToRetTy(
         PImpl->Builder.create<gpu::ThreadIdOp>(Loc, gpu::Dimension::x));
@@ -1440,21 +1551,62 @@ VarAlloc MLIRCodeBuilder::allocArray(const std::string & /*Name*/,
 
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
 void MLIRCodeBuilder::setKernel(IRFunction *F) {
-  auto FuncOp = PImpl->unwrapFunction(F);
-  FuncOp->setAttr("gpu.kernel", UnitAttr::get(&PImpl->Context));
+  auto *MF = PImpl->unwrapFunction(F);
+  if (!MF->IsKernel)
+    reportFatalError("MLIRCodeBuilder::setKernel: kernel-ness must be chosen "
+                     "at addFunction/Func construction time");
+  if (auto KernelFn = dyn_cast<gpu::GPUFuncOp>(MF->Op)) {
+    KernelFn->setAttr("gpu.kernel", UnitAttr::get(&PImpl->Context));
+    return;
+  }
+  reportFatalError("MLIRCodeBuilder::setKernel: expected gpu.func");
 }
 void MLIRCodeBuilder::setLaunchBoundsForKernel(IRFunction *F,
                                                int MaxThreadsPerBlock,
                                                int MinBlocksPerSM) {
-  auto FuncOp = PImpl->unwrapFunction(F);
-  // Keep launch-bounds on the kernel op as attributes so later GPU lowering
-  // can map them to target-specific metadata.
-  FuncOp->setAttr("proteus.launch_bounds.max_threads_per_block",
-                  IntegerAttr::get(IntegerType::get(&PImpl->Context, 32),
-                                   MaxThreadsPerBlock));
-  FuncOp->setAttr(
-      "proteus.launch_bounds.min_blocks_per_sm",
-      IntegerAttr::get(IntegerType::get(&PImpl->Context, 32), MinBlocksPerSM));
+  if (MaxThreadsPerBlock <= 0 || MinBlocksPerSM < 0)
+    reportFatalError("MLIRCodeBuilder::setLaunchBoundsForKernel: invalid "
+                     "launch-bounds arguments");
+
+  auto *MF = PImpl->unwrapFunction(F);
+  if (!MF->IsKernel)
+    reportFatalError("MLIRCodeBuilder::setLaunchBoundsForKernel: function is "
+                     "not marked as kernel");
+
+  auto KernelFn = dyn_cast<gpu::GPUFuncOp>(MF->Op);
+  if (!KernelFn)
+    reportFatalError("MLIRCodeBuilder::setLaunchBoundsForKernel: expected "
+                     "gpu.func kernel");
+
+  if (TargetModel == TargetModelType::CUDA) {
+    // Canonical GPU->NVVM lowering expects NVVM launch-bounds attributes on
+    // the kernel function (nvvm.maxntid / nvvm.minctasm).
+    KernelFn->setAttr("nvvm.maxntid", PImpl->Builder.getDenseI32ArrayAttr(
+                                          {MaxThreadsPerBlock, 1, 1}));
+    KernelFn->setAttr("nvvm.minctasm",
+                      IntegerAttr::get(IntegerType::get(&PImpl->Context, 32),
+                                       MinBlocksPerSM));
+    return;
+  }
+
+  if (TargetModel == TargetModelType::HIP) {
+    // ROCDL launch bounds are represented with canonical rocdl.* attributes;
+    // these map to AMDGPU kernel function attributes in LLVM lowering.
+    KernelFn->setAttr(
+        "rocdl.flat_work_group_size",
+        StringAttr::get(&PImpl->Context,
+                        "1," + std::to_string(MaxThreadsPerBlock)));
+    KernelFn->setAttr("rocdl.max_flat_work_group_size",
+                      IntegerAttr::get(IntegerType::get(&PImpl->Context, 32),
+                                       MaxThreadsPerBlock));
+    KernelFn->setAttr("rocdl.waves_per_eu",
+                      IntegerAttr::get(IntegerType::get(&PImpl->Context, 32),
+                                       MinBlocksPerSM));
+    return;
+  }
+
+  reportFatalError("MLIRCodeBuilder::setLaunchBoundsForKernel: unsupported "
+                   "target model for launch bounds");
 }
 #endif
 

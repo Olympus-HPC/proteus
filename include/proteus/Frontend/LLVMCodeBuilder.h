@@ -109,7 +109,8 @@ public:
   // CodeBuilder overrides — function management.
   // -----------------------------------------------------------------------
   IRFunction *addFunction(const std::string &Name, IRType RetTy,
-                          const std::vector<IRType> &ArgTys) override;
+                          const std::vector<IRType> &ArgTys,
+                          bool IsKernel = false) override;
   void setFunctionName(IRFunction *F, const std::string &Name) override;
   IRValue *getArg(IRFunction *F, size_t Idx) override;
   void beginFunction(IRFunction *F, const char *File, int Line) override;

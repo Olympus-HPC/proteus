@@ -229,7 +229,8 @@ LLVMContext &LLVMCodeBuilder::getContext() {
 }
 
 IRFunction *LLVMCodeBuilder::addFunction(const std::string &Name, IRType RetTy,
-                                         const std::vector<IRType> &ArgTys) {
+                                         const std::vector<IRType> &ArgTys,
+                                         bool IsKernel) {
   if (!PImpl->OwnedMod)
     reportFatalError("addFunction requires an owning LLVMCodeBuilder");
   auto &Ctx = getContext();
@@ -245,7 +246,12 @@ IRFunction *LLVMCodeBuilder::addFunction(const std::string &Name, IRType RetTy,
     reportFatalError("Expected LLVM Function");
   BasicBlock::Create(Fn->getContext(), "entry", Fn);
   F = Fn;
-  return PImpl->wrapFunction(Fn);
+  IRFunction *IRF = PImpl->wrapFunction(Fn);
+#if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
+  if (IsKernel)
+    setKernel(IRF);
+#endif
+  return IRF;
 }
 
 void LLVMCodeBuilder::setFunctionName(IRFunction *IRF,

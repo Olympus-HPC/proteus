@@ -78,10 +78,12 @@ public:
   // Function management.
   // -----------------------------------------------------------------------
 
-  /// Create a function with the given name and signature.  Returns an opaque
-  /// IRFunction handle owned by this builder.
+  /// Create a function with the given name and signature. Kernel intent is
+  /// explicit so backends can select the correct IR container up front.
+  /// Returns an opaque IRFunction handle owned by this builder.
   virtual IRFunction *addFunction(const std::string &Name, IRType RetTy,
-                                  const std::vector<IRType> &ArgTys) = 0;
+                                  const std::vector<IRType> &ArgTys,
+                                  bool IsKernel = false) = 0;
 
   /// Rename the function identified by \p F.
   virtual void setFunctionName(IRFunction *F, const std::string &Name) = 0;

@@ -1,5 +1,5 @@
 // clang-format off
-// RUN: %build/mlir_gpu_builtins | %FILECHECK %s
+// RUN: %build/mlir_gpu_kernel_representation | %FILECHECK %s
 // clang-format on
 
 #include <memory>
@@ -18,20 +18,15 @@ using namespace proteus;
 
 int main() {
   auto J = std::make_unique<JitModule>(TARGET, "mlir");
-  auto KernelHandle = J->addKernel<void()>("kernel");
+
+  // Kernel-ness is declared at construction time via addKernel.
+  auto KernelHandle = J->addKernel<void()>("kernel_repr");
   auto &K = KernelHandle.F;
 
   K.beginFunction();
   {
     auto TX = K.callBuiltin(builtins::gpu::getThreadIdX);
-    auto BX = K.callBuiltin(builtins::gpu::getBlockIdX);
-    auto BDX = K.callBuiltin(builtins::gpu::getBlockDimX);
-    auto GDX = K.callBuiltin(builtins::gpu::getGridDimX);
-
-    auto Sink = TX + BX + BDX + GDX;
-    (void)Sink;
-
-    K.callBuiltin(builtins::gpu::syncThreads);
+    (void)TX;
     K.ret();
   }
   K.endFunction();
@@ -45,10 +40,6 @@ int main() {
 // CHECK: sym_name = "kernels"
 // CHECK: "gpu.func"()
 // CHECK: "gpu.thread_id"()
-// CHECK: "gpu.block_id"()
-// CHECK: "gpu.block_dim"()
-// CHECK: "gpu.grid_dim"()
-// CHECK: "gpu.barrier"()
 // CHECK: gpu.kernel
-// CHECK: sym_name = "kernel"
+// CHECK: sym_name = "kernel_repr"
 // clang-format on

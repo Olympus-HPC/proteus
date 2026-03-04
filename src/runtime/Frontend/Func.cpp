@@ -4,9 +4,10 @@
 namespace proteus {
 
 FuncBase::FuncBase(JitModule &J, CodeBuilder &CBParam, const std::string &Name,
-                   IRType RetTy, const std::vector<IRType> &ArgTys)
-    : J(J), Name(Name), CB(&CBParam) {
-  Func = CBParam.addFunction(Name, RetTy, ArgTys);
+                   IRType RetTy, const std::vector<IRType> &ArgTys,
+                   bool IsKernel)
+    : J(J), Name(Name), CB(&CBParam), IsKernel(IsKernel) {
+  Func = CBParam.addFunction(Name, RetTy, ArgTys, IsKernel);
 }
 
 FuncBase::~FuncBase() = default;
@@ -19,8 +20,6 @@ void FuncBase::setName(const std::string &NewName) {
 IRValue *FuncBase::getArg(size_t Idx) { return CB->getArg(Func, Idx); }
 
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
-void FuncBase::setKernel() { CB->setKernel(Func); }
-
 void FuncBase::setLaunchBoundsForKernel(int MaxThreadsPerBlock,
                                         int MinBlocksPerSM) {
   CB->setLaunchBoundsForKernel(Func, MaxThreadsPerBlock, MinBlocksPerSM);
