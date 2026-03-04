@@ -1285,22 +1285,21 @@ private:
         if (Discovered.contains(Val))
           continue;
         Discovered.insert(Val);
-        // gep
         if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(Val)) {
+          // gep
           WorkList.push(GEP->getPointerOperand());
-        }
-        // store. E.G. to the first field of a lambda class
-        if (StoreInst *Store = dyn_cast<StoreInst>(Val)) {
+        } else if (StoreInst *Store = dyn_cast<StoreInst>(Val)) {
+          // store. E.G. to the first field of a lambda class
           WorkList.push(Store->getPointerOperand());
-        }
-        // alloca
-        if (AllocaInst *Alloc = dyn_cast<AllocaInst>(Val)) {
-          if (StructType *LambdaType =
-                  dyn_cast<StructType>(Alloc->getAllocatedType())) {
-            // We found the allocation site for the lambda
-            CallBaseToLambda[CB] = LambdaType;
-            break;
-          }
+        } else if (AllocaInst *Alloc = dyn_cast<AllocaInst>(Val)) {
+          // alloca
+          StructType *LambdaType =
+              dyn_cast<StructType>(Alloc->getAllocatedType());
+          if (!LambdaType)
+            continue;
+          // We found the allocation site for the lambda
+          CallBaseToLambda[CB] = LambdaType;
+          break;
         }
       }
     }

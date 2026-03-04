@@ -15,7 +15,6 @@ class Abstraction {
   public:
   LambdaType Lambda;
   Abstraction(const LambdaType& Lam) : Lambda(Lam) {};
-  // Abstraction(const LambdaType& Lam) : Lambda(Lam) {};
   auto operator()() {
     return Lambda();
   }
