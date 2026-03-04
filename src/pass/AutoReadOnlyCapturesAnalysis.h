@@ -10,6 +10,7 @@
 
 namespace llvm {
 class Function;
+class Module;
 } // namespace llvm
 
 namespace proteus {
@@ -26,6 +27,8 @@ analyzeAutoReadOnlyCaptures(llvm::Function &F);
 void emitAutoReadOnlyCapturesMetadata(
     llvm::Function &F,
     llvm::ArrayRef<AutoReadOnlyCaptureMetadataEntry> Captures);
+
+void annotateAutoReadOnlyCaptures(llvm::Module &M);
 
 } // namespace proteus
 

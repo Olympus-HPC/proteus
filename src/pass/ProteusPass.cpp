@@ -267,8 +267,7 @@ private:
     // runtime constants.
     emitJitFunctionArgMetadata(*JitMod, JFI, *JitF);
 
-    auto AutoCaptures = analyzeAutoReadOnlyCaptures(*JitF);
-    emitAutoReadOnlyCapturesMetadata(*JitF, AutoCaptures);
+    annotateAutoReadOnlyCaptures(*JitMod);
 
     if (verifyModule(*JitMod, &errs()))
       reportFatalError("Broken JIT module found, compilation aborted!");
@@ -302,6 +301,7 @@ private:
                         bool HasSourceFileID) {
     SmallVector<char> Bitcode;
     raw_svector_ostream OS(Bitcode);
+    annotateAutoReadOnlyCaptures(EmbedM);
     WriteBitcodeToFile(EmbedM, OS);
 
     HashT HashValue = hash(StringRef{Bitcode.data(), Bitcode.size()});

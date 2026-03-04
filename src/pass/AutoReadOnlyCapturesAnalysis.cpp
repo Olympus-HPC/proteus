@@ -354,4 +354,14 @@ void emitAutoReadOnlyCapturesMetadata(
   F.setMetadata(AutoReadOnlyCapturesMetadataName, MDNode::get(Ctx, Entries));
 }
 
+void annotateAutoReadOnlyCaptures(Module &M) {
+  for (Function &F : M) {
+    if (F.isDeclaration())
+      continue;
+
+    auto Captures = analyzeAutoReadOnlyCaptures(F);
+    emitAutoReadOnlyCapturesMetadata(F, Captures);
+  }
+}
+
 } // namespace proteus
