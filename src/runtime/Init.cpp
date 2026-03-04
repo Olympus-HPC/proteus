@@ -13,6 +13,11 @@ extern "C" void __jit_enable_host();
 extern "C" void __jit_enable_device();
 extern "C" void __jit_disable_host();
 extern "C" void __jit_disable_device();
+
+extern "C" void __proteus_enable_host();
+extern "C" void __proteus_enable_device();
+extern "C" void __proteus_disable_host();
+extern "C" void __proteus_disable_device();
 // NOLINTEND(readability-identifier-naming)
 
 namespace proteus {
