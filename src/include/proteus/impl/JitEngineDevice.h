@@ -476,29 +476,26 @@ public:
         Function *LambdaFn = KernelModule.getFunction(FnName);
 
         if (LambdaFn) {
-          // 1. Analyze IR for read-only captures
-          auto DetectedCaptures = analyzeReadOnlyCaptures(*LambdaFn);
+          // 1. Read pass-emitted capture metadata.
+          auto DetectedCaptures = parseAutoReadOnlyCapturesMetadata(*LambdaFn);
 
           if (!DetectedCaptures.empty()) {
-            // 2. Get closure type and data layout
-            const DataLayout &DL = KernelModule.getDataLayout();
-            StructType *ClosureType = inferClosureType(*LambdaFn);
-
-            // 3. Get lambda closure pointer from KernelArgs
+            // 2. Get lambda closure pointer from KernelArgs.
             int LambdaArgIndex = findLambdaArgIndex(KernelInfo, FnName);
             const void *LambdaClosure = KernelArgs[LambdaArgIndex];
 
-            // 4. Extract auto-detected capture values
-            auto AutoCaptures = extractAutoDetectedCaptures(
-                LambdaClosure, DetectedCaptures, DL, ClosureType);
+            // 3. Extract auto-detected capture values from metadata byte
+            // offsets.
+            auto AutoCaptures = extractAutoDetectedCapturesFromMetadata(
+                LambdaClosure, DetectedCaptures);
 
-            // 5. Merge (explicit takes precedence)
+            // 4. Merge (explicit takes precedence).
             mergeCaptures(MergedValues, AutoCaptures);
 
-            // 6. Trace auto-detected captures
+            // 5. Trace auto-detected captures.
             if (Config::get().traceSpecializations()) {
               for (const auto &RC : AutoCaptures) {
-                // Only trace if it wasn't already explicit
+                // Only trace if it wasn't already explicit.
                 bool WasExplicit = false;
                 for (const auto &Explicit : ExplicitValues) {
                   if (Explicit.Pos == RC.Pos) {

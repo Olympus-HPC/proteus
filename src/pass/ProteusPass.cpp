@@ -26,6 +26,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "AnnotationHandler.h"
+#include "AutoReadOnlyCapturesAnalysis.h"
 #include "Helpers.h"
 
 #include "proteus/CompilerInterfaceTypes.h"
@@ -281,6 +282,8 @@ private:
     // runtime constants.
     emitJitFunctionArgMetadata(*JitMod, JFI, *JitF);
 
+    annotateAutoReadOnlyCaptures(*JitMod);
+
     if (verifyModule(*JitMod, &errs()))
       reportFatalError("Broken JIT module found, compilation aborted!");
 
@@ -313,6 +316,7 @@ private:
                         bool HasSourceFileID) {
     SmallVector<char> Bitcode;
     raw_svector_ostream OS(Bitcode);
+    annotateAutoReadOnlyCaptures(EmbedM);
     WriteBitcodeToFile(EmbedM, OS);
 
     HashT HashValue = hash(StringRef{Bitcode.data(), Bitcode.size()});

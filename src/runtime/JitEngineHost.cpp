@@ -209,46 +209,27 @@ void getLambdaJitValues(Module &M, StringRef FnName, void **Args,
   if (Config::get().ProteusAutoReadOnlyCaptures) {
     Function *F = M.getFunction(FnName);
     if (F && Args && Args[0]) {
-      // 1. Analyze IR for read-only captures
-      auto DetectedCaptures = analyzeReadOnlyCaptures(*F);
+      // 1. Read pass-emitted capture metadata.
+      auto DetectedCaptures = parseAutoReadOnlyCapturesMetadata(*F);
 
       if (!DetectedCaptures.empty()) {
-        // 2. Get closure type and data layout
-        const DataLayout &DL = M.getDataLayout();
-        StructType *ClosureType = inferClosureType(*F);
-
-        // 3. Get lambda closure pointer from Args
-        // For host JIT, the lambda closure is passed as the first argument
-        // Args[0] contains a pointer-to-pointer to the lambda closure (due to ABI)
+        // 2. Get lambda closure pointer from Args[0].
+        // For host JIT, the lambda closure is passed as the first argument and
+        // Args[0] contains a pointer-to-pointer to the closure due to the ABI.
         const void *LambdaClosure = *static_cast<const void **>(Args[0]);
 
-        // 4. Extract auto-detected capture values
-        // If we have a ClosureType, use the struct-based extraction
-        // Otherwise, use byte offsets directly
-        SmallVector<RuntimeConstant> AutoCaptures;
-        if (ClosureType) {
-          AutoCaptures = extractAutoDetectedCaptures(
-              LambdaClosure, DetectedCaptures, DL, ClosureType);
-        } else {
-          // Use byte-offset extraction for untyped closures
-          const char *ClosureBytes = static_cast<const char *>(LambdaClosure);
-          for (const auto &Cap : DetectedCaptures) {
-            if (Cap.IsReadOnly && Cap.Offset >= 0) {
-              AutoCaptures.push_back(
-                  readValueFromMemory(ClosureBytes + Cap.Offset, Cap.CaptureType,
-                                      Cap.SlotIndex));
-            }
-          }
-        }
+        // 3. Extract auto-detected capture values from metadata byte offsets.
+        SmallVector<RuntimeConstant> AutoCaptures =
+            extractAutoDetectedCapturesFromMetadata(LambdaClosure,
+                                                    DetectedCaptures);
 
         if (!AutoCaptures.empty()) {
-          // 5. Merge (explicit takes precedence)
+          // 4. Merge (explicit takes precedence).
           mergeCaptures(MergedValues, AutoCaptures);
 
-          // 6. Trace auto-detected captures
+          // 5. Trace auto-detected captures.
           if (Config::get().traceSpecializations()) {
             for (const auto &RC : AutoCaptures) {
-              // Only trace if it wasn't already explicit
               bool WasExplicit = false;
               for (const auto &Explicit : ExplicitValues) {
                 if (Explicit.Pos == RC.Pos) {
@@ -256,9 +237,8 @@ void getLambdaJitValues(Module &M, StringRef FnName, void **Args,
                   break;
                 }
               }
-              if (!WasExplicit) {
+              if (!WasExplicit)
                 Logger::trace(traceOutAuto(RC.Pos, RC));
-              }
             }
           }
         }
