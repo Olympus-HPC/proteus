@@ -2,7 +2,6 @@
 
 #include "proteus/impl/CompiledLibrary.h"
 #include "proteus/impl/Hashing.h"
-#include "proteus/impl/JitEngineHost.h"
 
 #if defined(PROTEUS_ENABLE_MLIR)
 #include "proteus/Frontend/MLIRCodeBuilder.h"
@@ -39,21 +38,39 @@ void JitModule::compile(bool Verify) {
   if (IsCompiled)
     return;
 
-  if (CB->getBackendKind() != CodeBuilderKind::LLVM)
-    reportFatalError(
-        "compile() is currently only supported for the LLVM backend");
-  auto *LCB = static_cast<LLVMCodeBuilder *>(CB.get());
+  std::unique_ptr<LLVMContext> Ctx;
+  std::unique_ptr<Module> Mod;
 
-  auto &Mod = LCB->getModule();
+  if (CB->getBackendKind() == CodeBuilderKind::LLVM) {
+    auto *LCB = static_cast<LLVMCodeBuilder *>(CB.get());
+    Ctx = LCB->takeLLVMContext();
+    Mod = LCB->takeModule();
+  }
+
+#if defined(PROTEUS_ENABLE_MLIR)
+  else if (CB->getBackendKind() == CodeBuilderKind::MLIR) {
+    // MLIR backend compiles by lowering to LLVM IR; dispatchers remain
+    // unchanged.
+    auto *MLIRCB = static_cast<MLIRCodeBuilder *>(CB.get());
+    Ctx = MLIRCB->takeContext();
+    Mod = MLIRCB->takeModule();
+  }
+#endif
+  else {
+    reportFatalError("compile() not supported for this backend");
+  }
+
+  if (!Ctx || !Mod)
+    reportFatalError("compile() expected non-null LLVM context/module");
 
   if (Verify)
-    if (verifyModule(Mod, &errs())) {
+    if (verifyModule(*Mod, &errs())) {
       reportFatalError("Broken module found, JIT compilation aborted!");
     }
 
   SmallVector<char, 0> Buffer;
   raw_svector_ostream OS(Buffer);
-  WriteBitcodeToFile(Mod, OS);
+  WriteBitcodeToFile(*Mod, OS);
 
   // Create a unique module hash based on the bitcode and append to all
   // function names to make them unique.
@@ -61,7 +78,16 @@ void JitModule::compile(bool Verify) {
   ModuleHash =
       std::make_unique<HashT>(hash(StringRef{Buffer.data(), Buffer.size()}));
   for (auto &JitF : Functions) {
-    JitF->setName(JitF->getName() + ModuleHash->toMangledSuffix());
+    const std::string OldName = JitF->getName();
+    const std::string NewName = OldName + ModuleHash->toMangledSuffix();
+
+    auto *Fn = Mod->getFunction(OldName);
+    if (!Fn)
+      reportFatalError("compile() failed to find function in LLVM module: " +
+                       OldName);
+
+    Fn->setName(NewName);
+    JitF->setFrontendName(NewName);
   }
 
   if ((Library = Dispatch.lookupCompiledLibrary(*ModuleHash))) {
@@ -70,7 +96,7 @@ void JitModule::compile(bool Verify) {
   }
 
   Library = std::make_unique<CompiledLibrary>(
-      Dispatch.compile(LCB->takeLLVMContext(), LCB->takeModule(), *ModuleHash));
+      Dispatch.compile(std::move(Ctx), std::move(Mod), *ModuleHash));
   IsCompiled = true;
 }
 

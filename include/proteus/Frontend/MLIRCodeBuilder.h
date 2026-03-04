@@ -7,6 +7,12 @@
 #include <string>
 #include <vector>
 
+namespace llvm {
+class LLVMContext;
+class Module;
+class raw_ostream;
+} // namespace llvm
+
 namespace proteus {
 
 /// MLIRCodeBuilder implements the CodeBuilder interface using MLIR dialects.
@@ -32,6 +38,17 @@ public:
 
   /// Dump the MLIR module to llvm::outs().
   void print();
+
+  /// Print the lowered LLVM IR.
+  /// Useful for debugging the MLIR->LLVM lowering.
+  void printLLVMIR(llvm::raw_ostream &OS);
+
+  /// Transfers ownership of the lowered LLVM context/module.
+  /// These trigger lowering if it has not yet been performed.
+  /// Calling order is flexible: takeContext() and takeModule() are safe in
+  /// either order.
+  std::unique_ptr<llvm::LLVMContext> takeContext();
+  std::unique_ptr<llvm::Module> takeModule();
 
   // -----------------------------------------------------------------------
   // Implemented CodeBuilder overrides (Phase 1b).
@@ -113,6 +130,11 @@ public:
 #endif
 
 private:
+  void ensureLoweredToLLVM(int OptLevel = 3,
+                           const std::string &TargetTriple = "",
+                           const std::string &CPU = "",
+                           const std::string &Features = "");
+
   struct Impl;
   std::unique_ptr<Impl> PImpl;
   TargetModelType TargetModel;

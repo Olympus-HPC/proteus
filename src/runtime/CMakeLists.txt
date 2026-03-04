@@ -135,14 +135,26 @@ target_link_libraries(proteus PRIVATE ${llvm_libs})
 
 if(PROTEUS_ENABLE_MLIR)
   set(mlir_libs
+    MLIRArithToLLVM
     MLIRFuncDialect
+    MLIRFuncToLLVM
     MLIRArithDialect
     MLIRGPUDialect
+    MLIRControlFlowDialect
+    MLIRLLVMDialect
     MLIRMathDialect
+    MLIRMathToLLVM
     MLIRMemRefDialect
+    MLIRMemRefToLLVM
+    MLIRPass
+    MLIRReconcileUnrealizedCasts
     MLIRSCFDialect
+    MLIRSCFToControlFlow
+    MLIRBuiltinToLLVMIRTranslation
+    MLIRLLVMToLLVMIRTranslation
     MLIRIR
     MLIRSupport
+    MLIRTargetLLVMIRExport
   )
   message(STATUS "Linking MLIR libraries: ${mlir_libs}")
   target_link_libraries(proteus PRIVATE ${mlir_libs})

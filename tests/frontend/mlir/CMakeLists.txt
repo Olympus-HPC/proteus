@@ -15,6 +15,23 @@ function(CREATE_MLIR_FRONTEND_TEST exe check_source)
   set_property(TEST ${exe} PROPERTY LABELS "frontend-mlir")
 endfunction()
 
+function(CREATE_MLIR_RUNTIME_TEST exe source)
+  add_executable(${exe} ${source} ${ARGN})
+  target_link_libraries(${exe} PUBLIC proteusFrontend)
+
+  if(${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "ppc64le")
+    set(NATIVE_OPT_FLAGS "-mcpu=native" "-mtune=native")
+  else()
+    set(NATIVE_OPT_FLAGS "-march=native")
+  endif()
+
+  target_compile_options(${exe} PUBLIC ${NATIVE_OPT_FLAGS})
+  target_link_options(${exe} PRIVATE $<LINK_ONLY:-rdynamic>)
+
+  add_test(NAME ${exe} COMMAND ${exe})
+  set_property(TEST ${exe} PROPERTY LABELS "frontend-mlir")
+endfunction()
+
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/lit.cfg.py "
 import lit.formats
 import os
@@ -55,6 +72,7 @@ CREATE_MLIR_FRONTEND_TEST(mlir_generic_load_store
 CREATE_MLIR_FRONTEND_TEST(mlir_casts mlir_casts.cpp)
 CREATE_MLIR_FRONTEND_TEST(mlir_calls mlir_calls.cpp)
 CREATE_MLIR_FRONTEND_TEST(mlir_intrinsics mlir_intrinsics.cpp)
+CREATE_MLIR_RUNTIME_TEST(mlir_host_jit_execute mlir_host_jit_execute.cpp)
 
 if(PROTEUS_ENABLE_CUDA OR PROTEUS_ENABLE_HIP)
   CREATE_MLIR_FRONTEND_TEST(mlir_gpu_builtins mlir_gpu_builtins.cpp)

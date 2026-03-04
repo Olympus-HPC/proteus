@@ -4,9 +4,18 @@
 #include "proteus/impl/MLIRIRFunction.h"
 #include "proteus/impl/MLIRIRValue.h"
 
+#include <mlir/Conversion/ArithToLLVM/ArithToLLVM.h>
+#include <mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h>
+#include <mlir/Conversion/MathToLLVM/MathToLLVM.h>
+#include <mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h>
+#include <mlir/Conversion/Passes.h>
+#include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
+#include <mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h>
 #include <mlir/Dialect/Arith/IR/Arith.h>
+#include <mlir/Dialect/ControlFlow/IR/ControlFlow.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
+#include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 #include <mlir/Dialect/Math/IR/Math.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
@@ -16,11 +25,19 @@
 #include <mlir/IR/BuiltinTypes.h>
 #include <mlir/IR/MLIRContext.h>
 #include <mlir/IR/OpDefinition.h>
+#include <mlir/IR/Verifier.h>
+#include <mlir/Pass/Pass.h>
+#include <mlir/Pass/PassManager.h>
+#include <mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h>
+#include <mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h>
+#include <mlir/Target/LLVMIR/Export.h>
 
 #include <llvm/ADT/APFloat.h>
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 #include <llvm/Support/raw_ostream.h>
 
 #include <deque>
@@ -83,6 +100,12 @@ struct MLIRCodeBuilder::Impl {
   ModuleOp Module;
   gpu::GPUModuleOp DeviceModule;
 
+  // Lowering is performed lazily when JitModule requests compilation
+  // artifacts.
+  std::unique_ptr<llvm::LLVMContext> LLVMCtx;
+  std::unique_ptr<llvm::Module> LLVMMod;
+  bool LoweredToLLVM = false;
+
   // Pointer-stable storage for returned handles.
   std::deque<MLIRIRValue> Values;
   std::deque<MLIRIRFunction> Functions;
@@ -128,9 +151,59 @@ struct MLIRCodeBuilder::Impl {
 
   explicit Impl() : Builder(&Context) {
     Context.loadDialect<mlir::func::FuncDialect, arith::ArithDialect,
-                        gpu::GPUDialect, math::MathDialect,
+                        cf::ControlFlowDialect, gpu::GPUDialect,
+                        LLVM::LLVMDialect, math::MathDialect,
                         memref::MemRefDialect, scf::SCFDialect>();
     Module = ModuleOp::create(Builder.getUnknownLoc());
+  }
+
+  void lowerToLLVM(int OptLevel, llvm::StringRef TargetTriple,
+                   llvm::StringRef CPU, llvm::StringRef Features) {
+    if (LoweredToLLVM)
+      return;
+
+    if (failed(mlir::verify(Module)))
+      reportFatalError("MLIRCodeBuilder: invalid MLIR module before lowering");
+
+    mlir::PassManager PM(&Context);
+
+    // Required because MLIRCodeBuilder emits structured scf control flow.
+    PM.addPass(mlir::createConvertSCFToCFPass());
+    // Required because MLIRCodeBuilder emits arith operations.
+    PM.addPass(mlir::createArithToLLVMConversionPass());
+    // Required because MLIRCodeBuilder emits math dialect intrinsics.
+    PM.addPass(mlir::createConvertMathToLLVMPass());
+    // Required because MLIRCodeBuilder represents storage using memref.
+    PM.addPass(mlir::createFinalizeMemRefToLLVMConversionPass());
+    // Required because MLIRCodeBuilder emits func.func definitions/calls.
+    PM.addPass(mlir::createConvertFuncToLLVMPass());
+    // Required to clean up temporary unrealized_conversion_cast ops.
+    PM.addPass(mlir::createReconcileUnrealizedCastsPass());
+
+    if (failed(PM.run(Module)))
+      reportFatalError("MLIRCodeBuilder: failed to lower MLIR module to LLVM "
+                       "dialect");
+
+    LLVMCtx = std::make_unique<llvm::LLVMContext>();
+
+    // Register translations used by translateModuleToLLVMIR.
+    mlir::registerBuiltinDialectTranslation(Context);
+    mlir::registerLLVMDialectTranslation(Context);
+
+    LLVMMod = mlir::translateModuleToLLVMIR(Module, *LLVMCtx);
+    if (!LLVMMod)
+      reportFatalError("MLIRCodeBuilder: failed to translate LLVM dialect to "
+                       "LLVM IR module");
+
+    // Keep these knobs in place so call sites can pass target options when
+    // needed; the current host path relies on module defaults.
+    (void)OptLevel;
+    if (!TargetTriple.empty())
+      LLVMMod->setTargetTriple(TargetTriple.str());
+    (void)CPU;
+    (void)Features;
+
+    LoweredToLLVM = true;
   }
 
   IRValue *wrap(Value V) {
@@ -393,6 +466,33 @@ MLIRCodeBuilder::~MLIRCodeBuilder() = default;
 // ---------------------------------------------------------------------------
 
 void MLIRCodeBuilder::print() { PImpl->Module.print(llvm::outs()); }
+
+void MLIRCodeBuilder::printLLVMIR(llvm::raw_ostream &OS) {
+  ensureLoweredToLLVM();
+  if (!PImpl->LLVMMod)
+    reportFatalError("MLIRCodeBuilder::printLLVMIR: LLVM module ownership was "
+                     "already transferred");
+  PImpl->LLVMMod->print(OS, nullptr);
+}
+
+void MLIRCodeBuilder::ensureLoweredToLLVM(int OptLevel,
+                                          const std::string &TargetTriple,
+                                          const std::string &CPU,
+                                          const std::string &Features) {
+  const std::string EffectiveTriple =
+      TargetTriple.empty() ? getTargetTriple(TargetModel) : TargetTriple;
+  PImpl->lowerToLLVM(OptLevel, EffectiveTriple, CPU, Features);
+}
+
+std::unique_ptr<llvm::LLVMContext> MLIRCodeBuilder::takeContext() {
+  ensureLoweredToLLVM();
+  return std::move(PImpl->LLVMCtx);
+}
+
+std::unique_ptr<llvm::Module> MLIRCodeBuilder::takeModule() {
+  ensureLoweredToLLVM();
+  return std::move(PImpl->LLVMMod);
+}
 
 // ---------------------------------------------------------------------------
 // addFunction

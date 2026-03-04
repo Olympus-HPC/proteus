@@ -282,6 +282,9 @@ public:
 
   void setName(const std::string &NewName);
 
+  // Update only the frontend-visible function name without touching backend IR.
+  void setFrontendName(const std::string &NewName) { Name = NewName; }
+
   // Convert the given Var's value to type U and return a new Var holding
   // the converted value. Preserves cv-qualifiers but drops references.
   // Note: prefer calling var.convert<U>() directly on the Var.
