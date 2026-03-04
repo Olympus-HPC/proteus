@@ -236,7 +236,6 @@ public:
   // GPU kernel support (CUDA / HIP only).
   // -----------------------------------------------------------------------
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
-  virtual void setKernel(IRFunction *F) = 0;
   virtual void setLaunchBoundsForKernel(IRFunction *F, int MaxThreadsPerBlock,
                                         int MinBlocksPerSM) = 0;
 #endif

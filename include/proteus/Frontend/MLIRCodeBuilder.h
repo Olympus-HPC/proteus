@@ -108,7 +108,6 @@ public:
                       size_t NElem) override;
 
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
-  void setKernel(IRFunction *F) override;
   void setLaunchBoundsForKernel(IRFunction *F, int MaxThreadsPerBlock,
                                 int MinBlocksPerSM) override;
 #endif

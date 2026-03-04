@@ -228,7 +228,6 @@ public:
   // CodeBuilder overrides — GPU kernel support.
   // -----------------------------------------------------------------------
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
-  void setKernel(IRFunction *F) override;
   void setLaunchBoundsForKernel(IRFunction *F, int MaxThreadsPerBlock,
                                 int MinBlocksPerSM) override;
 #endif
@@ -309,6 +308,13 @@ private:
   IRValue *createConstInBoundsGEP2_64(IRType Ty, IRValue *Ptr, size_t Idx0,
                                       size_t Idx1);
   unsigned getAddressSpaceFromValue(IRValue *PtrVal);
+
+  // -----------------------------------------------------------------------
+  // Private GPU kernel support.
+  // -----------------------------------------------------------------------
+#if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
+  void setKernel(IRFunction *F);
+#endif
 };
 
 } // namespace proteus

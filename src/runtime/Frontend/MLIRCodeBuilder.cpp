@@ -1550,17 +1550,6 @@ VarAlloc MLIRCodeBuilder::allocArray(const std::string & /*Name*/,
 }
 
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
-void MLIRCodeBuilder::setKernel(IRFunction *F) {
-  auto *MF = PImpl->unwrapFunction(F);
-  if (!MF->IsKernel)
-    reportFatalError("MLIRCodeBuilder::setKernel: kernel-ness must be chosen "
-                     "at addFunction/Func construction time");
-  if (auto KernelFn = dyn_cast<gpu::GPUFuncOp>(MF->Op)) {
-    KernelFn->setAttr("gpu.kernel", UnitAttr::get(&PImpl->Context));
-    return;
-  }
-  reportFatalError("MLIRCodeBuilder::setKernel: expected gpu.func");
-}
 void MLIRCodeBuilder::setLaunchBoundsForKernel(IRFunction *F,
                                                int MaxThreadsPerBlock,
                                                int MinBlocksPerSM) {
