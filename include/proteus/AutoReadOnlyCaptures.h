@@ -12,96 +12,34 @@
 #define PROTEUS_AUTOREADONLYCAPTURES_H
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/RuntimeConstantHelpers.h"
 
-#include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Metadata.h"
-#include "llvm/IR/Type.h"
-#include "llvm/Support/Format.h"
-#include "llvm/Support/raw_ostream.h"
 
 #include <cstdint>
 #include <optional>
+#include <vector>
 
 namespace proteus {
 
 using namespace llvm;
 
-struct AutoReadOnlyCaptureMetadataEntry {
+struct AutoCaptureInfo {
   int32_t SlotIndex;
   int32_t ByteOffset;
-  RuntimeConstantType RCType;
+  RuntimeConstantType Type;
 };
 
-inline bool isSupportedAutoReadOnlyRCType(RuntimeConstantType RCType) {
-  switch (RCType) {
-  case RuntimeConstantType::BOOL:
-  case RuntimeConstantType::INT8:
-  case RuntimeConstantType::INT32:
-  case RuntimeConstantType::INT64:
-  case RuntimeConstantType::FLOAT:
-  case RuntimeConstantType::DOUBLE:
-    return true;
-  default:
-    return false;
-  }
-}
-
-/// Merge auto-detected captures with explicit captures (explicit takes
-/// precedence)
-inline void mergeCaptures(llvm::SmallVectorImpl<RuntimeConstant> &Explicit,
-                          const llvm::SmallVectorImpl<RuntimeConstant> &Auto) {
-  // Build set of slots already covered by explicit captures
-  llvm::SmallSet<int32_t, 16> ExplicitSlots;
-  for (const auto &RC : Explicit)
-    ExplicitSlots.insert(RC.Pos);
-
-  // Add auto-detected captures that don't conflict with explicit ones
-  for (const auto &RC : Auto) {
-    if (!ExplicitSlots.contains(RC.Pos))
-      Explicit.push_back(RC);
-  }
-}
-
-inline RuntimeConstant readValueFromMemory(const void *Ptr,
-                                           RuntimeConstantType RCType,
-                                           int32_t SlotIndex) {
-  RuntimeConstant RC(RuntimeConstantType::NONE, SlotIndex);
-
-  if (RCType == RuntimeConstantType::BOOL) {
-    RC.Type = RuntimeConstantType::BOOL;
-    RC.Value.BoolVal = *static_cast<const bool *>(Ptr);
-  } else if (RCType == RuntimeConstantType::INT8) {
-    RC.Type = RuntimeConstantType::INT8;
-    RC.Value.Int8Val = *static_cast<const int8_t *>(Ptr);
-  } else if (RCType == RuntimeConstantType::INT32) {
-    RC.Type = RuntimeConstantType::INT32;
-    RC.Value.Int32Val = *static_cast<const int32_t *>(Ptr);
-  } else if (RCType == RuntimeConstantType::INT64) {
-    RC.Type = RuntimeConstantType::INT64;
-    RC.Value.Int64Val = *static_cast<const int64_t *>(Ptr);
-  } else if (RCType == RuntimeConstantType::FLOAT) {
-    RC.Type = RuntimeConstantType::FLOAT;
-    RC.Value.FloatVal = *static_cast<const float *>(Ptr);
-  } else if (RCType == RuntimeConstantType::DOUBLE) {
-    RC.Type = RuntimeConstantType::DOUBLE;
-    RC.Value.DoubleVal = *static_cast<const double *>(Ptr);
-  }
-
-  return RC;
-}
-
-inline llvm::SmallVector<AutoReadOnlyCaptureMetadataEntry>
-parseAutoReadOnlyCapturesMetadata(Function &F) {
-  llvm::SmallVector<AutoReadOnlyCaptureMetadataEntry> Captures;
-  MDNode *Root = F.getMetadata("proteus.auto_readonly_captures");
+inline std::vector<AutoCaptureInfo>
+parseAutoReadOnlyCaptureMetadata(const llvm::Function &F) {
+  std::vector<AutoCaptureInfo> Captures;
+  const MDNode *Root = F.getMetadata("proteus.auto_readonly_captures");
   if (!Root)
     return Captures;
 
-  auto ParseI32 = [](Metadata *M) -> std::optional<int32_t> {
+  auto ParseI32 = [](const Metadata *M) -> std::optional<int32_t> {
     auto *CAM = dyn_cast<ConstantAsMetadata>(M);
     if (!CAM)
       return std::nullopt;
@@ -125,69 +63,38 @@ parseAutoReadOnlyCapturesMetadata(Function &F) {
       continue;
 
     RuntimeConstantType RCType = static_cast<RuntimeConstantType>(*RCTypeInt);
-    if (!isSupportedAutoReadOnlyRCType(RCType))
+    if (!RuntimeConstantHelpers::isSupportedScalarType(RCType))
       continue;
 
-    Captures.push_back(
-        AutoReadOnlyCaptureMetadataEntry{*SlotIndex, *ByteOffset, RCType});
+    Captures.push_back(AutoCaptureInfo{*SlotIndex, *ByteOffset, RCType});
   }
 
   return Captures;
 }
 
-inline llvm::SmallVector<RuntimeConstant>
-extractAutoDetectedCapturesFromMetadata(
-    const void *LambdaClosure,
-    const llvm::SmallVector<AutoReadOnlyCaptureMetadataEntry>
-        &DetectedCaptures) {
-  llvm::SmallVector<RuntimeConstant> Result;
-  if (!LambdaClosure || DetectedCaptures.empty())
+inline std::vector<RuntimeConstant>
+extractAutoReadOnlyCapturesFromMetadata(const llvm::Function &F,
+                                        const void *ClosureBaseBytes) {
+  std::vector<RuntimeConstant> Result;
+  if (!ClosureBaseBytes)
     return Result;
 
-  const char *ClosureBytes = static_cast<const char *>(LambdaClosure);
-  for (const auto &Cap : DetectedCaptures) {
-    RuntimeConstant RC = readValueFromMemory(ClosureBytes + Cap.ByteOffset,
-                                             Cap.RCType, Cap.SlotIndex);
-    if (RC.Type == RuntimeConstantType::NONE)
+  std::vector<AutoCaptureInfo> Captures = parseAutoReadOnlyCaptureMetadata(F);
+  if (Captures.empty())
+    return Result;
+
+  const char *ClosureBytes = static_cast<const char *>(ClosureBaseBytes);
+  Result.reserve(Captures.size());
+  for (const auto &Capture : Captures) {
+    RuntimeConstant RC{RuntimeConstantType::NONE, Capture.SlotIndex};
+    const void *ValuePtr = ClosureBytes + Capture.ByteOffset;
+    if (!RuntimeConstantHelpers::tryReadScalar(ValuePtr, Capture.Type,
+                                               Capture.SlotIndex, RC))
       continue;
     Result.push_back(RC);
   }
 
   return Result;
-}
-
-/// Overload for RuntimeConstant - formats value as LLVM type string
-inline SmallString<128> traceOutAuto(int Slot, const RuntimeConstant &RC) {
-  SmallString<128> S;
-  raw_svector_ostream OS(S);
-  OS << "[LambdaSpec][Auto] Replacing slot " << Slot << " with ";
-
-  switch (RC.Type) {
-  case RuntimeConstantType::BOOL:
-    OS << "i1 " << (RC.Value.BoolVal ? "1" : "0");
-    break;
-  case RuntimeConstantType::INT8:
-    OS << "i8 " << static_cast<int>(RC.Value.Int8Val);
-    break;
-  case RuntimeConstantType::INT32:
-    OS << "i32 " << RC.Value.Int32Val;
-    break;
-  case RuntimeConstantType::INT64:
-    OS << "i64 " << RC.Value.Int64Val;
-    break;
-  case RuntimeConstantType::FLOAT:
-    OS << "float " << format("%g", RC.Value.FloatVal);
-    break;
-  case RuntimeConstantType::DOUBLE:
-    OS << "double " << format("%g", RC.Value.DoubleVal);
-    break;
-  default:
-    OS << "<unsupported type>";
-    break;
-  }
-
-  OS << "\n";
-  return S;
 }
 
 } // namespace proteus

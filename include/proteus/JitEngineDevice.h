@@ -465,7 +465,7 @@ public:
 
         if (LambdaFn) {
           // 1. Read pass-emitted capture metadata.
-          auto DetectedCaptures = parseAutoReadOnlyCapturesMetadata(*LambdaFn);
+          auto DetectedCaptures = parseAutoReadOnlyCaptureMetadata(*LambdaFn);
 
           if (!DetectedCaptures.empty()) {
             // 2. Get lambda closure from cached data (not KernelArgs).
@@ -474,26 +474,27 @@ public:
               const void *LambdaClosure = ClosureData->data();
 
               // 3. Extract auto-detected capture values from byte offsets.
-              auto AutoCaptures = extractAutoDetectedCapturesFromMetadata(
-                  LambdaClosure, DetectedCaptures);
+              auto AutoCaptures =
+                  extractAutoReadOnlyCapturesFromMetadata(*LambdaFn,
+                                                          LambdaClosure);
 
-              // 4. Merge (explicit takes precedence).
-              mergeCaptures(MergedValues, AutoCaptures);
+              // 4. Merge (explicit takes precedence) and trace merged values.
+              for (const auto &RC : AutoCaptures) {
+                bool WasExplicit = false;
+                for (const auto &Explicit : ExplicitValues) {
+                  if (Explicit.Pos == RC.Pos) {
+                    WasExplicit = true;
+                    break;
+                  }
+                }
 
-              // 5. Trace auto-detected captures.
-              if (Config::get().ProteusTraceOutput >= 1) {
-                for (const auto &RC : AutoCaptures) {
-                  // Only trace if it wasn't already explicit
-                  bool WasExplicit = false;
-                  for (const auto &Explicit : ExplicitValues) {
-                    if (Explicit.Pos == RC.Pos) {
-                      WasExplicit = true;
-                      break;
-                    }
-                  }
-                  if (!WasExplicit) {
-                    Logger::trace(traceOutAuto(RC.Pos, RC));
-                  }
+                if (!WasExplicit)
+                  MergedValues.push_back(RC);
+
+                if (Config::get().ProteusTraceOutput >= 1 && !WasExplicit) {
+                  Logger::trace("[LambdaSpec][Auto] Replacing slot " +
+                                std::to_string(RC.Pos) + " with " +
+                                RuntimeConstantHelpers::toString(RC) + "\n");
                 }
               }
             }
