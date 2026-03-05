@@ -1319,6 +1319,9 @@ private:
         auto *Alloc = dyn_cast<AllocaInst>(&I);
         if (!Alloc)
           continue;
+        StructType *StructTy = dyn_cast<StructType>(Alloc->getAllocatedType());
+        if (!StructTy)
+          continue;
         if (LambdaAlloca)
           reportFatalError("Error in LLVM IR of "
                            "proteus::register_lambda--found multiple alloca");
