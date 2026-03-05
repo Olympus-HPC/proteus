@@ -30,19 +30,23 @@ __jit_entry(char *FnName, char *IR, int IRSize, void **Args,
   return JitFnPtr;
 }
 
-extern "C" __attribute__((used)) void __jit_push_variable(RuntimeConstant RC) {
-  LambdaRegistry::instance().pushJitVariable(RC);
+extern "C" __attribute__((used)) void
+__jit_register_variable(RuntimeConstant RC, const char *LambdaName) {
+  LambdaRegistry::instance().setJitVariable(LambdaName, RC);
 }
 
 extern "C" __attribute__((used)) void
-__jit_register_lambda(const char *Symbol) {
-  LambdaRegistry::instance().registerLambda(Symbol);
+__jit_register_lambda(const char *LambdaName) {
+  LambdaRegistry::instance().registerLambda(LambdaName);
 }
 
 extern "C" void __jit_enable_host() {
   JitEngineHost &Jit = JitEngineHost::instance();
   Jit.enable();
 }
+
+extern "C" __attribute__((noinline)) void
+__jit_take_address(void const *) noexcept {}
 
 extern "C" void __jit_disable_host() {
   JitEngineHost &Jit = JitEngineHost::instance();

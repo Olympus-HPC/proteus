@@ -36,6 +36,7 @@
 #include "proteus/impl/RuntimeConstantTypeHelpers.h"
 
 #include <llvm/ADT/SmallPtrSet.h>
+#include <llvm/ADT/StringMap.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/ADT/StringSet.h>
 #include <llvm/Analysis/CallGraph.h>
@@ -80,6 +81,7 @@
 #include <llvm/Transforms/Utils/Cloning.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
+#include <queue>
 #include <string>
 
 using namespace llvm;
@@ -116,7 +118,6 @@ public:
     // ==================
     // Device compilation
     // ==================
-
     // For device compilation, just extract the module IR of device code
     // and return.
     if (isDeviceCompilation(M)) {
@@ -136,6 +137,7 @@ public:
     instrumentRegisterFunction(M);
 
     findJitVariables(M);
+    registerJitVariablesWithLambda(M);
     registerLambdaFunctions(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
@@ -1239,6 +1241,113 @@ private:
     }
   }
 
+  /// This function tells the Proteus runtime which variables to replace with
+  /// constants at runtime within a given lambda.  Here's how it works:
+  /// 1. Start a use-def analysis at the callbase of each jit_variable
+  /// function
+  /// 2. Do very simple use-def traversal to find the associated
+  /// anonymous class (e.g. class.anon)
+  /// 3. Look at all callbases of each proteus::register_lambda template
+  /// instantiation. Because we force passage of the lambda by value to
+  /// register_lambda, the instantiation must contain an AllocaInst of the
+  /// lambda's corresponding anonymous class.  The demangled name of the
+  /// lambda can be deduced from the name of the Clang-generated template
+  /// instantiation.
+  /// 4. Inject the demangled name into the original callbase of the
+  /// `jit_variable` function.
+  void registerJitVariablesWithLambda(Module &M) {
+    llvm::SmallVector<CallBase *, 16> JitVarCallsites;
+    llvm::DenseMap<CallBase *, Type *> CallBaseToLambda;
+    for (auto &F : M.getFunctionList()) {
+      std::string DemangledName = demangle(F.getName().str());
+      if (StringRef{DemangledName}.contains("proteus::jit_variable")) {
+        for (User *Usr : F.users()) {
+          CallBase *CB = dyn_cast<CallBase>(Usr);
+          if (!CB)
+            continue;
+          JitVarCallsites.push_back(CB);
+        }
+      }
+    }
+
+    for (CallBase *CB : JitVarCallsites) {
+      // traverse use-def from each callsite, the CB value will be used by the
+      // allocated lambda class.
+      std::queue<Value *> WorkList;
+      llvm::DenseSet<Value *> Discovered;
+      WorkList.push(CB);
+      for (User *Usr : CB->users()) {
+        WorkList.push(Usr);
+      }
+      while (!WorkList.empty()) {
+        Value *Val = WorkList.front();
+        WorkList.pop();
+        if (Discovered.contains(Val))
+          continue;
+        Discovered.insert(Val);
+        if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(Val)) {
+          // gep
+          WorkList.push(GEP->getPointerOperand());
+        } else if (StoreInst *Store = dyn_cast<StoreInst>(Val)) {
+          // store. E.G. to the first field of a lambda class
+          WorkList.push(Store->getPointerOperand());
+        } else if (AllocaInst *Alloc = dyn_cast<AllocaInst>(Val)) {
+          // alloca
+          StructType *LambdaType =
+              dyn_cast<StructType>(Alloc->getAllocatedType());
+          if (!LambdaType)
+            continue;
+          // We found the allocation site for the lambda
+          CallBaseToLambda[CB] = LambdaType;
+          break;
+        }
+      }
+    }
+    IRBuilder<> IRB{M.getContext()};
+
+    // Create a global variable for each lambda type registered
+    DenseMap<Type *, GlobalVariable *> LambdaTypeToGlobalName;
+    for (auto &F : M.getFunctionList()) {
+      if (!StringRef{demangle(F.getName().str())}.contains(
+              "proteus::register_lambda"))
+        continue;
+      // Alloca must be in the entry block.
+      AllocaInst *LambdaAlloca = nullptr;
+      for (Instruction &I : F.getEntryBlock()) {
+        // By our definition, we force register_lambda to allocate a copy
+        // of the lambda struct in our entry block
+        auto *Alloc = dyn_cast<AllocaInst>(&I);
+        if (!Alloc)
+          continue;
+        StructType *StructTy = dyn_cast<StructType>(Alloc->getAllocatedType());
+        if (!StructTy)
+          continue;
+        if (LambdaAlloca)
+          reportFatalError("Error in LLVM IR of "
+                           "proteus::register_lambda--found multiple alloca");
+        // We found the allocation site of the lambda.
+        LambdaAlloca = Alloc;
+        std::string DemangledFuncName = demangle(F.getName().str());
+        StringRef DemangledLambdaName =
+            parseLambdaType(DemangledFuncName, "proteus::register_lambda");
+        LambdaTypeToGlobalName[Alloc->getAllocatedType()] =
+            IRB.CreateGlobalString(DemangledLambdaName, ".str", 0, &M);
+      }
+      if (!LambdaAlloca)
+        reportFatalError("Error in LLVM IR of proteus::register_lambda--no "
+                         "lambda alloca site found");
+    }
+
+    // Inject lambda's Clang-generated name into the jit_variable callsite.
+    for (auto &[CB, LambdaType] : CallBaseToLambda) {
+      auto It = LambdaTypeToGlobalName.find(LambdaType);
+      if (It == LambdaTypeToGlobalName.end())
+        reportFatalError("Failed to find the lambda association info");
+      CB->setArgOperand(3, It->second);
+    }
+  }
+
+  /// findJitVariables modifies calls to proteus::jit_variable by injecting
   void findJitVariables(Module &M) {
     DEBUG(Logger::logs("proteus-pass") << "finding jit variables" << "\n");
     DEBUG(Logger::logs("proteus-pass") << "users..." << "\n");
@@ -1314,13 +1423,17 @@ private:
     }
   }
 
-  StringRef parseLambdaType(StringRef DemangledName) {
+  // Parse the lambda name from the template parameters of a function template
+  // E.G. given "Haystack<Needle>" as DemangledName and "Haystack" as
+  // FuncTemplateName return "Needle"
+  StringRef parseLambdaType(StringRef DemangledName,
+                            const char *FuncTemplateName) {
     int L = -1;
     int R = -1;
     int Level = 0;
     // Start after the function symbol to avoid parsing its templated return
     // type.
-    size_t Start = DemangledName.find("proteus::register_lambda");
+    size_t Start = DemangledName.find(FuncTemplateName);
     for (size_t I = Start, E = DemangledName.size(); I < E; ++I) {
       const char C = DemangledName[I];
       if (C == '<') {
@@ -1344,13 +1457,11 @@ private:
       R--;
     // Slicing returns characters [Start, End).
     return DemangledName.slice(L + 1, R);
-    ;
   }
 
   void registerLambdaFunctions(Module &M) {
     DEBUG(Logger::logs("proteus-pass")
           << "registering lambda functions" << "\n");
-
     SmallVector<Function *, 16> LambdaFunctions;
     for (auto &F : M.getFunctionList()) {
       if (StringRef{demangle(F.getName().str())}.contains(
@@ -1361,7 +1472,8 @@ private:
 
     for (auto *Function : LambdaFunctions) {
       auto DemangledName = llvm::demangle(Function->getName().str());
-      StringRef LambdaType = parseLambdaType(DemangledName);
+      StringRef LambdaType =
+          parseLambdaType(DemangledName, "proteus::register_lambda");
 
       DEBUG(Logger::logs("proteus-pass")
             << Function->getName() << " " << DemangledName << " " << LambdaType
@@ -1375,7 +1487,17 @@ private:
 
         IRBuilder<> Builder(CB);
         auto *LambdaNameGlobal = Builder.CreateGlobalString(LambdaType);
-        CB->setArgOperand(1, LambdaNameGlobal);
+        // Sometimes, whenever a function returns a struct, clang will
+        // automatically convert one of the arguments into holding the struct
+        // return pointer. We need to modify the last argoperand of the
+        // register_lambda call so we check if we have an sret argument
+        bool HasSRETArg = false;
+        for (uint32_t I = 0; I < CB->getNumOperands(); ++I) {
+          HasSRETArg =
+              HasSRETArg || CB->paramHasAttr(I, llvm::Attribute::StructRet);
+        }
+        int LambdaNameIndex = HasSRETArg ? 2 : 1;
+        CB->setArgOperand(LambdaNameIndex, LambdaNameGlobal);
       }
     }
   }
