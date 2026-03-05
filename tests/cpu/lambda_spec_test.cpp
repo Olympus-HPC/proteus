@@ -13,7 +13,7 @@
 template <typename LambdaType> class Abstraction {
 public:
   LambdaType Lambda;
-  Abstraction(const LambdaType &Lam) : Lambda(Lam) {};
+  Abstraction(const LambdaType &Lam) : Lambda(Lam){};
   auto operator()() { return Lambda(); }
 };
 
@@ -32,14 +32,20 @@ int main() {
   int One = 1;
   int Two = 2;
 
-  auto ZeroLambda = [=, C = proteus::jit_variable(Zero)]()
-                        __attribute__((annotate("jit"))) { printInt(C); };
+  auto ZeroLambda = [ =, C = proteus::jit_variable(Zero) ]()
+      __attribute__((annotate("jit"))) {
+    printInt(C);
+  };
 
-  auto OneLambda = [=, C = proteus::jit_variable(One)]()
-                       __attribute__((annotate("jit"))) { printInt(C); };
+  auto OneLambda =
+      [ =, C = proteus::jit_variable(One) ]() __attribute__((annotate("jit"))) {
+    printInt(C);
+  };
 
-  auto TwoLambda = [=, C = proteus::jit_variable(Two)]()
-                       __attribute__((annotate("jit"))) { printInt(C); };
+  auto TwoLambda =
+      [ =, C = proteus::jit_variable(Two) ]() __attribute__((annotate("jit"))) {
+    printInt(C);
+  };
 
   run(ZeroLambda);
   run(OneLambda);
