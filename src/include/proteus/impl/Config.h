@@ -111,6 +111,7 @@ enum class TraceOption : unsigned {
   Specialization = 0x1,
   IRDump = 0x2,
   KernelTrace = 0x4,
+  CacheStats = 0x8,
 };
 
 inline unsigned parseTraceConfig(const char *VarName) {
@@ -130,6 +131,8 @@ inline unsigned parseTraceConfig(const char *VarName) {
       Mask |= static_cast<unsigned>(TraceOption::IRDump);
     else if (Token == "kernel-trace")
       Mask |= static_cast<unsigned>(TraceOption::KernelTrace);
+    else if (Token == "cache-stats")
+      Mask |= static_cast<unsigned>(TraceOption::CacheStats);
     else
       reportFatalError("Unknown PROTEUS_TRACE_OUTPUT token: " + Token);
   }
@@ -371,6 +374,9 @@ public:
   }
   bool traceKernels() const {
     return ProteusTraceConfig & static_cast<unsigned>(TraceOption::KernelTrace);
+  }
+  bool traceCacheStats() const {
+    return ProteusTraceConfig & static_cast<unsigned>(TraceOption::CacheStats);
   }
 
   void dump(llvm::raw_ostream &OS) const {

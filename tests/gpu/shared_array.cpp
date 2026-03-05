@@ -1,11 +1,11 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="specialization" %build/shared_array.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="specialization;cache-stats" %build/shared_array.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/shared_array.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="cache-stats" %build/shared_array.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf "%t.$$.proteus"
 // Third run runs with proteus disabled to test fallback shared memory allocation.
-// RUN: PROTEUS_DISABLE=1 PROTEUS_CACHE_DIR="%t.$$.proteus" %build/shared_array.%ext | %FILECHECK %s --check-prefixes=CHECK
+// RUN: PROTEUS_DISABLE=1 PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="cache-stats" %build/shared_array.%ext | %FILECHECK %s --check-prefixes=CHECK
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 

@@ -1,12 +1,12 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/kernel_cache.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="cache-stats" %build/kernel_cache.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/kernel_cache.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="cache-stats" %build/kernel_cache.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf "%t.$$.proteus"
 // Test buildFromConfig parsing with explicit PROTEUS_OBJECT_CACHE_CHAIN.
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_OBJECT_CACHE_CHAIN="storage" PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="specialization" %build/kernel_cache.%ext 2>&1 | %FILECHECK %s --check-prefix=CHECK-CONFIG
+// RUN: PROTEUS_OBJECT_CACHE_CHAIN="storage" PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="specialization;cache-stats" %build/kernel_cache.%ext 2>&1 | %FILECHECK %s --check-prefix=CHECK-CONFIG
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 

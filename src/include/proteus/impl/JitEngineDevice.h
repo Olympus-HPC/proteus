@@ -545,9 +545,10 @@ protected:
     if (AsyncCompiler)
       AsyncCompiler->joinAllThreads();
 
-    CodeCache.printStats();
+    if (Config::get().traceCacheStats())
+      CodeCache.printStats();
     CodeCache.printKernelTrace();
-    if (CacheChain)
+    if (Config::get().traceCacheStats() && CacheChain)
       CacheChain->printStats();
   }
 
