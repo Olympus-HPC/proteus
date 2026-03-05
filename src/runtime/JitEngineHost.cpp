@@ -126,9 +126,10 @@ void JitEngineHost::notifyLoaded(MaterializationResponsibility & /*R*/,
 }
 
 JitEngineHost::~JitEngineHost() {
-  CodeCache.printStats();
+  if (Config::get().traceCacheStats())
+    CodeCache.printStats();
   CodeCache.printKernelTrace();
-  if (CacheChain)
+  if (Config::get().traceCacheStats() && CacheChain)
     CacheChain->printStats();
 }
 
