@@ -1271,10 +1271,7 @@ private:
     }
 
     for (CallBase *CB : JitVarCallsites) {
-<<<<<<< HEAD
-=======
       llvm::outs() << "JIT VAR CALLSITE "<< *CB<<"\n";
->>>>>>> 68c6d3c (Working)
       // traverse use-def from each callsite, the CB value will be used by the
       // allocated lambda class.
       std::queue<Value *> WorkList;
@@ -1301,6 +1298,7 @@ private:
             WorkList.push(Usr);
           }
         } else if (CallBase *NestedCB = dyn_cast<CallBase>(Val)) {
+          // E.G. the callsite of the function accessed through the ReturnInst
           for (User *Usr : NestedCB->users()) {
             WorkList.push(Usr);
           }
