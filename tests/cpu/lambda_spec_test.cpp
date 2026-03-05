@@ -10,41 +10,36 @@
 
 #include <proteus/JitInterface.h>
 
-template<typename LambdaType>
-class Abstraction {
-  public:
+template <typename LambdaType> class Abstraction {
+public:
   LambdaType Lambda;
-  Abstraction(const LambdaType& Lam) : Lambda(Lam) {};
-  auto operator()() {
-    return Lambda();
-  }
+  Abstraction(const LambdaType &Lam) : Lambda(Lam) {};
+  auto operator()() { return Lambda(); }
 };
 
 void printInt(int I) { printf("Integer = %d\n", I); }
 
 template <typename T> void run(T &&LB) {
   proteus::register_lambda(LB);
-  Abstraction<T> Abs (LB) ;
+  Abstraction<T> Abs(LB);
   run2(Abs);
 }
 
-template<typename T> void run2(T&& LB) {
-  LB();
-}
+template <typename T> void run2(T &&LB) { LB(); }
 
 int main() {
   int Zero = 0;
   int One = 1;
   int Two = 2;
 
-  auto ZeroLambda = [=, C = proteus::jit_variable(Zero)] ()
-                         __attribute__((annotate("jit"))) { printInt(C); };
-
-  auto OneLambda = [=, C = proteus::jit_variable(One)] ()
+  auto ZeroLambda = [=, C = proteus::jit_variable(Zero)]()
                         __attribute__((annotate("jit"))) { printInt(C); };
 
-  auto TwoLambda = [=, C = proteus::jit_variable(Two)] ()
-                        __attribute__((annotate("jit"))) { printInt(C); };
+  auto OneLambda = [=, C = proteus::jit_variable(One)]()
+                       __attribute__((annotate("jit"))) { printInt(C); };
+
+  auto TwoLambda = [=, C = proteus::jit_variable(Two)]()
+                       __attribute__((annotate("jit"))) { printInt(C); };
 
   run(ZeroLambda);
   run(OneLambda);
