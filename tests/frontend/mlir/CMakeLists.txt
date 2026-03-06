@@ -75,6 +75,35 @@ CREATE_MLIR_FRONTEND_TEST(mlir_intrinsics mlir_intrinsics.cpp)
 CREATE_MLIR_RUNTIME_TEST(mlir_host_jit_execute mlir_host_jit_execute.cpp)
 
 if(PROTEUS_ENABLE_CUDA OR PROTEUS_ENABLE_HIP)
+  if(PROTEUS_ENABLE_HIP)
+    enable_language(HIP)
+    set_source_files_properties(mlir_gpu_kernel_execute.cpp PROPERTIES
+                                LANGUAGE HIP)
+    set_source_files_properties(mlir_gpu_add_vectors.cpp PROPERTIES
+                                LANGUAGE HIP)
+  elseif(PROTEUS_ENABLE_CUDA)
+    if(NOT CMAKE_CUDA_ARCHITECTURES)
+      message(FATAL_ERROR "Set CMAKE_CUDA_ARCHITECTURES to compile for")
+    endif()
+
+    enable_language(CUDA)
+    message(STATUS "CUDA compiler ${CMAKE_CUDA_COMPILER_ID}")
+
+    if(NOT ${CMAKE_CUDA_COMPILER_ID} STREQUAL "Clang")
+      message(FATAL_ERROR "JIT is compatible only with Clang CUDA compilation")
+    endif()
+
+    set_source_files_properties(mlir_gpu_kernel_execute.cpp PROPERTIES
+                                LANGUAGE CUDA)
+    set_source_files_properties(mlir_gpu_add_vectors.cpp PROPERTIES
+                                LANGUAGE CUDA)
+  endif()
+
+  CREATE_MLIR_RUNTIME_TEST(mlir_gpu_kernel_execute
+                           mlir_gpu_kernel_execute.cpp)
+  CREATE_MLIR_RUNTIME_TEST(mlir_gpu_add_vectors
+                           mlir_gpu_add_vectors.cpp)
+
   CREATE_MLIR_FRONTEND_TEST(mlir_gpu_builtins mlir_gpu_builtins.cpp)
   CREATE_MLIR_FRONTEND_TEST(mlir_gpu_device_function_calls
                             mlir_gpu_device_function_calls.cpp)

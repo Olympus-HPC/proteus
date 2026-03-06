@@ -141,11 +141,13 @@ if(PROTEUS_ENABLE_MLIR)
     MLIRArithDialect
     MLIRGPUDialect
     MLIRControlFlowDialect
+    MLIRControlFlowToLLVM
     MLIRLLVMDialect
     MLIRMathDialect
     MLIRMathToLLVM
     MLIRMemRefDialect
     MLIRMemRefToLLVM
+    MLIRIndexToLLVM
     MLIRPass
     MLIRReconcileUnrealizedCasts
     MLIRSCFDialect
@@ -156,6 +158,30 @@ if(PROTEUS_ENABLE_MLIR)
     MLIRSupport
     MLIRTargetLLVMIRExport
   )
+
+  # MLIR GPU lowering/translation for CUDA/HIP requires target-specific
+  # dialect + conversion + LLVM IR translation libraries to be explicitly
+  # linked so symbols are available in libproteus at runtime.
+  if(PROTEUS_ENABLE_CUDA)
+    list(APPEND mlir_libs
+      MLIRNVVMDialect
+      MLIRGPUToNVVMTransforms
+      MLIRNVVMToLLVM
+      MLIRGPUToLLVMIRTranslation
+      MLIRNVVMToLLVMIRTranslation
+    )
+  endif()
+
+  if(PROTEUS_ENABLE_HIP)
+    list(APPEND mlir_libs
+      MLIRROCDLDialect
+      MLIRGPUToROCDLTransforms
+      MLIRAMDGPUToROCDL
+      MLIRGPUToLLVMIRTranslation
+      MLIRROCDLToLLVMIRTranslation
+    )
+  endif()
+
   message(STATUS "Linking MLIR libraries: ${mlir_libs}")
   target_link_libraries(proteus PRIVATE ${mlir_libs})
 endif()

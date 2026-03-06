@@ -41,14 +41,11 @@ int main() {
 }
 
 // clang-format off
-// CHECK: "gpu.module"()
-// CHECK: sym_name = "kernels"
-// CHECK: "gpu.func"()
-// CHECK: "gpu.thread_id"()
-// CHECK: "gpu.block_id"()
-// CHECK: "gpu.block_dim"()
-// CHECK: "gpu.grid_dim"()
-// CHECK: "gpu.barrier"()
-// CHECK: gpu.kernel
-// CHECK: sym_name = "kernel"
+// CHECK: {{(\"gpu\.module\"\(\)|gpu\.module)}}{{.*(@kernels|sym_name = \"kernels\")}}
+// CHECK: {{(\"gpu\.func\"\(\)|gpu\.func)}}{{.*(@kernel|sym_name = \"kernel\")}}{{.* kernel}}
+// CHECK: {{(\"gpu\.thread_id\"\(\)|gpu\.thread_id)}}
+// CHECK: {{(\"gpu\.block_id\"\(\)|gpu\.block_id)}}
+// CHECK: {{((\"gpu\.block_dim\"\(\)|gpu\.block_dim)|amdgcn\.implicitarg\.ptr)}}
+// CHECK: {{((\"gpu\.grid_dim\"\(\)|gpu\.grid_dim)|amdgcn\.implicitarg\.ptr)}}
+// CHECK: {{(\"gpu\.barrier\"\(\)|gpu\.barrier)}}
 // clang-format on

@@ -171,6 +171,7 @@ public:
   }
 
   void print();
+  void printLLVMIR();
 };
 
 template <typename RetT, typename... ArgT>

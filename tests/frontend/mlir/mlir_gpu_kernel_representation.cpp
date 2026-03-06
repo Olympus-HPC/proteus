@@ -36,10 +36,7 @@ int main() {
 }
 
 // clang-format off
-// CHECK: "gpu.module"()
-// CHECK: sym_name = "kernels"
-// CHECK: "gpu.func"()
-// CHECK: "gpu.thread_id"()
-// CHECK: gpu.kernel
-// CHECK: sym_name = "kernel_repr"
+// CHECK: {{(\"gpu\.module\"\(\)|gpu\.module)}}{{.*(@kernels|sym_name = \"kernels\")}}
+// CHECK: {{(\"gpu\.func\"\(\)|gpu\.func)}}{{.*(@kernel_repr|sym_name = \"kernel_repr\")}}{{.* kernel}}
+// CHECK: {{(\"gpu\.thread_id\"\(\)|gpu\.thread_id)}}
 // clang-format on

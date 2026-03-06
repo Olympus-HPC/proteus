@@ -49,9 +49,11 @@ void JitModule::compile(bool Verify) {
 
 #if defined(PROTEUS_ENABLE_MLIR)
   else if (CB->getBackendKind() == CodeBuilderKind::MLIR) {
-    // MLIR backend compiles by lowering to LLVM IR; dispatchers remain
-    // unchanged.
+    // MLIRCodeBuilder lowers to host LLVM IR for HOST, and device LLVM IR for
+    // CUDA/HIP; dispatcher compilation/launch flow remains unchanged.
     auto *MLIRCB = static_cast<MLIRCodeBuilder *>(CB.get());
+    if (!isHostTargetModel(TargetModel))
+      MLIRCB->setDeviceArch(Dispatch.getDeviceArch().str());
     Ctx = MLIRCB->takeContext();
     Mod = MLIRCB->takeModule();
   }
@@ -82,6 +84,7 @@ void JitModule::compile(bool Verify) {
     const std::string NewName = OldName + ModuleHash->toMangledSuffix();
 
     auto *Fn = Mod->getFunction(OldName);
+
     if (!Fn)
       reportFatalError("compile() failed to find function in LLVM module: " +
                        OldName);
@@ -115,6 +118,26 @@ void JitModule::print() {
 #endif
 
   reportFatalError("print() not supported for this backend");
+}
+
+void JitModule::printLLVMIR() {
+  if (CB->getBackendKind() == CodeBuilderKind::LLVM) {
+    static_cast<LLVMCodeBuilder *>(CB.get())->getModule().print(outs(),
+                                                                nullptr);
+    return;
+  }
+
+#if defined(PROTEUS_ENABLE_MLIR)
+  if (CB->getBackendKind() == CodeBuilderKind::MLIR) {
+    auto *MLIRCB = static_cast<MLIRCodeBuilder *>(CB.get());
+    if (!isHostTargetModel(TargetModel))
+      MLIRCB->setDeviceArch(Dispatch.getDeviceArch().str());
+    MLIRCB->printLLVMIR(outs());
+    return;
+  }
+#endif
+
+  reportFatalError("printLLVMIR() not supported for this backend");
 }
 
 JitModule::~JitModule() = default;

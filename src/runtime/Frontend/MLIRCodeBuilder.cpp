@@ -1,6 +1,7 @@
 #include "proteus/Frontend/MLIRCodeBuilder.h"
 #include "proteus/Error.h"
 #include "proteus/Frontend/IRType.h"
+#include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/MLIRIRFunction.h"
 #include "proteus/impl/MLIRIRValue.h"
 
@@ -16,6 +17,13 @@
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
+#if PROTEUS_ENABLE_CUDA
+#include <mlir/Dialect/LLVMIR/NVVMDialect.h>
+#endif
+#if PROTEUS_ENABLE_HIP
+#include <mlir/Conversion/GPUToROCDL/GPUToROCDLPass.h>
+#include <mlir/Dialect/LLVMIR/ROCDLDialect.h>
+#endif
 #include <mlir/Dialect/Math/IR/Math.h>
 #include <mlir/Dialect/MemRef/IR/MemRef.h>
 #include <mlir/Dialect/SCF/IR/SCF.h>
@@ -29,22 +37,84 @@
 #include <mlir/Pass/Pass.h>
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h>
+#include <mlir/Target/LLVMIR/Dialect/GPU/GPUToLLVMIRTranslation.h>
 #include <mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h>
+#if PROTEUS_ENABLE_CUDA
+#include <mlir/Target/LLVMIR/Dialect/NVVM/NVVMToLLVMIRTranslation.h>
+#endif
+#if PROTEUS_ENABLE_HIP
+#include <mlir/Target/LLVMIR/Dialect/ROCDL/ROCDLToLLVMIRTranslation.h>
+#endif
 #include <mlir/Target/LLVMIR/Export.h>
 
 #include <llvm/ADT/APFloat.h>
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
+#include <llvm/ADT/StringSet.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+#include <llvm/MC/TargetRegistry.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Target/TargetMachine.h>
 
 #include <deque>
+#include <mutex>
+#include <optional>
+#include <unordered_map>
 
 namespace proteus {
 
 using namespace mlir;
+
+static void ensureLLVMTargetsInitialized() {
+  static InitLLVMTargets Init;
+  (void)Init;
+}
+
+static std::string computeTargetDataLayout(llvm::StringRef TargetTriple,
+                                           llvm::StringRef CPU,
+                                           llvm::StringRef Features) {
+  ensureLLVMTargetsInitialized();
+
+  static std::mutex CacheMu;
+  static std::unordered_map<std::string, std::string> Cache;
+
+  const std::string Key =
+      (TargetTriple.str() + "\n" + CPU.str() + "\n" + Features.str());
+  {
+    std::lock_guard<std::mutex> Guard(CacheMu);
+    if (auto It = Cache.find(Key); It != Cache.end())
+      return It->second;
+  }
+
+  std::string Error;
+  const llvm::Target *T =
+      llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
+  if (!T)
+    reportFatalError("MLIRCodeBuilder: failed to lookup LLVM target for '" +
+                     TargetTriple.str() + "': " + Error);
+
+  llvm::TargetOptions Options;
+  std::optional<llvm::Reloc::Model> RelocModel;
+  std::optional<llvm::CodeModel::Model> CodeModel;
+
+  std::unique_ptr<llvm::TargetMachine> TM(T->createTargetMachine(
+      TargetTriple, CPU, Features, Options, RelocModel, CodeModel,
+      /*OptLevel=*/llvm::CodeGenOptLevel::Default));
+  if (!TM)
+    reportFatalError("MLIRCodeBuilder: failed to create LLVM TargetMachine for "
+                     "'" +
+                     TargetTriple.str() + "'");
+
+  std::string DataLayout = TM->createDataLayout().getStringRepresentation();
+  {
+    std::lock_guard<std::mutex> Guard(CacheMu);
+    auto [It, Inserted] = Cache.emplace(Key, std::move(DataLayout));
+    (void)Inserted;
+    return It->second;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // IRType -> MLIR type helper
@@ -53,13 +123,13 @@ using namespace mlir;
 static mlir::Type toMLIRScalarType(IRTypeKind Kind, MLIRContext &Ctx) {
   switch (Kind) {
   case IRTypeKind::Int1:
-    return IntegerType::get(&Ctx, 1);
+    return mlir::IntegerType::get(&Ctx, 1);
   case IRTypeKind::Int16:
-    return IntegerType::get(&Ctx, 16);
+    return mlir::IntegerType::get(&Ctx, 16);
   case IRTypeKind::Int32:
-    return IntegerType::get(&Ctx, 32);
+    return mlir::IntegerType::get(&Ctx, 32);
   case IRTypeKind::Int64:
-    return IntegerType::get(&Ctx, 64);
+    return mlir::IntegerType::get(&Ctx, 64);
   case IRTypeKind::Float:
     return Float32Type::get(&Ctx);
   case IRTypeKind::Double:
@@ -86,6 +156,18 @@ static mlir::Type toMLIRType(IRType Ty, MLIRContext &Ctx) {
   }
 }
 
+// Device kernels lower with `useBarePtrCallConv=true` (HIP) and require memrefs
+// in the kernel ABI to have static shape and identity layout. For pointer-like
+// arguments, use a static 1-D memref as a "pointer proxy" that can be lowered
+// to a raw pointer in the backend ABI.
+static mlir::Type toDeviceMLIRType(IRType Ty, MLIRContext &Ctx) {
+  if (Ty.Kind == IRTypeKind::Pointer) {
+    mlir::Type ElemTy = toMLIRScalarType(Ty.ElemKind, Ctx);
+    return MemRefType::get({1}, ElemTy);
+  }
+  return toMLIRType(Ty, Ctx);
+}
+
 static bool isSupportedAtomicFloatType(mlir::Type Ty) {
   return Ty.isF32() || Ty.isF64();
 }
@@ -99,6 +181,10 @@ struct MLIRCodeBuilder::Impl {
   OpBuilder Builder;
   ModuleOp Module;
   gpu::GPUModuleOp DeviceModule;
+
+  // Optional device architecture string used during device lowering.
+  // For HIP this is the ROCDL chipset (e.g. gfx90a). For CUDA it is unused.
+  std::string DeviceArch;
 
   // Lowering is performed lazily when JitModule requests compilation
   // artifacts.
@@ -138,27 +224,34 @@ struct MLIRCodeBuilder::Impl {
   }
 
   static unsigned getBitWidthOrZero(mlir::Type Ty) {
-    if (auto IntTy = dyn_cast<IntegerType>(Ty))
+    if (auto IntTy = mlir::dyn_cast<mlir::IntegerType>(Ty))
       return IntTy.getWidth();
-    if (auto FloatTy = dyn_cast<FloatType>(Ty))
+    if (auto FloatTy = mlir::dyn_cast<mlir::FloatType>(Ty))
       return FloatTy.getWidth();
     return 0;
   }
 
   static bool isScalarIntOrFloat(mlir::Type Ty) {
-    return isa<IntegerType>(Ty) || isa<FloatType>(Ty);
+    return mlir::isa<mlir::IntegerType>(Ty) || mlir::isa<mlir::FloatType>(Ty);
   }
 
   explicit Impl() : Builder(&Context) {
-    Context.loadDialect<mlir::func::FuncDialect, arith::ArithDialect,
-                        cf::ControlFlowDialect, gpu::GPUDialect,
-                        LLVM::LLVMDialect, math::MathDialect,
-                        memref::MemRefDialect, scf::SCFDialect>();
+    Context.loadDialect<
+        mlir::func::FuncDialect, arith::ArithDialect, cf::ControlFlowDialect,
+        gpu::GPUDialect, LLVM::LLVMDialect,
+#if PROTEUS_ENABLE_CUDA
+        NVVM::NVVMDialect,
+#endif
+#if PROTEUS_ENABLE_HIP
+        ROCDL::ROCDLDialect,
+#endif
+        math::MathDialect, memref::MemRefDialect, scf::SCFDialect>();
     Module = ModuleOp::create(Builder.getUnknownLoc());
   }
 
-  void lowerToLLVM(int OptLevel, llvm::StringRef TargetTriple,
-                   llvm::StringRef CPU, llvm::StringRef Features) {
+  void lowerToLLVM(TargetModelType TM, int OptLevel,
+                   llvm::StringRef TargetTriple, llvm::StringRef CPU,
+                   llvm::StringRef Features) {
     if (LoweredToLLVM)
       return;
 
@@ -166,19 +259,105 @@ struct MLIRCodeBuilder::Impl {
       reportFatalError("MLIRCodeBuilder: invalid MLIR module before lowering");
 
     mlir::PassManager PM(&Context);
+    auto SetDeviceModuleTargetAttrs = [&]() {
+      const std::string DataLayout =
+          computeTargetDataLayout(TargetTriple, CPU, Features);
+      Module.getOperation()->setAttr(
+          mlir::LLVM::LLVMDialect::getTargetTripleAttrName(),
+          Builder.getStringAttr(TargetTriple));
+      Module.getOperation()->setAttr(
+          mlir::LLVM::LLVMDialect::getDataLayoutAttrName(),
+          Builder.getStringAttr(DataLayout));
+    };
+    auto AddCommonGpuLoweringPrelude = [&]() {
+      PM.addPass(mlir::createConvertSCFToCFPass());
+      {
+        mlir::ConvertIndexToLLVMPassOptions Opts;
+        Opts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
+        PM.addPass(mlir::createConvertIndexToLLVMPass(Opts));
+      }
+      {
+        mlir::ConvertControlFlowToLLVMPassOptions Opts;
+        Opts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
+        PM.addPass(mlir::createConvertControlFlowToLLVMPass(Opts));
+      }
+      PM.addPass(mlir::createReconcileUnrealizedCastsPass());
+    };
 
-    // Required because MLIRCodeBuilder emits structured scf control flow.
-    PM.addPass(mlir::createConvertSCFToCFPass());
-    // Required because MLIRCodeBuilder emits arith operations.
-    PM.addPass(mlir::createArithToLLVMConversionPass());
-    // Required because MLIRCodeBuilder emits math dialect intrinsics.
-    PM.addPass(mlir::createConvertMathToLLVMPass());
-    // Required because MLIRCodeBuilder represents storage using memref.
-    PM.addPass(mlir::createFinalizeMemRefToLLVMConversionPass());
-    // Required because MLIRCodeBuilder emits func.func definitions/calls.
-    PM.addPass(mlir::createConvertFuncToLLVMPass());
-    // Required to clean up temporary unrealized_conversion_cast ops.
-    PM.addPass(mlir::createReconcileUnrealizedCastsPass());
+    if (TM == TargetModelType::HOST) {
+      // HOST path: input is host-side structured IR (func/scf/arith/math/
+      // memref); output is host-targeted LLVM dialect before translation.
+      PM.addPass(mlir::createConvertSCFToCFPass());
+      PM.addPass(mlir::createArithToLLVMConversionPass());
+      PM.addPass(mlir::createConvertMathToLLVMPass());
+      PM.addPass(mlir::createFinalizeMemRefToLLVMConversionPass());
+      PM.addPass(mlir::createConvertFuncToLLVMPass());
+      PM.addPass(mlir::createReconcileUnrealizedCastsPass());
+    } else if (TM == TargetModelType::CUDA) {
+#if PROTEUS_ENABLE_CUDA
+      // CUDA path: lower device-only gpu.module/gpu.func to NVVM/LLVM dialect.
+      // This pass is defined on gpu.module, so schedule it as a nested pass.
+      mlir::ConvertGpuOpsToNVVMOpsOptions NVVMOpts;
+      NVVMOpts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
+      // Use bare pointer call convention so kernel argument ABI matches the
+      // existing Proteus CUDA dispatcher launch path (raw pointer parameters).
+      NVVMOpts.useBarePtrCallConv = true;
+      // Provide a target triple + data layout so index bitwidth can be derived
+      // consistently during conversion.
+      SetDeviceModuleTargetAttrs();
+
+      // NOTE: ConvertControlFlowToLLVMPass / ConvertIndexToLLVMPass are
+      // restricted to `builtin.module`, so they cannot be added to a nested
+      // `gpu.module` pass manager. Run them at the top-level before GPU->NVVM
+      // conversion creates llvm.func bodies.
+      AddCommonGpuLoweringPrelude();
+
+      PM.nest<gpu::GPUModuleOp>().addPass(
+          mlir::createConvertGpuOpsToNVVMOps(NVVMOpts));
+#else
+      reportFatalError(
+          "MLIRCodeBuilder: CUDA target requested but Proteus was built with "
+          "PROTEUS_ENABLE_CUDA=OFF");
+#endif
+    } else if (TM == TargetModelType::HIP) {
+#if PROTEUS_ENABLE_HIP
+      // HIP path: input is device-only gpu.module/gpu.func + gpu.* ops;
+      // output is ROCDL/LLVM dialect that can be translated to AMDGPU LLVM IR.
+      // Step 1 (gpu -> rocdl/llvm): lower gpu.module/gpu.func and gpu.* ops.
+      // This pass is defined on gpu.module, so schedule it as a nested pass
+      // instead of directly on builtin.module.
+      // Use bare pointer call convention so kernel argument ABI matches the
+      // existing Proteus HIP dispatcher launch path (raw pointer parameters).
+      // The ROCDL lowering pass requires a non-empty chipset name.
+      if (CPU.empty())
+        reportFatalError(
+            "MLIRCodeBuilder: HIP device lowering requires a "
+            "non-empty device arch (call setDeviceArch(\"gfx*\"))");
+      const std::string HipChipset = CPU.str();
+      // Provide a target triple + data layout so index bitwidth can be derived
+      // consistently during conversion.
+      SetDeviceModuleTargetAttrs();
+
+      // NOTE: ConvertControlFlowToLLVMPass / ConvertIndexToLLVMPass are
+      // restricted to `builtin.module`, so they cannot be added to a nested
+      // `gpu.module` pass manager. Run them at the top-level before GPU->ROCDL
+      // conversion creates llvm.func bodies.
+      AddCommonGpuLoweringPrelude();
+
+      PM.nest<gpu::GPUModuleOp>().addPass(mlir::createLowerGpuOpsToROCDLOpsPass(
+          /*chipset=*/HipChipset,
+          /*indexBitwidth=*/
+          mlir::kDeriveIndexBitwidthFromDataLayout,
+          /*useBarePtrCallConv=*/true));
+#else
+      reportFatalError(
+          "MLIRCodeBuilder: HIP target requested but Proteus was built with "
+          "PROTEUS_ENABLE_HIP=OFF");
+#endif
+    } else {
+      reportFatalError(
+          "MLIRCodeBuilder: lowering only supported for HOST/CUDA/HIP");
+    }
 
     if (failed(PM.run(Module)))
       reportFatalError("MLIRCodeBuilder: failed to lower MLIR module to LLVM "
@@ -186,32 +365,155 @@ struct MLIRCodeBuilder::Impl {
 
     LLVMCtx = std::make_unique<llvm::LLVMContext>();
 
-    // Register translations used by translateModuleToLLVMIR.
+    // Register dialect translations used by translateModuleToLLVMIR.
     mlir::registerBuiltinDialectTranslation(Context);
     mlir::registerLLVMDialectTranslation(Context);
+    if (TM == TargetModelType::CUDA || TM == TargetModelType::HIP)
+      mlir::registerGPUDialectTranslation(Context);
+    if (TM == TargetModelType::CUDA) {
+#if PROTEUS_ENABLE_CUDA
+      mlir::registerNVVMDialectTranslation(Context);
+#else
+      reportFatalError(
+          "MLIRCodeBuilder: CUDA target requested but Proteus was built with "
+          "PROTEUS_ENABLE_CUDA=OFF");
+#endif
+    }
+    if (TM == TargetModelType::HIP) {
+#if PROTEUS_ENABLE_HIP
+      mlir::registerROCDLDialectTranslation(Context);
+#else
+      reportFatalError(
+          "MLIRCodeBuilder: HIP target requested but Proteus was built with "
+          "PROTEUS_ENABLE_HIP=OFF");
+#endif
+    }
 
-    LLVMMod = mlir::translateModuleToLLVMIR(Module, *LLVMCtx);
+    ModuleOp ModuleToTranslate = Module;
+    OwningOpRef<ModuleOp> DeviceTranslateModule;
+    if (TM == TargetModelType::CUDA || TM == TargetModelType::HIP) {
+      auto DeviceSym = Module.lookupSymbol<gpu::GPUModuleOp>("kernels");
+      if (!DeviceSym)
+        reportFatalError("MLIRCodeBuilder: expected gpu.module @kernels for "
+                         "device lowering");
+
+      DeviceTranslateModule = ModuleOp::create(Builder.getUnknownLoc());
+      Block &Dst = DeviceTranslateModule->getBodyRegion().front();
+      Block &Src = DeviceSym.getBodyRegion().front();
+
+      // Device lowering keeps kernel LLVM/NVVM/ROCDL ops nested in
+      // gpu.module. Proteus device dispatch expects a plain device LLVM module,
+      // so clone those operations into a standalone top-level module.
+      for (Operation &Op : Src.without_terminator())
+        Dst.push_back(Op.clone());
+
+      // Device kernels are lowered under gpu.module. The main lowering
+      // pipeline runs on the top-level builtin.module, so conversions that
+      // are defined on builtin.module may not visit ops that remain nested
+      // under gpu.module.
+      //
+      // Translate device code by cloning the gpu.module contents into a fresh
+      // standalone builtin.module. Run the remaining structured -> LLVM
+      // dialect conversions on that standalone module to guarantee
+      // translation does not encounter builtin.unrealized_conversion_cast
+      // (or other non-LLVM ops).
+      const std::string DataLayout =
+          computeTargetDataLayout(TargetTriple, CPU, Features);
+      DeviceTranslateModule->getOperation()->setAttr(
+          mlir::LLVM::LLVMDialect::getTargetTripleAttrName(),
+          Builder.getStringAttr(TargetTriple));
+      DeviceTranslateModule->getOperation()->setAttr(
+          mlir::LLVM::LLVMDialect::getDataLayoutAttrName(),
+          Builder.getStringAttr(DataLayout));
+
+      mlir::PassManager DevicePM(&Context);
+      // Device lowering should have finished in the nested gpu.module pipeline.
+      // Only reconcile and validate here.
+      DevicePM.addPass(mlir::createReconcileUnrealizedCastsPass());
+      if (failed(DevicePM.run(*DeviceTranslateModule)))
+        reportFatalError(
+            "MLIRCodeBuilder: failed to finish device lowering to LLVM "
+            "dialect");
+
+      bool HasUnrealizedCasts = false;
+      DeviceTranslateModule->walk(
+          [&](mlir::UnrealizedConversionCastOp) { HasUnrealizedCasts = true; });
+      if (HasUnrealizedCasts) {
+        llvm::errs()
+            << "[proteus][MLIRCodeBuilder] Device module still contains "
+               "builtin.unrealized_conversion_cast after lowering:\n";
+        DeviceTranslateModule->print(llvm::errs());
+        llvm::errs() << "\n";
+        reportFatalError("MLIRCodeBuilder: device lowering left unrealized "
+                         "conversion casts");
+      }
+
+      ModuleToTranslate = *DeviceTranslateModule;
+    }
+
+    LLVMMod = mlir::translateModuleToLLVMIR(ModuleToTranslate, *LLVMCtx);
     if (!LLVMMod)
       reportFatalError("MLIRCodeBuilder: failed to translate LLVM dialect to "
                        "LLVM IR module");
 
+    // MLIR device lowering may qualify kernel function symbols (e.g. with the
+    // gpu.module name). Normalize known prefixes so the rest of Proteus can
+    // resolve functions by their frontend names.
+    if (TM == TargetModelType::CUDA || TM == TargetModelType::HIP) {
+      llvm::SmallVector<std::pair<llvm::Function *, std::string>> ToRename;
+      llvm::StringSet<> NewNames;
+
+      for (auto &Fn : LLVMMod->functions()) {
+        if (Fn.isDeclaration())
+          continue;
+
+        llvm::StringRef Name = Fn.getName();
+        static constexpr llvm::StringLiteral KernelsPrefix = "kernels.";
+        if (!Name.starts_with(KernelsPrefix))
+          continue;
+
+        llvm::StringRef Stripped = Name.drop_front(KernelsPrefix.size());
+        if (Stripped.empty())
+          continue;
+
+        if (LLVMMod->getFunction(Stripped))
+          reportFatalError(
+              "MLIRCodeBuilder: device symbol name collision for " +
+              Stripped.str());
+
+        if (!NewNames.insert(Stripped).second)
+          reportFatalError("MLIRCodeBuilder: multiple device symbols map to " +
+                           Stripped.str());
+
+        ToRename.emplace_back(&Fn, Stripped.str());
+      }
+
+      for (auto &[Fn, NewName] : ToRename)
+        Fn->setName(NewName);
+    }
+
     // Keep these knobs in place so call sites can pass target options when
-    // needed; the current host path relies on module defaults.
+    // needed; the current host path relies on module defaults. For device
+    // targets, also set the data layout so the downstream device JIT sees a
+    // consistent module configuration.
     (void)OptLevel;
-    if (!TargetTriple.empty())
+    if (!TargetTriple.empty()) {
       LLVMMod->setTargetTriple(TargetTriple.str());
-    (void)CPU;
-    (void)Features;
+      if (TM == TargetModelType::CUDA || TM == TargetModelType::HIP) {
+        LLVMMod->setDataLayout(
+            computeTargetDataLayout(TargetTriple, CPU, Features));
+      }
+    }
 
     LoweredToLLVM = true;
   }
 
-  IRValue *wrap(Value V) {
+  IRValue *wrap(mlir::Value V) {
     Values.emplace_back(V);
     return &Values.back();
   }
 
-  Value unwrap(IRValue *V) { return static_cast<MLIRIRValue *>(V)->V; }
+  mlir::Value unwrap(IRValue *V) { return static_cast<MLIRIRValue *>(V)->V; }
 
   IRFunction *wrapFunction(mlir::Operation *Op, bool IsKernel) {
     Functions.emplace_back(Op, IsKernel);
@@ -243,12 +545,12 @@ struct MLIRCodeBuilder::Impl {
   }
 
   std::pair<mlir::Value, mlir::Value> resolveAtomicAddress(IRValue *Addr) {
-    Value Slot = unwrap(Addr);
+    mlir::Value Slot = unwrap(Addr);
     auto It = PointerMap.find(Slot);
     if (It == PointerMap.end())
       reportFatalError("atomic on non-pointer address");
 
-    Value Base = It->second.BaseMemRef;
+    mlir::Value Base = It->second.BaseMemRef;
     if (!Base)
       reportFatalError("atomic on non-pointer address");
 
@@ -258,8 +560,9 @@ struct MLIRCodeBuilder::Impl {
       reportFatalError("atomic on non-pointer address");
 
     auto Loc = Builder.getUnknownLoc();
-    Value Zero = Builder.create<arith::ConstantIndexOp>(Loc, 0);
-    Value Idx = Builder.create<memref::LoadOp>(Loc, Slot, ValueRange{Zero});
+    mlir::Value Zero = Builder.create<arith::ConstantIndexOp>(Loc, 0);
+    mlir::Value Idx =
+        Builder.create<memref::LoadOp>(Loc, Slot, ValueRange{Zero});
     return {Base, Idx};
   }
 
@@ -268,7 +571,7 @@ struct MLIRCodeBuilder::Impl {
     //   - slot: memref<1xindex> holding the current offset at [0]
     //   - PointerMap[slot]: side-table entry holding the base memref
     // This helper validates the representation and returns {slot, base}.
-    Value Slot = unwrap(Ptr);
+    mlir::Value Slot = unwrap(Ptr);
     auto SlotTy = dyn_cast<MemRefType>(Slot.getType());
     if (!SlotTy || SlotTy.getRank() != 1 || SlotTy.getShape()[0] != 1 ||
         !SlotTy.getElementType().isIndex())
@@ -328,8 +631,9 @@ struct MLIRCodeBuilder::Impl {
           "slot");
 
     auto Loc = Builder.getUnknownLoc();
-    Value Zero = Builder.create<arith::ConstantIndexOp>(Loc, 0);
-    Value Idx = Builder.create<memref::LoadOp>(Loc, PtrSlot, ValueRange{Zero});
+    mlir::Value Zero = Builder.create<arith::ConstantIndexOp>(Loc, 0);
+    mlir::Value Idx =
+        Builder.create<memref::LoadOp>(Loc, PtrSlot, ValueRange{Zero});
     return {It->second.BaseMemRef, Idx};
   }
 
@@ -346,19 +650,19 @@ struct MLIRCodeBuilder::Impl {
     if (!BaseTy)
       reportFatalError("atomic op not supported for this type");
 
-    Type ElemTy = BaseTy.getElementType();
+    mlir::Type ElemTy = BaseTy.getElementType();
     if (Val.getType() != ElemTy)
       reportFatalError("atomic op not supported for this type");
 
-    const bool IsInt = mlir::isa<IntegerType>(ElemTy);
-    const bool IsFloat = mlir::isa<FloatType>(ElemTy);
+    const bool IsInt = mlir::isa<mlir::IntegerType>(ElemTy);
+    const bool IsFloat = mlir::isa<mlir::FloatType>(ElemTy);
     if (!IsInt && !IsFloat)
       reportFatalError("atomic op not supported for this type");
     if (IsFloat && !isSupportedAtomicFloatType(ElemTy))
       reportFatalError("atomic op not supported for this type");
 
     const char *KindStr = nullptr;
-    if (mlir::isa<IntegerType>(ElemTy)) {
+    if (mlir::isa<mlir::IntegerType>(ElemTy)) {
       switch (Op) {
       case AtomicOp::Add:
         KindStr = "addi";
@@ -373,7 +677,7 @@ struct MLIRCodeBuilder::Impl {
         KindStr = "mins";
         break;
       }
-    } else if (mlir::isa<FloatType>(ElemTy)) {
+    } else if (mlir::isa<mlir::FloatType>(ElemTy)) {
       switch (Op) {
       case AtomicOp::Add:
         KindStr = "addf";
@@ -411,8 +715,8 @@ struct MLIRCodeBuilder::Impl {
 
       Builder.setInsertionPointToEnd(&Body);
 
-      Value Cur = Body.getArgument(0);
-      Value New;
+      mlir::Value Cur = Body.getArgument(0);
+      mlir::Value New;
       if (IsInt) {
         switch (Op) {
         case AtomicOp::Add:
@@ -468,7 +772,7 @@ MLIRCodeBuilder::~MLIRCodeBuilder() = default;
 void MLIRCodeBuilder::print() { PImpl->Module.print(llvm::outs()); }
 
 void MLIRCodeBuilder::printLLVMIR(llvm::raw_ostream &OS) {
-  ensureLoweredToLLVM();
+  ensureLoweredToLLVM(/*OptLevel=*/3, /*TargetTriple=*/"", /*Features=*/"");
   if (!PImpl->LLVMMod)
     reportFatalError("MLIRCodeBuilder::printLLVMIR: LLVM module ownership was "
                      "already transferred");
@@ -477,21 +781,39 @@ void MLIRCodeBuilder::printLLVMIR(llvm::raw_ostream &OS) {
 
 void MLIRCodeBuilder::ensureLoweredToLLVM(int OptLevel,
                                           const std::string &TargetTriple,
-                                          const std::string &CPU,
                                           const std::string &Features) {
   const std::string EffectiveTriple =
       TargetTriple.empty() ? getTargetTriple(TargetModel) : TargetTriple;
-  PImpl->lowerToLLVM(OptLevel, EffectiveTriple, CPU, Features);
+  PImpl->lowerToLLVM(TargetModel, OptLevel, EffectiveTriple,
+                     llvm::StringRef{PImpl->DeviceArch}, Features);
 }
 
 std::unique_ptr<llvm::LLVMContext> MLIRCodeBuilder::takeContext() {
-  ensureLoweredToLLVM();
+  ensureLoweredToLLVM(/*OptLevel=*/3, /*TargetTriple=*/"", /*Features=*/"");
   return std::move(PImpl->LLVMCtx);
 }
 
 std::unique_ptr<llvm::Module> MLIRCodeBuilder::takeModule() {
-  ensureLoweredToLLVM();
+  ensureLoweredToLLVM(/*OptLevel=*/3, /*TargetTriple=*/"", /*Features=*/"");
   return std::move(PImpl->LLVMMod);
+}
+
+void MLIRCodeBuilder::setDeviceArch(const std::string &Arch) {
+  if (Arch.empty())
+    return;
+
+  if (PImpl->LoweredToLLVM) {
+    // Allow redundant calls (e.g. J.printLLVMIR() lowers lazily, then compile()
+    // calls setDeviceArch again) as long as the value is consistent.
+    if (!PImpl->DeviceArch.empty() && PImpl->DeviceArch != Arch)
+      reportFatalError("MLIRCodeBuilder::setDeviceArch called after lowering "
+                       "with a different arch (existing=" +
+                       PImpl->DeviceArch + ", new=" + Arch + ")");
+    PImpl->DeviceArch = Arch;
+    return;
+  }
+
+  PImpl->DeviceArch = Arch;
 }
 
 // ---------------------------------------------------------------------------
@@ -503,32 +825,44 @@ IRFunction *MLIRCodeBuilder::addFunction(const std::string &Name, IRType RetTy,
                                          bool IsKernel) {
   auto &Ctx = PImpl->Context;
 
+  const bool IsDeviceMode = (TargetModel == TargetModelType::CUDA ||
+                             TargetModel == TargetModelType::HIP);
+  auto MapIRType = [&](IRType Ty) -> mlir::Type {
+    return IsDeviceMode ? toDeviceMLIRType(Ty, Ctx) : toMLIRType(Ty, Ctx);
+  };
+
   llvm::SmallVector<mlir::Type> MLIRArgTys;
   MLIRArgTys.reserve(ArgTys.size());
   for (const auto &AT : ArgTys)
-    MLIRArgTys.push_back(toMLIRType(AT, Ctx));
+    MLIRArgTys.push_back(MapIRType(AT));
 
   llvm::SmallVector<mlir::Type> RetTys;
   if (RetTy.Kind != IRTypeKind::Void)
-    RetTys.push_back(toMLIRType(RetTy, Ctx));
+    RetTys.push_back(MapIRType(RetTy));
 
-  auto FTy = FunctionType::get(&Ctx, MLIRArgTys, RetTys);
+  auto FTy = mlir::FunctionType::get(&Ctx, MLIRArgTys, RetTys);
   auto Loc = PImpl->Builder.getUnknownLoc();
-
-  const bool IsDeviceMode = (TargetModel == TargetModelType::CUDA ||
-                             TargetModel == TargetModelType::HIP);
 
   if (IsDeviceMode) {
     auto DeviceModule = PImpl->getOrCreateDeviceModule();
     if (DeviceModule.getBodyRegion().empty())
       DeviceModule.getBodyRegion().push_back(new Block());
     OpBuilder::InsertionGuard Guard(PImpl->Builder);
-    PImpl->Builder.setInsertionPointToEnd(
-        &DeviceModule.getBodyRegion().front());
+    Block &DeviceBody = DeviceModule.getBodyRegion().front();
+    // gpu.module owns a terminator (gpu.module_end); insert new gpu.func
+    // declarations before the terminator to keep the IR structurally valid.
+    if (!DeviceBody.empty() &&
+        DeviceBody.back().hasTrait<OpTrait::IsTerminator>()) {
+      PImpl->Builder.setInsertionPoint(&DeviceBody.back());
+    } else {
+      PImpl->Builder.setInsertionPointToEnd(&DeviceBody);
+    }
 
     // In CUDA/HIP mode Proteus emits device-side IR under gpu.module;
     // host-side orchestration remains outside MLIR. Device helpers are
     // regular gpu.func without the gpu.kernel marker.
+    // Keep gpu.func symbol names equal to frontend names so the existing
+    // Proteus hash-based mangling step can find and rename the LLVM function.
     auto KernelOp = PImpl->Builder.create<gpu::GPUFuncOp>(Loc, Name, FTy);
     if (KernelOp.getBody().empty())
       KernelOp.addEntryBlock();
@@ -569,6 +903,8 @@ void MLIRCodeBuilder::setFunctionName(IRFunction *F, const std::string &Name) {
     return;
   }
   if (auto KernelFn = dyn_cast<gpu::GPUFuncOp>(MF->Op)) {
+    // Preserve frontend-visible kernel naming through lowering so
+    // JitModule::compile can apply the existing hash suffix mangling.
     KernelFn.setName(Name);
     return;
   }
@@ -668,9 +1004,9 @@ void MLIRCodeBuilder::createRet(IRValue *V) {
 IRValue *MLIRCodeBuilder::createArith(ArithOp Op, IRValue *LHS, IRValue *RHS,
                                       IRType Ty) {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  Value L = PImpl->unwrap(LHS);
-  Value R = PImpl->unwrap(RHS);
-  Value Result;
+  mlir::Value L = PImpl->unwrap(LHS);
+  mlir::Value R = PImpl->unwrap(RHS);
+  mlir::Value Result;
 
   if (isIntegerKind(Ty)) {
     switch (Op) {
@@ -727,9 +1063,9 @@ IRValue *MLIRCodeBuilder::createArith(ArithOp Op, IRValue *LHS, IRValue *RHS,
 
 IRValue *MLIRCodeBuilder::createCast(IRValue *V, IRType FromTy, IRType ToTy) {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  Value Src = PImpl->unwrap(V);
+  mlir::Value Src = PImpl->unwrap(V);
   mlir::Type DstTy = toMLIRType(ToTy, PImpl->Context);
-  Value Result;
+  mlir::Value Result;
 
   const bool FromInt = isIntegerKind(FromTy);
   const bool ToInt = isIntegerKind(ToTy);
@@ -751,6 +1087,8 @@ IRValue *MLIRCodeBuilder::createCast(IRValue *V, IRType FromTy, IRType ToTy) {
     const unsigned ToBits = DstTy.getIntOrFloatBitWidth();
     if (ToBits < FromBits)
       Result = PImpl->Builder.create<arith::TruncIOp>(Loc, DstTy, Src);
+    else if (ToBits == FromBits)
+      Result = Src;
     else if (FromTy.Signed)
       Result = PImpl->Builder.create<arith::ExtSIOp>(Loc, DstTy, Src);
     else
@@ -760,6 +1098,8 @@ IRValue *MLIRCodeBuilder::createCast(IRValue *V, IRType FromTy, IRType ToTy) {
     const unsigned ToBits = DstTy.getIntOrFloatBitWidth();
     if (ToBits < FromBits)
       Result = PImpl->Builder.create<arith::TruncFOp>(Loc, DstTy, Src);
+    else if (ToBits == FromBits)
+      Result = Src;
     else
       Result = PImpl->Builder.create<arith::ExtFOp>(Loc, DstTy, Src);
   } else {
@@ -777,20 +1117,20 @@ IRValue *MLIRCodeBuilder::getConstantInt(IRType Ty, uint64_t Val) {
   auto Loc = PImpl->Builder.getUnknownLoc();
   mlir::Type MLIRTy = toMLIRType(Ty, PImpl->Context);
   auto Attr = IntegerAttr::get(MLIRTy, static_cast<int64_t>(Val));
-  Value C = PImpl->Builder.create<arith::ConstantOp>(Loc, Attr);
+  mlir::Value C = PImpl->Builder.create<arith::ConstantOp>(Loc, Attr);
   return PImpl->wrap(C);
 }
 
 IRValue *MLIRCodeBuilder::getConstantFP(IRType Ty, double Val) {
   auto Loc = PImpl->Builder.getUnknownLoc();
   mlir::Type MLIRTy = toMLIRType(Ty, PImpl->Context);
-  auto FTy = cast<FloatType>(MLIRTy);
+  auto FTy = mlir::cast<mlir::FloatType>(MLIRTy);
   bool LosesInfo;
   llvm::APFloat APVal(Val); // double precision by default
   APVal.convert(FTy.getFloatSemantics(), llvm::APFloat::rmNearestTiesToEven,
                 &LosesInfo);
   auto Attr = FloatAttr::get(FTy, APVal);
-  Value C = PImpl->Builder.create<arith::ConstantOp>(Loc, Attr);
+  mlir::Value C = PImpl->Builder.create<arith::ConstantOp>(Loc, Attr);
   return PImpl->wrap(C);
 }
 
@@ -800,18 +1140,18 @@ IRValue *MLIRCodeBuilder::getConstantFP(IRType Ty, double Val) {
 
 IRValue *MLIRCodeBuilder::loadScalar(IRValue *Slot, IRType /*ValueTy*/) {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  Value MemRefVal = PImpl->unwrap(Slot);
-  Value Idx = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-  Value Val =
+  mlir::Value MemRefVal = PImpl->unwrap(Slot);
+  mlir::Value Idx = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+  mlir::Value Val =
       PImpl->Builder.create<memref::LoadOp>(Loc, MemRefVal, ValueRange{Idx});
   return PImpl->wrap(Val);
 }
 
 void MLIRCodeBuilder::storeScalar(IRValue *Slot, IRValue *Val) {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  Value MemRefVal = PImpl->unwrap(Slot);
-  Value V = PImpl->unwrap(Val);
-  Value Idx = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+  mlir::Value MemRefVal = PImpl->unwrap(Slot);
+  mlir::Value V = PImpl->unwrap(Val);
+  mlir::Value Idx = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
   PImpl->Builder.create<memref::StoreOp>(Loc, V, MemRefVal, ValueRange{Idx});
 }
 
@@ -822,7 +1162,7 @@ VarAlloc MLIRCodeBuilder::allocScalar(const std::string & /*Name*/,
   // Allocate memref<1xT> — mirrors LLVM's alloca pattern.
   auto MemRefTy = MemRefType::get({1}, ElemTy);
 
-  Value Alloca;
+  mlir::Value Alloca;
   {
     // Always place the alloca at the start of the entry block.
     OpBuilder::InsertionGuard Guard(PImpl->Builder);
@@ -844,7 +1184,7 @@ VarAlloc MLIRCodeBuilder::allocScalar(const std::string & /*Name*/,
 void MLIRCodeBuilder::beginIf(IRValue *Cond, const char * /*File*/,
                               int /*Line*/) {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  Value CondV = PImpl->unwrap(Cond);
+  mlir::Value CondV = PImpl->unwrap(Cond);
 
   // Save the current insertion point for endIf to restore.
   PImpl->ScopeStack.push_back(
@@ -877,11 +1217,11 @@ void MLIRCodeBuilder::beginFor(IRValue *IterSlot, IRType IterTy,
   auto Loc = PImpl->Builder.getUnknownLoc();
 
   // Cast integer bounds to index type.
-  Value LB = PImpl->Builder.create<arith::IndexCastOp>(
+  mlir::Value LB = PImpl->Builder.create<arith::IndexCastOp>(
       Loc, PImpl->Builder.getIndexType(), PImpl->unwrap(InitVal));
-  Value UB = PImpl->Builder.create<arith::IndexCastOp>(
+  mlir::Value UB = PImpl->Builder.create<arith::IndexCastOp>(
       Loc, PImpl->Builder.getIndexType(), PImpl->unwrap(UpperBoundVal));
-  Value Step = PImpl->Builder.create<arith::IndexCastOp>(
+  mlir::Value Step = PImpl->Builder.create<arith::IndexCastOp>(
       Loc, PImpl->Builder.getIndexType(), PImpl->unwrap(IncVal));
 
   // Save insertion point for endFor.
@@ -896,12 +1236,12 @@ void MLIRCodeBuilder::beginFor(IRValue *IterSlot, IRType IterTy,
 
   // Cast the index induction variable back to the original integer type
   // and store into IterSlot so user code can read it.
-  Value IV = ForOp.getInductionVar();
+  mlir::Value IV = ForOp.getInductionVar();
   mlir::Type IterMLIRTy = toMLIRType(IterTy, PImpl->Context);
-  Value TypedIV =
+  mlir::Value TypedIV =
       PImpl->Builder.create<arith::IndexCastOp>(Loc, IterMLIRTy, IV);
-  Value Idx = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-  Value SlotV = PImpl->unwrap(IterSlot);
+  mlir::Value Idx = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+  mlir::Value SlotV = PImpl->unwrap(IterSlot);
   PImpl->Builder.create<memref::StoreOp>(Loc, TypedIV, SlotV, ValueRange{Idx});
 }
 
@@ -933,7 +1273,7 @@ void MLIRCodeBuilder::beginWhile(std::function<IRValue *()> CondFn,
 
   // Call CondFn to emit the condition IR into the before region.
   IRValue *CondIRV = CondFn();
-  Value CondV = PImpl->unwrap(CondIRV);
+  mlir::Value CondV = PImpl->unwrap(CondIRV);
 
   // Terminate the before region with scf.condition.
   PImpl->Builder.create<scf::ConditionOp>(Loc, CondV, /*args=*/ValueRange{});
@@ -956,9 +1296,9 @@ void MLIRCodeBuilder::endWhile() {
 IRValue *MLIRCodeBuilder::createCmp(CmpOp Op, IRValue *LHS, IRValue *RHS,
                                     IRType Ty) {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  Value L = PImpl->unwrap(LHS);
-  Value R = PImpl->unwrap(RHS);
-  Value Result;
+  mlir::Value L = PImpl->unwrap(LHS);
+  mlir::Value R = PImpl->unwrap(RHS);
+  mlir::Value Result;
 
   if (isFloatingPointKind(Ty)) {
     arith::CmpFPredicate Pred;
@@ -1016,31 +1356,32 @@ IRValue *MLIRCodeBuilder::createCmp(CmpOp Op, IRValue *LHS, IRValue *RHS,
 
 IRValue *MLIRCodeBuilder::createAnd(IRValue *LHS, IRValue *RHS) {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  Value Result = PImpl->Builder.create<arith::AndIOp>(Loc, PImpl->unwrap(LHS),
-                                                      PImpl->unwrap(RHS));
+  mlir::Value Result = PImpl->Builder.create<arith::AndIOp>(
+      Loc, PImpl->unwrap(LHS), PImpl->unwrap(RHS));
   return PImpl->wrap(Result);
 }
 
 IRValue *MLIRCodeBuilder::createOr(IRValue *LHS, IRValue *RHS) {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  Value Result = PImpl->Builder.create<arith::OrIOp>(Loc, PImpl->unwrap(LHS),
-                                                     PImpl->unwrap(RHS));
+  mlir::Value Result = PImpl->Builder.create<arith::OrIOp>(
+      Loc, PImpl->unwrap(LHS), PImpl->unwrap(RHS));
   return PImpl->wrap(Result);
 }
 
 IRValue *MLIRCodeBuilder::createXor(IRValue *LHS, IRValue *RHS) {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  Value Result = PImpl->Builder.create<arith::XOrIOp>(Loc, PImpl->unwrap(LHS),
-                                                      PImpl->unwrap(RHS));
+  mlir::Value Result = PImpl->Builder.create<arith::XOrIOp>(
+      Loc, PImpl->unwrap(LHS), PImpl->unwrap(RHS));
   return PImpl->wrap(Result);
 }
 
 IRValue *MLIRCodeBuilder::createNot(IRValue *Val) {
   auto Loc = PImpl->Builder.getUnknownLoc();
   // arith.xori %val, %true  where %true is arith.constant 1 : i1
-  auto TrueAttr = IntegerAttr::get(IntegerType::get(&PImpl->Context, 1), 1);
-  Value TrueVal = PImpl->Builder.create<arith::ConstantOp>(Loc, TrueAttr);
-  Value Result =
+  auto TrueAttr =
+      IntegerAttr::get(mlir::IntegerType::get(&PImpl->Context, 1), 1);
+  mlir::Value TrueVal = PImpl->Builder.create<arith::ConstantOp>(Loc, TrueAttr);
+  mlir::Value Result =
       PImpl->Builder.create<arith::XOrIOp>(Loc, PImpl->unwrap(Val), TrueVal);
   return PImpl->wrap(Result);
 }
@@ -1054,7 +1395,7 @@ IRValue *MLIRCodeBuilder::createLoad(IRType Ty, IRValue *Ptr,
   // PointerMap, so load dynamic index from slot and dereference base[idx].
   if (PImpl->isPointerValue(PtrV)) {
     auto [Base, Idx] = PImpl->resolvePointerAddress(PtrV);
-    Value Val =
+    mlir::Value Val =
         PImpl->Builder.create<memref::LoadOp>(Loc, Base, ValueRange{Idx});
     if (Val.getType() != ExpectedTy)
       reportFatalError("MLIRCodeBuilder::createLoad: type mismatch for pointer "
@@ -1065,8 +1406,8 @@ IRValue *MLIRCodeBuilder::createLoad(IRType Ty, IRValue *Ptr,
   // Scalar-slot case: Ptr is a mutable scalar slot represented as
   // memref<1xT>; load slot[0].
   if (Impl::isScalarSlotType(PtrV.getType())) {
-    Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-    Value Val =
+    mlir::Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+    mlir::Value Val =
         PImpl->Builder.create<memref::LoadOp>(Loc, PtrV, ValueRange{Zero});
     if (Val.getType() != ExpectedTy)
       reportFatalError("MLIRCodeBuilder::createLoad: type mismatch for scalar "
@@ -1099,7 +1440,7 @@ void MLIRCodeBuilder::createStore(IRValue *Val, IRValue *Ptr) {
     if (SlotTy.getElementType() != V.getType())
       reportFatalError("MLIRCodeBuilder::createStore: scalar slot type "
                        "mismatch");
-    Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+    mlir::Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
     PImpl->Builder.create<memref::StoreOp>(Loc, V, PtrV, ValueRange{Zero});
     return;
   }
@@ -1124,7 +1465,7 @@ IRValue *MLIRCodeBuilder::createBitCast(IRValue *V, IRType DestTy) {
     reportFatalError("createBitCast: source and destination must have equal "
                      "non-zero bitwidth");
 
-  Value Res = PImpl->Builder.create<arith::BitcastOp>(Loc, DstTy, Src);
+  mlir::Value Res = PImpl->Builder.create<arith::BitcastOp>(Loc, DstTy, Src);
   return PImpl->wrap(Res);
 }
 IRValue *MLIRCodeBuilder::createZExt(IRValue *V, IRType DestTy) {
@@ -1133,13 +1474,13 @@ IRValue *MLIRCodeBuilder::createZExt(IRValue *V, IRType DestTy) {
   mlir::Type SrcTy = Src.getType();
   mlir::Type DstTy = PImpl->toScalarMLIRType(DestTy);
 
-  if (isa<FloatType>(SrcTy) || isa<FloatType>(DstTy))
+  if (mlir::isa<mlir::FloatType>(SrcTy) || mlir::isa<mlir::FloatType>(DstTy))
     reportFatalError("createZExt: float types are not supported");
 
-  const bool SrcIsInt = isa<IntegerType>(SrcTy);
-  const bool DstIsInt = isa<IntegerType>(DstTy);
-  const bool SrcIsIndex = isa<IndexType>(SrcTy);
-  const bool DstIsIndex = isa<IndexType>(DstTy);
+  const bool SrcIsInt = mlir::isa<mlir::IntegerType>(SrcTy);
+  const bool DstIsInt = mlir::isa<mlir::IntegerType>(DstTy);
+  const bool SrcIsIndex = mlir::isa<mlir::IndexType>(SrcTy);
+  const bool DstIsIndex = mlir::isa<mlir::IndexType>(DstTy);
   if ((!SrcIsInt && !SrcIsIndex) || (!DstIsInt && !DstIsIndex))
     reportFatalError("createZExt: only integer/index types are supported");
 
@@ -1147,17 +1488,18 @@ IRValue *MLIRCodeBuilder::createZExt(IRValue *V, IRType DestTy) {
     return V;
 
   if (SrcIsInt && DstIsInt) {
-    auto SrcIntTy = cast<IntegerType>(SrcTy);
-    auto DstIntTy = cast<IntegerType>(DstTy);
+    auto SrcIntTy = mlir::cast<mlir::IntegerType>(SrcTy);
+    auto DstIntTy = mlir::cast<mlir::IntegerType>(DstTy);
     if (DstIntTy.getWidth() <= SrcIntTy.getWidth())
       reportFatalError("createZExt: destination integer must be wider than "
                        "source integer");
-    Value Res = PImpl->Builder.create<arith::ExtUIOp>(Loc, DstTy, Src);
+    mlir::Value Res = PImpl->Builder.create<arith::ExtUIOp>(Loc, DstTy, Src);
     return PImpl->wrap(Res);
   }
 
   if ((SrcIsIndex && DstIsInt) || (SrcIsInt && DstIsIndex)) {
-    Value Res = PImpl->Builder.create<arith::IndexCastUIOp>(Loc, DstTy, Src);
+    mlir::Value Res =
+        PImpl->Builder.create<arith::IndexCastUIOp>(Loc, DstTy, Src);
     return PImpl->wrap(Res);
   }
 
@@ -1166,34 +1508,34 @@ IRValue *MLIRCodeBuilder::createZExt(IRValue *V, IRType DestTy) {
 VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
                                         IRValue *Index, IRType ElemTy) {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  Value IdxV = PImpl->unwrap(Index);
+  mlir::Value IdxV = PImpl->unwrap(Index);
 
   // Cast index to index type if needed.
-  if (!isa<IndexType>(IdxV.getType()))
+  if (!mlir::isa<mlir::IndexType>(IdxV.getType()))
     IdxV = PImpl->Builder.create<arith::IndexCastOp>(
         Loc, PImpl->Builder.getIndexType(), IdxV);
 
   // Allocate offset slot at entry block.
   auto IdxMemRefTy = MemRefType::get({1}, PImpl->Builder.getIndexType());
-  Value OffsetSlot;
+  mlir::Value OffsetSlot;
   {
     OpBuilder::InsertionGuard Guard(PImpl->Builder);
     PImpl->Builder.setInsertionPointToStart(PImpl->EntryBlock);
     OffsetSlot = PImpl->Builder.create<memref::AllocaOp>(Loc, IdxMemRefTy);
   }
 
-  Value BaseMemRef;
-  Value OffsetToStore;
-  Value BaseV = PImpl->unwrap(Base);
+  mlir::Value BaseMemRef;
+  mlir::Value OffsetToStore;
+  mlir::Value BaseV = PImpl->unwrap(Base);
   if (auto It = PImpl->PointerMap.find(BaseV); It != PImpl->PointerMap.end()) {
     BaseMemRef = It->second.BaseMemRef;
     if (!BaseMemRef)
       reportFatalError("getElementPtr: null pointer base");
 
     // Compose GEP offsets when Base is itself a pointer slot.
-    Value BaseSlotV = BaseV;
-    Value Idx0 = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-    Value BaseOffset =
+    mlir::Value BaseSlotV = BaseV;
+    mlir::Value Idx0 = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+    mlir::Value BaseOffset =
         PImpl->Builder.create<memref::LoadOp>(Loc, BaseSlotV, ValueRange{Idx0});
     OffsetToStore = PImpl->Builder.create<arith::AddIOp>(Loc, BaseOffset, IdxV);
   } else {
@@ -1202,7 +1544,7 @@ VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
   }
 
   // Store the index as offset.
-  Value Idx0 = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+  mlir::Value Idx0 = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
   PImpl->Builder.create<memref::StoreOp>(Loc, OffsetToStore, OffsetSlot,
                                          ValueRange{Idx0});
 
@@ -1217,30 +1559,30 @@ VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
 VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
                                         size_t Index, IRType ElemTy) {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  Value IdxV =
+  mlir::Value IdxV =
       PImpl->Builder.create<arith::ConstantIndexOp>(Loc, (int64_t)Index);
 
   // Allocate offset slot at entry block.
   auto IdxMemRefTy = MemRefType::get({1}, PImpl->Builder.getIndexType());
-  Value OffsetSlot;
+  mlir::Value OffsetSlot;
   {
     OpBuilder::InsertionGuard Guard(PImpl->Builder);
     PImpl->Builder.setInsertionPointToStart(PImpl->EntryBlock);
     OffsetSlot = PImpl->Builder.create<memref::AllocaOp>(Loc, IdxMemRefTy);
   }
 
-  Value BaseMemRef;
-  Value OffsetToStore;
-  Value BaseV = PImpl->unwrap(Base);
+  mlir::Value BaseMemRef;
+  mlir::Value OffsetToStore;
+  mlir::Value BaseV = PImpl->unwrap(Base);
   if (auto It = PImpl->PointerMap.find(BaseV); It != PImpl->PointerMap.end()) {
     BaseMemRef = It->second.BaseMemRef;
     if (!BaseMemRef)
       reportFatalError("getElementPtr: null pointer base");
 
     // Compose GEP offsets when Base is itself a pointer slot.
-    Value BaseSlotV = BaseV;
-    Value Idx0 = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-    Value BaseOffset =
+    mlir::Value BaseSlotV = BaseV;
+    mlir::Value Idx0 = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+    mlir::Value BaseOffset =
         PImpl->Builder.create<memref::LoadOp>(Loc, BaseSlotV, ValueRange{Idx0});
     OffsetToStore = PImpl->Builder.create<arith::AddIOp>(Loc, BaseOffset, IdxV);
   } else {
@@ -1249,7 +1591,7 @@ VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
   }
 
   // Store the index as offset.
-  Value Idx0 = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+  mlir::Value Idx0 = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
   PImpl->Builder.create<memref::StoreOp>(Loc, OffsetToStore, OffsetSlot,
                                          ValueRange{Idx0});
 
@@ -1277,17 +1619,6 @@ IRValue *MLIRCodeBuilder::createCall(const std::string &FName, IRType RetTy,
                        "memref or add LLVM-dialect lowering.");
   }
 
-  llvm::SmallVector<mlir::Type> MLIRArgTys;
-  MLIRArgTys.reserve(ArgTys.size());
-  for (const auto &ArgTy : ArgTys)
-    MLIRArgTys.push_back(toMLIRType(ArgTy, PImpl->Context));
-
-  llvm::SmallVector<mlir::Type> ResultTys;
-  if (RetTy.Kind != IRTypeKind::Void)
-    ResultTys.push_back(toMLIRType(RetTy, PImpl->Context));
-
-  auto FTy = PImpl->Builder.getFunctionType(MLIRArgTys, ResultTys);
-
   const bool InDeviceFunc =
       PImpl->CurrentFuncOp && isa<gpu::GPUFuncOp>(PImpl->CurrentFuncOp);
   const bool InHostFunc =
@@ -1295,6 +1626,22 @@ IRValue *MLIRCodeBuilder::createCall(const std::string &FName, IRType RetTy,
 
   if (!InDeviceFunc && !InHostFunc)
     reportFatalError("createCall: no active function context");
+
+  auto MapIRType = [&](IRType Ty) -> mlir::Type {
+    return InDeviceFunc ? toDeviceMLIRType(Ty, PImpl->Context)
+                        : toMLIRType(Ty, PImpl->Context);
+  };
+
+  llvm::SmallVector<mlir::Type> MLIRArgTys;
+  MLIRArgTys.reserve(ArgTys.size());
+  for (const auto &ArgTy : ArgTys)
+    MLIRArgTys.push_back(MapIRType(ArgTy));
+
+  llvm::SmallVector<mlir::Type> ResultTys;
+  if (RetTy.Kind != IRTypeKind::Void)
+    ResultTys.push_back(MapIRType(RetTy));
+
+  auto FTy = PImpl->Builder.getFunctionType(MLIRArgTys, ResultTys);
 
   llvm::SmallVector<mlir::Value> CallArgs;
   CallArgs.reserve(Args.size());
@@ -1425,6 +1772,42 @@ IRValue *MLIRCodeBuilder::emitBuiltin(const std::string &Name, IRType RetTy,
                      "device function");
 
   auto Loc = PImpl->Builder.getUnknownLoc();
+  auto EmitHipImplicitArgPtr = [&]() -> mlir::Value {
+    constexpr unsigned ConstantAddressSpace = 4;
+    auto PtrTy =
+        mlir::LLVM::LLVMPointerType::get(&PImpl->Context, ConstantAddressSpace);
+    auto Call = PImpl->Builder.create<mlir::LLVM::CallIntrinsicOp>(
+        Loc, TypeRange{PtrTy}, "llvm.amdgcn.implicitarg.ptr", ValueRange{});
+    return Call.getResult(0);
+  };
+  auto EmitLLVMConstI64 = [&](int64_t V) -> mlir::Value {
+    auto I64Ty = mlir::IntegerType::get(&PImpl->Context, 64);
+    return PImpl->Builder.create<mlir::LLVM::ConstantOp>(
+        Loc, I64Ty, PImpl->Builder.getI64IntegerAttr(V));
+  };
+  auto EmitImplicitArgLoad = [&](mlir::Type ElemTy,
+                                 int64_t Offset) -> mlir::Value {
+    constexpr unsigned ConstantAddressSpace = 4;
+    auto PtrTy =
+        mlir::LLVM::LLVMPointerType::get(&PImpl->Context, ConstantAddressSpace);
+    mlir::Value ImplicitArgPtr = EmitHipImplicitArgPtr();
+    mlir::Value OffsetVal = EmitLLVMConstI64(Offset);
+    auto GEP = PImpl->Builder.create<mlir::LLVM::GEPOp>(
+        Loc, PtrTy, ElemTy, ImplicitArgPtr, ValueRange{OffsetVal});
+    return PImpl->Builder.create<mlir::LLVM::LoadOp>(Loc, ElemTy, GEP);
+  };
+  auto CastI32ToRetTy = [&](mlir::Value I32V) -> IRValue * {
+    if (RetTy.Kind == IRTypeKind::Int32)
+      return PImpl->wrap(I32V);
+    if (RetTy.Kind == IRTypeKind::Int64) {
+      auto I64Ty = mlir::IntegerType::get(&PImpl->Context, 64);
+      auto Cast = PImpl->Builder.create<arith::ExtUIOp>(Loc, I64Ty, I32V);
+      return PImpl->wrap(Cast);
+    }
+    reportFatalError("MLIRCodeBuilder::emitBuiltin: unsupported return type "
+                     "for " +
+                     Name);
+  };
   auto CastIndexToRetTy = [&](mlir::Value IndexV) -> IRValue * {
     if (RetTy.Kind == IRTypeKind::Int32 || RetTy.Kind == IRTypeKind::Int64) {
       // gpu dialect IDs are target-agnostic index values; cast at the builder
@@ -1460,6 +1843,41 @@ IRValue *MLIRCodeBuilder::emitBuiltin(const std::string &Name, IRType RetTy,
   if (Name == "blockIdx.z")
     return CastIndexToRetTy(
         PImpl->Builder.create<gpu::BlockIdOp>(Loc, gpu::Dimension::z));
+
+  // For HIP, avoid lowering block/grid dims via OCKL runtime calls
+  // (__ockl_get_local_size/__ockl_get_num_groups). Emit implicitarg loads
+  // directly, mirroring the LLVM backend implementation.
+  if (TargetModel == TargetModelType::HIP) {
+    auto I16Ty = mlir::IntegerType::get(&PImpl->Context, 16);
+    auto I32Ty = mlir::IntegerType::get(&PImpl->Context, 32);
+
+    auto EmitBlockDim = [&](int64_t Offset) -> IRValue * {
+      // HIP block dimensions are encoded as i16 in the implicit argument area;
+      // zero-extend to i32 to match the frontend builtin contract.
+      mlir::Value V16 = EmitImplicitArgLoad(I16Ty, Offset);
+      mlir::Value V32 = PImpl->Builder.create<arith::ExtUIOp>(Loc, I32Ty, V16);
+      return CastI32ToRetTy(V32);
+    };
+    auto EmitGridDim = [&](int64_t Offset) -> IRValue * {
+      // HIP grid dimensions are encoded as i32 in the implicit argument area.
+      mlir::Value V32 = EmitImplicitArgLoad(I32Ty, Offset);
+      return CastI32ToRetTy(V32);
+    };
+
+    if (Name == "blockDim.x")
+      return EmitBlockDim(/*Offset=*/6);
+    if (Name == "blockDim.y")
+      return EmitBlockDim(/*Offset=*/7);
+    if (Name == "blockDim.z")
+      return EmitBlockDim(/*Offset=*/8);
+
+    if (Name == "gridDim.x")
+      return EmitGridDim(/*Offset=*/0);
+    if (Name == "gridDim.y")
+      return EmitGridDim(/*Offset=*/1);
+    if (Name == "gridDim.z")
+      return EmitGridDim(/*Offset=*/2);
+  }
 
   if (Name == "blockDim.x")
     return CastIndexToRetTy(
@@ -1500,26 +1918,27 @@ IRValue *MLIRCodeBuilder::loadAddress(IRValue *Slot, IRType /*AllocTy*/) {
 void MLIRCodeBuilder::storeAddress(IRValue *Slot, IRValue *Addr) {
   auto Loc = PImpl->Builder.getUnknownLoc();
   // LHS must be a pointer slot in our canonical representation.
-  Value LhsSlot = PImpl->unwrap(Slot);
+  mlir::Value LhsSlot = PImpl->unwrap(Slot);
   auto LhsSlotTy = dyn_cast<MemRefType>(LhsSlot.getType());
   if (!LhsSlotTy || LhsSlotTy.getRank() != 1 || LhsSlotTy.getShape()[0] != 1 ||
       !LhsSlotTy.getElementType().isIndex())
     reportFatalError("storeAddress: expected pointer slot (memref<1xindex>)");
 
   auto LhsIt = PImpl->PointerMap.find(LhsSlot);
-  Value LhsBase =
-      (LhsIt != PImpl->PointerMap.end()) ? LhsIt->second.BaseMemRef : Value{};
+  mlir::Value LhsBase = (LhsIt != PImpl->PointerMap.end())
+                            ? LhsIt->second.BaseMemRef
+                            : mlir::Value{};
 
-  Value RhsIdx;
-  Value RhsBase;
+  mlir::Value RhsIdx;
+  mlir::Value RhsBase;
 
-  Value AddrV = PImpl->unwrap(Addr);
+  mlir::Value AddrV = PImpl->unwrap(Addr);
   auto AddrMemRefTy = dyn_cast<MemRefType>(AddrV.getType());
   bool IsPointerSlotTy = AddrMemRefTy && AddrMemRefTy.getRank() == 1 &&
                          AddrMemRefTy.getShape()[0] == 1 &&
                          AddrMemRefTy.getElementType().isIndex();
 
-  Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+  mlir::Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
   if (IsPointerSlotTy) {
     // Pointer-to-pointer assignment: copy both dynamic offset and base mapping.
     // This is the key path for re-assignment semantics such as p = &B[i].
@@ -1557,28 +1976,28 @@ void MLIRCodeBuilder::storeAddress(IRValue *Slot, IRValue *Addr) {
 
 IRValue *MLIRCodeBuilder::createAtomicAdd(IRValue *Addr, IRValue *Val) {
   auto [Base, Idx] = PImpl->resolveAtomicAddress(Addr);
-  Value Old =
+  mlir::Value Old =
       PImpl->emitAtomicRmw(Impl::AtomicOp::Add, Base, Idx, PImpl->unwrap(Val));
   return PImpl->wrap(Old);
 }
 
 IRValue *MLIRCodeBuilder::createAtomicSub(IRValue *Addr, IRValue *Val) {
   auto [Base, Idx] = PImpl->resolveAtomicAddress(Addr);
-  Value Old =
+  mlir::Value Old =
       PImpl->emitAtomicRmw(Impl::AtomicOp::Sub, Base, Idx, PImpl->unwrap(Val));
   return PImpl->wrap(Old);
 }
 
 IRValue *MLIRCodeBuilder::createAtomicMax(IRValue *Addr, IRValue *Val) {
   auto [Base, Idx] = PImpl->resolveAtomicAddress(Addr);
-  Value Old =
+  mlir::Value Old =
       PImpl->emitAtomicRmw(Impl::AtomicOp::Max, Base, Idx, PImpl->unwrap(Val));
   return PImpl->wrap(Old);
 }
 
 IRValue *MLIRCodeBuilder::createAtomicMin(IRValue *Addr, IRValue *Val) {
   auto [Base, Idx] = PImpl->resolveAtomicAddress(Addr);
-  Value Old =
+  mlir::Value Old =
       PImpl->emitAtomicRmw(Impl::AtomicOp::Min, Base, Idx, PImpl->unwrap(Val));
   return PImpl->wrap(Old);
 }
@@ -1586,17 +2005,17 @@ IRValue *MLIRCodeBuilder::createAtomicMin(IRValue *Addr, IRValue *Val) {
 IRValue *MLIRCodeBuilder::loadFromPointee(IRValue *Slot, IRType /*AllocTy*/,
                                           IRType /*ValueTy*/) {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  Value SlotV = PImpl->unwrap(Slot);
+  mlir::Value SlotV = PImpl->unwrap(Slot);
   auto It = PImpl->PointerMap.find(SlotV);
   if (It == PImpl->PointerMap.end())
     reportFatalError("loadFromPointee: unknown pointer slot");
-  Value Base = It->second.BaseMemRef;
+  mlir::Value Base = It->second.BaseMemRef;
   // Load offset from the memref<1xindex> slot.
-  Value IdxZero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-  Value Offset =
+  mlir::Value IdxZero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+  mlir::Value Offset =
       PImpl->Builder.create<memref::LoadOp>(Loc, SlotV, ValueRange{IdxZero});
   // Load element from base[offset].
-  Value Result =
+  mlir::Value Result =
       PImpl->Builder.create<memref::LoadOp>(Loc, Base, ValueRange{Offset});
   return PImpl->wrap(Result);
 }
@@ -1604,15 +2023,15 @@ IRValue *MLIRCodeBuilder::loadFromPointee(IRValue *Slot, IRType /*AllocTy*/,
 void MLIRCodeBuilder::storeToPointee(IRValue *Slot, IRType /*AllocTy*/,
                                      IRValue *Val) {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  Value SlotV = PImpl->unwrap(Slot);
+  mlir::Value SlotV = PImpl->unwrap(Slot);
   auto It = PImpl->PointerMap.find(SlotV);
   if (It == PImpl->PointerMap.end())
     reportFatalError("storeToPointee: unknown pointer slot");
-  Value Base = It->second.BaseMemRef;
-  Value IdxZero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-  Value Offset =
+  mlir::Value Base = It->second.BaseMemRef;
+  mlir::Value IdxZero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+  mlir::Value Offset =
       PImpl->Builder.create<memref::LoadOp>(Loc, SlotV, ValueRange{IdxZero});
-  Value V = PImpl->unwrap(Val);
+  mlir::Value V = PImpl->unwrap(Val);
   PImpl->Builder.create<memref::StoreOp>(Loc, V, Base, ValueRange{Offset});
 }
 
@@ -1620,7 +2039,7 @@ VarAlloc MLIRCodeBuilder::allocPointer(const std::string & /*Name*/,
                                        IRType ElemTy, unsigned AddrSpace) {
   auto Loc = PImpl->Builder.getUnknownLoc();
   auto IdxMemRefTy = MemRefType::get({1}, PImpl->Builder.getIndexType());
-  Value OffsetSlot;
+  mlir::Value OffsetSlot;
   {
     OpBuilder::InsertionGuard Guard(PImpl->Builder);
     PImpl->Builder.setInsertionPointToStart(PImpl->EntryBlock);
@@ -1639,7 +2058,7 @@ VarAlloc MLIRCodeBuilder::allocArray(const std::string & /*Name*/,
   auto Loc = PImpl->Builder.getUnknownLoc();
   mlir::Type MLIRElemTy = toMLIRScalarType(ElemTy.Kind, PImpl->Context);
   auto ArrMemRefTy = MemRefType::get({static_cast<int64_t>(NElem)}, MLIRElemTy);
-  Value Alloca;
+  mlir::Value Alloca;
   {
     OpBuilder::InsertionGuard Guard(PImpl->Builder);
     PImpl->Builder.setInsertionPointToStart(PImpl->EntryBlock);
@@ -1672,9 +2091,10 @@ void MLIRCodeBuilder::setLaunchBoundsForKernel(IRFunction *F,
     // the kernel function (nvvm.maxntid / nvvm.minctasm).
     KernelFn->setAttr("nvvm.maxntid", PImpl->Builder.getDenseI32ArrayAttr(
                                           {MaxThreadsPerBlock, 1, 1}));
-    KernelFn->setAttr("nvvm.minctasm",
-                      IntegerAttr::get(IntegerType::get(&PImpl->Context, 32),
-                                       MinBlocksPerSM));
+    KernelFn->setAttr(
+        "nvvm.minctasm",
+        IntegerAttr::get(mlir::IntegerType::get(&PImpl->Context, 32),
+                         MinBlocksPerSM));
     return;
   }
 
@@ -1685,12 +2105,14 @@ void MLIRCodeBuilder::setLaunchBoundsForKernel(IRFunction *F,
         "rocdl.flat_work_group_size",
         StringAttr::get(&PImpl->Context,
                         "1," + std::to_string(MaxThreadsPerBlock)));
-    KernelFn->setAttr("rocdl.max_flat_work_group_size",
-                      IntegerAttr::get(IntegerType::get(&PImpl->Context, 32),
-                                       MaxThreadsPerBlock));
-    KernelFn->setAttr("rocdl.waves_per_eu",
-                      IntegerAttr::get(IntegerType::get(&PImpl->Context, 32),
-                                       MinBlocksPerSM));
+    KernelFn->setAttr(
+        "rocdl.max_flat_work_group_size",
+        IntegerAttr::get(mlir::IntegerType::get(&PImpl->Context, 32),
+                         MaxThreadsPerBlock));
+    KernelFn->setAttr(
+        "rocdl.waves_per_eu",
+        IntegerAttr::get(mlir::IntegerType::get(&PImpl->Context, 32),
+                         MinBlocksPerSM));
     return;
   }
 

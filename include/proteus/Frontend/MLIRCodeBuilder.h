@@ -50,6 +50,11 @@ public:
   std::unique_ptr<llvm::LLVMContext> takeContext();
   std::unique_ptr<llvm::Module> takeModule();
 
+  /// Device-only lowering configuration.
+  /// For HIP this is the target chipset (e.g. gfx90a) used by ROCDL lowering.
+  /// For CUDA it is currently unused.
+  void setDeviceArch(const std::string &Arch);
+
   // -----------------------------------------------------------------------
   // Implemented CodeBuilder overrides (Phase 1b).
   // -----------------------------------------------------------------------
@@ -132,7 +137,6 @@ public:
 private:
   void ensureLoweredToLLVM(int OptLevel = 3,
                            const std::string &TargetTriple = "",
-                           const std::string &CPU = "",
                            const std::string &Features = "");
 
   struct Impl;

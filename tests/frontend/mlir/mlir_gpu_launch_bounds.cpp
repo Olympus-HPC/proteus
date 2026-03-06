@@ -32,11 +32,8 @@ int main() {
 }
 
 // clang-format off
-// CHECK: "gpu.module"()
-// CHECK: sym_name = "kernels"
-// CHECK: "gpu.func"()
-// CHECK: gpu.kernel
+// CHECK: {{(\"gpu\.module\"\(\)|gpu\.module)}}{{.*(@kernels|sym_name = \"kernels\")}}
+// CHECK: {{(\"gpu\.func\"\(\)|gpu\.func)}}{{.*(@kernel_lb|sym_name = \"kernel_lb\")}}{{.* kernel}}
 // CHECK-DAG: {{(nvvm\.maxntid|rocdl\.flat_work_group_size)}}
 // CHECK-DAG: {{(nvvm\.minctasm|rocdl\.waves_per_eu)}}
-// CHECK: sym_name = "kernel_lb"
 // clang-format on
