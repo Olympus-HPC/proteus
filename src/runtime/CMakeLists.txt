@@ -156,6 +156,7 @@ if(PROTEUS_ENABLE_MLIR)
     MLIRLLVMToLLVMIRTranslation
     MLIRIR
     MLIRSupport
+    MLIRTargetLLVM
     MLIRTargetLLVMIRExport
   )
 

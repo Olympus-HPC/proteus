@@ -85,9 +85,26 @@ void JitModule::compile(bool Verify) {
 
     auto *Fn = Mod->getFunction(OldName);
 
-    if (!Fn)
+    if (!Fn) {
+      std::string AvailableFns;
+      raw_string_ostream OS(AvailableFns);
+      bool First = true;
+      for (auto &Candidate : Mod->functions()) {
+        if (Candidate.isDeclaration())
+          continue;
+
+        if (!First)
+          OS << ", ";
+        OS << Candidate.getName();
+        First = false;
+      }
+
+      if (First)
+        OS << "<no definitions>";
+
       reportFatalError("compile() failed to find function in LLVM module: " +
-                       OldName);
+                       OldName + "; available definitions: " + OS.str());
+    }
 
     Fn->setName(NewName);
     JitF->setFrontendName(NewName);

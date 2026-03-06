@@ -12,6 +12,9 @@
 #include <mlir/Conversion/Passes.h>
 #include <mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h>
 #include <mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h>
+#if PROTEUS_ENABLE_HIP
+#include <mlir/Conversion/GPUToROCDL/GPUToROCDLPass.h>
+#endif
 #include <mlir/Dialect/Arith/IR/Arith.h>
 #include <mlir/Dialect/ControlFlow/IR/ControlFlow.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
@@ -21,7 +24,6 @@
 #include <mlir/Dialect/LLVMIR/NVVMDialect.h>
 #endif
 #if PROTEUS_ENABLE_HIP
-#include <mlir/Conversion/GPUToROCDL/GPUToROCDLPass.h>
 #include <mlir/Dialect/LLVMIR/ROCDLDialect.h>
 #endif
 #include <mlir/Dialect/Math/IR/Math.h>
@@ -36,6 +38,7 @@
 #include <mlir/IR/Verifier.h>
 #include <mlir/Pass/Pass.h>
 #include <mlir/Pass/PassManager.h>
+#include <mlir/Target/LLVM/ModuleToObject.h>
 #include <mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h>
 #include <mlir/Target/LLVMIR/Dialect/GPU/GPUToLLVMIRTranslation.h>
 #include <mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h>
@@ -52,9 +55,12 @@
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/ADT/StringSet.h>
+#include <llvm/Bitcode/BitcodeReader.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/MC/TargetRegistry.h>
+#include <llvm/Support/Error.h>
+#include <llvm/Support/MemoryBufferRef.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
 
@@ -114,6 +120,13 @@ static std::string computeTargetDataLayout(llvm::StringRef TargetTriple,
     (void)Inserted;
     return It->second;
   }
+}
+
+static bool hasLLVMFunctionDefinitions(llvm::Module &Mod) {
+  for (auto &Fn : Mod.functions())
+    if (!Fn.isDeclaration())
+      return true;
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -389,72 +402,74 @@ struct MLIRCodeBuilder::Impl {
 #endif
     }
 
-    ModuleOp ModuleToTranslate = Module;
-    OwningOpRef<ModuleOp> DeviceTranslateModule;
+    Operation *OperationToSerialize = Module.getOperation();
     if (TM == TargetModelType::CUDA || TM == TargetModelType::HIP) {
       auto DeviceSym = Module.lookupSymbol<gpu::GPUModuleOp>("kernels");
       if (!DeviceSym)
         reportFatalError("MLIRCodeBuilder: expected gpu.module @kernels for "
                          "device lowering");
-
-      DeviceTranslateModule = ModuleOp::create(Builder.getUnknownLoc());
-      Block &Dst = DeviceTranslateModule->getBodyRegion().front();
-      Block &Src = DeviceSym.getBodyRegion().front();
-
-      // Device lowering keeps kernel LLVM/NVVM/ROCDL ops nested in
-      // gpu.module. Proteus device dispatch expects a plain device LLVM module,
-      // so clone those operations into a standalone top-level module.
-      for (Operation &Op : Src.without_terminator())
-        Dst.push_back(Op.clone());
-
-      // Device kernels are lowered under gpu.module. The main lowering
-      // pipeline runs on the top-level builtin.module, so conversions that
-      // are defined on builtin.module may not visit ops that remain nested
-      // under gpu.module.
-      //
-      // Translate device code by cloning the gpu.module contents into a fresh
-      // standalone builtin.module. Run the remaining structured -> LLVM
-      // dialect conversions on that standalone module to guarantee
-      // translation does not encounter builtin.unrealized_conversion_cast
-      // (or other non-LLVM ops).
-      const std::string DataLayout =
-          computeTargetDataLayout(TargetTriple, CPU, Features);
-      DeviceTranslateModule->getOperation()->setAttr(
-          mlir::LLVM::LLVMDialect::getTargetTripleAttrName(),
-          Builder.getStringAttr(TargetTriple));
-      DeviceTranslateModule->getOperation()->setAttr(
-          mlir::LLVM::LLVMDialect::getDataLayoutAttrName(),
-          Builder.getStringAttr(DataLayout));
-
       mlir::PassManager DevicePM(&Context);
-      // Device lowering should have finished in the nested gpu.module pipeline.
-      // Only reconcile and validate here.
-      DevicePM.addPass(mlir::createReconcileUnrealizedCastsPass());
-      if (failed(DevicePM.run(*DeviceTranslateModule)))
-        reportFatalError(
-            "MLIRCodeBuilder: failed to finish device lowering to LLVM "
-            "dialect");
+      DevicePM.nest<gpu::GPUModuleOp>().addPass(
+          mlir::createReconcileUnrealizedCastsPass());
+      if (failed(DevicePM.run(Module)))
+        reportFatalError("MLIRCodeBuilder: failed to reconcile device "
+                         "gpu.module after lowering");
+
+      DeviceSym = Module.lookupSymbol<gpu::GPUModuleOp>("kernels");
+      if (!DeviceSym)
+        reportFatalError("MLIRCodeBuilder: reconciled device module lost "
+                         "gpu.module @kernels");
 
       bool HasUnrealizedCasts = false;
-      DeviceTranslateModule->walk(
+      DeviceSym.walk(
           [&](mlir::UnrealizedConversionCastOp) { HasUnrealizedCasts = true; });
       if (HasUnrealizedCasts) {
         llvm::errs()
-            << "[proteus][MLIRCodeBuilder] Device module still contains "
-               "builtin.unrealized_conversion_cast after lowering:\n";
-        DeviceTranslateModule->print(llvm::errs());
+            << "[proteus][MLIRCodeBuilder] Lowered device gpu.module still "
+               "contains builtin.unrealized_conversion_cast:\n";
+        DeviceSym.print(llvm::errs());
         llvm::errs() << "\n";
-        reportFatalError("MLIRCodeBuilder: device lowering left unrealized "
-                         "conversion casts");
+        reportFatalError("MLIRCodeBuilder: device gpu.module still contains "
+                         "unrealized conversion casts after reconciliation");
       }
 
-      ModuleToTranslate = *DeviceTranslateModule;
+      OperationToSerialize = DeviceSym.getOperation();
     }
 
-    LLVMMod = mlir::translateModuleToLLVMIR(ModuleToTranslate, *LLVMCtx);
-    if (!LLVMMod)
-      reportFatalError("MLIRCodeBuilder: failed to translate LLVM dialect to "
-                       "LLVM IR module");
+    if (TM == TargetModelType::CUDA || TM == TargetModelType::HIP) {
+      mlir::LLVM::ModuleToObject Serializer(*OperationToSerialize, TargetTriple,
+                                            CPU, Features, OptLevel);
+      std::optional<SmallVector<char, 0>> Serialized = Serializer.run();
+      if (!Serialized)
+        reportFatalError("MLIRCodeBuilder: failed to serialize device module "
+                         "to LLVM bitcode");
+
+      llvm::MemoryBufferRef Buffer(
+          StringRef(Serialized->data(), Serialized->size()), "DeviceBitcode");
+      auto ParsedModule = llvm::parseBitcodeFile(Buffer, *LLVMCtx);
+      if (!ParsedModule)
+        reportFatalError("MLIRCodeBuilder: failed to parse serialized device "
+                         "LLVM bitcode: " +
+                         llvm::toString(ParsedModule.takeError()));
+      LLVMMod = std::move(*ParsedModule);
+    } else {
+      LLVMMod = mlir::translateModuleToLLVMIR(Module.getOperation(), *LLVMCtx);
+      if (!LLVMMod)
+        reportFatalError("MLIRCodeBuilder: failed to translate LLVM dialect "
+                         "to LLVM IR module");
+    }
+
+    if (TM == TargetModelType::CUDA || TM == TargetModelType::HIP) {
+      if (!hasLLVMFunctionDefinitions(*LLVMMod)) {
+        llvm::errs()
+            << "[proteus][MLIRCodeBuilder] Device translation produced no "
+               "function definitions. MLIR device module was:\n";
+        OperationToSerialize->print(llvm::errs());
+        llvm::errs() << "\n";
+        reportFatalError("MLIRCodeBuilder: device translation produced an "
+                         "empty LLVM IR module");
+      }
+    }
 
     // MLIR device lowering may qualify kernel function symbols (e.g. with the
     // gpu.module name). Normalize known prefixes so the rest of Proteus can
@@ -1776,8 +1791,14 @@ IRValue *MLIRCodeBuilder::emitBuiltin(const std::string &Name, IRType RetTy,
     constexpr unsigned ConstantAddressSpace = 4;
     auto PtrTy =
         mlir::LLVM::LLVMPointerType::get(&PImpl->Context, ConstantAddressSpace);
+#if LLVM_VERSION_MAJOR >= 20
+    auto Call = PImpl->Builder.create<mlir::LLVM::CallIntrinsicOp>(
+        Loc, PtrTy, PImpl->Builder.getStringAttr("llvm.amdgcn.implicitarg.ptr"),
+        ValueRange{});
+#else
     auto Call = PImpl->Builder.create<mlir::LLVM::CallIntrinsicOp>(
         Loc, TypeRange{PtrTy}, "llvm.amdgcn.implicitarg.ptr", ValueRange{});
+#endif
     return Call.getResult(0);
   };
   auto EmitLLVMConstI64 = [&](int64_t V) -> mlir::Value {

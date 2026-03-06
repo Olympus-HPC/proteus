@@ -19,6 +19,7 @@ int main() {
   J.compile();
 
   const size_t Result = Add(40, 2);
+  printf("result: %zu\n", Result);
   assert(Result == 42 && "MLIR host JIT execution returned wrong result");
 
   return 0;
