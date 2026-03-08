@@ -250,6 +250,8 @@ IRFunction *LLVMCodeBuilder::addFunction(const std::string &Name, IRType RetTy,
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
   if (IsKernel)
     setKernel(IRF);
+#else
+  (void)IsKernel;
 #endif
   return IRF;
 }
