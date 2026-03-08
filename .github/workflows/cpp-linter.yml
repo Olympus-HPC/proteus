@@ -22,11 +22,12 @@ jobs:
       - name: Create environment
         run: |
           conda install -y -q -c conda-forge \
-            clang=18.1.3 \
-            clangxx=18.1.3 \
-            clangdev=18.1.3 \
-            llvmdev=18.1.3 \
-            lit=18.1.3 \
+            clang=19.1.7 \
+            clangxx=19.1.7 \
+            clangdev=19.1.7 \
+            llvmdev=19.1.7 \
+            lit=19.1.7 \
+            mlir=19.1.7 \
             zlib zstd
       - name: Run cmake to export compilation database
         run: |
@@ -44,10 +45,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          version: 18
+          version: 19
           ignore: .github | scripts
           database: build
-          extra-args: '-DPROTEUS_ENABLE_HIP'
+          extra-args: '-DPROTEUS_ENABLE_HIP -DPROTEUS_ENABLE_MLIR'
           style: file
           tidy-checks: ''
           lines-changed-only: true
