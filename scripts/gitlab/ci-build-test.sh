@@ -27,7 +27,7 @@ if [ "${CI_MACHINE}" == "matrix" ]; then
   conda create -y -q -n proteus -c conda-forge \
       python=${PYTHON_VERSION} clang=${PROTEUS_CI_LLVM_VERSION} clangxx=${PROTEUS_CI_LLVM_VERSION} \
       clangdev=${PROTEUS_CI_LLVM_VERSION} llvmdev=${PROTEUS_CI_LLVM_VERSION} lit=${PROTEUS_CI_LLVM_VERSION} \
-      gcc=12 gxx=12
+      mlir=${PROTEUS_CI_LLVM_VERSION} gcc=12 gxx=12
   conda activate proteus
 
   LLVM_INSTALL_DIR=$(llvm-config --prefix)
@@ -60,6 +60,7 @@ CMAKE_OPTIONS="-DLLVM_INSTALL_DIR=$LLVM_INSTALL_DIR"
 CMAKE_OPTIONS+=" -DCMAKE_BUILD_TYPE=Release"
 CMAKE_OPTIONS+=" -DCMAKE_C_COMPILER=$LLVM_INSTALL_DIR/bin/clang -DCMAKE_CXX_COMPILER=$LLVM_INSTALL_DIR/bin/clang++"
 CMAKE_OPTIONS+=" -DENABLE_DEVELOPER_COMPILER_FLAGS=on"
+CMAKE_OPTIONS+=" -DPROTEUS_ENABLE_MLIR=on"
 CMAKE_OPTIONS+=" -DENABLE_TESTS=on"
 CMAKE_OPTIONS+=${CMAKE_OPTIONS_MACHINE}
 if [ -n "${PROTEUS_CI_BUILD_SHARED}" ]; then
