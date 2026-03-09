@@ -12,6 +12,10 @@ jobs:
         os: [ubuntu-latest]
         llvm: [18.1.8, 19.1.7, 20.1.8]
         build_shared: [on, off]
+        mlir: [on, off]
+        exclude:
+          - llvm: 18.1.8
+            mlir: on
     defaults:
       run:
         shell: bash -el {0}
@@ -42,6 +46,7 @@ jobs:
             -DENABLE_DEVELOPER_COMPILER_FLAGS=on \
             -DENABLE_TESTS=on \
             -DLLVM_INSTALL_DIR=$(llvm-config --prefix) \
+            -DPROTEUS_ENABLE_MLIR=${{ matrix.mlir }} \
             -DBUILD_SHARED=${{ matrix.build_shared }} |& tee cmake_output.log
           if grep -q "Manually-specified variables were not used by the project:" cmake_output.log; then
             echo "Error: Unused variables detected"
