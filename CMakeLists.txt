@@ -51,21 +51,26 @@ if(PROTEUS_ENABLE_HIP)
 	endif()
 
 	# Find ROCm device library bitcode (ocml/ockl/oclc_*), typically under
-	# <ROCm>/amdgcn/bitcode. Restrict lookup to the ROCm installation rooted at
-	# LLVM_INSTALL_DIR. We use them to link DSL generated code for AMDGCN targets.
-	get_filename_component(PROTEUS_ROCM_ROOT_FROM_LLVM "${LLVM_INSTALL_DIR}" DIRECTORY)
-	find_path(PROTEUS_ROCM_AMDGCN_BITCODE_DIR
-	          NAMES ocml.bc
-	          PATH_SUFFIXES amdgcn/bitcode
-	          PATHS "${PROTEUS_ROCM_ROOT_FROM_LLVM}"
-	          NO_DEFAULT_PATH)
-	if(NOT PROTEUS_ROCM_AMDGCN_BITCODE_DIR)
-	  message(FATAL_ERROR
-	    "Could not find ROCm AMDGCN device bitcode directory containing ocml.bc. "
-	    "Expected under <ROCm>/amdgcn/bitcode relative to LLVM_INSTALL_DIR. "
-	    "Ensure LLVM_INSTALL_DIR points into a ROCm install (e.g. /opt/rocm-6.4.1/llvm).")
+	# <ROCm>/amdgcn/bitcode. We rely on the ROCm-provided CMake package
+	# (rocm-device-libs) rather than hard-coding filesystem layout.
+	find_package(AMDDeviceLibs REQUIRED CONFIG
+	  HINTS
+	    ${HIP_PACKAGE_PREFIX_DIR}
+	    ${HIP_PACKAGE_PREFIX_DIR}/..
+	    ${LLVM_INSTALL_DIR}
+	    ${LLVM_INSTALL_DIR}/..
+	)
+	message(STATUS "Found AMDDeviceLibs package in: ${AMDDeviceLibs_DIR}")
+	if(NOT TARGET ocml)
+	  message(FATAL_ERROR "AMDDeviceLibs package did not define expected imported target: ocml")
 	endif()
-  message(STATUS "Found ROCm AMDGCN bitcode dir: ${PROTEUS_ROCM_AMDGCN_BITCODE_DIR}")
+	get_target_property(_ocml_bc ocml IMPORTED_LOCATION)
+	if(NOT _ocml_bc OR NOT EXISTS "${_ocml_bc}")
+	  message(FATAL_ERROR
+	    "AMDDeviceLibs ocml imported target has missing IMPORTED_LOCATION: ${_ocml_bc}")
+	endif()
+	get_filename_component(PROTEUS_ROCM_AMDGCN_BITCODE_DIR "${_ocml_bc}" DIRECTORY)
+	message(STATUS "Found ROCm AMDGCN bitcode dir: ${PROTEUS_ROCM_AMDGCN_BITCODE_DIR}")
 endif()
 
 if(PROTEUS_ENABLE_MPI)
