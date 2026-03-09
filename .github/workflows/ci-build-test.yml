@@ -34,11 +34,13 @@ jobs:
             clangdev=${{ matrix.llvm }} \
             llvmdev=${{ matrix.llvm }} \
             lit=${{ matrix.llvm }} \
+            mlir=${{ matrix.llvm }} \
             zlib zstd
       - name: Build build_shared=${{ matrix.build_shared }}
         run: |
           mkdir -p build
           pushd build
+          set -o pipefail
           cmake .. \
             -DCMAKE_PREFIX_PATH="$CONDA_PREFIX;$CONDA_PREFIX/lib/cmake" \
             -DCMAKE_C_COMPILER=clang \
