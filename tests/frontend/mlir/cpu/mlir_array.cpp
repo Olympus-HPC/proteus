@@ -23,12 +23,16 @@ int main() {
 
     // Fill Arr[I] = 1.0 * I.
     F.beginFor(I, Zero, Four, One);
-    { Arr[I] = 1.0 * I; }
+    {
+      Arr[I] = 1.0 * I;
+    }
     F.endFor();
 
     // Copy Arr[I] to Out[I].
     F.beginFor(I, Zero, Four, One);
-    { Out[I] = Arr[I]; }
+    {
+      Out[I] = Arr[I];
+    }
     F.endFor();
 
     F.ret();

@@ -12,7 +12,7 @@
 
 using namespace proteus;
 
-auto createJitModule1() {
+static auto createJitModule1() {
   auto J = std::make_unique<JitModule>("host");
 
   auto &F1 = J->addFunction<void(double *)>("f1");

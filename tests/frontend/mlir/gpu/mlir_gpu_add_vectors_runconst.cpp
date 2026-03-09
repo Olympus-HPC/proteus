@@ -24,7 +24,7 @@ using namespace builtins::gpu;
 #error "Expected PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA defined"
 #endif
 
-auto createJitKernel(size_t N) {
+static auto createJitKernel(size_t N) {
   auto J = std::make_unique<JitModule>(TARGET);
 
   // Add a kernel with the signature: void add_vectors(double *A, double *B)
@@ -50,7 +50,9 @@ auto createJitKernel(size_t N) {
 
     // Strided loop: each thread processes multiple elements.
     F.beginFor(I, I, RunConstN, Inc);
-    { A[I] = A[I] + B[I]; }
+    {
+      A[I] = A[I] + B[I];
+    }
     F.endFor();
 
     F.ret();

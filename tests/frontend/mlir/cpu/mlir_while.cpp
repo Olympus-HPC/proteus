@@ -17,7 +17,9 @@ int main() {
     auto [N] = F.getArgs();
     auto X = F.defVar(N, "x");
     F.beginWhile([&]() { return X > 0; });
-    { X -= 1; }
+    {
+      X -= 1;
+    }
     F.endWhile();
     F.ret(X);
   }

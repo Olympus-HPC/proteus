@@ -25,7 +25,7 @@ using namespace proteus;
 #error "Expected PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA defined"
 #endif
 
-auto createJitModule1() {
+static auto createJitModule1() {
   auto J = std::make_unique<JitModule>(TARGET);
 
   auto KernelHandle1 = J->addKernel<void(double *)>("kernel1");
@@ -59,7 +59,7 @@ auto createJitModule1() {
   return std::make_tuple(std::move(J), KernelHandle1, KernelHandle2);
 }
 
-auto createJitModule2() {
+static auto createJitModule2() {
   auto J = std::make_unique<JitModule>(TARGET);
 
   auto KernelHandle1 = J->addKernel<void(double *)>("kernel1");

@@ -259,6 +259,8 @@ struct MLIRCodeBuilder::Impl {
           mlir::LLVM::LLVMDialect::getDataLayoutAttrName(),
           Builder.getStringAttr(DataLayout));
     };
+
+#if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
     auto AddCommonGpuLoweringPrelude = [&]() {
       PM.addPass(mlir::createConvertSCFToCFPass());
       {
@@ -268,6 +270,7 @@ struct MLIRCodeBuilder::Impl {
       }
       PM.addPass(mlir::createReconcileUnrealizedCastsPass());
     };
+#endif
 
     // Set triple + data layout so index bitwidth derivation is consistent.
     if (TM == TargetModelType::HIP && CPU.empty())

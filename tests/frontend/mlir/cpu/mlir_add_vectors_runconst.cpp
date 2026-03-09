@@ -12,7 +12,7 @@
 
 using namespace proteus;
 
-auto createJitFunction(size_t N) {
+static auto createJitFunction(size_t N) {
   auto J = std::make_unique<JitModule>("host");
 
   // Add a function with the signature: void add_vectors(double *A, double *B)
@@ -31,7 +31,9 @@ auto createJitFunction(size_t N) {
     auto RunConstN = F.defRuntimeConst(N);
     // Element-wise addition over all vector elements.
     F.beginFor(I, I, RunConstN, Inc);
-    { A[I] = A[I] + B[I]; }
+    {
+      A[I] = A[I] + B[I];
+    }
     F.endFor();
 
     F.ret();

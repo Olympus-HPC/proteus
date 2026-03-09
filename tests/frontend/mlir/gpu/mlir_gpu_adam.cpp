@@ -103,11 +103,15 @@ auto createJitModule() {
 
         auto denom = F.declVar<float>("denom");
         F.beginIf(mode == 0);
-        { denom = sqrtf(v_corrected + eps); }
+        {
+          denom = sqrtf(v_corrected + eps);
+        }
         F.endIf();
 
         F.beginIf(mode == 1);
-        { denom = sqrtf(v_corrected) + eps; }
+        {
+          denom = sqrtf(v_corrected) + eps;
+        }
         F.endIf();
 
         auto update = F.declVar<float>("update");

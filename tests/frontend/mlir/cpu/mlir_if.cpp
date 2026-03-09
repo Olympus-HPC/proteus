@@ -18,7 +18,9 @@ int main() {
     auto Result = F.defVar(X, "result");
     auto IsNeg = X < 0;
     F.beginIf(IsNeg);
-    { Result = -X; }
+    {
+      Result = -X;
+    }
     F.endIf();
     F.ret(Result);
   }

@@ -25,7 +25,7 @@
 
 using namespace proteus;
 
-auto createJitModule1() {
+static auto createJitModule1() {
   auto J = std::make_unique<JitModule>(TARGET);
 
   auto KernelHandle = J->addKernel<void(double *)>("kernel");

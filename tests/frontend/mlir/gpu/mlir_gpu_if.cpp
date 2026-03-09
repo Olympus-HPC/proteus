@@ -33,7 +33,9 @@ int main() {
     {
       Ret[0] = 0;
       LT.beginIf(Arg0 < Arg1);
-      { Ret[0] = 1; }
+      {
+        Ret[0] = 1;
+      }
       LT.endIf();
       LT.ret();
     }
@@ -51,7 +53,9 @@ int main() {
     {
       Ret[0] = 0;
       LE.beginIf(Arg0 <= Arg1);
-      { Ret[0] = 1; }
+      {
+        Ret[0] = 1;
+      }
       LE.endIf();
       LE.ret();
     }
@@ -69,7 +73,9 @@ int main() {
     {
       Ret[0] = 0;
       GT.beginIf(Arg0 > Arg1);
-      { Ret[0] = 1; }
+      {
+        Ret[0] = 1;
+      }
       GT.endIf();
       GT.ret();
     }
@@ -87,7 +93,9 @@ int main() {
     {
       Ret[0] = 0;
       GE.beginIf(Arg0 >= Arg1);
-      { Ret[0] = 1; }
+      {
+        Ret[0] = 1;
+      }
       GE.endIf();
       GE.ret();
     }
@@ -105,7 +113,9 @@ int main() {
     {
       Ret[0] = 0;
       EQ.beginIf(Arg0 == Arg1);
-      { Ret[0] = 1; }
+      {
+        Ret[0] = 1;
+      }
       EQ.endIf();
       EQ.ret();
     }
@@ -123,7 +133,9 @@ int main() {
     {
       Ret[0] = 0;
       NE.beginIf(Arg0 != Arg1);
-      { Ret[0] = 1; }
+      {
+        Ret[0] = 1;
+      }
       NE.endIf();
       NE.ret();
     }

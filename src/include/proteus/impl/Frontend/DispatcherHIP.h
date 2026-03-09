@@ -44,13 +44,13 @@ public:
       return std::move(Parsed.get());
     };
 
-    auto AppendBitcodePath = [&](llvm::SmallVectorImpl<llvm::SmallString<256>>
-                                     &Paths,
-                                 llvm::StringRef Filename) {
-      llvm::SmallString<256> Path{PROTEUS_ROCM_BITCODE_DIR};
-      llvm::sys::path::append(Path, Filename);
-      Paths.push_back(std::move(Path));
-    };
+    auto AppendBitcodePath =
+        [&](llvm::SmallVectorImpl<llvm::SmallString<256>> &Paths,
+            llvm::StringRef Filename) {
+          llvm::SmallString<256> Path{PROTEUS_ROCM_BITCODE_DIR};
+          llvm::sys::path::append(Path, Filename);
+          Paths.push_back(std::move(Path));
+        };
 
     auto Exists = [&](llvm::StringRef Filename) -> bool {
       llvm::SmallString<256> Path{PROTEUS_ROCM_BITCODE_DIR};
@@ -58,8 +58,9 @@ public:
       return llvm::sys::fs::exists(Path);
     };
 
-    auto PickFirstExisting = [&](std::initializer_list<llvm::StringRef>
-                                     Candidates) -> llvm::StringRef {
+    auto PickFirstExisting =
+        [&](std::initializer_list<llvm::StringRef> Candidates)
+        -> llvm::StringRef {
       for (auto C : Candidates) {
         if (Exists(C))
           return C;
@@ -74,9 +75,9 @@ public:
     AppendBitcodePath(LibsToLink, "ockl.bc");
 
     // ABI: prefer the newest available.
-    if (auto Abi = PickFirstExisting(
-            {"oclc_abi_version_600.bc", "oclc_abi_version_500.bc",
-             "oclc_abi_version_400.bc"});
+    if (auto Abi = PickFirstExisting({"oclc_abi_version_600.bc",
+                                      "oclc_abi_version_500.bc",
+                                      "oclc_abi_version_400.bc"});
         !Abi.empty()) {
       AppendBitcodePath(LibsToLink, Abi);
     } else {
@@ -92,13 +93,11 @@ public:
       reportFatalError("DispatchHIP: unexpected HIP device arch: " +
                        DeviceArch);
     const llvm::StringRef IsaSuffix = llvm::StringRef{DeviceArch}.drop_front(3);
-    const std::string IsaFile =
-        ("oclc_isa_version_" + IsaSuffix + ".bc").str();
+    const std::string IsaFile = ("oclc_isa_version_" + IsaSuffix + ".bc").str();
     if (!Exists(IsaFile))
-      reportFatalError(
-          std::string("DispatchHIP: missing ISA bitcode file ") + IsaFile +
-          " under " + PROTEUS_ROCM_BITCODE_DIR + " (DeviceArch=" + DeviceArch +
-          ")");
+      reportFatalError(std::string("DispatchHIP: missing ISA bitcode file ") +
+                       IsaFile + " under " + PROTEUS_ROCM_BITCODE_DIR +
+                       " (DeviceArch=" + DeviceArch + ")");
     AppendBitcodePath(LibsToLink, IsaFile);
 
     // Math/FP mode defaults (safe defaults, can be revisited later).
@@ -108,17 +107,17 @@ public:
     AppendBitcodePath(LibsToLink, "oclc_correctly_rounded_sqrt_on.bc");
 
     // Wavefront size selection: RDNA is typically wave32; CDNA/gfx9 wave64.
-    const bool IsWave32 =
-        llvm::StringRef{DeviceArch}.starts_with("gfx10") ||
-        llvm::StringRef{DeviceArch}.starts_with("gfx11") ||
-        llvm::StringRef{DeviceArch}.starts_with("gfx12");
+    const bool IsWave32 = llvm::StringRef{DeviceArch}.starts_with("gfx10") ||
+                          llvm::StringRef{DeviceArch}.starts_with("gfx11") ||
+                          llvm::StringRef{DeviceArch}.starts_with("gfx12");
     AppendBitcodePath(LibsToLink, IsWave32 ? "oclc_wavefrontsize64_off.bc"
-                                          : "oclc_wavefrontsize64_on.bc");
+                                           : "oclc_wavefrontsize64_on.bc");
 
     llvm::Linker Linker{*ModOwner};
     for (const auto &Path : LibsToLink) {
       auto LibMod = LoadBitcode(Path);
-      Linker.linkInModule(std::move(LibMod), llvm::Linker::Flags::LinkOnlyNeeded);
+      Linker.linkInModule(std::move(LibMod),
+                          llvm::Linker::Flags::LinkOnlyNeeded);
     }
 
     std::unique_ptr<MemoryBuffer> ObjectModule =

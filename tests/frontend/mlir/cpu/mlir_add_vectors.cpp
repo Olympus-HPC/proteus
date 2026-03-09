@@ -19,7 +19,9 @@ int main() {
     auto Zero = F.defVar<int>(0);
     auto One = F.defVar<int>(1);
     F.beginFor(I, Zero, N, One);
-    { A[I] = A[I] + B[I]; }
+    {
+      A[I] = A[I] + B[I];
+    }
     F.endFor();
     F.ret();
   }

@@ -22,7 +22,9 @@ int main() {
   auto &K = KernelHandle.F;
 
   K.beginFunction();
-  { K.ret(); }
+  {
+    K.ret();
+  }
   K.endFunction();
 
   KernelHandle.setLaunchBounds(256, 2);

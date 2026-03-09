@@ -12,7 +12,7 @@
 
 using namespace proteus;
 
-auto createJitModule1() {
+static auto createJitModule1() {
   auto J = std::make_unique<JitModule>("host");
 
   auto &F1 = J->addFunction<void(double *)>("f1");
@@ -43,7 +43,7 @@ auto createJitModule1() {
   return std::make_tuple(std::move(J), std::ref(F1), std::ref(F2));
 }
 
-auto createJitModule2() {
+static auto createJitModule2() {
   auto J = std::make_unique<JitModule>("host");
 
   auto &F1 = J->addFunction<void(double *)>("f1");

@@ -21,7 +21,9 @@ int main() {
     auto Zero = F.defVar<int>(0);
     auto One = F.defVar<int>(1);
     F.beginFor(I, Zero, N, One);
-    { Sum += I; }
+    {
+      Sum += I;
+    }
     F.endFor();
     F.ret(Sum);
   }

@@ -18,7 +18,9 @@ int main() {
     auto Result = F.defVar(A, "result");
     auto Cond = B > A;
     F.beginIf(Cond);
-    { Result = B; }
+    {
+      Result = B;
+    }
     F.endIf();
     F.ret(Result);
   }
