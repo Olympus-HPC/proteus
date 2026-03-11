@@ -61,6 +61,10 @@ inline std::string toString(ScopeKind Kind) {
   }
 }
 
+/// Identifies the concrete backend implementation, enabling static_cast
+/// dispatch without RTTI.
+enum class CodeBuilderKind { LLVM, MLIR };
+
 /// Abstract code-builder interface.  The frontend (Var.h, Func.h, LoopNest.h)
 /// depends only on this class.
 class CodeBuilder {
@@ -68,15 +72,18 @@ public:
   virtual ~CodeBuilder() = default;
 
   virtual TargetModelType getTargetModel() const = 0;
+  virtual CodeBuilderKind getBackendKind() const = 0;
 
   // -----------------------------------------------------------------------
   // Function management.
   // -----------------------------------------------------------------------
 
-  /// Create a function with the given name and signature.  Returns an opaque
-  /// IRFunction handle owned by this builder.
+  /// Create a function with the given name and signature. Kernel intent is
+  /// explicit so backends can select the correct IR container up front.
+  /// Returns an opaque IRFunction handle owned by this builder.
   virtual IRFunction *addFunction(const std::string &Name, IRType RetTy,
-                                  const std::vector<IRType> &ArgTys) = 0;
+                                  const std::vector<IRType> &ArgTys,
+                                  bool IsKernel = false) = 0;
 
   /// Rename the function identified by \p F.
   virtual void setFunctionName(IRFunction *F, const std::string &Name) = 0;
@@ -173,7 +180,6 @@ public:
   // -----------------------------------------------------------------------
   virtual VarAlloc getElementPtr(IRValue *Base, IRType BaseTy, IRValue *Index,
                                  IRType ElemTy) = 0;
-  // NOLINTNEXTLINE
   virtual VarAlloc getElementPtr(IRValue *Base, IRType BaseTy, size_t Index,
                                  IRType ElemTy) = 0;
 
@@ -184,6 +190,19 @@ public:
                               const std::vector<IRType> &ArgTys,
                               const std::vector<IRValue *> &Args) = 0;
   virtual IRValue *createCall(const std::string &FName, IRType RetTy) = 0;
+
+  // -----------------------------------------------------------------------
+  // Math intrinsics and GPU builtins.
+  // -----------------------------------------------------------------------
+
+  /// Lower a frontend intrinsic name to backend IR.
+  virtual IRValue *emitIntrinsic(const std::string &Name, IRType RetTy,
+                                 const std::vector<IRValue *> &Args) = 0;
+
+  /// Lower a frontend GPU builtin name to backend IR.
+  /// Returns nullptr for void builtins (e.g. syncThreads).
+  virtual IRValue *emitBuiltin(const std::string &Name, IRType RetTy,
+                               const std::vector<IRValue *> &Args) = 0;
 
   // -----------------------------------------------------------------------
   // Storage-aware load/store.
@@ -216,7 +235,6 @@ public:
   // GPU kernel support (CUDA / HIP only).
   // -----------------------------------------------------------------------
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
-  virtual void setKernel(IRFunction *F) = 0;
   virtual void setLaunchBoundsForKernel(IRFunction *F, int MaxThreadsPerBlock,
                                         int MinBlocksPerSM) = 0;
 #endif

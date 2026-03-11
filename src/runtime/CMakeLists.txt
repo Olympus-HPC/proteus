@@ -10,6 +10,7 @@ set(SOURCES
   Caching/ObjectCacheChain.cpp
   Caching/StorageCache.cpp
   Frontend/CppJitModule.cpp
+  Frontend/Builtins.cpp
   Frontend/Dispatcher.cpp
   Frontend/Func.cpp
   Frontend/JitFrontend.cpp
@@ -25,7 +26,6 @@ if(PROTEUS_ENABLE_CUDA)
   list(APPEND SOURCES
     CompilerInterfaceDevice.cpp
     JitEngineDeviceCUDA.cpp
-    Frontend/BuiltinsCUDA.cpp
   )
 endif()
 
@@ -33,7 +33,12 @@ if(PROTEUS_ENABLE_HIP)
   list(APPEND SOURCES
     CompilerInterfaceDevice.cpp
     JitEngineDeviceHIP.cpp
-    Frontend/BuiltinsHIP.cpp
+  )
+endif()
+
+if(PROTEUS_ENABLE_MLIR)
+  list(APPEND SOURCES
+    Frontend/MLIRCodeBuilder.cpp
   )
 endif()
 
@@ -66,6 +71,8 @@ endif()
 if(PROTEUS_ENABLE_HIP)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_HIP)
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_HIP)
+  target_compile_definitions(
+    proteus PRIVATE PROTEUS_ROCM_BITCODE_DIR="${PROTEUS_ROCM_AMDGCN_BITCODE_DIR}")
 elseif(PROTEUS_ENABLE_CUDA)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_CUDA)
   target_compile_definitions(proteus PRIVATE LIBDEVICE_BC_PATH="${LIBDEVICE_BC_FILE}")
@@ -73,8 +80,18 @@ elseif(PROTEUS_ENABLE_CUDA)
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_CUDA)
 endif()
 
+if(PROTEUS_ENABLE_MLIR)
+  target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_MLIR)
+  target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_MLIR)
+endif()
+
 target_include_directories(proteus SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
 target_include_directories(proteusCore SYSTEM INTERFACE ${LLVM_INCLUDE_DIRS})
+
+if(PROTEUS_ENABLE_MLIR)
+  target_include_directories(proteus SYSTEM PRIVATE ${MLIR_INCLUDE_DIRS})
+  target_include_directories(proteusCore SYSTEM INTERFACE ${MLIR_INCLUDE_DIRS})
+endif()
 
 target_include_directories(proteus
   PUBLIC
@@ -117,6 +134,59 @@ else()
 endif()
 message(STATUS "Found LLVM libraries: ${llvm_libs}")
 target_link_libraries(proteus PRIVATE ${llvm_libs})
+
+if(PROTEUS_ENABLE_MLIR)
+	set(mlir_libs
+	  MLIRArithToLLVM
+	  MLIRFuncDialect
+	  MLIRFuncToLLVM
+	  MLIRArithDialect
+	  MLIRGPUDialect
+	  MLIRControlFlowDialect
+	  MLIRControlFlowToLLVM
+	  MLIRLLVMDialect
+	  MLIRMathDialect
+	  MLIRMathToLLVM
+	  MLIRMemRefDialect
+	  MLIRMemRefToLLVM
+	  MLIRPass
+	  MLIRReconcileUnrealizedCasts
+	  MLIRSCFDialect
+	  MLIRSCFToControlFlow
+    MLIRBuiltinToLLVMIRTranslation
+    MLIRLLVMToLLVMIRTranslation
+    MLIRIR
+    MLIRSupport
+    MLIRTargetLLVM
+    MLIRTargetLLVMIRExport
+  )
+
+  # MLIR GPU lowering/translation for CUDA/HIP requires target-specific
+  # dialect + conversion + LLVM IR translation libraries to be explicitly
+  # linked so symbols are available in libproteus at runtime.
+  if(PROTEUS_ENABLE_CUDA)
+    list(APPEND mlir_libs
+      MLIRNVVMDialect
+      MLIRGPUToNVVMTransforms
+      MLIRNVVMToLLVM
+      MLIRGPUToLLVMIRTranslation
+      MLIRNVVMToLLVMIRTranslation
+    )
+  endif()
+
+  if(PROTEUS_ENABLE_HIP)
+    list(APPEND mlir_libs
+      MLIRROCDLDialect
+      MLIRGPUToROCDLTransforms
+      MLIRAMDGPUToROCDL
+      MLIRGPUToLLVMIRTranslation
+      MLIRROCDLToLLVMIRTranslation
+    )
+  endif()
+
+  message(STATUS "Linking MLIR libraries: ${mlir_libs}")
+  target_link_libraries(proteus PRIVATE ${mlir_libs})
+endif()
 
 if(NOT LLVM_ENABLE_RTTI)
   target_compile_options(proteusCore INTERFACE -fno-rtti)

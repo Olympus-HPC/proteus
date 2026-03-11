@@ -35,6 +35,9 @@ public:
   ~LLVMCodeBuilder() override;
 
   TargetModelType getTargetModel() const override { return TargetModel; }
+  CodeBuilderKind getBackendKind() const override {
+    return CodeBuilderKind::LLVM;
+  }
 
   LLVMCodeBuilder(const LLVMCodeBuilder &) = delete;
   LLVMCodeBuilder &operator=(const LLVMCodeBuilder &) = delete;
@@ -106,7 +109,8 @@ public:
   // CodeBuilder overrides — function management.
   // -----------------------------------------------------------------------
   IRFunction *addFunction(const std::string &Name, IRType RetTy,
-                          const std::vector<IRType> &ArgTys) override;
+                          const std::vector<IRType> &ArgTys,
+                          bool IsKernel = false) override;
   void setFunctionName(IRFunction *F, const std::string &Name) override;
   IRValue *getArg(IRFunction *F, size_t Idx) override;
   void beginFunction(IRFunction *F, const char *File, int Line) override;
@@ -195,6 +199,10 @@ public:
                       const std::vector<IRType> &ArgTys,
                       const std::vector<IRValue *> &Args) override;
   IRValue *createCall(const std::string &FName, IRType RetTy) override;
+  IRValue *emitIntrinsic(const std::string &Name, IRType RetTy,
+                         const std::vector<IRValue *> &Args) override;
+  IRValue *emitBuiltin(const std::string &Name, IRType RetTy,
+                       const std::vector<IRValue *> &Args) override;
 
   // -----------------------------------------------------------------------
   // CodeBuilder overrides — storage-aware load/store.
@@ -220,7 +228,6 @@ public:
   // CodeBuilder overrides — GPU kernel support.
   // -----------------------------------------------------------------------
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
-  void setKernel(IRFunction *F) override;
   void setLaunchBoundsForKernel(IRFunction *F, int MaxThreadsPerBlock,
                                 int MinBlocksPerSM) override;
 #endif
@@ -301,6 +308,13 @@ private:
   IRValue *createConstInBoundsGEP2_64(IRType Ty, IRValue *Ptr, size_t Idx0,
                                       size_t Idx1);
   unsigned getAddressSpaceFromValue(IRValue *PtrVal);
+
+  // -----------------------------------------------------------------------
+  // Private GPU kernel support.
+  // -----------------------------------------------------------------------
+#if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
+  void setKernel(IRFunction *F);
+#endif
 };
 
 } // namespace proteus

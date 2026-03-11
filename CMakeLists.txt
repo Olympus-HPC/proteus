@@ -15,6 +15,7 @@ endif()
 option(PROTEUS_ENABLE_HIP "Enable HIP" OFF)
 option(PROTEUS_ENABLE_CUDA "Enable CUDA" OFF)
 option(PROTEUS_ENABLE_MPI "Enable MPI support for shared caching" OFF)
+option(PROTEUS_ENABLE_MLIR "Enable MLIR backend" OFF)
 option(BUILD_SHARED "Builds the JIT library as shared" OFF)
 option(ENABLE_TESTS "Enable tests" OFF)
 option(ENABLE_DEVELOPER_COMPILER_FLAGS "Enable developer compiler flags: -Wall -Wextra -Werror" OFF)
@@ -47,7 +48,29 @@ if(PROTEUS_ENABLE_HIP)
   message(STATUS "hiprtc Version: ${hiprtc_VERSION}")
   if(hip_VERSION VERSION_LESS "6.2.0")
     message(FATAL_ERROR "HIP found: ${hip_VERSION} is less than minimum required version 6.2.0.")
-  endif()
+	endif()
+
+	# Find ROCm device library bitcode (ocml/ockl/oclc_*), typically under
+	# <ROCm>/amdgcn/bitcode. We rely on the ROCm-provided CMake package
+	# (rocm-device-libs) rather than hard-coding filesystem layout.
+	find_package(AMDDeviceLibs REQUIRED CONFIG
+	  HINTS
+	    ${HIP_PACKAGE_PREFIX_DIR}
+	    ${HIP_PACKAGE_PREFIX_DIR}/..
+	    ${LLVM_INSTALL_DIR}
+	    ${LLVM_INSTALL_DIR}/..
+	)
+	message(STATUS "Found AMDDeviceLibs package in: ${AMDDeviceLibs_DIR}")
+	if(NOT TARGET ocml)
+	  message(FATAL_ERROR "AMDDeviceLibs package did not define expected imported target: ocml")
+	endif()
+	get_target_property(_ocml_bc ocml IMPORTED_LOCATION)
+	if(NOT _ocml_bc OR NOT EXISTS "${_ocml_bc}")
+	  message(FATAL_ERROR
+	    "AMDDeviceLibs ocml imported target has missing IMPORTED_LOCATION: ${_ocml_bc}")
+	endif()
+	get_filename_component(PROTEUS_ROCM_AMDGCN_BITCODE_DIR "${_ocml_bc}" DIRECTORY)
+	message(STATUS "Found ROCm AMDGCN bitcode dir: ${PROTEUS_ROCM_AMDGCN_BITCODE_DIR}")
 endif()
 
 if(PROTEUS_ENABLE_MPI)

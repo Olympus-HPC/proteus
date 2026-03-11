@@ -55,18 +55,21 @@ protected:
   std::string Name;
   CodeBuilder *CB;
   IRFunction *Func;
+  // Kernel-ness must be known at creation time so backends can create the
+  // correct IR container (gpu.func vs func.func) without duplication.
+  bool IsKernel;
 
 public:
   FuncBase(JitModule &J, CodeBuilder &CB, const std::string &Name, IRType RetTy,
-           const std::vector<IRType> &ArgTys);
+           const std::vector<IRType> &ArgTys, bool IsKernel = false);
   ~FuncBase();
 
   IRFunction *getFunction();
   IRValue *getArg(size_t Idx);
 
+  bool isKernel() const { return IsKernel; }
+
 #if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
-  // Kernel management.
-  void setKernel();
   void setLaunchBoundsForKernel(int MaxThreadsPerBlock, int MinBlocksPerSM);
 #endif
 
@@ -279,6 +282,9 @@ public:
 
   void setName(const std::string &NewName);
 
+  // Update only the frontend-visible function name without touching backend IR.
+  void setFrontendName(const std::string &NewName) { Name = NewName; }
+
   // Convert the given Var's value to type U and return a new Var holding
   // the converted value. Preserves cv-qualifiers but drops references.
   // Note: prefer calling var.convert<U>() directly on the Var.
@@ -319,8 +325,9 @@ private:
 
 public:
   Func(JitModule &J, CodeBuilder &CB, const std::string &Name,
-       Dispatcher &Dispatch)
-      : FuncBase(J, CB, Name, TypeMap<RetT>::get(), {TypeMap<ArgT>::get()...}),
+       Dispatcher &Dispatch, bool IsKernel = false)
+      : FuncBase(J, CB, Name, TypeMap<RetT>::get(), {TypeMap<ArgT>::get()...},
+                 IsKernel),
         Dispatch(Dispatch) {}
 
   RetT operator()(ArgT... Args);
