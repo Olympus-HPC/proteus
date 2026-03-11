@@ -1,17 +1,6 @@
-function(_PROTEUS_SET_NATIVE_OPT_FLAGS out_var)
-  if(${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "ppc64le")
-    set(${out_var} "-mcpu=native" "-mtune=native" PARENT_SCOPE)
-  else()
-    set(${out_var} "-march=native" PARENT_SCOPE)
-  endif()
-endfunction()
-
 function(CREATE_MLIR_CPU_LIT_TEST exe check_source)
   add_executable(${exe} ${check_source} ${ARGN})
   target_link_libraries(${exe} PUBLIC proteusFrontend)
-
-  _PROTEUS_SET_NATIVE_OPT_FLAGS(NATIVE_OPT_FLAGS)
-  target_compile_options(${exe} PUBLIC ${NATIVE_OPT_FLAGS})
 
   # Consumers need to add rdynamic when linking so that ORC JIT can link JIT
   # modules with exported symbols.
@@ -20,18 +9,6 @@ function(CREATE_MLIR_CPU_LIT_TEST exe check_source)
   add_test(NAME ${exe}
            COMMAND ${LIT} -vv -D FILECHECK=${FILECHECK} ${check_source})
   set_property(TEST ${exe} PROPERTY LABELS "frontend-mlir;frontend-mlir-cpu")
-endfunction()
-
-function(CREATE_MLIR_CPU_RUNTIME_TEST exe source)
-  add_executable(${exe} ${source} ${ARGN})
-  target_link_libraries(${exe} PUBLIC proteusFrontend)
-
-  _PROTEUS_SET_NATIVE_OPT_FLAGS(NATIVE_OPT_FLAGS)
-  target_compile_options(${exe} PUBLIC ${NATIVE_OPT_FLAGS})
-  target_link_options(${exe} PRIVATE $<LINK_ONLY:-rdynamic>)
-
-  add_test(NAME ${exe} COMMAND ${exe})
-  set_property(TEST ${exe} PROPERTY LABELS "frontend-mlir;frontend-cpu")
 endfunction()
 
 file(
@@ -74,6 +51,7 @@ set(MLIR_CPU_LIT_TESTS
     mlir_functional_blocks
     mlir_generic_load_store
     mlir_get_address
+    mlir_host_jit_execute
     mlir_if
     mlir_int_atomics
     mlir_internal_call
@@ -95,5 +73,3 @@ set(MLIR_CPU_LIT_TESTS
 foreach(exe IN LISTS MLIR_CPU_LIT_TESTS)
   CREATE_MLIR_CPU_LIT_TEST(${exe} ${exe}.cpp)
 endforeach()
-
-CREATE_MLIR_CPU_RUNTIME_TEST(mlir_host_jit_execute mlir_host_jit_execute.cpp)

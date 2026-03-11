@@ -809,9 +809,12 @@ void MLIRCodeBuilder::endFunction() {
 // ---------------------------------------------------------------------------
 
 void MLIRCodeBuilder::setInsertPointAtEntry() {
-  if (PImpl->EntryBlock)
-    // Default to end-of-entry insertion; allocas explicitly insert at start.
-    PImpl->Builder.setInsertionPointToEnd(PImpl->EntryBlock);
+  if (!PImpl->EntryBlock)
+    reportFatalError(
+        "MLIRCodeBuilder::setInsertPointAtEntry: entry block missing");
+
+  // Default to end-of-entry insertion; allocas explicitly insert at start.
+  PImpl->Builder.setInsertionPointToEnd(PImpl->EntryBlock);
 }
 
 void MLIRCodeBuilder::clearInsertPoint() {
@@ -1489,6 +1492,7 @@ VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
   IRType AllocTy{IRTypeKind::Pointer, ElemTy.Signed, 0, ElemTy.Kind};
   return {PImpl->wrap(PtrSlot), ElemTy, AllocTy, PtrTy.getAddressSpace()};
 }
+
 IRValue *MLIRCodeBuilder::createCall(const std::string &FName, IRType RetTy,
                                      const std::vector<IRType> &ArgTys,
                                      const std::vector<IRValue *> &Args) {

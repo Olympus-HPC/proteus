@@ -18,11 +18,6 @@ namespace proteus {
 /// MLIRCodeBuilder implements the CodeBuilder interface using MLIR dialects.
 /// Host mode emits func/arith/memref, while CUDA/HIP mode emits gpu.module
 /// with gpu.func kernels.
-///
-/// Phase 1b: supports addFunction, getArg, beginFunction/endFunction,
-/// allocScalar, loadScalar/storeScalar, createArith, createCast,
-/// createRet/createRetVoid, getConstantInt/getConstantFP, and print.
-/// All other CodeBuilder methods report a fatal error.
 class MLIRCodeBuilder : public CodeBuilder {
 public:
   explicit MLIRCodeBuilder(TargetModelType TM = TargetModelType::HOST);
@@ -55,10 +50,6 @@ public:
   /// For CUDA it is currently unused.
   void setDeviceArch(const std::string &Arch);
 
-  // -----------------------------------------------------------------------
-  // Implemented CodeBuilder overrides (Phase 1b).
-  // -----------------------------------------------------------------------
-
   IRFunction *addFunction(const std::string &Name, IRType RetTy,
                           const std::vector<IRType> &ArgTys,
                           bool IsKernel = false) override;
@@ -78,11 +69,6 @@ public:
   IRValue *loadScalar(IRValue *Slot, IRType ValueTy) override;
   void storeScalar(IRValue *Slot, IRValue *Val) override;
   VarAlloc allocScalar(const std::string &Name, IRType ValueTy) override;
-
-  // -----------------------------------------------------------------------
-  // Stub CodeBuilder overrides (fatal error, to be implemented later).
-  // -----------------------------------------------------------------------
-
   void beginIf(IRValue *Cond, const char *File, int Line) override;
   void endIf() override;
   void beginFor(IRValue *IterSlot, IRType IterTy, IRValue *InitVal,
@@ -108,7 +94,6 @@ public:
   IRValue *createZExt(IRValue *V, IRType DestTy) override;
   VarAlloc getElementPtr(IRValue *Base, IRType BaseTy, IRValue *Index,
                          IRType ElemTy) override;
-  // NOLINTNEXTLINE
   VarAlloc getElementPtr(IRValue *Base, IRType BaseTy, size_t Index,
                          IRType ElemTy) override;
   IRValue *createCall(const std::string &FName, IRType RetTy,

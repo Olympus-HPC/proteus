@@ -247,12 +247,15 @@ IRFunction *LLVMCodeBuilder::addFunction(const std::string &Name, IRType RetTy,
   BasicBlock::Create(Fn->getContext(), "entry", Fn);
   F = Fn;
   IRFunction *IRF = PImpl->wrapFunction(Fn);
+  if (IsKernel) {
 #if defined(PROTEUS_ENABLE_CUDA) || defined(PROTEUS_ENABLE_HIP)
-  if (IsKernel)
     setKernel(IRF);
 #else
-  (void)IsKernel;
+    reportFatalError("addFunction: IsKernel " + std::to_string(IsKernel) +
+                     " kernel functions are not supported for host target");
 #endif
+  }
+
   return IRF;
 }
 
