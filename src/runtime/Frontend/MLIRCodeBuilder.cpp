@@ -226,7 +226,8 @@ struct MLIRCodeBuilder::Impl {
     return mlir::isa<mlir::IntegerType>(Ty) || mlir::isa<mlir::FloatType>(Ty);
   }
 
-  VarAlloc emitElementPtrSlot(IRValue *Base, mlir::Value IdxI64, IRType ElemTy) {
+  VarAlloc emitElementPtrSlot(IRValue *Base, mlir::Value IdxI64,
+                              IRType ElemTy) {
     auto Loc = Builder.getUnknownLoc();
     auto I64Ty = mlir::IntegerType::get(&Context, 64);
     auto LLVMPointerTy = mlir::LLVM::LLVMPointerType::get(&Context);
@@ -252,17 +253,16 @@ struct MLIRCodeBuilder::Impl {
       PtrTy = mlir::LLVM::LLVMPointerType::get(&Context, AddrSpace);
       mlir::Value BaseAddrAsIndex =
           Builder.create<memref::ExtractAlignedPointerAsIndexOp>(Loc, BaseV);
-      mlir::Value BaseAddrI64 = Builder.create<arith::IndexCastUIOp>(
-          Loc, I64Ty, BaseAddrAsIndex);
+      mlir::Value BaseAddrI64 =
+          Builder.create<arith::IndexCastUIOp>(Loc, I64Ty, BaseAddrAsIndex);
       BasePtr = Builder.create<mlir::LLVM::IntToPtrOp>(Loc, PtrTy, BaseAddrI64);
     } else {
       reportFatalError("getElementPtr: expected !llvm.ptr or memref base");
     }
 
-    mlir::Type GepElemTy =
-        (ElemTy.Kind == IRTypeKind::Pointer)
-            ? mlir::Type(LLVMPointerTy)
-            : toMLIRScalarType(ElemTy.Kind, Context);
+    mlir::Type GepElemTy = (ElemTy.Kind == IRTypeKind::Pointer)
+                               ? mlir::Type(LLVMPointerTy)
+                               : toMLIRScalarType(ElemTy.Kind, Context);
     mlir::Value ElemPtr = Builder.create<mlir::LLVM::GEPOp>(
         Loc, PtrTy, GepElemTy, BasePtr, ValueRange{IdxI64});
 
