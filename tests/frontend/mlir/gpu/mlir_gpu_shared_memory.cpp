@@ -42,11 +42,16 @@ int main() {
     I = Bid * WarpSize + Tid;
 
     auto S = F.declVar<double[]>(WarpSize, AddressSpace::SHARED, "shared_mem");
+    auto S2 = F.declVar<double[]>(WarpSize, AddressSpace::SHARED);
+    auto S3 = F.declVar<double[]>(WarpSize, AddressSpace::SHARED);
 
     // Load from global into shared, then sync, then write reversed index.
     S[Tid] = A[I];
+    S2[Tid] = A[I];
+    S3[Tid] = A[I];
     F.callBuiltin(syncThreads);
-    A[I] = S[WarpSize - 1 - Tid];
+    A[I] =
+        S[WarpSize - 1 - Tid] + S2[WarpSize - 1 - Tid] + S3[WarpSize - 1 - Tid];
 
     F.ret();
   }
@@ -81,7 +86,7 @@ int main() {
   for (size_t B = 0; B < NumBlocks && Verified; ++B) {
     for (size_t T = 0; T < WarpSize; ++T) {
       size_t Idx = B * WarpSize + T;
-      double Expected = static_cast<double>(WarpSize - 1 - T);
+      double Expected = static_cast<double>(WarpSize - 1 - T) * 3;
       if (A[Idx] != Expected) {
         std::cout << "Verification failed: A[" << Idx << "] = " << A[Idx]
                   << " != " << Expected << " (expected)\n";
@@ -99,6 +104,8 @@ int main() {
 }
 
 // clang-format off
+// CHECK: @array_var_0 = {{.*}} addrspace(3) global [{{[0-9]+}} x double] undef
+// CHECK: @array_var = {{.*}} addrspace(3) global [{{[0-9]+}} x double] undef
 // CHECK: @shared_mem = {{.*}} addrspace(3) global [{{[0-9]+}} x double] undef
 // CHECK: Verification successful!
 // CHECK: [proteus][Dispatcher{{CUDA|HIP}}] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0

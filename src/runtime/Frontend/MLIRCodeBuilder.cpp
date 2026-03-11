@@ -33,6 +33,7 @@
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/BuiltinTypes.h>
 #include <mlir/IR/MLIRContext.h>
+#include <mlir/IR/SymbolTable.h>
 #include <mlir/IR/Verifier.h>
 #include <mlir/Pass/PassManager.h>
 #include <mlir/Target/LLVM/ModuleToObject.h>
@@ -2075,12 +2076,24 @@ VarAlloc MLIRCodeBuilder::allocArray(const std::string &Name, AddressSpace AS,
       reportFatalError(
           "allocArray: expected active gpu.module for device code");
 
-    // Create the global once per gpu.module.
-    if (!PImpl->DeviceModule.lookupSymbol<memref::GlobalOp>(Name)) {
+    // `memref.global` is a symbol; symbols must be unique within the gpu.module
+    // symbol table. Auto-unique on collisions by appending a numeric suffix.
+    std::string UniqueName = Name.empty() ? "allocArray" : Name;
+    if (PImpl->DeviceModule.lookupSymbol(UniqueName) != nullptr) {
+      unsigned UniquingCounter = 0;
+      auto HasSymbolConflict = [&](llvm::StringRef Candidate) {
+        return PImpl->DeviceModule.lookupSymbol(Candidate) != nullptr;
+      };
+      auto Unique = mlir::SymbolTable::generateSymbolName<64>(
+          UniqueName, HasSymbolConflict, UniquingCounter);
+      UniqueName.assign(Unique.begin(), Unique.end());
+    }
+
+    {
       OpBuilder::InsertionGuard Guard(PImpl->Builder);
       PImpl->Builder.setInsertionPointToStart(PImpl->DeviceModule.getBody());
       PImpl->Builder.create<memref::GlobalOp>(
-          Loc, Name,
+          Loc, UniqueName,
           /*sym_visibility=*/PImpl->Builder.getStringAttr("private"),
           /*type=*/ArrMemRefTy,
           /*initial_value=*/mlir::UnitAttr::get(&PImpl->Context),
@@ -2088,8 +2101,8 @@ VarAlloc MLIRCodeBuilder::allocArray(const std::string &Name, AddressSpace AS,
           /*alignment=*/mlir::IntegerAttr{});
     }
 
-    mlir::Value Global =
-        PImpl->Builder.create<memref::GetGlobalOp>(Loc, ArrMemRefTy, Name);
+    mlir::Value Global = PImpl->Builder.create<memref::GetGlobalOp>(
+        Loc, ArrMemRefTy, UniqueName);
     return {PImpl->wrap(Global), ElemTy, AllocTy, static_cast<unsigned>(AS)};
   }
 
