@@ -180,7 +180,6 @@ public:
   // -----------------------------------------------------------------------
   virtual VarAlloc getElementPtr(IRValue *Base, IRType BaseTy, IRValue *Index,
                                  IRType ElemTy) = 0;
-  // NOLINTNEXTLINE
   virtual VarAlloc getElementPtr(IRValue *Base, IRType BaseTy, size_t Index,
                                  IRType ElemTy) = 0;
 

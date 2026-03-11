@@ -226,6 +226,61 @@ struct MLIRCodeBuilder::Impl {
     return mlir::isa<mlir::IntegerType>(Ty) || mlir::isa<mlir::FloatType>(Ty);
   }
 
+  VarAlloc emitElementPtrSlot(IRValue *Base, mlir::Value IdxI64, IRType ElemTy) {
+    auto Loc = Builder.getUnknownLoc();
+    auto I64Ty = mlir::IntegerType::get(&Context, 64);
+    auto LLVMPointerTy = mlir::LLVM::LLVMPointerType::get(&Context);
+
+    if (!mlir::isa<mlir::IntegerType>(IdxI64.getType()) ||
+        mlir::cast<mlir::IntegerType>(IdxI64.getType()).getWidth() != 64) {
+      reportFatalError("getElementPtr: expected i64 element index");
+    }
+
+    // Convert base to an LLVM pointer.
+    mlir::Value BaseV = unwrap(Base);
+    mlir::Value BasePtr;
+    mlir::LLVM::LLVMPointerType PtrTy;
+    if (auto BasePtrTy =
+            dyn_cast<mlir::LLVM::LLVMPointerType>(BaseV.getType())) {
+      PtrTy = BasePtrTy;
+      BasePtr = BaseV;
+    } else if (auto BaseMemRefTy = dyn_cast<MemRefType>(BaseV.getType())) {
+      unsigned AddrSpace = 0;
+      if (auto MemSpaceAttr = dyn_cast_or_null<mlir::IntegerAttr>(
+              BaseMemRefTy.getMemorySpace()))
+        AddrSpace = static_cast<unsigned>(MemSpaceAttr.getInt());
+      PtrTy = mlir::LLVM::LLVMPointerType::get(&Context, AddrSpace);
+      mlir::Value BaseAddrAsIndex =
+          Builder.create<memref::ExtractAlignedPointerAsIndexOp>(Loc, BaseV);
+      mlir::Value BaseAddrI64 = Builder.create<arith::IndexCastUIOp>(
+          Loc, I64Ty, BaseAddrAsIndex);
+      BasePtr = Builder.create<mlir::LLVM::IntToPtrOp>(Loc, PtrTy, BaseAddrI64);
+    } else {
+      reportFatalError("getElementPtr: expected !llvm.ptr or memref base");
+    }
+
+    mlir::Type GepElemTy =
+        (ElemTy.Kind == IRTypeKind::Pointer)
+            ? mlir::Type(LLVMPointerTy)
+            : toMLIRScalarType(ElemTy.Kind, Context);
+    mlir::Value ElemPtr = Builder.create<mlir::LLVM::GEPOp>(
+        Loc, PtrTy, GepElemTy, BasePtr, ValueRange{IdxI64});
+
+    // Materialize as a pointer slot so reference Vars can call load/store.
+    auto PtrSlotTy = MemRefType::get({1}, PtrTy);
+    mlir::Value PtrSlot;
+    {
+      OpBuilder::InsertionGuard Guard(Builder);
+      Builder.setInsertionPointToStart(EntryBlock);
+      PtrSlot = Builder.create<memref::AllocaOp>(Loc, PtrSlotTy);
+    }
+    mlir::Value Zero = Builder.create<arith::ConstantIndexOp>(Loc, 0);
+    Builder.create<memref::StoreOp>(Loc, ElemPtr, PtrSlot, ValueRange{Zero});
+
+    IRType AllocTy{IRTypeKind::Pointer, ElemTy.Signed, 0, ElemTy.Kind};
+    return {wrap(PtrSlot), ElemTy, AllocTy, PtrTy.getAddressSpace()};
+  }
+
   explicit Impl(TargetModelType TM) : TargetModel(TM), Builder(&Context) {
     Context.loadDialect<
         mlir::func::FuncDialect, arith::ArithDialect, cf::ControlFlowDialect,
@@ -1371,11 +1426,11 @@ IRValue *MLIRCodeBuilder::createZExt(IRValue *V, IRType DestTy) {
 
   reportFatalError("createZExt: unsupported type combination");
 }
+
 VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
                                         IRValue *Index, IRType ElemTy) {
   auto Loc = PImpl->Builder.getUnknownLoc();
   auto I64Ty = mlir::IntegerType::get(&PImpl->Context, 64);
-  auto LLVMPointerTy = mlir::LLVM::LLVMPointerType::get(&PImpl->Context);
 
   // Normalize element index to i64 for LLVM's `getelementptr`.
   mlir::Value RawIdx = PImpl->unwrap(Index);
@@ -1394,104 +1449,15 @@ VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
     reportFatalError("getElementPtr: expected integer-like index");
   }
 
-  // Convert base to an LLVM pointer.
-  mlir::Value BaseV = PImpl->unwrap(Base);
-  mlir::Value BasePtr;
-  mlir::LLVM::LLVMPointerType PtrTy;
-  if (auto BasePtrTy = dyn_cast<mlir::LLVM::LLVMPointerType>(BaseV.getType())) {
-    PtrTy = BasePtrTy;
-    BasePtr = BaseV;
-  } else if (auto BaseMemRefTy = dyn_cast<MemRefType>(BaseV.getType())) {
-    unsigned AddrSpace = 0;
-    if (auto MemSpaceAttr =
-            dyn_cast_or_null<mlir::IntegerAttr>(BaseMemRefTy.getMemorySpace()))
-      AddrSpace = static_cast<unsigned>(MemSpaceAttr.getInt());
-    PtrTy = mlir::LLVM::LLVMPointerType::get(&PImpl->Context, AddrSpace);
-    mlir::Value BaseAddrAsIndex =
-        PImpl->Builder.create<memref::ExtractAlignedPointerAsIndexOp>(Loc,
-                                                                      BaseV);
-    mlir::Value BaseAddrI64 = PImpl->Builder.create<arith::IndexCastUIOp>(
-        Loc, I64Ty, BaseAddrAsIndex);
-    BasePtr =
-        PImpl->Builder.create<mlir::LLVM::IntToPtrOp>(Loc, PtrTy, BaseAddrI64);
-  } else {
-    reportFatalError("getElementPtr: expected !llvm.ptr or memref base");
-  }
-
-  mlir::Type GepElemTy = (ElemTy.Kind == IRTypeKind::Pointer)
-                             ? mlir::Type(LLVMPointerTy)
-                             : toMLIRScalarType(ElemTy.Kind, PImpl->Context);
-
-  mlir::Value ElemPtr = PImpl->Builder.create<mlir::LLVM::GEPOp>(
-      Loc, PtrTy, GepElemTy, BasePtr, ValueRange{IdxI64});
-
-  // Materialize as a pointer slot so reference Vars can call load/store.
-  auto PtrSlotTy = MemRefType::get({1}, PtrTy);
-  mlir::Value PtrSlot;
-  {
-    OpBuilder::InsertionGuard Guard(PImpl->Builder);
-    PImpl->Builder.setInsertionPointToStart(PImpl->EntryBlock);
-    PtrSlot = PImpl->Builder.create<memref::AllocaOp>(Loc, PtrSlotTy);
-  }
-  mlir::Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-  PImpl->Builder.create<memref::StoreOp>(Loc, ElemPtr, PtrSlot,
-                                         ValueRange{Zero});
-
-  IRType AllocTy{IRTypeKind::Pointer, ElemTy.Signed, 0, ElemTy.Kind};
-  return {PImpl->wrap(PtrSlot), ElemTy, AllocTy, PtrTy.getAddressSpace()};
+  return PImpl->emitElementPtrSlot(Base, IdxI64, ElemTy);
 }
-// NOLINTNEXTLINE
+
 VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
                                         size_t Index, IRType ElemTy) {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  auto I64Ty = mlir::IntegerType::get(&PImpl->Context, 64);
-  auto LLVMPointerTy = mlir::LLVM::LLVMPointerType::get(&PImpl->Context);
-
   mlir::Value IdxI64 =
       PImpl->Builder.create<arith::ConstantIntOp>(Loc, Index, 64);
-
-  mlir::Value BaseV = PImpl->unwrap(Base);
-  mlir::Value BasePtr;
-  mlir::LLVM::LLVMPointerType PtrTy;
-  if (auto BasePtrTy = dyn_cast<mlir::LLVM::LLVMPointerType>(BaseV.getType())) {
-    PtrTy = BasePtrTy;
-    BasePtr = BaseV;
-  } else if (auto BaseMemRefTy = dyn_cast<MemRefType>(BaseV.getType())) {
-    unsigned AddrSpace = 0;
-    if (auto MemSpaceAttr =
-            dyn_cast_or_null<mlir::IntegerAttr>(BaseMemRefTy.getMemorySpace()))
-      AddrSpace = static_cast<unsigned>(MemSpaceAttr.getInt());
-    PtrTy = mlir::LLVM::LLVMPointerType::get(&PImpl->Context, AddrSpace);
-    mlir::Value BaseAddrAsIndex =
-        PImpl->Builder.create<memref::ExtractAlignedPointerAsIndexOp>(Loc,
-                                                                      BaseV);
-    mlir::Value BaseAddrI64 = PImpl->Builder.create<arith::IndexCastUIOp>(
-        Loc, I64Ty, BaseAddrAsIndex);
-    BasePtr =
-        PImpl->Builder.create<mlir::LLVM::IntToPtrOp>(Loc, PtrTy, BaseAddrI64);
-  } else {
-    reportFatalError("getElementPtr: expected !llvm.ptr or memref base");
-  }
-
-  mlir::Type GepElemTy = (ElemTy.Kind == IRTypeKind::Pointer)
-                             ? mlir::Type(LLVMPointerTy)
-                             : toMLIRScalarType(ElemTy.Kind, PImpl->Context);
-  mlir::Value ElemPtr = PImpl->Builder.create<mlir::LLVM::GEPOp>(
-      Loc, PtrTy, GepElemTy, BasePtr, ValueRange{IdxI64});
-
-  auto PtrSlotTy = MemRefType::get({1}, PtrTy);
-  mlir::Value PtrSlot;
-  {
-    OpBuilder::InsertionGuard Guard(PImpl->Builder);
-    PImpl->Builder.setInsertionPointToStart(PImpl->EntryBlock);
-    PtrSlot = PImpl->Builder.create<memref::AllocaOp>(Loc, PtrSlotTy);
-  }
-  mlir::Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-  PImpl->Builder.create<memref::StoreOp>(Loc, ElemPtr, PtrSlot,
-                                         ValueRange{Zero});
-
-  IRType AllocTy{IRTypeKind::Pointer, ElemTy.Signed, 0, ElemTy.Kind};
-  return {PImpl->wrap(PtrSlot), ElemTy, AllocTy, PtrTy.getAddressSpace()};
+  return PImpl->emitElementPtrSlot(Base, IdxI64, ElemTy);
 }
 
 IRValue *MLIRCodeBuilder::createCall(const std::string &FName, IRType RetTy,
