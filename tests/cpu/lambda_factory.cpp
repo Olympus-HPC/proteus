@@ -9,24 +9,29 @@
 #include <climits>
 #include <cstdio>
 
-#include "gpu_common.h"
 #include <proteus/JitInterface.h>
 
-__device__ void printInt(int I) { printf("Integer = %d\n", I); }
+template <typename LambdaType> class Abstraction {
+public:
+  LambdaType Lambda;
+  // force a copy in the constructor
+  Abstraction(LambdaType Lam) : Lambda(Lam){};
+  // Abstraction(LambdaType& Lam) = delete;
+  // Abstraction(const LambdaType& Lam) = delete;
+  // Abstraction(LambdaType&& Lam) = delete;
+  auto operator()() { return Lambda(); }
+};
+
+void printInt(int I) { printf("Integer = %d\n", I); }
 
 template <typename T>
-__global__ __attribute__((annotate("jit"))) void kernel(T LB) {
+__attribute__((annotate("jit"))) void kernel(T LB) {
   LB();
 }
 
 namespace wrapper {
   template <typename T>
   auto jit_variable(T arg) { return proteus::jit_variable(arg); }
-
-  auto declareLambda(int rc1, int rc2) {
-  return [=, C = wrapper::jit_variable(rc1), D = 5, C2 = wrapper::jit_variable(rc2)] ()
-                         __attribute__((annotate("jit"))) { printInt(C); printInt(C2); printInt(D); };
-}
 }
 
 auto declareLambda(int rc1, int rc2) {
@@ -44,21 +49,18 @@ auto forwardLambda(int rc1, int rc2, int rc3) {
   return declareLambdaThree(rc1, loc, rc3);
 }
 
-
-
-template <typename T> void run(T &&LB) {
+template <typename T> void run_direct(T &&LB) {
   proteus::register_lambda(LB);
-  kernel<<<1, 1>>>(LB);
-  gpuErrCheck(gpuDeviceSynchronize());
+  LB();
 }
 
-
-void forDeclareLambda() {
-  for (int i = 0; i < 5; ++i) {
-    auto lam = declareLambda(i, 2);
-    run(lam);
-  }
+template <typename T> void run_abs(T &&LB) {
+  // proteus::register_lambda(LB);
+  using DecayedT= std::decay_t<T>;
+  Abstraction<DecayedT> Abs(LB);
+  run_direct(Abs);
 }
+
 
 int main() {
   int Zero = 0;
@@ -74,20 +76,16 @@ int main() {
   auto BigLam = declareLambdaThree(Zero, One, Two);
 
   auto forLam = forwardLambda(Zero, One, Two);
-
-  auto wrapLam = wrapper::declareLambda(Zero, One);
-
   std::cout <<"addr in main " << &ZeroLambda << "\n";
   std::cout <<"addr in main " << &OneLambda << "\n";
   std::cout <<"addr in main " << &TwoLambda << "\n";
   std::cout <<"addr in main " << &BigLam << "\n";
   std::cout <<"addr in main " << &forLam << "\n";
-  run(ZeroLambda);
-  run(OneLambda);
-  run(TwoLambda);
-  run(BigLam);
-  run(forLam);
-  run(wrapLam);
+  run_abs(ZeroLambda);
+  run_abs(OneLambda);
+  run_direct(TwoLambda);
+  run_direct(BigLam);
+  run_abs(forLam);
 
   return 0;
 }
