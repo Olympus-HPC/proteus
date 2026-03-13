@@ -5,8 +5,8 @@
 #include "proteus/Init.h"
 
 #include <algorithm>
-#include <unordered_map>
 #include <sstream>
+#include <unordered_map>
 #include <vector>
 
 namespace proteus {
@@ -176,7 +176,8 @@ private:
     }
   };
 
-  std::unordered_map<std::string, std::unique_ptr<CodeInstance>> InstantiationCache;
+  std::unordered_map<std::string, std::unique_ptr<CodeInstance>>
+      InstantiationCache;
 
   struct CompilationResult {
     // Declare Ctx first to ensure it is destroyed after Mod.
@@ -225,15 +226,13 @@ public:
     InstanceName += ">";
 
     auto It = InstantiationCache.find(InstanceName);
-    if(It != InstantiationCache.end()) {
+    if (It != InstantiationCache.end()) {
       return *It->second;
     }
 
-    auto [NewIt, OK] =
-        InstantiationCache
-            .emplace(InstanceName,
-                     std::make_unique<CodeInstance>(TargetModel, Code, ExtraArgs,
-                                                    InstanceName));
+    auto [NewIt, OK] = InstantiationCache.emplace(
+        InstanceName, std::make_unique<CodeInstance>(TargetModel, Code,
+                                                     ExtraArgs, InstanceName));
     return *NewIt->second;
   }
 
