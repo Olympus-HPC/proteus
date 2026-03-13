@@ -30,7 +30,7 @@ int main() {
    )cpp";
 
   CppJitModule CJM{"host", Code};
-  auto InstValue = CJM.instantiate("foo", "3");
+  auto &InstValue = CJM.instantiate("foo", "3");
 
   double Ret = InstValue.run<double>(42);
   std::cout << "Ret " << Ret << "\n";
@@ -38,8 +38,8 @@ int main() {
   Ret = InstValue.run<double>(23);
   std::cout << "Ret " << Ret << "\n";
 
-  auto InstTypeD = CJM.instantiate("bar", "double");
-  auto InstTypeF = CJM.instantiate("bar", "float");
+  auto &InstTypeD = CJM.instantiate("bar", "double");
+  auto &InstTypeF = CJM.instantiate("bar", "float");
   InstTypeD.run<void>();
   InstTypeF.run<void>();
 

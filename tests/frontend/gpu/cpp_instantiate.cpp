@@ -49,7 +49,7 @@ int main() {
   gpuErrCheck(gpuMallocManaged(&R, sizeof(double)));
 
   CppJitModule CJM{TARGET, Code};
-  auto InstValue = CJM.instantiate("foo", "3");
+  auto &InstValue = CJM.instantiate("foo", "3");
 
   InstValue.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr, 42, R);
   gpuErrCheck(gpuDeviceSynchronize());
@@ -59,11 +59,11 @@ int main() {
   gpuErrCheck(gpuDeviceSynchronize());
   std::cout << "Ret " << *R << "\n";
 
-  auto InstTypeD = CJM.instantiate("bar", "double");
+  auto &InstTypeD = CJM.instantiate("bar", "double");
   InstTypeD.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr);
   gpuErrCheck(gpuDeviceSynchronize());
 
-  auto InstTypeF = CJM.instantiate("bar", "float");
+  auto &InstTypeF = CJM.instantiate("bar", "float");
   InstTypeF.launch({1, 1, 1}, {1, 1, 1}, 0, nullptr);
   gpuErrCheck(gpuDeviceSynchronize());
 
