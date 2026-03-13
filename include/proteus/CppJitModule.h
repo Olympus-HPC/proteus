@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <sstream>
+#include <unordered_map>
 #include <vector>
 
 namespace proteus {
@@ -175,6 +176,9 @@ private:
     }
   };
 
+  std::unordered_map<std::string, std::unique_ptr<CodeInstance>>
+      InstantiationCache;
+
   struct CompilationResult {
     // Declare Ctx first to ensure it is destroyed after Mod.
     std::unique_ptr<llvm::LLVMContext> Ctx;
@@ -211,7 +215,7 @@ public:
   }
 
   template <typename... ArgT>
-  auto instantiate(const std::string &FuncName, ArgT... Args) {
+  auto &instantiate(const std::string &FuncName, ArgT... Args) {
     std::string InstanceName = FuncName + "<";
     bool First = true;
     ((InstanceName +=
@@ -221,7 +225,15 @@ public:
 
     InstanceName += ">";
 
-    return CodeInstance{TargetModel, Code, ExtraArgs, InstanceName};
+    auto It = InstantiationCache.find(InstanceName);
+    if (It != InstantiationCache.end()) {
+      return *It->second;
+    }
+
+    auto [NewIt, OK] = InstantiationCache.emplace(
+        InstanceName, std::make_unique<CodeInstance>(TargetModel, Code,
+                                                     ExtraArgs, InstanceName));
+    return *NewIt->second;
   }
 
   template <typename Sig> struct FunctionHandle;

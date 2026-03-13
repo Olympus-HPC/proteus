@@ -25,7 +25,7 @@ int main() {
   )cpp";
 
   CppJitModule CJM{"host", Code, {"-DMY_OFFSET=10"}};
-  auto Inst = CJM.instantiate("foo", "double");
+  auto &Inst = CJM.instantiate("foo", "double");
 
   double Ret = Inst.run<double>(5.0);
   std::cout << "Ret " << Ret << "\n";
