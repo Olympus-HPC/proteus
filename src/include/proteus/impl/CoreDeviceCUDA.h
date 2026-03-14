@@ -104,6 +104,15 @@ inline cudaError_t launchKernelFunction(CUfunction KernelFunc, dim3 GridDim,
       return cudaErrorUnknown;
     }
   };
+  // TODO: Use attributes to find the actual shared memory size supported by the
+  // device architecture.
+  constexpr size_t DefaultShmemSize = 48 * 1024;
+  // Allow kernels to use more than the default 48KB of dynamic shared memory.
+  if (ShmemSize >= DefaultShmemSize) {
+    proteusCuErrCheck(cuFuncSetAttribute(
+        KernelFunc, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
+        ShmemSize));
+  }
 
   CUresult Res = cuLaunchKernel(KernelFunc, GridDim.x, GridDim.y, GridDim.z,
                                 BlockDim.x, BlockDim.y, BlockDim.z, ShmemSize,
