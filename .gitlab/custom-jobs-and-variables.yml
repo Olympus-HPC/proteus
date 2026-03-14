@@ -55,3 +55,37 @@ variables:
 .custom_job:
   variables:
     JOB_TEMPLATE_CANNOT_BE_EMPTY: "True"
+
+.remove-builds-dir:
+  after_script:
+    - rm -rf ${CI_BUILDS_DIR}
+
+.cancel-slurm-allocation:
+  after_script:
+    - |
+      if [ "${CI_JOB_STATUS}" = "canceled" ]; then
+        echo "### Cancel SLURM allocation job=${CI_JOB_NAME} status=${CI_JOB_STATUS}"
+        ALLOC_JOBID="$(squeue -h --states=PD,R,CF --name="${ALLOC_NAME}" --format=%A)"
+
+        if [ -n "${ALLOC_JOBID}" ]; then
+          echo "### Attempting to cancel shared allocation ${ALLOC_NAME} (${ALLOC_JOBID})"
+          scancel "${ALLOC_JOBID}" || true
+        else
+          echo "### No allocation found for ${ALLOC_NAME}"
+        fi
+      fi
+
+.cancel-flux-allocation:
+  after_script:
+    - |
+      if [ "${CI_JOB_STATUS}" = "canceled" ]; then
+        echo "### Cancel Flux allocation job=${CI_JOB_NAME} status=${CI_JOB_STATUS}"
+        URI="$(flux jobs --name="${ALLOC_NAME}" -n -o "{id}")"
+
+        if [ -n "${URI}" ]; then
+          echo "### Attempting to cancel shared allocation ${ALLOC_NAME} (${URI})"
+          flux cancel "${URI}" || true
+        else
+          echo "### No allocation found for ${ALLOC_NAME}"
+        fi
+      fi
