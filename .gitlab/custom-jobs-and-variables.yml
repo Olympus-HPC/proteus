@@ -18,7 +18,7 @@ variables:
 # Note: can be set to "OFF" to prevent allocation sharing.
   MATRIX_SHARED_ALLOC: "--gpus=1 --nodes=1 --time=60 --partition=pdebug"
 # Arguments for job level allocation
-  MATRIX_JOB_ALLOC: "--gpus=1 --nodes=1 --partition=pdebug"
+  MATRIX_JOB_ALLOC: "--gpus=1 --nodes=1 --time=60 --partition=pdebug"
 # Arguments for performance job allocation (dedicated allocation with no overlapping).
   MATRIX_PERF_ALLOC: "--exclusive --time=60 --nodes=1"
 # Add variables that should apply to all the jobs on a machine:
@@ -30,7 +30,7 @@ variables:
 # OPTIONAL: "-o per-resource.count=2" allows to get 2 jobs running on each node.
   TIOGA_SHARED_ALLOC: "--queue=pci --exclusive --time-limit=1h --nodes=1 -o per-resource.count=4"
 # Arguments for job level allocation
-  TIOGA_JOB_ALLOC: "--queue=pci --nodes=1 --begin-time=+5s"
+  TIOGA_JOB_ALLOC: "--queue=pci --time-limit=1h --nodes=1 --begin-time=+5s"
 # Arguments for performance job allocation (dedicated allocation with no overlapping).
   TIOGA_PERF_ALLOC: "--queue=pci --exclusive --time-limit=1h --nodes=1 --begin-time=+5s"
 # Add variables that should apply to all the jobs on a machine:
@@ -42,7 +42,7 @@ variables:
 # OPTIONAL: "-o per-resource.count=2" allows to get 2 jobs running on each node.
   TUOLUMNE_SHARED_ALLOC: "--queue=pci --exclusive --time-limit=1h --nodes=1 -o per-resource.count=4"
 # Arguments for job level allocation
-  TUOLUMNE_JOB_ALLOC: "--queue=pci --nodes=1 --begin-time=+5s"
+  TUOLUMNE_JOB_ALLOC: "--queue=pci --time-limit=1h --nodes=1 --begin-time=+5s"
 # Arguments for performance job allocation (dedicated allocation with no overlapping).
   TUOLUMNE_PERF_ALLOC: "--queue=pci --exclusive --time-limit=1h --nodes=1 --begin-time=+5s"
 # Add variables that should apply to all the jobs on a machine:
