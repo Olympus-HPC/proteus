@@ -3,7 +3,6 @@
   before_script:
     - echo "=== Start CI Benchmarking ==="
   after_script:
-    - !reference [.cancel-slurm-allocation, after_script]
     - echo "=== End CI Benchmarking ==="
 
 proteus-benchmarks-matrix:

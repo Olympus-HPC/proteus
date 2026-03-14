@@ -3,7 +3,7 @@
   before_script:
     - echo "=== Start CI spack Tests ==="
   after_script:
-    - !reference [.cancel-flux-allocation, after_script]
+    - !reference [.clean-flux-allocation, after_script]
     - !reference [.remove-builds-dir, after_script]
     - echo "=== End CI spack Tests ==="
 

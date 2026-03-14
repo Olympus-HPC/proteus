@@ -3,7 +3,6 @@
   before_script:
     - echo "=== Start CI Integration Tests ==="
   after_script:
-    - !reference [.cancel-slurm-allocation, after_script]
     - !reference [.remove-builds-dir, after_script]
     - echo "=== End CI Integration Tests ==="
 
