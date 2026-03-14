@@ -24,7 +24,7 @@
 #include "proteus/impl/Hashing.h"
 #include "proteus/impl/JitEngine.h"
 #include "proteus/impl/JitEngineInfoRegistry.h"
-#include "proteus/impl/TimeTracing.h"
+#include "proteus/TimeTracing.h"
 #include "proteus/impl/Utils.h"
 
 #include <llvm/ADT/SmallPtrSet.h>
@@ -110,7 +110,7 @@ public:
       if (!hasExtractedModules())
         reportFatalError("Expected extracted modules");
 
-      Timer T;
+      Timer T(Config::get().ProteusEnableTimers);
       // Avoid linking when there's a single module by moving it instead and
       // making sure it's materialized for call graph analysis.
       if (ExtractedModules->size() == 1) {
@@ -299,7 +299,7 @@ public:
     // If there is no ready-made kernel module from AOT, extract per-TU or the
     // single linked module and clone the kernel module.
     if (!KernelModule) {
-      Timer T;
+      Timer T(Config::get().ProteusEnableTimers);
       if (!BinInfo.hasExtractedModules())
         static_cast<ImplT &>(*this).extractModules(BinInfo);
 
@@ -377,7 +377,7 @@ public:
 
     BinaryInfo &BinInfo = KernelInfo.getBinaryInfo();
 
-    Timer T;
+    Timer T(Config::get().ProteusEnableTimers);
     auto [KernelModule, BitcodeBuffer] = extractKernelModule(
         BinInfo, KernelInfo.getName(), *KernelInfo.getLLVMContext());
 

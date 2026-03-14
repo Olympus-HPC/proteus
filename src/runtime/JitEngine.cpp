@@ -9,13 +9,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "proteus/impl/JitEngine.h"
-#include "proteus/impl/TimeTracing.h"
+#include "proteus/TimeTracing.h"
+#include "proteus/impl/Config.h"
+#include "proteus/impl/TimeTracingInit.h"
 
 #include <cstdlib>
 
 namespace proteus {
 
-TimeTracerRAII TimeTracer;
+TimeTracerRAII TimeTracer(Config::get().ProteusEnableTimeTrace,
+                          Config::get().ProteusTimeTraceFile);
 
 using namespace llvm;
 

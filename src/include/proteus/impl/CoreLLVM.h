@@ -5,9 +5,10 @@ static_assert(__cplusplus >= 201703L,
               "This header requires C++17 or later due to LLVM.");
 
 #include "proteus/Error.h"
+#include "proteus/impl/Config.h"
 #include "proteus/impl/Debug.h"
 #include "proteus/impl/Logger.h"
-#include "proteus/impl/TimeTracing.h"
+#include "proteus/TimeTracing.h"
 
 #include <llvm/CodeGen/CommandFlags.h>
 #include <llvm/IR/DebugInfo.h>
@@ -181,7 +182,7 @@ struct InitLLVMTargets {
 
 inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
                        unsigned CodegenOptLevel) {
-  Timer T;
+  Timer T(Config::get().ProteusEnableTimers);
   detail::runOptimizationPassPipeline(M, Arch, OptLevel, CodegenOptLevel);
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                        << "optimizeIR optlevel " << OptLevel << " codegenopt "
@@ -191,7 +192,7 @@ inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
 inline void optimizeIR(Module &M, StringRef Arch,
                        const std::string &PassPipeline,
                        unsigned CodegenOptLevel) {
-  Timer T;
+  Timer T(Config::get().ProteusEnableTimers);
   auto TraceOut = [](const std::string &PassPipeline) {
     SmallString<128> S;
     raw_svector_ostream OS(S);

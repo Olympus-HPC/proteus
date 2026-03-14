@@ -204,7 +204,7 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   StringRef StrIR(IR, IRSize);
   auto Ctx = std::make_unique<LLVMContext>();
 
-  Timer T;
+  Timer T(Config::get().ProteusEnableTimers);
   SMDiagnostic Diag;
   auto M = parseIR(MemoryBufferRef(StrIR, "JitModule"), Diag, *Ctx);
   if (!M)

@@ -13,7 +13,7 @@
 #include "proteus/Error.h"
 #include "proteus/impl/Config.h"
 #include "proteus/impl/Logger.h"
-#include "proteus/impl/TimeTracing.h"
+#include "proteus/TimeTracing.h"
 #include "proteus/impl/Utils.h"
 
 #include <llvm/ADT/StringRef.h>

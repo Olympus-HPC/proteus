@@ -5,7 +5,7 @@
 #include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/Debug.h"
 #include "proteus/impl/Logger.h"
-#include "proteus/impl/TimeTracing.h"
+#include "proteus/TimeTracing.h"
 #include "proteus/impl/Utils.h"
 #include "proteus/impl/UtilsHIP.h"
 
@@ -440,7 +440,7 @@ codegenObject(Module &M, StringRef DeviceArch,
               CodegenOption CGOption = CodegenOption::RTC) {
   assert(GlobalLinkedBinaries.empty() &&
          "Expected empty linked binaries for HIP");
-  Timer T;
+  Timer T(Config::get().ProteusEnableTimers);
   SmallVector<std::unique_ptr<sys::fs::TempFile>> ObjectFiles;
   switch (CGOption) {
   case CodegenOption::RTC: {

@@ -12,7 +12,7 @@
 #include "proteus/impl/CoreDevice.h"
 #include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/CoreLLVMHIP.h"
-#include "proteus/impl/TimeTracing.h"
+#include "proteus/TimeTracing.h"
 
 #if LLVM_VERSION_MAJOR == 18
 #include <lld/Common/Driver.h>
@@ -265,7 +265,7 @@ std::unique_ptr<Module> JitEngineDeviceHIP::tryExtractKernelModule(
     auto Bitcode = StringRef{reinterpret_cast<const char *>(BitcodeData.data()),
                              BitcodeData.size()};
 
-    Timer T;
+    Timer T(Config::get().ProteusEnableTimers);
     SMDiagnostic Diag;
     // Parse the IR module eagerly as it will be immediately used for codegen.
     auto M = parseIR(MemoryBufferRef(Bitcode, SectionName), Diag, Ctx);
@@ -322,7 +322,7 @@ void JitEngineDeviceHIP::extractModules(BinaryInfo &BinInfo) {
     auto Bitcode = StringRef{reinterpret_cast<const char *>(BitcodeData.data()),
                              BitcodeData.size()};
 
-    Timer T;
+    Timer T(Config::get().ProteusEnableTimers);
     SMDiagnostic Diag;
     auto M =
         getLazyIRModule(MemoryBuffer::getMemBufferCopy(Bitcode, SectionName),
