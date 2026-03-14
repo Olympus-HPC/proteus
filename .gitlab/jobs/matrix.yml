@@ -45,10 +45,11 @@ variables:
 
 .base-job:
   extends: .job_on_matrix
+  interruptible: true
   before_script:
     - echo "=== Start CI Build and Test==="
   after_script:
-    - rm -rf ${CI_BUILDS_DIR}
+    - !reference [.remove-builds-dir, after_script]
     - echo "=== End CI Build and Test==="
 
 .build-variants:
