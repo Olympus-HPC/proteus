@@ -163,5 +163,8 @@ include:
   - project: 'radiuss/radiuss-shared-ci'
     ref: 'v2025.09.1'
     file: 'utilities/preliminary-ignore-draft-pr.yml'
+  - project: 'radiuss/radiuss-shared-ci'
+    ref: 'v2025.09.1'
+    file: 'utilities/skip-branch-not-a-pr.yml'    
   # pipelines subscribed by the project
   - local: '.gitlab/subscribed-pipelines.yml'
