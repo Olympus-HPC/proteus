@@ -1,9 +1,9 @@
 .base-job:
   extends: .job_on_matrix
+  interruptible: true
   before_script:
     - echo "=== Start CI Benchmarking ==="
   after_script:
-    #- rm -rf ${CI_BUILDS_DIR}
     - echo "=== End CI Benchmarking ==="
 
 proteus-benchmarks-matrix:
