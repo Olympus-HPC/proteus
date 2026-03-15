@@ -110,6 +110,9 @@ matrix-up-check:
 matrix-build-and-test:
   variables:
     CI_MACHINE: "matrix"
+    JOB_CMD:
+      value: "scripts/gitlab/ci-build-test.sh"
+      expand: false
   needs: [matrix-up-check]
   extends: [.build-and-test-llvm]
 
@@ -149,6 +152,9 @@ tioga-up-check:
 tioga-build-and-test:
   variables:
     CI_MACHINE: "tioga"
+    JOB_CMD:
+      value: "scripts/gitlab/ci-build-test.sh"
+      expand: false
   needs: [tioga-up-check]
   extends: [.build-and-test-rocm]
 
@@ -188,6 +194,9 @@ tuolumne-up-check:
 tuolumne-build-and-test:
   variables:
     CI_MACHINE: "tuolumne"
+    JOB_CMD:
+      value: "scripts/gitlab/ci-build-test.sh"
+      expand: false
   needs: [tuolumne-up-check]
   extends: [.build-and-test-rocm]
 
