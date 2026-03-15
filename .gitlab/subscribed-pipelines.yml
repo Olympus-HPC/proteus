@@ -122,7 +122,7 @@ matrix-proteus-benchmarks:
     JOB_CMD:
       value: "scripts/gitlab/ci-run-benchmarks.sh"
       expand: false
-  needs: [matrix-up-check]
+  needs: [matrix-up-check, matrix-build-and-test]
   extends: [.run-benchmarks]
 
 matrix-test-spack:
@@ -131,7 +131,7 @@ matrix-test-spack:
     JOB_CMD:
       value: "tests/spack/cuda/ci-test-spack.sh"
       expand: false
-  needs: [matrix-up-check]
+  needs: [matrix-up-check, matrix-build-and-test]
   extends: [.test-spack]
 
 matrix-test-integration:
@@ -140,7 +140,7 @@ matrix-test-integration:
     JOB_CMD:
       value: "tests/integration/cuda/ci-test-integration.sh"
       expand: false
-  needs: [matrix-up-check]
+  needs: [matrix-up-check, matrix-build-and-test]
   extends: [.test-integration]
 
 # TIOGA
@@ -164,7 +164,7 @@ tioga-test-integration:
     JOB_CMD:
       value: "tests/integration/hip/ci-test-integration.sh"
       expand: false
-  needs: [tioga-up-check]
+  needs: [tioga-up-check, tioga-build-and-test]
   extends: [.test-integration]
 
 tioga-test-spack:
@@ -173,7 +173,7 @@ tioga-test-spack:
     JOB_CMD:
       value: "tests/spack/hip/ci-test-spack.sh"
       expand: false
-  needs: [tioga-up-check]
+  needs: [tioga-up-check, tioga-build-and-test]
   extends: [.test-spack]
 
 tioga-proteus-benchmarks:
@@ -182,7 +182,7 @@ tioga-proteus-benchmarks:
     JOB_CMD:
       value: "scripts/gitlab/ci-run-benchmarks.sh"
       expand: false
-  needs: [tioga-up-check]
+  needs: [tioga-up-check, tioga-build-and-test]
   extends: [.run-benchmarks]
 
 # TUOLUMNE
@@ -206,7 +206,7 @@ tuolumne-test-integration:
     JOB_CMD:
       value: "tests/integration/hip/ci-test-integration.sh"
       expand: false
-  needs: [tuolumne-up-check]
+  needs: [tuolumne-up-check, tuolumne-build-and-test]
   extends: [.test-integration]
 
 tuolumne-test-spack:
@@ -215,7 +215,7 @@ tuolumne-test-spack:
     JOB_CMD:
       value: "tests/spack/hip/ci-test-spack.sh"
       expand: false
-  needs: [tuolumne-up-check]
+  needs: [tuolumne-up-check, tuolumne-build-and-test]
   extends: [.test-spack]
 
 tuolumne-proteus-benchmarks:
@@ -224,5 +224,5 @@ tuolumne-proteus-benchmarks:
     JOB_CMD:
       value: "scripts/gitlab/ci-run-benchmarks.sh"
       expand: false
-  needs: [tuolumne-up-check]
+  needs: [tuolumne-up-check, tuolumne-build-and-test]
   extends: [.run-benchmarks]
