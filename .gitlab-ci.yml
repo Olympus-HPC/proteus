@@ -72,6 +72,7 @@ stages:
 # Template for jobs triggering a build-and-test sub-pipeline:
 .build-and-test-llvm:
   stage: build-and-test
+  interruptible: true
   parallel:
     matrix:
       - PROTEUS_CI_LLVM_VERSION: ["18.1.8", "19.1.7", "20.1.8"]
@@ -94,6 +95,7 @@ stages:
 
 .build-and-test-rocm:
   stage: build-and-test
+  interruptible: true
   parallel:
     matrix:
       - PROTEUS_CI_ROCM_VERSION: ["6.3.1", "6.4.1", "7.1.0"]
@@ -116,6 +118,7 @@ stages:
 
 .test-integration:
   stage: test-integration
+  interruptible: true
   trigger:
     include:
       - local: '.gitlab/custom-jobs-and-variables.yml'
@@ -129,6 +132,7 @@ stages:
 
 .test-spack:
   stage: test-spack
+  interruptible: true
   trigger:
     include:
       - local: '.gitlab/custom-jobs-and-variables.yml'
@@ -142,6 +146,7 @@ stages:
 
 .run-benchmarks:
   stage: run-benchmarks
+  interruptible: true
   trigger:
     include:
       - local: '.gitlab/custom-jobs-and-variables.yml'

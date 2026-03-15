@@ -45,6 +45,7 @@ variables:
 
 .base-job:
   extends: .job_on_tioga
+  interruptible: true
   before_script:
     - echo "=== Start CI Build and Test==="
   after_script:

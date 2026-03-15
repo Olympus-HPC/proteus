@@ -1,5 +1,6 @@
 .base-job:
   extends: .job_on_tioga
+  interruptible: true
   before_script:
     - echo "=== Start CI Integration Tests ==="
   after_script:

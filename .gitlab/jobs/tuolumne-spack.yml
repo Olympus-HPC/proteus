@@ -1,5 +1,6 @@
 .base-job:
   extends: .job_on_tuolumne
+  interruptible: true
   before_script:
     - echo "=== Start CI spack Tests ==="
   after_script:

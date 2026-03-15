@@ -1,5 +1,6 @@
 .base-job:
   extends: .job_on_matrix
+  interruptible: true
   before_script:
     - echo "=== Start CI Benchmarking ==="
   after_script:
