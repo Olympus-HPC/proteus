@@ -222,6 +222,7 @@ config.substitutions.append(('%device_lang', '${lang}'))
 "
 )
 
+CREATE_GPU_TEST(dim_spec_cache_test dim_spec_cache_test.cpp)
 CREATE_GPU_TEST(kernel kernel.cpp)
 CREATE_GPU_TEST(kernel_pass_pipeline kernel_pass_pipeline.cpp)
 CREATE_GPU_TEST(kernel_cache kernel_cache.cpp)
