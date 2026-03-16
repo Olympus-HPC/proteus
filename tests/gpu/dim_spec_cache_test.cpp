@@ -10,16 +10,16 @@
 // clang-format on
 
 #include <climits>
-#include <iostream>
 #include <cstdio>
+#include <iostream>
 
 #include "gpu_common.h"
 #include <proteus/JitInterface.h>
 
 __global__ __attribute__((annotate("jit"))) void printGridDim() {
   unsigned int Idx = threadIdx.x + threadIdx.y + threadIdx.z +
-     blockIdx.x * blockDim.x + blockIdx.y * blockDim.y +
-     blockIdx.z * blockDim.z;
+                     blockIdx.x * blockDim.x + blockIdx.y * blockDim.y +
+                     blockIdx.z * blockDim.z;
 
   if (Idx == 0) {
     printf("Block dim.x = %d\n", blockDim.x);
@@ -47,7 +47,6 @@ int main() {
 
   printGridDim<<<GridDim4, BlockDim4>>>();
   gpuErrCheck(gpuDeviceSynchronize());
-
 
   return 0;
 }
