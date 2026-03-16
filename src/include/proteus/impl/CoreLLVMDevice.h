@@ -285,7 +285,7 @@ inline void specializeIR(
     const SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo,
     bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsRange,
     bool SpecializeLaunchBounds, int MinBlocksPerSM) {
-  Timer T;
+  Timer T(Config::get().ProteusEnableTimers);
   Function *F = M.getFunction(FnName);
 
   assert(F && "Expected non-null function!");

@@ -45,7 +45,7 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
   DeviceBitcode.reserve(Bytes);
   proteusCuErrCheck(cuMemcpyDtoH(DeviceBitcode.data(), DevPtr, Bytes));
 
-  Timer T;
+  Timer T(Config::get().ProteusEnableTimers);
   StringRef Bitcode{DeviceBitcode.data(), Bytes};
   SMDiagnostic Diag;
   // We copy the Bitcode data for lazy parsing.

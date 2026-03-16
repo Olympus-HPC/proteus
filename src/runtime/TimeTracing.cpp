@@ -1,59 +1,57 @@
+#include "proteus/TimeTracing.h"
 
-#include "proteus/impl/TimeTracing.h"
-#include "proteus/impl/Config.h"
+#include "proteus/impl/TimeTracingInit.h"
 
+#include <llvm/Support/Error.h>
 #include <llvm/Support/TimeProfiler.h>
-
-#include <chrono>
 
 namespace proteus {
 
-using namespace llvm;
-
-// Define the wrapper struct to hold the actual LLVM type
 struct TimeTraceScopeWrapper {
-  TimeTraceScope Scope;
-  TimeTraceScopeWrapper(StringRef Name) : Scope(Name) {}
+  std::string NameStorage;
+  llvm::TimeTraceScope Scope;
+
+  explicit TimeTraceScopeWrapper(std::string_view Name)
+      : NameStorage(Name), Scope(NameStorage) {}
 };
 
-ScopedTimeTrace::ScopedTimeTrace(const std::string &Name) {
-  if (Config::get().ProteusEnableTimeTrace) {
+ScopedTimeTrace::ScopedTimeTrace(std::string_view Name) {
+  if (llvm::timeTraceProfilerEnabled())
     Pimpl = std::make_unique<TimeTraceScopeWrapper>(Name);
-  }
 }
 
 ScopedTimeTrace::~ScopedTimeTrace() = default;
 
-TimeTracerRAII::TimeTracerRAII() {
-  if (Config::get().ProteusEnableTimeTrace) {
-    timeTraceProfilerInitialize(500 /* us */, "proteus");
-  }
+TimeTracerRAII::TimeTracerRAII(bool Enable, std::string OutputFile)
+    : Enabled(Enable), OutputFile(std::move(OutputFile)) {
+  if (Enabled)
+    llvm::timeTraceProfilerInitialize(500 /* us */, "proteus");
 }
 
 TimeTracerRAII::~TimeTracerRAII() {
-  if (Config::get().ProteusEnableTimeTrace) {
-    auto &OutputFile = Config::get().ProteusTimeTraceFile;
-    if (auto E = timeTraceProfilerWrite(OutputFile, "-")) {
-      handleAllErrors(std::move(E));
-      return;
-    }
-    timeTraceProfilerCleanup();
+  if (!Enabled)
+    return;
+
+  if (auto E = llvm::timeTraceProfilerWrite(OutputFile, "-")) {
+    llvm::handleAllErrors(std::move(E));
+    return;
   }
+  llvm::timeTraceProfilerCleanup();
 }
 
-using Clock = std::chrono::steady_clock;
-
-Timer::Timer() {
-  if (Config::get().ProteusEnableTimers)
+Timer::Timer(bool Enabled) : Enabled(Enabled) {
+  if (this->Enabled)
     Start = Clock::now();
 }
 
 uint64_t Timer::elapsed() {
-  return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() -
-                                                               Start)
-      .count();
+  return elapsedAs<std::chrono::milliseconds>();
 }
 
-void Timer::reset() { Start = Clock::now(); }
+void Timer::reset() {
+  if (!Enabled)
+    return;
+  Start = Clock::now();
+}
 
 } // namespace proteus

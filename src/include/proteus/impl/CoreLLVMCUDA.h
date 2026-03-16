@@ -4,7 +4,7 @@
 #include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/Debug.h"
 #include "proteus/impl/Logger.h"
-#include "proteus/impl/TimeTracing.h"
+#include "proteus/TimeTracing.h"
 #include "proteus/impl/UtilsCUDA.h"
 
 #include <llvm/ADT/SmallVector.h>
@@ -127,7 +127,7 @@ inline void codegenPTX(Module &M, StringRef DeviceArch,
   // Interesting env vars: CUDA_CACHE_DISABLE, CUDA_CACHE_MAXSIZE,
   // CUDA_CACHE_PATH, CUDA_FORCE_PTX_JIT.
 
-  Timer T;
+  Timer T(Config::get().ProteusEnableTimers);
   auto TMExpected = proteus::detail::createTargetMachine(M, DeviceArch);
   if (!TMExpected)
     reportFatalError(toString(TMExpected.takeError()));
@@ -173,7 +173,7 @@ codegenObject(Module &M, StringRef DeviceArch,
   codegenPTX(M, DeviceArch, PTXStr);
   PTXStr.push_back('\0');
 
-  Timer T;
+  Timer T(Config::get().ProteusEnableTimers);
   nvPTXCompilerHandle PTXCompiler;
   proteusNvPTXCompilerErrCheck(
       nvPTXCompilerCreate(&PTXCompiler, PTXStr.size(), PTXStr.data()));

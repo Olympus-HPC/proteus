@@ -10,7 +10,7 @@
 
 #include "proteus/impl/Caching/MPILocalLookupCache.h"
 
-#include "proteus/impl/TimeTracing.h"
+#include "proteus/TimeTracing.h"
 
 namespace proteus {
 

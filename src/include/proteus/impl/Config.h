@@ -432,4 +432,8 @@ private:
 };
 } // namespace proteus
 
+#define PROTEUS_TIMER_OUTPUT(x)                                                \
+  if (::proteus::Config::get().ProteusEnableTimers)                            \
+    x;
+
 #endif
