@@ -17,8 +17,8 @@
 
 namespace proteus {
 
-TimeTracerRAII TimeTracer(Config::get().ProteusEnableTimeTrace,
-                          Config::get().ProteusTimeTraceFile);
+static TimeTracerRAII TimeTracer(Config::get().ProteusEnableTimeTrace,
+                                 Config::get().ProteusTimeTraceFile);
 
 using namespace llvm;
 

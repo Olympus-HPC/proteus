@@ -40,8 +40,9 @@ public:
   uint64_t elapsed();
 
   template <class Duration> uint64_t elapsedAs() const {
-    static_assert(!std::chrono::treat_as_floating_point_v<typename Duration::rep>,
-                  "Timer::elapsedAs only supports integral duration reps");
+    static_assert(
+        !std::chrono::treat_as_floating_point_v<typename Duration::rep>,
+        "Timer::elapsedAs only supports integral duration reps");
     if (!Enabled)
       return 0;
     return std::chrono::duration_cast<Duration>(Clock::now() - Start).count();

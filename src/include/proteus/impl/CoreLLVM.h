@@ -5,10 +5,10 @@ static_assert(__cplusplus >= 201703L,
               "This header requires C++17 or later due to LLVM.");
 
 #include "proteus/Error.h"
+#include "proteus/TimeTracing.h"
 #include "proteus/impl/Config.h"
 #include "proteus/impl/Debug.h"
 #include "proteus/impl/Logger.h"
-#include "proteus/TimeTracing.h"
 
 #include <llvm/CodeGen/CommandFlags.h>
 #include <llvm/IR/DebugInfo.h>
