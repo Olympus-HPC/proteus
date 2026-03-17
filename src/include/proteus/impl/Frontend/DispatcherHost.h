@@ -79,9 +79,9 @@ public:
   }
 
 protected:
-  DispatcherHost()
-      : Dispatcher("DispatcherHost", TargetModelType::HOST),
-        Jit(JitEngineHost::instance()) {}
+  explicit DispatcherHost(const std::string &Label = "DispatcherHost")
+      : Dispatcher(Label, TargetModelType::HOST),
+        Jit(JitEngineHost::instance()), CodeCache(Label) {}
 
   ~DispatcherHost() {
     CodeCache.printStats();
@@ -91,7 +91,7 @@ protected:
 
 private:
   JitEngineHost &Jit;
-  MemoryCache<void *> CodeCache{"DispatcherHost"};
+  MemoryCache<void *> CodeCache;
 };
 
 } // namespace proteus
