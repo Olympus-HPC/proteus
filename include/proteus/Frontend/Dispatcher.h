@@ -16,6 +16,7 @@ namespace llvm {
 class LLVMContext;
 class Module;
 class MemoryBuffer;
+class MemoryBufferRef;
 } // namespace llvm
 
 struct LaunchDims {
@@ -118,6 +119,9 @@ public:
 
   virtual void registerDynamicLibrary(const HashT &HashValue,
                                       const std::string &Path) = 0;
+
+  virtual void registerObject(const HashT &HashValue,
+                              const llvm::MemoryBufferRef &Obj) = 0;
 };
 
 } // namespace proteus

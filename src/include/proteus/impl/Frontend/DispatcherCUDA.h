@@ -92,6 +92,11 @@ public:
     reportFatalError("Dispatch CUDA does not support registerDynamicLibrary");
   }
 
+  void registerObject(const HashT &HashValue,
+                      const llvm::MemoryBufferRef &Obj) override {
+    ObjectCache->store(HashValue, CacheEntry::staticObject(Obj));
+  }
+
   ~DispatcherCUDA() {
     CodeCache.printStats();
     CodeCache.printKernelTrace();

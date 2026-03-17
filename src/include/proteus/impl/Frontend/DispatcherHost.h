@@ -78,6 +78,11 @@ public:
                        CacheEntry::sharedObject((*Buf)->getMemBufferRef()));
   }
 
+  void registerObject(const HashT &HashValue,
+                      const llvm::MemoryBufferRef &Obj) override {
+    ObjectCache->store(HashValue, CacheEntry::staticObject(Obj));
+  }
+
 protected:
   explicit DispatcherHost(const std::string &Label = "DispatcherHost")
       : Dispatcher(Label, TargetModelType::HOST),
