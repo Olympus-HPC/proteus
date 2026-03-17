@@ -9,7 +9,10 @@ set(SOURCES
   TimeTracing.cpp
   Caching/ObjectCacheChain.cpp
   Caching/StorageCache.cpp
+  Frontend/CppJitCompiler.cpp
+  Frontend/CppJitCompilerClang.cpp
   Frontend/CppJitModule.cpp
+  Frontend/CppJitCompilerNvcc.cpp
   Frontend/Builtins.cpp
   Frontend/Dispatcher.cpp
   Frontend/Func.cpp
@@ -277,6 +280,10 @@ target_link_libraries(proteus PRIVATE ${clang_libs})
 # Add the clangxx binary path as a compile definition for use in the runtime,
 # which needs it for the CPP frontend to resolve system path.
 target_compile_definitions(proteus PRIVATE PROTEUS_CLANGXX_BIN="${CLANGXX}")
+
+if(PROTEUS_ENABLE_CUDA AND PROTEUS_NVCC_BIN)
+  target_compile_definitions(proteus PRIVATE PROTEUS_NVCC_BIN="${PROTEUS_NVCC_BIN}")
+endif()
 
 find_package(Threads REQUIRED)
 target_link_libraries(proteus PRIVATE Threads::Threads)

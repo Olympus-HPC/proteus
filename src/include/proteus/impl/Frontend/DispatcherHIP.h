@@ -184,6 +184,11 @@ public:
     reportFatalError("Dispatch HIP does not support registerDynamicLibrary");
   }
 
+  void registerObject(const HashT &HashValue,
+                      const llvm::MemoryBufferRef &Obj) override {
+    ObjectCache->store(HashValue, CacheEntry::staticObject(Obj));
+  }
+
 private:
   JitEngineDeviceHIP &Jit;
   DispatcherHIP()

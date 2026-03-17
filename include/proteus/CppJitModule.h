@@ -1,6 +1,7 @@
 #ifndef PROTEUS_CPPFRONTEND_H
 #define PROTEUS_CPPFRONTEND_H
 
+#include "proteus/CppJitCompilerBackend.h"
 #include "proteus/Frontend/Dispatcher.h"
 
 #include <algorithm>
@@ -19,9 +20,7 @@ private:
   std::string Code;
   std::unique_ptr<HashT> ModuleHash;
   std::vector<std::string> ExtraArgs;
-
-  // Optimization level used when emitting IR.
-  static constexpr const char *FrontendOptLevelFlag = "-O3";
+  CppJitCompilerBackend CompilerBackend;
 
   Dispatcher &Dispatch;
   std::unique_ptr<CompiledLibrary> Library;
@@ -39,6 +38,7 @@ private:
     TargetModelType TargetModel;
     const std::string &TemplateCode;
     std::vector<std::string> ExtraArgs;
+    CppJitCompilerBackend CompilerBackend;
     std::string InstanceName;
     std::unique_ptr<CppJitModule> InstanceModule;
     std::string EntryFuncName;
@@ -46,9 +46,11 @@ private:
 
     CodeInstance(TargetModelType TargetModel, const std::string &TemplateCode,
                  const std::vector<std::string> &ExtraArgs,
+                 CppJitCompilerBackend CompilerBackend,
                  const std::string &InstanceName)
         : TargetModel(TargetModel), TemplateCode(TemplateCode),
-          ExtraArgs(ExtraArgs), InstanceName(InstanceName) {
+          ExtraArgs(ExtraArgs), CompilerBackend(CompilerBackend),
+          InstanceName(InstanceName) {
       EntryFuncName = "__jit_instance_" + this->InstanceName;
       // Replace characters '<', '>', ',' with $ to create a unique for the
       // entry function.
@@ -73,6 +75,10 @@ private:
       }
 
       return TargetModel;
+    }
+
+    CppJitCompilerBackend getInstanceCompilerBackend() const {
+      return CompilerBackend;
     }
 
     const char *getGPUStreamType() const {
@@ -214,8 +220,9 @@ private:
 
     template <typename RetT, typename... ArgT> void compile() {
       std::string InstanceCode = buildCode<RetT, ArgT...>();
-      InstanceModule = std::make_unique<CppJitModule>(getInstanceTargetModel(),
-                                                      InstanceCode, ExtraArgs);
+      InstanceModule = std::make_unique<CppJitModule>(
+          getInstanceTargetModel(), InstanceCode, ExtraArgs,
+          getInstanceCompilerBackend());
       InstanceModule->compile();
 
       FuncPtr = InstanceModule->getFunctionAddress(EntryFuncName);
@@ -263,28 +270,20 @@ private:
   std::unordered_map<std::string, std::unique_ptr<CodeInstance>>
       InstantiationCache;
 
-  struct CompilationResult {
-    // Declare Ctx first to ensure it is destroyed after Mod.
-    std::unique_ptr<llvm::LLVMContext> Ctx;
-    std::unique_ptr<llvm::Module> Mod;
-
-    ~CompilationResult();
-  };
-
   void *getFunctionAddress(const std::string &Name);
   DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
                         LaunchDims BlockDim, void *KernelArgs[],
                         uint64_t ShmemSize, void *Stream);
 
-protected:
-  CompilationResult compileCppToIR();
-  void compileCppToDynamicLibrary();
-
 public:
-  explicit CppJitModule(TargetModelType TargetModel, const std::string &Code,
-                        const std::vector<std::string> &ExtraArgs = {});
-  explicit CppJitModule(const std::string &Target, const std::string &Code,
-                        const std::vector<std::string> &ExtraArgs = {});
+  explicit CppJitModule(
+      TargetModelType TargetModel, const std::string &Code,
+      const std::vector<std::string> &ExtraArgs = {},
+      CppJitCompilerBackend CompilerBackend = CppJitCompilerBackend::Clang);
+  explicit CppJitModule(
+      const std::string &Target, const std::string &Code,
+      const std::vector<std::string> &ExtraArgs = {},
+      CppJitCompilerBackend CompilerBackend = CppJitCompilerBackend::Clang);
   ~CppJitModule();
 
   void compile();
@@ -316,8 +315,9 @@ public:
     }
 
     auto [NewIt, OK] = InstantiationCache.emplace(
-        InstanceName, std::make_unique<CodeInstance>(TargetModel, Code,
-                                                     ExtraArgs, InstanceName));
+        InstanceName,
+        std::make_unique<CodeInstance>(TargetModel, Code, ExtraArgs,
+                                       CompilerBackend, InstanceName));
     return *NewIt->second;
   }
 
