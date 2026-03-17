@@ -64,9 +64,11 @@ createCppJitCompiler(const CppJitCompileRequest &Request) {
   switch (Request.Backend) {
   case CppJitCompilerBackend::Clang:
     return createCppJitCompilerClang();
-#if PROTEUS_ENABLE_CUDA
   case CppJitCompilerBackend::Nvcc:
+#if PROTEUS_ENABLE_CUDA
     return createCppJitCompilerNvcc();
+#else
+    reportFatalError("NVCC backend is not available in this build");
 #endif
   }
 
