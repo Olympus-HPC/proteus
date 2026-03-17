@@ -39,9 +39,14 @@ void CppJitModule::compile() {
     return;
   }
 
-  CppJitCompileRequest Request{TargetModel, CompilerBackend,
-                               Code,        ExtraArgs,
-                               *ModuleHash, Dispatch.getDeviceArch().str()};
+  CppJitCompileRequest Request{TargetModel,
+                               CompilerBackend,
+                               Code,
+                               ExtraArgs,
+                               *ModuleHash,
+                               TargetModel != TargetModelType::HOST
+                                   ? Dispatch.getDeviceArch().str()
+                                   : std::string{}};
   auto Compiler = createCppJitCompiler(Request);
   auto Artifact = Compiler->compile(Request);
 
