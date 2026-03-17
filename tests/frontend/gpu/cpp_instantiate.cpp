@@ -79,10 +79,10 @@ int main() {
 // CHECK: Ret 24
 // CHECK: bar type double
 // CHECK: bar type float
-// CHECK: [proteus][Dispatcher{{HostCUDA|HostHIP}}] MemoryCache rank 0 hits 0 accesses 3
-// CHECK-DAG: [proteus][Dispatcher{{HostCUDA|HostHIP}}] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-DAG: [proteus][Dispatcher{{HostCUDA|HostHIP}}] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-DAG: [proteus][Dispatcher{{HostCUDA|HostHIP}}] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][DispatcherHost{{CUDA|HIP}}] MemoryCache rank 0 hits 0 accesses 3
+// CHECK-DAG: [proteus][DispatcherHost{{CUDA|HIP}}] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-DAG: [proteus][DispatcherHost{{CUDA|HIP}}] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-DAG: [proteus][DispatcherHost{{CUDA|HIP}}] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // First run does an extra shared-library lookup after populating the cache.
-// CHECK-FIRST: [proteus][Dispatcher{{HostCUDA|HostHIP}}] StorageCache rank 0 hits 3 accesses 6
-// CHECK-SECOND: [proteus][Dispatcher{{HostCUDA|HostHIP}}] StorageCache rank 0 hits 3 accesses 3
+// CHECK-FIRST: [proteus][DispatcherHost{{CUDA|HIP}}] StorageCache rank 0 hits 3 accesses 6
+// CHECK-SECOND: [proteus][DispatcherHost{{CUDA|HIP}}] StorageCache rank 0 hits 3 accesses 3
