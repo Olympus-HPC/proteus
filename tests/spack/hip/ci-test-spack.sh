@@ -7,7 +7,7 @@ ml load rocm/${PROTEUS_CI_ROCM_VERSION}
 # Install spack.
 export SPACK_DISABLE_LOCAL_CONFIG=true
 export SPACK_USER_CACHE_PATH=/tmp/spack-${CI_JOB_ID}/user_cache
-git clone --depth=2 https://github.com/spack/spack.git /tmp/spack-${CI_JOB_ID}
+git clone --quiet --depth=2 --branch v1.1.1 https://github.com/spack/spack.git /tmp/spack-${CI_JOB_ID}
 source /tmp/spack-${CI_JOB_ID}/share/spack/setup-env.sh
 
 # Create environment.
