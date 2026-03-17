@@ -2,7 +2,6 @@
 
 #include "proteus/impl/CompiledLibrary.h"
 #include "proteus/impl/Hashing.h"
-#include "proteus/impl/JitEngineHost.h"
 
 #include <clang/CodeGen/CodeGenAction.h>
 #include <clang/Driver/Compilation.h>
@@ -271,10 +270,11 @@ void *CppJitModule::getFunctionAddress(const std::string &Name) {
   return Dispatch.getFunctionAddress(Name, *ModuleHash, getLibrary());
 }
 
-void CppJitModule::launch(void *KernelFunc, LaunchDims GridDim,
-                          LaunchDims BlockDim, void *KernelArgs[],
-                          uint64_t ShmemSize, void *Stream) {
-  Dispatch.launch(KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize, Stream);
+DispatchResult CppJitModule::launch(void *KernelFunc, LaunchDims GridDim,
+                                    LaunchDims BlockDim, void *KernelArgs[],
+                                    uint64_t ShmemSize, void *Stream) {
+  return Dispatch.launch(KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize,
+                         Stream);
 }
 
 CppJitModule::CompilationResult::~CompilationResult() = default;

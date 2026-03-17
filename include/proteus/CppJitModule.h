@@ -2,7 +2,6 @@
 #define PROTEUS_CPPFRONTEND_H
 
 #include "proteus/Frontend/Dispatcher.h"
-#include "proteus/Init.h"
 
 #include <algorithm>
 #include <sstream>
@@ -56,6 +55,48 @@ private:
       std::replace_if(
           EntryFuncName.begin(), EntryFuncName.end(),
           [](char C) { return C == '<' || C == '>' || C == ','; }, '$');
+    }
+
+    bool useHostLaunchEntry() const {
+      // Instantiated GPU kernels compile through the host+device path.
+      return TargetModel == TargetModelType::CUDA ||
+             TargetModel == TargetModelType::HIP;
+    }
+
+    TargetModelType getInstanceTargetModel() const {
+      if (TargetModel == TargetModelType::CUDA) {
+        return TargetModelType::HOST_CUDA;
+      }
+
+      if (TargetModel == TargetModelType::HIP) {
+        return TargetModelType::HOST_HIP;
+      }
+
+      return TargetModel;
+    }
+
+    const char *getGPUStreamType() const {
+      if (TargetModel == TargetModelType::CUDA) {
+        return "cudaStream_t";
+      }
+
+      if (TargetModel == TargetModelType::HIP) {
+        return "hipStream_t";
+      }
+
+      reportFatalError("Expected CUDA or HIP target model for host launcher");
+    }
+
+    const char *getGPUGetLastErrorName() const {
+      if (TargetModel == TargetModelType::CUDA) {
+        return "cudaGetLastError";
+      }
+
+      if (TargetModel == TargetModelType::HIP) {
+        return "hipGetLastError";
+      }
+
+      reportFatalError("Expected CUDA or HIP target model for host launcher");
     }
 
     // Compile-time type name (no RTTI).
@@ -112,7 +153,41 @@ private:
       return OS.str();
     }
 
+    template <typename... ArgT, std::size_t... I>
+    std::string buildGPUHostLauncher(std::index_sequence<I...>) {
+      std::stringstream OS;
+
+      OS << "extern \"C\" int " << EntryFuncName
+         << "(unsigned GridX, unsigned GridY, unsigned GridZ, unsigned "
+            "BlockX, unsigned BlockY, unsigned BlockZ, size_t ShmemSize, "
+            "void *Stream";
+      ((OS << ", "
+           << typeName<
+                  std::decay_t<std::tuple_element_t<I, std::tuple<ArgT...>>>>()
+           << " Arg" << I),
+       ...);
+      OS << ") { ";
+      // Use a typed launch so implicit C++ conversions still happen at the
+      // call site.
+      OS << InstanceName
+         << "<<<dim3(GridX, GridY, GridZ), dim3(BlockX, BlockY, BlockZ), "
+            "ShmemSize, static_cast<"
+         << getGPUStreamType() << ">(Stream)>>>(";
+      ((OS << (I == 0 ? "" : ", ") << "Arg" << I), ...);
+      OS << "); return static_cast<int>(" << getGPUGetLastErrorName()
+         << "()); }";
+
+      return OS.str();
+    }
+
     template <typename RetOrSig, typename... ArgT> std::string buildCode() {
+      if constexpr (std::is_void_v<RetOrSig>) {
+        if (useHostLaunchEntry()) {
+          return TemplateCode + buildGPUHostLauncher<ArgT...>(
+                                    std::index_sequence_for<ArgT...>{});
+        }
+      }
+
       std::string FunctionCode = buildFunctionEntry<RetOrSig, ArgT...>(
           std::index_sequence_for<ArgT...>{});
 
@@ -139,8 +214,8 @@ private:
 
     template <typename RetT, typename... ArgT> void compile() {
       std::string InstanceCode = buildCode<RetT, ArgT...>();
-      InstanceModule =
-          std::make_unique<CppJitModule>(TargetModel, InstanceCode, ExtraArgs);
+      InstanceModule = std::make_unique<CppJitModule>(getInstanceTargetModel(),
+                                                      InstanceCode, ExtraArgs);
       InstanceModule->compile();
 
       FuncPtr = InstanceModule->getFunctionAddress(EntryFuncName);
@@ -154,6 +229,15 @@ private:
       }
 
       void *Ptrs[sizeof...(ArgT)] = {(void *)&Args...};
+
+      if (useHostLaunchEntry()) {
+        using LauncherFunc =
+            int(unsigned, unsigned, unsigned, unsigned, unsigned, unsigned,
+                std::size_t, void *, ArgT...);
+        return DispatchResult{InstanceModule->Dispatch.run<LauncherFunc>(
+            FuncPtr, GridDim.X, GridDim.Y, GridDim.Z, BlockDim.X, BlockDim.Y,
+            BlockDim.Z, static_cast<std::size_t>(ShmemSize), Stream, Args...)};
+      }
 
       return InstanceModule->launch(FuncPtr, GridDim, BlockDim, Ptrs, ShmemSize,
                                     Stream);
@@ -188,8 +272,9 @@ private:
   };
 
   void *getFunctionAddress(const std::string &Name);
-  void launch(void *KernelFunc, LaunchDims GridDim, LaunchDims BlockDim,
-              void *KernelArgs[], uint64_t ShmemSize, void *Stream);
+  DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
+                        LaunchDims BlockDim, void *KernelArgs[],
+                        uint64_t ShmemSize, void *Stream);
 
 protected:
   CompilationResult compileCppToIR();

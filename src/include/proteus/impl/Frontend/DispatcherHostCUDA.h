@@ -20,7 +20,10 @@ public:
   }
 
 private:
-  DispatcherHostCUDA() { TargetModel = TargetModelType::HOST_CUDA; }
+  DispatcherHostCUDA() : DispatcherHost("DispatcherHostCUDA") {
+    // Preserve CUDA cache labels when the implementation goes through host JIT.
+    TargetModel = TargetModelType::HOST_CUDA;
+  }
 };
 
 } // namespace proteus
