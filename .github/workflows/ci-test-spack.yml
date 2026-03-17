@@ -32,7 +32,7 @@ jobs:
           # Install spack
           export SPACK_DISABLE_LOCAL_CONFIG=true
           export SPACK_USER_CACHE_PATH=/tmp/spack/user_cache
-          git clone --quiet --depth=2 https://github.com/spack/spack.git /tmp/spack
+          git clone --quiet --depth=2 --branch v1.1.1 https://github.com/spack/spack.git /tmp/spack
           source /tmp/spack/share/spack/setup-env.sh
           # Create spack environment
           spack env create -d /tmp/proteus-spack-env
