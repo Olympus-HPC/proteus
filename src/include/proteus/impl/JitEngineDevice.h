@@ -414,7 +414,7 @@ public:
 
   void getLambdaJitValues(JITKernelInfo &KernelInfo,
                           SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
-    LambdaRegistry LR = LambdaRegistry::instance();
+    LambdaRegistry &LR = LambdaRegistry::instance();
     if (LR.empty()) {
       KernelInfo.setLambdaCalleeInfo({});
       return;
