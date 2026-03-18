@@ -11,6 +11,7 @@ set(SOURCES
   Caching/StorageCache.cpp
   Frontend/CppJitCompiler.cpp
   Frontend/CppJitCompilerClang.cpp
+  Frontend/CppJitFuncAttribute.cpp
   Frontend/CppJitModule.cpp
   Frontend/CppJitCompilerNvcc.cpp
   Frontend/Builtins.cpp

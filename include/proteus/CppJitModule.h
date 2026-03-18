@@ -2,9 +2,11 @@
 #define PROTEUS_CPPFRONTEND_H
 
 #include "proteus/CppJitCompilerBackend.h"
+#include "proteus/CppJitFuncAttribute.h"
 #include "proteus/Frontend/Dispatcher.h"
 
 #include <algorithm>
+#include <optional>
 #include <sstream>
 #include <unordered_map>
 #include <vector>
@@ -26,6 +28,23 @@ private:
   std::unique_ptr<CompiledLibrary> Library;
   bool IsCompiled = false;
 
+  struct FuncAttributeState {
+    std::optional<int> MaxDynamicSharedMemorySize;
+
+    void set(CppJitFuncAttribute Attr, int Value) {
+      if (Value < 0)
+        reportFatalError("Function attribute value must be non-negative");
+
+      switch (Attr) {
+      case CppJitFuncAttribute::MaxDynamicSharedMemorySize:
+        MaxDynamicSharedMemorySize = Value;
+        return;
+      }
+
+      reportFatalError("Unsupported function attribute");
+    }
+  };
+
   // TODO: We don't cache CodeInstances so if a user re-creates the exact same
   // instantiation it will create a new CodeInstance. This creation cost is
   // mitigated because the dispatcher caches the compiled object so we will pay
@@ -43,14 +62,17 @@ private:
     std::unique_ptr<CppJitModule> InstanceModule;
     std::string EntryFuncName;
     void *FuncPtr = nullptr;
+    FuncAttributeState FuncAttributes;
 
     CodeInstance(TargetModelType TargetModel, const std::string &TemplateCode,
                  const std::vector<std::string> &ExtraArgs,
                  CppJitCompilerBackend CompilerBackend,
-                 const std::string &InstanceName)
+                 const std::string &InstanceName,
+                 FuncAttributeState FuncAttributes = {})
         : TargetModel(TargetModel), TemplateCode(TemplateCode),
           ExtraArgs(ExtraArgs), CompilerBackend(CompilerBackend),
-          InstanceName(InstanceName) {
+          InstanceName(InstanceName),
+          FuncAttributes(std::move(FuncAttributes)) {
       EntryFuncName = "__jit_instance_" + this->InstanceName;
       // Replace characters '<', '>', ',' with $ to create a unique for the
       // entry function.
@@ -100,6 +122,30 @@ private:
 
       if (TargetModel == TargetModelType::HIP) {
         return "hipGetLastError";
+      }
+
+      reportFatalError("Expected CUDA or HIP target model for host launcher");
+    }
+
+    const char *getGPUFuncSetAttributeName() const {
+      if (TargetModel == TargetModelType::CUDA) {
+        return "cudaFuncSetAttribute";
+      }
+
+      if (TargetModel == TargetModelType::HIP) {
+        return "hipFuncSetAttribute";
+      }
+
+      reportFatalError("Expected CUDA or HIP target model for host launcher");
+    }
+
+    const char *getGPUMaxDynamicSharedMemoryAttrName() const {
+      if (TargetModel == TargetModelType::CUDA) {
+        return "cudaFuncAttributeMaxDynamicSharedMemorySize";
+      }
+
+      if (TargetModel == TargetModelType::HIP) {
+        return "hipFuncAttributeMaxDynamicSharedMemorySize";
       }
 
       reportFatalError("Expected CUDA or HIP target model for host launcher");
@@ -173,6 +219,13 @@ private:
            << " Arg" << I),
        ...);
       OS << ") { ";
+      if (FuncAttributes.MaxDynamicSharedMemorySize) {
+        OS << "{ auto AttrErr = " << getGPUFuncSetAttributeName()
+           << "((const void *)" << InstanceName << ", "
+           << getGPUMaxDynamicSharedMemoryAttrName() << ", "
+           << *FuncAttributes.MaxDynamicSharedMemorySize
+           << "); if (AttrErr != 0) return static_cast<int>(AttrErr); } ";
+      }
       // Use a typed launch so implicit C++ conversions still happen at the
       // call site.
       OS << InstanceName
@@ -228,6 +281,12 @@ private:
       FuncPtr = InstanceModule->getFunctionAddress(EntryFuncName);
     }
 
+    void setFuncAttribute(CppJitFuncAttribute Attr, int Value) {
+      FuncAttributes.set(Attr, Value);
+      InstanceModule.reset();
+      FuncPtr = nullptr;
+    }
+
     template <typename... ArgT>
     auto launch(LaunchDims GridDim, LaunchDims BlockDim, uint64_t ShmemSize,
                 void *Stream, ArgT... Args) {
@@ -270,6 +329,7 @@ private:
   std::unordered_map<std::string, std::unique_ptr<CodeInstance>>
       InstantiationCache;
 
+  void setFuncAttribute(void *KernelFunc, CppJitFuncAttribute Attr, int Value);
   void *getFunctionAddress(const std::string &Name);
   DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
                         LaunchDims BlockDim, void *KernelArgs[],
@@ -348,6 +408,10 @@ public:
     explicit KernelHandle(CppJitModule &M, void *FuncPtr)
         : M(M), FuncPtr(FuncPtr) {
       static_assert(std::is_void_v<RetT>, "Kernel function must return void");
+    }
+
+    void setFuncAttribute(CppJitFuncAttribute Attr, int Value) {
+      M.setFuncAttribute(FuncPtr, Attr, Value);
     }
 
     auto launch(LaunchDims GridDim, LaunchDims BlockDim, uint64_t ShmemSize,
