@@ -1,6 +1,7 @@
 #include "proteus/CppJitModule.h"
 
 #include "proteus/impl/Frontend/CppJitCompiler.h"
+#include "proteus/impl/Frontend/CppJitFuncAttribute.h"
 
 #include "proteus/impl/CompiledLibrary.h"
 
@@ -74,6 +75,11 @@ void CppJitModule::compile() {
   }
 
   IsCompiled = true;
+}
+
+void CppJitModule::setFuncAttribute(void *KernelFunc, CppJitFuncAttribute Attr,
+                                    int Value) {
+  proteus::setFuncAttribute(TargetModel, KernelFunc, Attr, Value);
 }
 
 void *CppJitModule::getFunctionAddress(const std::string &Name) {
