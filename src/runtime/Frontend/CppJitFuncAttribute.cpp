@@ -47,6 +47,9 @@ void setFuncAttribute(TargetModelType TargetModel, void *KernelFunc,
   case TargetModelType::HOST:
   case TargetModelType::HOST_CUDA:
   case TargetModelType::HOST_HIP:
+    (void)KernelFunc;
+    (void)Attr;
+
     reportFatalError(
         "Host launchers do not support direct function attributes");
   }
