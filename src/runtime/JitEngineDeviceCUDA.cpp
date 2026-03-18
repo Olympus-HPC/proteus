@@ -30,6 +30,7 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
     LLVMContext &Ctx, CUmodule &CUMod,
     SmallVector<std::unique_ptr<Module>> &LinkedModules,
     std::string &ModuleId) {
+  TIMESCOPE(JitEngineDeviceCUDA, extractLinkedBitcode);
   PROTEUS_DBG(Logger::logs("proteus")
               << "extractLinkedBitcode " << ModuleId << "\n");
 
@@ -64,6 +65,7 @@ void JitEngineDeviceCUDA::extractLinkedBitcode(
 }
 
 HashT JitEngineDeviceCUDA::getModuleHash(BinaryInfo &BinInfo) {
+  TIMESCOPE(JitEngineDeviceCUDA, getModuleHash);
   if (BinInfo.hasModuleHash())
     return BinInfo.getModuleHash();
 
@@ -106,6 +108,7 @@ JitEngineDeviceCUDA::tryExtractKernelModule(BinaryInfo &, StringRef,
 }
 
 void JitEngineDeviceCUDA::extractModules(BinaryInfo &BinInfo) {
+  TIMESCOPE(JitEngineDeviceCUDA, extractModules);
   CUmodule CUMod;
 
   FatbinWrapperT *FatbinWrapper = BinInfo.getFatbinWrapper();
@@ -128,6 +131,7 @@ void JitEngineDeviceCUDA::extractModules(BinaryInfo &BinInfo) {
 }
 
 JitEngineDeviceCUDA::JitEngineDeviceCUDA() {
+  TIMESCOPE(JitEngineDeviceCUDA, JitEngineDeviceCUDA);
   proteusCuErrCheck(cuInit(0));
 
   CUdevice CUDev;
@@ -163,6 +167,7 @@ JitEngineDeviceCUDA::JitEngineDeviceCUDA() {
 
 std::unique_ptr<MemoryBuffer>
 JitEngineDeviceCUDA::compileOnly(Module &M, bool DisableIROpt) {
+  TIMESCOPE(JitEngineDeviceCUDA, compileOnly);
   if (!DisableIROpt) {
     const auto &CGConfig = Config::get().getCGConfig();
     proteus::optimizeIR(M, DeviceArch, CGConfig.optLevel(),

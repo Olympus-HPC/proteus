@@ -1,4 +1,5 @@
 #include "proteus/impl/Frontend/CppJitCompiler.h"
+#include "proteus/TimeTracing.h"
 
 #if PROTEUS_ENABLE_CUDA
 
@@ -27,6 +28,7 @@ std::string readTempFile(const SmallString<128> &Path) {
 class CppJitCompilerNvcc : public CppJitCompiler {
 private:
   CppJitArtifact compileToCubin(const CppJitCompileRequest &Request) {
+    TIMESCOPE(CppJitCompilerNvcc, compileToCubin);
 #if !defined(PROTEUS_NVCC_BIN)
     reportFatalError(
         "NVCC backend selected but PROTEUS_NVCC_BIN is not configured");
@@ -126,6 +128,7 @@ private:
   }
 
   CppJitArtifact compileToDynamicLibrary(const CppJitCompileRequest &Request) {
+    TIMESCOPE(CppJitCompilerNvcc, compileToDynamicLibrary);
 #if !defined(PROTEUS_NVCC_BIN)
     reportFatalError(
         "NVCC backend selected but PROTEUS_NVCC_BIN is not configured");
@@ -222,6 +225,7 @@ private:
 
 public:
   CppJitArtifact compile(const CppJitCompileRequest &Request) override {
+    TIMESCOPE(CppJitCompilerNvcc, compile);
     switch (Request.TargetModel) {
     case TargetModelType::CUDA:
       return compileToCubin(Request);

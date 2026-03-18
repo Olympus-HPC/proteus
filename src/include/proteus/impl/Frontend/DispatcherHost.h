@@ -2,6 +2,7 @@
 #define PROTEUS_FRONTEND_DISPATCHER_HOST_H
 
 #include "proteus/Frontend/Dispatcher.h"
+#include "proteus/TimeTracing.h"
 #include "proteus/impl/Caching/ObjectCacheChain.h"
 #include "proteus/impl/CompiledLibrary.h"
 #include "proteus/impl/JitEngineHost.h"
@@ -19,6 +20,7 @@ public:
                                         std::unique_ptr<Module> Mod,
                                         const HashT &ModuleHash,
                                         bool DisableIROpt = false) override {
+    TIMESCOPE(DispatcherHost, compile);
     // This is necessary to ensure Ctx outlives M. Setting [[maybe_unused]] can
     // trigger a lifetime bug.
     auto CtxOwner = std::move(Ctx);
@@ -50,6 +52,7 @@ public:
 
   void *getFunctionAddress(const std::string &FnName, const HashT &ModuleHash,
                            CompiledLibrary &Library) override {
+    TIMESCOPE(DispatcherHost, getFunctionAddress);
     HashT FuncHash = hash(FnName, ModuleHash);
 
     if (void *FuncPtr = CodeCache.lookup(FuncHash))

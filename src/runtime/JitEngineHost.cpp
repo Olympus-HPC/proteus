@@ -135,7 +135,7 @@ JitEngineHost::~JitEngineHost() {
 
 void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
                                  ArrayRef<RuntimeConstant> RCArray) {
-  TIMESCOPE("specializeIR");
+  TIMESCOPE(JitEngineHost, specializeIR);
   Function *F = M.getFunction(FnName);
   assert(F && "Expected non-null function!");
 
@@ -177,6 +177,7 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
 
 void getLambdaJitValues(StringRef FnName,
                         SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
+  TIMESCOPE("proteus::getLambdaJitValues");
   LambdaRegistry &LR = LambdaRegistry::instance();
   if (LR.empty())
     return;
@@ -199,7 +200,7 @@ void *
 JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
                               void **Args,
                               ArrayRef<RuntimeConstantInfo *> RCInfoArray) {
-  TIMESCOPE("compileAndLink");
+  TIMESCOPE(JitEngineHost, compileAndLink);
 
   StringRef StrIR(IR, IRSize);
   auto Ctx = std::make_unique<LLVMContext>();
@@ -278,6 +279,7 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 
 std::unique_ptr<MemoryBuffer> JitEngineHost::compileOnly(Module &M,
                                                          bool DisableIROpt) {
+  TIMESCOPE(JitEngineHost, compileOnly);
   // Create the target machine using JITTargetMachineBuilder to match ORC JIT
   // loading.
   auto ExpectedTM =
@@ -320,6 +322,7 @@ std::unique_ptr<MemoryBuffer> JitEngineHost::compileOnly(Module &M,
 }
 
 void JitEngineHost::loadCompiledLibrary(CompiledLibrary &Library) {
+  TIMESCOPE(JitEngineHost, loadCompiledLibrary);
   // Create an isolated JITDyLib context and load the compiled library for
   // linking and symbol retrieval.
   auto &ES = LLJITPtr->getExecutionSession();
@@ -356,6 +359,7 @@ void JitEngineHost::loadCompiledLibrary(CompiledLibrary &Library) {
 
 void *JitEngineHost::getFunctionAddress(StringRef FnName,
                                         CompiledLibrary &Library) {
+  TIMESCOPE(JitEngineHost, getFunctionAddress);
   // Lookup the function address corresponding the dynamic library context of
   // the compiled library.
   assert(Library.JitDyLib && "Expected non-null JIT dylib");

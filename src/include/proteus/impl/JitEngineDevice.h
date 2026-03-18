@@ -13,6 +13,7 @@
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Init.h"
+#include "proteus/TimeTracing.h"
 #include "proteus/impl/Caching/MemoryCache.h"
 #include "proteus/impl/Caching/ObjectCacheChain.h"
 #include "proteus/impl/Cloning.h"
@@ -24,7 +25,6 @@
 #include "proteus/impl/Hashing.h"
 #include "proteus/impl/JitEngine.h"
 #include "proteus/impl/JitEngineInfoRegistry.h"
-#include "proteus/TimeTracing.h"
 #include "proteus/impl/Utils.h"
 
 #include <llvm/ADT/SmallPtrSet.h>
@@ -106,6 +106,7 @@ public:
 
   bool hasLinkedModule() const { return (LinkedModule != nullptr); }
   Module &getLinkedModule() {
+    TIMESCOPE(BinaryInfo, getLinkedModule);
     if (!LinkedModule) {
       if (!hasExtractedModules())
         reportFatalError("Expected extracted modules");
@@ -291,6 +292,7 @@ public:
   std::pair<std::unique_ptr<Module>, std::unique_ptr<MemoryBuffer>>
   extractKernelModule(BinaryInfo &BinInfo, StringRef KernelName,
                       LLVMContext &Ctx) {
+    TIMESCOPE(JitEngineDevice, extractKernelModule);
     std::unique_ptr<Module> KernelModule =
         static_cast<ImplT &>(*this).tryExtractKernelModule(BinInfo, KernelName,
                                                            Ctx);
@@ -364,7 +366,7 @@ public:
   }
 
   void extractModuleAndBitcode(JITKernelInfo &KernelInfo) {
-    TIMESCOPE(__FUNCTION__)
+    TIMESCOPE(JitEngineDevice, extractModuleAndBitcode);
 
     if (KernelInfo.hasModule() && KernelInfo.hasBitcode())
       return;
@@ -414,6 +416,7 @@ public:
 
   void getLambdaJitValues(JITKernelInfo &KernelInfo,
                           SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
+    TIMESCOPE(JitEngineDevice, getLambdaJitValues);
     LambdaRegistry &LR = LambdaRegistry::instance();
     if (LR.empty()) {
       KernelInfo.setLambdaCalleeInfo({});
@@ -508,6 +511,7 @@ public:
 
 protected:
   JitEngineDevice() {
+    TIMESCOPE(JitEngineDevice, JitEngineDevice);
     auto &JitEngineInfo = JitEngineInfoRegistry::instance();
 
     for (auto &[Handle, FatbinInfo] : JitEngineInfo.FatbinaryMap) {
@@ -565,7 +569,7 @@ typename DeviceTraits<ImplT>::DeviceError_t
 JitEngineDevice<ImplT>::compileAndRun(
     JITKernelInfo &KernelInfo, dim3 GridDim, dim3 BlockDim, void **KernelArgs,
     uint64_t ShmemSize, typename DeviceTraits<ImplT>::DeviceStream_t Stream) {
-  TIMESCOPE("compileAndRun");
+  TIMESCOPE(JitEngineDevice, compileAndRun);
 
   auto &BinInfo = KernelInfo.getBinaryInfo();
 
@@ -671,6 +675,7 @@ template <typename ImplT>
 void JitEngineDevice<ImplT>::registerFatBinary(void *Handle,
                                                FatbinWrapperT *FatbinWrapper,
                                                const char *ModuleId) {
+  TIMESCOPE(JitEngineDevice, registerFatBinary);
   PROTEUS_DBG(Logger::logs("proteus")
               << "Register fatbinary Handle " << Handle << " FatbinWrapper "
               << FatbinWrapper << " Binary " << (void *)FatbinWrapper->Binary
@@ -699,6 +704,7 @@ void JitEngineDevice<ImplT>::registerFatBinary(void *Handle,
 }
 
 template <typename ImplT> void JitEngineDevice<ImplT>::finalizeRegistration() {
+  TIMESCOPE(JitEngineDevice, finalizeRegistration);
   PROTEUS_DBG(Logger::logs("proteus") << "Finalize registration\n");
   // Erase linked binaries for which we have LLVM IR code, those binaries are
   // stored in the ModuleIdToFatBinary map.
@@ -740,6 +746,7 @@ template <typename ImplT>
 void JitEngineDevice<ImplT>::registerLinkedBinary(void *Handle,
                                                   FatbinWrapperT *FatbinWrapper,
                                                   const char *ModuleId) {
+  TIMESCOPE(JitEngineDevice, registerLinkedBinary);
   PROTEUS_DBG(Logger::logs("proteus")
               << "Register linked binary FatBinary " << FatbinWrapper
               << " Binary " << (void *)FatbinWrapper->Binary << " ModuleId "

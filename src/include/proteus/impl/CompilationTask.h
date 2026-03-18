@@ -42,6 +42,7 @@ private:
   std::optional<std::string> PassPipeline;
 
   std::unique_ptr<Module> cloneKernelModule(LLVMContext &Ctx) {
+    TIMESCOPE(CompilationTask, cloneKernelModule);
     auto ClonedModule = parseBitcodeFile(Bitcode, Ctx);
     if (auto E = ClonedModule.takeError()) {
       reportFatalError("Failed to parse bitcode" + toString(std::move(E)));
@@ -51,6 +52,7 @@ private:
   }
 
   void invokeOptimizeIR(Module &M) {
+    TIMESCOPE(CompilationTask, invokeOptimizeIR);
 #if PROTEUS_ENABLE_CUDA
     // For CUDA we always run the optimization pipeline.
     if (!PassPipeline)
@@ -120,6 +122,7 @@ public:
   HashT getHashValue() const { return HashValue; }
 
   std::unique_ptr<MemoryBuffer> compile() {
+    TIMESCOPE(CompilationTask, compile);
     struct TimerRAII {
       std::chrono::high_resolution_clock::time_point Start, End;
       HashT HashValue;

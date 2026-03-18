@@ -15,7 +15,7 @@ namespace proteus {
 
 class TimeTracerRAII {
 public:
-  TimeTracerRAII(bool Enable, std::string OutputFile);
+  TimeTracerRAII(bool Enable, std::string OutputFile, int GranularityUs);
   ~TimeTracerRAII();
 
   TimeTracerRAII(const TimeTracerRAII &) = delete;
@@ -24,6 +24,18 @@ public:
 private:
   bool Enabled = false;
   std::string OutputFile;
+};
+
+class TimeTraceThreadRAII {
+public:
+  TimeTraceThreadRAII();
+  ~TimeTraceThreadRAII();
+
+  TimeTraceThreadRAII(const TimeTraceThreadRAII &) = delete;
+  TimeTraceThreadRAII &operator=(const TimeTraceThreadRAII &) = delete;
+
+private:
+  bool Enabled = false;
 };
 
 } // namespace proteus

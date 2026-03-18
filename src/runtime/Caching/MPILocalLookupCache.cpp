@@ -21,7 +21,7 @@ MPILocalLookupCache::MPILocalLookupCache(const std::string &Label)
 
 std::unique_ptr<CompiledLibrary>
 MPILocalLookupCache::lookup(const HashT &HashValue) {
-  TIMESCOPE("MPILocalLookupCache::lookup");
+  TIMESCOPE(MPILocalLookupCache, lookup);
   Accesses++;
 
   auto Result = lookupFromDisk(HashValue);

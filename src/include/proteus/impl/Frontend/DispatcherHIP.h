@@ -5,6 +5,7 @@
 
 #include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.h"
+#include "proteus/TimeTracing.h"
 #include "proteus/impl/Caching/ObjectCacheChain.h"
 #include "proteus/impl/JitEngineDeviceHIP.h"
 
@@ -26,6 +27,7 @@ public:
                                         std::unique_ptr<Module> Mod,
                                         const HashT &ModuleHash,
                                         bool DisableIROpt = false) override {
+    TIMESCOPE(DispatcherHIP, compile);
     // This is necessary to ensure Ctx outlives M. Setting [[maybe_unused]] can
     // trigger a lifetime bug.
     auto CtxOwner = std::move(Ctx);
@@ -139,6 +141,7 @@ public:
   DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
                         LaunchDims BlockDim, void *KernelArgs[],
                         uint64_t ShmemSize, void *Stream) override {
+    TIMESCOPE(DispatcherHIP, launch);
     dim3 HipGridDim = {GridDim.X, GridDim.Y, GridDim.Z};
     dim3 HipBlockDim = {BlockDim.X, BlockDim.Y, BlockDim.Z};
     hipStream_t HipStream = reinterpret_cast<hipStream_t>(Stream);
@@ -159,6 +162,7 @@ public:
   void *getFunctionAddress(const std::string &KernelName,
                            const HashT &ModuleHash,
                            CompiledLibrary &Library) override {
+    TIMESCOPE(DispatcherHIP, getFunctionAddress);
     auto GetKernelFunc = [&]() {
       // Hash the kernel name to get a unique id.
       HashT HashValue = hash(KernelName, ModuleHash);

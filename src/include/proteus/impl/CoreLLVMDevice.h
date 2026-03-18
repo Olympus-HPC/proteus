@@ -147,6 +147,7 @@ inline void setKernelDimsRange(Module &M, dim3 &GridDim, dim3 &BlockDim) {
 inline void replaceGlobalVariablesWithPointers(
     Module &M,
     const std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo) {
+  TIMESCOPE("proteus::replaceGlobalVariablesWithPointers");
   // Re-link globals to fixed addresses provided by registered
   // variables.
   for (auto RegisterVar : VarNameToGlobalInfo) {
@@ -227,6 +228,7 @@ inline void replaceGlobalVariablesWithPointers(
 inline void relinkGlobalsObject(
     MemoryBufferRef Object,
     const std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo) {
+  TIMESCOPE("proteus::relinkGlobalsObject");
   Expected<object::ELF64LEObjectFile> DeviceElfOrErr =
       object::ELF64LEObjectFile::create(Object);
   if (auto E = DeviceElfOrErr.takeError())
@@ -285,6 +287,7 @@ inline void specializeIR(
     const SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo,
     bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsRange,
     bool SpecializeLaunchBounds, int MinBlocksPerSM) {
+  TIMESCOPE("proteus::specializeIR");
   Timer T(Config::get().ProteusEnableTimers);
   Function *F = M.getFunction(FnName);
 

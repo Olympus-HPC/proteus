@@ -9,10 +9,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "proteus/impl/JitEngineDeviceHIP.h"
+#include "proteus/TimeTracing.h"
 #include "proteus/impl/CoreDevice.h"
 #include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/CoreLLVMHIP.h"
-#include "proteus/TimeTracing.h"
 
 #if LLVM_VERSION_MAJOR == 18
 #include <lld/Common/Driver.h>
@@ -33,6 +33,7 @@ JitEngineDeviceHIP &JitEngineDeviceHIP::instance() {
 
 #if LLVM_VERSION_MAJOR >= 18
 static Expected<std::unique_ptr<MemoryBuffer>> decompress(StringRef Blob) {
+  TIMESCOPE("proteus::decompress");
   static constexpr size_t MagicSize = 4;
   static constexpr size_t VersionFieldSize = sizeof(uint16_t);
   static constexpr size_t MethodFieldSize = sizeof(uint16_t);
@@ -99,6 +100,7 @@ static Expected<std::unique_ptr<MemoryBuffer>> decompress(StringRef Blob) {
 
 static std::unique_ptr<MemoryBuffer> getDeviceBinary(BinaryInfo &BinInfo,
                                                      StringRef DeviceArch) {
+  TIMESCOPE("proteus::getDeviceBinary");
   FatbinWrapperT *FatbinWrapper = BinInfo.getFatbinWrapper();
 
 #if LLVM_VERSION_MAJOR >= 18
@@ -181,6 +183,7 @@ static std::unique_ptr<MemoryBuffer> getDeviceBinary(BinaryInfo &BinInfo,
 
 static Expected<object::ELF64LEFile> getDeviceElf(BinaryInfo &BinInfo,
                                                   StringRef DeviceArch) {
+  TIMESCOPE("proteus::getDeviceElf");
   if (!BinInfo.hasDeviceBinary())
     BinInfo.setDeviceBinary(getDeviceBinary(BinInfo, DeviceArch));
 
@@ -191,6 +194,7 @@ static Expected<object::ELF64LEFile> getDeviceElf(BinaryInfo &BinInfo,
 }
 
 HashT JitEngineDeviceHIP::getModuleHash(BinaryInfo &BinInfo) {
+  TIMESCOPE(JitEngineDeviceHIP, getModuleHash);
   if (BinInfo.hasModuleHash())
     return BinInfo.getModuleHash();
 
@@ -247,6 +251,7 @@ HashT JitEngineDeviceHIP::getModuleHash(BinaryInfo &BinInfo) {
 
 std::unique_ptr<Module> JitEngineDeviceHIP::tryExtractKernelModule(
     BinaryInfo &BinInfo, StringRef KernelName, LLVMContext &Ctx) {
+  TIMESCOPE(JitEngineDeviceHIP, tryExtractKernelModule);
   Expected<object::ELF64LEFile> DeviceElf = getDeviceElf(BinInfo, DeviceArch);
   if (DeviceElf.takeError())
     reportFatalError("Cannot create the device elf");
@@ -302,6 +307,7 @@ std::unique_ptr<Module> JitEngineDeviceHIP::tryExtractKernelModule(
 }
 
 void JitEngineDeviceHIP::extractModules(BinaryInfo &BinInfo) {
+  TIMESCOPE(JitEngineDeviceHIP, extractModules);
   Expected<object::ELF64LEFile> DeviceElf = getDeviceElf(BinInfo, DeviceArch);
   if (DeviceElf.takeError())
     reportFatalError("Cannot create the device elf");
@@ -358,6 +364,7 @@ void JitEngineDeviceHIP::extractModules(BinaryInfo &BinInfo) {
 }
 
 JitEngineDeviceHIP::JitEngineDeviceHIP() {
+  TIMESCOPE(JitEngineDeviceHIP, JitEngineDeviceHIP);
   hipDeviceProp_t DevProp;
   proteusHipErrCheck(hipGetDeviceProperties(&DevProp, 0));
 
@@ -367,6 +374,7 @@ JitEngineDeviceHIP::JitEngineDeviceHIP() {
 
 std::unique_ptr<MemoryBuffer>
 JitEngineDeviceHIP::compileOnly(Module &M, bool DisableIROpt) {
+  TIMESCOPE(JitEngineDeviceHIP, compileOnly);
   if (!DisableIROpt) {
     const auto &CGConfig = Config::get().getCGConfig();
     proteus::optimizeIR(M, DeviceArch, CGConfig.optLevel(),

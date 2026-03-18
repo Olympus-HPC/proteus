@@ -139,6 +139,7 @@ inline Expected<sys::fs::TempFile> createTempFile(StringRef Prefix,
 inline SmallVector<std::unique_ptr<sys::fs::TempFile>>
 codegenSerial(Module &M, StringRef DeviceArch,
               [[maybe_unused]] char OptLevel = '3', int CodegenOptLevel = 3) {
+  TIMESCOPE("proteus::codegenSerial");
   SmallVector<std::unique_ptr<sys::fs::TempFile>> ObjectFiles;
 
   auto ExpectedTM =
@@ -185,6 +186,7 @@ codegenSerial(Module &M, StringRef DeviceArch,
 inline SmallVector<std::unique_ptr<sys::fs::TempFile>>
 codegenParallel(Module &M, StringRef DeviceArch, unsigned int OptLevel = 3,
                 int CodegenOptLevel = 3) {
+  TIMESCOPE("proteus::codegenParallel");
   // Use regular LTO with parallelism enabled to parallelize codegen.
   std::atomic<bool> LTOError = false;
 
@@ -369,6 +371,7 @@ codegenParallel(Module &M, StringRef DeviceArch, unsigned int OptLevel = 3,
 
 inline std::unique_ptr<MemoryBuffer> codegenRTC(Module &M,
                                                 StringRef DeviceArch) {
+  TIMESCOPE("proteus::codegenRTC");
   char *BinOut;
   size_t BinSize;
 
@@ -438,6 +441,7 @@ inline std::unique_ptr<MemoryBuffer>
 codegenObject(Module &M, StringRef DeviceArch,
               [[maybe_unused]] SmallPtrSetImpl<void *> &GlobalLinkedBinaries,
               CodegenOption CGOption = CodegenOption::RTC) {
+  TIMESCOPE("proteus::codegenObjectHIP");
   assert(GlobalLinkedBinaries.empty() &&
          "Expected empty linked binaries for HIP");
   Timer T(Config::get().ProteusEnableTimers);

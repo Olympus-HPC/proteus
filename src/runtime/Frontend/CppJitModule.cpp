@@ -1,9 +1,8 @@
 #include "proteus/CppJitModule.h"
-
+#include "proteus/TimeTracing.h"
+#include "proteus/impl/CompiledLibrary.h"
 #include "proteus/impl/Frontend/CppJitCompiler.h"
 #include "proteus/impl/Frontend/CppJitFuncAttribute.h"
-
-#include "proteus/impl/CompiledLibrary.h"
 
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
@@ -35,6 +34,8 @@ CppJitModule::CppJitModule(const std::string &Target, const std::string &Code,
 CppJitModule::~CppJitModule() = default;
 
 void CppJitModule::compile() {
+  TIMESCOPE(CppJitModule, compile);
+
   if ((Library = Dispatch.lookupCompiledLibrary(*ModuleHash))) {
     IsCompiled = true;
     return;
@@ -83,12 +84,14 @@ void CppJitModule::setFuncAttribute(void *KernelFunc, CppJitFuncAttribute Attr,
 }
 
 void *CppJitModule::getFunctionAddress(const std::string &Name) {
+  TIMESCOPE(CppJitModule, getFunctionAddress);
   return Dispatch.getFunctionAddress(Name, *ModuleHash, getLibrary());
 }
 
 DispatchResult CppJitModule::launch(void *KernelFunc, LaunchDims GridDim,
                                     LaunchDims BlockDim, void *KernelArgs[],
                                     uint64_t ShmemSize, void *Stream) {
+  TIMESCOPE(CppJitModule, launch);
   return Dispatch.launch(KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize,
                          Stream);
 }

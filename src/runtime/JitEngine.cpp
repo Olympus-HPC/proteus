@@ -18,7 +18,8 @@
 namespace proteus {
 
 static TimeTracerRAII TimeTracer(Config::get().ProteusEnableTimeTrace,
-                                 Config::get().ProteusTimeTraceFile);
+                                 Config::get().ProteusTimeTraceFile,
+                                 Config::get().ProteusTimeTraceGrainUs);
 
 using namespace llvm;
 
@@ -30,7 +31,7 @@ JitEngine::JitEngine() {
 
 SmallVector<RuntimeConstant> JitEngine::getRuntimeConstantValues(
     void **Args, ArrayRef<RuntimeConstantInfo *> RCInfoArray) {
-  TIMESCOPE(__FUNCTION__);
+  TIMESCOPE(JitEngine, getRuntimeConstantValues);
 
   SmallVector<RuntimeConstant> RCVec;
   RCVec.reserve(RCInfoArray.size());

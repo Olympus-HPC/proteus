@@ -110,7 +110,7 @@ void ObjectCacheChain::promoteToLevel(const HashT &HashValue,
 
 std::unique_ptr<CompiledLibrary>
 ObjectCacheChain::lookup(const HashT &HashValue) {
-  TIMESCOPE("ObjectCacheChain::lookup");
+  TIMESCOPE(ObjectCacheChain, lookup);
 
   // Search from fastest (index 0) to slowest.
   for (size_t I = 0; I < Caches.size(); ++I) {
@@ -147,7 +147,7 @@ ObjectCacheChain::lookup(const HashT &HashValue) {
 }
 
 void ObjectCacheChain::store(const HashT &HashValue, const CacheEntry &Entry) {
-  TIMESCOPE("ObjectCacheChain::store");
+  TIMESCOPE(ObjectCacheChain, store);
 
   for (auto &Cache : Caches) {
     Cache->store(HashValue, Entry);
