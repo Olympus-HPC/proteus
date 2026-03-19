@@ -182,6 +182,7 @@ struct InitLLVMTargets {
 
 inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
                        unsigned CodegenOptLevel) {
+  TIMESCOPE("proteus::optimizeIR");
   Timer T(Config::get().ProteusEnableTimers);
   detail::runOptimizationPassPipeline(M, Arch, OptLevel, CodegenOptLevel);
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
@@ -192,6 +193,7 @@ inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
 inline void optimizeIR(Module &M, StringRef Arch,
                        const std::string &PassPipeline,
                        unsigned CodegenOptLevel) {
+  TIMESCOPE("proteus::optimizeIR");
   Timer T(Config::get().ProteusEnableTimers);
   auto TraceOut = [](const std::string &PassPipeline) {
     SmallString<128> S;
@@ -213,6 +215,7 @@ inline void optimizeIR(Module &M, StringRef Arch,
 inline std::unique_ptr<Module>
 linkModules(LLVMContext &Ctx,
             SmallVector<std::unique_ptr<Module>> LinkedModules) {
+  TIMESCOPE("proteus::linkModules");
   if (LinkedModules.empty())
     reportFatalError("Expected jit module");
 
@@ -229,6 +232,7 @@ linkModules(LLVMContext &Ctx,
 }
 
 inline void runCleanupPassPipeline(Module &M) {
+  TIMESCOPE("proteus::runCleanupPassPipeline");
   PassBuilder PB;
   LoopAnalysisManager LAM;
   FunctionAnalysisManager FAM;

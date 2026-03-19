@@ -1,4 +1,5 @@
 #include "proteus/impl/Frontend/CppJitCompiler.h"
+#include "proteus/TimeTracing.h"
 
 #include <clang/CodeGen/CodeGenAction.h>
 #include <clang/Driver/Compilation.h>
@@ -44,6 +45,7 @@ void initializeCompilerInstance(CompilerInstance &Compiler) {
 class CppJitCompilerClang : public CppJitCompiler {
 private:
   CppJitArtifact compileToDynamicLibrary(const CppJitCompileRequest &Request) {
+    TIMESCOPE(CppJitCompilerClang, compileToDynamicLibrary);
     CompilerInstance Compiler;
     initializeCompilerInstance(Compiler);
 
@@ -112,6 +114,7 @@ private:
   }
 
   CppJitArtifact compileToIR(const CppJitCompileRequest &Request) {
+    TIMESCOPE(CppJitCompilerClang, compileToIR);
     CompilerInstance Compiler;
     initializeCompilerInstance(Compiler);
 
@@ -196,6 +199,7 @@ private:
 
 public:
   CppJitArtifact compile(const CppJitCompileRequest &Request) override {
+    TIMESCOPE(CppJitCompilerClang, compile);
     switch (Request.TargetModel) {
     case TargetModelType::HOST_CUDA:
     case TargetModelType::HOST_HIP:

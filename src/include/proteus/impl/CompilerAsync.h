@@ -4,6 +4,8 @@
 #include "proteus/impl/CompilationTask.h"
 #include "proteus/impl/Debug.h"
 #include "proteus/impl/Hashing.h"
+#include "proteus/impl/TimeTracingInit.h"
+#include "proteus/TimeTracing.h"
 
 #include <condition_variable>
 #include <deque>
@@ -57,6 +59,7 @@ public:
   }
 
   void run() {
+    TimeTraceThreadRAII TimeTraceThread;
     [[maybe_unused]] int Count = 0;
     while (Active) {
       std::unique_lock Lock(Mutex);
@@ -113,6 +116,7 @@ public:
 
   std::unique_ptr<MemoryBuffer> takeCompilationResult(HashT HashValue,
                                                       bool BlockingWait) {
+    TIMESCOPE(CompilerAsync, takeCompilationResult);
     std::unique_lock Lock{Mutex};
     auto It = CompilationResultMap.find(HashValue);
     if (It == CompilationResultMap.end())

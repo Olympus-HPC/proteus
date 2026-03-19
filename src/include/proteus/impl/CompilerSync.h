@@ -4,6 +4,7 @@
 #include "proteus/impl/CompilationTask.h"
 #include "proteus/impl/Debug.h"
 #include "proteus/impl/Hashing.h"
+#include "proteus/TimeTracing.h"
 
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 
@@ -19,6 +20,7 @@ public:
   }
 
   std::unique_ptr<MemoryBuffer> compile(CompilationTask &&CT) {
+    TIMESCOPE(CompilerSync, compile);
     return CT.compile();
   }
 

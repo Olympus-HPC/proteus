@@ -12,6 +12,7 @@
 #include "proteus/impl/CompilerInterfaceDeviceInternal.h"
 #include "proteus/impl/JitEngineDevice.h"
 #include "proteus/impl/JitEngineInfoRegistry.h"
+#include "proteus/TimeTracing.h"
 
 using namespace proteus;
 
@@ -62,6 +63,7 @@ __jit_register_function(void *Handle, void *Kernel, char *KernelName,
 extern "C" proteus::DeviceTraits<JitDeviceImplT>::DeviceError_t
 __jit_launch_kernel(void *Kernel, dim3 GridDim, dim3 BlockDim,
                     void **KernelArgs, uint64_t ShmemSize, void *Stream) {
+  TIMESCOPE("__jit_launch_kernel");
   return __jit_launch_kernel_internal(Kernel, GridDim, BlockDim, KernelArgs,
                                       ShmemSize, Stream);
 }

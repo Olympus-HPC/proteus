@@ -1,4 +1,5 @@
 #include "proteus/impl/Frontend/CppJitCompiler.h"
+#include "proteus/TimeTracing.h"
 
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
@@ -61,6 +62,7 @@ HashT computeCppJitModuleHash(TargetModelType TM, CppJitCompilerBackend Backend,
 
 std::unique_ptr<CppJitCompiler>
 createCppJitCompiler(const CppJitCompileRequest &Request) {
+  TIMESCOPE("proteus::createCppJitCompiler");
   switch (Request.Backend) {
   case CppJitCompilerBackend::Clang:
     return createCppJitCompilerClang();

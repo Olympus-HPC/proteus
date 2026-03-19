@@ -1,5 +1,4 @@
 #include "proteus/TimeTracing.h"
-
 #include "proteus/impl/TimeTracingInit.h"
 
 #include <llvm/Support/Error.h>
@@ -7,12 +6,15 @@
 
 namespace proteus {
 
+namespace {
+unsigned ProcessTimeTraceGranularityUs = 0;
+constexpr llvm::StringLiteral TimeTraceProcessName = "proteus";
+} // namespace
+
 struct TimeTraceScopeWrapper {
-  std::string NameStorage;
   llvm::TimeTraceScope Scope;
 
-  explicit TimeTraceScopeWrapper(std::string_view Name)
-      : NameStorage(Name), Scope(NameStorage) {}
+  explicit TimeTraceScopeWrapper(std::string_view Name) : Scope(Name) {}
 };
 
 ScopedTimeTrace::ScopedTimeTrace(std::string_view Name) {
@@ -22,10 +24,15 @@ ScopedTimeTrace::ScopedTimeTrace(std::string_view Name) {
 
 ScopedTimeTrace::~ScopedTimeTrace() = default;
 
-TimeTracerRAII::TimeTracerRAII(bool Enable, std::string OutputFile)
+TimeTracerRAII::TimeTracerRAII(bool Enable, std::string OutputFile,
+                               int GranularityUs)
     : Enabled(Enable), OutputFile(std::move(OutputFile)) {
-  if (Enabled)
-    llvm::timeTraceProfilerInitialize(500 /* us */, "proteus");
+  if (!Enabled)
+    return;
+
+  ProcessTimeTraceGranularityUs = GranularityUs;
+  llvm::timeTraceProfilerInitialize(ProcessTimeTraceGranularityUs,
+                                    TimeTraceProcessName);
 }
 
 TimeTracerRAII::~TimeTracerRAII() {
@@ -39,14 +46,24 @@ TimeTracerRAII::~TimeTracerRAII() {
   llvm::timeTraceProfilerCleanup();
 }
 
+TimeTraceThreadRAII::TimeTraceThreadRAII() {
+  Enabled = llvm::timeTraceProfilerEnabled();
+  if (Enabled)
+    llvm::timeTraceProfilerInitialize(ProcessTimeTraceGranularityUs,
+                                      TimeTraceProcessName);
+}
+
+TimeTraceThreadRAII::~TimeTraceThreadRAII() {
+  if (Enabled)
+    llvm::timeTraceProfilerFinishThread();
+}
+
 Timer::Timer(bool Enabled) : Enabled(Enabled) {
   if (this->Enabled)
     Start = Clock::now();
 }
 
-uint64_t Timer::elapsed() {
-  return elapsedAs<std::chrono::milliseconds>();
-}
+uint64_t Timer::elapsed() { return elapsedAs<std::chrono::milliseconds>(); }
 
 void Timer::reset() {
   if (!Enabled)

@@ -33,7 +33,7 @@ MPIRemoteLookupCache::MPIRemoteLookupCache(const std::string &Label)
 
 std::unique_ptr<CompiledLibrary>
 MPIRemoteLookupCache::lookup(const HashT &HashValue) {
-  TIMESCOPE("MPIRemoteLookupCache::lookup");
+  TIMESCOPE(MPIRemoteLookupCache, lookup);
   Accesses++;
 
   // Rank 0 reads directly from disk to avoid sending a LookupRequest to its
@@ -48,6 +48,7 @@ MPIRemoteLookupCache::lookup(const HashT &HashValue) {
 
 std::unique_ptr<CompiledLibrary>
 MPIRemoteLookupCache::lookupRemote(const HashT &HashValue) {
+  TIMESCOPE(MPIRemoteLookupCache, lookupRemote);
   MPI_Comm Comm = CommHandle.get();
 
   auto ReqBuf = packLookupRequest(HashValue);
@@ -89,6 +90,7 @@ void MPIRemoteLookupCache::handleMessage(MPI_Status &Status, MPITag Tag) {
 }
 
 void MPIRemoteLookupCache::handleLookupRequest(MPI_Status &Status) {
+  TIMESCOPE(MPIRemoteLookupCache, handleLookupRequest);
   MPI_Comm Comm = CommHandle.get();
   int SourceRank = Status.MPI_SOURCE;
 

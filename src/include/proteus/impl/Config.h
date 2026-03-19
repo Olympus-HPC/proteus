@@ -352,6 +352,7 @@ public:
   std::string ProteusObjectCacheChain;
   bool ProteusEnableTimeTrace;
   std::string ProteusTimeTraceFile;
+  int ProteusTimeTraceGrainUs;
   int ProteusCommThreadPollMs;
 
   const CodeGenerationConfig &getCGConfig(llvm::StringRef KName = "") const {
@@ -426,6 +427,10 @@ private:
         getEnvOrDefaultBool("PROTEUS_ENABLE_TIME_TRACE", false);
     ProteusTimeTraceFile =
         getEnvOrDefaultString("PROTEUS_TIME_TRACE_FILE").value_or("");
+    ProteusTimeTraceGrainUs =
+        getEnvOrDefaultInt("PROTEUS_TIME_TRACE_GRAIN", 500);
+    if (ProteusTimeTraceGrainUs <= 0)
+      reportFatalError("PROTEUS_TIME_TRACE_GRAIN must be > 0");
     ProteusCommThreadPollMs =
         getEnvOrDefaultInt("PROTEUS_COMM_THREAD_POLL_MS", 25);
   }

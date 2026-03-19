@@ -12,7 +12,6 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
-#include <string>
 #include <string_view>
 
 namespace proteus {
@@ -55,7 +54,18 @@ private:
   Clock::time_point Start;
 };
 
-#define TIMESCOPE(x) ::proteus::ScopedTimeTrace STT_##__LINE__(x);
+// Use TIMESCOPE("Explicit::Label") for explicit phase names and
+// TIMESCOPE(Class, Method) to emit a stable "Class::Method" label.
+#define PROTEUS_TIMESCOPE_VAR(Line) STT_##Line
+#define PROTEUS_TIMESCOPE_VAR_EXPAND(Line) PROTEUS_TIMESCOPE_VAR(Line)
+#define PROTEUS_TIMESCOPE_1(Label)                                             \
+  ::proteus::ScopedTimeTrace PROTEUS_TIMESCOPE_VAR_EXPAND(__LINE__)(Label);
+#define PROTEUS_TIMESCOPE_2(Class, Method)                                     \
+  PROTEUS_TIMESCOPE_1(#Class "::" #Method)
+#define PROTEUS_GET_TIMESCOPE(_1, _2, NAME, ...) NAME
+#define TIMESCOPE(...)                                                         \
+  PROTEUS_GET_TIMESCOPE(__VA_ARGS__, PROTEUS_TIMESCOPE_2,                      \
+                        PROTEUS_TIMESCOPE_1)(__VA_ARGS__)
 
 } // namespace proteus
 

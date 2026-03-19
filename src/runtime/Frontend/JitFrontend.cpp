@@ -1,8 +1,7 @@
 #include "proteus/JitFrontend.h"
-
+#include "proteus/TimeTracing.h"
 #include "proteus/impl/CompiledLibrary.h"
 #include "proteus/impl/Hashing.h"
-
 #if defined(PROTEUS_ENABLE_MLIR)
 #include "proteus/Frontend/MLIRCodeBuilder.h"
 #endif
@@ -35,6 +34,8 @@ JitModule::JitModule(const std::string &Target, const std::string &Backend)
 }
 
 void JitModule::compile(bool Verify) {
+  TIMESCOPE(JitModule, compile);
+
   if (IsCompiled)
     return;
 

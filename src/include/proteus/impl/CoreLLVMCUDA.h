@@ -120,6 +120,7 @@ inline void setLaunchBoundsForKernel(Function &F, int MaxThreadsPerSM,
 
 inline void codegenPTX(Module &M, StringRef DeviceArch,
                        SmallVectorImpl<char> &PTXStr) {
+  TIMESCOPE("proteus::codegenPTX");
   // TODO: It is possbile to use PTX directly through the CUDA PTX JIT
   // interface. Maybe useful if we can re-link globals using the CUDA API.
   // Check this reference for PTX JIT caching:
@@ -165,6 +166,7 @@ inline std::unique_ptr<MemoryBuffer>
 codegenObject(Module &M, StringRef DeviceArch,
               SmallPtrSetImpl<void *> &GlobalLinkedBinaries,
               CodegenOption CGOption = CodegenOption::RTC) {
+  TIMESCOPE("proteus::codegenObjectCUDA");
   if (CGOption != CodegenOption::RTC)
     reportFatalError("Only RTC compilation is supported for CUDA");
   SmallVector<char, 4096> PTXStr;

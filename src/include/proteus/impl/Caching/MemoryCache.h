@@ -32,7 +32,7 @@ public:
   MemoryCache(const std::string &Label)
       : Label(Label), DistributedRank(getDistributedRank()) {}
   Function_t lookup(HashT &HashValue) {
-    TIMESCOPE("lookup");
+    TIMESCOPE("MemoryCache::lookup");
     Accesses++;
 
     auto It = CacheMap.find(HashValue);

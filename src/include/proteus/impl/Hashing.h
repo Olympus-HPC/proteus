@@ -140,7 +140,7 @@ inline HashT hashCombine(HashT A, HashT B) {
 
 template <typename FirstT, typename... RestTs>
 inline HashT hash(FirstT &&First, RestTs &&...Rest) {
-  TIMESCOPE(__FUNCTION__);
+  TIMESCOPE("proteus::hash");
   HashT HashValue = hashValue(First);
 
   ((HashValue = hashCombine(HashValue, hashValue(Rest))), ...);
