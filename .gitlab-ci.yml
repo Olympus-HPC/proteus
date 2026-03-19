@@ -61,24 +61,31 @@ variables:
 # included files.
 workflow:
   rules:
-    - changes: &pipeline_trigger_paths
-        - ".gitlab-ci.yml"
-        - ".gitlab/**/*"
-        - "CMakeLists.txt"
-        - "cmake/**/*"
-        - "include/**/*"
-        - "src/**/*"
-        - "scripts/gitlab/**/*"
-        - "tests/**/*"
-        - "packaging/spack/**/*"
+    # Don't compare main to itself; default-branch pipelines should always run.
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
       when: always
-    - changes: &docs_only_paths
-        - "docs/**/*"
-        - "*.md"
-        - "mkdocs.yml"
-        - "COPYRIGHT"
-        - "LICENSE"
-        - "NOTICE"
+    - changes:
+        compare_to: &compare_to_ref "refs/heads/main"
+        paths: &pipeline_trigger_paths
+          - ".gitlab-ci.yml"
+          - ".gitlab/**/*"
+          - "CMakeLists.txt"
+          - "cmake/**/*"
+          - "include/**/*"
+          - "src/**/*"
+          - "scripts/gitlab/**/*"
+          - "tests/**/*"
+          - "packaging/spack/**/*"
+      when: always
+    - changes:
+        compare_to: *compare_to_ref
+        paths: &docs_only_paths
+          - "docs/**/*"
+          - "*.md"
+          - "mkdocs.yml"
+          - "COPYRIGHT"
+          - "LICENSE"
+          - "NOTICE"
       when: always
     - when: always
 
@@ -95,7 +102,11 @@ docs-only:
   interruptible: true
   tags: [shell, oslic]
   rules:
-    - changes: *docs_only_paths
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: never
+    - changes:
+        compare_to: *compare_to_ref
+        paths: *docs_only_paths
   script:
     - echo "Docs-only change detected; skipping heavy GitLab CI."
 
