@@ -96,6 +96,41 @@
         fi
       fi
 
+.pipeline-trigger-rules:
+  rules:
+    - changes:
+        - ".gitlab-ci.yml"
+        - ".gitlab/**/*"
+        - "CMakeLists.txt"
+        - "cmake/**/*"
+        - "include/**/*"
+        - "src/**/*"
+        - "scripts/gitlab/**/*"
+        - "tests/**/*"
+        - "packaging/spack/**/*"
+
+.core-build-rules:
+  rules:
+    - changes:
+        - ".gitlab-ci.yml"
+        - ".gitlab/**/*"
+        - "CMakeLists.txt"
+        - "cmake/**/*"
+        - "include/**/*"
+        - "src/**/*"
+        - "scripts/gitlab/**/*"
+        - "tests/**/*"
+
+.spack-rules:
+  rules:
+    - changes:
+        - ".gitlab-ci.yml"
+        - ".gitlab/**/*"
+        - "CMakeLists.txt"
+        - "cmake/**/*"
+        - "packaging/spack/**/*"
+        - "tests/**/*"
+
 ###
 # Trigger a build-and-test pipeline for a machine.
 # Comment the jobs for machines you don’t need.
@@ -105,7 +140,7 @@
 matrix-up-check:
   variables:
     CI_MACHINE: "matrix"
-  extends: [.machine-check]
+  extends: [.machine-check, .pipeline-trigger-rules]
 
 matrix-build-and-test:
   variables:
@@ -114,7 +149,7 @@ matrix-build-and-test:
       value: "scripts/gitlab/ci-build-test.sh"
       expand: false
   needs: [matrix-up-check]
-  extends: [.build-and-test-llvm]
+  extends: [.build-and-test-llvm, .core-build-rules]
 
 matrix-proteus-benchmarks:
   variables:
@@ -122,7 +157,11 @@ matrix-proteus-benchmarks:
     JOB_CMD:
       value: "scripts/gitlab/ci-run-benchmarks.sh"
       expand: false
-  needs: [matrix-up-check, matrix-build-and-test]
+  needs:
+    - job: matrix-up-check
+      optional: true
+    - job: matrix-build-and-test
+      optional: true
   extends: [.run-benchmarks]
 
 matrix-test-spack:
@@ -131,8 +170,11 @@ matrix-test-spack:
     JOB_CMD:
       value: "tests/spack/cuda/ci-test-spack.sh"
       expand: false
-  needs: [matrix-up-check, matrix-build-and-test]
-  extends: [.test-spack]
+  needs:
+    - job: matrix-up-check
+    - job: matrix-build-and-test
+      optional: true
+  extends: [.test-spack, .spack-rules]
 
 matrix-test-integration:
   variables:
@@ -141,13 +183,13 @@ matrix-test-integration:
       value: "tests/integration/cuda/ci-test-integration.sh"
       expand: false
   needs: [matrix-up-check, matrix-build-and-test]
-  extends: [.test-integration]
+  extends: [.test-integration, .core-build-rules]
 
 # TIOGA
 tioga-up-check:
   variables:
     CI_MACHINE: "tioga"
-  extends: [.machine-check]
+  extends: [.machine-check, .pipeline-trigger-rules]
 
 tioga-build-and-test:
   variables:
@@ -156,7 +198,7 @@ tioga-build-and-test:
       value: "scripts/gitlab/ci-build-test.sh"
       expand: false
   needs: [tioga-up-check]
-  extends: [.build-and-test-rocm]
+  extends: [.build-and-test-rocm, .core-build-rules]
 
 tioga-test-integration:
   variables:
@@ -165,7 +207,7 @@ tioga-test-integration:
       value: "tests/integration/hip/ci-test-integration.sh"
       expand: false
   needs: [tioga-up-check, tioga-build-and-test]
-  extends: [.test-integration]
+  extends: [.test-integration, .core-build-rules]
 
 tioga-test-spack:
   variables:
@@ -173,8 +215,11 @@ tioga-test-spack:
     JOB_CMD:
       value: "tests/spack/hip/ci-test-spack.sh"
       expand: false
-  needs: [tioga-up-check, tioga-build-and-test]
-  extends: [.test-spack]
+  needs:
+    - job: tioga-up-check
+    - job: tioga-build-and-test
+      optional: true
+  extends: [.test-spack, .spack-rules]
 
 tioga-proteus-benchmarks:
   variables:
@@ -182,14 +227,18 @@ tioga-proteus-benchmarks:
     JOB_CMD:
       value: "scripts/gitlab/ci-run-benchmarks.sh"
       expand: false
-  needs: [tioga-up-check, tioga-build-and-test]
+  needs:
+    - job: tioga-up-check
+      optional: true
+    - job: tioga-build-and-test
+      optional: true
   extends: [.run-benchmarks]
 
 # TUOLUMNE
 tuolumne-up-check:
   variables:
     CI_MACHINE: "tuolumne"
-  extends: [.machine-check]
+  extends: [.machine-check, .pipeline-trigger-rules]
 
 tuolumne-build-and-test:
   variables:
@@ -198,7 +247,7 @@ tuolumne-build-and-test:
       value: "scripts/gitlab/ci-build-test.sh"
       expand: false
   needs: [tuolumne-up-check]
-  extends: [.build-and-test-rocm]
+  extends: [.build-and-test-rocm, .core-build-rules]
 
 tuolumne-test-integration:
   variables:
@@ -207,7 +256,7 @@ tuolumne-test-integration:
       value: "tests/integration/hip/ci-test-integration.sh"
       expand: false
   needs: [tuolumne-up-check, tuolumne-build-and-test]
-  extends: [.test-integration]
+  extends: [.test-integration, .core-build-rules]
 
 tuolumne-test-spack:
   variables:
@@ -215,8 +264,11 @@ tuolumne-test-spack:
     JOB_CMD:
       value: "tests/spack/hip/ci-test-spack.sh"
       expand: false
-  needs: [tuolumne-up-check, tuolumne-build-and-test]
-  extends: [.test-spack]
+  needs:
+    - job: tuolumne-up-check
+    - job: tuolumne-build-and-test
+      optional: true
+  extends: [.test-spack, .spack-rules]
 
 tuolumne-proteus-benchmarks:
   variables:
@@ -224,5 +276,9 @@ tuolumne-proteus-benchmarks:
     JOB_CMD:
       value: "scripts/gitlab/ci-run-benchmarks.sh"
       expand: false
-  needs: [tuolumne-up-check, tuolumne-build-and-test]
+  needs:
+    - job: tuolumne-up-check
+      optional: true
+    - job: tuolumne-build-and-test
+      optional: true
   extends: [.run-benchmarks]
