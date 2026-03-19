@@ -23,6 +23,11 @@ public:
     return Singleton;
   }
 
+  LambdaRegistry(const LambdaRegistry &) = delete;
+  LambdaRegistry &operator=(const LambdaRegistry &) = delete;
+  LambdaRegistry(LambdaRegistry &&) = delete;
+  LambdaRegistry &operator=(LambdaRegistry &&) = delete;
+
   std::optional<DenseMap<StringRef, SmallVector<RuntimeConstant>>::iterator>
   matchJitVariableMap(StringRef FnName) {
     std::string Operator = llvm::demangle(FnName.str());
