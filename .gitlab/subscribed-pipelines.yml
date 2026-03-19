@@ -98,38 +98,50 @@
 
 .pipeline-trigger-rules:
   rules:
+    # Don't compare main to itself; default-branch pipelines should always run.
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - changes:
-        - ".gitlab-ci.yml"
-        - ".gitlab/**/*"
-        - "CMakeLists.txt"
-        - "cmake/**/*"
-        - "include/**/*"
-        - "src/**/*"
-        - "scripts/gitlab/**/*"
-        - "tests/**/*"
-        - "packaging/spack/**/*"
+        compare_to: &compare_to_ref "refs/heads/main"
+        paths: &pipeline_trigger_paths
+          - ".gitlab-ci.yml"
+          - ".gitlab/**/*"
+          - "CMakeLists.txt"
+          - "cmake/**/*"
+          - "include/**/*"
+          - "src/**/*"
+          - "scripts/gitlab/**/*"
+          - "tests/**/*"
+          - "packaging/spack/**/*"
 
 .core-build-rules:
   rules:
+    # Don't compare main to itself; default-branch pipelines should always run.
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - changes:
-        - ".gitlab-ci.yml"
-        - ".gitlab/**/*"
-        - "CMakeLists.txt"
-        - "cmake/**/*"
-        - "include/**/*"
-        - "src/**/*"
-        - "scripts/gitlab/**/*"
-        - "tests/**/*"
+        compare_to: *compare_to_ref
+        paths: &core_build_paths
+          - ".gitlab-ci.yml"
+          - ".gitlab/**/*"
+          - "CMakeLists.txt"
+          - "cmake/**/*"
+          - "include/**/*"
+          - "src/**/*"
+          - "scripts/gitlab/**/*"
+          - "tests/**/*"
 
 .spack-rules:
   rules:
+    # Don't compare main to itself; default-branch pipelines should always run.
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - changes:
-        - ".gitlab-ci.yml"
-        - ".gitlab/**/*"
-        - "CMakeLists.txt"
-        - "cmake/**/*"
-        - "packaging/spack/**/*"
-        - "tests/**/*"
+        compare_to: *compare_to_ref
+        paths:
+          - ".gitlab-ci.yml"
+          - ".gitlab/**/*"
+          - "CMakeLists.txt"
+          - "cmake/**/*"
+          - "packaging/spack/**/*"
+          - "tests/**/*"
 
 ###
 # Trigger a build-and-test pipeline for a machine.
