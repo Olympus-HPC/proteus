@@ -169,12 +169,8 @@ matrix-proteus-benchmarks:
     JOB_CMD:
       value: "scripts/gitlab/ci-run-benchmarks.sh"
       expand: false
-  needs:
-    - job: matrix-up-check
-      optional: true
-    - job: matrix-build-and-test
-      optional: true
-  extends: [.run-benchmarks]
+  needs: [matrix-up-check, matrix-build-and-test]
+  extends: [.run-benchmarks, .core-build-rules]
 
 matrix-test-spack:
   variables:
@@ -239,12 +235,8 @@ tioga-proteus-benchmarks:
     JOB_CMD:
       value: "scripts/gitlab/ci-run-benchmarks.sh"
       expand: false
-  needs:
-    - job: tioga-up-check
-      optional: true
-    - job: tioga-build-and-test
-      optional: true
-  extends: [.run-benchmarks]
+  needs: [tioga-up-check, tioga-build-and-test]
+  extends: [.run-benchmarks, .core-build-rules]
 
 # TUOLUMNE
 tuolumne-up-check:
@@ -288,9 +280,5 @@ tuolumne-proteus-benchmarks:
     JOB_CMD:
       value: "scripts/gitlab/ci-run-benchmarks.sh"
       expand: false
-  needs:
-    - job: tuolumne-up-check
-      optional: true
-    - job: tuolumne-build-and-test
-      optional: true
-  extends: [.run-benchmarks]
+  needs: [tuolumne-up-check, tuolumne-build-and-test]
+  extends: [.run-benchmarks, .core-build-rules]
