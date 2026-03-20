@@ -22,6 +22,7 @@ jobs:
             llvm-19-dev \
             libclang-19-dev \
             libmlir-19-dev \
+            mlir-19-tools \
             zlib1g-dev \
             libzstd-dev
       - name: Run cmake to export compilation database
