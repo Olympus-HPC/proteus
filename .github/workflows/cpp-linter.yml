@@ -14,30 +14,25 @@ jobs:
         shell: bash -el {0}
     steps:
       - uses: actions/checkout@v4
-      - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          conda-remove-defaults: true
-      # Install Clang/LLVM using conda
-      - name: Create environment
+      - name: Install LLVM 19
         run: |
-          conda install -y -q -c conda-forge \
-            clang=19.1.7 \
-            clangxx=19.1.7 \
-            clangdev=19.1.7 \
-            llvmdev=19.1.7 \
-            lit=19.1.7 \
-            mlir=19.1.7 \
-            zlib zstd
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang-19 \
+            llvm-19-dev \
+            libclang-19-dev \
+            libmlir-19-dev \
+            zlib1g-dev \
+            libzstd-dev
       - name: Run cmake to export compilation database
         run: |
           mkdir -p build
           pushd build
           cmake .. \
-            -DCMAKE_PREFIX_PATH="$CONDA_PREFIX;$CONDA_PREFIX/lib/cmake" \
-            -DLLVM_INSTALL_DIR=$(llvm-config --prefix) \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_PREFIX_PATH="/usr/lib/llvm-19;/usr/lib/llvm-19/lib/cmake" \
+            -DLLVM_INSTALL_DIR=$(llvm-config-19 --prefix) \
+            -DCMAKE_C_COMPILER=clang-19 \
+            -DCMAKE_CXX_COMPILER=clang++-19 \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=on
       - uses: cpp-linter/cpp-linter-action@v2
         id: linter
