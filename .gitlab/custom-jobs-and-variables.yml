@@ -11,6 +11,8 @@ variables:
 # order to save time and resources. This allocation has to be uniquely
 # named so that we are sure to retrieve it and avoid collisions.
   ALLOC_NAME: ${CI_PROJECT_NAME}_ci_${CI_PIPELINE_ID}
+# Standalone Slurm jobs need a job-scoped unique name for cleanup.
+  SLURM_JOB_NAME: ${CI_PROJECT_NAME}_ci_${CI_JOB_ID}
 # Standalone Flux batch jobs need a job-scoped unique name for cleanup.
   FLUX_JOB_NAME: ${CI_PROJECT_NAME}_ci_${CI_JOB_ID}
 
@@ -20,7 +22,7 @@ variables:
 # Note: can be set to "OFF" to prevent allocation sharing.
   MATRIX_SHARED_ALLOC: "OFF"
 # Arguments for job level allocation
-  MATRIX_JOB_ALLOC: "--gpus=1 --nodes=1 --time=60 --partition=pdebug"
+  MATRIX_JOB_ALLOC: "--job-name=${SLURM_JOB_NAME} --gpus=1 --nodes=1 --time=60 --partition=pdebug"
 # Arguments for performance job allocation (dedicated allocation with no overlapping).
   MATRIX_PERF_ALLOC: "--exclusive --time=60 --nodes=1"
 # Add variables that should apply to all the jobs on a machine:
@@ -73,5 +75,25 @@ variables:
           flux cancel "${URI}" || true
         else
           echo "### No standalone Flux job found for ${FLUX_JOB_NAME}"
+        fi
+      fi
+
+.clean-slurm-allocation:
+  after_script:
+    - |
+      if [ "${CI_JOB_STATUS}" = "canceled" ]; then
+        SLURM_ID=""
+
+        if [ -n "${SLURM_JOB_ID}" ]; then
+          SLURM_ID="${SLURM_JOB_ID}"
+        else
+          SLURM_ID="$(squeue --noheader --name="${SLURM_JOB_NAME}" --format="%A" 2>/dev/null | head -n1)"
+        fi
+
+        if [ -n "${SLURM_ID}" ]; then
+          echo "### Cancel Slurm standalone job ${SLURM_JOB_NAME} (${SLURM_ID})"
+          scancel "${SLURM_ID}" || true
+        else
+          echo "### No standalone Slurm job found for ${SLURM_JOB_NAME}"
         fi
       fi
