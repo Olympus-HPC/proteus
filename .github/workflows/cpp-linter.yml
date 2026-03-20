@@ -33,6 +33,7 @@ jobs:
             -DLLVM_INSTALL_DIR=$(llvm-config-19 --prefix) \
             -DCMAKE_C_COMPILER=clang-19 \
             -DCMAKE_CXX_COMPILER=clang++-19 \
+            -DPROTEUS_ENABLE_MLIR=ON \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=on
       - uses: cpp-linter/cpp-linter-action@v2
         id: linter
