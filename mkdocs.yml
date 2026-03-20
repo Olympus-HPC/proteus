@@ -4,8 +4,12 @@ nav:
   - Home: index.md
   - User's guide: 
       - Installation: user/install.md
-      - User Interface: user/interface.md
-      - Integration: user/integration.md
+      - Build System Integration: user/integration.md
+      - User Interface:
+          - Overview: user/interface.md
+          - Code Annotations: user/annotations.md
+          - C++ Frontend API: user/cpp-frontend.md
+          - DSL API: user/dsl.md
       - Runtime Configuration: user/config.md
       - Resources : user/resources.md
   - Developer's manual: 
@@ -28,4 +32,4 @@ markdown_extensions:
   - pymdownx.superfences
 extra_css:
   - stylesheets/extra.css
-copyright: Copyright &copy; 2024 - 2025 Lawrence Livermore National Security, LLC and Proteus project contributors.
+copyright: Copyright &copy; 2024 - 2026 Lawrence Livermore National Security, LLC and Proteus project contributors.
