@@ -38,7 +38,7 @@ jobs:
           conda run -n llvm-env conda-pack -n llvm-env \
             -o "$RUNNER_TEMP/conda-artifacts/llvm-env-${{ matrix.llvm }}.tar.gz"
       - name: Upload environment
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: llvm-conda-${{ matrix.llvm }}
           path: ${{ runner.temp }}/conda-artifacts/llvm-env-${{ matrix.llvm }}.tar.gz
@@ -64,7 +64,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download environment
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: llvm-conda-${{ matrix.llvm }}
           path: ${{ runner.temp }}/conda-artifacts
