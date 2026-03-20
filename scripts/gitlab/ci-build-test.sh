@@ -16,15 +16,15 @@ if [ "${CI_MACHINE}" == "matrix" ]; then
   echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES} SLURM_STEP_GPUS=${SLURM_STEP_GPUS}"
 
   # Install Clang/LLVM through conda.
-  MINICONDA_DIR=miniconda3
-  mkdir -p ${MINICONDA_DIR}
-  wget -q https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -m).sh -O ./${MINICONDA_DIR}/miniconda.sh
-  bash ./${MINICONDA_DIR}/miniconda.sh -b -u -p ./${MINICONDA_DIR}
-  rm ./${MINICONDA_DIR}/miniconda.sh
-  source ./${MINICONDA_DIR}/bin/activate
+  MINIFORGE_DIR=miniforge3
+  mkdir -p ${MINIFORGE_DIR}
+  wget -q --tries=5 --retry-connrefused --wait=5 https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-$(uname -m).sh -O ./${MINIFORGE_DIR}/miniforge.sh
+  bash ./${MINIFORGE_DIR}/miniforge.sh -b -u -p ./${MINIFORGE_DIR}
+  rm ./${MINIFORGE_DIR}/miniforge.sh
+  source ./${MINIFORGE_DIR}/bin/activate
   # Use an older version of gcc to avoid issues with detecting Clang as the CUDA
   # compiler.
-  conda create -y -q -n proteus -c conda-forge \
+  conda create -y -q -n proteus --override-channels -c conda-forge \
       python=${PYTHON_VERSION} clang=${PROTEUS_CI_LLVM_VERSION} clangxx=${PROTEUS_CI_LLVM_VERSION} \
       clangdev=${PROTEUS_CI_LLVM_VERSION} llvmdev=${PROTEUS_CI_LLVM_VERSION} lit=${PROTEUS_CI_LLVM_VERSION} \
       mlir=${PROTEUS_CI_LLVM_VERSION} gcc=12 gxx=12
