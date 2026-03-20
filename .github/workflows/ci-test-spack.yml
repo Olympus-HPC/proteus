@@ -16,11 +16,7 @@ jobs:
         shell: bash -el {0}
     steps:
       - uses: actions/checkout@v4
-      - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          miniforge-version: latest
-      # Install Clang/LLVM using conda and lit, filecheck utilities.
+      # Install Clang/LLVM using system packages for Spack external package detection.
       - name: Install LLVM ${{ matrix.llvm }}
         run: |
           sudo apt-get update

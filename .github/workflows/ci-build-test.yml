@@ -4,9 +4,51 @@ on:
   pull_request:
 
 jobs:
+  prepare-conda:
+    name: prepare conda ${{ matrix.os }} LLVM ${{ matrix.llvm }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        llvm: [18.1.8, 19.1.7, 20.1.8]
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - name: Setup conda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          conda-remove-defaults: true
+      # Build the toolchain env once per LLVM version, then hand it to build jobs.
+      - name: Create environment
+        run: |
+          conda create -y -n llvm-env -c conda-forge \
+            conda-pack \
+            clang=${{ matrix.llvm }} \
+            clangxx=${{ matrix.llvm }} \
+            clangdev=${{ matrix.llvm }} \
+            llvmdev=${{ matrix.llvm }} \
+            lit=${{ matrix.llvm }} \
+            mlir=${{ matrix.llvm }} \
+            zlib zstd
+      - name: Pack environment
+        run: |
+          mkdir -p "$RUNNER_TEMP/conda-artifacts"
+          conda run -n llvm-env conda-pack -n llvm-env \
+            -o "$RUNNER_TEMP/conda-artifacts/llvm-env-${{ matrix.llvm }}.tar.gz"
+      - name: Upload environment
+        uses: actions/upload-artifact@v7
+        with:
+          name: llvm-conda-${{ matrix.llvm }}
+          path: ${{ runner.temp }}/conda-artifacts/llvm-env-${{ matrix.llvm }}.tar.gz
+          compression-level: 0
+          retention-days: 1
+
   build-and-test:
     name: proteus ${{ matrix.os }} LLVM ${{ matrix.llvm }} shared ${{ matrix.build_shared }} MLIR ${{ matrix.mlir }}
     runs-on: ${{ matrix.os }}
+    needs: prepare-conda
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -21,21 +63,19 @@ jobs:
         shell: bash -el {0}
     steps:
       - uses: actions/checkout@v4
-      - name: Setup conda
-        uses: conda-incubator/setup-miniconda@v3
+      - name: Download environment
+        uses: actions/download-artifact@v8
         with:
-          conda-remove-defaults: true
-      # Install Clang/LLVM using conda and lit, filecheck utilities.
-      - name: Create environment
+          name: llvm-conda-${{ matrix.llvm }}
+          path: ${{ runner.temp }}/conda-artifacts
+      - name: Unpack environment
         run: |
-          conda install -y -c conda-forge \
-            clang=${{ matrix.llvm }} \
-            clangxx=${{ matrix.llvm }} \
-            clangdev=${{ matrix.llvm }} \
-            llvmdev=${{ matrix.llvm }} \
-            lit=${{ matrix.llvm }} \
-            mlir=${{ matrix.llvm }} \
-            zlib zstd
+          env_dir="$RUNNER_TEMP/llvm-env-${{ matrix.llvm }}"
+          mkdir -p "$env_dir"
+          tar -xzf "$RUNNER_TEMP/conda-artifacts/llvm-env-${{ matrix.llvm }}.tar.gz" -C "$env_dir"
+          "$env_dir/bin/conda-unpack"
+          echo "CONDA_PREFIX=$env_dir" >> "$GITHUB_ENV"
+          echo "$env_dir/bin" >> "$GITHUB_PATH"
       - name: Build build_shared=${{ matrix.build_shared }}
         run: |
           mkdir -p build
