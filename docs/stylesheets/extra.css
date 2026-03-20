@@ -3,3 +3,11 @@
   height: 8vh;
   width: auto;
 }
+
+/* Keep long environment-variable names readable in Markdown tables. */
+.md-typeset table:not([class]) td:first-child,
+.md-typeset table:not([class]) td:first-child code {
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+}
