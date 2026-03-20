@@ -35,7 +35,7 @@ jobs:
       - name: Pack environment
         run: |
           mkdir -p "$RUNNER_TEMP/conda-artifacts"
-          conda pack -n llvm-env \
+          conda run -n llvm-env conda-pack -n llvm-env \
             -o "$RUNNER_TEMP/conda-artifacts/llvm-env-${{ matrix.llvm }}.tar.gz"
       - name: Upload environment
         uses: actions/upload-artifact@v4
