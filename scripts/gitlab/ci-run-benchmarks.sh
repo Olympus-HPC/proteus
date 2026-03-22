@@ -42,15 +42,15 @@ else
   exit 0
 fi
 
-echo "Install miniconda..."
+echo "Install miniforge..."
 PYTHON_VERSION=3.12
-MINICONDA_DIR=/tmp/proteus-ci-${CI_JOB_ID}/miniconda3
-mkdir -p ${MINICONDA_DIR}
-wget --tries=5 --retry-connrefused --wait=5 https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -m).sh -O ${MINICONDA_DIR}/miniconda.sh
-bash ${MINICONDA_DIR}/miniconda.sh -b -u -p ${MINICONDA_DIR}
-rm ${MINICONDA_DIR}/miniconda.sh
-source ${MINICONDA_DIR}/bin/activate
-conda create -y -q -n proteus -c conda-forge \
+MINIFORGE_DIR=/tmp/proteus-ci-${CI_JOB_ID}/miniforge3
+mkdir -p ${MINIFORGE_DIR}
+wget -q --tries=5 --retry-connrefused --wait=5 https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-$(uname -m).sh -O ${MINIFORGE_DIR}/miniforge.sh
+bash ${MINIFORGE_DIR}/miniforge.sh -b -u -p ${MINIFORGE_DIR}
+rm ${MINIFORGE_DIR}/miniforge.sh
+source ${MINIFORGE_DIR}/bin/activate
+conda create -y -q -n proteus --override-channels -c conda-forge \
     python=${PYTHON_VERSION} pandas==2.2.3 matplotlib==3.10.0
 conda activate proteus
 
@@ -68,7 +68,7 @@ if [ "${CI_MACHINE}" == "matrix" ]; then
   ml load cuda/12.2.2
 
   PROTEUS_CI_LLVM_VERSION=18.1.8
-  conda install -y -q -c conda-forge \
+  conda install -y -q --override-channels -c conda-forge \
     python=${PYTHON_VERSION} clang=${PROTEUS_CI_LLVM_VERSION} clangxx=${PROTEUS_CI_LLVM_VERSION} \
     clangdev=${PROTEUS_CI_LLVM_VERSION} llvmdev=${PROTEUS_CI_LLVM_VERSION} lit=${PROTEUS_CI_LLVM_VERSION}
 
@@ -188,4 +188,4 @@ curl --retry 5 --retry-connrefused --retry-delay 5 -L -X POST \
   -d "{\"body\": \"${COMMENT}\"}"
 
 conda deactivate
-rm -rf ${MINICONDA_DIR}
+rm -rf ${MINIFORGE_DIR}

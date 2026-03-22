@@ -55,7 +55,7 @@ variables:
 # We organize the build-and-test stage with sub-pipelines. Each sub-pipeline
 # corresponds to a test batch on a given machine.
 
-# Create a minimal pipeline for docs-only changes so GitHub still receives a
+# Create a minimal pipeline for meta-only changes so GitHub still receives a
 # passing GitLab status. The per-stage path groups live in
 # .gitlab/subscribed-pipelines.yml because YAML anchors do not carry across
 # included files.
@@ -79,7 +79,8 @@ workflow:
       when: always
     - changes:
         compare_to: *compare_to_ref
-        paths: &docs_only_paths
+        paths: &meta_only_paths
+          - ".github/**/*"
           - "docs/**/*"
           - "*.md"
           - "mkdocs.yml"
@@ -97,7 +98,7 @@ stages:
   - test-spack
   - run-benchmarks
 
-docs-only:
+meta-only:
   stage: prerequisites
   interruptible: true
   tags: [shell, oslic]
@@ -106,9 +107,9 @@ docs-only:
       when: never
     - changes:
         compare_to: *compare_to_ref
-        paths: *docs_only_paths
+        paths: *meta_only_paths
   script:
-    - echo "Docs-only change detected; skipping heavy GitLab CI."
+    - echo "Meta-only change detected; skipping heavy GitLab CI."
 
 # Template for jobs triggering a build-and-test sub-pipeline:
 .build-and-test-llvm:
