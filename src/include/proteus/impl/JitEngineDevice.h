@@ -585,9 +585,7 @@ JitEngineDevice<ImplT>::compileAndRun(
                          BlockDim.x, BlockDim.y, BlockDim.z);
   if (Config::get().getCGConfig().specializeDims() ||
       Config::get().getCGConfig().specializeDimsRange())
-    HashValue =
-        hash(getStaticHash(KernelInfo), RCVec, LambdaJitValuesVec, GridDim.x,
-             GridDim.y, GridDim.z, BlockDim.x, BlockDim.y, BlockDim.z);
+    HashValue = hash(HashValue, GridDim.x, GridDim.y, GridDim.z);
 
   typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc =
       CodeCache.lookup(HashValue);

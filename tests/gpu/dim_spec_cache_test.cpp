@@ -62,10 +62,7 @@ int main() {
 // CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workitem.id.y|llvm.nvvm.read.ptx.sreg.tid.y}} [0,2)
 // CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workitem.id.z|llvm.nvvm.read.ptx.sreg.tid.z}} [0,2)
 // CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workgroup.id.x|llvm.nvvm.read.ptx.sreg.ctaid.x}} [0,4)
-// CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workgroup.id.x|llvm.nvvm.read.ptx.sreg.ctaid.x}} [0,4)
 // CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workgroup.id.y|llvm.nvvm.read.ptx.sreg.ctaid.y}} [0,4)
-// CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workgroup.id.y|llvm.nvvm.read.ptx.sreg.ctaid.y}} [0,4)
-// CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workgroup.id.z|llvm.nvvm.read.ptx.sreg.ctaid.z}} [0,4)
 // CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workgroup.id.z|llvm.nvvm.read.ptx.sreg.ctaid.z}} [0,4)
 // CHECK-FIRST: [LaunchBoundSpec] MaxThreads 8 MinBlocksPerSM 0
 // CHECK-THIRD: [LaunchBoundSpec] MaxThreads 8 MinBlocksPerSM 0
@@ -87,10 +84,7 @@ int main() {
 // CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workitem.id.y|llvm.nvvm.read.ptx.sreg.tid.y}} [0,2)
 // CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workitem.id.z|llvm.nvvm.read.ptx.sreg.tid.z}} [0,2)
 // CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workgroup.id.x|llvm.nvvm.read.ptx.sreg.ctaid.x}} [0,8)
-// CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workgroup.id.x|llvm.nvvm.read.ptx.sreg.ctaid.x}} [0,8)
 // CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workgroup.id.y|llvm.nvvm.read.ptx.sreg.ctaid.y}} [0,8)
-// CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workgroup.id.y|llvm.nvvm.read.ptx.sreg.ctaid.y}} [0,8)
-// CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workgroup.id.z|llvm.nvvm.read.ptx.sreg.ctaid.z}} [0,8)
 // CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workgroup.id.z|llvm.nvvm.read.ptx.sreg.ctaid.z}} [0,8)
 // CHECK-THIRD: [LaunchBoundSpec] MaxThreads 8 MinBlocksPerSM 0
 // CHECK-FOURTH: [ObjectCacheChain] Hit at level 0 (Storage) for hash {{[0-9]+}}
@@ -110,10 +104,7 @@ int main() {
 // CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workitem.id.y|llvm.nvvm.read.ptx.sreg.tid.y}} [0,4)
 // CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workitem.id.z|llvm.nvvm.read.ptx.sreg.tid.z}} [0,4)
 // CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workgroup.id.x|llvm.nvvm.read.ptx.sreg.ctaid.x}} [0,4)
-// CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workgroup.id.x|llvm.nvvm.read.ptx.sreg.ctaid.x}} [0,4)
 // CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workgroup.id.y|llvm.nvvm.read.ptx.sreg.ctaid.y}} [0,4)
-// CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workgroup.id.y|llvm.nvvm.read.ptx.sreg.ctaid.y}} [0,4)
-// CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workgroup.id.z|llvm.nvvm.read.ptx.sreg.ctaid.z}} [0,4)
 // CHECK-THIRD: [DimSpec] Range {{llvm.amdgcn.workgroup.id.z|llvm.nvvm.read.ptx.sreg.ctaid.z}} [0,4)
 // CHECK-FIRST: [LaunchBoundSpec] MaxThreads 64 MinBlocksPerSM 0
 // CHECK-THIRD: [LaunchBoundSpec] MaxThreads 64 MinBlocksPerSM 0
