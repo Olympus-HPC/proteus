@@ -59,6 +59,7 @@ if(BUILD_SHARED)
   add_library(proteus SHARED ${SOURCES})
 else()
   add_library(proteus STATIC ${SOURCES})
+  set_target_properties(proteus PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
 
 add_library(proteusCore INTERFACE)
