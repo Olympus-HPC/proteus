@@ -578,10 +578,14 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   SmallVector<RuntimeConstant> LambdaJitValuesVec;
   getLambdaJitValues(KernelInfo, LambdaJitValuesVec);
-
-  HashT HashValue =
-      hash(getStaticHash(KernelInfo), RCVec, LambdaJitValuesVec, GridDim.x,
-           GridDim.y, GridDim.z, BlockDim.x, BlockDim.y, BlockDim.z);
+  // Determine the hash based on dimension specialization.  If we do not
+  // specialize IR based on grid dimensions, avoid hashing on those to
+  // eliminate repeated compilation overhead.
+  HashT HashValue = hash(getStaticHash(KernelInfo), RCVec, LambdaJitValuesVec,
+                         BlockDim.x, BlockDim.y, BlockDim.z);
+  if (Config::get().getCGConfig().specializeDims() ||
+      Config::get().getCGConfig().specializeDimsRange())
+    HashValue = hash(HashValue, GridDim.x, GridDim.y, GridDim.z);
 
   typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc =
       CodeCache.lookup(HashValue);
