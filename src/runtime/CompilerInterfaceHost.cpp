@@ -36,6 +36,15 @@ __jit_register_variable(RuntimeConstant RC, const char *LambdaName) {
   LambdaRegistry::instance().setJitVariable(LambdaName, RC);
 }
 
+extern "C" __attribute__((used)) void __jit_push_lambda_runtime_constant(
+    int32_t Type, int32_t Pos, int32_t Offset, const void *ValuePtr,
+    const char *LambdaType) {
+  RuntimeConstant RC{static_cast<RuntimeConstantType>(Type), Pos, Offset};
+  const size_t CopySize = sizeof(RuntimeConstantValue);
+  std::memcpy(&RC.Value, ValuePtr, CopySize);
+  LambdaRegistry::instance().setJitVariable(LambdaType, RC);
+}
+
 extern "C" __attribute__((used)) void
 __jit_push_lambda_runtime_constant(int32_t Type, int32_t Pos, int32_t Offset,
                                    const void *ValuePtr,

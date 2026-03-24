@@ -440,7 +440,7 @@ public:
           llvm::outs()<<"KWORD " <<OptionalMapIt.value().first<<"\n";
         if (OptionalMapIt)
           LambdaCalleeInfo.emplace_back(F.getName(),
-                                        OptionalMapIt.value()->first);
+                                        OptionalMapIt.value().first);
       }
 
       KernelInfo.setLambdaCalleeInfo(std::move(LambdaCalleeInfo));
@@ -448,7 +448,7 @@ public:
 
     for (auto &[FnName, LambdaType] : KernelInfo.getLambdaCalleeInfo()) {
       const SmallVector<RuntimeConstant> &Values =
-          LR.getJitVariables(LambdaType);
+          LR.getJitVariables();
       LambdaJitValuesVec.insert(LambdaJitValuesVec.end(), Values.begin(),
                                 Values.end());
     }

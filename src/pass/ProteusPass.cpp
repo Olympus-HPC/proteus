@@ -30,6 +30,7 @@
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Error.h"
+#include "proteus/Frontend/IRFunction.h"
 #include "proteus/impl/Cloning.h"
 #include "proteus/impl/Hashing.h"
 #include "proteus/impl/Logger.h"
@@ -159,6 +160,14 @@ public:
     instrumentRegisterFatBinaryEnd(M);
     instrumentRegisterVar(M);
     instrumentRegisterFunction(M);
+    llvm::outs() << M;
+
+    // Lambda analysis pipeline
+    // (1) instrumentJitVariableStructIndex analyzes jit_variable calls and marks which indices of a
+    //     given lambda class have been designated as runtime constants
+    // (2) We then instrument __jit_push_lambda_runtime_constant into device stubs in the case of GPU/CPU
+    //.    compilation, or before the callsite of the lambda operator in the case of host execution
+    DenseMap<StructType*, SmallVector<LambdaJitVariableInfo, 16>> LambdaStorageTypeToJitIndices;
 
     if (hasDeviceLaunchKernelCalls(M)) {
       emitJitLaunchKernelCall(M);
@@ -1387,14 +1396,14 @@ llvm::PassPluginLibraryInfo getProteusPassPluginInfo() {
   // PB.registerOptimizerLastEPCallback(
   // PM.registerPipelineEarlySimplificationEPCallback
 #if LLVM_VERSION_MAJOR >= 20
-    PB.registerPipelineEarlySimplificationEPCallback(
+    PB.registerPipelineStartEPCallback(
         [&](ModulePassManager &MPM, OptimizationLevel,
             ThinOrFullLTOPhase LTOPhase) {
           if (LTOPhase != ThinOrFullLTOPhase::None) {
             reportFatalError("Expected registration only for non-LTO");
           }
 #else
-    PB.registerPipelineEarlySimplificationEPCallback(
+    PB.registerPipelineStartEPCallback(
         [&](ModulePassManager &MPM, OptimizationLevel) {
 #endif
           MPM.addPass(ProteusPass{false});

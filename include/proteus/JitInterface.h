@@ -23,6 +23,10 @@
 
 extern "C" void __jit_register_variable(proteus::RuntimeConstant RC,
                                         const char *AssociatedLambda);
+
+extern "C" __attribute__((used)) void __jit_push_lambda_runtime_constant(
+    int32_t Type, int32_t Pos, int32_t Offset, const void *ValuePtr, const char *LambdaType);
+
 extern "C" void __jit_register_lambda(const char *Symbol);
 extern "C" void __jit_take_address(void const *) noexcept;
 extern "C" void __jit_var(void const *) noexcept;

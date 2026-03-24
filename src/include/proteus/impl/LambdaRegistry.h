@@ -29,7 +29,7 @@ public:
   LambdaRegistry(LambdaRegistry &&) = delete;
   LambdaRegistry &operator=(LambdaRegistry &&) = delete;
 
-  std::optional<DenseMap<StringRef, SmallVector<RuntimeConstant>>::iterator>
+  std::optional<std::pair<StringRef, SmallVector<RuntimeConstant>>>
   matchJitVariableMap(StringRef FnName) {
     if (JitVariables.empty())
       return std::nullopt;
@@ -56,29 +56,29 @@ public:
     return std::make_pair(LambdaType, JitVariables);
   }
 
-  void dump() {
-    Logger::logs("proteus") << "Dumping pending registry \n";
-    for (const auto &[Key, Value] : PendingJitVariableMap) {
-      Logger::logs("proteus") << Key << " : " << "\n";
-      for (const auto &V : Value) {
-        Logger::logs("proteus") << ", " << V.Value.DoubleVal;
-      }
-      Logger::logs("proteus") << "\n";
-    }
-    Logger::logs("proteus") << "Dumping finalized registry \n";
-    for (const auto &[Key, Value] : JitVariableMap) {
-      Logger::logs("proteus") << Key << " : " << "\n";
-      for (const auto &V : Value) {
-        Logger::logs("proteus") << ", " << V.Value.DoubleVal;
-      }
-      Logger::logs("proteus") << "\n";
-    }
-  }
+  // void dump() {
+  //   Logger::logs("proteus") << "Dumping pending registry \n";
+  //   for (const auto &[Key, Value] : PendingJitVariableMap) {
+  //     Logger::logs("proteus") << Key << " : " << "\n";
+  //     for (const auto &V : Value) {
+  //       Logger::logs("proteus") << ", " << V.Value.DoubleVal;
+  //     }
+  //     Logger::logs("proteus") << "\n";
+  //   }
+  //   Logger::logs("proteus") << "Dumping finalized registry \n";
+  //   for (const auto &[Key, Value] : JitVariableMap) {
+  //     Logger::logs("proteus") << Key << " : " << "\n";
+  //     for (const auto &V : Value) {
+  //       Logger::logs("proteus") << ", " << V.Value.DoubleVal;
+  //     }
+  //     Logger::logs("proteus") << "\n";
+  //   }
+  // }
 
   void setJitVariable(const char *LambdaType, RuntimeConstant &RC) {
     assert(PendingJitVariableMap.contains(LambdaType) &&
            "Lambda must be registered prior to register JIT variable!");
-    PendingJitVariableMap[LambdaType].emplace_back(RC);
+    JitVariables.emplace_back(RC);
   }
 
   inline void registerLambda(const char *LambdaType) {
@@ -87,18 +87,20 @@ public:
                 << "=> RegisterLambda " << LambdaTypeRef << "\n");
     // Copy PendingJitVariables if there were changed, otherwise the runtime
     // values for the lambda definition have not changed.
-    PROTEUS_DBG(dump());
-    if (!PendingJitVariableMap[LambdaTypeRef].empty()) {
-      JitVariableMap[LambdaTypeRef] = PendingJitVariableMap[LambdaTypeRef];
-      PendingJitVariableMap[LambdaTypeRef].clear();
-    }
+    // PROTEUS_DBG(dump());
+    // if (!PendingJitVariableMap[LambdaTypeRef].empty()) {
+    //   JitVariableMap[LambdaTypeRef] = PendingJitVariableMap[LambdaTypeRef];
+    //   PendingJitVariableMap[LambdaTypeRef].clear();
+    // }
   }
 
-  const SmallVector<RuntimeConstant> &getJitVariables(StringRef LambdaTypeRef) {
-    return JitVariableMap[LambdaTypeRef];
+  const SmallVector<RuntimeConstant> &getJitVariables() {
+    return JitVariables;
   }
 
-  bool empty() { return JitVariableMap.empty(); }
+  void flushJitVariables() { JitVariables.clear(); }
+
+  bool empty() { return JitVariables.empty(); }
 
 private:
   explicit LambdaRegistry() : SavedStrings(SavedStringAlloc) {}
