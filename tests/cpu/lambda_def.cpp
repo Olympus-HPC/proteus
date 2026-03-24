@@ -18,9 +18,8 @@ template <typename F> void run(F &&Func) {
 int main() {
   int A = 42;
   auto Lambda =
-      [ =, A = proteus::jit_variable(A) ]() __attribute__((annotate("jit"))) {
-    printf("Lambda A %d\n", A);
-  };
+      [=, A = proteus::jit_variable(A)]()
+          __attribute__((annotate("jit"))) { printf("Lambda A %d\n", A); };
   run(Lambda);
   run(Lambda);
   run(Lambda);

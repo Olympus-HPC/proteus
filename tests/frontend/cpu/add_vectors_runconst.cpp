@@ -31,7 +31,9 @@ auto createJitFunction(size_t N) {
     auto RunConstN = F.defRuntimeConst(N);
     // Element-wise addition over all vector elements.
     F.beginFor(I, I, RunConstN, Inc);
-    { A[I] = A[I] + B[I]; }
+    {
+      A[I] = A[I] + B[I];
+    }
     F.endFor();
 
     F.ret();

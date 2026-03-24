@@ -35,7 +35,9 @@ int main() {
     UB = 10;
     Inc = 1;
     F.beginFor(I, I, UB, Inc);
-    { Arg[I] = Arg[I] + 1.0; }
+    {
+      Arg[I] = Arg[I] + 1.0;
+    }
     F.endFor();
     F.ret();
   }

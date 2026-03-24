@@ -22,7 +22,9 @@ int main() {
     auto Inc = F.defVar<int>(1, "inc");
     I = 0;
     F.beginFor(I, I, UB, Inc);
-    { Arg[I] = Arg[I] + 1.0; }
+    {
+      Arg[I] = Arg[I] + 1.0;
+    }
     F.endFor();
     F.ret();
   }

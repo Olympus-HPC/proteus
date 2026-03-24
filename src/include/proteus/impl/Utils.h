@@ -12,8 +12,8 @@
 #define PROTEUS_UTILS_H
 
 #include "proteus/Error.h"
-#include "proteus/impl/Logger.h"
 #include "proteus/TimeTracing.h"
+#include "proteus/impl/Logger.h"
 
 #include <llvm/ADT/Twine.h>
 #include <llvm/Support/SourceMgr.h>

@@ -9,10 +9,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "proteus/impl/CompilerInterfaceDevice.h"
+#include "proteus/TimeTracing.h"
 #include "proteus/impl/CompilerInterfaceDeviceInternal.h"
 #include "proteus/impl/JitEngineDevice.h"
 #include "proteus/impl/JitEngineInfoRegistry.h"
-#include "proteus/TimeTracing.h"
 
 using namespace proteus;
 

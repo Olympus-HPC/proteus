@@ -1,5 +1,5 @@
-#include "proteus/impl/Frontend/CppJitCompiler.h"
 #include "proteus/TimeTracing.h"
+#include "proteus/impl/Frontend/CppJitCompiler.h"
 
 #include <clang/CodeGen/CodeGenAction.h>
 #include <clang/Driver/Compilation.h>

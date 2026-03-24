@@ -52,7 +52,9 @@ int main() {
 
     // Strided loop: each thread processes multiple elements.
     F.beginFor(I, I, N, Inc);
-    { A[I] = A[I] + B[I]; }
+    {
+      A[I] = A[I] + B[I];
+    }
     F.endFor();
 
     F.ret();

@@ -68,7 +68,9 @@ int main() {
     Cmp = 5.0;
     Arg11[0] = 0.0;
     F.beginIf(Cmp <= 5.0);
-    { Arg11[0] = 1.0; }
+    {
+      Arg11[0] = 1.0;
+    }
     F.endIf();
 
     auto ConstVal = F.defVar<const int>(Cmp, "const_val");

@@ -1,10 +1,10 @@
 #ifndef PROTEUS_SYNC_COMPILER_H
 #define PROTEUS_SYNC_COMPILER_H
 
+#include "proteus/TimeTracing.h"
 #include "proteus/impl/CompilationTask.h"
 #include "proteus/impl/Debug.h"
 #include "proteus/impl/Hashing.h"
-#include "proteus/TimeTracing.h"
 
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 

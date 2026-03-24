@@ -346,7 +346,9 @@ void LLVMCodeBuilder::beginFunction(IRFunction *IRF, const char *File,
   PImpl->IRB.CreateBr(ExitBB);
 
   PImpl->IRB.SetInsertPoint(ExitBB);
-  { PImpl->IRB.CreateUnreachable(); }
+  {
+    PImpl->IRB.CreateUnreachable();
+  }
 
   PImpl->IP = IRBuilderBase::InsertPoint(BodyBB, BodyBB->begin());
   PImpl->IRB.restoreIP(PImpl->IP);
@@ -386,13 +388,19 @@ void LLVMCodeBuilder::beginIf(IRValue *Cond, const char *File, int Line) {
 
   CurBlock->getTerminator()->eraseFromParent();
   PImpl->IRB.SetInsertPoint(CurBlock);
-  { PImpl->IRB.CreateCondBr(PImpl->unwrap(Cond), ThenBlock, ExitBlock); }
+  {
+    PImpl->IRB.CreateCondBr(PImpl->unwrap(Cond), ThenBlock, ExitBlock);
+  }
 
   PImpl->IRB.SetInsertPoint(ThenBlock);
-  { PImpl->IRB.CreateBr(ExitBlock); }
+  {
+    PImpl->IRB.CreateBr(ExitBlock);
+  }
 
   PImpl->IRB.SetInsertPoint(ExitBlock);
-  { PImpl->IRB.CreateBr(NextBlock); }
+  {
+    PImpl->IRB.CreateBr(NextBlock);
+  }
 
   PImpl->IP = IRBuilderBase::InsertPoint(ThenBlock, ThenBlock->begin());
   PImpl->IRB.restoreIP(PImpl->IP);
@@ -432,7 +440,9 @@ void LLVMCodeBuilder::beginFor(IRValue *IterSlot, IRType IterTy,
   // Erase the old terminator and branch to the header.
   eraseTerminator(CurBlock);
   setInsertPoint(CurBlock);
-  { createBr(Header); }
+  {
+    createBr(Header);
+  }
 
   setInsertPoint(Header);
   {
@@ -485,7 +495,9 @@ void LLVMCodeBuilder::beginFor(IRValue *IterSlot, IRType IterTy,
   }
 
   setInsertPoint(LoopExit);
-  { createBr(NextBlock); }
+  {
+    createBr(NextBlock);
+  }
 
   setInsertPointBegin(Body);
 }
@@ -520,7 +532,9 @@ void LLVMCodeBuilder::beginWhile(std::function<IRValue *()> CondFn,
 
   eraseTerminator(CurBlock);
   setInsertPoint(CurBlock);
-  { createBr(LoopCond); }
+  {
+    createBr(LoopCond);
+  }
 
   setInsertPoint(LoopCond);
   {
@@ -532,7 +546,9 @@ void LLVMCodeBuilder::beginWhile(std::function<IRValue *()> CondFn,
   createBr(LoopCond);
 
   setInsertPoint(LoopExit);
-  { createBr(NextBlock); }
+  {
+    createBr(NextBlock);
+  }
 
   setInsertPointBegin(Body);
 }
