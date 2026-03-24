@@ -84,6 +84,22 @@ Proteus has repository formatting configuration in `.clang-format` and
 CI currently enforces `clang-format` checks on changed C++ lines, so it is worth
 formatting touched code before you push.
 
+For a quicker local feedback loop, the repository also includes a
+`.pre-commit-config.yaml` with lightweight checks and a `clang-format` hook for
+staged C and C++ files.
+If you want to use it locally:
+
+```bash
+python -m pip install pre-commit
+pre-commit install
+pre-commit run --all-files
+```
+
+The local `clang-format` hook uses the `clang-format` executable available in
+your `PATH` and applies the repository style from `.clang-format`.
+Keep hook usage lightweight: formatting and hygiene checks are a good fit, while
+full builds and test coverage should still be run manually or in CI.
+
 In practice, try to keep a PR easy to read:
 
 - prefer focused commits over one mixed change that combines refactors and
