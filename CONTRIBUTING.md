@@ -61,6 +61,7 @@ cmake .. \
   -DCMAKE_PREFIX_PATH="$CONDA_PREFIX;$CONDA_PREFIX/lib/cmake" \
   -DCMAKE_C_COMPILER=clang \
   -DCMAKE_CXX_COMPILER=clang++ \
+  -DENABLE_DEVELOPER_COMPILER_FLAGS=on \
   -DENABLE_TESTS=on \
   -DLLVM_INSTALL_DIR="$(llvm-config --prefix)"
 cmake --build . -j
@@ -71,8 +72,7 @@ A few practical notes:
 
 - if you touch pass or runtime behavior, run the relevant `ctest` coverage for
   CPU, GPU, frontend, or integration tests as appropriate
-- if you touch MLIR-specific code, test with `-DPROTEUS_ENABLE_MLIR=ON` when
-  possible
+- if you touch MLIR-specific code, test with `-DPROTEUS_ENABLE_MLIR=ON`
 - if you touch CUDA or HIP paths, say clearly in the PR description what target
   you tested and what you could not test locally
 - if your change is documentation-only, say that explicitly so reviewers know a
