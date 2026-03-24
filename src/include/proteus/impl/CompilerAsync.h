@@ -1,11 +1,11 @@
 #ifndef PROTEUS_ASYNC_COMPILER_H
 #define PROTEUS_ASYNC_COMPILER_H
 
+#include "proteus/TimeTracing.h"
 #include "proteus/impl/CompilationTask.h"
 #include "proteus/impl/Debug.h"
 #include "proteus/impl/Hashing.h"
 #include "proteus/impl/TimeTracingInit.h"
-#include "proteus/TimeTracing.h"
 
 #include <condition_variable>
 #include <deque>

@@ -1100,7 +1100,9 @@ min(const Var<T> &L, const Var<T> &R) {
   ResultVar = R;
   auto CondVar = L < R;
   CB.beginIf(CondVar.loadValue(), __builtin_FILE(), __builtin_LINE());
-  { ResultVar = L; }
+  {
+    ResultVar = L;
+  }
   CB.endIf();
   return ResultVar;
 }
@@ -1116,7 +1118,9 @@ max(const Var<T> &L, const Var<T> &R) {
   ResultVar = R;
   auto CondVar = L > R;
   CB.beginIf(CondVar.loadValue(), __builtin_FILE(), __builtin_LINE());
-  { ResultVar = L; }
+  {
+    ResultVar = L;
+  }
   CB.endIf();
   return ResultVar;
 }

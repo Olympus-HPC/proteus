@@ -13,10 +13,10 @@
 #include "proteus/impl/Caching/MPILocalLookupCache.h"
 #include "proteus/impl/Caching/MPIRemoteLookupCache.h"
 #endif
+#include "proteus/TimeTracing.h"
 #include "proteus/impl/Caching/StorageCache.h"
 #include "proteus/impl/Config.h"
 #include "proteus/impl/Logger.h"
-#include "proteus/TimeTracing.h"
 #include "proteus/impl/Utils.h"
 
 #include <llvm/ADT/SmallVector.h>

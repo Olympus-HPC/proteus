@@ -48,7 +48,9 @@ int main() {
     auto Cmp = F.declVar<double>("cmp");
     Cmp = 5.0;
     F.beginIf(Cmp <= 5.0);
-    { Arg13[0] = 1.0; }
+    {
+      Arg13[0] = 1.0;
+    }
     F.endIf();
 
     auto ConstVal = F.defVar<const int>(Cmp, "const_val");

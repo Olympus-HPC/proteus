@@ -24,10 +24,9 @@ template <typename T> void run(T &&LB) {
 
 int main() {
   int A = 42;
-  auto Lambda = [ =, A = proteus::jit_variable(A) ] __device__()
-      __attribute__((annotate("jit"))) {
-    printf("Lambda A %d\n", A);
-  };
+  auto Lambda =
+      [=, A = proteus::jit_variable(A)] __device__()
+          __attribute__((annotate("jit"))) { printf("Lambda A %d\n", A); };
   run(Lambda);
   run(Lambda);
   run(Lambda);

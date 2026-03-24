@@ -30,10 +30,8 @@ int main() {
 
   std::cout << Y[1] << std::endl;
 
-  run([
-    =, N = proteus::jit_variable(N), A = proteus::jit_variable(A),
-    B = proteus::jit_variable(B)
-  ]() __attribute__((annotate("jit"))) {
+  run([=, N = proteus::jit_variable(N), A = proteus::jit_variable(A),
+       B = proteus::jit_variable(B)]() __attribute__((annotate("jit"))) {
     for (std::size_t I{0}; I < N; ++I) {
       Y[I] += A * B * X[I];
     }

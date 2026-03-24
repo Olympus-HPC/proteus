@@ -25,7 +25,7 @@ template <typename T> void launcher(T &&LB) {
 
 int main() {
   int A = 42;
-  launcher([ =, A = proteus::jit_variable(A) ] __host__ __device__()
+  launcher([=, A = proteus::jit_variable(A)] __host__ __device__()
                __attribute__((annotate("jit"))) { printf("Lambda %d\n", A); });
 }
 

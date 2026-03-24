@@ -11,9 +11,9 @@
 #ifndef PROTEUS_JITCACHE_H
 #define PROTEUS_JITCACHE_H
 
+#include "proteus/TimeTracing.h"
 #include "proteus/impl/Config.h"
 #include "proteus/impl/Hashing.h"
-#include "proteus/TimeTracing.h"
 #include "proteus/impl/Utils.h"
 
 #include <llvm/ADT/StringRef.h>

@@ -21,4 +21,3 @@ cp -r ${TEST_DIR}/* .
 export PROTEUS_INSTALL_DIR=${PWD}/install-proteus
 make -j
 ./main
-

@@ -36,7 +36,7 @@ cmake -G Ninja \
     ${CMAKEDIR}
 
 echo "===> Compile llvm..."
-ninja 
+ninja
 
 echo "===> Install llvm..."
 ninja install

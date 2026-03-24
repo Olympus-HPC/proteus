@@ -50,7 +50,9 @@ auto createJitKernel(size_t N) {
 
     // Strided loop: each thread processes multiple elements.
     F.beginFor(I, I, RunConstN, Inc);
-    { A[I] = A[I] + B[I]; }
+    {
+      A[I] = A[I] + B[I];
+    }
     F.endFor();
 
     F.ret();

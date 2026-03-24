@@ -33,7 +33,9 @@ int main() {
     I = 0;
     Inc = 1;
     F.beginFor(I, I, N, Inc);
-    { A[I] = A[I] + B[I]; }
+    {
+      A[I] = A[I] + B[I];
+    }
     F.endFor();
 
     F.ret();

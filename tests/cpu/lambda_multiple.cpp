@@ -18,7 +18,7 @@ template <typename F> void run(F &&Func) {
 }
 
 void lambdaCaller(int V) {
-  run([ =, V = proteus::jit_variable(V) ]()
+  run([=, V = proteus::jit_variable(V)]()
           __attribute__((annotate("jit"))) { printf("V %d\n", V); });
 }
 

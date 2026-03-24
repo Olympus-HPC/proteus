@@ -2,7 +2,7 @@ site_name: Proteus
 
 nav:
   - Home: index.md
-  - User's guide: 
+  - User's guide:
       - Installation: user/install.md
       - Build System Integration: user/integration.md
       - User Interface:
@@ -12,13 +12,13 @@ nav:
           - DSL API: user/dsl.md
       - Runtime Configuration: user/config.md
       - Resources : user/resources.md
-  - Developer's manual: 
+  - Developer's manual:
     - Concepts: dev/concepts.md
     - Creating a PR: dev/pr.md
     - API Reference: dev/api.md
 repo_url: https://github.com/Olympus-HPC/proteus
-theme: 
-  name: material 
+theme:
+  name: material
   features:
     - toc.integrate
   logo: assets/proteus-logo.png

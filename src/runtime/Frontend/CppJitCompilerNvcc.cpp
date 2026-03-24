@@ -1,5 +1,5 @@
-#include "proteus/impl/Frontend/CppJitCompiler.h"
 #include "proteus/TimeTracing.h"
+#include "proteus/impl/Frontend/CppJitCompiler.h"
 
 #if PROTEUS_ENABLE_CUDA
 
