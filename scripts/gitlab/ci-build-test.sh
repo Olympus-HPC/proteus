@@ -107,7 +107,7 @@ if [ "${CI_MACHINE}" == "tioga" ] || [ "${CI_MACHINE}" == "tuolumne" ]; then
 
   if [ "${PROTEUS_CI_ROCM_VERSION}" == "6.3.1" ] \
      || [ "${PROTEUS_CI_ROCM_VERSION}" == "6.4.1" ] \
-     || [ "${PROTEUS_CI_ROCM_VERSION}" == "7.1.0" ]; then
+     || [ "${PROTEUS_CI_ROCM_VERSION}" == "7.1.1" ]; then
     echo "### $(date) START TESTING SYNC COMPILATION WITH PROTEUS CODEGEN PARALLEL ###"
     PROTEUS_CODEGEN=parallel ctest -j8 -T test --output-on-failure
     echo "### $(date) END TESTING SYNC COMPILATION WITH PROTEUS HIP CODEGEN PARALLEL ###"
