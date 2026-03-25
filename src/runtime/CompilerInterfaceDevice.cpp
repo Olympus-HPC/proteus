@@ -25,6 +25,10 @@ extern "C" __attribute((used)) void __proteus_register_var(void *Handle,
                                                            const char *VarName,
                                                            uint64_t VarSize) {
   auto &JitEngineInfo = JitEngineInfoRegistry::instance();
+  // NOTE: For HIP it works to get the symbol address during the call inside a
+  // constructor context, but for CUDA, it fails.  So we save the host address
+  // and defer resolving the symbol address when patching the bitcode, which
+  // works for both CUDA and HIP.
   JitEngineInfo.registerVar(Handle, HostAddr, VarName, VarSize);
 }
 
@@ -49,8 +53,8 @@ __proteus_register_linked_binary(void *FatbinWrapper, const char *ModuleId) {
 
 extern "C" __attribute((used)) void
 __proteus_register_function(void *Handle, void *Kernel, char *KernelName,
-                             RuntimeConstantInfo **RCInfoArrayPtr,
-                             int32_t NumRCs) {
+                            RuntimeConstantInfo **RCInfoArrayPtr,
+                            int32_t NumRCs) {
   ArrayRef<RuntimeConstantInfo *> RCInfoArray{RCInfoArrayPtr,
                                               static_cast<size_t>(NumRCs)};
   auto &JitEngineInfo = JitEngineInfoRegistry::instance();
