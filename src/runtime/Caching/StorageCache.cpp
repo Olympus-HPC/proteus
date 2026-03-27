@@ -18,6 +18,7 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/MemoryBufferRef.h>
 
+#include <cinttypes>
 #include <cstdint>
 #include <filesystem>
 
@@ -74,7 +75,8 @@ void StorageCache::store(const HashT &HashValue, const CacheEntry &Entry) {
 }
 
 void StorageCache::printStats() {
-  printf("[proteus][%s] StorageCache rank %s hits %lu accesses %lu\n",
+  printf("[proteus][%s] StorageCache rank %s hits %" PRIu64 " accesses %" PRIu64
+         "\n",
          Label.c_str(), DistributedRank.c_str(), Hits, Accesses);
 }
 
