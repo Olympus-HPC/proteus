@@ -260,7 +260,9 @@ find_program(CLANGXX
   PATHS
     "${LLVM_BINARY_DIR}/bin"
 )
+get_filename_component(CLANGXX_REALPATH "${CLANGXX}" REALPATH)
 message(STATUS "Found clang++: ${CLANGXX}")
+message(STATUS "Resolved clang++: ${CLANGXX_REALPATH}")
 
 # Find required clang libraries in the LLVM installation.
 if(CLANG_LINK_CLANG_DYLIB)
@@ -281,7 +283,7 @@ target_link_libraries(proteus PRIVATE ${clang_libs})
 
 # Add the clangxx binary path as a compile definition for use in the runtime,
 # which needs it for the CPP frontend to resolve system path.
-target_compile_definitions(proteus PRIVATE PROTEUS_CLANGXX_BIN="${CLANGXX}")
+target_compile_definitions(proteus PRIVATE PROTEUS_CLANGXX_BIN="${CLANGXX_REALPATH}")
 
 if(PROTEUS_ENABLE_CUDA AND PROTEUS_NVCC_BIN)
   target_compile_definitions(proteus PRIVATE PROTEUS_NVCC_BIN="${PROTEUS_NVCC_BIN}")
