@@ -178,7 +178,7 @@ dispatchGetRuntimeConstantValue(void **Args,
                 << "Value " << std::to_string(RC.Value.LongDoubleVal) << "\n");
     break;
   case RuntimeConstantType::PTR:
-    RC.Value.PtrVal = (void *)getRuntimeConstantValue<intptr_t>(Arg);
+    RC.Value.PtrVal = *static_cast<void **>(Arg);
     PROTEUS_DBG(Logger::logs("proteus") << "Value " << RC.Value.PtrVal << "\n");
     break;
   case RuntimeConstantType::ARRAY: {
@@ -201,7 +201,7 @@ dispatchGetRuntimeConstantValue(void **Args,
     std::shared_ptr<unsigned char[]> Blob{new unsigned char[SizeInBytes]};
     // The interface is a pointer-to-pointer so we need to deref it to copy the
     // data.
-    void *Src = (void *)getRuntimeConstantValue<intptr_t>(Arg);
+    void *Src = *static_cast<void **>(Arg);
     std::memcpy(Blob.get(), Src, SizeInBytes);
 
     RC.ArrInfo = ArrayInfo{NumElts, RCInfo.OptArrInfo->EltType, Blob};
@@ -245,8 +245,7 @@ dispatchGetRuntimeConstantValue(void **Args,
 
     void *Src = (RCInfo.OptObjInfo->PassByValue
                      ? Args[RCInfo.ArgInfo.Pos]
-                     : (void *)getRuntimeConstantValue<intptr_t>(
-                           Args[RCInfo.ArgInfo.Pos]));
+                     : *static_cast<void **>(Args[RCInfo.ArgInfo.Pos]));
     std::memcpy(Blob.get(), Src, RCInfo.OptObjInfo->Size);
 
     RC.ObjInfo = ObjectInfo{RCInfo.OptObjInfo->Size,
