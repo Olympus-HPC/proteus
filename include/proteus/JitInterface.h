@@ -25,6 +25,7 @@ extern "C" void __jit_register_variable(proteus::RuntimeConstant RC,
                                         const char *AssociatedLambda);
 extern "C" void __jit_register_lambda(const char *Symbol);
 extern "C" void __jit_take_address(void const *) noexcept;
+extern "C" void __jit_var(void const *) noexcept;
 
 namespace proteus {
 
@@ -101,10 +102,6 @@ template <typename T>
 static __attribute__((noinline)) T
 jit_variable(T V, int Pos = -1, int Offset = -1,
              const char *AssociatedLambda = "") noexcept {
-  RuntimeConstant RC{convertCTypeToRCType<T>(), Pos, Offset};
-  std::memcpy(static_cast<void *>(&RC), &V, sizeof(T));
-  __jit_register_variable(RC, AssociatedLambda);
-
   return V;
 }
 

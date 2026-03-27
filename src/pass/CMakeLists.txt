@@ -32,6 +32,16 @@ add_library(ProteusPass SHARED
   ${PROTEUS_PASS_SOURCES}
 )
 
+add_library(LambdaPass SHARED
+  ${PROJECT_SOURCE_DIR}/src/pass/LambdaAnalysis.cpp
+)
+
+target_include_directories(LambdaPass
+  PRIVATE ${PROJECT_SOURCE_DIR}/include
+  PRIVATE ${PROJECT_SOURCE_DIR}/src/include
+  ${CMAKE_CURRENT_BINARY_DIR}
+)
+
 target_include_directories(ProteusPass
   PRIVATE ${PROJECT_SOURCE_DIR}/include
   PRIVATE ${PROJECT_SOURCE_DIR}/src/include
@@ -41,8 +51,12 @@ target_include_directories(ProteusPass
 target_include_directories(ProteusPass
   SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
 
+target_include_directories(LambdaPass
+  SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
+
 if(NOT LLVM_ENABLE_RTTI)
   target_compile_options(ProteusPass PRIVATE -fno-rtti)
+  target_compile_options(LambdaPass PRIVATE -fno-rtti)
 endif()
 
 # Allow undefined symbols in shared objects on Darwin (this is the default
@@ -50,6 +64,16 @@ endif()
 target_link_libraries(ProteusPass
   PRIVATE IRLinker
   "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+
+target_link_libraries(LambdaPass
+  PRIVATE IRLinker
+  "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+
+target_compile_options(
+  LambdaPass
+  INTERFACE
+  -fpass-plugin=$<TARGET_FILE:LambdaPass>
+)
 
 target_compile_options(
   ProteusPass
@@ -60,8 +84,10 @@ target_compile_options(
 target_link_options(
   ProteusPass
   INTERFACE
-  "SHELL:$<$<LINK_LANGUAGE:HIP>:-Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPass>>"
+  "SHELL:$<$<LINK_LANGUAGE:HIP>:-Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPass>>
+  --load-pass-plugin=$<TARGET_FILE:LambdaPass>>"
 )
+
 
 set_target_properties(ProteusPass PROPERTIES
   # on macOS enable passing RPATH flags to the linker; no-ops on Linux
@@ -73,7 +99,7 @@ set_target_properties(ProteusPass PROPERTIES
 )
 
 install(
-  TARGETS ProteusPass IRLinker
+  TARGETS ProteusPass IRLinker LambdaPass
   EXPORT proteusTargets
   RUNTIME DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"

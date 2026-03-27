@@ -40,6 +40,7 @@
 #include <llvm/ADT/StringRef.h>
 #include <llvm/ADT/StringSet.h>
 #include <llvm/Analysis/CallGraph.h>
+#include <llvm/Analysis/ValueTracking.h>
 #include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/Demangle/Demangle.h>
 #include <llvm/IR/CallingConv.h>
@@ -48,6 +49,7 @@
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Dominators.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalValue.h>
 #include <llvm/IR/GlobalVariable.h>
@@ -95,6 +97,29 @@ static cl::opt<bool> ForceProteusAnnotateAll(
     "force-proteus-jit-annotate-all",
     cl::desc("Apply the 'jit' annotation on all GPU kernels"), cl::init(false));
 
+struct LambdaJitVariableInfo {
+  llvm::Value *Slot;
+  llvm::Value *Offset;
+  llvm::Type *Type;
+};
+
+std::optional<std::string> getGlobalString(const GlobalVariable *GV) {
+  if (!GV || !GV->hasInitializer())
+    return std::nullopt;
+
+  const Constant *Init = GV->getInitializer();
+
+  if (auto *CDS = dyn_cast<ConstantDataSequential>(Init))
+    if (CDS->isString())
+      return CDS->getAsCString().str(); // drops trailing '\0'
+
+  if (auto *CDA = dyn_cast<ConstantDataArray>(Init))
+    if (CDA->isString())
+      return CDA->getAsCString().str();
+
+  return std::nullopt;
+}
+
 class ProteusPassImpl {
 public:
   ProteusPassImpl(Module &M) : Types(M) {}
@@ -122,7 +147,6 @@ public:
     // and return.
     if (isDeviceCompilation(M)) {
       emitJitModuleDevice(M, IsLTO);
-
       return true;
     }
 
@@ -135,10 +159,6 @@ public:
     instrumentRegisterFatBinaryEnd(M);
     instrumentRegisterVar(M);
     instrumentRegisterFunction(M);
-
-    findJitVariables(M);
-    registerJitVariablesWithLambda(M);
-    registerLambdaFunctions(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
       emitJitLaunchKernelCall(M);
@@ -1255,7 +1275,8 @@ private:
   /// instantiation.
   /// 4. Inject the demangled name into the original callbase of the
   /// `jit_variable` function.
-  void registerJitVariablesWithLambda(Module &M) {
+  void registerJitVariablesWithLambda(
+      Module &M, DenseMap<Type *, GlobalVariable *> &LambdaTypeToGlobalName) {
     llvm::SmallVector<CallBase *, 16> JitVarCallsites;
     llvm::DenseMap<CallBase *, Type *> CallBaseToLambda;
     for (auto &F : M.getFunctionList()) {
@@ -1347,8 +1368,45 @@ private:
     }
   }
 
-  /// findJitVariables modifies calls to proteus::jit_variable by injecting
-  void findJitVariables(Module &M) {
+  FunctionCallee getJitPushLambdaRuntimeConstant(Module &M) {
+    // __jit_register_variable_instance_raw(
+    //   int32_t Type, int32_t Pos, int32_t Offset,
+    //   void const* ValuePtr, int32_t Size,
+    //   char const* LambdaType, void const* Key)
+    FunctionType *FnTy = FunctionType::get(
+        Types.VoidTy,
+        {Types.Int32Ty, Types.Int32Ty, Types.Int32Ty, Types.PtrTy, Types.PtrTy},
+        /*isVarArg=*/false);
+    return M.getOrInsertFunction("__jit_push_lambda_runtime_constant", FnTy);
+  }
+
+  std::optional<RuntimeConstantType> getRCTypeForLLVMType(Type *Ty) {
+    if (Ty->isIntegerTy(1))
+      return RuntimeConstantType::BOOL;
+    if (Ty->isIntegerTy(8))
+      return RuntimeConstantType::INT8;
+    if (Ty->isIntegerTy(32))
+      return RuntimeConstantType::INT32;
+    if (Ty->isIntegerTy(64))
+      return RuntimeConstantType::INT64;
+    if (Ty->isFloatTy())
+      return RuntimeConstantType::FLOAT;
+    if (Ty->isDoubleTy())
+      return RuntimeConstantType::DOUBLE;
+    if (Ty->isPointerTy())
+      return RuntimeConstantType::PTR;
+    return std::nullopt;
+  }
+
+  /// instrumentJitVariableStructIndex modifies calls to proteus::jit_variable
+  /// by injecting the corresponding jit variable offset into the call.
+  /// todo(bowen): add assert on jit_variable having an alloca within the same
+  /// procedure
+  void instrumentJitVariableStructIndex(
+      Module &M,
+      DenseMap<Type *, GlobalVariable *> &RegisteredLambdaStorageTypes,
+      DenseMap<StructType *, SmallVector<LambdaJitVariableInfo, 16>>
+          &JitIndices) {
     DEBUG(Logger::logs("proteus-pass") << "finding jit variables" << "\n");
     DEBUG(Logger::logs("proteus-pass") << "users..." << "\n");
 
@@ -1361,64 +1419,218 @@ private:
       }
     }
 
-    auto FindStorePtr = [&](CallBase *CB) {
-      // Find the store instruction user of the JitVariableCB to extract the
-      // pointer to the lambda anonymous class object.
-      Value *Ptr = nullptr;
-      Value *V = CB;
-      while (!Ptr) {
-        if (!V->hasOneUser())
-          reportFatalError("Expected single user");
-
-        StoreInst *S = dyn_cast<StoreInst>(*(V->users().begin()));
-        if (S) {
-          DEBUG(Logger::logs("proteus-pass") << "store: " << *S << "\n");
-          Ptr = S->getPointerOperand();
-          break;
-        }
-
-        // Recurse to the next user.
-        V = *V->users().begin();
-      }
-
-      return Ptr;
-    };
-
-    for (auto *Function : JitFunctions) {
-      for (auto *User : Function->users()) {
-        CallBase *CB = dyn_cast<CallBase>(User);
+    for (auto &F : JitFunctions) {
+      Type *LoadType = F->getReturnType();
+      if (!LoadType)
+        reportFatalError("jit function return type null??\n");
+      std::queue<Value *> WorkList;
+      DenseSet<Value *> Discovered;
+      for (auto *Usr : F->users()) {
+        CallBase *CB = dyn_cast<CallBase>(Usr);
         if (!CB)
-          reportFatalError(
-              "Expected CallBase as user of proteus::jit_variable function");
+          continue;
+        for (auto *Usr : CB->users())
+          WorkList.push(Usr);
+      }
+      // These two integers need to be equivalent--we track down each callsite
+      // to an offset in the struct.
+      uint16_t numJitVars = WorkList.size();
+      uint16_t numSlotsFound = 0;
 
-        DEBUG(Logger::logs("proteus-pass") << "call: " << *CB << "\n");
+      while (!WorkList.empty()) {
+        Value *CurVal = WorkList.front();
 
-        Value *V = FindStorePtr(CB);
-
-        GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(V);
-        if (GEP) {
-          DEBUG(Logger::logs("proteus-pass") << "gep: " << *GEP << "\n");
+        if (Discovered.contains(CurVal))
+          continue;
+        Discovered.insert(CurVal);
+        WorkList.pop();
+        // very simple use-def traversal only handles three cases, which we
+        // expect at startEPCallBack
+        if (StoreInst *Store = dyn_cast<StoreInst>(CurVal))
+          WorkList.push(Store->getPointerOperand());
+        if (AllocaInst *Alloca = dyn_cast<AllocaInst>(CurVal)) {
+          Constant *Slot = ConstantInt::get(Types.Int32Ty, 0);
+          auto *PossibleLamType =
+              dyn_cast<StructType>(Alloca->getAllocatedType());
+          if (!PossibleLamType ||
+              !RegisteredLambdaStorageTypes.contains(PossibleLamType))
+            continue;
+          ++numSlotsFound;
+          JitIndices[PossibleLamType].emplace_back(
+              LambdaJitVariableInfo{Slot, Slot, LoadType});
+          if (!LoadType)
+            reportFatalError("Load type is null\n");
+        }
+        if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(CurVal)) {
+          StructType *PossibleLamTyp =
+              dyn_cast<StructType>(GEP->getSourceElementType());
+          if (!PossibleLamTyp ||
+              !RegisteredLambdaStorageTypes.contains(PossibleLamTyp))
+            continue;
           auto *Slot = GEP->getOperand(GEP->getNumOperands() - 1);
-          DEBUG(Logger::logs("proteus-pass") << "slot: " << *Slot << "\n");
-          CB->setArgOperand(1, Slot);
-          auto *GEPTy = GEP->getSourceElementType();
-          StructType *STy = dyn_cast<StructType>(GEPTy);
-          if (!STy)
-            reportFatalError("Expected struct type for lambda");
-          const StructLayout *SL = M.getDataLayout().getStructLayout(STy);
+          const StructLayout *SL =
+              M.getDataLayout().getStructLayout(PossibleLamTyp);
           ConstantInt *SlotC = dyn_cast<ConstantInt>(Slot);
           if (!SlotC)
             reportFatalError("Expected constant slot");
           auto Offset = SL->getElementOffset(SlotC->getZExtValue());
           Constant *OffsetCI = ConstantInt::get(Types.Int32Ty, Offset);
-          CB->setArgOperand(2, OffsetCI);
-        } else {
-          DEBUG(Logger::logs("proteus-pass")
-                << "no gep, assuming slot 0" << "\n");
-          Constant *C = ConstantInt::get(Types.Int32Ty, 0);
-          CB->setArgOperand(1, C);
-          CB->setArgOperand(2, C);
+          // Type* LoadType = GEP->getAccessType();
+          JitIndices[PossibleLamTyp].emplace_back(
+              LambdaJitVariableInfo{Slot, OffsetCI, LoadType});
+          ++numSlotsFound;
+          // break;
         }
+      }
+
+      if (numJitVars != numSlotsFound)
+        reportFatalError("Expected number of jit variables callsites to equal "
+                         "the number of slots found");
+    }
+  }
+
+  void instrumentJitPushCalls(
+      Module &M,
+      const DenseMap<StructType *, SmallVector<LambdaJitVariableInfo, 16>>
+          &LambdaStorageTypeToJitIndices,
+      const DenseMap<Type *, GlobalVariable *> &LambdaTypeToGlobalName,
+      StringMap<Type *> &LambdaGlobalNameToType,
+      const DenseMap<Value *, GlobalVariable *> &StubToKernelMap) {
+    Function *LaunchKernelFn = nullptr;
+    if (!LaunchFunctionName) {
+      reportFatalError("expected launch function name");
+    }
+    LaunchKernelFn = M.getFunction(LaunchFunctionName);
+    for (Value *V : LaunchKernelFn->users()) {
+      CallBase *LaunchKernelCB = dyn_cast<CallBase>(V);
+      if (!LaunchKernelCB)
+        continue;
+      Function *Caller = LaunchKernelCB->getFunction();
+      if (!StubToKernelMap.contains(Caller))
+        continue;
+
+      auto findKernelParam0StoreValue = [&]() -> Value * {
+        if (LaunchKernelCB->arg_size() < 3)
+          return nullptr;
+
+        Instruction *LaunchI = dyn_cast<Instruction>(LaunchKernelCB);
+        if (!LaunchI)
+          return nullptr;
+
+        const DataLayout &DL = M.getDataLayout();
+        Value *KernelParamsPtr =
+            LaunchKernelCB->getArgOperand(LaunchKernelCB->arg_size() - 3);
+        if (!KernelParamsPtr)
+          return nullptr;
+
+        KernelParamsPtr = KernelParamsPtr->stripPointerCasts();
+
+        APInt TargetOff(DL.getIndexSizeInBits(0), 0);
+        Value *TargetBase =
+            KernelParamsPtr->stripAndAccumulateInBoundsConstantOffsets(
+                DL, TargetOff);
+
+        auto isParam0Store = [&](StoreInst *SI) -> bool {
+          APInt StoreOff(DL.getIndexSizeInBits(0), 0);
+          Value *StoreBase =
+              SI->getPointerOperand()
+                  ->stripPointerCasts()
+                  ->stripAndAccumulateInBoundsConstantOffsets(DL, StoreOff);
+          return StoreBase == TargetBase && StoreOff == TargetOff;
+        };
+
+        for (Instruction *I = LaunchI->getPrevNode(); I; I = I->getPrevNode())
+          if (auto *SI = dyn_cast<StoreInst>(I))
+            if (isParam0Store(SI))
+              return SI->getValueOperand();
+
+        Function *F = LaunchKernelCB->getFunction();
+        if (!F)
+          return nullptr;
+
+        DominatorTree DT(*F);
+        StoreInst *BestStore = nullptr;
+        unsigned BestLevel = 0;
+        for (BasicBlock &BB : *F)
+          for (Instruction &I : BB)
+            if (auto *SI = dyn_cast<StoreInst>(&I))
+              if (isParam0Store(SI) && DT.dominates(SI, LaunchI)) {
+                unsigned Level = DT.getNode(SI->getParent())->getLevel();
+                if (!BestStore || Level > BestLevel ||
+                    (Level == BestLevel &&
+                     BestStore->getParent() == LaunchI->getParent() &&
+                     BestStore->comesBefore(SI))) {
+                  BestStore = SI;
+                  BestLevel = Level;
+                }
+              }
+
+        return BestStore ? BestStore->getValueOperand() : nullptr;
+      };
+
+
+      auto lambdaName = parseLambdaType(demangle(Caller->getName().str()),
+                                        "__device_stub__kernel");
+
+
+      auto it = LambdaGlobalNameToType.find(lambdaName);
+      if (it == LambdaGlobalNameToType.end())
+        reportFatalError("lambda not found");
+      auto *lambdaType = it->second;
+      StructType *LambdaStorageClass = dyn_cast<StructType>(lambdaType);
+      if (!LambdaStorageClass)
+        reportFatalError(
+            "Lambda storage class not found.  Internal proteus error.");
+
+      Value *LambdaStoragePtr = nullptr;
+      if (Value *Stored = findKernelParam0StoreValue()) {
+        Value *StoredStripped = Stored->stripPointerCasts();
+        if (auto *A = dyn_cast<Argument>(StoredStripped)) {
+          if (A->hasByValAttr() && A->getParamByValType() == LambdaStorageClass)
+            LambdaStoragePtr = Stored;
+        } else {
+          LambdaStoragePtr = Stored;
+        }
+      }
+
+      if (!LambdaStoragePtr) {
+        for (Argument &A : Caller->args()) {
+          if (A.hasByValAttr() && A.getParamByValType() == LambdaStorageClass) {
+            LambdaStoragePtr = &A;
+            break;
+          }
+        }
+      }
+
+      if (!LambdaStoragePtr)
+        reportFatalError(
+            "Failed to locate lambda storage pointer for hipLaunchKernel");
+
+      // inject the call to our runtime before the kernel launch
+      IRBuilder<> Builder(LaunchKernelCB);
+      auto JitVarFn = getJitPushLambdaRuntimeConstant(M);
+
+      for (auto JitVarInfo :
+           LambdaStorageTypeToJitIndices.find(LambdaStorageClass)
+               ->getSecond()) {
+        if (!JitVarInfo.Type)
+          reportFatalError("jit var info type is null\n");
+        auto ProteusRCType = getRCTypeForLLVMType(JitVarInfo.Type);
+        ConstantInt *SlotC = dyn_cast<ConstantInt>(JitVarInfo.Slot);
+
+        if (!SlotC)
+          reportFatalError("Expected constant slot");
+        auto Idx = SlotC->getZExtValue();
+        if (!ProteusRCType)
+          reportFatalError("Proteus does not support user-specified type as a "
+                           "jit::variable");
+        Value *FieldPtr =
+            Builder.CreateStructGEP(LambdaStorageClass, LambdaStoragePtr, Idx);
+        Builder.CreateCall(
+            JitVarFn,
+            {Builder.getInt32(static_cast<int32_t>(ProteusRCType.value())),
+             Builder.getInt32(Idx), JitVarInfo.Offset, FieldPtr,
+             LambdaTypeToGlobalName.find(LambdaStorageClass)->second});
       }
     }
   }
@@ -1571,6 +1783,7 @@ llvm::PassPluginLibraryInfo getProteusPassPluginInfo() {
 
   // PB.registerPipelineStartEPCallback(
   // PB.registerOptimizerLastEPCallback(
+  // PM.registerPipelineEarlySimplificationEPCallback
 #if LLVM_VERSION_MAJOR >= 20
     PB.registerPipelineEarlySimplificationEPCallback(
         [&](ModulePassManager &MPM, OptimizationLevel,

@@ -298,8 +298,12 @@ inline void specializeIR(
 
   auto &LR = LambdaRegistry::instance();
   for (auto &[FnName, LambdaType] : LambdaCalleeInfo) {
-    const SmallVector<RuntimeConstant> &RCVec = LR.getJitVariables(LambdaType);
+
+
+    const SmallVector<RuntimeConstant> &RCVec = LR.getJitVariables();
     Function *F = M.getFunction(FnName);
+    for (int i = 0; i < RCVec.size(); ++i){
+    }
     if (!F)
       reportFatalError("Expected non-null Function");
     TransformLambdaSpecialization::transform(M, *F, RCVec);
