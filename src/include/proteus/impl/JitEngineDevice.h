@@ -437,6 +437,8 @@ public:
         auto OptionalMapIt =
             LambdaRegistry::instance().matchJitVariableMap(F.getName());
         if (OptionalMapIt)
+          llvm::outs()<<"KWORD " <<OptionalMapIt.value().first<<"\n";
+        if (OptionalMapIt)
           LambdaCalleeInfo.emplace_back(F.getName(),
                                         OptionalMapIt.value()->first);
       }
@@ -577,6 +579,7 @@ JitEngineDevice<ImplT>::compileAndRun(
       getRuntimeConstantValues(KernelArgs, KernelInfo.getRCInfoArray());
 
   SmallVector<RuntimeConstant> LambdaJitValuesVec;
+  auto& LR = LambdaRegistry::instance();
   getLambdaJitValues(KernelInfo, LambdaJitValuesVec);
   const auto &CGConfig = Config::get().getCGConfig(KernelInfo.getName());
   // Include codegen and runtime specialization policy in the cache key. If we
@@ -591,9 +594,11 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc =
       CodeCache.lookup(HashValue);
-  if (KernelFunc)
+  if (KernelFunc) {
+    LR.flushJitVariables();
     return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
-                                ShmemSize, Stream);
+      ShmemSize, Stream);
+  }
 
   // NOTE: we don't need a suffix to differentiate kernels, each
   // specialization will be in its own module uniquely identify by HashValue.
@@ -615,7 +620,7 @@ JitEngineDevice<ImplT>::compileAndRun(
           BinInfo.getVarNameToGlobalInfo());
 
       CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
-
+      LR.flushJitVariables();
       return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                                   ShmemSize, Stream);
     }

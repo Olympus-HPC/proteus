@@ -21,10 +21,11 @@
 #include <type_traits>
 #include <utility>
 
-extern "C" void __proteus_register_variable(proteus::RuntimeConstant RC,
-                                            const char *AssociatedLambda);
-extern "C" void __proteus_register_lambda(const char *Symbol);
-extern "C" void __proteus_take_address(void const *) noexcept;
+extern "C" void __jit_register_variable(proteus::RuntimeConstant RC,
+                                        const char *AssociatedLambda);
+extern "C" void __jit_register_lambda(const char *Symbol);
+extern "C" void __jit_take_address(void const *) noexcept;
+extern "C" void __jit_var(void const *) noexcept;
 
 namespace proteus {
 
