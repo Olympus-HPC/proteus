@@ -141,6 +141,7 @@ public:
 
     PROTEUS_DBG(Logger::logs("proteus") << "\t users" << "\n");
     for (User *User : LambdaClass->users()) {
+      PROTEUS_DBG(Logger::logs("proteus") << *LambdaClass << "\n");
       PROTEUS_DBG(Logger::logs("proteus") << *User << "\n");
       if (isa<LoadInst>(User))
         handleLoad(M, User, RCVec);

@@ -42,6 +42,7 @@ function(CREATE_GPU_TEST_RDC exe check_source)
             -fgpu-rdc
             --hip-link
             -Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPassOffload>
+            -Xoffload-linker --load-pass-plugin=$<TARGET_FILE:LambdaPass>
         )
     elseif(PROTEUS_ENABLE_CUDA)
         target_compile_options(${exe}.${lang}.rdc PRIVATE --no-offload-new-driver)
@@ -132,6 +133,7 @@ function(CREATE_GPU_TEST_FORCE exe check_source)
         ${exe}.${lang}
         PUBLIC
             "-fplugin=$<TARGET_FILE:ProteusPass>"
+            "-fplugin=$<TARGET_FILE:LambdaPass>"
             "SHELL:-Xclang -mllvm -Xclang -force-proteus-jit-annotate-all"
     )
 endfunction()
@@ -143,6 +145,7 @@ function(CREATE_GPU_TEST_RDC_FORCE exe check_source)
         ${exe}.${lang}.rdc
         PUBLIC
             "-fplugin=$<TARGET_FILE:ProteusPass>"
+            "-fplugin=$<TARGET_FILE:LambdaPass>"
             "SHELL:-Xclang -mllvm -Xclang -force-proteus-jit-annotate-all"
     )
 endfunction()
@@ -236,6 +239,7 @@ CREATE_GPU_TEST(shared_array shared_array.cpp)
 CREATE_GPU_TEST(enable_disable enable_disable.cpp)
 CREATE_GPU_TEST(lambda_multiple lambda_multiple.cpp)
 CREATE_GPU_TEST(lambda_def lambda_def.cpp)
+CREATE_GPU_TEST(lambda_factory lambda_factory.cpp)
 CREATE_GPU_TEST(lambda_host_device lambda_host_device.cpp)
 CREATE_GPU_TEST(lambda_spec_test lambda_spec_test.cpp)
 CREATE_GPU_TEST(builtin_globals builtin_globals.cpp)

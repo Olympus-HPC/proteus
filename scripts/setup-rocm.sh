@@ -22,6 +22,7 @@ cmake .. \
 -DPROTEUS_ENABLE_HIP=on \
 -DCMAKE_INSTALL_PREFIX=../install-${HOSTN}-rocm-${ROCM_VERSION} \
 -DCMAKE_EXPORT_COMPILE_COMMANDS=on \
+-DENABLE_TESTS=ON \
 "${@:2}"
 
 popd
