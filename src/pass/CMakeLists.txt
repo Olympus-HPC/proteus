@@ -1,4 +1,6 @@
-add_library(IRLinker SHARED IRLinker.cpp)
+add_library(IRLinker SHARED
+  IRLinker.cpp
+  ${PROJECT_SOURCE_DIR}/src/runtime/Error.cpp)
 target_include_directories(IRLinker
   PRIVATE
   ${PROJECT_SOURCE_DIR}/include
