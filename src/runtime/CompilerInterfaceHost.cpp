@@ -36,12 +36,10 @@ __proteus_register_variable(RuntimeConstant RC, const char *LambdaName) {
   LambdaRegistry::instance().setJitVariable(LambdaName, RC);
 }
 
-<<<<<<< Updated upstream
-=======
 extern "C" __attribute__((used)) void
-__jit_push_lambda_runtime_constant(int32_t Type, int32_t Pos, int32_t Offset,
-                                   const void *ValuePtr,
-                                   const char *LambdaType) {
+__jit_register_lambda_runtime_constant(int32_t Type, int32_t Pos,
+                                       int32_t Offset, const void *ValuePtr,
+                                       uint64_t ID) {
   RuntimeConstant RC{static_cast<RuntimeConstantType>(Type), Pos, Offset};
   // ValuePtr points at the lambda field storage (e.g., an i32 capture). It is
   // not a pointer to a full RuntimeConstantValue, so only copy the bytes
@@ -73,15 +71,10 @@ __jit_push_lambda_runtime_constant(int32_t Type, int32_t Pos, int32_t Offset,
     reportFatalError(
         "__jit_push_lambda_runtime_constant only supports scalar captures");
   }
-  // llvm::outs() << "PRINT FROM PUSH " << *static_cast<const double *>(ValuePtr)
-              //  << "\n";
-  LambdaRegistry::instance().setJitVariable(LambdaType, RC);
-}
 
->>>>>>> Stashed changes
 extern "C" __attribute__((used)) void
-__proteus_register_lambda(const char *LambdaName) {
-  LambdaRegistry::instance().registerLambda(LambdaName);
+__jit_register_lambda(const char *LambdaName) {
+  LambdaRegistry::instance().setJitVariable(ID, RC);
 }
 
 extern "C" void __proteus_enable_host() {

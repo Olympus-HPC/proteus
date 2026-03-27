@@ -11,8 +11,7 @@
 #include <proteus/JitInterface.h>
 
 template <typename F> void run(F &&Func) {
-  proteus::register_lambda(Func);
-  Func();
+  PROTEUS_REGISTER_LAMBDA(Func)();
 }
 
 int main() {

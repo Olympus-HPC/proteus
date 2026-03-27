@@ -16,6 +16,17 @@ namespace proteus {
 
 using namespace llvm;
 
+inline void copyProteusFunctionMetadata(const Function *Src, Function *Dst) {
+  if (!Src || !Dst)
+    return;
+  constexpr const char *Keys[] = {"proteus.wrapper_call",
+                                  "proteus.registered_lambda"
+                                 };
+  for (const char *Key : Keys)
+    if (MDNode *Node = Src->getMetadata(Key))
+      Dst->setMetadata(Key, Node);
+}
+
 inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, StringRef Name,
                                                      CallGraph &CG) {
   auto KernelModuleTmp = std::make_unique<Module>("JitModule", M.getContext());
@@ -97,22 +108,24 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, StringRef Name,
     VMap[GV] = NewGV;
   }
 
-  for (auto *F : ReachableFunctions) {
-    auto *NewFunction = Function::Create(F->getFunctionType(), F->getLinkage(),
-                                         F->getAddressSpace(), F->getName(),
-                                         KernelModuleTmp.get());
-    NewFunction->copyAttributesFrom(F);
-    VMap[F] = NewFunction;
-  }
+	  for (auto *F : ReachableFunctions) {
+	    auto *NewFunction = Function::Create(F->getFunctionType(), F->getLinkage(),
+	                                         F->getAddressSpace(), F->getName(),
+	                                         KernelModuleTmp.get());
+	    NewFunction->copyAttributesFrom(F);
+	    copyProteusFunctionMetadata(F, NewFunction);
+	    VMap[F] = NewFunction;
+	  }
 
-  for (auto *F : ReachableDeclarations) {
-    auto *NewFunction = Function::Create(F->getFunctionType(), F->getLinkage(),
-                                         F->getAddressSpace(), F->getName(),
-                                         KernelModuleTmp.get());
-    NewFunction->copyAttributesFrom(F);
-    NewFunction->setLinkage(GlobalValue::ExternalLinkage);
-    VMap[F] = NewFunction;
-  }
+	  for (auto *F : ReachableDeclarations) {
+	    auto *NewFunction = Function::Create(F->getFunctionType(), F->getLinkage(),
+	                                         F->getAddressSpace(), F->getName(),
+	                                         KernelModuleTmp.get());
+	    NewFunction->copyAttributesFrom(F);
+	    copyProteusFunctionMetadata(F, NewFunction);
+	    NewFunction->setLinkage(GlobalValue::ExternalLinkage);
+	    VMap[F] = NewFunction;
+	  }
 
   for (GlobalVariable *GV : ReachableGlobals) {
     if (GV->hasInitializer()) {
@@ -397,12 +410,13 @@ struct LinkingCloner {
 
     // Create unpopulated declarations.
     for (GlobalValue *GV : Reachable) {
-      if (auto *F = dyn_cast<Function>(GV)) {
-        Function *NF = Function::Create(F->getFunctionType(), F->getLinkage(),
-                                        F->getAddressSpace(), F->getName(),
-                                        ModuleOut.get());
-        NF->copyAttributesFrom(F);
-        VMap[F] = NF;
+	      if (auto *F = dyn_cast<Function>(GV)) {
+	        Function *NF = Function::Create(F->getFunctionType(), F->getLinkage(),
+	                                        F->getAddressSpace(), F->getName(),
+	                                        ModuleOut.get());
+	        NF->copyAttributesFrom(F);
+	        copyProteusFunctionMetadata(F, NF);
+	        VMap[F] = NF;
 
         for (auto *DeclGV : ResolvedMap[F])
           VMap[DeclGV] = NF;
