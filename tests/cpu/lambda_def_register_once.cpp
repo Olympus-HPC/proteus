@@ -10,16 +10,25 @@
 
 #include <proteus/JitInterface.h>
 
-template <typename F> void run(F &&Func) { PROTEUS_REGISTER_LAMBDA(Func)(); }
+template <typename F> void registerRun(F &&Func) {
+  PROTEUS_REGISTER_LAMBDA(Func)();
+}
+
+template <typename F> void run(F &&Func) { Func(); }
 
 int main() {
   int A = 42;
   auto Lambda =
       [=, A = proteus::jit_variable(A)]()
           __attribute__((annotate("jit"))) { printf("Lambda A %d\n", A); };
-  run(Lambda);
-  run(Lambda);
-  run(Lambda);
+  auto RegisteredLambda = PROTEUS_REGISTER_LAMBDA(Lambda);
+  run(RegisteredLambda);
+  run(RegisteredLambda);
+  run(RegisteredLambda);
+
+  registerRun(Lambda);
+  registerRun(Lambda);
+  registerRun(Lambda);
 
   return 0;
 }

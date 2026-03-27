@@ -12,6 +12,7 @@
 #define PROTEUS_TRANSFORM_LAMBDA_SPECIALIZATION_H
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/Debug.h"
 #include "proteus/impl/Utils.h"
 
@@ -59,8 +60,8 @@ inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
 class TransformLambdaSpecialization {
 private:
   static const RuntimeConstant *
-  findArgByOffset(const SmallVector<RuntimeConstant> &RCVec, int32_t Offset) {
-    for (auto &Arg : RCVec) {
+  findArgByOffset(const DenseMap<int32_t, RuntimeConstant> &RCMap, int32_t Offset) {
+    for (auto &[_, Arg] : RCMap) {
       if (Arg.Offset == Offset)
         return &Arg;
     }
@@ -68,12 +69,11 @@ private:
   };
 
   static const RuntimeConstant *
-  findArgByPos(const SmallVector<RuntimeConstant> &RCVec, int32_t Pos) {
-    for (auto &Arg : RCVec) {
-      if (Arg.Pos == Pos)
-        return &Arg;
-    }
-    return nullptr;
+  findArgByPos(const DenseMap<int32_t, RuntimeConstant> &RCMap, int32_t Pos) {
+    auto It = RCMap.find(Pos);
+    if (It == RCMap.end())
+      return nullptr;
+    return &It->second;
   };
 
   static auto traceOut(int Slot, Constant *C) {
@@ -85,7 +85,7 @@ private:
   };
 
   static void handleLoad(Module &M, User *User,
-                         const SmallVector<RuntimeConstant> &RCVec) {
+                         const DenseMap<int32_t, RuntimeConstant> &RCVec) {
     auto *Arg = findArgByPos(RCVec, 0);
     if (!Arg)
       return;
@@ -98,7 +98,7 @@ private:
   }
 
   static void handleGEP(Module &M, GetElementPtrInst *GEP, User *User,
-                        const SmallVector<RuntimeConstant> &RCVec) {
+                        const DenseMap<int32_t, RuntimeConstant> &RCVec) {
     auto *GEPSlot = GEP->getOperand(User->getNumOperands() - 1);
     ConstantInt *CI = dyn_cast<ConstantInt>(GEPSlot);
     int Slot = CI->getZExtValue();
@@ -123,19 +123,36 @@ private:
   }
 
 public:
-  static void transform(Module &M, Function &F,
-                        const SmallVector<RuntimeConstant> &RCVec) {
-    auto *LambdaClass = F.getArg(0);
+  static void transform(Module &M, Function &FunctorOperatorFunction, uint64_t FunctorID,
+                        const DenseMap<int32_t, RuntimeConstant> &RCMap) {
+    Function* LambdaOperatorMethod = nullptr;
+    SmallVector<std::pair<Function*, uint64_t>> LambdaOperators;
+    findFunctionsWithU64Metadata(M, "proteus.registered_lambda", LambdaOperators);
+    for (auto [Lambda, ID] : LambdaOperators) {
+      if (ID == FunctorID)
+        LambdaOperatorMethod = Lambda;
+    }
+    if (!LambdaOperatorMethod) {
+      // On host (and sometimes device) the lambda call operator may be fully
+      // inlined into the functor wrapper call operator, leaving no separate
+      // `lambda::operator()` function to tag.
+      LambdaOperatorMethod = &FunctorOperatorFunction;
+      PROTEUS_DBG(Logger::logs("proteus")
+                  << "[LambdaSpec] No separate lambda operator found for functor "
+                  << FunctorID << "; specializing wrapper operator directly\n");
+    }
+
+    auto *LambdaClass = LambdaOperatorMethod->getArg(0);
     PROTEUS_DBG(Logger::logs("proteus")
-                << "[LambdaSpec] Function: " << F.getName() << " RCVec size "
-                << RCVec.size() << "\n");
+                << "[LambdaSpec] Function: " << LambdaOperatorMethod->getName() << " RCVec size "
+                << RCMap.size() << "\n");
     PROTEUS_DBG(Logger::logs("proteus")
                 << "TransformLambdaSpecialization::transform" << "\n");
     PROTEUS_DBG(Logger::logs("proteus") << "\t args" << "\n");
     if (Config::get().ProteusDebugOutput) {
-      for (auto &Arg : RCVec) {
+      for (auto &[Pos, RC] : RCMap) {
         Logger::logs("proteus")
-            << "{" << Arg.Value.Int64Val << ", " << Arg.Pos << " }\n";
+            << "{" << RC.Value.Int64Val << ", " << Pos << " }\n";
       }
     }
 
@@ -144,9 +161,9 @@ public:
       PROTEUS_DBG(Logger::logs("proteus") << *LambdaClass << "\n");
       PROTEUS_DBG(Logger::logs("proteus") << *User << "\n");
       if (isa<LoadInst>(User))
-        handleLoad(M, User, RCVec);
+        handleLoad(M, User, RCMap);
       else if (auto *GEP = dyn_cast<GetElementPtrInst>(User))
-        handleGEP(M, GEP, User, RCVec);
+        handleGEP(M, GEP, User, RCMap);
     }
   }
 };

@@ -17,10 +17,10 @@ __global__ __attribute__((annotate("jit"))) void kernel(T LB) {
 }
 
 template <typename T> void launcher(T &&LB) {
-  proteus::register_lambda(LB);
-  kernel<<<1, 1>>>(LB);
+  auto RegisteredFunctor = PROTEUS_REGISTER_LAMBDA(LB);
+  kernel<<<1, 1>>>(RegisteredFunctor);
   gpuErrCheck(gpuDeviceSynchronize());
-  LB();
+  RegisteredFunctor();
 }
 
 int main() {
