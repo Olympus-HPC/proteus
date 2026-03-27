@@ -1,6 +1,7 @@
 #include "proteus/Frontend/LLVMCodeBuilder.h"
 #include "proteus/Frontend/LLVMTypeMap.h"
 #include "proteus/Frontend/TargetModel.h"
+#include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/CoreLLVMDevice.h"
 #include "proteus/impl/LLVMIRFunction.h"
 #include "proteus/impl/LLVMIRValue.h"
@@ -11,6 +12,7 @@
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
+#include <llvm/TargetParser/Host.h>
 
 #include <deque>
 #include <string>
@@ -200,6 +202,15 @@ LLVMCodeBuilder::LLVMCodeBuilder(std::unique_ptr<LLVMContext> Ctx,
     : PImpl{std::make_unique<Impl>(std::move(Ctx), std::move(Mod))}, F(nullptr),
       TargetModel(TM) {
   getModule().setTargetTriple(getTargetTriple(TM));
+  // TODO: Create a TargetArch abstraction to encapsulate this kind of logic for
+  // both host and device targets.
+  if (isHostTargetModel(TM)) {
+    auto TMExpected =
+        detail::createTargetMachine(getModule(), sys::getHostCPUName());
+    if (!TMExpected)
+      reportFatalError("LLVMCodeBuilder: failed to create host target machine");
+    getModule().setDataLayout((*TMExpected)->createDataLayout());
+  }
 }
 
 LLVMCodeBuilder::~LLVMCodeBuilder() = default;
