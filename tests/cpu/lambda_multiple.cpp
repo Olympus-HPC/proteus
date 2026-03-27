@@ -12,10 +12,7 @@
 
 #include <proteus/JitInterface.h>
 
-template <typename F> void run(F &&Func) {
-  proteus::register_lambda(Func);
-  Func();
-}
+template <typename F> void run(F &&Func) { PROTEUS_REGISTER_LAMBDA(Func)(); }
 
 void lambdaCaller(int V) {
   run([=, V = proteus::jit_variable(V)]()

@@ -286,7 +286,7 @@ inline void relinkGlobalsObject(
 inline void specializeIR(
     Module &M, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
     dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
-    const SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo,
+    const SmallVector<std::pair<Function*, uint64_t>> LambdaCalleeInfo,
     bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsRange,
     bool SpecializeLaunchBounds, int MinBlocksPerSM) {
   TIMESCOPE("proteus::specializeIR");
@@ -299,16 +299,12 @@ inline void specializeIR(
     TransformArgumentSpecialization::transform(M, *F, RCArray);
 
   auto &LR = LambdaRegistry::instance();
-  for (auto &[FnName, LambdaType] : LambdaCalleeInfo) {
 
-
-    const SmallVector<RuntimeConstant> &RCVec = LR.getJitVariables();
-    Function *F = M.getFunction(FnName);
-    for (int i = 0; i < RCVec.size(); ++i){
-    }
-    if (!F)
-      reportFatalError("Expected non-null Function");
-    TransformLambdaSpecialization::transform(M, *F, RCVec);
+  for (auto &[F, ID] : LambdaCalleeInfo) {
+    auto RCMapOpt = LR.getJitVariables(ID);
+    if (!RCMapOpt)
+      continue;
+    TransformLambdaSpecialization::transform(M, *F, ID, RCMapOpt.value());
   }
 
   // Run the shared array transform after any value specialization (arguments,
