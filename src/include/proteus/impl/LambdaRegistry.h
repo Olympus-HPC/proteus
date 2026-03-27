@@ -10,6 +10,7 @@
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Demangle/Demangle.h>
+#include <llvm/Support/StringSaver.h>
 namespace proteus {
 
 using namespace llvm;
@@ -30,6 +31,8 @@ public:
 
   std::optional<DenseMap<StringRef, SmallVector<RuntimeConstant>>::iterator>
   matchJitVariableMap(StringRef FnName) {
+    if (JitVariables.empty())
+      return std::nullopt;
     std::string Operator = llvm::demangle(FnName.str());
     std::size_t Sep = Operator.rfind("::operator()");
     if (Sep == std::string::npos) {
@@ -37,24 +40,20 @@ public:
                   << "... SKIP ::operator() not found\n");
       return std::nullopt;
     }
+    StringRef LambdaType =
+        SavedStrings.save(StringRef{Operator}.slice(0, Sep));
+    // if (Config::get().ProteusDebugOutput) {
+    //   Logger::logs("proteus")
+    //       << "Operator " << Operator << "\n=> LambdaType to match "
+    //       << LambdaType << "\n";
+    //   Logger::logs("proteus") << "Available Keys\n";
+    //   for (auto &[Key, Val] : JitVariableMap) {
+    //     Logger::logs("proteus") << "\tKey: " << Key << "\n";
+    //   }
+    //   Logger::logs("proteus") << "===\n";
+    // }
 
-    StringRef LambdaType = StringRef{Operator}.slice(0, Sep);
-    if (Config::get().ProteusDebugOutput) {
-      Logger::logs("proteus")
-          << "Operator " << Operator << "\n=> LambdaType to match "
-          << LambdaType << "\n";
-      Logger::logs("proteus") << "Available Keys\n";
-      for (auto &[Key, Val] : JitVariableMap) {
-        Logger::logs("proteus") << "\tKey: " << Key << "\n";
-      }
-      Logger::logs("proteus") << "===\n";
-    }
-
-    const auto It = JitVariableMap.find(LambdaType);
-    if (It == JitVariableMap.end())
-      return std::nullopt;
-
-    return It;
+    return std::make_pair(LambdaType, JitVariables);
   }
 
   void dump() {
@@ -102,9 +101,13 @@ public:
   bool empty() { return JitVariableMap.empty(); }
 
 private:
-  explicit LambdaRegistry() = default;
-  DenseMap<StringRef, SmallVector<RuntimeConstant>> JitVariableMap;
-  DenseMap<StringRef, SmallVector<RuntimeConstant>> PendingJitVariableMap;
+  explicit LambdaRegistry() : SavedStrings(SavedStringAlloc) {}
+  // DenseMap<StringRef, SmallVector<RuntimeConstant>> JitVariableMap;
+  // DenseMap<StringRef, SmallVector<RuntimeConstant>> PendingJitVariableMap;
+  SmallVector<RuntimeConstant> JitVariables;
+
+  llvm::BumpPtrAllocator SavedStringAlloc;
+  llvm::UniqueStringSaver SavedStrings;
 };
 
 } // namespace proteus

@@ -12,11 +12,13 @@ endif()
 function(CREATE_GPU_TEST exe check_source)
     add_executable(${exe}.${lang} ${check_source} ${ARGN})
     get_target_property(PROTEUS_PASS_SOURCES ProteusPass SOURCES)
+    get_target_property(LAMBDA_PASS_SOURCES LambdaPass SOURCES)
     set_source_files_properties(${check_source} ${ARGN} PROPERTIES
         LANGUAGE ${lang}
-        OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES}"
+        OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES};${LAMBDA_PASS_SOURCES}"
     )
     add_dependencies(${exe}.${lang} ProteusPass)
+    add_dependencies(${exe}.${lang} LambdaPass)
 
     target_link_libraries(${exe}.${lang} PUBLIC proteus)
 
@@ -24,6 +26,7 @@ function(CREATE_GPU_TEST exe check_source)
         ${exe}.${lang}
         PUBLIC
         -fpass-plugin=$<TARGET_FILE:ProteusPass>
+        -fpass-plugin=$<TARGET_FILE:LambdaPass>
     )
 
     add_test(NAME ${exe}.${lang} COMMAND ${LIT} -vv -D EXT=${lang} -DFILECHECK=${FILECHECK} ${check_source})
@@ -33,11 +36,12 @@ endfunction()
 function(CREATE_GPU_TEST_RDC exe check_source)
     add_executable(${exe}.${lang}.rdc ${check_source} ${ARGN})
     get_target_property(PROTEUS_PASS_SOURCES ProteusPass SOURCES)
+    get_target_property(LAMBDA_PASS_SOURCES LambdaPass SOURCES)
     set_source_files_properties(${check_source} ${ARGN} PROPERTIES
         LANGUAGE ${lang}
-        OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES}"
+        OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES};${LAMBDA_PASS_SOURCES}"
     )
-    add_dependencies(${exe}.${lang}.rdc ProteusPass)
+    add_dependencies(${exe}.${lang}.rdc ProteusPass LambdaPass)
 
     target_link_libraries(${exe}.${lang}.rdc PUBLIC proteus)
 
@@ -51,20 +55,24 @@ function(CREATE_GPU_TEST_RDC exe check_source)
             PUBLIC
             -fgpu-rdc
             -fpass-plugin=$<TARGET_FILE:ProteusPass>
+            -fpass-plugin=$<TARGET_FILE:LambdaPass>
         )
 
-        target_link_options(
-            ${exe}.${lang}.rdc
-            PUBLIC
-            -fgpu-rdc
-            --hip-link
-            -Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPass>
-        )
+	        target_link_options(
+	            ${exe}.${lang}.rdc
+	            PUBLIC
+	            -fgpu-rdc
+	            --hip-link
+	            "SHELL:-Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPass>"
+	            "SHELL:-Xoffload-linker --load-pass-plugin=$<TARGET_FILE:LambdaPass>"
+	        )
+
     elseif(PROTEUS_ENABLE_CUDA)
         target_compile_options(
             ${exe}.${lang}.rdc
             PUBLIC
             -fpass-plugin=$<TARGET_FILE:ProteusPass>
+            -fpass-plugin=$<TARGET_FILE:LambdaPass>
         )
         target_compile_options(${exe}.${lang}.rdc PRIVATE --no-offload-new-driver)
 
@@ -127,11 +135,12 @@ function(CREATE_PROTEUS_GPU_LIBRARY lib source)
 
     set_source_files_properties(${source} ${ARGN} PROPERTIES LANGUAGE ${lang})
     get_target_property(PROTEUS_PASS_SOURCES ProteusPass SOURCES)
+    get_target_property(LAMBDA_PASS_SOURCES LambdaPass SOURCES)
     set_source_files_properties(${source} ${ARGN} PROPERTIES
         LANGUAGE ${lang}
-        OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES}"
+        OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES};${LAMBDA_PASS_SOURCES}"
     )
-    add_dependencies(${lib} ProteusPass)
+    add_dependencies(${lib} ProteusPass LambdaPass)
     target_link_libraries(${lib} PUBLIC proteus)
 
     if(PROTEUS_ENABLE_HIP)
@@ -142,6 +151,7 @@ function(CREATE_PROTEUS_GPU_LIBRARY lib source)
             PUBLIC
             -fgpu-rdc
             -fpass-plugin=$<TARGET_FILE:ProteusPass>
+            -fpass-plugin=$<TARGET_FILE:LambdaPass>
         )
 
         target_link_options(${lib} PUBLIC -fgpu-rdc --hip-link)
@@ -150,6 +160,7 @@ function(CREATE_PROTEUS_GPU_LIBRARY lib source)
             ${lib}
             PUBLIC
             -fpass-plugin=$<TARGET_FILE:ProteusPass>
+            -fpass-plugin=$<TARGET_FILE:LambdaPass>
         )
         target_compile_options(${lib} PRIVATE --no-offload-new-driver)
         set_target_properties(${lib} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
@@ -165,6 +176,7 @@ function(CREATE_GPU_TEST_FORCE exe check_source)
         ${exe}.${lang}
         PUBLIC
             "-fplugin=$<TARGET_FILE:ProteusPass>"
+            "-fplugin=$<TARGET_FILE:LambdaPass>"
             "SHELL:-Xclang -mllvm -Xclang -force-proteus-jit-annotate-all"
     )
 endfunction()
@@ -176,6 +188,7 @@ function(CREATE_GPU_TEST_RDC_FORCE exe check_source)
         ${exe}.${lang}.rdc
         PUBLIC
             "-fplugin=$<TARGET_FILE:ProteusPass>"
+            "-fplugin=$<TARGET_FILE:LambdaPass>"
             "SHELL:-Xclang -mllvm -Xclang -force-proteus-jit-annotate-all"
     )
 endfunction()
@@ -264,6 +277,7 @@ CREATE_GPU_TEST(shared_array shared_array.cpp)
 CREATE_GPU_TEST(enable_disable enable_disable.cpp)
 CREATE_GPU_TEST(lambda_multiple lambda_multiple.cpp)
 CREATE_GPU_TEST(lambda_def lambda_def.cpp)
+CREATE_GPU_TEST(lambda_factory lambda_factory.cpp)
 CREATE_GPU_TEST(lambda_host_device lambda_host_device.cpp)
 CREATE_GPU_TEST(lambda_spec_test lambda_spec_test.cpp)
 CREATE_GPU_TEST(builtin_globals builtin_globals.cpp)
