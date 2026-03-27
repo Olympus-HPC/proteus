@@ -307,6 +307,13 @@ static bool isLambdaFunction(const Function &F) {
          StringRef{DemangledName}.contains(")::operator()");
 }
 
+static bool isLambdaFunctorWrapperOperator(const Function &F) {
+  std::string DemangledName = demangle(F.getName().str());
+  return StringRef{DemangledName}.contains("'lambda") &&
+         StringRef{DemangledName}.contains("LambdaFunctorWrapper") &&
+         StringRef{DemangledName}.contains("::operator()");
+}
+
 AnnotationHandler::AnnotationHandler(Module &M) : M(M), Types(M) {}
 
 void AnnotationHandler::parseAnnotations(
@@ -1124,6 +1131,29 @@ static RuntimeConstantInfo parseAttributeJsonRuntimeConstantObject(
   return RuntimeConstantInfo{RCType, ArgNo, Size, PassByValue};
 }
 
+static llvm::StringRef getGlobalString(const llvm::GlobalVariable &GV) {
+  if (!GV.hasInitializer())
+    return {};
+
+  const llvm::Constant *Init = GV.getInitializer();
+
+  if (auto *CDS = llvm::dyn_cast<llvm::ConstantDataSequential>(Init)) {
+    if (CDS->isCString())
+      return CDS->getAsCString(); // drops trailing '\0'
+    if (CDS->isString())
+      return CDS->getAsString(); // may include '\0'
+  }
+
+  if (auto *CDA = llvm::dyn_cast<llvm::ConstantDataArray>(Init)) {
+    if (CDA->isCString())
+      return CDA->getAsCString();
+    if (CDA->isString())
+      return CDA->getAsString();
+  }
+
+  return {};
+}
+
 void AnnotationHandler::parseJitGlobalAnnotations(
     const DenseMap<Value *, GlobalVariable *> &StubToKernelMap,
     MapVector<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap) {
@@ -1145,13 +1175,16 @@ void AnnotationHandler::parseJitGlobalAnnotations(
     }
 
     auto *Fn = dyn_cast<Function>(Entry->getOperand(0)->stripPointerCasts());
+    auto *AnnotName = dyn_cast<GlobalVariable>(Entry->getOperand(1));
+    auto AnnotStr = getGlobalString(*AnnotName);
 
     assert(Fn && "Expected function in entry operands");
 
-    if (isDeviceCompilation(M)) {
+    if (isDeviceCompilation(M) && AnnotStr.contains("jit")) {
       // Check the annotated function is a kernel function or a device
       // lambda for device compilation.
-      if (!isDeviceKernel(Fn) && !isLambdaFunction(*Fn))
+      if (!isDeviceKernel(Fn) && !isLambdaFunction(*Fn) &&
+          !isLambdaFunctorWrapperOperator(*Fn))
         reportFatalError(
             std::string{} + __FILE__ + ":" + std::to_string(__LINE__) +
             " => Expected the annotated Fn " + Fn->getName() + " (" +

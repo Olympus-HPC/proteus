@@ -11,11 +11,14 @@ static_assert(__cplusplus >= 201703L,
 #include "proteus/impl/Logger.h"
 
 #include <llvm/CodeGen/CommandFlags.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/DebugInfo.h>
+#include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/PassManager.h>
 #include <llvm/Linker/Linker.h>
 #include <llvm/MC/TargetRegistry.h>
+#include <llvm/Analysis/ValueTracking.h>
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Target/TargetMachine.h>
@@ -253,6 +256,69 @@ inline void runCleanupPassPipeline(Module &M) {
   Passes.run(M, MAM);
 
   StripDebugInfo(M);
+}
+
+static void findAnnotatedFunctions(llvm::Module &M,
+                                  llvm::StringRef Wanted,
+                                  llvm::SmallVectorImpl<std::pair<llvm::Function*, std::uint64_t>> &Out) {
+  auto *GA = M.getGlobalVariable("llvm.global.annotations");
+  if (!GA) return;
+
+  auto *CA = llvm::dyn_cast<llvm::ConstantArray>(GA->getOperand(0));
+  if (!CA) return;
+
+  llvm::SmallDenseMap<llvm::Function*, std::uint64_t, 32> Seen;
+
+  for (llvm::Value *Elt : CA->operands()) {
+    auto *CS = llvm::dyn_cast<llvm::ConstantStruct>(Elt);
+    if (!CS || CS->getNumOperands() < 5) continue;
+
+    auto *F = llvm::dyn_cast<llvm::Function>(CS->getOperand(0)->stripPointerCasts());
+    if (!F) continue;
+
+    llvm::StringRef Ann;
+    if (!llvm::getConstantStringInfo(CS->getOperand(1)->stripPointerCasts(), Ann)) continue;
+    if (Ann != Wanted) continue;
+
+    // Parse the u64 payload (operand 4)
+    std::uint64_t Id = 0;
+    llvm::Value *ArgsPtr = CS->getOperand(4)->stripPointerCasts();
+    if (llvm::isa<llvm::ConstantPointerNull>(ArgsPtr)) continue;
+
+    auto *ArgsGV = llvm::dyn_cast<llvm::GlobalVariable>(ArgsPtr);
+    if (!ArgsGV) continue;
+
+    auto *ArgsInit = ArgsGV->getInitializer();
+    auto *ArgsCS = llvm::dyn_cast<llvm::ConstantStruct>(ArgsInit);
+    if (!ArgsCS || ArgsCS->getNumOperands() < 1) continue;
+
+    auto *CI = llvm::dyn_cast<llvm::ConstantInt>(ArgsCS->getOperand(0));
+    if (!CI) continue;
+
+    Id = CI->getZExtValue();
+
+    if (Seen.try_emplace(F, Id).second)
+      Out.emplace_back(F, Id);
+  }
+}
+
+static void findFunctionsWithU64Metadata(
+    llvm::Module &M, llvm::StringRef Key,
+    llvm::SmallVectorImpl<std::pair<llvm::Function *, std::uint64_t>> &Out) {
+  llvm::SmallDenseMap<llvm::Function *, std::uint64_t, 32> Seen;
+  for (llvm::Function &F : M) {
+    llvm::MDNode *Node = F.getMetadata(Key);
+    if (!Node || Node->getNumOperands() < 1)
+      continue;
+    auto *CAM = llvm::dyn_cast<llvm::ConstantAsMetadata>(Node->getOperand(0));
+    auto *CI = CAM ? llvm::dyn_cast<llvm::ConstantInt>(CAM->getValue())
+                   : nullptr;
+    if (!CI)
+      continue;
+    std::uint64_t Id = CI->getZExtValue();
+    if (Seen.try_emplace(&F, Id).second)
+      Out.emplace_back(&F, Id);
+  }
 }
 
 inline void pruneIR(Module &M, bool UnsetExternallyInitialized = true) {
