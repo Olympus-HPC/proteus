@@ -19,15 +19,15 @@ __global__ __attribute__((annotate("jit"))) void kernel(T LB) {
   LB();
 }
 
-namespace wrapper {
-  template <typename T>
-  auto jit_variable(T arg) { return proteus::jit_variable(arg); }
+// namespace wrapper {
+//   template <typename T>
+//   auto jit_variable(T arg) { return proteus::jit_variable(arg); }
 
-  auto declareLambda(int rc1, int rc2) {
-  return [=, C = wrapper::jit_variable(rc1), D = 5, C2 = wrapper::jit_variable(rc2)] ()
-                         __attribute__((annotate("jit"))) { printInt(C); printInt(C2); printInt(D); };
-}
-}
+//   auto declareLambda(int rc1, int rc2) {
+//   return [=, C = wrapper::jit_variable(rc1), D = 5, C2 = wrapper::jit_variable(rc2)] ()
+//                          __attribute__((annotate("jit"))) { printInt(C); printInt(C2); printInt(D); };
+// }
+// }
 
 auto declareLambda(int rc1, int rc2) {
   return [=, C = proteus::jit_variable(rc1), D = 5, C2 = proteus::jit_variable(rc2)] ()
@@ -43,8 +43,6 @@ auto forwardLambda(int rc1, int rc2, int rc3) {
   int loc = 1;
   return declareLambdaThree(rc1, loc, rc3);
 }
-
-
 
 template <typename T> void run(T &&LB) {
   proteus::register_lambda(LB);
@@ -94,11 +92,20 @@ int main() {
 
 // clang-format off
 // CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 0
+// CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 1
 // CHECK: Integer = 0
-// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 1
 // CHECK: Integer = 1
-// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 2
+// CHECK: Integer = 5
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 1
+// CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 2
+// CHECK: Integer = 1
 // CHECK: Integer = 2
+// CHECK: Integer = 5
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 2
+// CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 0
+// CHECK: Integer = 2
+// CHECK: Integer = 0
+// CHECK: Integer = 5
 // CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0

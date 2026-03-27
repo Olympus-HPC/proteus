@@ -532,8 +532,7 @@ private:
       llvm::outs() << "numvars = " << numJitVars << "\n";
       llvm::outs() << "numslots found = " << numSlotsFound << "\n";
       if (numJitVars != numSlotsFound)
-        reportFatalError("Expected number of jit variables callsites to equal "
-                         "the number of slots found");
+        reportFatalError("Analysis found jit_variable callsite outside lambda capture list");
     }
   }
 

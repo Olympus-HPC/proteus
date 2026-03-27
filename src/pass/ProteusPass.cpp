@@ -160,7 +160,7 @@ public:
     instrumentRegisterFatBinaryEnd(M);
     instrumentRegisterVar(M);
     instrumentRegisterFunction(M);
-    llvm::outs() << M;
+
 
     // Lambda analysis pipeline
     // (1) instrumentJitVariableStructIndex analyzes jit_variable calls and marks which indices of a
