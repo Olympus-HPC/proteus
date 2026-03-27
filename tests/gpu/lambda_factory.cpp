@@ -1,8 +1,8 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_TRACE_OUTPUT="specialization" %build/lambda_factory.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_TRACE_OUTPUT="specialization;cache-stats" %build/lambda_factory.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_TRACE_OUTPUT="specialization" %build/lambda_factory.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT=1 PROTEUS_TRACE_OUTPUT="specialization;cache-stats" %build/lambda_factory.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
@@ -91,23 +91,33 @@ int main() {
 }
 
 // clang-format off
-// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 0
 // CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 1
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 0
 // CHECK: Integer = 0
 // CHECK: Integer = 1
 // CHECK: Integer = 5
-// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 1
 // CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 2
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 1
 // CHECK: Integer = 1
 // CHECK: Integer = 2
 // CHECK: Integer = 5
-// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 2
 // CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 0
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 2
 // CHECK: Integer = 2
 // CHECK: Integer = 0
 // CHECK: Integer = 5
-// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 3
-// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 3 accesses 3
+// CHECK-FIRST: [LambdaSpec] Replacing slot 3 with i32 2
+// CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 1
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 0
+// CHECK: Integer = 0
+// CHECK: Integer = 1
+// CHECK: Integer = 2
+// CHECK: Integer = 4
+// CHECK: Integer = 0
+// CHECK: Integer = 1
+// CHECK: Integer = 2
+// CHECK: Integer = 4
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 2 NumHits 1
+// CHECK-COUNT-3: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 4
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 4 accesses 4

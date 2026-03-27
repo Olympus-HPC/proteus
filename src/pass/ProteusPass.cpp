@@ -1396,14 +1396,14 @@ llvm::PassPluginLibraryInfo getProteusPassPluginInfo() {
   // PB.registerOptimizerLastEPCallback(
   // PM.registerPipelineEarlySimplificationEPCallback
 #if LLVM_VERSION_MAJOR >= 20
-    PB.registerPipelineStartEPCallback(
+    PB.registerPipelineEarlySimplificationEPCallback(
         [&](ModulePassManager &MPM, OptimizationLevel,
             ThinOrFullLTOPhase LTOPhase) {
           if (LTOPhase != ThinOrFullLTOPhase::None) {
             reportFatalError("Expected registration only for non-LTO");
           }
 #else
-    PB.registerPipelineStartEPCallback(
+    PB.registerPipelineEarlySimplificationEPCallback(
         [&](ModulePassManager &MPM, OptimizationLevel) {
 #endif
           MPM.addPass(ProteusPass{false});

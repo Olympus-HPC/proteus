@@ -36,6 +36,7 @@
 #include "proteus/impl/Logger.h"
 #include "proteus/impl/RuntimeConstantTypeHelpers.h"
 
+#include <cstddef>
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/DenseSet.h>
 #include <llvm/ADT/SmallPtrSet.h>
@@ -131,22 +132,23 @@ public:
     // in forced annotations.
     const auto StubToKernelMap = getKernelHostStubs(M);
 
-    // if (isDeviceCompilation(M)) {
-    //   llvm::outs() << "Device Module\n";
-    //   llvm::outs() << M;
-    //   llvm::outs() << "End device Module\n";
-    // }
-    // llvm::outs() << "Host Module\n";
-    // llvm::outs() << M;
-    // llvm::outs() << "End host Module\n";
+    if (isDeviceCompilation(M)) {
+      llvm::outs() << "Device Module\n";
+      llvm::outs() << M;
+      llvm::outs() << "End device Module\n";
+    }
+    llvm::outs() << "Host Module\n";
+    llvm::outs() << M;
+    llvm::outs() << "End host Module\n";
     // Lambda analysis pipeline
-    // (1) instrumentJitVariableStructIndex analyzes jit_variable calls and
-    // marks which indices of a
-    //     given lambda class have been designated as runtime constants
-    // (2) We then instrument __jit_push_lambda_runtime_constant into device
-    // stubs in the case of GPU/CPU
-    //.    compilation, or before the callsite of the lambda operator in the
-    //case of host execution
+    // (1) Analyze user calls to register_lambda and identify which class.anon
+    //     types will be associated with jitted lambdas
+    // (2) instrumentJitVariableStructIndex analyzes jit_variable calls and
+    //     marks which indices of a lambda storage type (e.g. class.anon) will
+    //     be extracted at runtime and then propagated as constants
+    // (3) We then instrument __jit_push_lambda_runtime_constant into device
+    //     stubs in the case of GPU/CPU compilation, or before the callsite of the
+    //     lambda operator in the CPU case.
     DenseMap<StructType *, SmallVector<LambdaJitVariableInfo, 16>>
         LambdaStorageTypeToJitIndices;
 
@@ -270,7 +272,7 @@ private:
         assert(GV && "Expected global variable as kernel name operand");
         Value *Key = getStubGV(CB->getArgOperand(StubOperand));
         assert(Key && "Expected valid kernel stub key");
-        StubToKernelMap[Key] = GV;
+        StubToKernelMap[Key->stripPointerCasts()] = GV;
         DEBUG(Logger::logs("lambda-pass")
               << "StubToKernelMap Key: " << Key->getName() << " -> " << *GV
               << "\n");
@@ -543,23 +545,34 @@ private:
       const DenseMap<Type *, GlobalVariable *> &LambdaTypeToGlobalName,
       StringMap<Type *> &LambdaGlobalNameToType,
       const DenseMap<Value *, GlobalVariable *> &StubToKernelMap) {
+    // for (const auto [stub, _] : StubToKernelMap) {
+    //   llvm::errs()<< "STUB = " << *stub;
+    // }
     Function *LaunchKernelFn = nullptr;
     if (!LaunchFunctionName) {
       reportFatalError("expected launch function name");
     }
     LaunchKernelFn = M.getFunction(LaunchFunctionName);
+
     for (Value *V : LaunchKernelFn->users()) {
+      // llvm::errs() << "USER = " << *V <<"\n";
+      // llvm::errs().flush();
       CallBase *LaunchKernelCB = dyn_cast<CallBase>(V);
-      if (!LaunchKernelCB)
+      if (!LaunchKernelCB) {
+        // llvm::errs() << "NO CB!\n";
+        // llvm::errs().flush();
         continue;
+      }
       Function *Caller = LaunchKernelCB->getFunction();
-      if (!StubToKernelMap.contains(Caller))
+      if (!StubToKernelMap.contains(Caller->stripPointerCasts())) {
+        // llvm::errs() << "CALLER NOT A STUB ! " << *Caller;
+        // llvm::errs().flush();
         continue;
+      }
       auto demangledName = demangle(Caller->getName().str());
       llvm::errs() << "DEMANGELD NAME = " << demangledName << "\n";
       auto lambdaName = parseLambdaType(demangledName, "__device_stub__kernel");
       llvm::errs() << "keyword : " << lambdaName << "\n";
-      llvm::errs().flush();
       auto it = LambdaGlobalNameToType.find(lambdaName);
       llvm::errs() << "SEARCHING FOR\n";
       for (auto &[Name, Ty] : LambdaGlobalNameToType) {
@@ -660,6 +673,22 @@ private:
         }
       }
 
+      // If no classes are allocated or GEPed and sent off to the kernel launch,
+      // check if we are simply forwarding an opaque pointer.  If so, grab it.
+      if (!LambdaStoragePtr) {
+        size_t numStores = 0;
+        StoreInst* SingleStore = nullptr;
+        for (auto &[_, StoreInstVec] : GEPsToKernelArgs) {
+          numStores += StoreInstVec.size();
+          if (StoreInstVec.size())
+            SingleStore = StoreInstVec[0];
+        }
+        if (numStores == 1)
+          LambdaStoragePtr = SingleStore->getValueOperand();
+        else
+         llvm::errs() << "num store = "<< numStores << "\n";
+      }
+      llvm::errs() << "found store " << *LambdaStoragePtr << "\n";
       if (!LambdaStoragePtr)
         reportFatalError(
             "Failed to locate lambda storage pointer for hipLaunchKernel");

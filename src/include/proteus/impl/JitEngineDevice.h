@@ -581,6 +581,7 @@ JitEngineDevice<ImplT>::compileAndRun(
   SmallVector<RuntimeConstant> LambdaJitValuesVec;
   auto& LR = LambdaRegistry::instance();
   getLambdaJitValues(KernelInfo, LambdaJitValuesVec);
+
   // Determine the hash based on dimension specialization.  If we do not
   // specialize IR based on grid dimensions, avoid hashing on those to
   // eliminate repeated compilation overhead.

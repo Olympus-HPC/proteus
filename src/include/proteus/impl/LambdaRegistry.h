@@ -76,8 +76,6 @@ public:
   // }
 
   void setJitVariable(const char *LambdaType, RuntimeConstant &RC) {
-    assert(PendingJitVariableMap.contains(LambdaType) &&
-           "Lambda must be registered prior to register JIT variable!");
     JitVariables.emplace_back(RC);
   }
 
