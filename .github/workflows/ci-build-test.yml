@@ -101,3 +101,53 @@ jobs:
           pushd build
           ctest -j8 -T test --output-on-failure
           popd
+
+  build-and-test-macos:
+    name: proteus macos LLVM ${{ matrix.llvm }} shared ${{ matrix.build_shared }} MLIR ${{ matrix.mlir }}
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        llvm: [19, 20]
+        build_shared: [on, off]
+        mlir: [on, off]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install LLVM
+        run: |
+          brew install llvm@${{ matrix.llvm }}
+      - name: Configure LLVM environment
+        run: |
+          LLVM_PREFIX="$(brew --prefix llvm@${{ matrix.llvm }})"
+          echo "LLVM_PREFIX=$LLVM_PREFIX" >> "$GITHUB_ENV"
+          echo "CC=$LLVM_PREFIX/bin/clang" >> "$GITHUB_ENV"
+          echo "CXX=$LLVM_PREFIX/bin/clang++" >> "$GITHUB_ENV"
+          echo "$LLVM_PREFIX/bin" >> "$GITHUB_PATH"
+      - name: Build build_shared=${{ matrix.build_shared }}
+        run: |
+          mkdir -p build
+          pushd build
+          set -o pipefail
+          cmake .. \
+            -DCMAKE_PREFIX_PATH="$LLVM_PREFIX" \
+            -DCMAKE_C_COMPILER="$CC" \
+            -DCMAKE_CXX_COMPILER="$CXX" \
+            -DCMAKE_OSX_SYSROOT="$(xcrun --sdk macosx --show-sdk-path)" \
+            -DENABLE_DEVELOPER_COMPILER_FLAGS=on \
+            -DENABLE_TESTS=on \
+            -DLLVM_INSTALL_DIR="$LLVM_PREFIX" \
+            -DPROTEUS_ENABLE_MLIR=${{ matrix.mlir }} \
+            -DBUILD_SHARED=${{ matrix.build_shared }} |& tee cmake_output.log
+          if grep -q "Manually-specified variables were not used by the project:" cmake_output.log; then
+            echo "Error: Unused variables detected"
+            exit 1
+          fi
+          make -j
+          popd
+      - name: Test
+        run: |
+          pushd build
+          ctest -j8 -T test --output-on-failure
+          popd
