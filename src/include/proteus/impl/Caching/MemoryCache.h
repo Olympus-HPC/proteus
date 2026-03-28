@@ -19,6 +19,7 @@
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Demangle/Demangle.h>
 
+#include <cinttypes>
 #include <cstdint>
 #include <iostream>
 #include <unordered_map>
@@ -59,7 +60,8 @@ public:
   }
 
   void printStats() {
-    printf("[proteus][%s] MemoryCache rank %s hits %lu accesses %lu\n",
+    printf("[proteus][%s] MemoryCache rank %s hits %" PRIu64
+           " accesses %" PRIu64 "\n",
            Label.c_str(), DistributedRank.c_str(), Hits, Accesses);
     for (const auto &[HashValue, JCE] : CacheMap) {
       std::cout << "[proteus][" << Label << "] MemoryCache rank "
@@ -93,9 +95,11 @@ public:
            DistributedRank.c_str());
     for (const auto &[MangledName, KS] : Grouped) {
       std::string Name = llvm::demangle(MangledName);
-      printf("[proteus][%s]   %s  rank=%s  specializations=%zu  launches=%lu\n",
-             Label.c_str(), Name.c_str(), DistributedRank.c_str(),
-             KS.Specializations, KS.TotalLaunches);
+      printf(
+          "[proteus][%s]   %s  rank=%s  specializations=%zu  launches=%" PRIu64
+          "\n",
+          Label.c_str(), Name.c_str(), DistributedRank.c_str(),
+          KS.Specializations, KS.TotalLaunches);
     }
     printf("[proteus][%s] === End Kernel Trace ===\n", Label.c_str());
   }
