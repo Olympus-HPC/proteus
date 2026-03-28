@@ -66,11 +66,11 @@ void JitEngineHost::addStaticLibrarySymbols() {
 #endif
 
 #if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
-  // Add __jit_launch_kernel as a static symbol.
-  SymbolMap[LLJITPtr->mangleAndIntern("__jit_launch_kernel")] =
-      orc::ExecutorSymbolDef(
-          orc::ExecutorAddr{reinterpret_cast<uintptr_t>(__jit_launch_kernel)},
-          JITSymbolFlags::Exported);
+  // Add __proteus_launch_kernel as a static symbol.
+  SymbolMap[LLJITPtr->mangleAndIntern("__proteus_launch_kernel")] =
+      orc::ExecutorSymbolDef(orc::ExecutorAddr{reinterpret_cast<uintptr_t>(
+                                 __proteus_launch_kernel)},
+                             JITSymbolFlags::Exported);
 
 #endif
   // Register the symbol in the main JIT dynamic library.
