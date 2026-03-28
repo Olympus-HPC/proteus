@@ -125,6 +125,9 @@ jobs:
           echo "CC=$LLVM_PREFIX/bin/clang" >> "$GITHUB_ENV"
           echo "CXX=$LLVM_PREFIX/bin/clang++" >> "$GITHUB_ENV"
           echo "$LLVM_PREFIX/bin" >> "$GITHUB_PATH"
+      - name: Install lit
+        run: |
+          python3 -m pip install --user "lit>=15.0.7"
       - name: Build build_shared=${{ matrix.build_shared }}
         run: |
           mkdir -p build
