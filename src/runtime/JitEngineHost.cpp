@@ -400,26 +400,26 @@ JitEngineHost::JitEngineHost() {
             return ObjLinkingLayer;
           })
 #else
-          .setObjectLinkingLayerCreator([&](ExecutionSession &ES,
-                                            const Triple &) {
-            auto GetMemMgr = []() {
-              return std::make_unique<SectionMemoryManager>();
-            };
-            auto ObjLinkingLayer =
-                std::make_unique<RTDyldObjectLinkingLayer>(ES, GetMemMgr);
+          .setObjectLinkingLayerCreator(
+              [&](ExecutionSession &ES, const Triple &) {
+                auto GetMemMgr = []() {
+                  return std::make_unique<SectionMemoryManager>();
+                };
+                auto ObjLinkingLayer =
+                    std::make_unique<RTDyldObjectLinkingLayer>(ES, GetMemMgr);
 
-            // Register the event listener.
-            ObjLinkingLayer->registerJITEventListener(
-                *JITEventListener::createGDBRegistrationListener());
+                // Register the event listener.
+                ObjLinkingLayer->registerJITEventListener(
+                    *JITEventListener::createGDBRegistrationListener());
 
-            // Make sure the debug info sections aren't stripped.
-            ObjLinkingLayer->setProcessAllSections(true);
+                // Make sure the debug info sections aren't stripped.
+                ObjLinkingLayer->setProcessAllSections(true);
 
-            if (Config::get().ProteusDebugOutput) {
-              ObjLinkingLayer->setNotifyLoaded(notifyLoaded);
-            }
-            return ObjLinkingLayer;
-          })
+                if (Config::get().ProteusDebugOutput) {
+                  ObjLinkingLayer->setNotifyLoaded(notifyLoaded);
+                }
+                return ObjLinkingLayer;
+              })
 #endif
           .create());
   // Use the main JIT dynamic library to add a generator for host process
