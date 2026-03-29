@@ -62,7 +62,7 @@ inline bool isDebugOutputEnabled() {
 bool inline isDeviceCompilation(Module &M) {
   Triple TargetTriple(M.getTargetTriple());
   DEBUG(Logger::logs("proteus-pass")
-        << "TargetTriple " << M.getTargetTriple() << "\n");
+        << "TargetTriple " << TargetTriple.str() << "\n");
   if (TargetTriple.isNVPTX() || TargetTriple.isAMDGCN())
     return true;
 

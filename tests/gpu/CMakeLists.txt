@@ -273,8 +273,9 @@ if(PROTEUS_ENABLE_HIP)
     CREATE_GPU_TEST(alias_func alias_func.cpp)
     CREATE_GPU_TEST(alias_gvar alias_gvar.cpp)
 elseif(PROTEUS_ENABLE_CUDA)
-    # CUDA support alias on func only on LLVM >=18.
-    if(LLVM_VERSION_MAJOR VERSION_GREATER_EQUAL 18)
+    # CUDA support alias on func only on LLVM >=18 and <22.
+    if(LLVM_VERSION_MAJOR VERSION_GREATER_EQUAL 18 AND
+       LLVM_VERSION_MAJOR VERSION_LESS 22)
         CREATE_GPU_TEST(alias_func alias_func.cpp)
     endif()
     # CUDA does not support alias on global variables.

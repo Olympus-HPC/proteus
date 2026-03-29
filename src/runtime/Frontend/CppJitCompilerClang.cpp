@@ -34,11 +34,15 @@ using namespace llvm;
 namespace {
 
 void initializeCompilerInstance(CompilerInstance &Compiler) {
-#if LLVM_VERSION_MAJOR >= 20
+#if LLVM_VERSION_MAJOR >= 22
+  Compiler.createDiagnostics();
+#elif LLVM_VERSION_MAJOR >= 20
   Compiler.createDiagnostics(*vfs::getRealFileSystem());
 #else
   Compiler.createDiagnostics();
 #endif
+  if (!Compiler.hasDiagnostics())
+    reportFatalError("Compiler instance has no diagnostics");
 }
 
 // Clang-backed implementation for IR and shared-library compilation paths.
@@ -115,8 +119,8 @@ private:
 
   CppJitArtifact compileToIR(const CppJitCompileRequest &Request) {
     TIMESCOPE(CppJitCompilerClang, compileToIR);
-    CompilerInstance Compiler;
-    initializeCompilerInstance(Compiler);
+    CompilerInstance TempCompiler;
+    initializeCompilerInstance(TempCompiler);
 
     std::string SourceName = Request.ModuleHash.toString() + ".cpp";
 
@@ -155,10 +159,10 @@ private:
       DriverArgs.push_back(S.c_str());
 
     clang::driver::Driver D(PROTEUS_CLANGXX_BIN, sys::getDefaultTargetTriple(),
-                            Compiler.getDiagnostics());
+                            TempCompiler.getDiagnostics());
     D.setCheckInputsExist(false);
     auto *C = D.BuildCompilation(DriverArgs);
-    if (!C || Compiler.getDiagnostics().hasErrorOccurred())
+    if (!C || TempCompiler.getDiagnostics().hasErrorOccurred())
       reportFatalError("Building Driver failed");
 
     const clang::driver::JobList &Jobs = C->getJobs();
@@ -173,11 +177,17 @@ private:
 
     auto Invocation = std::make_shared<CompilerInvocation>();
     if (!CompilerInvocation::CreateFromArgs(*Invocation, CC1Args,
-                                            Compiler.getDiagnostics())) {
+                                            TempCompiler.getDiagnostics())) {
       throw std::runtime_error("Failed to create compiler invocation");
     }
 
+#if LLVM_VERSION_MAJOR >= 22
+    CompilerInstance Compiler(Invocation);
+#else
+    CompilerInstance Compiler;
     Compiler.setInvocation(Invocation);
+#endif
+    initializeCompilerInstance(Compiler);
     Compiler.LoadRequestedPlugins();
 
     std::unique_ptr<MemoryBuffer> Buffer =

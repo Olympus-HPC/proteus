@@ -201,7 +201,11 @@ LLVMCodeBuilder::LLVMCodeBuilder(std::unique_ptr<LLVMContext> Ctx,
                                  TargetModelType TM)
     : PImpl{std::make_unique<Impl>(std::move(Ctx), std::move(Mod))}, F(nullptr),
       TargetModel(TM) {
+#if LLVM_VERSION_MAJOR >= 22
+  getModule().setTargetTriple(Triple{getTargetTriple(TM)});
+#else
   getModule().setTargetTriple(getTargetTriple(TM));
+#endif
   // TODO: Create a TargetArch abstraction to encapsulate this kind of logic for
   // both host and device targets.
   if (isHostTargetModel(TM)) {
@@ -1002,11 +1006,11 @@ VarAlloc LLVMCodeBuilder::getElementPtr(IRValue *Base, IRType BaseTy,
 }
 
 // Type accessors.
-Type *LLVMCodeBuilder::getPointerType(Type *ElemTy, unsigned AS) {
-  return PointerType::get(ElemTy, AS);
+Type *LLVMCodeBuilder::getPointerType(unsigned AS) {
+  return PointerType::get(getContext(), AS);
 }
-Type *LLVMCodeBuilder::getPointerTypeUnqual(Type *ElemTy) {
-  return PointerType::getUnqual(ElemTy);
+Type *LLVMCodeBuilder::getPointerTypeUnqual() {
+  return PointerType::getUnqual(getContext());
 }
 Type *LLVMCodeBuilder::getInt16Ty() { return PImpl->IRB.getInt16Ty(); }
 Type *LLVMCodeBuilder::getInt32Ty() { return PImpl->IRB.getInt32Ty(); }

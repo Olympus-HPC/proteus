@@ -11,7 +11,7 @@
 .variants:
   parallel:
     matrix:
-      - PROTEUS_CI_ROCM_VERSION: ["6.3.1", "6.4.3", "7.1.1"]
+      - PROTEUS_CI_ROCM_VERSION: ["6.4.3", "7.1.1", "7.2.0"]
 
 test-spack-tuolumne:
   extends: [.base-job, .variants]

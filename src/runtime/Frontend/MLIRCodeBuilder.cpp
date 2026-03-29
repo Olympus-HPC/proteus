@@ -6,7 +6,9 @@
 #include "proteus/impl/MLIRIRValue.h"
 
 #include <mlir/Conversion/ArithToLLVM/ArithToLLVM.h>
+#include <mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h>
 #include <mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h>
+#include <mlir/Conversion/IndexToLLVM/IndexToLLVM.h>
 #include <mlir/Conversion/MathToLLVM/MathToLLVM.h>
 #include <mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h>
 #include <mlir/Conversion/Passes.h>
@@ -19,6 +21,7 @@
 #include <mlir/Dialect/ControlFlow/IR/ControlFlow.h>
 #include <mlir/Dialect/Func/IR/FuncOps.h>
 #include <mlir/Dialect/GPU/IR/GPUDialect.h>
+#include <mlir/Dialect/Index/IR/IndexDialect.h>
 #include <mlir/Dialect/LLVMIR/LLVMDialect.h>
 #if PROTEUS_ENABLE_CUDA
 #include <mlir/Dialect/LLVMIR/NVVMDialect.h>
@@ -32,6 +35,7 @@
 #include <mlir/IR/Builders.h>
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/BuiltinTypes.h>
+#include <mlir/IR/DialectRegistry.h>
 #include <mlir/IR/MLIRContext.h>
 #include <mlir/IR/SymbolTable.h>
 #include <mlir/IR/Verifier.h>
@@ -103,7 +107,12 @@ static std::string computeTargetDataLayout(llvm::StringRef TargetTriple,
   std::optional<llvm::CodeModel::Model> CodeModel;
 
   std::unique_ptr<llvm::TargetMachine> TM(T->createTargetMachine(
-      TargetTriple, CPU, Features, Options, RelocModel, CodeModel,
+#if LLVM_VERSION_MAJOR >= 22
+      Triple{TargetTriple},
+#else
+      TargetTriple,
+#endif
+      CPU, Features, Options, RelocModel, CodeModel,
       /*OptLevel=*/llvm::CodeGenOptLevel::Default));
   if (!TM)
     reportFatalError("MLIRCodeBuilder: failed to create LLVM TargetMachine for "
@@ -282,9 +291,19 @@ struct MLIRCodeBuilder::Impl {
   }
 
   explicit Impl(TargetModelType TM) : TargetModel(TM), Builder(&Context) {
+#if LLVM_VERSION_MAJOR >= 22
+    mlir::DialectRegistry Registry;
+    mlir::arith::registerConvertArithToLLVMInterface(Registry);
+    mlir::cf::registerConvertControlFlowToLLVMInterface(Registry);
+    mlir::registerConvertFuncToLLVMInterface(Registry);
+    mlir::index::registerConvertIndexToLLVMInterface(Registry);
+    mlir::registerConvertMathToLLVMInterface(Registry);
+    mlir::registerConvertMemRefToLLVMInterface(Registry);
+    Context.appendDialectRegistry(Registry);
+#endif
     Context.loadDialect<
         mlir::func::FuncDialect, arith::ArithDialect, cf::ControlFlowDialect,
-        gpu::GPUDialect, LLVM::LLVMDialect,
+        gpu::GPUDialect, index::IndexDialect, LLVM::LLVMDialect,
 #if PROTEUS_ENABLE_CUDA
         NVVM::NVVMDialect,
 #endif
@@ -316,15 +335,53 @@ struct MLIRCodeBuilder::Impl {
           Builder.getStringAttr(DataLayout));
     };
 
+#if LLVM_VERSION_MAJOR >= 22
+    auto AddGenericToLLVMConversion = [&]() {
+      mlir::ConvertToLLVMPassOptions Opts;
+      Opts.filterDialects = {"arith", "func", "index", "math", "memref"};
+      // Use DataLayoutAnalysis-backed conversion so index lowering follows the
+      // module data layout, matching the explicit pre-LLVM-22 pipeline.
+      Opts.useDynamic = true;
+      PM.addPass(mlir::createConvertToLLVMPass(Opts));
+      PM.addPass(mlir::createReconcileUnrealizedCastsPass());
+    };
+#endif
+
 #if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
     auto AddCommonGpuLoweringPrelude = [&]() {
+#if LLVM_VERSION_MAJOR >= 22
+      PM.addPass(mlir::createSCFToControlFlowPass());
+#else
       PM.addPass(mlir::createConvertSCFToCFPass());
+#endif
       {
         mlir::ConvertControlFlowToLLVMPassOptions Opts;
         Opts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
         PM.addPass(mlir::createConvertControlFlowToLLVMPass(Opts));
       }
       PM.addPass(mlir::createReconcileUnrealizedCastsPass());
+    };
+
+    auto AddCommonGpuLLVMFinalization = [&]() {
+#if LLVM_VERSION_MAJOR >= 22
+      AddGenericToLLVMConversion();
+#else
+      mlir::ArithToLLVMConversionPassOptions ArithOpts;
+      ArithOpts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
+      PM.addPass(mlir::createArithToLLVMConversionPass(ArithOpts));
+
+      PM.addPass(mlir::createConvertMathToLLVMPass());
+
+      mlir::ConvertIndexToLLVMPassOptions IndexOpts;
+      IndexOpts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
+      PM.addPass(mlir::createConvertIndexToLLVMPass(IndexOpts));
+
+      mlir::FinalizeMemRefToLLVMConversionPassOptions MemRefOpts;
+      MemRefOpts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
+      PM.addPass(mlir::createFinalizeMemRefToLLVMConversionPass(MemRefOpts));
+
+      PM.addPass(mlir::createReconcileUnrealizedCastsPass());
+#endif
     };
 #endif
 
@@ -337,17 +394,25 @@ struct MLIRCodeBuilder::Impl {
     if (TM == TargetModelType::HOST) {
       // HOST path: input is host-side structured IR (func/scf/arith/math/
       // memref); output is host-targeted LLVM dialect before translation.
+#if LLVM_VERSION_MAJOR >= 22
+      PM.addPass(mlir::createSCFToControlFlowPass());
+#else
       PM.addPass(mlir::createConvertSCFToCFPass());
+#endif
       {
         mlir::ConvertControlFlowToLLVMPassOptions Opts;
         Opts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
         PM.addPass(mlir::createConvertControlFlowToLLVMPass(Opts));
       }
+#if LLVM_VERSION_MAJOR >= 22
+      AddGenericToLLVMConversion();
+#else
       PM.addPass(mlir::createArithToLLVMConversionPass());
       PM.addPass(mlir::createConvertMathToLLVMPass());
       PM.addPass(mlir::createFinalizeMemRefToLLVMConversionPass());
       PM.addPass(mlir::createConvertFuncToLLVMPass());
       PM.addPass(mlir::createReconcileUnrealizedCastsPass());
+#endif
     } else if (TM == TargetModelType::CUDA) {
 #if PROTEUS_ENABLE_CUDA
       // CUDA path: lower device-only gpu.module/gpu.func to NVVM/LLVM dialect.
@@ -365,6 +430,7 @@ struct MLIRCodeBuilder::Impl {
 
       PM.nest<gpu::GPUModuleOp>().addPass(
           mlir::createConvertGpuOpsToNVVMOps(NVVMOpts));
+      AddCommonGpuLLVMFinalization();
 #else
       reportFatalError(
           "MLIRCodeBuilder: CUDA target requested but Proteus was built with "
@@ -387,11 +453,21 @@ struct MLIRCodeBuilder::Impl {
       // the top-level before GPU->ROCDL conversion creates llvm.func bodies.
       AddCommonGpuLoweringPrelude();
 
+#if LLVM_VERSION_MAJOR >= 22
+      mlir::ConvertGpuOpsToROCDLOpsOptions ROCDLOpts;
+      ROCDLOpts.chipset = HipChipset;
+      ROCDLOpts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
+      ROCDLOpts.useBarePtrCallConv = true;
+      PM.nest<gpu::GPUModuleOp>().addPass(
+          mlir::createConvertGpuOpsToROCDLOps(ROCDLOpts));
+#else
       PM.nest<gpu::GPUModuleOp>().addPass(mlir::createLowerGpuOpsToROCDLOpsPass(
           /*chipset=*/HipChipset,
           /*indexBitwidth=*/
           mlir::kDeriveIndexBitwidthFromDataLayout,
           /*useBarePtrCallConv=*/true));
+#endif
+      AddCommonGpuLLVMFinalization();
 #else
       reportFatalError(
           "MLIRCodeBuilder: HIP target requested but Proteus was built with "
@@ -542,7 +618,11 @@ struct MLIRCodeBuilder::Impl {
     // provided, propagate it (and device data layout) to the LLVM module.
     (void)OptLevel;
     if (!TargetTriple.empty()) {
-      LLVMMod->setTargetTriple(TargetTriple.str());
+#if LLVM_VERSION_MAJOR >= 22
+      LLVMMod->setTargetTriple(Triple{TargetTriple});
+#else
+      LLVMMod->setTargetTriple(TargetTriple);
+#endif
       if (TM == TargetModelType::CUDA || TM == TargetModelType::HIP) {
         LLVMMod->setDataLayout(
             computeTargetDataLayout(TargetTriple, CPU, Features));
