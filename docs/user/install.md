@@ -43,8 +43,8 @@ spack install proteus +mpi
 
 Proteus uses `cmake` for building and requires an existing LLVM installation.
 `LLVM_INSTALL_DIR` is mandatory and must point to the LLVM/Clang installation
-prefix. CI currently covers LLVM 18/19/20 with CUDA 12.2 and AMD ROCm versions
-6.3.1, 6.4.1, and 7.1.1.
+prefix. CI currently covers LLVM 19/20/22 with CUDA 12.2 and AMD ROCm versions
+6.4.3 (based on LLVM 19), 7.1.1 (based on LLVM 20), and 7.2.0 (based on LLVM 22).
 
 The top-level `CMakeLists.txt` currently defines the following build options:
 

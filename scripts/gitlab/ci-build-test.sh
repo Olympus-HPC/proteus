@@ -105,9 +105,9 @@ if [ "${CI_MACHINE}" == "tioga" ] || [ "${CI_MACHINE}" == "tuolumne" ]; then
   PROTEUS_ASYNC_COMPILATION=1 PROTEUS_ASYNC_TEST_BLOCKING=1 PROTEUS_CODEGEN=serial ctest -j8 -T test --output-on-failure
   echo "### $(date) END TESTING (BLOCKING) ASYNC COMPILATION WITH PROTEUS CODEGEN SERIAL ###"
 
-  if [ "${PROTEUS_CI_ROCM_VERSION}" == "6.3.1" ] \
-     || [ "${PROTEUS_CI_ROCM_VERSION}" == "6.4.1" ] \
-     || [ "${PROTEUS_CI_ROCM_VERSION}" == "7.1.1" ]; then
+  if [ "${PROTEUS_CI_ROCM_VERSION}" == "6.4.3" ] \
+     || [ "${PROTEUS_CI_ROCM_VERSION}" == "7.1.1" ] \
+     || [ "${PROTEUS_CI_ROCM_VERSION}" == "7.2.0" ]; then
     echo "### $(date) START TESTING SYNC COMPILATION WITH PROTEUS CODEGEN PARALLEL ###"
     PROTEUS_CODEGEN=parallel ctest -j8 -T test --output-on-failure
     echo "### $(date) END TESTING SYNC COMPILATION WITH PROTEUS HIP CODEGEN PARALLEL ###"
