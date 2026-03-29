@@ -75,7 +75,7 @@ spack install proteus +mpi
 
 ### Building from source
 The project uses `cmake` and requires an LLVM installation.
-CI tests currently cover LLVM 18, 19, 20, 22 with CUDA versions 12.2, and AMD
+CI tests currently cover LLVM 19, 20, 22 with CUDA versions 12.2, and AMD
 ROCm versions 6.4.3 (based on LLVM 19) , 7.1.1 (based on LLVM 20), 7.2.0 (based
 on LLVM 22).
 
