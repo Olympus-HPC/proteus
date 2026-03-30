@@ -179,6 +179,9 @@ codegenSerial(Module &M, StringRef DeviceArch,
   ObjectFiles.emplace_back(std::move(ObjectFilePtr));
 
   PM.run(M);
+  if (Error E = FileStream->commit())
+    reportFatalError("Error committing object tmp file stream " +
+                     toString(std::move(E)));
 
   return ObjectFiles;
 }

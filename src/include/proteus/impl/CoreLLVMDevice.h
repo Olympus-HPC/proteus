@@ -164,9 +164,9 @@ inline void replaceGlobalVariablesWithPointers(
     Constant *Addr =
         ConstantInt::get(Type::getInt64Ty(M.getContext()), 0xDEADBEEFDEADBEEF);
     auto *CE = ConstantExpr::getIntToPtr(
-        Addr, PointerType::get(GV->getType(), GV->getAddressSpace()));
+        Addr, PointerType::get(M.getContext(), GV->getAddressSpace()));
     auto *GVarPtr = new GlobalVariable(
-        M, PointerType::get(GV->getType(), GV->getAddressSpace()), false,
+        M, PointerType::get(M.getContext(), GV->getAddressSpace()), false,
         GlobalValue::ExternalLinkage, CE, GV->getName() + "$ptr", nullptr,
         GV->getThreadLocalMode(), GV->getAddressSpace(), true);
 
@@ -229,14 +229,16 @@ inline void relinkGlobalsObject(
     MemoryBufferRef Object,
     const std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo) {
   TIMESCOPE("proteus::relinkGlobalsObject");
-  Expected<object::ELF64LEObjectFile> DeviceElfOrErr =
-      object::ELF64LEObjectFile::create(Object);
-  if (auto E = DeviceElfOrErr.takeError())
+  auto ObjOrErr = object::ObjectFile::createObjectFile(Object);
+  if (auto E = ObjOrErr.takeError())
     reportFatalError("Cannot create the device elf: " + toString(std::move(E)));
-  auto &DeviceElf = *DeviceElfOrErr;
+  auto &DeviceObjFile = **ObjOrErr;
+  auto *DeviceElf = dyn_cast<object::ELFObjectFileBase>(&DeviceObjFile);
+  if (!DeviceElf)
+    reportFatalError("Expected ELF object file");
 
   for (auto &[GlobalName, GVI] : VarNameToGlobalInfo) {
-    for (auto &Symbol : DeviceElf.symbols()) {
+    for (auto &Symbol : DeviceElf->symbols()) {
       auto SymbolNameOrErr = Symbol.getName();
       if (!SymbolNameOrErr)
         continue;
@@ -255,7 +257,7 @@ inline void relinkGlobalsObject(
       if (!SectionOrErr)
         reportFatalError("Cannot retrieve section");
       const auto &Section = *SectionOrErr;
-      if (Section == DeviceElf.section_end())
+      if (Section == DeviceElf->section_end())
         reportFatalError("Expected sybmol in section");
 
       // Get the section's address and data
