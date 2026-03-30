@@ -20,9 +20,9 @@ using namespace llvm;
 // NOLINTBEGIN(readability-identifier-naming)
 
 extern "C" __attribute__((used)) void *
-__jit_entry(char *FnName, char *IR, int IRSize, void **Args,
-            RuntimeConstantInfo **RCInfoArrayPtr, int NumRuntimeConstants) {
-  TIMESCOPE("__jit_entry");
+__proteus_entry(char *FnName, char *IR, int IRSize, void **Args,
+                RuntimeConstantInfo **RCInfoArrayPtr, int NumRuntimeConstants) {
+  TIMESCOPE("__proteus_entry");
   JitEngineHost &Jit = JitEngineHost::instance();
   ArrayRef<RuntimeConstantInfo *> RCInfoArray{
       RCInfoArrayPtr, static_cast<size_t>(NumRuntimeConstants)};
@@ -32,24 +32,24 @@ __jit_entry(char *FnName, char *IR, int IRSize, void **Args,
 }
 
 extern "C" __attribute__((used)) void
-__jit_register_variable(RuntimeConstant RC, const char *LambdaName) {
+__proteus_register_variable(RuntimeConstant RC, const char *LambdaName) {
   LambdaRegistry::instance().setJitVariable(LambdaName, RC);
 }
 
 extern "C" __attribute__((used)) void
-__jit_register_lambda(const char *LambdaName) {
+__proteus_register_lambda(const char *LambdaName) {
   LambdaRegistry::instance().registerLambda(LambdaName);
 }
 
-extern "C" void __jit_enable_host() {
+extern "C" void __proteus_enable_host() {
   JitEngineHost &Jit = JitEngineHost::instance();
   Jit.enable();
 }
 
 extern "C" __attribute__((noinline)) void
-__jit_take_address(void const *) noexcept {}
+__proteus_take_address(void const *) noexcept {}
 
-extern "C" void __jit_disable_host() {
+extern "C" void __proteus_disable_host() {
   JitEngineHost &Jit = JitEngineHost::instance();
   Jit.disable();
 }
