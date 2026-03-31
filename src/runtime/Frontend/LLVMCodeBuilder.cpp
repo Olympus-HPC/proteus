@@ -1181,6 +1181,7 @@ void LLVMCodeBuilder::setKernel(IRFunction *IRF) {
   LLVMContext &Ctx = getContext();
   switch (TargetModel) {
   case TargetModelType::CUDA: {
+#if LLVM_VERSION_MAJOR < 22
     NamedMDNode *MD = getModule().getOrInsertNamedMetadata("nvvm.annotations");
 
     Metadata *MDVals[] = {
@@ -1188,6 +1189,7 @@ void LLVMCodeBuilder::setKernel(IRFunction *IRF) {
         ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 1))};
     // Append metadata to nvvm.annotations.
     MD->addOperand(MDNode::get(Ctx, MDVals));
+#endif
 
     // Add a function attribute for the kernel.
     Fn.addFnAttr(Attribute::get(Ctx, "kernel"));

@@ -86,6 +86,15 @@ inline const SmallVector<StringRef> &threadIdxZFnName() {
 
 inline void setLaunchBoundsForKernel(Function &F, int MaxThreadsPerSM,
                                      int MinBlocksPerSM = 0) {
+  // Overwrite any existing launch-bounds attributes so specialization remains
+  // the authoritative source.
+#if LLVM_VERSION_MAJOR >= 22
+  // LLVM 22+ lowers CUDA launch bounds from NVVM function attributes rather
+  // than mutating nvvm.annotations metadata in the IR.
+  F.addFnAttr("nvvm.maxntid", std::to_string(std::min(1024, MaxThreadsPerSM)));
+  if (MinBlocksPerSM != 0)
+    F.addFnAttr("nvvm.minctasm", std::to_string(MinBlocksPerSM));
+#else
   auto *M = F.getParent();
   NamedMDNode *NvvmAnnotations = M->getNamedMetadata("nvvm.annotations");
   assert(NvvmAnnotations && "Expected non-null nvvm.annotations metadata");
@@ -116,6 +125,7 @@ inline void setLaunchBoundsForKernel(Function &F, int MaxThreadsPerSM,
   SetMDNode("maxntid", std::min(1024, MaxThreadsPerSM));
   if (MinBlocksPerSM != 0)
     SetMDNode("minctasm", MinBlocksPerSM);
+#endif
 }
 
 inline void codegenPTX(Module &M, StringRef DeviceArch,
