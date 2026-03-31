@@ -67,7 +67,7 @@ if [ "${CI_MACHINE}" == "matrix" ]; then
   ml load cmake/3.23.1
   ml load cuda/12.2.2
 
-  PROTEUS_CI_LLVM_VERSION=18.1.8
+  PROTEUS_CI_LLVM_VERSION=19.1.7
   conda install -y -q --override-channels -c conda-forge \
     python=${PYTHON_VERSION} clang=${PROTEUS_CI_LLVM_VERSION} clangxx=${PROTEUS_CI_LLVM_VERSION} \
     clangdev=${PROTEUS_CI_LLVM_VERSION} llvmdev=${PROTEUS_CI_LLVM_VERSION} lit=${PROTEUS_CI_LLVM_VERSION}

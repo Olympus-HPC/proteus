@@ -118,7 +118,7 @@ meta-only:
   interruptible: true
   parallel:
     matrix:
-      - PROTEUS_CI_LLVM_VERSION: ["18.1.8", "19.1.7", "20.1.8"]
+      - PROTEUS_CI_LLVM_VERSION: ["19.1.7", "20.1.8", "22.1.0"]
   trigger:
     include:
       - local: '.gitlab/custom-jobs-and-variables.yml'
