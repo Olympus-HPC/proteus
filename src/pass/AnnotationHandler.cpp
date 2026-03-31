@@ -1136,6 +1136,10 @@ void AnnotationHandler::parseJitGlobalAnnotations(
   for (unsigned int I = 0; I < Array->getNumOperands(); I++) {
     auto *Entry = cast<ConstantStruct>(Array->getOperand(I));
     DEBUG(Logger::logs("proteus-pass") << "Entry " << *Entry << "\n");
+    if (Entry->isNullValue()) {
+      DEBUG(Logger::logs("proteus-pass") << "Skipping null entry...\n");
+      continue;
+    }
 
     auto *Fn = dyn_cast<Function>(Entry->getOperand(0)->stripPointerCasts());
 
@@ -1316,8 +1320,12 @@ void AnnotationHandler::removeJitGlobalAnnotations() {
   unsigned N = Init->getNumOperands();
   for (unsigned I = 0; I != N; ++I) {
     auto *Entry = dyn_cast<ConstantStruct>(Init->getOperand(I));
-    if (!Entry)
-      reportFatalError("Expected constant struct in global annotations");
+    if (!Entry) {
+      DEBUG(Logger::logs("proteus-pass")
+            << "Expected constant struct in global annotations, skipping null"
+               "entry...\n");
+      continue;
+    }
 
     auto *Annotation =
         dyn_cast<ConstantDataArray>(Entry->getOperand(1)->getOperand(0));
