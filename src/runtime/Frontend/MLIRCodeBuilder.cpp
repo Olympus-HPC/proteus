@@ -74,6 +74,16 @@ namespace proteus {
 
 using namespace mlir;
 
+template <typename OpTy, typename BuilderTy, typename... Args>
+static OpTy createOp(BuilderTy &Builder, mlir::Location Loc,
+                     Args &&...ArgsPack) {
+#if LLVM_VERSION_MAJOR >= 22
+  return OpTy::create(Builder, Loc, std::forward<Args>(ArgsPack)...);
+#else
+  return Builder.template create<OpTy>(Loc, std::forward<Args>(ArgsPack)...);
+#endif
+}
+
 static void ensureLLVMTargetsInitialized() {
   static InitLLVMTargets Init;
   (void)Init;
@@ -96,8 +106,13 @@ static std::string computeTargetDataLayout(llvm::StringRef TargetTriple,
   }
 
   std::string Error;
+#if LLVM_VERSION_MAJOR >= 22
+  llvm::Triple TT{TargetTriple};
+  const llvm::Target *T = llvm::TargetRegistry::lookupTarget(TT, Error);
+#else
   const llvm::Target *T =
       llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
+#endif
   if (!T)
     reportFatalError("MLIRCodeBuilder: failed to lookup LLVM target for '" +
                      TargetTriple.str() + "': " + Error);
@@ -261,10 +276,11 @@ struct MLIRCodeBuilder::Impl {
         AddrSpace = static_cast<unsigned>(MemSpaceAttr.getInt());
       PtrTy = mlir::LLVM::LLVMPointerType::get(&Context, AddrSpace);
       mlir::Value BaseAddrAsIndex =
-          Builder.create<memref::ExtractAlignedPointerAsIndexOp>(Loc, BaseV);
+          createOp<memref::ExtractAlignedPointerAsIndexOp>(Builder, Loc, BaseV);
       mlir::Value BaseAddrI64 =
-          Builder.create<arith::IndexCastUIOp>(Loc, I64Ty, BaseAddrAsIndex);
-      BasePtr = Builder.create<mlir::LLVM::IntToPtrOp>(Loc, PtrTy, BaseAddrI64);
+          createOp<arith::IndexCastUIOp>(Builder, Loc, I64Ty, BaseAddrAsIndex);
+      BasePtr =
+          createOp<mlir::LLVM::IntToPtrOp>(Builder, Loc, PtrTy, BaseAddrI64);
     } else {
       reportFatalError("getElementPtr: expected !llvm.ptr or memref base");
     }
@@ -272,8 +288,8 @@ struct MLIRCodeBuilder::Impl {
     mlir::Type GepElemTy = (ElemTy.Kind == IRTypeKind::Pointer)
                                ? mlir::Type(LLVMPointerTy)
                                : toMLIRScalarType(ElemTy.Kind, Context);
-    mlir::Value ElemPtr = Builder.create<mlir::LLVM::GEPOp>(
-        Loc, PtrTy, GepElemTy, BasePtr, ValueRange{IdxI64});
+    mlir::Value ElemPtr = createOp<mlir::LLVM::GEPOp>(
+        Builder, Loc, PtrTy, GepElemTy, BasePtr, ValueRange{IdxI64});
 
     // Materialize as a pointer slot so reference Vars can call load/store.
     auto PtrSlotTy = MemRefType::get({1}, PtrTy);
@@ -281,10 +297,10 @@ struct MLIRCodeBuilder::Impl {
     {
       OpBuilder::InsertionGuard Guard(Builder);
       Builder.setInsertionPointToStart(EntryBlock);
-      PtrSlot = Builder.create<memref::AllocaOp>(Loc, PtrSlotTy);
+      PtrSlot = createOp<memref::AllocaOp>(Builder, Loc, PtrSlotTy);
     }
-    mlir::Value Zero = Builder.create<arith::ConstantIndexOp>(Loc, 0);
-    Builder.create<memref::StoreOp>(Loc, ElemPtr, PtrSlot, ValueRange{Zero});
+    mlir::Value Zero = createOp<arith::ConstantIndexOp>(Builder, Loc, 0);
+    createOp<memref::StoreOp>(Builder, Loc, ElemPtr, PtrSlot, ValueRange{Zero});
 
     IRType AllocTy{IRTypeKind::Pointer, ElemTy.Signed, 0, ElemTy.Kind};
     return {wrap(PtrSlot), ElemTy, AllocTy, PtrTy.getAddressSpace()};
@@ -664,8 +680,8 @@ struct MLIRCodeBuilder::Impl {
     Builder.setInsertionPointToStart(Module.getBody());
     // CUDA/HIP lowering expects device kernels to live under a dedicated
     // gpu.module symbol, mirroring separate device compilation.
-    DeviceModule = Builder.create<gpu::GPUModuleOp>(Builder.getUnknownLoc(),
-                                                    DeviceModuleName);
+    DeviceModule = createOp<gpu::GPUModuleOp>(Builder, Builder.getUnknownLoc(),
+                                              DeviceModuleName);
     return DeviceModule;
   }
 
@@ -686,7 +702,7 @@ struct MLIRCodeBuilder::Impl {
     OpBuilder::InsertionGuard Guard(Builder);
     Builder.setInsertionPointToStart(Module.getBody());
     auto NewFunc =
-        Builder.create<func::FuncOp>(Builder.getUnknownLoc(), Name, FTy);
+        createOp<func::FuncOp>(Builder, Builder.getUnknownLoc(), Name, FTy);
     NewFunc.setSymVisibilityAttr(Builder.getStringAttr("private"));
     return NewFunc;
   }
@@ -826,7 +842,7 @@ IRFunction *MLIRCodeBuilder::addFunction(const std::string &Name, IRType RetTy,
     if (IsKernel) {
       // Keep gpu.func names equal to frontend names so later mangling can map
       // lowered kernel symbols back to frontend names.
-      auto KernelOp = PImpl->Builder.create<gpu::GPUFuncOp>(Loc, Name, FTy);
+      auto KernelOp = createOp<gpu::GPUFuncOp>(PImpl->Builder, Loc, Name, FTy);
       if (KernelOp.getBody().empty())
         KernelOp.addEntryBlock();
       // Keep kernel marker explicit so downstream GPU passes can identify
@@ -840,7 +856,7 @@ IRFunction *MLIRCodeBuilder::addFunction(const std::string &Name, IRType RetTy,
                                  RetTy, ArgTys);
     }
 
-    auto DevFn = PImpl->Builder.create<mlir::func::FuncOp>(Loc, Name, FTy);
+    auto DevFn = createOp<mlir::func::FuncOp>(PImpl->Builder, Loc, Name, FTy);
     DevFn.setSymVisibilityAttr(PImpl->Builder.getStringAttr("private"));
     DevFn.addEntryBlock();
 
@@ -854,7 +870,7 @@ IRFunction *MLIRCodeBuilder::addFunction(const std::string &Name, IRType RetTy,
   // Host mode emits an exported function callable from the C++ dispatcher
   // (Dispatcher::run<Ret(Args...)>).
   PImpl->Builder.setInsertionPointToEnd(PImpl->Module.getBody());
-  auto HostOp = PImpl->Builder.create<mlir::func::FuncOp>(Loc, Name, FTy);
+  auto HostOp = createOp<mlir::func::FuncOp>(PImpl->Builder, Loc, Name, FTy);
   HostOp.addEntryBlock();
 
   PImpl->CurrentFuncOp = HostOp.getOperation();
@@ -931,9 +947,9 @@ void MLIRCodeBuilder::endFunction() {
                    !CurBlock->back().hasTrait<OpTrait::IsTerminator>())) {
     auto Loc = PImpl->Builder.getUnknownLoc();
     if (PImpl->CurrentIsKernel)
-      PImpl->Builder.create<gpu::ReturnOp>(Loc);
+      createOp<gpu::ReturnOp>(PImpl->Builder, Loc);
     else
-      PImpl->Builder.create<mlir::func::ReturnOp>(Loc);
+      createOp<mlir::func::ReturnOp>(PImpl->Builder, Loc);
   }
   PImpl->CurrentFuncOp = nullptr;
   PImpl->CurrentIsKernel = false;
@@ -965,9 +981,9 @@ void MLIRCodeBuilder::clearInsertPoint() {
 void MLIRCodeBuilder::createRetVoid() {
   auto Loc = PImpl->Builder.getUnknownLoc();
   if (PImpl->CurrentFuncOp && isa<gpu::GPUFuncOp>(PImpl->CurrentFuncOp))
-    PImpl->Builder.create<gpu::ReturnOp>(Loc);
+    createOp<gpu::ReturnOp>(PImpl->Builder, Loc);
   else
-    PImpl->Builder.create<mlir::func::ReturnOp>(Loc);
+    createOp<mlir::func::ReturnOp>(PImpl->Builder, Loc);
 }
 
 void MLIRCodeBuilder::createRet(IRValue *V) {
@@ -975,10 +991,10 @@ void MLIRCodeBuilder::createRet(IRValue *V) {
   if (PImpl->CurrentFuncOp && isa<gpu::GPUFuncOp>(PImpl->CurrentFuncOp)) {
     if (PImpl->CurrentIsKernel)
       reportFatalError("MLIRCodeBuilder::createRet: kernels must return void");
-    PImpl->Builder.create<gpu::ReturnOp>(Loc, ValueRange{PImpl->unwrap(V)});
+    createOp<gpu::ReturnOp>(PImpl->Builder, Loc, ValueRange{PImpl->unwrap(V)});
     return;
   }
-  PImpl->Builder.create<mlir::func::ReturnOp>(Loc, PImpl->unwrap(V));
+  createOp<mlir::func::ReturnOp>(PImpl->Builder, Loc, PImpl->unwrap(V));
 }
 
 // ---------------------------------------------------------------------------
@@ -995,43 +1011,43 @@ IRValue *MLIRCodeBuilder::createArith(ArithOp Op, IRValue *LHS, IRValue *RHS,
   if (isIntegerKind(Ty)) {
     switch (Op) {
     case ArithOp::Add:
-      Result = PImpl->Builder.create<arith::AddIOp>(Loc, L, R);
+      Result = createOp<arith::AddIOp>(PImpl->Builder, Loc, L, R);
       break;
     case ArithOp::Sub:
-      Result = PImpl->Builder.create<arith::SubIOp>(Loc, L, R);
+      Result = createOp<arith::SubIOp>(PImpl->Builder, Loc, L, R);
       break;
     case ArithOp::Mul:
-      Result = PImpl->Builder.create<arith::MulIOp>(Loc, L, R);
+      Result = createOp<arith::MulIOp>(PImpl->Builder, Loc, L, R);
       break;
     case ArithOp::Div:
       if (Ty.Signed)
-        Result = PImpl->Builder.create<arith::DivSIOp>(Loc, L, R);
+        Result = createOp<arith::DivSIOp>(PImpl->Builder, Loc, L, R);
       else
-        Result = PImpl->Builder.create<arith::DivUIOp>(Loc, L, R);
+        Result = createOp<arith::DivUIOp>(PImpl->Builder, Loc, L, R);
       break;
     case ArithOp::Rem:
       if (Ty.Signed)
-        Result = PImpl->Builder.create<arith::RemSIOp>(Loc, L, R);
+        Result = createOp<arith::RemSIOp>(PImpl->Builder, Loc, L, R);
       else
-        Result = PImpl->Builder.create<arith::RemUIOp>(Loc, L, R);
+        Result = createOp<arith::RemUIOp>(PImpl->Builder, Loc, L, R);
       break;
     }
   } else if (isFloatingPointKind(Ty)) {
     switch (Op) {
     case ArithOp::Add:
-      Result = PImpl->Builder.create<arith::AddFOp>(Loc, L, R);
+      Result = createOp<arith::AddFOp>(PImpl->Builder, Loc, L, R);
       break;
     case ArithOp::Sub:
-      Result = PImpl->Builder.create<arith::SubFOp>(Loc, L, R);
+      Result = createOp<arith::SubFOp>(PImpl->Builder, Loc, L, R);
       break;
     case ArithOp::Mul:
-      Result = PImpl->Builder.create<arith::MulFOp>(Loc, L, R);
+      Result = createOp<arith::MulFOp>(PImpl->Builder, Loc, L, R);
       break;
     case ArithOp::Div:
-      Result = PImpl->Builder.create<arith::DivFOp>(Loc, L, R);
+      Result = createOp<arith::DivFOp>(PImpl->Builder, Loc, L, R);
       break;
     case ArithOp::Rem:
-      Result = PImpl->Builder.create<arith::RemFOp>(Loc, L, R);
+      Result = createOp<arith::RemFOp>(PImpl->Builder, Loc, L, R);
       break;
     }
   } else {
@@ -1058,34 +1074,34 @@ IRValue *MLIRCodeBuilder::createCast(IRValue *V, IRType FromTy, IRType ToTy) {
 
   if (FromInt && ToFloat) {
     if (FromTy.Signed)
-      Result = PImpl->Builder.create<arith::SIToFPOp>(Loc, DstTy, Src);
+      Result = createOp<arith::SIToFPOp>(PImpl->Builder, Loc, DstTy, Src);
     else
-      Result = PImpl->Builder.create<arith::UIToFPOp>(Loc, DstTy, Src);
+      Result = createOp<arith::UIToFPOp>(PImpl->Builder, Loc, DstTy, Src);
   } else if (FromFloat && ToInt) {
     if (ToTy.Signed)
-      Result = PImpl->Builder.create<arith::FPToSIOp>(Loc, DstTy, Src);
+      Result = createOp<arith::FPToSIOp>(PImpl->Builder, Loc, DstTy, Src);
     else
-      Result = PImpl->Builder.create<arith::FPToUIOp>(Loc, DstTy, Src);
+      Result = createOp<arith::FPToUIOp>(PImpl->Builder, Loc, DstTy, Src);
   } else if (FromInt && ToInt) {
     const unsigned FromBits = Src.getType().getIntOrFloatBitWidth();
     const unsigned ToBits = DstTy.getIntOrFloatBitWidth();
     if (ToBits < FromBits)
-      Result = PImpl->Builder.create<arith::TruncIOp>(Loc, DstTy, Src);
+      Result = createOp<arith::TruncIOp>(PImpl->Builder, Loc, DstTy, Src);
     else if (ToBits == FromBits)
       Result = Src;
     else if (FromTy.Signed)
-      Result = PImpl->Builder.create<arith::ExtSIOp>(Loc, DstTy, Src);
+      Result = createOp<arith::ExtSIOp>(PImpl->Builder, Loc, DstTy, Src);
     else
-      Result = PImpl->Builder.create<arith::ExtUIOp>(Loc, DstTy, Src);
+      Result = createOp<arith::ExtUIOp>(PImpl->Builder, Loc, DstTy, Src);
   } else if (FromFloat && ToFloat) {
     const unsigned FromBits = Src.getType().getIntOrFloatBitWidth();
     const unsigned ToBits = DstTy.getIntOrFloatBitWidth();
     if (ToBits < FromBits)
-      Result = PImpl->Builder.create<arith::TruncFOp>(Loc, DstTy, Src);
+      Result = createOp<arith::TruncFOp>(PImpl->Builder, Loc, DstTy, Src);
     else if (ToBits == FromBits)
       Result = Src;
     else
-      Result = PImpl->Builder.create<arith::ExtFOp>(Loc, DstTy, Src);
+      Result = createOp<arith::ExtFOp>(PImpl->Builder, Loc, DstTy, Src);
   } else {
     reportFatalError("createCast: unsupported type combination");
   }
@@ -1101,7 +1117,7 @@ IRValue *MLIRCodeBuilder::getConstantInt(IRType Ty, uint64_t Val) {
   auto Loc = PImpl->Builder.getUnknownLoc();
   mlir::Type MLIRTy = toMLIRType(Ty, PImpl->Context);
   auto Attr = IntegerAttr::get(MLIRTy, static_cast<int64_t>(Val));
-  mlir::Value C = PImpl->Builder.create<arith::ConstantOp>(Loc, Attr);
+  mlir::Value C = createOp<arith::ConstantOp>(PImpl->Builder, Loc, Attr);
   return PImpl->wrap(C);
 }
 
@@ -1114,7 +1130,7 @@ IRValue *MLIRCodeBuilder::getConstantFP(IRType Ty, double Val) {
   APVal.convert(FTy.getFloatSemantics(), llvm::APFloat::rmNearestTiesToEven,
                 &LosesInfo);
   auto Attr = FloatAttr::get(FTy, APVal);
-  mlir::Value C = PImpl->Builder.create<arith::ConstantOp>(Loc, Attr);
+  mlir::Value C = createOp<arith::ConstantOp>(PImpl->Builder, Loc, Attr);
   return PImpl->wrap(C);
 }
 
@@ -1125,9 +1141,9 @@ IRValue *MLIRCodeBuilder::getConstantFP(IRType Ty, double Val) {
 IRValue *MLIRCodeBuilder::loadScalar(IRValue *Slot, IRType /*ValueTy*/) {
   auto Loc = PImpl->Builder.getUnknownLoc();
   mlir::Value MemRefVal = PImpl->unwrap(Slot);
-  mlir::Value Idx = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+  mlir::Value Idx = createOp<arith::ConstantIndexOp>(PImpl->Builder, Loc, 0);
   mlir::Value Val =
-      PImpl->Builder.create<memref::LoadOp>(Loc, MemRefVal, ValueRange{Idx});
+      createOp<memref::LoadOp>(PImpl->Builder, Loc, MemRefVal, ValueRange{Idx});
   return PImpl->wrap(Val);
 }
 
@@ -1135,8 +1151,8 @@ void MLIRCodeBuilder::storeScalar(IRValue *Slot, IRValue *Val) {
   auto Loc = PImpl->Builder.getUnknownLoc();
   mlir::Value MemRefVal = PImpl->unwrap(Slot);
   mlir::Value V = PImpl->unwrap(Val);
-  mlir::Value Idx = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-  PImpl->Builder.create<memref::StoreOp>(Loc, V, MemRefVal, ValueRange{Idx});
+  mlir::Value Idx = createOp<arith::ConstantIndexOp>(PImpl->Builder, Loc, 0);
+  createOp<memref::StoreOp>(PImpl->Builder, Loc, V, MemRefVal, ValueRange{Idx});
 }
 
 VarAlloc MLIRCodeBuilder::allocScalar(const std::string & /*Name*/,
@@ -1151,7 +1167,7 @@ VarAlloc MLIRCodeBuilder::allocScalar(const std::string & /*Name*/,
     // Always place the alloca at the start of the entry block.
     OpBuilder::InsertionGuard Guard(PImpl->Builder);
     PImpl->Builder.setInsertionPointToStart(PImpl->EntryBlock);
-    Alloca = PImpl->Builder.create<memref::AllocaOp>(Loc, MemRefTy);
+    Alloca = createOp<memref::AllocaOp>(PImpl->Builder, Loc, MemRefTy);
   }
 
   IRType AllocTy;
@@ -1175,8 +1191,9 @@ void MLIRCodeBuilder::beginIf(IRValue *Cond, const char * /*File*/,
       {ScopeKind::IF, PImpl->Builder.saveInsertionPoint()});
 
   // Create scf.if with no results (mutations via memref side-effects).
-  auto IfOp = PImpl->Builder.create<scf::IfOp>(Loc, /*resultTypes=*/TypeRange{},
-                                               CondV, /*withElseRegion=*/false);
+  auto IfOp = createOp<scf::IfOp>(PImpl->Builder, Loc,
+                                  /*resultTypes=*/TypeRange{}, CondV,
+                                  /*withElseRegion=*/false);
 
   // Set insertion point to the start of the then region.
   PImpl->Builder.setInsertionPointToStart(&IfOp.getThenRegion().front());
@@ -1186,7 +1203,7 @@ void MLIRCodeBuilder::endIf() {
   // Ensure the then region has a scf.yield terminator.
   Block *CurBlock = PImpl->Builder.getInsertionBlock();
   if (CurBlock->empty() || !CurBlock->back().hasTrait<OpTrait::IsTerminator>())
-    PImpl->Builder.create<scf::YieldOp>(PImpl->Builder.getUnknownLoc());
+    createOp<scf::YieldOp>(PImpl->Builder, PImpl->Builder.getUnknownLoc());
 
   // Restore insertion point to after the scf.if.
   auto Scope = PImpl->ScopeStack.pop_back_val();
@@ -1201,19 +1218,22 @@ void MLIRCodeBuilder::beginFor(IRValue *IterSlot, IRType IterTy,
   auto Loc = PImpl->Builder.getUnknownLoc();
 
   // Cast integer bounds to index type.
-  mlir::Value LB = PImpl->Builder.create<arith::IndexCastOp>(
-      Loc, PImpl->Builder.getIndexType(), PImpl->unwrap(InitVal));
-  mlir::Value UB = PImpl->Builder.create<arith::IndexCastOp>(
-      Loc, PImpl->Builder.getIndexType(), PImpl->unwrap(UpperBoundVal));
-  mlir::Value Step = PImpl->Builder.create<arith::IndexCastOp>(
-      Loc, PImpl->Builder.getIndexType(), PImpl->unwrap(IncVal));
+  mlir::Value LB = createOp<arith::IndexCastOp>(PImpl->Builder, Loc,
+                                                PImpl->Builder.getIndexType(),
+                                                PImpl->unwrap(InitVal));
+  mlir::Value UB = createOp<arith::IndexCastOp>(PImpl->Builder, Loc,
+                                                PImpl->Builder.getIndexType(),
+                                                PImpl->unwrap(UpperBoundVal));
+  mlir::Value Step = createOp<arith::IndexCastOp>(PImpl->Builder, Loc,
+                                                  PImpl->Builder.getIndexType(),
+                                                  PImpl->unwrap(IncVal));
 
   // Save insertion point for endFor.
   PImpl->ScopeStack.push_back(
       {ScopeKind::FOR, PImpl->Builder.saveInsertionPoint()});
 
   // Create scf.for with no iter_args (mutation via memref side-effects).
-  auto ForOp = PImpl->Builder.create<scf::ForOp>(Loc, LB, UB, Step);
+  auto ForOp = createOp<scf::ForOp>(PImpl->Builder, Loc, LB, UB, Step);
 
   // Set insertion point inside the body.
   PImpl->Builder.setInsertionPointToStart(ForOp.getBody());
@@ -1223,17 +1243,18 @@ void MLIRCodeBuilder::beginFor(IRValue *IterSlot, IRType IterTy,
   mlir::Value IV = ForOp.getInductionVar();
   mlir::Type IterMLIRTy = toMLIRType(IterTy, PImpl->Context);
   mlir::Value TypedIV =
-      PImpl->Builder.create<arith::IndexCastOp>(Loc, IterMLIRTy, IV);
-  mlir::Value Idx = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+      createOp<arith::IndexCastOp>(PImpl->Builder, Loc, IterMLIRTy, IV);
+  mlir::Value Idx = createOp<arith::ConstantIndexOp>(PImpl->Builder, Loc, 0);
   mlir::Value SlotV = PImpl->unwrap(IterSlot);
-  PImpl->Builder.create<memref::StoreOp>(Loc, TypedIV, SlotV, ValueRange{Idx});
+  createOp<memref::StoreOp>(PImpl->Builder, Loc, TypedIV, SlotV,
+                            ValueRange{Idx});
 }
 
 void MLIRCodeBuilder::endFor() {
   // Ensure the scf.for body has a scf.yield terminator.
   Block *CurBlock = PImpl->Builder.getInsertionBlock();
   if (CurBlock->empty() || !CurBlock->back().hasTrait<OpTrait::IsTerminator>())
-    PImpl->Builder.create<scf::YieldOp>(PImpl->Builder.getUnknownLoc());
+    createOp<scf::YieldOp>(PImpl->Builder, PImpl->Builder.getUnknownLoc());
 
   auto Scope = PImpl->ScopeStack.pop_back_val();
   PImpl->Builder.restoreInsertionPoint(Scope.SavedIP);
@@ -1248,8 +1269,9 @@ void MLIRCodeBuilder::beginWhile(std::function<IRValue *()> CondFn,
       {ScopeKind::WHILE, PImpl->Builder.saveInsertionPoint()});
 
   // Create scf.while with no iter_args and no results.
-  auto WhileOp = PImpl->Builder.create<scf::WhileOp>(
-      Loc, /*resultTypes=*/TypeRange{}, /*operands=*/ValueRange{});
+  auto WhileOp = createOp<scf::WhileOp>(PImpl->Builder, Loc,
+                                        /*resultTypes=*/TypeRange{},
+                                        /*operands=*/ValueRange{});
 
   // --- Fill the "before" region (condition). ---
   Block *BeforeBlock = PImpl->Builder.createBlock(&WhileOp.getBefore());
@@ -1260,7 +1282,8 @@ void MLIRCodeBuilder::beginWhile(std::function<IRValue *()> CondFn,
   mlir::Value CondV = PImpl->unwrap(CondIRV);
 
   // Terminate the before region with scf.condition.
-  PImpl->Builder.create<scf::ConditionOp>(Loc, CondV, /*args=*/ValueRange{});
+  createOp<scf::ConditionOp>(PImpl->Builder, Loc, CondV,
+                             /*args=*/ValueRange{});
 
   // --- Prepare the "after" region (body). ---
   Block *AfterBlock = PImpl->Builder.createBlock(&WhileOp.getAfter());
@@ -1272,7 +1295,7 @@ void MLIRCodeBuilder::endWhile() {
   // Ensure the after region has a scf.yield terminator.
   Block *CurBlock = PImpl->Builder.getInsertionBlock();
   if (CurBlock->empty() || !CurBlock->back().hasTrait<OpTrait::IsTerminator>())
-    PImpl->Builder.create<scf::YieldOp>(PImpl->Builder.getUnknownLoc());
+    createOp<scf::YieldOp>(PImpl->Builder, PImpl->Builder.getUnknownLoc());
 
   auto Scope = PImpl->ScopeStack.pop_back_val();
   PImpl->Builder.restoreInsertionPoint(Scope.SavedIP);
@@ -1308,7 +1331,7 @@ IRValue *MLIRCodeBuilder::createCmp(CmpOp Op, IRValue *LHS, IRValue *RHS,
     default:
       reportFatalError("createCmp: unknown CmpOp");
     }
-    Result = PImpl->Builder.create<arith::CmpFOp>(Loc, Pred, L, R);
+    Result = createOp<arith::CmpFOp>(PImpl->Builder, Loc, Pred, L, R);
   } else {
     arith::CmpIPredicate Pred;
     switch (Op) {
@@ -1333,29 +1356,29 @@ IRValue *MLIRCodeBuilder::createCmp(CmpOp Op, IRValue *LHS, IRValue *RHS,
     default:
       reportFatalError("createCmp: unknown CmpOp");
     }
-    Result = PImpl->Builder.create<arith::CmpIOp>(Loc, Pred, L, R);
+    Result = createOp<arith::CmpIOp>(PImpl->Builder, Loc, Pred, L, R);
   }
   return PImpl->wrap(Result);
 }
 
 IRValue *MLIRCodeBuilder::createAnd(IRValue *LHS, IRValue *RHS) {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  mlir::Value Result = PImpl->Builder.create<arith::AndIOp>(
-      Loc, PImpl->unwrap(LHS), PImpl->unwrap(RHS));
+  mlir::Value Result = createOp<arith::AndIOp>(
+      PImpl->Builder, Loc, PImpl->unwrap(LHS), PImpl->unwrap(RHS));
   return PImpl->wrap(Result);
 }
 
 IRValue *MLIRCodeBuilder::createOr(IRValue *LHS, IRValue *RHS) {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  mlir::Value Result = PImpl->Builder.create<arith::OrIOp>(
-      Loc, PImpl->unwrap(LHS), PImpl->unwrap(RHS));
+  mlir::Value Result = createOp<arith::OrIOp>(
+      PImpl->Builder, Loc, PImpl->unwrap(LHS), PImpl->unwrap(RHS));
   return PImpl->wrap(Result);
 }
 
 IRValue *MLIRCodeBuilder::createXor(IRValue *LHS, IRValue *RHS) {
   auto Loc = PImpl->Builder.getUnknownLoc();
-  mlir::Value Result = PImpl->Builder.create<arith::XOrIOp>(
-      Loc, PImpl->unwrap(LHS), PImpl->unwrap(RHS));
+  mlir::Value Result = createOp<arith::XOrIOp>(
+      PImpl->Builder, Loc, PImpl->unwrap(LHS), PImpl->unwrap(RHS));
   return PImpl->wrap(Result);
 }
 
@@ -1364,9 +1387,10 @@ IRValue *MLIRCodeBuilder::createNot(IRValue *Val) {
   // Logical NOT for i1: xor with true.
   auto TrueAttr =
       IntegerAttr::get(mlir::IntegerType::get(&PImpl->Context, 1), 1);
-  mlir::Value TrueVal = PImpl->Builder.create<arith::ConstantOp>(Loc, TrueAttr);
+  mlir::Value TrueVal =
+      createOp<arith::ConstantOp>(PImpl->Builder, Loc, TrueAttr);
   mlir::Value Result =
-      PImpl->Builder.create<arith::XOrIOp>(Loc, PImpl->unwrap(Val), TrueVal);
+      createOp<arith::XOrIOp>(PImpl->Builder, Loc, PImpl->unwrap(Val), TrueVal);
   return PImpl->wrap(Result);
 }
 IRValue *MLIRCodeBuilder::createLoad(IRType Ty, IRValue *Ptr,
@@ -1379,7 +1403,7 @@ IRValue *MLIRCodeBuilder::createLoad(IRType Ty, IRValue *Ptr,
   // Raw-address case: Ptr is a first-class pointer value; load directly.
   if (mlir::isa<mlir::LLVM::LLVMPointerType>(PtrV.getType())) {
     mlir::Value Val =
-        PImpl->Builder.create<mlir::LLVM::LoadOp>(Loc, ExpectedTy, PtrV);
+        createOp<mlir::LLVM::LoadOp>(PImpl->Builder, Loc, ExpectedTy, PtrV);
     return PImpl->wrap(Val);
   }
 
@@ -1387,21 +1411,21 @@ IRValue *MLIRCodeBuilder::createLoad(IRType Ty, IRValue *Ptr,
   // memref<1xT>; load slot[0].
   if (Impl::isScalarSlotType(PtrV.getType())) {
     auto SlotTy = cast<MemRefType>(PtrV.getType());
-    mlir::Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+    mlir::Value Zero = createOp<arith::ConstantIndexOp>(PImpl->Builder, Loc, 0);
 
     // Direct scalar slot: memref<1xElemTy> where ElemTy is the scalar type.
     if (SlotTy.getElementType() == ExpectedTy) {
       mlir::Value Val =
-          PImpl->Builder.create<memref::LoadOp>(Loc, PtrV, ValueRange{Zero});
+          createOp<memref::LoadOp>(PImpl->Builder, Loc, PtrV, ValueRange{Zero});
       return PImpl->wrap(Val);
     }
 
     // Address slot: memref<1x!llvm.ptr> holding an address of an element.
     if (SlotTy.getElementType() == LLVMPointerTy) {
       mlir::Value Addr =
-          PImpl->Builder.create<memref::LoadOp>(Loc, PtrV, ValueRange{Zero});
+          createOp<memref::LoadOp>(PImpl->Builder, Loc, PtrV, ValueRange{Zero});
       mlir::Value Val =
-          PImpl->Builder.create<mlir::LLVM::LoadOp>(Loc, ExpectedTy, Addr);
+          createOp<mlir::LLVM::LoadOp>(PImpl->Builder, Loc, ExpectedTy, Addr);
       return PImpl->wrap(Val);
     }
 
@@ -1418,27 +1442,27 @@ void MLIRCodeBuilder::createStore(IRValue *Val, IRValue *Ptr) {
 
   // Raw-address case: Ptr is a first-class pointer value; store directly.
   if (mlir::isa<mlir::LLVM::LLVMPointerType>(PtrV.getType())) {
-    PImpl->Builder.create<mlir::LLVM::StoreOp>(Loc, V, PtrV);
+    createOp<mlir::LLVM::StoreOp>(PImpl->Builder, Loc, V, PtrV);
     return;
   }
 
   // Scalar-slot case: Ptr is memref<1xT>; store into slot[0].
   if (Impl::isScalarSlotType(PtrV.getType())) {
     auto SlotTy = cast<MemRefType>(PtrV.getType());
-    mlir::Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+    mlir::Value Zero = createOp<arith::ConstantIndexOp>(PImpl->Builder, Loc, 0);
     auto LLVMPointerTy = mlir::LLVM::LLVMPointerType::get(&PImpl->Context);
 
     // Direct scalar slot: memref<1xElemTy> where ElemTy matches V's type.
     if (SlotTy.getElementType() == V.getType()) {
-      PImpl->Builder.create<memref::StoreOp>(Loc, V, PtrV, ValueRange{Zero});
+      createOp<memref::StoreOp>(PImpl->Builder, Loc, V, PtrV, ValueRange{Zero});
       return;
     }
 
     // Address slot: memref<1x!llvm.ptr> holding an address of an element.
     if (SlotTy.getElementType() == LLVMPointerTy) {
       mlir::Value Addr =
-          PImpl->Builder.create<memref::LoadOp>(Loc, PtrV, ValueRange{Zero});
-      PImpl->Builder.create<mlir::LLVM::StoreOp>(Loc, V, Addr);
+          createOp<memref::LoadOp>(PImpl->Builder, Loc, PtrV, ValueRange{Zero});
+      createOp<mlir::LLVM::StoreOp>(PImpl->Builder, Loc, V, Addr);
       return;
     }
 
@@ -1466,7 +1490,7 @@ IRValue *MLIRCodeBuilder::createBitCast(IRValue *V, IRType DestTy) {
     reportFatalError("createBitCast: source and destination must have equal "
                      "non-zero bitwidth");
 
-  mlir::Value Res = PImpl->Builder.create<arith::BitcastOp>(Loc, DstTy, Src);
+  mlir::Value Res = createOp<arith::BitcastOp>(PImpl->Builder, Loc, DstTy, Src);
   return PImpl->wrap(Res);
 }
 IRValue *MLIRCodeBuilder::createZExt(IRValue *V, IRType DestTy) {
@@ -1494,13 +1518,13 @@ IRValue *MLIRCodeBuilder::createZExt(IRValue *V, IRType DestTy) {
     if (DstIntTy.getWidth() <= SrcIntTy.getWidth())
       reportFatalError("createZExt: destination integer must be wider than "
                        "source integer");
-    mlir::Value Res = PImpl->Builder.create<arith::ExtUIOp>(Loc, DstTy, Src);
+    mlir::Value Res = createOp<arith::ExtUIOp>(PImpl->Builder, Loc, DstTy, Src);
     return PImpl->wrap(Res);
   }
 
   if ((SrcIsIndex && DstIsInt) || (SrcIsInt && DstIsIndex)) {
     mlir::Value Res =
-        PImpl->Builder.create<arith::IndexCastUIOp>(Loc, DstTy, Src);
+        createOp<arith::IndexCastUIOp>(PImpl->Builder, Loc, DstTy, Src);
     return PImpl->wrap(Res);
   }
 
@@ -1516,14 +1540,14 @@ VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
   mlir::Value RawIdx = PImpl->unwrap(Index);
   mlir::Value IdxI64;
   if (mlir::isa<mlir::IndexType>(RawIdx.getType())) {
-    IdxI64 = PImpl->Builder.create<arith::IndexCastUIOp>(Loc, I64Ty, RawIdx);
+    IdxI64 = createOp<arith::IndexCastUIOp>(PImpl->Builder, Loc, I64Ty, RawIdx);
   } else if (auto IntTy = dyn_cast<mlir::IntegerType>(RawIdx.getType())) {
     if (IntTy.getWidth() == 64) {
       IdxI64 = RawIdx;
     } else if (IntTy.getWidth() < 64) {
-      IdxI64 = PImpl->Builder.create<arith::ExtUIOp>(Loc, I64Ty, RawIdx);
+      IdxI64 = createOp<arith::ExtUIOp>(PImpl->Builder, Loc, I64Ty, RawIdx);
     } else {
-      IdxI64 = PImpl->Builder.create<arith::TruncIOp>(Loc, I64Ty, RawIdx);
+      IdxI64 = createOp<arith::TruncIOp>(PImpl->Builder, Loc, I64Ty, RawIdx);
     }
   } else {
     reportFatalError("getElementPtr: expected integer-like index");
@@ -1536,7 +1560,7 @@ VarAlloc MLIRCodeBuilder::getElementPtr(IRValue *Base, IRType /*BaseTy*/,
                                         size_t Index, IRType ElemTy) {
   auto Loc = PImpl->Builder.getUnknownLoc();
   mlir::Value IdxI64 =
-      PImpl->Builder.create<arith::ConstantIntOp>(Loc, Index, 64);
+      createOp<arith::ConstantIntOp>(PImpl->Builder, Loc, Index, 64);
   return PImpl->emitElementPtrSlot(Base, IdxI64, ElemTy);
 }
 
@@ -1589,13 +1613,13 @@ IRValue *MLIRCodeBuilder::createCall(const std::string &FName, IRType RetTy,
       reportFatalError("createCall: expected internal device callee");
     if (DeviceInternalCallee.getFunctionType() != FTy)
       reportFatalError("createCall: device callee type mismatch for " + FName);
-    Call = PImpl->Builder.create<func::CallOp>(Loc, FName, FTy.getResults(),
-                                               ValueRange{CallArgs});
+    Call = createOp<func::CallOp>(PImpl->Builder, Loc, FName, FTy.getResults(),
+                                  ValueRange{CallArgs});
   } else {
     auto Callee = PImpl->getOrCreateFunc(FName, FTy);
     (void)Callee;
-    Call = PImpl->Builder.create<func::CallOp>(Loc, FName, FTy.getResults(),
-                                               ValueRange{CallArgs});
+    Call = createOp<func::CallOp>(PImpl->Builder, Loc, FName, FTy.getResults(),
+                                  ValueRange{CallArgs});
   }
 
   if (RetTy.Kind == IRTypeKind::Void)
@@ -1637,45 +1661,52 @@ IRValue *MLIRCodeBuilder::emitIntrinsic(const std::string &Name, IRType RetTy,
   if (Name == "sinf") {
     RequireArgCount(1);
     RequireFloatRetTy();
-    return PImpl->wrap(PImpl->Builder.create<math::SinOp>(Loc, UnwrapArg(0)));
+    return PImpl->wrap(
+        createOp<math::SinOp>(PImpl->Builder, Loc, UnwrapArg(0)));
   }
   if (Name == "cosf") {
     RequireArgCount(1);
     RequireFloatRetTy();
-    return PImpl->wrap(PImpl->Builder.create<math::CosOp>(Loc, UnwrapArg(0)));
+    return PImpl->wrap(
+        createOp<math::CosOp>(PImpl->Builder, Loc, UnwrapArg(0)));
   }
   if (Name == "expf") {
     RequireArgCount(1);
     RequireFloatRetTy();
-    return PImpl->wrap(PImpl->Builder.create<math::ExpOp>(Loc, UnwrapArg(0)));
+    return PImpl->wrap(
+        createOp<math::ExpOp>(PImpl->Builder, Loc, UnwrapArg(0)));
   }
   if (Name == "logf") {
     RequireArgCount(1);
     RequireFloatRetTy();
-    return PImpl->wrap(PImpl->Builder.create<math::LogOp>(Loc, UnwrapArg(0)));
+    return PImpl->wrap(
+        createOp<math::LogOp>(PImpl->Builder, Loc, UnwrapArg(0)));
   }
   if (Name == "sqrtf") {
     RequireArgCount(1);
     RequireFloatRetTy();
-    return PImpl->wrap(PImpl->Builder.create<math::SqrtOp>(Loc, UnwrapArg(0)));
+    return PImpl->wrap(
+        createOp<math::SqrtOp>(PImpl->Builder, Loc, UnwrapArg(0)));
   }
   if (Name == "truncf") {
     RequireArgCount(1);
     RequireFloatRetTy();
-    return PImpl->wrap(PImpl->Builder.create<math::TruncOp>(Loc, UnwrapArg(0)));
+    return PImpl->wrap(
+        createOp<math::TruncOp>(PImpl->Builder, Loc, UnwrapArg(0)));
   }
   if (Name == "powf") {
     RequireArgCount(2);
     RequireFloatRetTy();
-    return PImpl->wrap(
-        PImpl->Builder.create<math::PowFOp>(Loc, UnwrapArg(0), UnwrapArg(1)));
+    return PImpl->wrap(createOp<math::PowFOp>(PImpl->Builder, Loc, UnwrapArg(0),
+                                              UnwrapArg(1)));
   }
   if (Name == "fabsf" || Name == "absf") {
     RequireArgCount(1);
     RequireFloatRetTy();
     auto Arg = UnwrapArg(0);
-    auto Neg = PImpl->Builder.create<arith::NegFOp>(Loc, Arg);
-    return PImpl->wrap(PImpl->Builder.create<arith::MaximumFOp>(Loc, Arg, Neg));
+    auto Neg = createOp<arith::NegFOp>(PImpl->Builder, Loc, Arg);
+    return PImpl->wrap(
+        createOp<arith::MaximumFOp>(PImpl->Builder, Loc, Arg, Neg));
   }
 
   reportFatalError("MLIRCodeBuilder::emitIntrinsic: unsupported intrinsic " +
@@ -1702,19 +1733,21 @@ IRValue *MLIRCodeBuilder::emitBuiltin(const std::string &Name, IRType RetTy,
     auto PtrTy =
         mlir::LLVM::LLVMPointerType::get(&PImpl->Context, ConstantAddressSpace);
 #if LLVM_VERSION_MAJOR >= 20
-    auto Call = PImpl->Builder.create<mlir::LLVM::CallIntrinsicOp>(
-        Loc, PtrTy, PImpl->Builder.getStringAttr("llvm.amdgcn.implicitarg.ptr"),
+    auto Call = createOp<mlir::LLVM::CallIntrinsicOp>(
+        PImpl->Builder, Loc, PtrTy,
+        PImpl->Builder.getStringAttr("llvm.amdgcn.implicitarg.ptr"),
         ValueRange{});
 #else
-    auto Call = PImpl->Builder.create<mlir::LLVM::CallIntrinsicOp>(
-        Loc, TypeRange{PtrTy}, "llvm.amdgcn.implicitarg.ptr", ValueRange{});
+    auto Call = createOp<mlir::LLVM::CallIntrinsicOp>(
+        PImpl->Builder, Loc, TypeRange{PtrTy}, "llvm.amdgcn.implicitarg.ptr",
+        ValueRange{});
 #endif
     return Call.getResult(0);
   };
   auto EmitLLVMConstI64 = [&](int64_t V) -> mlir::Value {
     auto I64Ty = mlir::IntegerType::get(&PImpl->Context, 64);
-    return PImpl->Builder.create<mlir::LLVM::ConstantOp>(
-        Loc, I64Ty, PImpl->Builder.getI64IntegerAttr(V));
+    return createOp<mlir::LLVM::ConstantOp>(
+        PImpl->Builder, Loc, I64Ty, PImpl->Builder.getI64IntegerAttr(V));
   };
   auto EmitImplicitArgLoad = [&](mlir::Type ElemTy,
                                  int64_t Offset) -> mlir::Value {
@@ -1723,16 +1756,17 @@ IRValue *MLIRCodeBuilder::emitBuiltin(const std::string &Name, IRType RetTy,
         mlir::LLVM::LLVMPointerType::get(&PImpl->Context, ConstantAddressSpace);
     mlir::Value ImplicitArgPtr = EmitHipImplicitArgPtr();
     mlir::Value OffsetVal = EmitLLVMConstI64(Offset);
-    auto GEP = PImpl->Builder.create<mlir::LLVM::GEPOp>(
-        Loc, PtrTy, ElemTy, ImplicitArgPtr, ValueRange{OffsetVal});
-    return PImpl->Builder.create<mlir::LLVM::LoadOp>(Loc, ElemTy, GEP);
+    auto GEP =
+        createOp<mlir::LLVM::GEPOp>(PImpl->Builder, Loc, PtrTy, ElemTy,
+                                    ImplicitArgPtr, ValueRange{OffsetVal});
+    return createOp<mlir::LLVM::LoadOp>(PImpl->Builder, Loc, ElemTy, GEP);
   };
   auto CastI32ToRetTy = [&](mlir::Value I32V) -> IRValue * {
     if (RetTy.Kind == IRTypeKind::Int32)
       return PImpl->wrap(I32V);
     if (RetTy.Kind == IRTypeKind::Int64) {
       auto I64Ty = mlir::IntegerType::get(&PImpl->Context, 64);
-      auto Cast = PImpl->Builder.create<arith::ExtUIOp>(Loc, I64Ty, I32V);
+      auto Cast = createOp<arith::ExtUIOp>(PImpl->Builder, Loc, I64Ty, I32V);
       return PImpl->wrap(Cast);
     }
     reportFatalError("MLIRCodeBuilder::emitBuiltin: unsupported return type "
@@ -1745,7 +1779,7 @@ IRValue *MLIRCodeBuilder::emitBuiltin(const std::string &Name, IRType RetTy,
       // boundary to preserve the frontend's integer builtin API.
       auto DstTy = toMLIRType(RetTy, PImpl->Context);
       auto Cast =
-          PImpl->Builder.create<arith::IndexCastUIOp>(Loc, DstTy, IndexV);
+          createOp<arith::IndexCastUIOp>(PImpl->Builder, Loc, DstTy, IndexV);
       return PImpl->wrap(Cast);
     }
     reportFatalError("MLIRCodeBuilder::emitBuiltin: unsupported return type "
@@ -1757,23 +1791,23 @@ IRValue *MLIRCodeBuilder::emitBuiltin(const std::string &Name, IRType RetTy,
   // NVVM/ROCDL intrinsics happens in later conversion passes.
   if (Name == "threadIdx.x")
     return CastIndexToRetTy(
-        PImpl->Builder.create<gpu::ThreadIdOp>(Loc, gpu::Dimension::x));
+        createOp<gpu::ThreadIdOp>(PImpl->Builder, Loc, gpu::Dimension::x));
   if (Name == "threadIdx.y")
     return CastIndexToRetTy(
-        PImpl->Builder.create<gpu::ThreadIdOp>(Loc, gpu::Dimension::y));
+        createOp<gpu::ThreadIdOp>(PImpl->Builder, Loc, gpu::Dimension::y));
   if (Name == "threadIdx.z")
     return CastIndexToRetTy(
-        PImpl->Builder.create<gpu::ThreadIdOp>(Loc, gpu::Dimension::z));
+        createOp<gpu::ThreadIdOp>(PImpl->Builder, Loc, gpu::Dimension::z));
 
   if (Name == "blockIdx.x")
     return CastIndexToRetTy(
-        PImpl->Builder.create<gpu::BlockIdOp>(Loc, gpu::Dimension::x));
+        createOp<gpu::BlockIdOp>(PImpl->Builder, Loc, gpu::Dimension::x));
   if (Name == "blockIdx.y")
     return CastIndexToRetTy(
-        PImpl->Builder.create<gpu::BlockIdOp>(Loc, gpu::Dimension::y));
+        createOp<gpu::BlockIdOp>(PImpl->Builder, Loc, gpu::Dimension::y));
   if (Name == "blockIdx.z")
     return CastIndexToRetTy(
-        PImpl->Builder.create<gpu::BlockIdOp>(Loc, gpu::Dimension::z));
+        createOp<gpu::BlockIdOp>(PImpl->Builder, Loc, gpu::Dimension::z));
 
   // For HIP, avoid lowering block/grid dims via OCKL runtime calls
   // (__ockl_get_local_size/__ockl_get_num_groups). Emit implicitarg loads
@@ -1786,7 +1820,8 @@ IRValue *MLIRCodeBuilder::emitBuiltin(const std::string &Name, IRType RetTy,
       // HIP block dimensions are encoded as i16 in the implicit argument area;
       // zero-extend to i32 to match the frontend builtin contract.
       mlir::Value V16 = EmitImplicitArgLoad(I16Ty, Offset);
-      mlir::Value V32 = PImpl->Builder.create<arith::ExtUIOp>(Loc, I32Ty, V16);
+      mlir::Value V32 =
+          createOp<arith::ExtUIOp>(PImpl->Builder, Loc, I32Ty, V16);
       return CastI32ToRetTy(V32);
     };
     auto EmitGridDim = [&](int64_t Offset) -> IRValue * {
@@ -1812,26 +1847,26 @@ IRValue *MLIRCodeBuilder::emitBuiltin(const std::string &Name, IRType RetTy,
 
   if (Name == "blockDim.x")
     return CastIndexToRetTy(
-        PImpl->Builder.create<gpu::BlockDimOp>(Loc, gpu::Dimension::x));
+        createOp<gpu::BlockDimOp>(PImpl->Builder, Loc, gpu::Dimension::x));
   if (Name == "blockDim.y")
     return CastIndexToRetTy(
-        PImpl->Builder.create<gpu::BlockDimOp>(Loc, gpu::Dimension::y));
+        createOp<gpu::BlockDimOp>(PImpl->Builder, Loc, gpu::Dimension::y));
   if (Name == "blockDim.z")
     return CastIndexToRetTy(
-        PImpl->Builder.create<gpu::BlockDimOp>(Loc, gpu::Dimension::z));
+        createOp<gpu::BlockDimOp>(PImpl->Builder, Loc, gpu::Dimension::z));
 
   if (Name == "gridDim.x")
     return CastIndexToRetTy(
-        PImpl->Builder.create<gpu::GridDimOp>(Loc, gpu::Dimension::x));
+        createOp<gpu::GridDimOp>(PImpl->Builder, Loc, gpu::Dimension::x));
   if (Name == "gridDim.y")
     return CastIndexToRetTy(
-        PImpl->Builder.create<gpu::GridDimOp>(Loc, gpu::Dimension::y));
+        createOp<gpu::GridDimOp>(PImpl->Builder, Loc, gpu::Dimension::y));
   if (Name == "gridDim.z")
     return CastIndexToRetTy(
-        PImpl->Builder.create<gpu::GridDimOp>(Loc, gpu::Dimension::z));
+        createOp<gpu::GridDimOp>(PImpl->Builder, Loc, gpu::Dimension::z));
 
   if (Name == "syncThreads") {
-    PImpl->Builder.create<gpu::BarrierOp>(Loc);
+    createOp<gpu::BarrierOp>(PImpl->Builder, Loc);
     return nullptr;
   }
 
@@ -1846,9 +1881,9 @@ IRValue *MLIRCodeBuilder::loadAddress(IRValue *Slot, IRType /*AllocTy*/) {
     reportFatalError(
         "loadAddress: expected pointer slot (memref<1x!llvm.ptr<...>>)");
 
-  mlir::Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+  mlir::Value Zero = createOp<arith::ConstantIndexOp>(PImpl->Builder, Loc, 0);
   return PImpl->wrap(
-      PImpl->Builder.create<memref::LoadOp>(Loc, SlotV, ValueRange{Zero}));
+      createOp<memref::LoadOp>(PImpl->Builder, Loc, SlotV, ValueRange{Zero}));
 }
 
 void MLIRCodeBuilder::storeAddress(IRValue *Slot, IRValue *Addr) {
@@ -1869,8 +1904,8 @@ void MLIRCodeBuilder::storeAddress(IRValue *Slot, IRValue *Addr) {
   if (auto AddrPtrTy = dyn_cast<mlir::LLVM::LLVMPointerType>(AddrV.getType())) {
     PtrVal = AddrV;
     if (AddrPtrTy.getAddressSpace() != SlotPtrTy.getAddressSpace())
-      PtrVal = PImpl->Builder.create<mlir::LLVM::AddrSpaceCastOp>(
-          Loc, SlotPtrTy, PtrVal);
+      PtrVal = createOp<mlir::LLVM::AddrSpaceCastOp>(PImpl->Builder, Loc,
+                                                     SlotPtrTy, PtrVal);
   } else if (mlir::isa<MemRefType>(AddrV.getType())) {
     // Form a raw pointer value to element 0 of the memref.
     unsigned AddrSpace = 0;
@@ -1881,22 +1916,22 @@ void MLIRCodeBuilder::storeAddress(IRValue *Slot, IRValue *Addr) {
     }
     auto PtrTy = mlir::LLVM::LLVMPointerType::get(&PImpl->Context, AddrSpace);
     mlir::Value BaseAddrAsIndex =
-        PImpl->Builder.create<memref::ExtractAlignedPointerAsIndexOp>(Loc,
-                                                                      AddrV);
-    mlir::Value BaseAddrI64 = PImpl->Builder.create<arith::IndexCastUIOp>(
-        Loc, I64Ty, BaseAddrAsIndex);
-    PtrVal =
-        PImpl->Builder.create<mlir::LLVM::IntToPtrOp>(Loc, PtrTy, BaseAddrI64);
+        createOp<memref::ExtractAlignedPointerAsIndexOp>(PImpl->Builder, Loc,
+                                                         AddrV);
+    mlir::Value BaseAddrI64 = createOp<arith::IndexCastUIOp>(
+        PImpl->Builder, Loc, I64Ty, BaseAddrAsIndex);
+    PtrVal = createOp<mlir::LLVM::IntToPtrOp>(PImpl->Builder, Loc, PtrTy,
+                                              BaseAddrI64);
     if (PtrTy.getAddressSpace() != SlotPtrTy.getAddressSpace())
-      PtrVal = PImpl->Builder.create<mlir::LLVM::AddrSpaceCastOp>(
-          Loc, SlotPtrTy, PtrVal);
+      PtrVal = createOp<mlir::LLVM::AddrSpaceCastOp>(PImpl->Builder, Loc,
+                                                     SlotPtrTy, PtrVal);
   } else {
     reportFatalError("storeAddress: unsupported address value kind");
   }
 
-  mlir::Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-  PImpl->Builder.create<memref::StoreOp>(Loc, PtrVal, LhsSlot,
-                                         ValueRange{Zero});
+  mlir::Value Zero = createOp<arith::ConstantIndexOp>(PImpl->Builder, Loc, 0);
+  createOp<memref::StoreOp>(PImpl->Builder, Loc, PtrVal, LhsSlot,
+                            ValueRange{Zero});
 }
 
 IRValue *MLIRCodeBuilder::createAtomicAdd(IRValue *Addr, IRValue *Val) {
@@ -1908,8 +1943,9 @@ IRValue *MLIRCodeBuilder::createAtomicAdd(IRValue *Addr, IRValue *Val) {
   } else if (auto SlotTy = dyn_cast<MemRefType>(AddrV.getType());
              SlotTy && SlotTy.getRank() == 1 && SlotTy.getShape()[0] == 1 &&
              mlir::isa<mlir::LLVM::LLVMPointerType>(SlotTy.getElementType())) {
-    mlir::Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-    Ptr = PImpl->Builder.create<memref::LoadOp>(Loc, AddrV, ValueRange{Zero});
+    mlir::Value Zero = createOp<arith::ConstantIndexOp>(PImpl->Builder, Loc, 0);
+    Ptr =
+        createOp<memref::LoadOp>(PImpl->Builder, Loc, AddrV, ValueRange{Zero});
   } else {
     reportFatalError("createAtomicAdd: expected !llvm.ptr or "
                      "memref<1x!llvm.ptr> address slot");
@@ -1923,8 +1959,9 @@ IRValue *MLIRCodeBuilder::createAtomicAdd(IRValue *Addr, IRValue *Val) {
   mlir::LLVM::AtomicBinOp BinOp = mlir::isa<mlir::FloatType>(V.getType())
                                       ? mlir::LLVM::AtomicBinOp::fadd
                                       : mlir::LLVM::AtomicBinOp::add;
-  auto Atomic = PImpl->Builder.create<mlir::LLVM::AtomicRMWOp>(
-      Loc, V.getType(), BinOp, Ptr, V, mlir::LLVM::AtomicOrdering::seq_cst,
+  auto Atomic = createOp<mlir::LLVM::AtomicRMWOp>(
+      PImpl->Builder, Loc, V.getType(), BinOp, Ptr, V,
+      mlir::LLVM::AtomicOrdering::seq_cst,
       /*syncscope=*/mlir::StringAttr{}, /*alignment=*/mlir::IntegerAttr{},
       /*volatile_=*/false, /*access_groups=*/mlir::ArrayAttr{},
       /*alias_scopes=*/mlir::ArrayAttr{}, /*noalias_scopes=*/mlir::ArrayAttr{},
@@ -1941,8 +1978,9 @@ IRValue *MLIRCodeBuilder::createAtomicSub(IRValue *Addr, IRValue *Val) {
   } else if (auto SlotTy = dyn_cast<MemRefType>(AddrV.getType());
              SlotTy && SlotTy.getRank() == 1 && SlotTy.getShape()[0] == 1 &&
              mlir::isa<mlir::LLVM::LLVMPointerType>(SlotTy.getElementType())) {
-    mlir::Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-    Ptr = PImpl->Builder.create<memref::LoadOp>(Loc, AddrV, ValueRange{Zero});
+    mlir::Value Zero = createOp<arith::ConstantIndexOp>(PImpl->Builder, Loc, 0);
+    Ptr =
+        createOp<memref::LoadOp>(PImpl->Builder, Loc, AddrV, ValueRange{Zero});
   } else {
     reportFatalError("createAtomicSub: expected !llvm.ptr or "
                      "memref<1x!llvm.ptr> address slot");
@@ -1956,8 +1994,9 @@ IRValue *MLIRCodeBuilder::createAtomicSub(IRValue *Addr, IRValue *Val) {
   mlir::LLVM::AtomicBinOp BinOp = mlir::isa<mlir::FloatType>(V.getType())
                                       ? mlir::LLVM::AtomicBinOp::fsub
                                       : mlir::LLVM::AtomicBinOp::sub;
-  auto Atomic = PImpl->Builder.create<mlir::LLVM::AtomicRMWOp>(
-      Loc, V.getType(), BinOp, Ptr, V, mlir::LLVM::AtomicOrdering::seq_cst,
+  auto Atomic = createOp<mlir::LLVM::AtomicRMWOp>(
+      PImpl->Builder, Loc, V.getType(), BinOp, Ptr, V,
+      mlir::LLVM::AtomicOrdering::seq_cst,
       /*syncscope=*/mlir::StringAttr{}, /*alignment=*/mlir::IntegerAttr{},
       /*volatile_=*/false, /*access_groups=*/mlir::ArrayAttr{},
       /*alias_scopes=*/mlir::ArrayAttr{}, /*noalias_scopes=*/mlir::ArrayAttr{},
@@ -1974,8 +2013,9 @@ IRValue *MLIRCodeBuilder::createAtomicMax(IRValue *Addr, IRValue *Val) {
   } else if (auto SlotTy = dyn_cast<MemRefType>(AddrV.getType());
              SlotTy && SlotTy.getRank() == 1 && SlotTy.getShape()[0] == 1 &&
              mlir::isa<mlir::LLVM::LLVMPointerType>(SlotTy.getElementType())) {
-    mlir::Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-    Ptr = PImpl->Builder.create<memref::LoadOp>(Loc, AddrV, ValueRange{Zero});
+    mlir::Value Zero = createOp<arith::ConstantIndexOp>(PImpl->Builder, Loc, 0);
+    Ptr =
+        createOp<memref::LoadOp>(PImpl->Builder, Loc, AddrV, ValueRange{Zero});
   } else {
     reportFatalError("createAtomicMax: expected !llvm.ptr or "
                      "memref<1x!llvm.ptr> address slot");
@@ -1992,8 +2032,9 @@ IRValue *MLIRCodeBuilder::createAtomicMax(IRValue *Addr, IRValue *Val) {
   else
     BinOp = mlir::LLVM::AtomicBinOp::max;
 
-  auto Atomic = PImpl->Builder.create<mlir::LLVM::AtomicRMWOp>(
-      Loc, V.getType(), BinOp, Ptr, V, mlir::LLVM::AtomicOrdering::seq_cst,
+  auto Atomic = createOp<mlir::LLVM::AtomicRMWOp>(
+      PImpl->Builder, Loc, V.getType(), BinOp, Ptr, V,
+      mlir::LLVM::AtomicOrdering::seq_cst,
       /*syncscope=*/mlir::StringAttr{}, /*alignment=*/mlir::IntegerAttr{},
       /*volatile_=*/false, /*access_groups=*/mlir::ArrayAttr{},
       /*alias_scopes=*/mlir::ArrayAttr{}, /*noalias_scopes=*/mlir::ArrayAttr{},
@@ -2010,8 +2051,9 @@ IRValue *MLIRCodeBuilder::createAtomicMin(IRValue *Addr, IRValue *Val) {
   } else if (auto SlotTy = dyn_cast<MemRefType>(AddrV.getType());
              SlotTy && SlotTy.getRank() == 1 && SlotTy.getShape()[0] == 1 &&
              mlir::isa<mlir::LLVM::LLVMPointerType>(SlotTy.getElementType())) {
-    mlir::Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
-    Ptr = PImpl->Builder.create<memref::LoadOp>(Loc, AddrV, ValueRange{Zero});
+    mlir::Value Zero = createOp<arith::ConstantIndexOp>(PImpl->Builder, Loc, 0);
+    Ptr =
+        createOp<memref::LoadOp>(PImpl->Builder, Loc, AddrV, ValueRange{Zero});
   } else {
     reportFatalError("createAtomicMin: expected !llvm.ptr or "
                      "memref<1x!llvm.ptr> address slot");
@@ -2028,8 +2070,9 @@ IRValue *MLIRCodeBuilder::createAtomicMin(IRValue *Addr, IRValue *Val) {
   else
     BinOp = mlir::LLVM::AtomicBinOp::min;
 
-  auto Atomic = PImpl->Builder.create<mlir::LLVM::AtomicRMWOp>(
-      Loc, V.getType(), BinOp, Ptr, V, mlir::LLVM::AtomicOrdering::seq_cst,
+  auto Atomic = createOp<mlir::LLVM::AtomicRMWOp>(
+      PImpl->Builder, Loc, V.getType(), BinOp, Ptr, V,
+      mlir::LLVM::AtomicOrdering::seq_cst,
       /*syncscope=*/mlir::StringAttr{}, /*alignment=*/mlir::IntegerAttr{},
       /*volatile_=*/false, /*access_groups=*/mlir::ArrayAttr{},
       /*alias_scopes=*/mlir::ArrayAttr{}, /*noalias_scopes=*/mlir::ArrayAttr{},
@@ -2049,15 +2092,15 @@ IRValue *MLIRCodeBuilder::loadFromPointee(IRValue *Slot, IRType /*AllocTy*/,
     reportFatalError(
         "loadFromPointee: expected address slot (memref<1x!llvm.ptr<...>>)");
 
-  mlir::Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+  mlir::Value Zero = createOp<arith::ConstantIndexOp>(PImpl->Builder, Loc, 0);
   mlir::Value PtrVal =
-      PImpl->Builder.create<memref::LoadOp>(Loc, SlotV, ValueRange{Zero});
+      createOp<memref::LoadOp>(PImpl->Builder, Loc, SlotV, ValueRange{Zero});
 
   mlir::Type LoadTy = (ValueTy.Kind == IRTypeKind::Pointer)
                           ? mlir::Type(LLVMPointerTy)
                           : toMLIRScalarType(ValueTy.Kind, PImpl->Context);
   mlir::Value Loaded =
-      PImpl->Builder.create<mlir::LLVM::LoadOp>(Loc, LoadTy, PtrVal);
+      createOp<mlir::LLVM::LoadOp>(PImpl->Builder, Loc, LoadTy, PtrVal);
   return PImpl->wrap(Loaded);
 }
 
@@ -2072,11 +2115,11 @@ void MLIRCodeBuilder::storeToPointee(IRValue *Slot, IRType /*AllocTy*/,
     reportFatalError(
         "storeToPointee: expected address slot (memref<1x!llvm.ptr<...>>)");
 
-  mlir::Value Zero = PImpl->Builder.create<arith::ConstantIndexOp>(Loc, 0);
+  mlir::Value Zero = createOp<arith::ConstantIndexOp>(PImpl->Builder, Loc, 0);
   mlir::Value PtrVal =
-      PImpl->Builder.create<memref::LoadOp>(Loc, SlotV, ValueRange{Zero});
+      createOp<memref::LoadOp>(PImpl->Builder, Loc, SlotV, ValueRange{Zero});
   mlir::Value V = PImpl->unwrap(Val);
-  PImpl->Builder.create<mlir::LLVM::StoreOp>(Loc, V, PtrVal);
+  createOp<mlir::LLVM::StoreOp>(PImpl->Builder, Loc, V, PtrVal);
 }
 
 VarAlloc MLIRCodeBuilder::allocPointer(const std::string & /*Name*/,
@@ -2089,7 +2132,7 @@ VarAlloc MLIRCodeBuilder::allocPointer(const std::string & /*Name*/,
   {
     OpBuilder::InsertionGuard Guard(PImpl->Builder);
     PImpl->Builder.setInsertionPointToStart(PImpl->EntryBlock);
-    PtrSlot = PImpl->Builder.create<memref::AllocaOp>(Loc, PtrSlotTy);
+    PtrSlot = createOp<memref::AllocaOp>(PImpl->Builder, Loc, PtrSlotTy);
   }
   IRType AllocTy{IRTypeKind::Pointer, ElemTy.Signed, 0, ElemTy.Kind};
   return {PImpl->wrap(PtrSlot), ElemTy, AllocTy, AddrSpace};
@@ -2138,8 +2181,8 @@ VarAlloc MLIRCodeBuilder::allocArray(const std::string &Name, AddressSpace AS,
     {
       OpBuilder::InsertionGuard Guard(PImpl->Builder);
       PImpl->Builder.setInsertionPointToStart(PImpl->DeviceModule.getBody());
-      PImpl->Builder.create<memref::GlobalOp>(
-          Loc, UniqueName,
+      createOp<memref::GlobalOp>(
+          PImpl->Builder, Loc, UniqueName,
           /*sym_visibility=*/PImpl->Builder.getStringAttr("private"),
           /*type=*/ArrMemRefTy,
           /*initial_value=*/mlir::UnitAttr::get(&PImpl->Context),
@@ -2147,8 +2190,8 @@ VarAlloc MLIRCodeBuilder::allocArray(const std::string &Name, AddressSpace AS,
           /*alignment=*/mlir::IntegerAttr{});
     }
 
-    mlir::Value Global = PImpl->Builder.create<memref::GetGlobalOp>(
-        Loc, ArrMemRefTy, UniqueName);
+    mlir::Value Global = createOp<memref::GetGlobalOp>(PImpl->Builder, Loc,
+                                                       ArrMemRefTy, UniqueName);
     return {PImpl->wrap(Global), ElemTy, AllocTy, static_cast<unsigned>(AS)};
   }
 
@@ -2156,7 +2199,7 @@ VarAlloc MLIRCodeBuilder::allocArray(const std::string &Name, AddressSpace AS,
   {
     OpBuilder::InsertionGuard Guard(PImpl->Builder);
     PImpl->Builder.setInsertionPointToStart(PImpl->EntryBlock);
-    Alloca = PImpl->Builder.create<memref::AllocaOp>(Loc, ArrMemRefTy);
+    Alloca = createOp<memref::AllocaOp>(PImpl->Builder, Loc, ArrMemRefTy);
   }
   return {PImpl->wrap(Alloca), ElemTy, AllocTy, static_cast<unsigned>(AS)};
 }
