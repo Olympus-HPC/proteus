@@ -10,6 +10,9 @@
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/Intrinsics.h>
+#include <llvm/IR/IntrinsicsAMDGPU.h>
+#include <llvm/IR/IntrinsicsNVPTX.h>
 #include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
 #include <llvm/TargetParser/Host.h>
@@ -29,6 +32,17 @@ bool isCudaDeviceTarget(TargetModelType TM) {
 
 bool isHipDeviceTarget(TargetModelType TM) {
   return TM == TargetModelType::HIP;
+}
+
+void emitVoidIntrinsicCall(LLVMCodeBuilder &CB, Intrinsic::ID IID,
+                           ArrayRef<Value *> Args = {}) {
+  Module &M = CB.getModule();
+#if LLVM_VERSION_MAJOR >= 20
+  Function *Fn = Intrinsic::getOrInsertDeclaration(&M, IID);
+#else
+  Function *Fn = Intrinsic::getDeclaration(&M, IID);
+#endif
+  CB.getIRBuilder().CreateCall(Fn, Args);
 }
 
 IRValue *emitCudaBuiltin(LLVMCodeBuilder &CB, const std::string &Name,
@@ -58,7 +72,15 @@ IRValue *emitCudaBuiltin(LLVMCodeBuilder &CB, const std::string &Name,
   if (Name == "gridDim.z")
     return CB.createCall("llvm.nvvm.read.ptx.sreg.nctaid.z", RetTy);
   if (Name == "syncThreads") {
-    CB.createCall("llvm.nvvm.barrier0", IRType{IRTypeKind::Void});
+#if LLVM_VERSION_MAJOR >= 22
+    // LLVM 22 replaced the legacy zero-arg barrier0 intrinsic with CTA barrier
+    // variants; __syncthreads maps to barrier.cta.sync.aligned.all(0).
+    Value *BarrierId = ConstantInt::get(Type::getInt32Ty(CB.getContext()), 0);
+    emitVoidIntrinsicCall(CB, Intrinsic::nvvm_barrier_cta_sync_aligned_all,
+                          {BarrierId});
+#else
+    emitVoidIntrinsicCall(CB, Intrinsic::nvvm_barrier0);
+#endif
     return nullptr;
   }
 
@@ -127,7 +149,7 @@ IRValue *emitHipBuiltin(LLVMCodeBuilder &CB, const std::string &Name,
   if (Name == "gridDim.z")
     return emitHipGridDimBuiltin(CB, 2);
   if (Name == "syncThreads") {
-    CB.createCall("llvm.amdgcn.s.barrier", IRType{IRTypeKind::Void});
+    emitVoidIntrinsicCall(CB, Intrinsic::amdgcn_s_barrier);
     return nullptr;
   }
 
@@ -641,9 +663,9 @@ IRValue *LLVMCodeBuilder::createAtomicAdd(IRValue *Addr, IRValue *Val) {
   auto Op = LLVMVal->getType()->isFloatingPointTy() ? AtomicRMWInst::FAdd
                                                     : AtomicRMWInst::Add;
 
-  return PImpl->wrap(PImpl->IRB.CreateAtomicRMW(
-      Op, PImpl->unwrap(Addr), LLVMVal, MaybeAlign(),
-      AtomicOrdering::SequentiallyConsistent, SyncScope::SingleThread));
+  return PImpl->wrap(
+      PImpl->IRB.CreateAtomicRMW(Op, PImpl->unwrap(Addr), LLVMVal, MaybeAlign(),
+                                 AtomicOrdering::SequentiallyConsistent));
 }
 
 IRValue *LLVMCodeBuilder::createAtomicSub(IRValue *Addr, IRValue *Val) {
@@ -651,9 +673,9 @@ IRValue *LLVMCodeBuilder::createAtomicSub(IRValue *Addr, IRValue *Val) {
   auto Op = LLVMVal->getType()->isFloatingPointTy() ? AtomicRMWInst::FSub
                                                     : AtomicRMWInst::Sub;
 
-  return PImpl->wrap(PImpl->IRB.CreateAtomicRMW(
-      Op, PImpl->unwrap(Addr), LLVMVal, MaybeAlign(),
-      AtomicOrdering::SequentiallyConsistent, SyncScope::SingleThread));
+  return PImpl->wrap(
+      PImpl->IRB.CreateAtomicRMW(Op, PImpl->unwrap(Addr), LLVMVal, MaybeAlign(),
+                                 AtomicOrdering::SequentiallyConsistent));
 }
 
 IRValue *LLVMCodeBuilder::createAtomicMax(IRValue *Addr, IRValue *Val) {
@@ -661,9 +683,9 @@ IRValue *LLVMCodeBuilder::createAtomicMax(IRValue *Addr, IRValue *Val) {
   auto Op = LLVMVal->getType()->isFloatingPointTy() ? AtomicRMWInst::FMax
                                                     : AtomicRMWInst::Max;
 
-  return PImpl->wrap(PImpl->IRB.CreateAtomicRMW(
-      Op, PImpl->unwrap(Addr), LLVMVal, MaybeAlign(),
-      AtomicOrdering::SequentiallyConsistent, SyncScope::SingleThread));
+  return PImpl->wrap(
+      PImpl->IRB.CreateAtomicRMW(Op, PImpl->unwrap(Addr), LLVMVal, MaybeAlign(),
+                                 AtomicOrdering::SequentiallyConsistent));
 }
 
 IRValue *LLVMCodeBuilder::createAtomicMin(IRValue *Addr, IRValue *Val) {
@@ -671,9 +693,9 @@ IRValue *LLVMCodeBuilder::createAtomicMin(IRValue *Addr, IRValue *Val) {
   auto Op = LLVMVal->getType()->isFloatingPointTy() ? AtomicRMWInst::FMin
                                                     : AtomicRMWInst::Min;
 
-  return PImpl->wrap(PImpl->IRB.CreateAtomicRMW(
-      Op, PImpl->unwrap(Addr), LLVMVal, MaybeAlign(),
-      AtomicOrdering::SequentiallyConsistent, SyncScope::SingleThread));
+  return PImpl->wrap(
+      PImpl->IRB.CreateAtomicRMW(Op, PImpl->unwrap(Addr), LLVMVal, MaybeAlign(),
+                                 AtomicOrdering::SequentiallyConsistent));
 }
 
 // Comparison operations.

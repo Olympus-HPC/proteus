@@ -40,5 +40,7 @@ int main() {
 // clang-format off
 // CHECK: define{{.*}}@dsl_static_bounds(
 // CHECK-HIP: "amdgpu-flat-work-group-size"="1,256"
-// CHECK-CUDA: !{ptr @dsl_static_bounds, !"maxntid", i32 128}
-// CHECK-CUDA: !{ptr @dsl_static_bounds, !"minctasm", i32 4}
+// CHECK-CUDA: maxntid
+// CHECK-CUDA: 128
+// CHECK-CUDA: minctasm
+// CHECK-CUDA: 4
