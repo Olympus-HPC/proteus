@@ -1131,6 +1131,9 @@ void AnnotationHandler::parseJitGlobalAnnotations(
   if (!GlobalAnnotations)
     return;
 
+  if (GlobalAnnotations->getInitializer()->isNullValue())
+    return;
+
   auto *Array = cast<ConstantArray>(GlobalAnnotations->getOperand(0));
   DEBUG(Logger::logs("proteus-pass") << "Annotation Array " << *Array << "\n");
   for (unsigned int I = 0; I < Array->getNumOperands(); I++) {
