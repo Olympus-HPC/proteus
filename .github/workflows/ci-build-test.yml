@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        llvm: [18.1.8, 19.1.7, 20.1.8]
+        llvm: [19.1.7, 20.1.8, 22.1.0]
     defaults:
       run:
         shell: bash -el {0}
@@ -52,12 +52,9 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        llvm: [18.1.8, 19.1.7, 20.1.8]
+        llvm: [19.1.7, 20.1.8, 22.1.0]
         build_shared: [on, off]
         mlir: [on, off]
-        exclude:
-          - llvm: 18.1.8
-            mlir: on
     defaults:
       run:
         shell: bash -el {0}
@@ -107,7 +104,7 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        llvm: [19, 20]
+        llvm: [19, 20, 22]
         build_shared: [on, off]
         mlir: [on, off]
     defaults:

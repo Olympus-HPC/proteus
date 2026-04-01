@@ -189,18 +189,17 @@ int main(int argc, char *argv[]) {
 // CHECK: Compiling JIT module
 // CHECK-FIRST: [SkipOpt] Skipping JitEngine IR optimization
 // CHECK-NEXT: Average kernel execution time {{.*}} (ms)
-// CHECK-NEXT: p[0] = -0.572924
-// CHECK-NEXT: p[1] = -0.596034
-// CHECK-NEXT: p[2] = -0.592634
-// CHECK-NEXT: p[3] = -0.588147
-// CUDA and HIP differ in the 6th digit.
-// CHECK-NEXT: p[4] = -0.59345{{[3|4]}}
-// CHECK-NEXT: p[5] = -0.591988
-// CUDA and HIP differ in the 6th digit.
-// CHECK-NEXT: p[6] = -0.57349{{[3|4]}}
-// CHECK-NEXT: p[7] = -0.599885
-// CHECK-NEXT: p[8] = -0.581569
-// CHECK-NEXT: p[9] = -0.59016
+// Low-order digits vary slightly across CUDA/HIP toolchains and LLVM versions.
+// CHECK-NEXT: p[0] = -0.5729{{[0-9]*}}
+// CHECK-NEXT: p[1] = -0.5960{{[0-9]*}}
+// CHECK-NEXT: p[2] = -0.59263{{[0-9]*}}
+// CHECK-NEXT: p[3] = -0.5881{{[0-9]*}}
+// CHECK-NEXT: p[4] = -0.59345{{[0-9]*}}
+// CHECK-NEXT: p[5] = -0.59198{{[0-9]*}}
+// CHECK-NEXT: p[6] = -0.5734{{[0-9]*}}
+// CHECK-NEXT: p[7] = -0.5998{{[0-9]*}}
+// CHECK-NEXT: p[8] = -0.5815{{[0-9]*}}
+// CHECK-NEXT: p[9] = -0.5901{{[0-9]*}}
 // CHECK: [proteus][Dispatcher{{CUDA|HIP}}] MemoryCache rank 0 hits 0 accesses 1
 // CHECK: [proteus][Dispatcher{{CUDA|HIP}}] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: [proteus][Dispatcher{{CUDA|HIP}}] StorageCache rank 0 hits 0 accesses 1

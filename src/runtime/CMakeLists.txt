@@ -142,6 +142,7 @@ target_link_libraries(proteus PRIVATE ${llvm_libs})
 
 if(PROTEUS_ENABLE_MLIR)
 	set(mlir_libs
+	  MLIRConvertToLLVMPass
 	  MLIRArithToLLVM
 	  MLIRFuncDialect
 	  MLIRFuncToLLVM
