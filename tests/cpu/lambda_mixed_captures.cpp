@@ -1,4 +1,6 @@
+// clang-format off
 // RUN: PROTEUS_AUTO_READONLY_CAPTURES=1 PROTEUS_TRACE_OUTPUT=specialization %build/%exe lambda_mixed_captures 2>&1 | %FILECHECK %s
+// clang-format on
 
 #include <iostream>
 
@@ -12,12 +14,12 @@ int main() {
 
   double X[2] = {0.0, 0.0};
 
-  auto lambda = [=, &X,
-                 A = proteus::jit_variable(A),
-                 C = proteus::jit_variable(C)]() __attribute__((annotate("jit"))) {
-    X[0] = A + B;
-    X[1] = C + D;
-  };
+  auto lambda =
+      [=, &X, A = proteus::jit_variable(A), C = proteus::jit_variable(C)]()
+          __attribute__((annotate("jit"))) {
+            X[0] = A + B;
+            X[1] = C + D;
+          };
 
   proteus::register_lambda(lambda);
   lambda();
