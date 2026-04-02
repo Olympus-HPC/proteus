@@ -418,7 +418,8 @@ public:
   // Helper to find which kernel argument index holds the lambda closure
   int findLambdaArgIndex(JITKernelInfo &, StringRef) {
     // For template kernels like: kernel<LambdaT>(LambdaT lambda)
-    // The lambda is typically the first non-pointer argument after grid/block dims
+    // The lambda is typically the first non-pointer argument after grid/block
+    // dims
     //
     // Implementation options:
     // 1. Parse kernel signature from IR
@@ -468,7 +469,7 @@ public:
 
       // Start with explicit values
       SmallVector<RuntimeConstant> MergedValues(ExplicitValues.begin(),
-                                               ExplicitValues.end());
+                                                ExplicitValues.end());
 
       // Auto-detect if enabled
       if (Config::get().ProteusAutoReadOnlyCaptures) {
@@ -513,8 +514,8 @@ public:
       }
 
       // Append merged values to output
-      LambdaJitValuesVec.insert(LambdaJitValuesVec.end(),
-                                MergedValues.begin(), MergedValues.end());
+      LambdaJitValuesVec.insert(LambdaJitValuesVec.end(), MergedValues.begin(),
+                                MergedValues.end());
     }
   }
 

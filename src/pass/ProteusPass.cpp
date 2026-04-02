@@ -800,7 +800,8 @@ private:
     ArrayType *ArgPtrsTy = ArrayType::get(Types.PtrTy, StubFn->arg_size());
     Value *ArgPtrs = nullptr;
 
-    // Check if this is a lambda function (contains ::operator() in demangled name)
+    // Check if this is a lambda function (contains ::operator() in demangled
+    // name)
     std::string DemangledName = llvm::demangle(StubFn->getName().str());
     bool IsLambda = DemangledName.find("::operator()") != std::string::npos;
 

@@ -111,8 +111,7 @@ bool pointerEscapes(Value *RootPtr) {
 
       // Direct stores through the current pointer mutate the pointee. They do
       // not make the pointer value escape.
-      if (auto *SI = dyn_cast<StoreInst>(U);
-          SI && SI->getPointerOperand() == V)
+      if (auto *SI = dyn_cast<StoreInst>(U); SI && SI->getPointerOperand() == V)
         continue;
 
       PointerUseEffect Effect = classifyPointerUse(U, V);

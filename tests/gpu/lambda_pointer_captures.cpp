@@ -1,4 +1,6 @@
+// clang-format off
 // RUN: PROTEUS_AUTO_READONLY_CAPTURES=1 PROTEUS_TRACE_OUTPUT=specialization %build/lambda_pointer_captures.%ext 2>&1 | %FILECHECK %s
+// clang-format on
 
 #include <iostream>
 
@@ -28,9 +30,8 @@ int main() {
   };
 
   int *PtrOnly = &Scalar;
-  auto lambda2 = [=] __device__ __attribute__((annotate("jit"))) () {
-    (void)PtrOnly;
-  };
+  auto lambda2 = [=] __device__
+      __attribute__((annotate("jit"))) () { (void)PtrOnly; };
 
   proteus::register_lambda(lambda);
   proteus::register_lambda(lambda2);

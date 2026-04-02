@@ -1,4 +1,6 @@
+// clang-format off
 // RUN: PROTEUS_AUTO_READONLY_CAPTURES=1 PROTEUS_TRACE_OUTPUT=specialization %build/lambda_auto_readonly.%ext 2>&1 | %FILECHECK %s
+// clang-format on
 
 #include <iostream>
 

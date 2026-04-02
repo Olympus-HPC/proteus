@@ -1,4 +1,6 @@
+// clang-format off
 // RUN: PROTEUS_AUTO_READONLY_CAPTURES=1 PROTEUS_TRACE_OUTPUT=specialization %build/lambda_mixed_captures.%ext 2>&1 | %FILECHECK %s
+// clang-format on
 
 #include <iostream>
 
@@ -22,10 +24,9 @@ int main() {
   double *X;
   gpuErrCheck(gpuMallocManaged(&X, sizeof(double) * 2));
 
-  auto lambda = [=,
-                 A = proteus::jit_variable(A),
-                 C = proteus::jit_variable(C)] __device__
-      __attribute__((annotate("jit")))() {
+  auto lambda =
+      [=, A = proteus::jit_variable(A), C = proteus::jit_variable(C)] __device__
+      __attribute__((annotate("jit"))) () {
         X[0] = A + B;
         X[1] = C + D;
       };
