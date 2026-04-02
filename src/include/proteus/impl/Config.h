@@ -352,6 +352,7 @@ public:
   std::string ProteusObjectCacheChain;
   bool ProteusEnableTimeTrace;
   std::string ProteusTimeTraceFile;
+  bool ProteusAutoReadOnlyCaptures;
   int ProteusTimeTraceGrainUs;
   int ProteusCommThreadPollMs;
 
@@ -392,6 +393,8 @@ public:
 
     OS << "PROTEUS_USE_STORED_CACHE " << ProteusUseStoredCache << "\n";
     OS << "PROTEUS_CACHE_DIR " << Config::get().ProteusCacheDir << "\n";
+    OS << "PROTEUS_AUTO_READONLY_CAPTURES " << ProteusAutoReadOnlyCaptures
+       << "\n";
 
     OS << PrintOut("Default", GlobalCodeGenConfig) << "\n";
     for (auto &KV : TunedConfigs) {
@@ -427,6 +430,8 @@ private:
         getEnvOrDefaultBool("PROTEUS_ENABLE_TIME_TRACE", false);
     ProteusTimeTraceFile =
         getEnvOrDefaultString("PROTEUS_TIME_TRACE_FILE").value_or("");
+    ProteusAutoReadOnlyCaptures =
+        getEnvOrDefaultBool("PROTEUS_AUTO_READONLY_CAPTURES", true);
     ProteusTimeTraceGrainUs =
         getEnvOrDefaultInt("PROTEUS_TIME_TRACE_GRAIN", 500);
     if (ProteusTimeTraceGrainUs <= 0)

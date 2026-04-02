@@ -7,6 +7,7 @@
 #include "proteus/impl/CoreLLVMDevice.h"
 #include "proteus/impl/Debug.h"
 #include "proteus/impl/Hashing.h"
+#include "proteus/impl/LambdaSpecializationInfo.h"
 #include "proteus/impl/Utils.h"
 
 #include <llvm/Bitcode/BitcodeReader.h>
@@ -25,7 +26,7 @@ private:
   dim3 BlockDim;
   dim3 GridDim;
   SmallVector<RuntimeConstant> RCVec;
-  SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo;
+  SmallVector<ResolvedLambdaSpecializationInfo> LambdaSpecializations;
   std::unordered_map<std::string, GlobalVarInfo> VarNameToGlobalInfo;
   SmallPtrSet<void *, 8> GlobalLinkedBinaries;
   std::string DeviceArch;
@@ -80,14 +81,15 @@ public:
       MemoryBufferRef Bitcode, HashT HashValue, const std::string &KernelName,
       std::string &Suffix, dim3 BlockDim, dim3 GridDim,
       const SmallVector<RuntimeConstant> &RCVec,
-      const SmallVector<std::pair<std::string, StringRef>> &LambdaCalleeInfo,
+      const SmallVector<ResolvedLambdaSpecializationInfo>
+          &LambdaSpecializations,
       const std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo,
       const SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
       const std::string &DeviceArch, const CodeGenerationConfig &CGConfig,
       bool DumpIR, bool RelinkGlobalsByCopy)
       : Bitcode(Bitcode), HashValue(HashValue), KernelName(KernelName),
         Suffix(Suffix), BlockDim(BlockDim), GridDim(GridDim), RCVec(RCVec),
-        LambdaCalleeInfo(LambdaCalleeInfo),
+        LambdaSpecializations(LambdaSpecializations),
         VarNameToGlobalInfo(VarNameToGlobalInfo),
         GlobalLinkedBinaries(GlobalLinkedBinaries), DeviceArch(DeviceArch),
         CGOption(CGConfig.codeGenOption()), DumpIR(DumpIR),
@@ -154,7 +156,7 @@ public:
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".input.ll", *M));
 
     proteus::specializeIR(*M, KernelName, Suffix, BlockDim, GridDim, RCVec,
-                          LambdaCalleeInfo, SpecializeArgs, SpecializeDims,
+                          LambdaSpecializations, SpecializeArgs, SpecializeDims,
                           SpecializeDimsRange, SpecializeLaunchBounds,
                           MinBlocksPerSM);
 
