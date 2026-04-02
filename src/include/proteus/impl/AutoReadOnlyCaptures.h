@@ -8,11 +8,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef PROTEUS_AUTOREADONLYCAPTURES_H
-#define PROTEUS_AUTOREADONLYCAPTURES_H
+#ifndef PROTEUS_IMPL_AUTOREADONLYCAPTURES_H
+#define PROTEUS_IMPL_AUTOREADONLYCAPTURES_H
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/impl/Logger.h"
 
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
@@ -50,10 +52,20 @@ inline bool isSupportedAutoReadOnlyRCType(RuntimeConstantType RCType) {
   }
 }
 
+inline bool containsCaptureForSlot(ArrayRef<RuntimeConstant> Captures,
+                                   int32_t SlotIndex) {
+  for (const auto &RC : Captures) {
+    if (RC.Pos == SlotIndex)
+      return true;
+  }
+
+  return false;
+}
+
 /// Merge auto-detected captures with explicit captures (explicit takes
 /// precedence).
 inline void mergeCaptures(llvm::SmallVectorImpl<RuntimeConstant> &Explicit,
-                          const llvm::SmallVectorImpl<RuntimeConstant> &Auto) {
+                          llvm::ArrayRef<RuntimeConstant> Auto) {
   llvm::SmallSet<int32_t, 16> ExplicitSlots;
   for (const auto &RC : Explicit)
     ExplicitSlots.insert(RC.Pos);
@@ -187,6 +199,39 @@ inline SmallString<128> traceOutAuto(int Slot, const RuntimeConstant &RC) {
 
   OS << "\n";
   return S;
+}
+
+inline llvm::SmallVector<RuntimeConstant>
+resolveLambdaSpecializationValues(ArrayRef<RuntimeConstant> ExplicitValues,
+                                  Function *LambdaFn, const void *LambdaClosure,
+                                  bool EnableAutoReadOnlyCaptures,
+                                  bool TraceSpecializations) {
+  llvm::SmallVector<RuntimeConstant> MergedValues(ExplicitValues.begin(),
+                                                  ExplicitValues.end());
+
+  if (!EnableAutoReadOnlyCaptures || !LambdaFn || !LambdaClosure)
+    return MergedValues;
+
+  auto DetectedCaptures = parseAutoReadOnlyCapturesMetadata(*LambdaFn);
+  if (DetectedCaptures.empty())
+    return MergedValues;
+
+  auto AutoCaptures =
+      extractAutoDetectedCapturesFromMetadata(LambdaClosure, DetectedCaptures);
+  if (AutoCaptures.empty())
+    return MergedValues;
+
+  mergeCaptures(MergedValues, AutoCaptures);
+
+  if (!TraceSpecializations)
+    return MergedValues;
+
+  for (const auto &RC : AutoCaptures) {
+    if (!containsCaptureForSlot(ExplicitValues, RC.Pos))
+      Logger::trace(traceOutAuto(RC.Pos, RC));
+  }
+
+  return MergedValues;
 }
 
 } // namespace proteus

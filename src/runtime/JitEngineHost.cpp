@@ -36,7 +36,7 @@
 
 #include <memory>
 
-#include "proteus/AutoReadOnlyCaptures.h"
+#include "proteus/impl/AutoReadOnlyCaptures.h"
 
 using namespace proteus;
 using namespace llvm;
@@ -150,15 +150,6 @@ void JitEngineHost::specializeIR(
   PROTEUS_DBG(Logger::logs("proteus") << "Metadata jit for F " << F->getName()
                                       << " = " << *Node << "\n");
 
-  // Replace argument uses with runtime constants.
-  SmallVector<int32_t> ArgPos;
-  for (unsigned int I = 0; I < Node->getNumOperands(); ++I) {
-    ConstantAsMetadata *CAM = cast<ConstantAsMetadata>(Node->getOperand(I));
-    ConstantInt *ConstInt = cast<ConstantInt>(CAM->getValue());
-    int ArgNo = ConstInt->getZExtValue();
-    ArgPos.push_back(ArgNo);
-  }
-
   TransformArgumentSpecialization::transform(M, *F, RCArray);
 
   if (!LambdaRegistry::instance().empty()) {
@@ -190,7 +181,6 @@ void getLambdaJitValues(Module &M, StringRef FnName, void **Args,
                                       << "Caller trigger " << FnName << " -> "
                                       << demangle(FnName.str()) << "\n");
 
-  SmallVector<StringRef> LambdaCalleeInfo;
   PROTEUS_DBG(Logger::logs("proteus")
               << " Trying F " << demangle(FnName.str()) << "\n ");
   auto OptionalMapIt = LR.matchJitVariableMap(FnName);
@@ -201,52 +191,15 @@ void getLambdaJitValues(Module &M, StringRef FnName, void **Args,
   const SmallVector<RuntimeConstant> &ExplicitValues =
       OptionalMapIt.value()->getSecond();
 
-  // Start with explicit values
-  SmallVector<RuntimeConstant> MergedValues(ExplicitValues.begin(),
-                                            ExplicitValues.end());
-
-  // Auto-detect if enabled
-  if (Config::get().ProteusAutoReadOnlyCaptures) {
-    Function *F = M.getFunction(FnName);
-    if (F && Args && Args[0]) {
-      // 1. Read pass-emitted capture metadata.
-      auto DetectedCaptures = parseAutoReadOnlyCapturesMetadata(*F);
-
-      if (!DetectedCaptures.empty()) {
-        // 2. Get lambda closure pointer from Args[0].
-        // For host JIT, the lambda closure is passed as the first argument and
-        // Args[0] contains a pointer-to-pointer to the closure due to the ABI.
-        const void *LambdaClosure = *static_cast<const void **>(Args[0]);
-
-        // 3. Extract auto-detected capture values from metadata byte offsets.
-        SmallVector<RuntimeConstant> AutoCaptures =
-            extractAutoDetectedCapturesFromMetadata(LambdaClosure,
-                                                    DetectedCaptures);
-
-        if (!AutoCaptures.empty()) {
-          // 4. Merge (explicit takes precedence).
-          mergeCaptures(MergedValues, AutoCaptures);
-
-          // 5. Trace auto-detected captures.
-          if (Config::get().traceSpecializations()) {
-            for (const auto &RC : AutoCaptures) {
-              bool WasExplicit = false;
-              for (const auto &Explicit : ExplicitValues) {
-                if (Explicit.Pos == RC.Pos) {
-                  WasExplicit = true;
-                  break;
-                }
-              }
-              if (!WasExplicit)
-                Logger::trace(traceOutAuto(RC.Pos, RC));
-            }
-          }
-        }
-      }
-    }
-  }
-
-  LambdaJitValuesVec = MergedValues;
+  Function *LambdaFn = M.getFunction(FnName);
+  // For host JIT, the lambda closure is passed as the first argument and
+  // Args[0] contains a pointer-to-pointer to the closure due to the ABI.
+  const void *LambdaClosure =
+      (Args && Args[0]) ? *static_cast<const void **>(Args[0]) : nullptr;
+  LambdaJitValuesVec = resolveLambdaSpecializationValues(
+      ExplicitValues, LambdaFn, LambdaClosure,
+      Config::get().ProteusAutoReadOnlyCaptures,
+      Config::get().traceSpecializations());
 }
 
 void *

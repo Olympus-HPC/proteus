@@ -1,7 +1,7 @@
 #ifndef PROTEUS_PASS_AUTO_READONLY_CAPTURES_ANALYSIS_H
 #define PROTEUS_PASS_AUTO_READONLY_CAPTURES_ANALYSIS_H
 
-#include "proteus/AutoReadOnlyCaptures.h"
+#include "proteus/impl/AutoReadOnlyCaptures.h"
 
 #include <llvm/ADT/ArrayRef.h>
 #include <llvm/ADT/SmallVector.h>

@@ -11,10 +11,10 @@
 #ifndef PROTEUS_JITENGINEDEVICE_H
 #define PROTEUS_JITENGINEDEVICE_H
 
-#include "proteus/AutoReadOnlyCaptures.h"
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Init.h"
 #include "proteus/TimeTracing.h"
+#include "proteus/impl/AutoReadOnlyCaptures.h"
 #include "proteus/impl/Caching/MemoryCache.h"
 #include "proteus/impl/Caching/ObjectCacheChain.h"
 #include "proteus/impl/Cloning.h"
@@ -732,51 +732,16 @@ public:
       const SmallVector<RuntimeConstant> &ExplicitValues =
           LR.getJitVariables(Info.LambdaType);
 
-      // Start with explicit values
-      SmallVector<RuntimeConstant> MergedValues(ExplicitValues.begin(),
-                                                ExplicitValues.end());
-
-      // Auto-detect if enabled
-      if (Config::get().ProteusAutoReadOnlyCaptures) {
-        Function *LambdaFn = KernelModule.getFunction(Info.CalleeName);
-
-        if (LambdaFn) {
-          // 1. Read pass-emitted capture metadata.
-          auto DetectedCaptures = parseAutoReadOnlyCapturesMetadata(*LambdaFn);
-
-          if (!DetectedCaptures.empty() && KernelArgs &&
-              Info.KernelArgIndex >= 0) {
-            // 2. Get lambda closure pointer from KernelArgs.
-            const void *LambdaClosure =
-                KernelArgs[static_cast<size_t>(Info.KernelArgIndex)];
-
-            // 3. Extract auto-detected capture values from metadata byte
-            // offsets.
-            auto AutoCaptures = extractAutoDetectedCapturesFromMetadata(
-                LambdaClosure, DetectedCaptures);
-
-            // 4. Merge (explicit takes precedence).
-            mergeCaptures(MergedValues, AutoCaptures);
-
-            // 5. Trace auto-detected captures.
-            if (Config::get().traceSpecializations()) {
-              for (const auto &RC : AutoCaptures) {
-                // Only trace if it wasn't already explicit.
-                bool WasExplicit = false;
-                for (const auto &Explicit : ExplicitValues) {
-                  if (Explicit.Pos == RC.Pos) {
-                    WasExplicit = true;
-                    break;
-                  }
-                }
-                if (!WasExplicit) {
-                  Logger::trace(traceOutAuto(RC.Pos, RC));
-                }
-              }
-            }
-          }
-        }
-      }
+      Function *LambdaFn = KernelModule.getFunction(Info.CalleeName);
+      const void *LambdaClosure =
+          (KernelArgs && Info.KernelArgIndex >= 0)
+              ? KernelArgs[static_cast<size_t>(Info.KernelArgIndex)]
+              : nullptr;
+      SmallVector<RuntimeConstant> MergedValues =
+          resolveLambdaSpecializationValues(
+              ExplicitValues, LambdaFn, LambdaClosure,
+              Config::get().ProteusAutoReadOnlyCaptures,
+              Config::get().traceSpecializations());
 
       LambdaSpecializations.push_back(ResolvedLambdaSpecializationInfo{
           Info.CalleeName, std::move(MergedValues)});
