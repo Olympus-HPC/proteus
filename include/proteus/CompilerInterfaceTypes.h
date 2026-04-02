@@ -73,7 +73,7 @@ struct RuntimeConstant {
   RuntimeConstantValue Value;
   RuntimeConstantType Type;
   int32_t Pos;
-  int32_t Offset;
+  int32_t Offset = 0;
 
   ArrayInfo ArrInfo{0, RuntimeConstantType::NONE, nullptr};
   ObjectInfo ObjInfo{0, false, nullptr};

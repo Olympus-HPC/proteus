@@ -1,5 +1,5 @@
 // clang-format off
-// RUN: PROTEUS_AUTO_READONLY_CAPTURES=1 PROTEUS_TRACE_OUTPUT=specialization %build/lambda_pointer_captures.%ext 2>&1 | %FILECHECK %s
+// RUN: PROTEUS_AUTO_READONLY_CAPTURES=1 PROTEUS_TRACE_OUTPUT=specialization %build/lambda_nested_captures.%ext 2>&1 | %FILECHECK %s
 // clang-format on
 
 #include <iostream>
@@ -7,6 +7,11 @@
 #include "proteus/JitInterface.h"
 
 #include "gpu_common.h"
+
+struct Payload {
+  int A;
+  double B;
+};
 
 template <typename T>
 __global__ __attribute__((annotate("jit"))) void kernel(T LB) {
@@ -16,28 +21,18 @@ __global__ __attribute__((annotate("jit"))) void kernel(T LB) {
 }
 
 int main() {
-  int Scalar = 42;
-  int *Ptr = &Scalar;
-  double Value = 3.14;
+  Payload P{42, 3.14};
 
   double *X;
   gpuErrCheck(gpuMallocManaged(&X, sizeof(double) * 2));
 
   auto lambda = [=] __device__ __attribute__((annotate("jit"))) () {
-    X[0] = Scalar;
-    X[1] = Value;
-    (void)Ptr;
+    X[0] = P.A;
+    X[1] = P.B;
   };
 
-  int *PtrOnly = &Scalar;
-  auto lambda2 = [=] __device__
-      __attribute__((annotate("jit"))) () { (void)PtrOnly; };
-
   proteus::register_lambda(lambda);
-  proteus::register_lambda(lambda2);
-
   kernel<<<1, 1>>>(lambda);
-  kernel<<<1, 1>>>(lambda2);
   gpuErrCheck(gpuDeviceSynchronize());
 
   std::cout << "x[0] = " << X[0] << "\n";

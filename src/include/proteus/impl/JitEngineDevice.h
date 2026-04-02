@@ -26,9 +26,12 @@
 #include "proteus/impl/Hashing.h"
 #include "proteus/impl/JitEngine.h"
 #include "proteus/impl/JitEngineInfoRegistry.h"
+#include "proteus/impl/LambdaRegistry.h"
+#include "proteus/impl/LambdaSpecializationInfo.h"
 #include "proteus/impl/Utils.h"
 
 #include <llvm/ADT/SmallPtrSet.h>
+#include <llvm/ADT/SmallSet.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Analysis/CallGraph.h>
@@ -43,6 +46,7 @@
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/IntrinsicInst.h>
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
@@ -230,8 +234,7 @@ class JITKernelInfo {
   std::optional<std::unique_ptr<MemoryBuffer>> Bitcode;
   std::optional<std::reference_wrapper<BinaryInfo>> BinInfo;
   std::optional<HashT> StaticHash;
-  std::optional<SmallVector<std::pair<std::string, StringRef>>>
-      LambdaCalleeInfo;
+  std::optional<SmallVector<proteus::LambdaCalleeInfo>> CachedLambdaCalleeInfo;
 
 public:
   JITKernelInfo(void *Kernel, BinaryInfo &BinInfo, char const *Name,
@@ -239,7 +242,7 @@ public:
       : Kernel(Kernel), Ctx(std::make_unique<LLVMContext>()), Name(Name),
         RCInfoArray(RCInfoArray), ExtractedModule(std::nullopt),
         Bitcode{std::nullopt}, BinInfo(BinInfo),
-        LambdaCalleeInfo(std::nullopt) {}
+        CachedLambdaCalleeInfo(std::nullopt) {}
 
   JITKernelInfo() = default;
   void *getKernel() const {
@@ -269,11 +272,11 @@ public:
     StaticHash = hashCombine(StaticHash.value(), ModuleHash);
   }
 
-  bool hasLambdaCalleeInfo() { return LambdaCalleeInfo.has_value(); }
-  const auto &getLambdaCalleeInfo() { return LambdaCalleeInfo.value(); }
-  void setLambdaCalleeInfo(
-      SmallVector<std::pair<std::string, StringRef>> &&LambdaInfo) {
-    LambdaCalleeInfo = std::move(LambdaInfo);
+  bool hasLambdaCalleeInfo() { return CachedLambdaCalleeInfo.has_value(); }
+  const auto &getLambdaCalleeInfo() { return CachedLambdaCalleeInfo.value(); }
+  void
+  setLambdaCalleeInfo(SmallVector<proteus::LambdaCalleeInfo> &&LambdaInfo) {
+    CachedLambdaCalleeInfo = std::move(LambdaInfo);
   }
 };
 
@@ -415,26 +418,297 @@ public:
     return KernelInfo.getBitcode();
   }
 
-  // Helper to find which kernel argument index holds the lambda closure
-  int findLambdaArgIndex(JITKernelInfo &, StringRef) {
-    // For template kernels like: kernel<LambdaT>(LambdaT lambda)
-    // The lambda is typically the first non-pointer argument after grid/block
-    // dims
-    //
-    // Implementation options:
-    // 1. Parse kernel signature from IR
-    // 2. Store arg index in LambdaCalleeInfo when matching
-    // 3. Convention: lambda is always at a specific position
-
-    // For now, assume lambda is at arg index 0 for simple kernels
-    // TODO: Enhance LambdaCalleeInfo to track argument index
-    return 0;
+  std::optional<unsigned> mergeKernelArgIndex(std::optional<unsigned> Current,
+                                              std::optional<unsigned> Candidate,
+                                              bool &HasAmbiguity) const {
+    if (!Candidate)
+      return Current;
+    if (!Current)
+      return Candidate;
+    if (*Current != *Candidate)
+      HasAmbiguity = true;
+    return Current;
   }
 
-  void getLambdaJitValues(JITKernelInfo &KernelInfo,
-                          SmallVector<RuntimeConstant> &LambdaJitValuesVec,
-                          void **KernelArgs) {
-    TIMESCOPE(JitEngineDevice, getLambdaJitValues);
+  std::optional<unsigned> matchKernelArgIndexByType(Function &KernelFn,
+                                                    Type *ClosureTy) const {
+    if (!ClosureTy)
+      return std::nullopt;
+
+    std::optional<unsigned> Result;
+    bool HasAmbiguity = false;
+    for (Argument &Arg : KernelFn.args()) {
+      Type *KernelArgTy = Arg.getParamByRefType();
+      if (!KernelArgTy)
+        KernelArgTy = Arg.getParamByValType();
+      if (KernelArgTy != ClosureTy)
+        continue;
+
+      Result = mergeKernelArgIndex(Result, Arg.getArgNo(), HasAmbiguity);
+      if (HasAmbiguity)
+        return std::nullopt;
+    }
+
+    return Result;
+  }
+
+  std::optional<Type *>
+  findClosureStorageType(Value *V, SmallPtrSetImpl<Value *> &Seen) const {
+    if (!V)
+      return std::nullopt;
+    if (!Seen.insert(V).second)
+      return std::nullopt;
+
+    if (auto *AI = dyn_cast<AllocaInst>(V))
+      return AI->getAllocatedType();
+
+    if (auto *Arg = dyn_cast<Argument>(V)) {
+      if (Type *Ty = Arg->getParamByRefType())
+        return Ty;
+      if (Type *Ty = Arg->getParamByValType())
+        return Ty;
+      return std::nullopt;
+    }
+
+    if (auto *BC = dyn_cast<BitCastInst>(V))
+      return findClosureStorageType(BC->getOperand(0), Seen);
+
+    if (auto *ASC = dyn_cast<AddrSpaceCastInst>(V))
+      return findClosureStorageType(ASC->getOperand(0), Seen);
+
+    if (auto *LI = dyn_cast<LoadInst>(V))
+      return findClosureStorageType(LI->getPointerOperand(), Seen);
+
+    if (auto *GEP = dyn_cast<GetElementPtrInst>(V))
+      return findClosureStorageType(GEP->getPointerOperand(), Seen);
+
+    if (auto *PN = dyn_cast<PHINode>(V)) {
+      std::optional<Type *> Result;
+      for (Value *Incoming : PN->incoming_values()) {
+        auto Candidate = findClosureStorageType(Incoming, Seen);
+        if (!Candidate)
+          continue;
+        if (!Result) {
+          Result = Candidate;
+          continue;
+        }
+        if (*Result != *Candidate)
+          return std::nullopt;
+      }
+      return Result;
+    }
+
+    if (auto *SI = dyn_cast<SelectInst>(V)) {
+      auto TrueTy = findClosureStorageType(SI->getTrueValue(), Seen);
+      auto FalseTy = findClosureStorageType(SI->getFalseValue(), Seen);
+      if (!TrueTy)
+        return FalseTy;
+      if (!FalseTy)
+        return TrueTy;
+      if (*TrueTy != *FalseTy)
+        return std::nullopt;
+      return TrueTy;
+    }
+
+    return std::nullopt;
+  }
+
+  std::optional<unsigned>
+  traceStoredKernelArgIndex(Function &KernelFn, Value *Ptr,
+                            SmallPtrSetImpl<Value *> &SeenPointers) const {
+    if (!SeenPointers.insert(Ptr).second)
+      return std::nullopt;
+
+    std::optional<unsigned> Result;
+    bool HasAmbiguity = false;
+    auto MergeCandidate = [&](Value *Candidate) {
+      if (!Candidate)
+        return;
+
+      SmallPtrSet<Value *, 32> CandidateSeenValues;
+      SmallPtrSet<Function *, 8> CandidateSeenFunctions;
+      auto CandidateIndex =
+          traceKernelArgIndex(KernelFn, Candidate->stripPointerCasts(),
+                              CandidateSeenValues, CandidateSeenFunctions);
+      Result = mergeKernelArgIndex(Result, CandidateIndex, HasAmbiguity);
+    };
+
+    for (User *User : Ptr->users()) {
+      if (auto *MemCpy = dyn_cast<MemCpyInst>(User)) {
+        if (MemCpy->getDest() == Ptr)
+          MergeCandidate(MemCpy->getSource());
+        continue;
+      }
+
+      if (auto *SI = dyn_cast<StoreInst>(User)) {
+        if (SI->getPointerOperand() == Ptr)
+          MergeCandidate(SI->getValueOperand());
+        continue;
+      }
+
+      if (isa<BitCastInst>(User) || isa<AddrSpaceCastInst>(User) ||
+          isa<GetElementPtrInst>(User) || isa<PHINode>(User) ||
+          isa<SelectInst>(User)) {
+        auto Candidate = traceStoredKernelArgIndex(KernelFn, cast<Value>(User),
+                                                   SeenPointers);
+        Result = mergeKernelArgIndex(Result, Candidate, HasAmbiguity);
+      }
+
+      if (HasAmbiguity)
+        return std::nullopt;
+    }
+
+    return Result;
+  }
+
+  std::optional<unsigned>
+  traceKernelArgIndex(Function &KernelFn, Value *V,
+                      SmallPtrSetImpl<Value *> &SeenValues,
+                      SmallPtrSetImpl<Function *> &SeenFunctions) const {
+    if (!V)
+      return std::nullopt;
+
+    if (!SeenValues.insert(V).second)
+      return std::nullopt;
+
+    if (auto *BC = dyn_cast<BitCastInst>(V))
+      return traceKernelArgIndex(KernelFn, BC->getOperand(0), SeenValues,
+                                 SeenFunctions);
+
+    if (auto *ASC = dyn_cast<AddrSpaceCastInst>(V))
+      return traceKernelArgIndex(KernelFn, ASC->getOperand(0), SeenValues,
+                                 SeenFunctions);
+
+    if (auto *LI = dyn_cast<LoadInst>(V))
+      return traceKernelArgIndex(KernelFn, LI->getPointerOperand(), SeenValues,
+                                 SeenFunctions);
+
+    if (auto *Arg = dyn_cast<Argument>(V)) {
+      if (Arg->getParent() == &KernelFn)
+        return Arg->getArgNo();
+
+      Function *ParentFn = Arg->getParent();
+      if (!SeenFunctions.insert(ParentFn).second)
+        return std::nullopt;
+
+      std::optional<unsigned> Result;
+      bool HasAmbiguity = false;
+      for (User *User : ParentFn->users()) {
+        auto *CB = dyn_cast<CallBase>(User);
+        if (!CB)
+          continue;
+        if (CB->getCalledOperand()->stripPointerCasts() != ParentFn)
+          continue;
+        if (Arg->getArgNo() >= CB->arg_size())
+          continue;
+
+        auto Candidate =
+            traceKernelArgIndex(KernelFn, CB->getArgOperand(Arg->getArgNo()),
+                                SeenValues, SeenFunctions);
+        Result = mergeKernelArgIndex(Result, Candidate, HasAmbiguity);
+        if (HasAmbiguity)
+          return std::nullopt;
+      }
+
+      return Result;
+    }
+
+    if (auto *AI = dyn_cast<AllocaInst>(V)) {
+      SmallPtrSet<Value *, 16> SeenPointers;
+      return traceStoredKernelArgIndex(KernelFn, AI, SeenPointers);
+    }
+
+    if (auto *GEP = dyn_cast<GetElementPtrInst>(V))
+      return traceKernelArgIndex(KernelFn, GEP->getPointerOperand(), SeenValues,
+                                 SeenFunctions);
+
+    if (auto *PN = dyn_cast<PHINode>(V)) {
+      std::optional<unsigned> Result;
+      bool HasAmbiguity = false;
+      for (Value *Incoming : PN->incoming_values()) {
+        auto Candidate =
+            traceKernelArgIndex(KernelFn, Incoming, SeenValues, SeenFunctions);
+        Result = mergeKernelArgIndex(Result, Candidate, HasAmbiguity);
+        if (HasAmbiguity)
+          return std::nullopt;
+      }
+      return Result;
+    }
+
+    if (auto *SI = dyn_cast<SelectInst>(V)) {
+      auto TrueCandidate = traceKernelArgIndex(KernelFn, SI->getTrueValue(),
+                                               SeenValues, SeenFunctions);
+      bool HasAmbiguity = false;
+      auto Result =
+          mergeKernelArgIndex(std::nullopt, TrueCandidate, HasAmbiguity);
+      auto FalseCandidate = traceKernelArgIndex(KernelFn, SI->getFalseValue(),
+                                                SeenValues, SeenFunctions);
+      Result = mergeKernelArgIndex(Result, FalseCandidate, HasAmbiguity);
+      if (HasAmbiguity)
+        return std::nullopt;
+      return Result;
+    }
+
+    return std::nullopt;
+  }
+
+  SmallVector<LambdaCalleeInfo>
+  discoverLambdaCalleeInfo(JITKernelInfo &KernelInfo, Module &KernelModule) {
+    Function *KernelFn = KernelModule.getFunction(KernelInfo.getName());
+    if (!KernelFn)
+      reportFatalError("Expected non-null kernel function");
+
+    SmallVector<LambdaCalleeInfo> LambdaInfo;
+    for (auto &F : KernelModule.getFunctionList()) {
+      PROTEUS_DBG(Logger::logs("proteus")
+                  << " Trying F " << demangle(F.getName().str()) << "\n ");
+      auto OptionalMapIt =
+          LambdaRegistry::instance().matchJitVariableMap(F.getName());
+      if (!OptionalMapIt)
+        continue;
+
+      std::optional<unsigned> KernelArgIndex;
+      bool HasAmbiguity = false;
+      for (User *User : F.users()) {
+        auto *CB = dyn_cast<CallBase>(User);
+        if (!CB)
+          continue;
+        if (CB->getCalledOperand()->stripPointerCasts() != &F)
+          continue;
+        if (CB->arg_empty())
+          continue;
+
+        SmallPtrSet<Value *, 32> SeenValues;
+        SmallPtrSet<Function *, 8> SeenFunctions;
+        auto Candidate = traceKernelArgIndex(*KernelFn, CB->getArgOperand(0),
+                                             SeenValues, SeenFunctions);
+        if (!Candidate) {
+          SmallPtrSet<Value *, 16> SeenTypes;
+          auto ClosureTy =
+              findClosureStorageType(CB->getArgOperand(0), SeenTypes);
+          Candidate =
+              matchKernelArgIndexByType(*KernelFn, ClosureTy.value_or(nullptr));
+        }
+        KernelArgIndex =
+            mergeKernelArgIndex(KernelArgIndex, Candidate, HasAmbiguity);
+        if (HasAmbiguity)
+          break;
+      }
+
+      LambdaCalleeInfo Info{
+          F.getName().str(), OptionalMapIt.value()->first.str(),
+          KernelArgIndex ? static_cast<int32_t>(*KernelArgIndex) : -1};
+      LambdaInfo.push_back(std::move(Info));
+    }
+
+    return LambdaInfo;
+  }
+
+  void resolveLambdaSpecializations(
+      JITKernelInfo &KernelInfo,
+      SmallVector<ResolvedLambdaSpecializationInfo> &LambdaSpecializations,
+      void **KernelArgs) {
+    TIMESCOPE(JitEngineDevice, resolveLambdaSpecializations);
     LambdaRegistry &LR = LambdaRegistry::instance();
     if (LR.empty()) {
       KernelInfo.setLambdaCalleeInfo({});
@@ -448,24 +722,15 @@ public:
                   << "Caller trigger " << KernelInfo.getName() << " -> "
                   << demangle(KernelInfo.getName()) << "\n");
 
-      SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo;
-      for (auto &F : KernelModule.getFunctionList()) {
-        PROTEUS_DBG(Logger::logs("proteus")
-                    << " Trying F " << demangle(F.getName().str()) << "\n ");
-        auto OptionalMapIt =
-            LambdaRegistry::instance().matchJitVariableMap(F.getName());
-        if (OptionalMapIt)
-          LambdaCalleeInfo.emplace_back(F.getName(),
-                                        OptionalMapIt.value()->first);
-      }
-
-      KernelInfo.setLambdaCalleeInfo(std::move(LambdaCalleeInfo));
+      KernelInfo.setLambdaCalleeInfo(
+          discoverLambdaCalleeInfo(KernelInfo, KernelModule));
     }
 
-    for (auto &[FnName, LambdaType] : KernelInfo.getLambdaCalleeInfo()) {
+    Module &KernelModule = getModule(KernelInfo);
+    for (const auto &Info : KernelInfo.getLambdaCalleeInfo()) {
       // Get explicit jit_variable captures
       const SmallVector<RuntimeConstant> &ExplicitValues =
-          LR.getJitVariables(LambdaType);
+          LR.getJitVariables(Info.LambdaType);
 
       // Start with explicit values
       SmallVector<RuntimeConstant> MergedValues(ExplicitValues.begin(),
@@ -473,17 +738,17 @@ public:
 
       // Auto-detect if enabled
       if (Config::get().ProteusAutoReadOnlyCaptures) {
-        Module &KernelModule = getModule(KernelInfo);
-        Function *LambdaFn = KernelModule.getFunction(FnName);
+        Function *LambdaFn = KernelModule.getFunction(Info.CalleeName);
 
         if (LambdaFn) {
           // 1. Read pass-emitted capture metadata.
           auto DetectedCaptures = parseAutoReadOnlyCapturesMetadata(*LambdaFn);
 
-          if (!DetectedCaptures.empty()) {
+          if (!DetectedCaptures.empty() && KernelArgs &&
+              Info.KernelArgIndex >= 0) {
             // 2. Get lambda closure pointer from KernelArgs.
-            int LambdaArgIndex = findLambdaArgIndex(KernelInfo, FnName);
-            const void *LambdaClosure = KernelArgs[LambdaArgIndex];
+            const void *LambdaClosure =
+                KernelArgs[static_cast<size_t>(Info.KernelArgIndex)];
 
             // 3. Extract auto-detected capture values from metadata byte
             // offsets.
@@ -513,9 +778,8 @@ public:
         }
       }
 
-      // Append merged values to output
-      LambdaJitValuesVec.insert(LambdaJitValuesVec.end(), MergedValues.begin(),
-                                MergedValues.end());
+      LambdaSpecializations.push_back(ResolvedLambdaSpecializationInfo{
+          Info.CalleeName, std::move(MergedValues)});
     }
   }
 
@@ -643,13 +907,15 @@ JitEngineDevice<ImplT>::compileAndRun(
   SmallVector<RuntimeConstant> RCVec =
       getRuntimeConstantValues(KernelArgs, KernelInfo.getRCInfoArray());
 
-  SmallVector<RuntimeConstant> LambdaJitValuesVec;
-  getLambdaJitValues(KernelInfo, LambdaJitValuesVec, KernelArgs);
+  SmallVector<ResolvedLambdaSpecializationInfo> LambdaSpecializations;
+  resolveLambdaSpecializations(KernelInfo, LambdaSpecializations, KernelArgs);
   // Determine the hash based on dimension specialization.  If we do not
   // specialize IR based on grid dimensions, avoid hashing on those to
   // eliminate repeated compilation overhead.
-  HashT HashValue = hash(getStaticHash(KernelInfo), RCVec, LambdaJitValuesVec,
-                         BlockDim.x, BlockDim.y, BlockDim.z);
+  HashT HashValue =
+      hash(getStaticHash(KernelInfo), RCVec,
+           ArrayRef<ResolvedLambdaSpecializationInfo>{LambdaSpecializations},
+           BlockDim.x, BlockDim.y, BlockDim.z);
   if (Config::get().getCGConfig().specializeDims() ||
       Config::get().getCGConfig().specializeDimsRange())
     HashValue = hash(HashValue, GridDim.x, GridDim.y, GridDim.z);
@@ -698,7 +964,7 @@ JitEngineDevice<ImplT>::compileAndRun(
 
       AsyncCompiler->compile(CompilationTask{
           KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
-          GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(),
+          GridDim, RCVec, LambdaSpecializations,
           BinInfo.getVarNameToGlobalInfo(), GlobalLinkedBinaries, DeviceArch,
           /*CodeGenConfig */ Config::get().getCGConfig(KernelInfo.getName()),
           /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
@@ -718,8 +984,8 @@ JitEngineDevice<ImplT>::compileAndRun(
     // Process through synchronous compilation.
     ObjBuf = CompilerSync::instance().compile(CompilationTask{
         KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
-        GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(),
-        BinInfo.getVarNameToGlobalInfo(), GlobalLinkedBinaries, DeviceArch,
+        GridDim, RCVec, LambdaSpecializations, BinInfo.getVarNameToGlobalInfo(),
+        GlobalLinkedBinaries, DeviceArch,
         /*CodeGenConfig */ Config::get().getCGConfig(KernelInfo.getName()),
         /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
         /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy});

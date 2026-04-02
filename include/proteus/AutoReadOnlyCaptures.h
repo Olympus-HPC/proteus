@@ -64,10 +64,12 @@ inline void mergeCaptures(llvm::SmallVectorImpl<RuntimeConstant> &Explicit,
   }
 }
 
-inline RuntimeConstant readValueFromMemory(const void *Ptr,
-                                           RuntimeConstantType RCType,
-                                           int32_t SlotIndex) {
-  RuntimeConstant RC(RuntimeConstantType::NONE, SlotIndex);
+inline RuntimeConstant
+readValueFromMemory(const void *Ptr,
+                    const AutoReadOnlyCaptureMetadataEntry &Capture) {
+  RuntimeConstant RC(RuntimeConstantType::NONE, Capture.SlotIndex,
+                     Capture.ByteOffset);
+  RuntimeConstantType RCType = Capture.RCType;
 
   if (RCType == RuntimeConstantType::BOOL) {
     RC.Type = RuntimeConstantType::BOOL;
@@ -144,8 +146,8 @@ extractAutoDetectedCapturesFromMetadata(
 
   const char *ClosureBytes = static_cast<const char *>(LambdaClosure);
   for (const auto &Cap : DetectedCaptures) {
-    RuntimeConstant RC = readValueFromMemory(ClosureBytes + Cap.ByteOffset,
-                                             Cap.RCType, Cap.SlotIndex);
+    RuntimeConstant RC =
+        readValueFromMemory(ClosureBytes + Cap.ByteOffset, Cap);
     if (RC.Type == RuntimeConstantType::NONE)
       continue;
     Result.push_back(RC);

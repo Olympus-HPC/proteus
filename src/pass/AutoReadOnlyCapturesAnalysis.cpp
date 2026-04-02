@@ -1,5 +1,8 @@
 #include "AutoReadOnlyCapturesAnalysis.h"
 
+#include "proteus/impl/RuntimeConstantTypeHelpers.h"
+
+#include <llvm/ADT/APInt.h>
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/SmallPtrSet.h>
@@ -12,6 +15,7 @@
 #include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
 
+#include <limits>
 #include <optional>
 
 #include <cassert>
@@ -42,29 +46,60 @@ enum class PointerUseEffect {
   WriteOrEscape,
 };
 
-RuntimeConstantType classifySupportedScalar(Type *Ty) {
-  if (auto *IT = dyn_cast<IntegerType>(Ty)) {
-    switch (IT->getBitWidth()) {
-    case 1:
-      return RuntimeConstantType::BOOL;
-    case 8:
-      return RuntimeConstantType::INT8;
-    case 32:
-      return RuntimeConstantType::INT32;
-    case 64:
-      return RuntimeConstantType::INT64;
-    default:
-      return RuntimeConstantType::NONE;
-    }
+std::optional<RuntimeConstantType> classifySupportedScalar(Type *Ty) {
+  if (!(Ty->isIntegerTy(1) || Ty->isIntegerTy(8) || Ty->isIntegerTy(32) ||
+        Ty->isIntegerTy(64) || Ty->isFloatTy() || Ty->isDoubleTy())) {
+    return std::nullopt;
   }
 
-  if (Ty->isFloatTy())
-    return RuntimeConstantType::FLOAT;
+  RuntimeConstantType RCType = convertTypeToRuntimeConstantType(Ty);
+  if (!isSupportedAutoReadOnlyRCType(RCType))
+    return std::nullopt;
+  return RCType;
+}
 
-  if (Ty->isDoubleTy())
-    return RuntimeConstantType::DOUBLE;
+std::optional<int32_t> getGEPByteOffset(Function &F, GetElementPtrInst *GEP) {
+  const DataLayout &DL = F.getParent()->getDataLayout();
+  APInt Offset(DL.getPointerTypeSizeInBits(GEP->getType()), 0, true);
+  if (!GEP->accumulateConstantOffset(DL, Offset))
+    return std::nullopt;
 
-  return RuntimeConstantType::NONE;
+  int64_t ByteOffset64 = Offset.getSExtValue();
+  if (ByteOffset64 < 0 || ByteOffset64 > std::numeric_limits<int32_t>::max())
+    return std::nullopt;
+
+  return static_cast<int32_t>(ByteOffset64);
+}
+
+std::optional<int32_t> getTopLevelSlotIndex(Argument *ClosureArg,
+                                            Value *BasePtr,
+                                            GetElementPtrInst *GEP) {
+  if (BasePtr != ClosureArg || GEP->getNumIndices() != 2)
+    return std::nullopt;
+
+  auto *SourceStruct = dyn_cast<StructType>(GEP->getSourceElementType());
+  if (!SourceStruct)
+    return std::nullopt;
+
+  auto *SlotIdxConst = dyn_cast<ConstantInt>(GEP->getOperand(2));
+  if (!SlotIdxConst)
+    return std::nullopt;
+
+  int64_t SlotIdx64 = SlotIdxConst->getSExtValue();
+  if (SlotIdx64 < 0)
+    return std::nullopt;
+
+  int32_t SlotIndex = static_cast<int32_t>(SlotIdx64);
+  if (static_cast<int64_t>(SlotIndex) != SlotIdx64)
+    return std::nullopt;
+
+  if (static_cast<unsigned>(SlotIndex) >= SourceStruct->getNumElements())
+    return std::nullopt;
+
+  if (!classifySupportedScalar(GEP->getResultElementType()))
+    return std::nullopt;
+
+  return SlotIndex;
 }
 
 PointerUseEffect classifyPointerUse(User *U, Value *Ptr) {
@@ -131,63 +166,13 @@ bool pointerEscapes(Value *RootPtr) {
   return false;
 }
 
-std::optional<ParsedCaptureAccess> parseGEPAccess(Function &F,
-                                                  GetElementPtrInst *GEP) {
-  if (GEP->getNumIndices() >= 2) {
-    auto *SourceStruct = dyn_cast<StructType>(GEP->getSourceElementType());
-    if (!SourceStruct)
-      return std::nullopt;
-
-    auto *SlotIdxConst = dyn_cast<ConstantInt>(GEP->getOperand(2));
-    if (!SlotIdxConst)
-      return std::nullopt;
-
-    int64_t SlotIdx64 = SlotIdxConst->getSExtValue();
-    if (SlotIdx64 < 0)
-      return std::nullopt;
-
-    int32_t SlotIndex = static_cast<int32_t>(SlotIdx64);
-    assert(SlotIndex >= 0 && "Expected constant slot index");
-    if (static_cast<int64_t>(SlotIndex) != SlotIdx64)
-      return std::nullopt;
-
-    if (static_cast<unsigned>(SlotIndex) >= SourceStruct->getNumElements())
-      return std::nullopt;
-
-    const DataLayout &DL = F.getParent()->getDataLayout();
-    const StructLayout *SL = DL.getStructLayout(SourceStruct);
-    int32_t ByteOffset = static_cast<int32_t>(SL->getElementOffset(SlotIndex));
-    return ParsedCaptureAccess{SlotIndex, ByteOffset};
-  }
-
-  if (GEP->getNumIndices() != 1)
-    return std::nullopt;
-
-  auto *ByteOffsetConst = dyn_cast<ConstantInt>(GEP->getOperand(1));
-  if (!ByteOffsetConst)
-    return std::nullopt;
-
-  int64_t ByteOffset64 = ByteOffsetConst->getSExtValue();
-  if (ByteOffset64 < 0)
-    return std::nullopt;
-
-  int32_t ByteOffset = static_cast<int32_t>(ByteOffset64);
-  if (static_cast<int64_t>(ByteOffset) != ByteOffset64)
-    return std::nullopt;
-
-  // Byte-offset GEPs access an untyped closure blob. Use the byte offset as
-  // the synthetic slot index so different offsets never collide.
-  return ParsedCaptureAccess{ByteOffset, ByteOffset};
-}
-
 std::optional<AutoReadOnlyCaptureMetadataEntry>
-parseDirectLoadCapture(LoadInst *LI) {
-  RuntimeConstantType RCType = classifySupportedScalar(LI->getType());
-  if (RCType == RuntimeConstantType::NONE)
+parseDirectLoadCapture(LoadInst *LI, int32_t SlotIndex, int32_t ByteOffset) {
+  auto RCType = classifySupportedScalar(LI->getType());
+  if (!RCType)
     return std::nullopt;
 
-  return AutoReadOnlyCaptureMetadataEntry{/*SlotIndex=*/0,
-                                          /*ByteOffset=*/0, RCType};
+  return AutoReadOnlyCaptureMetadataEntry{SlotIndex, ByteOffset, *RCType};
 }
 
 void updateReadOnlySlot(DenseMap<int32_t, SlotState> &Slots,
@@ -205,8 +190,18 @@ void updateReadOnlySlot(DenseMap<int32_t, SlotState> &Slots,
   if (!State.IsReadOnly)
     return;
 
-  if (State.RCType == RuntimeConstantType::NONE)
+  if (State.ByteOffset != Entry.ByteOffset) {
+    State.IsReadOnly = false;
+    return;
+  }
+
+  if (State.RCType == RuntimeConstantType::NONE) {
     State.RCType = Entry.RCType;
+    return;
+  }
+
+  if (State.RCType != Entry.RCType)
+    State.IsReadOnly = false;
 }
 
 void markSlotNonReadOnly(DenseMap<int32_t, SlotState> &Slots, int32_t SlotIdx,
@@ -223,7 +218,8 @@ void markSlotNonReadOnly(DenseMap<int32_t, SlotState> &Slots, int32_t SlotIdx,
   It->second.IsReadOnly = false;
 }
 
-void analyzePointerUsersForSlot(Value *RootPtr, int32_t SlotIndex,
+void analyzePointerUsersForSlot(Function &F, Argument *ClosureArg,
+                                Value *RootPtr, int32_t SlotIndex,
                                 int32_t ByteOffset,
                                 DenseMap<int32_t, SlotState> &Slots) {
   auto Existing = Slots.find(SlotIndex);
@@ -245,13 +241,19 @@ void analyzePointerUsersForSlot(Value *RootPtr, int32_t SlotIndex,
           break;
         }
 
-        auto Parsed = parseDirectLoadCapture(LI);
+        auto Parsed = parseDirectLoadCapture(LI, SlotIndex, ByteOffset);
         if (!Parsed)
           continue;
 
-        Parsed->SlotIndex = SlotIndex;
-        Parsed->ByteOffset = ByteOffset;
         updateReadOnlySlot(Slots, *Parsed);
+        continue;
+      }
+
+      if (auto *SI = dyn_cast<StoreInst>(U)) {
+        if (SI->getPointerOperand() == V || SI->getValueOperand() == V) {
+          markSlotNonReadOnly(Slots, SlotIndex, ByteOffset);
+          break;
+        }
         continue;
       }
 
@@ -261,6 +263,20 @@ void analyzePointerUsersForSlot(Value *RootPtr, int32_t SlotIndex,
         continue;
 
       if (Effect == PointerUseEffect::BenignTransform) {
+        if (auto *GEP = dyn_cast<GetElementPtrInst>(U)) {
+          auto LocalOffset = getGEPByteOffset(F, GEP);
+          if (!LocalOffset) {
+            markSlotNonReadOnly(Slots, SlotIndex, ByteOffset);
+            break;
+          }
+
+          int32_t NestedByteOffset = ByteOffset + *LocalOffset;
+          auto NestedSlot = getTopLevelSlotIndex(ClosureArg, V, GEP);
+          analyzePointerUsersForSlot(F, ClosureArg, GEP,
+                                     NestedSlot.value_or(NestedByteOffset),
+                                     NestedByteOffset, Slots);
+          continue;
+        }
         WorkList.push_back(cast<Value>(U));
         continue;
       }
@@ -330,7 +346,8 @@ analyzeAutoReadOnlyCaptures(Function &F) {
         if (LI->getPointerOperand() != V)
           continue;
 
-        auto Parsed = parseDirectLoadCapture(LI);
+        auto Parsed =
+            parseDirectLoadCapture(LI, /*SlotIndex=*/0, /*ByteOffset=*/0);
         if (!Parsed)
           continue;
 
@@ -348,13 +365,15 @@ analyzeAutoReadOnlyCaptures(Function &F) {
       }
 
       if (auto *GEP = dyn_cast<GetElementPtrInst>(U)) {
-        auto Parsed = parseGEPAccess(F, GEP);
-        if (!Parsed)
+        auto LocalOffset = getGEPByteOffset(F, GEP);
+        if (!LocalOffset)
           continue;
 
-        assert(Parsed->SlotIndex >= 0 && "Expected constant slot index");
-        analyzePointerUsersForSlot(GEP, Parsed->SlotIndex, Parsed->ByteOffset,
-                                   Slots);
+        auto TopLevelSlot = getTopLevelSlotIndex(ClosureArg, V, GEP);
+        int32_t ByteOffset = *LocalOffset;
+        analyzePointerUsersForSlot(F, ClosureArg, GEP,
+                                   TopLevelSlot.value_or(ByteOffset),
+                                   ByteOffset, Slots);
         continue;
       }
 

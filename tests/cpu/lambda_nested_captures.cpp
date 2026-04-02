@@ -1,32 +1,27 @@
 // clang-format off
-// RUN: PROTEUS_AUTO_READONLY_CAPTURES=1 PROTEUS_TRACE_OUTPUT=specialization %build/%exe lambda_pointer_captures 2>&1 | %FILECHECK %s
+// RUN: PROTEUS_AUTO_READONLY_CAPTURES=1 PROTEUS_TRACE_OUTPUT=specialization %build/%exe lambda_nested_captures 2>&1 | %FILECHECK %s
 // clang-format on
 
 #include <iostream>
 
 #include "proteus/JitInterface.h"
 
-int main() {
-  int Scalar = 42;
-  int *Ptr = &Scalar;
-  double Value = 3.14;
+struct Payload {
+  int A;
+  double B;
+};
 
+int main() {
+  Payload P{42, 3.14};
   double X[2] = {0.0, 0.0};
 
   auto lambda = [=, &X]() __attribute__((annotate("jit"))) {
-    X[0] = Scalar;
-    X[1] = Value;
-    (void)Ptr;
+    X[0] = P.A;
+    X[1] = P.B;
   };
 
-  int *PtrOnly = &Scalar;
-  auto lambda2 = [=]() __attribute__((annotate("jit"))) { (void)PtrOnly; };
-
   proteus::register_lambda(lambda);
-  proteus::register_lambda(lambda2);
-
   lambda();
-  lambda2();
 
   std::cout << "x[0] = " << X[0] << "\n";
   std::cout << "x[1] = " << X[1] << "\n";
