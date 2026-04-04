@@ -113,7 +113,7 @@ target_include_directories(proteusCore
 
 if(ENABLE_COVERAGE)
   target_compile_options(proteus PRIVATE ${PROTEUS_COVERAGE_COMPILE_OPTIONS})
-  target_link_options(proteus PRIVATE ${PROTEUS_COVERAGE_LINK_OPTIONS})
+  target_link_options(proteus PUBLIC ${PROTEUS_COVERAGE_LINK_OPTIONS})
 endif()
 
 # Link with LLVM libraries dynamically or statically based on the
