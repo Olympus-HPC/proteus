@@ -18,6 +18,7 @@ option(PROTEUS_ENABLE_MPI "Enable MPI support for shared caching" OFF)
 option(PROTEUS_ENABLE_MLIR "Enable MLIR backend" OFF)
 option(BUILD_SHARED "Builds the JIT library as shared" OFF)
 option(ENABLE_TESTS "Enable tests" OFF)
+option(ENABLE_COVERAGE "Enable host-side coverage instrumentation" OFF)
 option(ENABLE_DEVELOPER_COMPILER_FLAGS "Enable developer compiler flags: -Wall -Wextra -Werror" OFF)
 option(PROTEUS_INSTALL_IMPL_HEADERS "Install implementation headers" OFF)
 
@@ -38,6 +39,22 @@ message(STATUS "Using LLVM installation: ${LLVM_INSTALL_DIR}")
 
 if (ENABLE_DEVELOPER_COMPILER_FLAGS)
   add_compile_options(-Wall -Wextra -Werror "-Wno-error=\#warnings" -Wno-error=unknown-cuda-version)
+endif()
+
+if(ENABLE_COVERAGE)
+  if(PROTEUS_ENABLE_HIP OR PROTEUS_ENABLE_CUDA)
+    message(FATAL_ERROR
+      "ENABLE_COVERAGE currently supports host-only builds. "
+      "Disable PROTEUS_ENABLE_HIP and PROTEUS_ENABLE_CUDA.")
+  endif()
+
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    add_compile_options(-g --coverage)
+    add_link_options(--coverage)
+  else()
+    message(FATAL_ERROR
+      "ENABLE_COVERAGE is only supported with Clang or GCC host compilers.")
+  endif()
 endif()
 
 if(PROTEUS_ENABLE_HIP)

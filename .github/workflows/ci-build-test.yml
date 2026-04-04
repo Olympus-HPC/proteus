@@ -2,6 +2,9 @@ name: CI
 
 on:
   pull_request:
+  push:
+    branches:
+      - main
 
 jobs:
   prepare-conda:
@@ -98,6 +101,81 @@ jobs:
           pushd build
           ctest -j8 -T test --output-on-failure
           popd
+
+  coverage:
+    name: coverage ubuntu LLVM 20.1.8
+    runs-on: ubuntu-latest
+    needs: prepare-conda
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download environment
+        uses: actions/download-artifact@v8
+        with:
+          name: llvm-conda-20.1.8
+          path: ${{ runner.temp }}/conda-artifacts
+      - name: Unpack environment
+        run: |
+          env_dir="$RUNNER_TEMP/llvm-env-20.1.8"
+          mkdir -p "$env_dir"
+          tar -xzf "$RUNNER_TEMP/conda-artifacts/llvm-env-20.1.8.tar.gz" -C "$env_dir"
+          "$env_dir/bin/conda-unpack"
+          echo "CONDA_PREFIX=$env_dir" >> "$GITHUB_ENV"
+          echo "$env_dir/bin" >> "$GITHUB_PATH"
+      - name: Install coverage tools
+        run: |
+          conda install -y -p "$CONDA_PREFIX" -c conda-forge gcovr
+      - name: Build with coverage
+        run: |
+          mkdir -p build
+          pushd build
+          set -o pipefail
+          cmake .. \
+            -DCMAKE_PREFIX_PATH="$CONDA_PREFIX;$CONDA_PREFIX/lib/cmake" \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DENABLE_DEVELOPER_COMPILER_FLAGS=on \
+            -DENABLE_TESTS=on \
+            -DENABLE_COVERAGE=on \
+            -DLLVM_INSTALL_DIR=$(llvm-config --prefix) \
+            -DPROTEUS_ENABLE_MLIR=on \
+            -DBUILD_SHARED=off |& tee cmake_output.log
+          if grep -q "Manually-specified variables were not used by the project:" cmake_output.log; then
+            echo "Error: Unused variables detected"
+            exit 1
+          fi
+          make -j
+          popd
+      - name: Run tests
+        run: |
+          pushd build
+          ctest -j8 -T test --output-on-failure
+          popd
+      - name: Generate coverage report
+        run: |
+          gcovr \
+            --root "$GITHUB_WORKSPACE" \
+            --filter "$GITHUB_WORKSPACE/src" \
+            --filter "$GITHUB_WORKSPACE/include" \
+            --exclude-directories "$GITHUB_WORKSPACE/tests" \
+            --gcov-executable "llvm-cov gcov" \
+            --xml-pretty \
+            --output coverage.xml \
+            --print-summary \
+            build
+      - name: Upload coverage to Codecov
+        if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.xml
+          flags: host
+          name: ubuntu-llvm-20-host
+          use_oidc: true
 
   build-and-test-macos:
     name: proteus macos LLVM ${{ matrix.llvm }} shared ${{ matrix.build_shared }} MLIR ${{ matrix.mlir }}
