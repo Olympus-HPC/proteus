@@ -56,7 +56,9 @@ variables:
 .build-variants:
   parallel:
     matrix:
-      - PROTEUS_CI_BUILD_SHARED: ["on", "off"]
+      - PROTEUS_CI_BUILD_SHARED: "on"
+      - PROTEUS_CI_BUILD_SHARED: "off"
+        PROTEUS_CODECOV_VARIANT_SELECTED: "1"
 
 build-and-test-tioga:
   extends: [.base-job, .build-variants]
