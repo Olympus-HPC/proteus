@@ -49,8 +49,8 @@ if(ENABLE_COVERAGE)
   endif()
 
   if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-    add_compile_options(-g --coverage)
-    add_link_options(--coverage)
+    set(PROTEUS_COVERAGE_COMPILE_OPTIONS -g --coverage)
+    set(PROTEUS_COVERAGE_LINK_OPTIONS --coverage)
   else()
     message(FATAL_ERROR
       "ENABLE_COVERAGE is only supported with Clang or GCC host compilers.")

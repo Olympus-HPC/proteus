@@ -111,6 +111,11 @@ target_include_directories(proteusCore
   $<BUILD_INTERFACE:${PROTEUS_PROJECT_INCLUDE_DIR}>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
+if(ENABLE_COVERAGE)
+  target_compile_options(proteus PRIVATE ${PROTEUS_COVERAGE_COMPILE_OPTIONS})
+  target_link_options(proteus PRIVATE ${PROTEUS_COVERAGE_LINK_OPTIONS})
+endif()
+
 # Link with LLVM libraries dynamically or statically based on the
 # LLVM_LINK_LLVM_DYLIB option provided by the LLVM cmake setup.
 if(LLVM_LINK_LLVM_DYLIB)
