@@ -42,12 +42,6 @@ if (ENABLE_DEVELOPER_COMPILER_FLAGS)
 endif()
 
 if(ENABLE_COVERAGE)
-  if(PROTEUS_ENABLE_HIP OR PROTEUS_ENABLE_CUDA)
-    message(FATAL_ERROR
-      "ENABLE_COVERAGE currently supports host-only builds. "
-      "Disable PROTEUS_ENABLE_HIP and PROTEUS_ENABLE_CUDA.")
-  endif()
-
   if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     add_compile_options(-g --coverage)
     add_link_options(--coverage)

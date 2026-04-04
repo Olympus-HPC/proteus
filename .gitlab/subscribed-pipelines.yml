@@ -193,6 +193,15 @@ matrix-test-integration:
   needs: [matrix-up-check, matrix-build-and-test]
   extends: [.test-integration, .core-build-rules]
 
+matrix-test-codecov:
+  variables:
+    CI_MACHINE: "matrix"
+    JOB_CMD:
+      value: "scripts/gitlab/ci-test-codecov.sh"
+      expand: false
+  needs: [matrix-up-check, matrix-build-and-test]
+  extends: [.test-codecov, .core-build-rules]
+
 # TIOGA
 tioga-up-check:
   variables:
@@ -216,6 +225,15 @@ tioga-test-integration:
       expand: false
   needs: [tioga-up-check, tioga-build-and-test]
   extends: [.test-integration, .core-build-rules]
+
+tioga-test-codecov:
+  variables:
+    CI_MACHINE: "tioga"
+    JOB_CMD:
+      value: "scripts/gitlab/ci-test-codecov.sh"
+      expand: false
+  needs: [tioga-up-check, tioga-build-and-test]
+  extends: [.test-codecov, .core-build-rules]
 
 tioga-test-spack:
   variables:
