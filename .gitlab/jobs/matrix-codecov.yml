@@ -5,7 +5,6 @@
     - echo "=== Start CI Codecov Tests ==="
   after_script:
     - !reference [.clean-slurm-allocation, after_script]
-    - !reference [.remove-builds-dir, after_script]
     - echo "=== End CI Codecov Tests ==="
 
 .variants:

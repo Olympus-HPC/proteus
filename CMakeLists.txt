@@ -42,12 +42,25 @@ if (ENABLE_DEVELOPER_COMPILER_FLAGS)
 endif()
 
 if(ENABLE_COVERAGE)
-  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-    add_compile_options(-g --coverage)
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    add_compile_options(
+      "$<$<COMPILE_LANGUAGE:C>:-g>"
+      "$<$<COMPILE_LANGUAGE:CXX>:-g>"
+      "$<$<COMPILE_LANGUAGE:C>:--coverage>"
+      "$<$<COMPILE_LANGUAGE:CXX>:--coverage>"
+      "$<$<COMPILE_LANGUAGE:CUDA>:-Xarch_host>"
+      "$<$<COMPILE_LANGUAGE:CUDA>:-g>"
+      "$<$<COMPILE_LANGUAGE:CUDA>:-Xarch_host>"
+      "$<$<COMPILE_LANGUAGE:CUDA>:--coverage>"
+      "$<$<COMPILE_LANGUAGE:HIP>:-Xarch_host>"
+      "$<$<COMPILE_LANGUAGE:HIP>:-g>"
+      "$<$<COMPILE_LANGUAGE:HIP>:-Xarch_host>"
+      "$<$<COMPILE_LANGUAGE:HIP>:--coverage>"
+    )
     add_link_options(--coverage)
   else()
     message(FATAL_ERROR
-      "ENABLE_COVERAGE is only supported with Clang or GCC host compilers.")
+      "ENABLE_COVERAGE is only supported with Clang compilers.")
   endif()
 endif()
 

@@ -11,6 +11,7 @@ fi
 
 WORKDIR="/tmp/proteus-codecov-${CI_JOB_ID}"
 ARTIFACT_DIR="${CI_PROJECT_DIR}/gitlab-codecov-artifacts/${CI_MACHINE}"
+CODECOV_BIN="${WORKDIR}/codecov"
 mkdir -p "${WORKDIR}" "${ARTIFACT_DIR}"
 cd "${WORKDIR}"
 
@@ -43,8 +44,8 @@ install_codecov_uploader() {
       ;;
   esac
 
-  curl -fsSL "https://uploader.codecov.io/latest/${codecov_platform}/codecov" -o codecov
-  chmod +x codecov
+  curl -fsSL "https://uploader.codecov.io/latest/${codecov_platform}/codecov" -o "${CODECOV_BIN}"
+  chmod +x "${CODECOV_BIN}"
 }
 
 if [ "${CI_MACHINE}" = "matrix" ]; then
@@ -131,24 +132,25 @@ if [ "${CI_MACHINE}" = "tioga" ] || [ "${CI_MACHINE}" = "tuolumne" ]; then
   fi
 fi
 
+pushd "${CI_PROJECT_DIR}"
 "${PYTHON_BIN}" -m gcovr \
   --root "${CI_PROJECT_DIR}" \
   --filter "${CI_PROJECT_DIR}/src" \
   --filter "${CI_PROJECT_DIR}/include" \
   --exclude-directories "${CI_PROJECT_DIR}/tests" \
+  --object-directory "${WORKDIR}/build" \
   --gcov-executable "${GCOV_EXECUTABLE}" \
   --xml-pretty \
-  --output coverage.xml \
+  --output "${ARTIFACT_DIR}/coverage.xml" \
   --print-summary \
-  .
-
-cp coverage.xml "${ARTIFACT_DIR}/coverage.xml"
+  "${WORKDIR}/build"
+popd
 
 CODECOV_FLAG="gitlab-${CI_MACHINE}"
 CODECOV_NAME="gitlab-${CI_MACHINE}-gpu"
-./codecov \
+"${CODECOV_BIN}" \
   -t "${CODECOV_TOKEN}" \
-  -f coverage.xml \
+  -f "${ARTIFACT_DIR}/coverage.xml" \
   -F "${CODECOV_FLAG}" \
   -n "${CODECOV_NAME}" \
   -R "${CI_PROJECT_DIR}" \
