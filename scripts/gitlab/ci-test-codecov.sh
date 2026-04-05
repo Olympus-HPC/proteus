@@ -11,7 +11,7 @@ fi
 
 WORKDIR="/tmp/proteus-codecov-${CI_JOB_ID}"
 ARTIFACT_DIR="${CI_PROJECT_DIR}/gitlab-codecov-artifacts/${CI_MACHINE}"
-CODECOV_BIN="${WORKDIR}/codecov"
+CODECOV_CMD="codecovcli"
 mkdir -p "${WORKDIR}" "${ARTIFACT_DIR}"
 cd "${WORKDIR}"
 
@@ -22,30 +22,29 @@ run_ctest() {
   echo "### $(date) END TESTING ###"
 }
 
-install_gcovr() {
-  if [ "${CI_MACHINE}" = "matrix" ]; then
-    PYTHON_BIN=python
-    python -m pip install gcovr
-  else
-    PYTHON_BIN=python3
-    python3 -m pip install --user gcovr
-    export PATH="${HOME}/.local/bin:${PATH}"
-  fi
+install_miniforge() {
+  local miniforge_dir="${1}"
+  local python_version="${2}"
+  local env_name="${3}"
+
+  mkdir -p "${miniforge_dir}"
+  wget -q --tries=5 --retry-connrefused --wait=5 \
+    "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-$(uname -m).sh" \
+    -O "${miniforge_dir}/miniforge.sh"
+  bash "${miniforge_dir}/miniforge.sh" -b -u -p "${miniforge_dir}"
+  rm "${miniforge_dir}/miniforge.sh"
+  source "${miniforge_dir}/etc/profile.d/conda.sh"
+  conda create -y -q -n "${env_name}" --override-channels -c conda-forge python="${python_version}"
+  conda activate "${env_name}"
+  PYTHON_BIN=python
 }
 
-install_codecov_uploader() {
-  local codecov_platform
-  case "$(uname -m)" in
-    x86_64) codecov_platform="linux" ;;
-    aarch64|arm64) codecov_platform="linux-arm64" ;;
-    *)
-      echo "Unsupported architecture for Codecov uploader: $(uname -m)"
-      exit 1
-      ;;
-  esac
+install_gcovr() {
+  "${PYTHON_BIN}" -m pip install gcovr
+}
 
-  curl -fsSL "https://uploader.codecov.io/latest/${codecov_platform}/codecov" -o "${CODECOV_BIN}"
-  chmod +x "${CODECOV_BIN}"
+install_codecov_cli() {
+  "${PYTHON_BIN}" -m pip install codecov-cli
 }
 
 if [ "${CI_MACHINE}" = "matrix" ]; then
@@ -55,19 +54,20 @@ if [ "${CI_MACHINE}" = "matrix" ]; then
 
   echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-} SLURM_STEP_GPUS=${SLURM_STEP_GPUS:-}"
 
-  MINIFORGE_DIR=miniforge3
+  MINIFORGE_DIR="${WORKDIR}/miniforge3"
   mkdir -p "${MINIFORGE_DIR}"
   wget -q --tries=5 --retry-connrefused --wait=5 \
-    https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-$(uname -m).sh \
-    -O "./${MINIFORGE_DIR}/miniforge.sh"
-  bash "./${MINIFORGE_DIR}/miniforge.sh" -b -u -p "./${MINIFORGE_DIR}"
-  rm "./${MINIFORGE_DIR}/miniforge.sh"
-  source "./${MINIFORGE_DIR}/bin/activate"
+    "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-$(uname -m).sh" \
+    -O "${MINIFORGE_DIR}/miniforge.sh"
+  bash "${MINIFORGE_DIR}/miniforge.sh" -b -u -p "${MINIFORGE_DIR}"
+  rm "${MINIFORGE_DIR}/miniforge.sh"
+  source "${MINIFORGE_DIR}/etc/profile.d/conda.sh"
   conda create -y -q -n proteus --override-channels -c conda-forge \
     python=${PYTHON_VERSION} clang=${PROTEUS_CI_LLVM_VERSION} clangxx=${PROTEUS_CI_LLVM_VERSION} \
     clangdev=${PROTEUS_CI_LLVM_VERSION} llvmdev=${PROTEUS_CI_LLVM_VERSION} lit=${PROTEUS_CI_LLVM_VERSION} \
     mlir=${PROTEUS_CI_LLVM_VERSION} gcc=12 gxx=12
   conda activate proteus
+  PYTHON_BIN=python
 
   LLVM_INSTALL_DIR=$(llvm-config --prefix)
   CMAKE_OPTIONS_MACHINE=" -DCMAKE_PREFIX_PATH=$CONDA_PREFIX;$CONDA_PREFIX/lib/cmake"
@@ -88,10 +88,11 @@ else
   CMAKE_OPTIONS_MACHINE=" -DPROTEUS_ENABLE_HIP=on"
   CMAKE_OPTIONS_MACHINE+=" -DCMAKE_HIP_ARCHITECTURES=gfx942;gfx90a"
   GCOV_EXECUTABLE="$LLVM_INSTALL_DIR/bin/llvm-cov gcov"
+  install_miniforge "${WORKDIR}/miniforge3" 3.12 proteus-codecov
 fi
 
 install_gcovr
-install_codecov_uploader
+install_codecov_cli
 
 CMAKE_OPTIONS="-DLLVM_INSTALL_DIR=$LLVM_INSTALL_DIR"
 CMAKE_OPTIONS+=" -DCMAKE_BUILD_TYPE=Release"
@@ -148,12 +149,23 @@ popd
 
 CODECOV_FLAG="gitlab-${CI_MACHINE}"
 CODECOV_NAME="gitlab-${CI_MACHINE}-gpu"
-"${CODECOV_BIN}" \
+CODECOV_PR_ARGS=()
+if [ -n "${GITHUB_PR_NUMBER:-}" ]; then
+  CODECOV_PR_ARGS=(-P "${GITHUB_PR_NUMBER}")
+fi
+"${CODECOV_CMD}" \
+  --verbose \
+  upload-process \
+  --disable-search \
+  --fail-on-error \
   -t "${CODECOV_TOKEN}" \
   -f "${ARTIFACT_DIR}/coverage.xml" \
   -F "${CODECOV_FLAG}" \
   -n "${CODECOV_NAME}" \
-  -R "${CI_PROJECT_DIR}" \
-  -Z 2>&1 | tee "${ARTIFACT_DIR}/codecov-upload.log"
+  -B "${CI_COMMIT_BRANCH}" \
+  -C "${CI_COMMIT_SHA}" \
+  -r "Olympus-HPC/proteus" \
+  "${CODECOV_PR_ARGS[@]}" \
+  --git-service github 2>&1 | tee "${ARTIFACT_DIR}/codecov-upload.log"
 
 popd
