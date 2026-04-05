@@ -156,6 +156,9 @@ CODECOV_PR_ARGS=()
 if [ -n "${GITHUB_PR_NUMBER:-}" ]; then
   CODECOV_PR_ARGS=(-P "${GITHUB_PR_NUMBER}")
 fi
+popd
+
+pushd "${PROJECT_DIR_REAL}"
 "${CODECOV_CMD}" \
   --verbose \
   upload-process \
