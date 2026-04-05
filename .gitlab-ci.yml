@@ -96,6 +96,7 @@ stages:
   - prerequisites
   - build-and-test
   - test-integration
+  - test-codecov
   - test-spack
   - run-benchmarks
 
@@ -183,6 +184,20 @@ meta-only:
         ref: 'v2025.09.1'
         file: 'pipelines/${CI_MACHINE}.yml'
       - local: '.gitlab/jobs/${CI_MACHINE}-spack.yml'
+    strategy: depend
+    forward:
+      pipeline_variables: true
+
+.test-codecov:
+  stage: test-codecov
+  interruptible: true
+  trigger:
+    include:
+      - local: '.gitlab/custom-jobs-and-variables.yml'
+      - project: 'radiuss/radiuss-shared-ci'
+        ref: 'v2025.09.1'
+        file: 'pipelines/${CI_MACHINE}.yml'
+      - local: '.gitlab/jobs/${CI_MACHINE}-codecov.yml'
     strategy: depend
     forward:
       pipeline_variables: true

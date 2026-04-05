@@ -1,0 +1,22 @@
+.base-job:
+  extends: .job_on_matrix
+  interruptible: true
+  before_script:
+    - echo "=== Start CI Codecov Tests ==="
+  after_script:
+    - !reference [.clean-slurm-allocation, after_script]
+    - echo "=== End CI Codecov Tests ==="
+
+.variants:
+  parallel:
+    matrix:
+      - PROTEUS_CI_CUDA_VERSION: ["12.2.2"]
+        PROTEUS_CI_LLVM_VERSION: ["20.1.8"]
+
+test-codecov-matrix:
+  extends: [.base-job, .variants]
+  artifacts:
+    when: always
+    paths:
+      - gitlab-codecov-artifacts/matrix/coverage.xml
+      - gitlab-codecov-artifacts/matrix/codecov-upload.log
