@@ -48,14 +48,10 @@ if(ENABLE_COVERAGE)
       "$<$<COMPILE_LANGUAGE:CXX>:-g>"
       "$<$<COMPILE_LANGUAGE:C>:--coverage>"
       "$<$<COMPILE_LANGUAGE:CXX>:--coverage>"
-      "$<$<COMPILE_LANGUAGE:CUDA>:-Xarch_host>"
-      "$<$<COMPILE_LANGUAGE:CUDA>:-g>"
-      "$<$<COMPILE_LANGUAGE:CUDA>:-Xarch_host>"
-      "$<$<COMPILE_LANGUAGE:CUDA>:--coverage>"
-      "$<$<COMPILE_LANGUAGE:HIP>:-Xarch_host>"
-      "$<$<COMPILE_LANGUAGE:HIP>:-g>"
-      "$<$<COMPILE_LANGUAGE:HIP>:-Xarch_host>"
-      "$<$<COMPILE_LANGUAGE:HIP>:--coverage>"
+      "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xarch_host -g>"
+      "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xarch_host --coverage>"
+      "$<$<COMPILE_LANGUAGE:HIP>:SHELL:-Xarch_host -g>"
+      "$<$<COMPILE_LANGUAGE:HIP>:SHELL:-Xarch_host --coverage>"
     )
     add_link_options(--coverage)
   else()
