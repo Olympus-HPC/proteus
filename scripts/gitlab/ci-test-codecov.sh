@@ -13,7 +13,10 @@ WORKDIR="/tmp/proteus-codecov-${CI_JOB_ID}"
 ARTIFACT_DIR="${CI_PROJECT_DIR}/gitlab-codecov-artifacts/${CI_MACHINE}"
 CODECOV_CMD="codecovcli"
 mkdir -p "${WORKDIR}" "${ARTIFACT_DIR}"
+PROJECT_DIR_REAL="$(cd "${CI_PROJECT_DIR}" && pwd -P)"
+ARTIFACT_DIR_REAL="$(cd "${CI_PROJECT_DIR}" && mkdir -p "gitlab-codecov-artifacts/${CI_MACHINE}" && cd "gitlab-codecov-artifacts/${CI_MACHINE}" && pwd -P)"
 cd "${WORKDIR}"
+WORKDIR_REAL="$(pwd -P)"
 
 run_ctest() {
   echo "### $(date) START TESTING ${1} ###"
@@ -106,7 +109,7 @@ CMAKE_OPTIONS+=${CMAKE_OPTIONS_MACHINE}
 mkdir build
 pushd build
 
-cmake "${CI_PROJECT_DIR}" ${CMAKE_OPTIONS} 2>&1 | tee cmake_output.log
+cmake "${PROJECT_DIR_REAL}" ${CMAKE_OPTIONS} 2>&1 | tee cmake_output.log
 if grep -q "Manually-specified variables were not used by the project:" cmake_output.log; then
   echo "Error: Unused variables detected"
   exit 1
@@ -133,18 +136,18 @@ if [ "${CI_MACHINE}" = "tioga" ] || [ "${CI_MACHINE}" = "tuolumne" ]; then
   fi
 fi
 
-pushd "${CI_PROJECT_DIR}"
+pushd "${PROJECT_DIR_REAL}"
 "${PYTHON_BIN}" -m gcovr \
-  --root "${CI_PROJECT_DIR}" \
-  --filter "${CI_PROJECT_DIR}/src" \
-  --filter "${CI_PROJECT_DIR}/include" \
-  --exclude-directories "${CI_PROJECT_DIR}/tests" \
-  --object-directory "${WORKDIR}/build" \
+  --root "${PROJECT_DIR_REAL}" \
+  --filter "${PROJECT_DIR_REAL}/src" \
+  --filter "${PROJECT_DIR_REAL}/include" \
+  --exclude-directories "${PROJECT_DIR_REAL}/tests" \
+  --object-directory "${WORKDIR_REAL}/build" \
   --gcov-executable "${GCOV_EXECUTABLE}" \
   --xml-pretty \
-  --output "${ARTIFACT_DIR}/coverage.xml" \
+  --output "${ARTIFACT_DIR_REAL}/coverage.xml" \
   --print-summary \
-  "${WORKDIR}/build"
+  "${WORKDIR_REAL}/build"
 popd
 
 CODECOV_FLAG="gitlab-${CI_MACHINE}"
@@ -159,13 +162,13 @@ fi
   --disable-search \
   --fail-on-error \
   -t "${CODECOV_TOKEN}" \
-  -f "${ARTIFACT_DIR}/coverage.xml" \
+  -f "${ARTIFACT_DIR_REAL}/coverage.xml" \
   -F "${CODECOV_FLAG}" \
   -n "${CODECOV_NAME}" \
   -B "${CI_COMMIT_BRANCH}" \
   -C "${CI_COMMIT_SHA}" \
   -r "Olympus-HPC/proteus" \
   "${CODECOV_PR_ARGS[@]}" \
-  --git-service github 2>&1 | tee "${ARTIFACT_DIR}/codecov-upload.log"
+  --git-service github 2>&1 | tee "${ARTIFACT_DIR_REAL}/codecov-upload.log"
 
 popd
