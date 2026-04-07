@@ -1,5 +1,6 @@
 #include "AutoReadOnlyCapturesAnalysis.h"
 
+#include "Helpers.h"
 #include "proteus/impl/RuntimeConstantTypeHelpers.h"
 
 #include <llvm/ADT/APInt.h>
@@ -57,12 +58,20 @@ std::optional<RuntimeConstantType> classifySupportedScalar(Type *Ty) {
 std::optional<int32_t> getGEPByteOffset(Function &F, GetElementPtrInst *GEP) {
   const DataLayout &DL = F.getParent()->getDataLayout();
   APInt Offset(DL.getPointerTypeSizeInBits(GEP->getType()), 0, true);
-  if (!GEP->accumulateConstantOffset(DL, Offset))
+  if (!GEP->accumulateConstantOffset(DL, Offset)) {
+    DEBUG(Logger::logs("proteus-pass")
+          << "[AutoReadOnly] Cannot compute constant GEP offset: " << *GEP
+          << "\n");
     return std::nullopt;
+  }
 
   int64_t ByteOffset64 = Offset.getSExtValue();
-  if (ByteOffset64 < 0 || ByteOffset64 > std::numeric_limits<int32_t>::max())
+  if (ByteOffset64 < 0 || ByteOffset64 > std::numeric_limits<int32_t>::max()) {
+    DEBUG(Logger::logs("proteus-pass")
+          << "[AutoReadOnly] GEP offset out of range: " << ByteOffset64
+          << " for GEP: " << *GEP << "\n");
     return std::nullopt;
+  }
 
   return static_cast<int32_t>(ByteOffset64);
 }
@@ -70,30 +79,57 @@ std::optional<int32_t> getGEPByteOffset(Function &F, GetElementPtrInst *GEP) {
 std::optional<int32_t> getTopLevelSlotIndex(Argument *ClosureArg,
                                             Value *BasePtr,
                                             GetElementPtrInst *GEP) {
-  if (BasePtr != ClosureArg || GEP->getNumIndices() != 2)
+  if (BasePtr != ClosureArg || GEP->getNumIndices() != 2) {
+    DEBUG(Logger::logs("proteus-pass")
+          << "[AutoReadOnly] GEP not top-level closure access: " << *GEP
+          << "\n");
     return std::nullopt;
+  }
 
   auto *SourceStruct = dyn_cast<StructType>(GEP->getSourceElementType());
-  if (!SourceStruct)
+  if (!SourceStruct) {
+    DEBUG(Logger::logs("proteus-pass")
+          << "[AutoReadOnly] GEP source not a struct: " << *GEP << "\n");
     return std::nullopt;
+  }
 
   auto *SlotIdxConst = dyn_cast<ConstantInt>(GEP->getOperand(2));
-  if (!SlotIdxConst)
+  if (!SlotIdxConst) {
+    DEBUG(Logger::logs("proteus-pass")
+          << "[AutoReadOnly] GEP slot index not constant: " << *GEP << "\n");
     return std::nullopt;
+  }
 
   int64_t SlotIdx64 = SlotIdxConst->getSExtValue();
-  if (SlotIdx64 < 0)
+  if (SlotIdx64 < 0) {
+    DEBUG(Logger::logs("proteus-pass")
+          << "[AutoReadOnly] GEP slot index negative: " << SlotIdx64
+          << " in: " << *GEP << "\n");
     return std::nullopt;
+  }
 
   int32_t SlotIndex = static_cast<int32_t>(SlotIdx64);
-  if (static_cast<int64_t>(SlotIndex) != SlotIdx64)
+  if (static_cast<int64_t>(SlotIndex) != SlotIdx64) {
+    DEBUG(Logger::logs("proteus-pass")
+          << "[AutoReadOnly] GEP slot index overflow: " << SlotIdx64
+          << " in: " << *GEP << "\n");
     return std::nullopt;
+  }
 
-  if (static_cast<unsigned>(SlotIndex) >= SourceStruct->getNumElements())
+  if (static_cast<unsigned>(SlotIndex) >= SourceStruct->getNumElements()) {
+    DEBUG(Logger::logs("proteus-pass")
+          << "[AutoReadOnly] GEP slot index out of bounds: " << SlotIndex
+          << " >= " << SourceStruct->getNumElements() << " in: " << *GEP
+          << "\n");
     return std::nullopt;
+  }
 
-  if (!classifySupportedScalar(GEP->getResultElementType()))
+  if (!classifySupportedScalar(GEP->getResultElementType())) {
+    DEBUG(Logger::logs("proteus-pass")
+          << "[AutoReadOnly] Unsupported GEP result type: "
+          << *GEP->getResultElementType() << " in: " << *GEP << "\n");
     return std::nullopt;
+  }
 
   return SlotIndex;
 }
@@ -129,7 +165,11 @@ class ClosureEscapeTracker final : public CaptureTracker {
 public:
   bool pointerEscapes() const { return Captured; }
 
-  void tooManyUses() override { Captured = true; }
+  void tooManyUses() override {
+    DEBUG(Logger::logs("proteus-pass")
+          << "[AutoReadOnly] Closure has too many uses for tracking\n");
+    Captured = true;
+  }
 
   bool shouldExplore(const Use *U) override {
     // Field accesses are analyzed per-slot below. Escapes through a field GEP
@@ -143,6 +183,9 @@ public:
   }
 
   bool captured(const Use *U) override {
+    DEBUG(Logger::logs("proteus-pass")
+          << "[AutoReadOnly] Closure escapes through: " << *U->getUser()
+          << "\n");
     Captured = true;
     return true;
   }
@@ -159,8 +202,12 @@ bool pointerEscapes(Value *RootPtr) {
 std::optional<AutoReadOnlyCaptureMetadataEntry>
 parseDirectLoadCapture(LoadInst *LI, int32_t SlotIndex, int32_t ByteOffset) {
   auto RCType = classifySupportedScalar(LI->getType());
-  if (!RCType)
+  if (!RCType) {
+    DEBUG(Logger::logs("proteus-pass")
+          << "[AutoReadOnly] Unsupported load type: " << *LI->getType()
+          << " in: " << *LI << "\n");
     return std::nullopt;
+  }
 
   return AutoReadOnlyCaptureMetadataEntry{SlotIndex, ByteOffset, *RCType};
 }
@@ -181,6 +228,10 @@ void updateReadOnlySlot(DenseMap<int32_t, SlotState> &Slots,
     return;
 
   if (State.ByteOffset != Entry.ByteOffset) {
+    DEBUG(Logger::logs("proteus-pass")
+          << "[AutoReadOnly] Slot " << Entry.SlotIndex
+          << " disqualified: inconsistent byte offsets (" << State.ByteOffset
+          << " vs " << Entry.ByteOffset << ")\n");
     State.IsReadOnly = false;
     return;
   }
@@ -190,8 +241,13 @@ void updateReadOnlySlot(DenseMap<int32_t, SlotState> &Slots,
     return;
   }
 
-  if (State.RCType != Entry.RCType)
+  if (State.RCType != Entry.RCType) {
+    DEBUG(Logger::logs("proteus-pass")
+          << "[AutoReadOnly] Slot " << Entry.SlotIndex
+          << " disqualified: inconsistent types (" << toString(State.RCType)
+          << " vs " << toString(Entry.RCType) << ")\n");
     State.IsReadOnly = false;
+  }
 }
 
 void markSlotNonReadOnly(DenseMap<int32_t, SlotState> &Slots, int32_t SlotIdx,
@@ -216,6 +272,10 @@ void analyzePointerUsersForSlot(Function &F, Argument *ClosureArg,
   if (Existing != Slots.end() && !Existing->second.IsReadOnly)
     return;
 
+  DEBUG(Logger::logs("proteus-pass")
+        << "[AutoReadOnly] Analyzing slot " << SlotIndex << " at offset "
+        << ByteOffset << "\n");
+
   SmallVector<Value *, 16> WorkList{RootPtr};
   SmallPtrSet<Value *, 32> Seen;
 
@@ -227,6 +287,10 @@ void analyzePointerUsersForSlot(Function &F, Argument *ClosureArg,
     for (User *U : V->users()) {
       if (auto *LI = dyn_cast<LoadInst>(U)) {
         if (LI->getPointerOperand() != V) {
+          DEBUG(Logger::logs("proteus-pass")
+                << "[AutoReadOnly] Slot " << SlotIndex
+                << " disqualified: pointer used as value in load: " << *LI
+                << "\n");
           markSlotNonReadOnly(Slots, SlotIndex, ByteOffset);
           break;
         }
@@ -241,6 +305,9 @@ void analyzePointerUsersForSlot(Function &F, Argument *ClosureArg,
 
       if (auto *SI = dyn_cast<StoreInst>(U)) {
         if (SI->getPointerOperand() == V || SI->getValueOperand() == V) {
+          DEBUG(Logger::logs("proteus-pass")
+                << "[AutoReadOnly] Slot " << SlotIndex
+                << " disqualified: written by store: " << *SI << "\n");
           markSlotNonReadOnly(Slots, SlotIndex, ByteOffset);
           break;
         }
@@ -256,6 +323,10 @@ void analyzePointerUsersForSlot(Function &F, Argument *ClosureArg,
         if (auto *GEP = dyn_cast<GetElementPtrInst>(U)) {
           auto LocalOffset = getGEPByteOffset(F, GEP);
           if (!LocalOffset) {
+            DEBUG(Logger::logs("proteus-pass")
+                  << "[AutoReadOnly] Slot " << SlotIndex
+                  << " disqualified: non-constant nested GEP: " << *GEP
+                  << "\n");
             markSlotNonReadOnly(Slots, SlotIndex, ByteOffset);
             break;
           }
@@ -271,6 +342,11 @@ void analyzePointerUsersForSlot(Function &F, Argument *ClosureArg,
         continue;
       }
 
+      if (Effect == PointerUseEffect::WriteOrEscape) {
+        DEBUG(Logger::logs("proteus-pass")
+              << "[AutoReadOnly] Slot " << SlotIndex
+              << " disqualified: write/escape use: " << *U << "\n");
+      }
       markSlotNonReadOnly(Slots, SlotIndex, ByteOffset);
       break;
     }
@@ -311,15 +387,30 @@ SmallVector<AutoReadOnlyCaptureMetadataEntry>
 analyzeAutoReadOnlyCaptures(Function &F) {
   SmallVector<AutoReadOnlyCaptureMetadataEntry> Captures;
 
-  if (F.arg_empty())
+  DEBUG(Logger::logs("proteus-pass")
+        << "[AutoReadOnly] Analyzing function: " << F.getName() << "\n");
+
+  if (F.arg_empty()) {
+    DEBUG(Logger::logs("proteus-pass")
+          << "[AutoReadOnly] Skipping " << F.getName() << ": no arguments\n");
     return Captures;
+  }
 
   Argument *ClosureArg = &*F.arg_begin();
-  if (!ClosureArg->getType()->isPointerTy())
+  if (!ClosureArg->getType()->isPointerTy()) {
+    DEBUG(Logger::logs("proteus-pass")
+          << "[AutoReadOnly] Skipping " << F.getName()
+          << ": first argument not a pointer (type: " << *ClosureArg->getType()
+          << ")\n");
     return Captures;
+  }
 
-  if (pointerEscapes(ClosureArg))
+  if (pointerEscapes(ClosureArg)) {
+    DEBUG(Logger::logs("proteus-pass")
+          << "[AutoReadOnly] Function " << F.getName()
+          << ": closure pointer escapes\n");
     return Captures;
+  }
 
   DenseMap<int32_t, SlotState> Slots;
 
@@ -351,13 +442,20 @@ analyzeAutoReadOnlyCaptures(Function &F) {
 
         // A direct store through the closure pointer writes the first slot.
         markSlotNonReadOnly(Slots, /*SlotIdx=*/0, /*ByteOffset=*/0);
+        DEBUG(Logger::logs("proteus-pass")
+              << "[AutoReadOnly] Slot 0 disqualified: direct store to closure: "
+              << *SI << "\n");
         continue;
       }
 
       if (auto *GEP = dyn_cast<GetElementPtrInst>(U)) {
         auto LocalOffset = getGEPByteOffset(F, GEP);
-        if (!LocalOffset)
+        if (!LocalOffset) {
+          DEBUG(Logger::logs("proteus-pass")
+                << "[AutoReadOnly] Skipping GEP with non-constant offset: "
+                << *GEP << "\n");
           continue;
+        }
 
         auto TopLevelSlot = getTopLevelSlotIndex(ClosureArg, V, GEP);
         int32_t ByteOffset = *LocalOffset;
@@ -375,7 +473,23 @@ analyzeAutoReadOnlyCaptures(Function &F) {
     }
   }
 
-  return collectReadOnlyCaptures(Slots);
+  auto Result = collectReadOnlyCaptures(Slots);
+
+  DEBUG(Logger::logs("proteus-pass")
+        << "[AutoReadOnly] Function " << F.getName() << ": " << Slots.size()
+        << " slots analyzed, " << Result.size() << " qualified as readonly\n");
+
+  if (!Result.empty()) {
+    DEBUG(Logger::logs("proteus-pass") << "[AutoReadOnly] Qualified slots:");
+    for (const auto &Cap : Result) {
+      DEBUG(Logger::logs("proteus-pass")
+            << " [slot " << Cap.SlotIndex << " @ offset " << Cap.ByteOffset
+            << ", type " << toString(Cap.RCType) << "]");
+    }
+    DEBUG(Logger::logs("proteus-pass") << "\n");
+  }
+
+  return Result;
 }
 
 void emitAutoReadOnlyCapturesMetadata(
