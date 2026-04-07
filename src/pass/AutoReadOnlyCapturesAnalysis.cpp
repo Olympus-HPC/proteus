@@ -7,6 +7,7 @@
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/ADT/SmallVector.h>
+#include <llvm/Analysis/CaptureTracking.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -27,11 +28,6 @@ namespace {
 
 constexpr char AutoReadOnlyCapturesMetadataName[] =
     "proteus.auto_readonly_captures";
-
-struct ParsedCaptureAccess {
-  int32_t SlotIndex;
-  int32_t ByteOffset;
-};
 
 struct SlotState {
   int32_t ByteOffset;
@@ -127,43 +123,37 @@ PointerUseEffect classifyPointerUse(User *U, Value *Ptr) {
   return PointerUseEffect::WriteOrEscape;
 }
 
+class ClosureEscapeTracker final : public CaptureTracker {
+  bool Captured = false;
+
+public:
+  bool pointerEscapes() const { return Captured; }
+
+  void tooManyUses() override { Captured = true; }
+
+  bool shouldExplore(const Use *U) override {
+    // Field accesses are analyzed per-slot below. Escapes through a field GEP
+    // should disqualify only that slot, not the whole closure object.
+    if (auto *GEP = dyn_cast<GetElementPtrInst>(U->getUser());
+        GEP && GEP->getPointerOperand() == U->get()) {
+      return false;
+    }
+
+    return true;
+  }
+
+  bool captured(const Use *U) override {
+    Captured = true;
+    return true;
+  }
+};
+
 bool pointerEscapes(Value *RootPtr) {
   assert(RootPtr->getType()->isPointerTy() && "Expected pointer root");
 
-  SmallVector<Value *, 16> WorkList{RootPtr};
-  SmallPtrSet<Value *, 32> Seen;
-
-  while (!WorkList.empty()) {
-    Value *V = WorkList.pop_back_val();
-    if (!Seen.insert(V).second)
-      continue;
-
-    for (User *U : V->users()) {
-      // Field accesses are analyzed per-slot below. A store through a field GEP
-      // should only disqualify that capture, not the entire closure object.
-      if (isa<GetElementPtrInst>(U))
-        continue;
-
-      // Direct stores through the current pointer mutate the pointee. They do
-      // not make the pointer value escape.
-      if (auto *SI = dyn_cast<StoreInst>(U); SI && SI->getPointerOperand() == V)
-        continue;
-
-      PointerUseEffect Effect = classifyPointerUse(U, V);
-      if (Effect == PointerUseEffect::ReadOnly ||
-          Effect == PointerUseEffect::Ignore)
-        continue;
-
-      if (Effect == PointerUseEffect::BenignTransform) {
-        WorkList.push_back(cast<Value>(U));
-        continue;
-      }
-
-      return true;
-    }
-  }
-
-  return false;
+  ClosureEscapeTracker Tracker;
+  PointerMayBeCaptured(RootPtr, &Tracker);
+  return Tracker.pointerEscapes();
 }
 
 std::optional<AutoReadOnlyCaptureMetadataEntry>
