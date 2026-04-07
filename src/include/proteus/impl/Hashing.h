@@ -3,6 +3,7 @@
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/TimeTracing.h"
+#include "proteus/impl/LambdaSpecializationInfo.h"
 #include "proteus/impl/RuntimeConstantTypeHelpers.h"
 
 #include <llvm/ADT/ArrayRef.h>
@@ -130,6 +131,28 @@ inline HashT hashValue(ArrayRef<RuntimeConstant> Arr) {
   for (int I = 1, E = Arr.size(); I < E; ++I)
     HashValue = stable_hash_combine(HashValue.getValue(),
                                     hashArrayRefElement(Arr[I]).getValue());
+
+  return HashValue;
+}
+
+inline HashT
+hashValue(const ResolvedLambdaSpecializationInfo &LambdaSpecialization) {
+  HashT HashValue = hashValue(LambdaSpecialization.CalleeName);
+  return stable_hash_combine(
+      HashValue.getValue(),
+      hashValue(ArrayRef<RuntimeConstant>{LambdaSpecialization.Values})
+          .getValue());
+}
+
+inline HashT
+hashValue(ArrayRef<ResolvedLambdaSpecializationInfo> LambdaSpecializations) {
+  if (LambdaSpecializations.empty())
+    return 0;
+
+  HashT HashValue = hashValue(LambdaSpecializations.front());
+  for (size_t I = 1; I < LambdaSpecializations.size(); ++I)
+    HashValue = stable_hash_combine(
+        HashValue.getValue(), hashValue(LambdaSpecializations[I]).getValue());
 
   return HashValue;
 }
