@@ -1,0 +1,21 @@
+codecov:
+  require_ci_to_pass: true
+
+parsers:
+  cobertura:
+    # Treat partial branch hits as covered so merged host/CUDA/HIP uploads
+    # reflect line coverage across execution environments.
+    partials_as_hits: true
+
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+ignore:
+  - "build/**"
+  - "tests/**"

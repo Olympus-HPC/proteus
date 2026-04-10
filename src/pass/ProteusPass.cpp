@@ -233,6 +233,9 @@ private:
 
     auto JitMod = cloneKernelFromModules(
         {M}, JITFn->getName(), [](const GlobalValue *GV) {
+          if (isCoverageGlobal(*GV))
+            return true;
+
           if (const GlobalVariable *G = dyn_cast<GlobalVariable>(GV))
             if (!G->isConstant())
               return false;
@@ -295,13 +298,21 @@ private:
 
   // Returns true for globals that are not needed when cloning to extract a
   // module.
+  static bool isCoverageGlobal(const GlobalValue &G) {
+    StringRef Name = G.getName();
+    return Name.starts_with("__llvm_gcov_") ||
+           Name.starts_with("__llvm_prf_") || Name.starts_with("__profc_") ||
+           Name.starts_with("__profd_") || Name.starts_with("__llvm_cov");
+  }
+
   static bool skipGlobal(const GlobalValue &G) {
     if (G.getName().starts_with("_jit_bitcode") ||
         G.getName().starts_with("__clang_gpu_used_external") ||
         G.getName().starts_with("__hip_cuid") ||
         G.getName().starts_with("llvm.used") ||
         G.getName().starts_with("llvm.compiler.used") ||
-        G.getName().starts_with("llvm.global.annotations"))
+        G.getName().starts_with("llvm.global.annotations") ||
+        isCoverageGlobal(G))
       return true;
 
     return false;

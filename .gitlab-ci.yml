@@ -118,7 +118,10 @@ meta-only:
   interruptible: true
   parallel:
     matrix:
-      - PROTEUS_CI_LLVM_VERSION: ["19.1.7", "20.1.8", "22.1.0"]
+      - PROTEUS_CI_LLVM_VERSION: "19.1.7"
+      - PROTEUS_CI_LLVM_VERSION: "20.1.8"
+        PROTEUS_CODECOV_VERSION_SELECTED: "1"
+      - PROTEUS_CI_LLVM_VERSION: "22.1.0"
   trigger:
     include:
       - local: '.gitlab/custom-jobs-and-variables.yml'
@@ -141,7 +144,10 @@ meta-only:
   interruptible: true
   parallel:
     matrix:
-      - PROTEUS_CI_ROCM_VERSION: ["6.4.3", "7.1.1", "7.2.0"]
+      - PROTEUS_CI_ROCM_VERSION: "6.4.3"
+      - PROTEUS_CI_ROCM_VERSION: "7.1.1"
+      - PROTEUS_CI_ROCM_VERSION: "7.2.0"
+        PROTEUS_CODECOV_VERSION_SELECTED: "1"
   trigger:
     include:
       - local: '.gitlab/custom-jobs-and-variables.yml'
