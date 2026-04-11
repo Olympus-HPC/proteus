@@ -37,9 +37,9 @@ __jit_register_variable(RuntimeConstant RC, const char *LambdaName) {
 }
 
 extern "C" __attribute__((used)) void
-__jit_push_lambda_runtime_constant(int32_t Type, int32_t Pos, int32_t Offset,
+__jit_register_lambda_runtime_constant(int32_t Type, int32_t Pos, int32_t Offset,
                                    const void *ValuePtr,
-                                   const char *LambdaType) {
+                                   uint64_t ID) {
   RuntimeConstant RC{static_cast<RuntimeConstantType>(Type), Pos, Offset};
   // ValuePtr points at the lambda field storage (e.g., an i32 capture). It is
   // not a pointer to a full RuntimeConstantValue, so only copy the bytes
@@ -73,7 +73,7 @@ __jit_push_lambda_runtime_constant(int32_t Type, int32_t Pos, int32_t Offset,
   }
   // llvm::outs() << "PRINT FROM PUSH " << *static_cast<const double *>(ValuePtr)
               //  << "\n";
-  LambdaRegistry::instance().setJitVariable(LambdaType, RC);
+  LambdaRegistry::instance().setJitVariable(ID, RC);
 }
 
 extern "C" __attribute__((used)) void

@@ -31,7 +31,7 @@ public:
 
   std::optional<std::pair<StringRef, SmallVector<RuntimeConstant>>>
   matchJitVariableMap(StringRef FnName) {
-    if (JitVariables.empty())
+    if (JitVariableMap.empty())
       return std::nullopt;
     std::string Operator = llvm::demangle(FnName.str());
     std::size_t Sep = Operator.rfind("::operator()");
@@ -52,8 +52,11 @@ public:
     //   }
     //   Logger::logs("proteus") << "===\n";
     // }
+    auto It = JitVariableMap.find(LambdaType);
+    if (It == JitVariableMap.end())
+      return std::nullopt;
 
-    return std::make_pair(LambdaType, JitVariables);
+    return std::make_pair(LambdaType, It->second);
   }
 
   // void dump() {
@@ -76,7 +79,9 @@ public:
   // }
 
   void setJitVariable(const char *LambdaType, RuntimeConstant &RC) {
-    JitVariables.emplace_back(RC);
+    const StringRef LambdaTypeRef =
+        SavedStrings.save(StringRef{LambdaType});
+    JitVariableMap[LambdaTypeRef].emplace_back(RC);
   }
 
   inline void registerLambda(const char *LambdaType) {
@@ -93,18 +98,24 @@ public:
   }
 
   const SmallVector<RuntimeConstant> &getJitVariables() {
-    return JitVariables;
+    reportFatalError("Use getJitVariables(LambdaType) instead");
   }
 
-  void flushJitVariables() { JitVariables.clear(); }
+  const SmallVector<RuntimeConstant> &getJitVariables(StringRef LambdaType) {
+    auto It = JitVariableMap.find(LambdaType);
+    if (It == JitVariableMap.end())
+      reportFatalError("Expected jit variables for lambda type: " +
+                       LambdaType.str());
+    return It->second;
+  }
 
-  bool empty() { return JitVariables.empty(); }
+  void flushJitVariables() { JitVariableMap.clear(); }
+
+  bool empty() { return JitVariableMap.empty(); }
 
 private:
   explicit LambdaRegistry() : SavedStrings(SavedStringAlloc) {}
-  // DenseMap<StringRef, SmallVector<RuntimeConstant>> JitVariableMap;
-  // DenseMap<StringRef, SmallVector<RuntimeConstant>> PendingJitVariableMap;
-  SmallVector<RuntimeConstant> JitVariables;
+  DenseMap<uint64_t, SmallVector<RuntimeConstant>> JitVariableMap;
 
   llvm::BumpPtrAllocator SavedStringAlloc;
   llvm::UniqueStringSaver SavedStrings;

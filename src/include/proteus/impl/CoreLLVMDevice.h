@@ -300,15 +300,15 @@ inline void specializeIR(
   for (auto &[FnName, LambdaType] : LambdaCalleeInfo) {
 
 
-    const SmallVector<RuntimeConstant> &RCVec = LR.getJitVariables();
+    const SmallVector<RuntimeConstant> &RCVec = LR.getJitVariables(LambdaType);
     Function *F = M.getFunction(FnName);
     for (int i = 0; i < RCVec.size(); ++i){
     }
     if (!F)
       reportFatalError("Expected non-null Function");
     TransformLambdaSpecialization::transform(M, *F, RCVec);
-    LR.flushJitVariables();
   }
+  LR.flushJitVariables();
 
   // Run the shared array transform after any value specialization (arguments,
   // captures) to propagate any constants.

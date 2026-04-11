@@ -307,6 +307,13 @@ static bool isLambdaFunction(const Function &F) {
          StringRef{DemangledName}.contains(")::operator()");
 }
 
+static bool isLambdaFunctorWrapperOperator(const Function &F) {
+  std::string DemangledName = demangle(F.getName().str());
+  return StringRef{DemangledName}.contains("'lambda") &&
+         StringRef{DemangledName}.contains("LambdaFunctorWrapper") &&
+         StringRef{DemangledName}.contains("::operator()");
+}
+
 AnnotationHandler::AnnotationHandler(Module &M) : M(M), Types(M) {}
 
 void AnnotationHandler::parseAnnotations(
@@ -1144,7 +1151,7 @@ void AnnotationHandler::parseJitGlobalAnnotations(
     if (isDeviceCompilation(M)) {
       // Check the annotated function is a kernel function or a device
       // lambda for device compilation.
-      if (!isDeviceKernel(Fn) && !isLambdaFunction(*Fn))
+      if (!isDeviceKernel(Fn) && !isLambdaFunction(*Fn) && !isLambdaFunctorWrapperOperator(*Fn))
         reportFatalError(
             std::string{} + __FILE__ + ":" + std::to_string(__LINE__) +
             " => Expected the annotated Fn " + Fn->getName() + " (" +

@@ -447,8 +447,7 @@ public:
     }
 
     for (auto &[FnName, LambdaType] : KernelInfo.getLambdaCalleeInfo()) {
-      const SmallVector<RuntimeConstant> &Values =
-          LR.getJitVariables();
+      const SmallVector<RuntimeConstant> &Values = LR.getJitVariables(LambdaType);
       LambdaJitValuesVec.insert(LambdaJitValuesVec.end(), Values.begin(),
                                 Values.end());
     }

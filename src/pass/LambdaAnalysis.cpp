@@ -133,40 +133,48 @@ public:
     const auto StubToKernelMap = getKernelHostStubs(M);
 
     if (isDeviceCompilation(M)) {
-      llvm::outs() << "Device Module\n";
-      llvm::outs() << M;
-      llvm::outs() << "End device Module\n";
+      llvm::errs() << "Device Module\n";
+      llvm::errs() << M;
+      llvm::errs() << "End device Module\n";
+      llvm::errs().flush();
+    } else {
+      llvm::errs() << "Host Module\n";
+      llvm::errs() << M;
+      llvm::errs() << "End host Module\n";
+      llvm::errs().flush();
     }
-    llvm::outs() << "Host Module\n";
-    llvm::outs() << M;
-    llvm::outs() << "End host Module\n";
-    // Lambda analysis pipeline
-    // (1) Analyze user calls to register_lambda and identify which class.anon
-    //     types will be associated with jitted lambdas
-    // (2) instrumentJitVariableStructIndex analyzes jit_variable calls and
-    //     marks which indices of a lambda storage type (e.g. class.anon) will
-    //     be extracted at runtime and then propagated as constants
-    // (3) We then instrument __jit_push_lambda_runtime_constant into device
-    //     stubs in the case of GPU/CPU compilation, or before the callsite of the
-    //     lambda operator in the CPU case.
+
     DenseMap<StructType *, SmallVector<LambdaJitVariableInfo, 16>>
         LambdaStorageTypeToJitIndices;
-
     DenseMap<Type *, GlobalVariable *> LambdaTypeToGlobalName;
     StringMap<Type *> LambdaGlobalNameToType;
-
-    registerLambdaFunctions(M);
-    registerJitVariablesWithLambda(M, LambdaTypeToGlobalName);
-    for (auto [Ty, NameVar] : LambdaTypeToGlobalName) {
-      LambdaGlobalNameToType[getGlobalString(NameVar).value()] = Ty;
-      llvm::outs() << getGlobalString(NameVar).value() << "\n";
+    DenseMap<StructType *, StructType *> FunctorTypeToLambdaType;
+    DenseMap<StructType *, StructType *> LambdaTypeToFunctorType;
+    // problem: class.anon conventions vary between host and device module
+    // new pipeline: LambdaAnalysis sees early LLVM IR emitted with proteus__register_lambda --> proteus::__register_lambda_impl
+    // (1) make a DenseMap from lambda functor types to their underlying storage class
+    // (2) Find jit_variable calls and associate with class.anon types
+    // (3) Look at register lambda calls, identify the call operators of the functors from the callsite
+    //      (a) collect lambda ops in a map to functor ops, if there are two functor using the same one we need to clone and inject the
+    //          clone at the callsite
+    //     (b) make the call operators strings. inject register_jit_variable with the call operator functor string as the key
+    // (4) (RUNTIME) Look at all the call operators within a kernel, replace with runtime constants now propagated from the registry
+    // We need to do type association and jit_variable slot association at the
+    if (isDeviceCompilation(M)) {
+      // // registerJitVariablesWithLambda(M, LambdaTypeToGlobalName);
     }
-    instrumentJitVariableStructIndex(M, LambdaTypeToGlobalName,
-                                     LambdaStorageTypeToJitIndices);
-    if (StubToKernelMap.size())
-      instrumentJitPushCalls(M, LambdaStorageTypeToJitIndices,
-                             LambdaTypeToGlobalName, LambdaGlobalNameToType,
-                             StubToKernelMap);
+    getUnderlyingLambdaTypeFromFunctors(M, FunctorTypeToLambdaType, LambdaTypeToFunctorType);
+    instrumentJitVariableStructIndex(M, LambdaTypeToFunctorType,
+    LambdaStorageTypeToJitIndices);
+    registerLambdaFunctions(M, LambdaStorageTypeToJitIndices);
+    // for (auto [Ty, NameVar] : LambdaTypeToGlobalName) {
+    //   LambdaGlobalNameToType[getGlobalString(NameVar).value()] = Ty;
+    //   llvm::outs() << getGlobalString(NameVar).value() << "\n";
+    // }
+    // if (StubToKernelMap.size())
+    //   instrumentJitPushCalls(M, LambdaStorageTypeToJitIndices,
+    //                          LambdaTypeToGlobalName, LambdaGlobalNameToType,
+    //                          StubToKernelMap);
 
 
     DEBUG(Logger::logs("lambda-pass")
@@ -246,6 +254,50 @@ private:
     return V;
   }
 
+   static void findAnnotatedFunctions(llvm::Module &M,
+                                     llvm::StringRef Wanted,
+                                     llvm::SmallVectorImpl<std::pair<llvm::Function*, std::uint64_t>> &Out) {
+    auto *GA = M.getGlobalVariable("llvm.global.annotations");
+    if (!GA) return;
+
+    auto *CA = llvm::dyn_cast<llvm::ConstantArray>(GA->getOperand(0));
+    if (!CA) return;
+
+    llvm::SmallDenseMap<llvm::Function*, std::uint64_t, 32> Seen;
+
+    for (llvm::Value *Elt : CA->operands()) {
+      auto *CS = llvm::dyn_cast<llvm::ConstantStruct>(Elt);
+      if (!CS || CS->getNumOperands() < 5) continue;
+
+      auto *F = llvm::dyn_cast<llvm::Function>(CS->getOperand(0)->stripPointerCasts());
+      if (!F) continue;
+
+      llvm::StringRef Ann;
+      if (!llvm::getConstantStringInfo(CS->getOperand(1)->stripPointerCasts(), Ann)) continue;
+      if (Ann != Wanted) continue;
+
+      // Parse the u64 payload (operand 4)
+      std::uint64_t Id = 0;
+      llvm::Value *ArgsPtr = CS->getOperand(4)->stripPointerCasts();
+      if (llvm::isa<llvm::ConstantPointerNull>(ArgsPtr)) continue;
+
+      auto *ArgsGV = llvm::dyn_cast<llvm::GlobalVariable>(ArgsPtr);
+      if (!ArgsGV) continue;
+
+      auto *ArgsInit = ArgsGV->getInitializer();
+      auto *ArgsCS = llvm::dyn_cast<llvm::ConstantStruct>(ArgsInit);
+      if (!ArgsCS || ArgsCS->getNumOperands() < 1) continue;
+
+      auto *CI = llvm::dyn_cast<llvm::ConstantInt>(ArgsCS->getOperand(0));
+      if (!CI) continue;
+
+      Id = CI->getZExtValue();
+
+      if (Seen.try_emplace(F, Id).second)
+        Out.emplace_back(F, Id);
+    }
+  }
+
   DenseMap<Value *, GlobalVariable *> getKernelHostStubs(Module &M) {
     DenseMap<Value *, GlobalVariable *> StubToKernelMap;
     Function *RegisterFunction = nullptr;
@@ -293,6 +345,20 @@ private:
     return JitRegisterVarFn;
   }
 
+  void getUnderlyingLambdaTypeFromFunctors(Module& M, DenseMap<StructType*,StructType*> FunctorToLambdaType,
+    DenseMap<StructType*,StructType*> LambdaToFunctorType) {
+    for (llvm::StructType *ST : M.getIdentifiedStructTypes()) {
+      if (!ST->getStructName().contains("LambdaFunctorWrapper"))
+        continue;
+      auto* UnderlyingStruct = dyn_cast<StructType>(ST->getElementType(0));
+      if (!UnderlyingStruct)
+        reportFatalError("Internal Proteus Error: LambdaFunctorWrapper underlying class not initialized correctly.");
+      FunctorToLambdaType[ST] = UnderlyingStruct;
+      LambdaToFunctorType[UnderlyingStruct] = ST;
+
+    }
+  }
+
   FunctionCallee getJitRegisterFunctionFn(Module &M) {
     // The prototype is
     // __jit_register_function(void *Handle,
@@ -316,14 +382,6 @@ private:
   /// function
   /// 2. Do very simple use-def traversal to find the associated
   /// anonymous class (e.g. class.anon)
-  /// 3. Look at all callbases of each proteus::register_lambda template
-  /// instantiation. Because we force passage of the lambda by value to
-  /// register_lambda, the instantiation must contain an AllocaInst of the
-  /// lambda's corresponding anonymous class.  The demangled name of the
-  /// lambda can be deduced from the name of the Clang-generated template
-  /// instantiation.
-  /// 4. Inject the demangled name into the original callbase of the
-  /// `jit_variable` function.
   void registerJitVariablesWithLambda(
       Module &M, DenseMap<Type *, GlobalVariable *> &LambdaTypeToGlobalName) {
     llvm::SmallVector<CallBase *, 16> JitVarCallsites;
@@ -373,50 +431,50 @@ private:
         }
       }
     }
-    IRBuilder<> IRB{M.getContext()};
+    // IRBuilder<> IRB{M.getContext()};
 
-    // Create a global variable for each lambda type registered
-    for (auto &F : M.getFunctionList()) {
-      if (!StringRef{demangle(F.getName().str())}.contains(
-              "proteus::register_lambda"))
-        continue;
-      // Alloca must be in the entry block.
-      AllocaInst *LambdaAlloca = nullptr;
-      for (Instruction &I : F.getEntryBlock()) {
-        // By our definition, we force register_lambda to allocate a copy
-        // of the lambda struct in our entry block
-        auto *Alloc = dyn_cast<AllocaInst>(&I);
-        if (!Alloc)
-          continue;
-        StructType *StructTy = dyn_cast<StructType>(Alloc->getAllocatedType());
-        if (!StructTy)
-          continue;
-        if (LambdaAlloca)
-          reportFatalError("Error in LLVM IR of "
-                           "proteus::register_lambda--found multiple alloca");
-        // We found the allocation site of the lambda.
-        LambdaAlloca = Alloc;
-        std::string DemangledFuncName = demangle(F.getName().str());
-        StringRef DemangledLambdaName =
-            parseLambdaType(DemangledFuncName, "proteus::register_lambda");
-        LambdaTypeToGlobalName[Alloc->getAllocatedType()] =
-            IRB.CreateGlobalString(DemangledLambdaName, ".str", 0, &M);
-      }
-      if (!LambdaAlloca)
-        reportFatalError("Error in LLVM IR of proteus::register_lambda--no "
-                         "lambda alloca site found");
-    }
+    // // Create a global variable for each lambda type registered
+    // for (auto &F : M.getFunctionList()) {
+    //   if (!StringRef{demangle(F.getName().str())}.contains(
+    //           "proteus::register_lambda"))
+    //     continue;
+    //   // Alloca must be in the entry block.
+    //   AllocaInst *LambdaAlloca = nullptr;
+    //   for (Instruction &I : F.getEntryBlock()) {
+    //     // By our definition, we force register_lambda to allocate a copy
+    //     // of the lambda struct in our entry block
+    //     auto *Alloc = dyn_cast<AllocaInst>(&I);
+    //     if (!Alloc)
+    //       continue;
+    //     StructType *StructTy = dyn_cast<StructType>(Alloc->getAllocatedType());
+    //     if (!StructTy)
+    //       continue;
+    //     if (LambdaAlloca)
+    //       reportFatalError("Error in LLVM IR of "
+    //                        "proteus::register_lambda--found multiple alloca");
+    //     // We found the allocation site of the lambda.
+    //     LambdaAlloca = Alloc;
+    //     std::string DemangledFuncName = demangle(F.getName().str());
+    //     StringRef DemangledLambdaName =
+    //         parseLambdaType(DemangledFuncName, "proteus::register_lambda");
+    //     LambdaTypeToGlobalName[Alloc->getAllocatedType()] =
+    //         IRB.CreateGlobalString(DemangledLambdaName, ".str", 0, &M);
+    //   }
+    //   if (!LambdaAlloca)
+    //     reportFatalError("Error in LLVM IR of proteus::register_lambda--no "
+    //                      "lambda alloca site found");
+    // }
 
-    // Inject lambda's Clang-generated name into the jit_variable callsite.
-    for (auto &[CB, LambdaType] : CallBaseToLambda) {
-      auto It = LambdaTypeToGlobalName.find(LambdaType);
-      if (It == LambdaTypeToGlobalName.end())
-        reportFatalError("Failed to find the lambda association info");
-      CB->setArgOperand(3, It->second);
-    }
+    // // Inject lambda's Clang-generated name into the jit_variable callsite.
+    // for (auto &[CB, LambdaType] : CallBaseToLambda) {
+    //   auto It = LambdaTypeToGlobalName.find(LambdaType);
+    //   if (It == LambdaTypeToGlobalName.end())
+    //     reportFatalError("Failed to find the lambda association info");
+    //   CB->setArgOperand(3, It->second);
+    // }
   }
 
-  FunctionCallee getJitPushLambdaRuntimeConstant(Module &M) {
+  FunctionCallee getJitRegisterLambdaRuntimeConstant(Module &M) {
     // __jit_register_variable_instance_raw(
     //   int32_t Type, int32_t Pos, int32_t Offset,
     //   void const* ValuePtr, int32_t Size,
@@ -425,7 +483,7 @@ private:
         Types.VoidTy,
         {Types.Int32Ty, Types.Int32Ty, Types.Int32Ty, Types.PtrTy, Types.PtrTy},
         /*isVarArg=*/false);
-    return M.getOrInsertFunction("__jit_push_lambda_runtime_constant", FnTy);
+    return M.getOrInsertFunction("__jit_register_lambda_runtime_constant", FnTy);
   }
 
   std::optional<RuntimeConstantType> getRCTypeForLLVMType(Type *Ty) {
@@ -452,7 +510,7 @@ private:
   /// procedure
   void instrumentJitVariableStructIndex(
       Module &M,
-      DenseMap<Type *, GlobalVariable *> &RegisteredLambdaStorageTypes,
+      DenseMap<StructType*, StructType*> &LambdaTypeToFunctorType,
       DenseMap<StructType *, SmallVector<LambdaJitVariableInfo, 16>>
           &JitIndices) {
     DEBUG(Logger::logs("lambda-pass") << "finding jit variables" << "\n");
@@ -468,7 +526,8 @@ private:
     }
 
     for (auto &F : JitFunctions) {
-      Type *LoadType = F->getReturnType();
+      FunctionType *FTy = F->getFunctionType();
+      auto *LoadType = FTy->getParamType(0);
       if (!LoadType)
         reportFatalError("jit function return type null??\n");
       std::queue<Value *> WorkList;
@@ -501,7 +560,7 @@ private:
           auto *PossibleLamType =
               dyn_cast<StructType>(Alloca->getAllocatedType());
           if (!PossibleLamType ||
-              !RegisteredLambdaStorageTypes.contains(PossibleLamType))
+              !LambdaTypeToFunctorType.contains(PossibleLamType))
             continue;
           ++numSlotsFound;
           JitIndices[PossibleLamType].emplace_back(
@@ -510,14 +569,14 @@ private:
             reportFatalError("Load type is null\n");
         }
         if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(CurVal)) {
-          StructType *PossibleLamTyp =
+          StructType *PossibleLamType =
               dyn_cast<StructType>(GEP->getSourceElementType());
-          if (!PossibleLamTyp ||
-              !RegisteredLambdaStorageTypes.contains(PossibleLamTyp))
+          if (!PossibleLamType ||
+              !LambdaTypeToFunctorType.contains(PossibleLamType))
             continue;
           auto *Slot = GEP->getOperand(GEP->getNumOperands() - 1);
           const StructLayout *SL =
-              M.getDataLayout().getStructLayout(PossibleLamTyp);
+              M.getDataLayout().getStructLayout(PossibleLamType);
           ConstantInt *SlotC = dyn_cast<ConstantInt>(Slot);
           if (!SlotC)
             reportFatalError("Expected constant slot");
@@ -525,7 +584,7 @@ private:
           auto Offset = SL->getElementOffset(SlotC->getZExtValue());
           Constant *OffsetCI = ConstantInt::get(Types.Int32Ty, Offset);
           // Type* LoadType = GEP->getAccessType();
-          JitIndices[PossibleLamTyp].emplace_back(
+          JitIndices[PossibleLamType].emplace_back(
               LambdaJitVariableInfo{Slot, OffsetCI, LoadType});
           ++numSlotsFound;
           // break;
@@ -538,269 +597,59 @@ private:
     }
   }
 
-  void instrumentJitPushCalls(
-      Module &M,
-      const DenseMap<StructType *, SmallVector<LambdaJitVariableInfo, 16>>
-          &LambdaStorageTypeToJitIndices,
-      const DenseMap<Type *, GlobalVariable *> &LambdaTypeToGlobalName,
-      StringMap<Type *> &LambdaGlobalNameToType,
-      const DenseMap<Value *, GlobalVariable *> &StubToKernelMap) {
-    // for (const auto [stub, _] : StubToKernelMap) {
-    //   llvm::errs()<< "STUB = " << *stub;
-    // }
-    Function *LaunchKernelFn = nullptr;
-    if (!LaunchFunctionName) {
-      reportFatalError("expected launch function name");
-    }
-    LaunchKernelFn = M.getFunction(LaunchFunctionName);
+  void registerLambdaFunctions(Module &M, DenseMap<StructType *, SmallVector<LambdaJitVariableInfo, 16>> &LambdaStorageTypeToJitIndices) {
+    DEBUG(Logger::logs("lambda-pass")
+          << "registering lambda functions" << "\n");
+    SmallVector<std::pair<Function *, uint64_t>, 16> RegisterFunctions;
+    findAnnotatedFunctions(M, "proteus.register_call", RegisterFunctions);
 
-    for (Value *V : LaunchKernelFn->users()) {
-      // llvm::errs() << "USER = " << *V <<"\n";
-      // llvm::errs().flush();
-      CallBase *LaunchKernelCB = dyn_cast<CallBase>(V);
-      if (!LaunchKernelCB) {
-        // llvm::errs() << "NO CB!\n";
-        // llvm::errs().flush();
-        continue;
+    for (auto [Function, ID] : RegisterFunctions) {
+      SmallVector<ReturnInst*> Rets;
+      AllocaInst* AnonClassAlloca = nullptr;
+      for (auto &BB : *Function) {
+        if (auto *RI = llvm::dyn_cast<llvm::ReturnInst>(BB.getTerminator()))
+          Rets.push_back(RI);
+        for (Instruction& I : BB)
+          if (auto* AI = dyn_cast<AllocaInst>(&I))
+            AnonClassAlloca = AI;
       }
-      Function *Caller = LaunchKernelCB->getFunction();
-      if (!StubToKernelMap.contains(Caller->stripPointerCasts())) {
-        // llvm::errs() << "CALLER NOT A STUB ! " << *Caller;
-        // llvm::errs().flush();
-        continue;
-      }
-      auto demangledName = demangle(Caller->getName().str());
-      llvm::errs() << "DEMANGELD NAME = " << demangledName << "\n";
-      auto lambdaName = parseLambdaType(demangledName, "__device_stub__kernel");
-      llvm::errs() << "keyword : " << lambdaName << "\n";
-      auto it = LambdaGlobalNameToType.find(lambdaName);
-      llvm::errs() << "SEARCHING FOR\n";
-      for (auto &[Name, Ty] : LambdaGlobalNameToType) {
-        llvm::errs() << Name << " : " << *Ty << "\n";
-      }
-      llvm::errs().flush();
-      if (it == LambdaGlobalNameToType.end())
-        continue;
-      auto *lambdaType = it->second;
-      StructType *LambdaStorageClass = dyn_cast<StructType>(lambdaType);
-      if (!LambdaStorageClass)
-        reportFatalError(
-            "Lambda storage class not found.  Internal proteus error.");
-      Value *LambdaStoragePtr = nullptr;
-      size_t numArgs = LaunchKernelCB->arg_size();
-      if (numArgs < 3)
-        reportFatalError("hipLaunchKernel call has too few args");
-      auto *argPack = LaunchKernelCB->getArgOperand(numArgs - 3);
+      if (Rets.size() != 1)
+        reportFatalError("internal proteus error: expected single return from register func");
+      if (!AnonClassAlloca)
+        reportFatalError("internal proteus error: expected anon class alloca");
+      StructType* RegisterFuncAllocatedType = dyn_cast<StructType>(AnonClassAlloca->getAllocatedType());
+      if (!RegisterFuncAllocatedType)
+        reportFatalError("internal proteus error: expected anon class alloca");
+      ReturnInst* RetInst = Rets[0];
 
-      auto matchesLambdaStoragePtr = [&](Value *V) -> bool {
-        if (!V)
-          return false;
 
-        Value *Obj =
-            getUnderlyingObject(V->stripPointerCasts(), /*MaxLookup=*/6);
-        if (!Obj)
-          return false;
-        Obj = Obj->stripPointerCasts();
-
-        if (auto *A = dyn_cast<Argument>(Obj)) {
-          if (!A->hasByValAttr())
-            return false;
-          return A->getParamByValType() == LambdaStorageClass;
-        }
-
-        if (auto *AI = dyn_cast<AllocaInst>(Obj))
-          return AI->getAllocatedType() == LambdaStorageClass;
-
-        return false;
-      };
-
-      DenseMap<GetElementPtrInst *, SmallVector<StoreInst *>> GEPsToKernelArgs;
-      SmallVector<Value *, 16> ArgPackWorkList;
-      DenseSet<Value *> SeenArgPackVals;
-      ArgPackWorkList.push_back(argPack);
-      while (!ArgPackWorkList.empty()) {
-        Value *Cur = ArgPackWorkList.pop_back_val();
-        if (SeenArgPackVals.contains(Cur))
-          continue;
-        SeenArgPackVals.insert(Cur);
-
-        for (auto *Usr : argPack->users()) {
-          if (auto *GEP = dyn_cast<GetElementPtrInst>(Usr)) {
-            for (auto *GEPUser : GEP->users())
-              if (StoreInst *Store = dyn_cast<StoreInst>(GEPUser))
-                GEPsToKernelArgs[GEP].emplace_back(Store);
-            continue;
-          }
-          if (isa<BitCastInst>(Usr) || isa<AddrSpaceCastInst>(Usr))
-            ArgPackWorkList.push_back(Usr);
-        }
-      }
-
-      Instruction *LaunchI = dyn_cast<Instruction>(LaunchKernelCB);
-      if (!LaunchI)
-        reportFatalError("expected hipLaunchKernel call to be an Instruction");
-
-      DominatorTree DT(*Caller);
-      StoreInst *BestStore = nullptr;
-      unsigned BestLevel = 0;
-      for (auto &[_, StoreInstVec] : GEPsToKernelArgs) {
-        for (StoreInst *SI : StoreInstVec) {
-          if (!DT.dominates(SI, LaunchI))
-            continue;
-          if (!matchesLambdaStoragePtr(SI->getValueOperand()))
-            continue;
-
-          unsigned Level = DT.getNode(SI->getParent())->getLevel();
-          if (!BestStore || Level > BestLevel ||
-              (Level == BestLevel &&
-               BestStore->getParent() == LaunchI->getParent() &&
-               BestStore->comesBefore(SI))) {
-            BestStore = SI;
-            BestLevel = Level;
-          }
-        }
-      }
-
-      if (BestStore)
-        LambdaStoragePtr = BestStore->getValueOperand();
-      // Check the args for the storage class
-      if (!LambdaStoragePtr) {
-        for (Argument &A : Caller->args()) {
-          if (A.hasByValAttr() && A.getParamByValType() == LambdaStorageClass) {
-            LambdaStoragePtr = &A;
-            break;
-          }
-        }
-      }
-
-      // If no classes are allocated or GEPed and sent off to the kernel launch,
-      // check if we are simply forwarding an opaque pointer.  If so, grab it.
-      if (!LambdaStoragePtr) {
-        size_t numStores = 0;
-        StoreInst* SingleStore = nullptr;
-        for (auto &[_, StoreInstVec] : GEPsToKernelArgs) {
-          numStores += StoreInstVec.size();
-          if (StoreInstVec.size())
-            SingleStore = StoreInstVec[0];
-        }
-        if (numStores == 1)
-          LambdaStoragePtr = SingleStore->getValueOperand();
-        else
-         llvm::errs() << "num store = "<< numStores << "\n";
-      }
-      llvm::errs() << "found store " << *LambdaStoragePtr << "\n";
-      if (!LambdaStoragePtr)
-        reportFatalError(
-            "Failed to locate lambda storage pointer for hipLaunchKernel");
-
-      // inject the call to our runtime before the kernel launch
-      IRBuilder<> Builder(LaunchKernelCB);
-      auto JitVarFn = getJitPushLambdaRuntimeConstant(M);
-
+      // Insert __jit_push_lambda_runtime_constant calls for each lambda type
+      // participating in this kernel launch.
+      IRBuilder<> Builder(RetInst);
+      auto JitVarFn = getJitRegisterLambdaRuntimeConstant(M);
       for (auto JitVarInfo :
-           LambdaStorageTypeToJitIndices.find(LambdaStorageClass)
-               ->getSecond()) {
+            LambdaStorageTypeToJitIndices.find(RegisterFuncAllocatedType)->getSecond()) {
         if (!JitVarInfo.Type)
           reportFatalError("jit var info type is null\n");
         auto ProteusRCType = getRCTypeForLLVMType(JitVarInfo.Type);
         ConstantInt *SlotC = dyn_cast<ConstantInt>(JitVarInfo.Slot);
-
         if (!SlotC)
           reportFatalError("Expected constant slot");
-        auto Idx = SlotC->getZExtValue();
+        const auto Idx = SlotC->getZExtValue();
         if (!ProteusRCType)
           reportFatalError("Proteus does not support user-specified type as a "
-                           "jit::variable");
+                            "jit::variable");
+
         Value *FieldPtr =
-            Builder.CreateStructGEP(LambdaStorageClass, LambdaStoragePtr, Idx);
+            Builder.CreateStructGEP(RegisterFuncAllocatedType, AnonClassAlloca, Idx);
         Builder.CreateCall(
             JitVarFn,
             {Builder.getInt32(static_cast<int32_t>(ProteusRCType.value())),
-             Builder.getInt32(Idx), JitVarInfo.Offset, FieldPtr,
-             LambdaTypeToGlobalName.find(LambdaStorageClass)->second});
-      }
-    }
-  }
-
-  // Parse the lambda name from the template parameters of a function template
-  // E.G. given "Haystack<Needle>" as DemangledName and "Haystack" as
-  // FuncTemplateName return "Needle"
-  StringRef parseLambdaType(StringRef DemangledName,
-                            const char *FuncTemplateName) {
-    int L = -1;
-    int R = -1;
-    int Level = 0;
-    // Start after the function symbol to avoid parsing its templated return
-    // type.
-    size_t Start = DemangledName.find(FuncTemplateName);
-    for (size_t I = Start, E = DemangledName.size(); I < E; ++I) {
-      const char C = DemangledName[I];
-      if (C == '<') {
-        Level++;
-        if (Level == 1)
-          L = I;
-      }
-
-      if (C == '>') {
-        if (Level == 1) {
-          R = I;
-          break;
+              Builder.getInt32(Idx), JitVarInfo.Offset, FieldPtr,
+               Builder.getInt64(ID)});
         }
-        Level--;
       }
     }
-
-    assert(L > 0 && R > L && "Expected non-zero L, R for slicing");
-    // Remove reference character '&', if it exists.
-    if (DemangledName[R - 1] == '&')
-      R--;
-    // Slicing returns characters [Start, End).
-    return DemangledName.slice(L + 1, R);
-  }
-
-  void registerLambdaFunctions(Module &M) {
-    DEBUG(Logger::logs("lambda-pass")
-          << "registering lambda functions" << "\n");
-    SmallVector<Function *, 16> LambdaFunctions;
-    for (auto &F : M.getFunctionList()) {
-      if (StringRef{demangle(F.getName().str())}.contains(
-              "proteus::register_lambda")) {
-        LambdaFunctions.push_back(&F);
-      }
-    }
-
-    for (auto *Function : LambdaFunctions) {
-      auto DemangledName = llvm::demangle(Function->getName().str());
-      StringRef LambdaType =
-          parseLambdaType(DemangledName, "proteus::register_lambda");
-
-      DEBUG(Logger::logs("lambda-pass")
-            << Function->getName() << " " << DemangledName << " " << LambdaType
-            << "\n");
-      llvm::outs() << "Demangled name = " << DemangledName << "lambda type "
-                   << LambdaType << "\n";
-      for (auto *User : Function->users()) {
-        CallBase *CB = dyn_cast<CallBase>(User);
-        if (!CB)
-          reportFatalError("Expected CallBase as user of "
-                           "proteus::register_lambda function");
-
-        IRBuilder<> Builder(CB);
-        auto *LambdaNameGlobal = Builder.CreateGlobalString(LambdaType);
-        // Sometimes, whenever a function returns a struct, clang will
-        // automatically convert one of the arguments into holding the struct
-        // return pointer. We need to modify the last argoperand of the
-        // register_lambda call so we check if we have an sret argument
-        bool HasSRETArg = false;
-        for (uint32_t I = 0; I < CB->getNumOperands(); ++I) {
-          HasSRETArg =
-              HasSRETArg || CB->paramHasAttr(I, llvm::Attribute::StructRet);
-        }
-        int LambdaNameIndex = HasSRETArg ? 2 : 1;
-        CB->setArgOperand(LambdaNameIndex, LambdaNameGlobal);
-      }
-    }
-  }
 
   // Detect a CUDA module by the presence of the __cuda_register_globals
   // function.

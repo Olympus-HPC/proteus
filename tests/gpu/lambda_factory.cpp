@@ -31,7 +31,11 @@ __global__ __attribute__((annotate("jit"))) void kernel(T LB) {
 
 auto declareLambda(int rc1, int rc2) {
   return [=, C = proteus::jit_variable(rc1), D = 5, C2 = proteus::jit_variable(rc2)] ()
-                         __attribute__((annotate("jit"))) { printInt(C); printInt(C2); printInt(D); };
+                         __attribute__((annotate("jit"))) {
+                          printInt(C);
+                          printInt(C2);
+                          printInt(D);
+                        };
 }
 
 auto declareLambdaThree(int rc1, int rc2, int rc3) {

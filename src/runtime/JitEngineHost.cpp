@@ -162,6 +162,7 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
             LambdaRegistry::instance().matchJitVariableMap(F->getName())) {
       auto &RCVec = OptionalMapIt.value().second;
       TransformLambdaSpecialization::transform(M, *F, RCVec);
+      LambdaRegistry::instance().flushJitVariables();
     }
   }
 
