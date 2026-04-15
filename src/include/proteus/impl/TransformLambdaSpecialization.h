@@ -15,12 +15,17 @@
 #include "proteus/impl/Debug.h"
 #include "proteus/impl/Utils.h"
 
+#include <llvm/ADT/APInt.h>
+#include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/Demangle/Demangle.h>
-#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/DataLayout.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/Debug.h>
+
+#include <limits>
+#include <optional>
 
 namespace proteus {
 
@@ -84,41 +89,75 @@ private:
     return S;
   };
 
-  static void handleLoad(Module &M, User *User,
-                         const SmallVector<RuntimeConstant> &RCVec) {
-    auto *Arg = findArgByPos(RCVec, 0);
+  static void replaceLoad(Module &M, LoadInst *LI, int32_t ByteOffset,
+                          const SmallVector<RuntimeConstant> &RCVec) {
+    auto *Arg = findArgByOffset(RCVec, ByteOffset);
+    if (!Arg && ByteOffset == 0)
+      Arg = findArgByPos(RCVec, 0);
     if (!Arg)
       return;
 
-    Constant *C = getConstant(M.getContext(), User->getType(), *Arg);
-    User->replaceAllUsesWith(C);
+    Constant *C = getConstant(M.getContext(), LI->getType(), *Arg);
+    LI->replaceAllUsesWith(C);
     PROTEUS_DBG(Logger::logs("proteus") << traceOut(Arg->Pos, C));
     if (Config::get().traceSpecializations())
       Logger::trace(traceOut(Arg->Pos, C));
   }
 
-  static void handleGEP(Module &M, GetElementPtrInst *GEP, User *User,
-                        const SmallVector<RuntimeConstant> &RCVec) {
-    auto *GEPSlot = GEP->getOperand(User->getNumOperands() - 1);
-    ConstantInt *CI = dyn_cast<ConstantInt>(GEPSlot);
-    int Slot = CI->getZExtValue();
-    Type *SrcTy = GEP->getSourceElementType();
+  static std::optional<int32_t> getGEPByteOffset(const DataLayout &DL,
+                                                 GetElementPtrInst *GEP) {
+    APInt Offset(DL.getPointerTypeSizeInBits(GEP->getType()), 0, true);
+    if (!GEP->accumulateConstantOffset(DL, Offset))
+      return std::nullopt;
 
-    auto *Arg = SrcTy->isStructTy() ? findArgByPos(RCVec, Slot)
-                                    : findArgByOffset(RCVec, Slot);
-    if (!Arg)
+    int64_t Offset64 = Offset.getSExtValue();
+    if (Offset64 < std::numeric_limits<int32_t>::min() ||
+        Offset64 > std::numeric_limits<int32_t>::max())
+      return std::nullopt;
+
+    return static_cast<int32_t>(Offset64);
+  }
+
+  static void visitPointerUsers(Module &M, Value *Ptr, int32_t ByteOffset,
+                                const SmallVector<RuntimeConstant> &RCVec,
+                                SmallPtrSetImpl<Value *> &Seen) {
+    if (!Seen.insert(Ptr).second)
       return;
 
-    for (auto *GEPUser : GEP->users()) {
-      auto *LI = dyn_cast<LoadInst>(GEPUser);
-      if (!LI)
-        reportFatalError("Expected load instruction");
-      Type *LoadType = LI->getType();
-      Constant *C = getConstant(M.getContext(), LoadType, *Arg);
-      LI->replaceAllUsesWith(C);
-      PROTEUS_DBG(Logger::logs("proteus") << traceOut(Arg->Pos, C));
-      if (Config::get().traceSpecializations())
-        Logger::trace(traceOut(Arg->Pos, C));
+    const DataLayout &DL = M.getDataLayout();
+    for (User *User : Ptr->users()) {
+      if (auto *LI = dyn_cast<LoadInst>(User)) {
+        if (LI->getPointerOperand() != Ptr)
+          continue;
+        replaceLoad(M, LI, ByteOffset, RCVec);
+        continue;
+      }
+
+      if (auto *GEP = dyn_cast<GetElementPtrInst>(User)) {
+        if (GEP->getPointerOperand() != Ptr)
+          continue;
+
+        auto LocalOffset = getGEPByteOffset(DL, GEP);
+        if (!LocalOffset)
+          continue;
+
+        visitPointerUsers(M, GEP, ByteOffset + *LocalOffset, RCVec, Seen);
+        continue;
+      }
+
+      if (isa<BitCastInst>(User) || isa<AddrSpaceCastInst>(User) ||
+          isa<PHINode>(User) || isa<SelectInst>(User)) {
+        bool UsesPtr = false;
+        for (Value *Operand : User->operands()) {
+          if (Operand == Ptr) {
+            UsesPtr = true;
+            break;
+          }
+        }
+        if (!UsesPtr)
+          continue;
+        visitPointerUsers(M, cast<Value>(User), ByteOffset, RCVec, Seen);
+      }
     }
   }
 
@@ -139,14 +178,8 @@ public:
       }
     }
 
-    PROTEUS_DBG(Logger::logs("proteus") << "\t users" << "\n");
-    for (User *User : LambdaClass->users()) {
-      PROTEUS_DBG(Logger::logs("proteus") << *User << "\n");
-      if (isa<LoadInst>(User))
-        handleLoad(M, User, RCVec);
-      else if (auto *GEP = dyn_cast<GetElementPtrInst>(User))
-        handleGEP(M, GEP, User, RCVec);
-    }
+    SmallPtrSet<Value *, 32> Seen;
+    visitPointerUsers(M, LambdaClass, /*ByteOffset=*/0, RCVec, Seen);
   }
 };
 

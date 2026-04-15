@@ -26,6 +26,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "AnnotationHandler.h"
+#include "AutoReadOnlyCapturesAnalysis.h"
 #include "Helpers.h"
 
 #include "proteus/CompilerInterfaceTypes.h"
@@ -284,6 +285,8 @@ private:
     // runtime constants.
     emitJitFunctionArgMetadata(*JitMod, JFI, *JitF);
 
+    annotateAutoReadOnlyCaptures(*JitMod);
+
     if (verifyModule(*JitMod, &errs()))
       reportFatalError("Broken JIT module found, compilation aborted!");
 
@@ -324,6 +327,7 @@ private:
                         bool HasSourceFileID) {
     SmallVector<char> Bitcode;
     raw_svector_ostream OS(Bitcode);
+    annotateAutoReadOnlyCaptures(EmbedM);
     WriteBitcodeToFile(EmbedM, OS);
 
     HashT HashValue = hash(StringRef{Bitcode.data(), Bitcode.size()});
@@ -806,7 +810,16 @@ private:
 
     ArrayType *ArgPtrsTy = ArrayType::get(Types.PtrTy, StubFn->arg_size());
     Value *ArgPtrs = nullptr;
-    if (NumRuntimeConstants > 0) {
+
+    // Check if this is a lambda function (contains ::operator() in demangled
+    // name)
+    std::string DemangledName = llvm::demangle(StubFn->getName().str());
+    bool IsLambda = DemangledName.find("::operator()") != std::string::npos;
+
+    // For lambdas, we always need to pass Args to enable auto-readonly capture
+    // detection, even when there are no explicit jit_variable() captures.
+    // For non-lambdas, only create Args when there are runtime constants.
+    if (NumRuntimeConstants > 0 || IsLambda) {
       ArgPtrs = Builder.CreateAlloca(ArgPtrsTy);
       // Create an alloca for each argument to store a pointer to the argument,
       // mimicking how arguments are passed for GPU kernels. This is done so

@@ -7,3 +7,5 @@ miniconda3*
 install-*
 docs/doxygen*
 site
+**.proteus*
+**.proteus-logs*

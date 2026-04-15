@@ -36,6 +36,8 @@
 
 #include <memory>
 
+#include "proteus/impl/AutoReadOnlyCaptures.h"
+
 using namespace proteus;
 using namespace llvm;
 using namespace llvm::orc;
@@ -133,8 +135,10 @@ JitEngineHost::~JitEngineHost() {
     CacheChain->printStats();
 }
 
-void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
-                                 ArrayRef<RuntimeConstant> RCArray) {
+void JitEngineHost::specializeIR(
+    Module &M, StringRef FnName, StringRef Suffix,
+    ArrayRef<RuntimeConstant> RCArray,
+    const SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
   TIMESCOPE(JitEngineHost, specializeIR);
   Function *F = M.getFunction(FnName);
   assert(F && "Expected non-null function!");
@@ -146,22 +150,13 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
   PROTEUS_DBG(Logger::logs("proteus") << "Metadata jit for F " << F->getName()
                                       << " = " << *Node << "\n");
 
-  // Replace argument uses with runtime constants.
-  SmallVector<int32_t> ArgPos;
-  for (unsigned int I = 0; I < Node->getNumOperands(); ++I) {
-    ConstantAsMetadata *CAM = cast<ConstantAsMetadata>(Node->getOperand(I));
-    ConstantInt *ConstInt = cast<ConstantInt>(CAM->getValue());
-    int ArgNo = ConstInt->getZExtValue();
-    ArgPos.push_back(ArgNo);
-  }
-
   TransformArgumentSpecialization::transform(M, *F, RCArray);
 
   if (!LambdaRegistry::instance().empty()) {
     if (auto OptionalMapIt =
             LambdaRegistry::instance().matchJitVariableMap(F->getName())) {
-      auto &RCVec = OptionalMapIt.value()->getSecond();
-      TransformLambdaSpecialization::transform(M, *F, RCVec);
+      // Use the merged lambda values from getLambdaJitValues
+      TransformLambdaSpecialization::transform(M, *F, LambdaJitValuesVec);
     }
   }
 
@@ -175,7 +170,7 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
   }
 }
 
-void getLambdaJitValues(StringRef FnName,
+void getLambdaJitValues(Module &M, StringRef FnName, void **Args,
                         SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
   TIMESCOPE("proteus::getLambdaJitValues");
   LambdaRegistry &LR = LambdaRegistry::instance();
@@ -186,14 +181,25 @@ void getLambdaJitValues(StringRef FnName,
                                       << "Caller trigger " << FnName << " -> "
                                       << demangle(FnName.str()) << "\n");
 
-  SmallVector<StringRef> LambdaCalleeInfo;
   PROTEUS_DBG(Logger::logs("proteus")
               << " Trying F " << demangle(FnName.str()) << "\n ");
   auto OptionalMapIt = LR.matchJitVariableMap(FnName);
   if (!OptionalMapIt)
     return;
 
-  LambdaJitValuesVec = OptionalMapIt.value()->getSecond();
+  // Get the explicit jit_variable captures
+  const SmallVector<RuntimeConstant> &ExplicitValues =
+      OptionalMapIt.value()->getSecond();
+
+  Function *LambdaFn = M.getFunction(FnName);
+  // For host JIT, the lambda closure is passed as the first argument and
+  // Args[0] contains a pointer-to-pointer to the closure due to the ABI.
+  const void *LambdaClosure =
+      (Args && Args[0]) ? *static_cast<const void **>(Args[0]) : nullptr;
+  LambdaJitValuesVec = resolveLambdaSpecializationValues(
+      ExplicitValues, LambdaFn, LambdaClosure,
+      Config::get().ProteusAutoReadOnlyCaptures,
+      Config::get().traceSpecializations());
 }
 
 void *
@@ -217,7 +223,7 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   SmallVector<RuntimeConstant> RCVec =
       getRuntimeConstantValues(Args, RCInfoArray);
   SmallVector<RuntimeConstant> LambdaJitValuesVec;
-  getLambdaJitValues(FnName, LambdaJitValuesVec);
+  getLambdaJitValues(*M, FnName, Args, LambdaJitValuesVec);
 
   HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesVec);
   if (Config::get().ProteusDebugOutput) {
@@ -247,7 +253,7 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   } else {
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".input.ll", *M));
     // Specialize the module using runtime values.
-    specializeIR(*M, FnName, Suffix, RCVec);
+    specializeIR(*M, FnName, Suffix, RCVec, LambdaJitValuesVec);
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".specialized.ll", *M));
     // Compile the object.
     auto ObjectModule = compileOnly(*M);

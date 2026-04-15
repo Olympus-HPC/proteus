@@ -13,7 +13,7 @@
 
 #include "proteus/impl/CoreDevice.h"
 #include "proteus/impl/GlobalVarInfo.h"
-#include "proteus/impl/LambdaRegistry.h"
+#include "proteus/impl/LambdaSpecializationInfo.h"
 #include "proteus/impl/TransformArgumentSpecialization.h"
 #include "proteus/impl/TransformLambdaSpecialization.h"
 #include "proteus/impl/TransformSharedArray.h"
@@ -283,12 +283,12 @@ inline void relinkGlobalsObject(
   }
 }
 
-inline void specializeIR(
-    Module &M, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
-    dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
-    const SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo,
-    bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsRange,
-    bool SpecializeLaunchBounds, int MinBlocksPerSM) {
+inline void
+specializeIR(Module &M, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
+             dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
+             ArrayRef<ResolvedLambdaSpecializationInfo> LambdaSpecializations,
+             bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsRange,
+             bool SpecializeLaunchBounds, int MinBlocksPerSM) {
   TIMESCOPE("proteus::specializeIR");
   Timer T(Config::get().ProteusEnableTimers);
   Function *F = M.getFunction(FnName);
@@ -298,13 +298,12 @@ inline void specializeIR(
   if (SpecializeArgs)
     TransformArgumentSpecialization::transform(M, *F, RCArray);
 
-  auto &LR = LambdaRegistry::instance();
-  for (auto &[FnName, LambdaType] : LambdaCalleeInfo) {
-    const SmallVector<RuntimeConstant> &RCVec = LR.getJitVariables(LambdaType);
-    Function *F = M.getFunction(FnName);
-    if (!F)
+  for (const auto &LambdaSpecialization : LambdaSpecializations) {
+    Function *LambdaFn = M.getFunction(LambdaSpecialization.CalleeName);
+    if (!LambdaFn)
       reportFatalError("Expected non-null Function");
-    TransformLambdaSpecialization::transform(M, *F, RCVec);
+    TransformLambdaSpecialization::transform(M, *LambdaFn,
+                                             LambdaSpecialization.Values);
   }
 
   // Run the shared array transform after any value specialization (arguments,
