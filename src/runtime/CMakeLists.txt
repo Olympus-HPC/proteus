@@ -42,6 +42,8 @@ endif()
 
 if(PROTEUS_ENABLE_MLIR)
   list(APPEND SOURCES
+    Frontend/MLIRJitModule.cpp
+    Frontend/MLIRLower.cpp
     Frontend/MLIRCodeBuilder.cpp
   )
 endif()

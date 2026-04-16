@@ -76,6 +76,8 @@ CREATE_MLIR_GPU_LIT_TEST(mlir_gpu_if mlir_gpu_if.cpp)
 CREATE_MLIR_GPU_LIT_TEST(mlir_gpu_index_lowering mlir_gpu_index_lowering.cpp)
 CREATE_MLIR_GPU_LIT_TEST(mlir_gpu_internal_call mlir_gpu_internal_call.cpp)
 CREATE_MLIR_GPU_LIT_TEST(mlir_gpu_intrinsics mlir_gpu_intrinsics.cpp)
+CREATE_MLIR_GPU_LIT_TEST(mlir_gpu_jit_module_source
+             mlir_gpu_jit_module_source.cpp)
 CREATE_MLIR_GPU_LIT_TEST(mlir_gpu_kernel_2d mlir_gpu_kernel_2d.cpp)
 CREATE_MLIR_GPU_LIT_TEST(mlir_gpu_kernel_3d mlir_gpu_kernel_3d.cpp)
 CREATE_MLIR_GPU_LIT_TEST(mlir_gpu_multi_module mlir_gpu_multi_module.cpp)
