@@ -1,6 +1,8 @@
 .base-job:
   extends: .job_on_matrix
   interruptible: true
+  # Serialize actual Matrix runner jobs across all Matrix child pipelines.
+  resource_group: "matrix-ci"
   before_script:
     - echo "=== Start CI spack Tests ==="
   after_script:
