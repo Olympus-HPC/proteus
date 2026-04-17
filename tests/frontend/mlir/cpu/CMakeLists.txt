@@ -56,6 +56,7 @@ set(MLIR_CPU_LIT_TESTS
     mlir_int_atomics
     mlir_internal_call
     mlir_intrinsics
+    mlir_jit_module_source
     mlir_loopnest_1d
     mlir_loopnest_3d
     mlir_loopnest_3d_uniformtile

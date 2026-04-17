@@ -52,7 +52,7 @@ int main() {
 
   CppJitModule CJM{"cuda", Code, {}, CppJitCompilerBackend::Nvcc};
   auto &Inst = CJM.instantiate("shmem_kernel", "7");
-  Inst.setFuncAttribute(CppJitFuncAttribute::MaxDynamicSharedMemorySize,
+  Inst.setFuncAttribute(JitFuncAttribute::MaxDynamicSharedMemorySize,
                         LargeShmemSize);
 
   gpuErrCheck(static_cast<gpuError_t>(
@@ -63,7 +63,7 @@ int main() {
 
   *Out = 0;
   auto Kernel = CJM.getKernel<void(int *)>("shmem_plain");
-  Kernel.setFuncAttribute(CppJitFuncAttribute::MaxDynamicSharedMemorySize,
+  Kernel.setFuncAttribute(JitFuncAttribute::MaxDynamicSharedMemorySize,
                           LargeShmemSize);
   gpuErrCheck(static_cast<gpuError_t>(
       Kernel.launch({1, 1, 1}, {1, 1, 1}, LargeShmemSize, nullptr, Out)));

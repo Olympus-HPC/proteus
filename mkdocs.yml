@@ -9,6 +9,7 @@ nav:
           - Overview: user/interface.md
           - Code Annotations: user/annotations.md
           - C++ Frontend API: user/cpp-frontend.md
+          - MLIR Frontend API: user/mlir-frontend.md
           - DSL API: user/dsl.md
       - Runtime Configuration: user/config.md
       - Resources : user/resources.md

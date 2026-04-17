@@ -2,8 +2,8 @@
 #define PROTEUS_CPPFRONTEND_H
 
 #include "proteus/CppJitCompilerBackend.h"
-#include "proteus/CppJitFuncAttribute.h"
 #include "proteus/Frontend/Dispatcher.h"
+#include "proteus/JitFuncAttribute.h"
 
 #include <algorithm>
 #include <optional>
@@ -31,12 +31,12 @@ private:
   struct FuncAttributeState {
     std::optional<int> MaxDynamicSharedMemorySize;
 
-    void set(CppJitFuncAttribute Attr, int Value) {
+    void set(JitFuncAttribute Attr, int Value) {
       if (Value < 0)
         reportFatalError("Function attribute value must be non-negative");
 
       switch (Attr) {
-      case CppJitFuncAttribute::MaxDynamicSharedMemorySize:
+      case JitFuncAttribute::MaxDynamicSharedMemorySize:
         MaxDynamicSharedMemorySize = Value;
         return;
       }
@@ -281,7 +281,7 @@ private:
       FuncPtr = InstanceModule->getFunctionAddress(EntryFuncName);
     }
 
-    void setFuncAttribute(CppJitFuncAttribute Attr, int Value) {
+    void setFuncAttribute(JitFuncAttribute Attr, int Value) {
       FuncAttributes.set(Attr, Value);
       InstanceModule.reset();
       FuncPtr = nullptr;
@@ -329,7 +329,7 @@ private:
   std::unordered_map<std::string, std::unique_ptr<CodeInstance>>
       InstantiationCache;
 
-  void setFuncAttribute(void *KernelFunc, CppJitFuncAttribute Attr, int Value);
+  void setFuncAttribute(void *KernelFunc, JitFuncAttribute Attr, int Value);
   void *getFunctionAddress(const std::string &Name);
   DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
                         LaunchDims BlockDim, void *KernelArgs[],
@@ -410,7 +410,7 @@ public:
       static_assert(std::is_void_v<RetT>, "Kernel function must return void");
     }
 
-    void setFuncAttribute(CppJitFuncAttribute Attr, int Value) {
+    void setFuncAttribute(JitFuncAttribute Attr, int Value) {
       M.setFuncAttribute(FuncPtr, Attr, Value);
     }
 
