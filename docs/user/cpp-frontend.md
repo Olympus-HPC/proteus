@@ -163,11 +163,11 @@ to compile through the NVCC toolchain instead.
 For GPU kernels and instantiated kernels, you can set supported function
 attributes before launching.
 For example, Proteus exposes
-`CppJitFuncAttribute::MaxDynamicSharedMemorySize`:
+`JitFuncAttribute::MaxDynamicSharedMemorySize`:
 
 ```cpp
 auto Kernel = Module.getKernel<void(int *)>("shmem_plain");
-Kernel.setFuncAttribute(CppJitFuncAttribute::MaxDynamicSharedMemorySize,
+Kernel.setFuncAttribute(JitFuncAttribute::MaxDynamicSharedMemorySize,
                         49 * 1024);
 Kernel.launch({1, 1, 1}, {1, 1, 1}, 49 * 1024, nullptr, Out);
 ```
