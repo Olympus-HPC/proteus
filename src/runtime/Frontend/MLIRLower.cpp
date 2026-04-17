@@ -166,6 +166,349 @@ void loadMLIRLoweringDialects(mlir::MLIRContext &Context) {
       math::MathDialect, memref::MemRefDialect, scf::SCFDialect>();
 }
 
+static bool isStandaloneDeviceTarget(TargetModelType TM) {
+  return TM == TargetModelType::CUDA || TM == TargetModelType::HIP;
+}
+
+static bool isMixedHostDeviceTarget(TargetModelType TM) {
+  return TM == TargetModelType::HOST_CUDA || TM == TargetModelType::HOST_HIP;
+}
+
+static void setModuleTargetAttrs(mlir::ModuleOp Module, OpBuilder &Builder,
+                                 llvm::StringRef TargetTriple,
+                                 llvm::StringRef CPU, llvm::StringRef Features,
+                                 llvm::StringRef Prefix) {
+  const std::string DataLayout =
+      computeTargetDataLayout(TargetTriple, CPU, Features, Prefix);
+  Module.getOperation()->setAttr(
+      mlir::LLVM::LLVMDialect::getTargetTripleAttrName(),
+      Builder.getStringAttr(TargetTriple));
+  Module.getOperation()->setAttr(
+      mlir::LLVM::LLVMDialect::getDataLayoutAttrName(),
+      Builder.getStringAttr(DataLayout));
+}
+
+#if LLVM_VERSION_MAJOR >= 22
+static void addGenericToLLVMConversion(mlir::PassManager &PM) {
+  mlir::ConvertToLLVMPassOptions Opts;
+  Opts.filterDialects = {"arith", "func", "index", "math", "memref"};
+  // Use DataLayoutAnalysis-backed conversion so index lowering follows the
+  // module data layout, matching the explicit pre-LLVM-22 pipeline.
+  Opts.useDynamic = true;
+  PM.addPass(mlir::createConvertToLLVMPass(Opts));
+  PM.addPass(mlir::createReconcileUnrealizedCastsPass());
+}
+#endif
+
+static void addHostLoweringPipeline(mlir::PassManager &PM) {
+  // HOST path: input is host-side structured IR (func/scf/arith/math/
+  // memref); output is host-targeted LLVM dialect before translation.
+#if LLVM_VERSION_MAJOR >= 22
+  PM.addPass(mlir::createSCFToControlFlowPass());
+#else
+  PM.addPass(mlir::createConvertSCFToCFPass());
+#endif
+  {
+    mlir::ConvertControlFlowToLLVMPassOptions Opts;
+    Opts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
+    PM.addPass(mlir::createConvertControlFlowToLLVMPass(Opts));
+  }
+#if LLVM_VERSION_MAJOR >= 22
+  addGenericToLLVMConversion(PM);
+#else
+  PM.addPass(mlir::createArithToLLVMConversionPass());
+  PM.addPass(mlir::createConvertMathToLLVMPass());
+  PM.addPass(mlir::createFinalizeMemRefToLLVMConversionPass());
+  PM.addPass(mlir::createConvertFuncToLLVMPass());
+  PM.addPass(mlir::createReconcileUnrealizedCastsPass());
+#endif
+}
+
+#if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
+static void addCommonGpuLoweringPrelude(mlir::PassManager &PM) {
+#if LLVM_VERSION_MAJOR >= 22
+  PM.addPass(mlir::createSCFToControlFlowPass());
+#else
+  PM.addPass(mlir::createConvertSCFToCFPass());
+#endif
+  {
+    mlir::ConvertControlFlowToLLVMPassOptions Opts;
+    Opts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
+    PM.addPass(mlir::createConvertControlFlowToLLVMPass(Opts));
+  }
+  PM.addPass(mlir::createReconcileUnrealizedCastsPass());
+}
+
+static void addCommonGpuLLVMFinalization(mlir::PassManager &PM) {
+#if LLVM_VERSION_MAJOR >= 22
+  addGenericToLLVMConversion(PM);
+#else
+  mlir::ArithToLLVMConversionPassOptions ArithOpts;
+  ArithOpts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
+  PM.addPass(mlir::createArithToLLVMConversionPass(ArithOpts));
+
+  PM.addPass(mlir::createConvertMathToLLVMPass());
+
+  mlir::ConvertIndexToLLVMPassOptions IndexOpts;
+  IndexOpts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
+  PM.addPass(mlir::createConvertIndexToLLVMPass(IndexOpts));
+
+  mlir::FinalizeMemRefToLLVMConversionPassOptions MemRefOpts;
+  MemRefOpts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
+  PM.addPass(mlir::createFinalizeMemRefToLLVMConversionPass(MemRefOpts));
+
+  PM.addPass(mlir::createReconcileUnrealizedCastsPass());
+#endif
+}
+#endif
+
+static void addCUDALoweringPipeline(mlir::PassManager &PM,
+                                    llvm::StringRef Prefix) {
+#if PROTEUS_ENABLE_CUDA
+  // CUDA path: lower device-only gpu.module/gpu.func to NVVM/LLVM dialect.
+  // This pass is defined on gpu.module, so schedule it as a nested pass.
+  mlir::ConvertGpuOpsToNVVMOpsOptions NVVMOpts;
+  NVVMOpts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
+  // Use bare pointer call convention so kernel argument ABI matches the
+  // existing Proteus CUDA dispatcher launch path (raw pointer parameters).
+  NVVMOpts.useBarePtrCallConv = true;
+
+  // NOTE: ConvertControlFlowToLLVMPass is restricted to `builtin.module`,
+  // so it cannot be added to a nested `gpu.module` pass manager. Run it at
+  // the top-level before GPU->NVVM conversion creates llvm.func bodies.
+  addCommonGpuLoweringPrelude(PM);
+  PM.nest<gpu::GPUModuleOp>().addPass(
+      mlir::createConvertGpuOpsToNVVMOps(NVVMOpts));
+  addCommonGpuLLVMFinalization(PM);
+#else
+  (void)PM;
+  reportFatalError(Prefix.str() +
+                   ": CUDA target requested but Proteus was built with "
+                   "PROTEUS_ENABLE_CUDA=OFF");
+#endif
+}
+
+static void addHIPLoweringPipeline(mlir::PassManager &PM, llvm::StringRef CPU,
+                                   llvm::StringRef Prefix) {
+#if PROTEUS_ENABLE_HIP
+  // HIP path: input is device-only gpu.module/gpu.func + gpu.* ops;
+  // output is ROCDL/LLVM dialect that can be translated to AMDGPU LLVM IR.
+  // Step 1 (gpu -> rocdl/llvm): lower gpu.module/gpu.func and gpu.* ops.
+  // This pass is defined on gpu.module, so schedule it as a nested pass
+  // instead of directly on builtin.module.
+  // Use bare pointer call convention so kernel argument ABI matches the
+  // existing Proteus HIP dispatcher launch path (raw pointer parameters).
+  // The ROCDL lowering pass requires a non-empty chipset name.
+  const std::string HipChipset = CPU.str();
+
+  // NOTE: ConvertControlFlowToLLVMPass is restricted to `builtin.module`,
+  // so it cannot be added to a nested `gpu.module` pass manager. Run it at
+  // the top-level before GPU->ROCDL conversion creates llvm.func bodies.
+  addCommonGpuLoweringPrelude(PM);
+
+#if LLVM_VERSION_MAJOR >= 22
+  mlir::ConvertGpuOpsToROCDLOpsOptions ROCDLOpts;
+  ROCDLOpts.chipset = HipChipset;
+  ROCDLOpts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
+  ROCDLOpts.useBarePtrCallConv = true;
+  PM.nest<gpu::GPUModuleOp>().addPass(
+      mlir::createConvertGpuOpsToROCDLOps(ROCDLOpts));
+#else
+  PM.nest<gpu::GPUModuleOp>().addPass(mlir::createLowerGpuOpsToROCDLOpsPass(
+      /*chipset=*/HipChipset,
+      /*indexBitwidth=*/mlir::kDeriveIndexBitwidthFromDataLayout,
+      /*useBarePtrCallConv=*/true));
+#endif
+  addCommonGpuLLVMFinalization(PM);
+#else
+  (void)PM;
+  (void)CPU;
+  reportFatalError(Prefix.str() +
+                   ": HIP target requested but Proteus was built with "
+                   "PROTEUS_ENABLE_HIP=OFF");
+#endif
+}
+
+static void addTargetLoweringPipeline(mlir::PassManager &PM, TargetModelType TM,
+                                      llvm::StringRef CPU,
+                                      llvm::StringRef Prefix) {
+  if (TM == TargetModelType::HOST) {
+    addHostLoweringPipeline(PM);
+  } else if (TM == TargetModelType::CUDA) {
+    addCUDALoweringPipeline(PM, Prefix);
+  } else if (TM == TargetModelType::HIP) {
+    addHIPLoweringPipeline(PM, CPU, Prefix);
+  } else if (isMixedHostDeviceTarget(TM)) {
+    reportFatalError(Prefix.str() +
+                     ": mixed host+device MLIR lowering is not yet supported");
+  } else {
+    reportFatalError(Prefix.str() +
+                     ": lowering only supported for HOST/CUDA/HIP");
+  }
+}
+
+static void registerLLVMTranslations(mlir::MLIRContext &Context,
+                                     TargetModelType TM,
+                                     llvm::StringRef Prefix) {
+  // Register dialect translations used by translateModuleToLLVMIR.
+  mlir::registerBuiltinDialectTranslation(Context);
+  mlir::registerLLVMDialectTranslation(Context);
+  if (isStandaloneDeviceTarget(TM))
+    mlir::registerGPUDialectTranslation(Context);
+  if (TM == TargetModelType::CUDA) {
+#if PROTEUS_ENABLE_CUDA
+    mlir::registerNVVMDialectTranslation(Context);
+#else
+    reportFatalError(Prefix.str() +
+                     ": CUDA target requested but Proteus was built with "
+                     "PROTEUS_ENABLE_CUDA=OFF");
+#endif
+  }
+  if (TM == TargetModelType::HIP) {
+#if PROTEUS_ENABLE_HIP
+    mlir::registerROCDLDialectTranslation(Context);
+#else
+    reportFatalError(Prefix.str() +
+                     ": HIP target requested but Proteus was built with "
+                     "PROTEUS_ENABLE_HIP=OFF");
+#endif
+  }
+}
+
+static gpu::GPUModuleOp
+getDeviceModuleForSerialization(mlir::ModuleOp Module, llvm::StringRef Prefix) {
+  auto DeviceSym = Module.lookupSymbol<gpu::GPUModuleOp>("kernels");
+  if (!DeviceSym)
+    reportFatalError(Prefix.str() +
+                     ": expected gpu.module @kernels for device lowering");
+
+  mlir::PassManager DevicePM(Module.getContext());
+  DevicePM.nest<gpu::GPUModuleOp>().addPass(
+      mlir::createReconcileUnrealizedCastsPass());
+  if (failed(DevicePM.run(Module)))
+    reportFatalError(Prefix.str() +
+                     ": failed to reconcile device gpu.module after lowering");
+
+  DeviceSym = Module.lookupSymbol<gpu::GPUModuleOp>("kernels");
+  if (!DeviceSym)
+    reportFatalError(Prefix.str() +
+                     ": reconciled device module lost gpu.module @kernels");
+
+  bool HasUnrealizedCasts = false;
+  DeviceSym.walk(
+      [&](mlir::UnrealizedConversionCastOp) { HasUnrealizedCasts = true; });
+  if (HasUnrealizedCasts) {
+    llvm::errs() << "[proteus][" << Prefix
+                 << "] Lowered device gpu.module still contains "
+                    "builtin.unrealized_conversion_cast:\n";
+    DeviceSym.print(llvm::errs());
+    llvm::errs() << "\n";
+    reportFatalError(Prefix.str() +
+                     ": device gpu.module still contains unrealized "
+                     "conversion casts after reconciliation");
+  }
+
+  return DeviceSym;
+}
+
+static std::unique_ptr<llvm::Module> serializeDeviceModuleToLLVMIR(
+    Operation &OperationToSerialize, llvm::LLVMContext &LLVMCtx,
+    llvm::StringRef TargetTriple, llvm::StringRef CPU, llvm::StringRef Features,
+    int OptLevel, llvm::StringRef Prefix) {
+  mlir::LLVM::ModuleToObject Serializer(OperationToSerialize, TargetTriple, CPU,
+                                        Features, OptLevel);
+  std::optional<SmallVector<char, 0>> Serialized = Serializer.run();
+  if (!Serialized)
+    reportFatalError(Prefix.str() +
+                     ": failed to serialize device module to LLVM bitcode");
+
+  llvm::MemoryBufferRef Buffer(
+      llvm::StringRef(Serialized->data(), Serialized->size()), "DeviceBitcode");
+  auto ParsedModule = llvm::parseBitcodeFile(Buffer, LLVMCtx);
+  if (!ParsedModule)
+    reportFatalError(Prefix.str() +
+                     ": failed to parse serialized device LLVM bitcode: " +
+                     llvm::toString(ParsedModule.takeError()));
+  return std::move(*ParsedModule);
+}
+
+static std::unique_ptr<llvm::Module>
+translateHostModuleToLLVMIR(mlir::ModuleOp Module, llvm::LLVMContext &LLVMCtx,
+                            llvm::StringRef Prefix) {
+  auto Mod = mlir::translateModuleToLLVMIR(Module.getOperation(), LLVMCtx);
+  if (!Mod)
+    reportFatalError(Prefix.str() +
+                     ": failed to translate LLVM dialect to LLVM IR module");
+  return Mod;
+}
+
+static void validateDeviceLLVMModule(llvm::Module &Mod,
+                                     Operation &OperationToSerialize,
+                                     llvm::StringRef Prefix) {
+  if (hasLLVMFunctionDefinitions(Mod))
+    return;
+
+  llvm::errs() << "[proteus][" << Prefix
+               << "] Device translation produced no function definitions. "
+                  "MLIR device module was:\n";
+  OperationToSerialize.print(llvm::errs());
+  llvm::errs() << "\n";
+  reportFatalError(Prefix.str() +
+                   ": device translation produced an empty LLVM IR module");
+}
+
+static void normalizeDeviceKernelSymbols(llvm::Module &Mod,
+                                         llvm::StringRef Prefix) {
+  // MLIR device lowering may qualify kernel function symbols (e.g. with the
+  // gpu.module name). Normalize known prefixes so the rest of Proteus can
+  // resolve functions by their frontend names.
+  llvm::SmallVector<std::pair<llvm::Function *, std::string>> ToRename;
+  llvm::StringSet<> NewNames;
+  for (auto &Fn : Mod.functions()) {
+    if (Fn.isDeclaration())
+      continue;
+
+    llvm::StringRef Name = Fn.getName();
+    static constexpr llvm::StringLiteral KernelsPrefix = "kernels.";
+    if (!Name.starts_with(KernelsPrefix))
+      continue;
+
+    llvm::StringRef Stripped = Name.drop_front(KernelsPrefix.size());
+    if (Stripped.empty())
+      continue;
+
+    if (Mod.getFunction(Stripped))
+      reportFatalError(Prefix.str() + ": device symbol name collision for " +
+                       Stripped.str());
+
+    if (!NewNames.insert(Stripped).second)
+      reportFatalError(Prefix.str() + ": multiple device symbols map to " +
+                       Stripped.str());
+
+    ToRename.emplace_back(&Fn, Stripped.str());
+  }
+
+  for (auto &[Fn, NewName] : ToRename)
+    Fn->setName(NewName);
+}
+
+static void setFinalLLVMTargetAttrs(llvm::Module &Mod, TargetModelType TM,
+                                    llvm::StringRef TargetTriple,
+                                    llvm::StringRef CPU,
+                                    llvm::StringRef Features,
+                                    llvm::StringRef Prefix) {
+  if (!TargetTriple.empty()) {
+#if LLVM_VERSION_MAJOR >= 22
+    Mod.setTargetTriple(llvm::Triple{TargetTriple});
+#else
+    Mod.setTargetTriple(TargetTriple);
+#endif
+    if (isStandaloneDeviceTarget(TM))
+      Mod.setDataLayout(
+          computeTargetDataLayout(TargetTriple, CPU, Features, Prefix));
+  }
+}
+
 MLIRLoweringResult lowerMLIRModuleToLLVM(mlir::ModuleOp Module,
                                          const MLIRLoweringOptions &Options) {
   const TargetModelType TM = Options.TargetModel;
@@ -181,68 +524,6 @@ MLIRLoweringResult lowerMLIRModuleToLLVM(mlir::ModuleOp Module,
 
   MLIRContext *Context = Module.getContext();
   OpBuilder Builder(Context);
-  mlir::PassManager PM(Context);
-
-  auto SetModuleTargetAttrs = [&]() {
-    const std::string DataLayout =
-        computeTargetDataLayout(TargetTriple, CPU, Features, Prefix);
-    Module.getOperation()->setAttr(
-        mlir::LLVM::LLVMDialect::getTargetTripleAttrName(),
-        Builder.getStringAttr(TargetTriple));
-    Module.getOperation()->setAttr(
-        mlir::LLVM::LLVMDialect::getDataLayoutAttrName(),
-        Builder.getStringAttr(DataLayout));
-  };
-
-#if LLVM_VERSION_MAJOR >= 22
-  auto AddGenericToLLVMConversion = [&]() {
-    mlir::ConvertToLLVMPassOptions Opts;
-    Opts.filterDialects = {"arith", "func", "index", "math", "memref"};
-    // Use DataLayoutAnalysis-backed conversion so index lowering follows the
-    // module data layout, matching the explicit pre-LLVM-22 pipeline.
-    Opts.useDynamic = true;
-    PM.addPass(mlir::createConvertToLLVMPass(Opts));
-    PM.addPass(mlir::createReconcileUnrealizedCastsPass());
-  };
-#endif
-
-#if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
-  auto AddCommonGpuLoweringPrelude = [&]() {
-#if LLVM_VERSION_MAJOR >= 22
-    PM.addPass(mlir::createSCFToControlFlowPass());
-#else
-    PM.addPass(mlir::createConvertSCFToCFPass());
-#endif
-    {
-      mlir::ConvertControlFlowToLLVMPassOptions Opts;
-      Opts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
-      PM.addPass(mlir::createConvertControlFlowToLLVMPass(Opts));
-    }
-    PM.addPass(mlir::createReconcileUnrealizedCastsPass());
-  };
-
-  auto AddCommonGpuLLVMFinalization = [&]() {
-#if LLVM_VERSION_MAJOR >= 22
-    AddGenericToLLVMConversion();
-#else
-    mlir::ArithToLLVMConversionPassOptions ArithOpts;
-    ArithOpts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
-    PM.addPass(mlir::createArithToLLVMConversionPass(ArithOpts));
-
-    PM.addPass(mlir::createConvertMathToLLVMPass());
-
-    mlir::ConvertIndexToLLVMPassOptions IndexOpts;
-    IndexOpts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
-    PM.addPass(mlir::createConvertIndexToLLVMPass(IndexOpts));
-
-    mlir::FinalizeMemRefToLLVMConversionPassOptions MemRefOpts;
-    MemRefOpts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
-    PM.addPass(mlir::createFinalizeMemRefToLLVMConversionPass(MemRefOpts));
-
-    PM.addPass(mlir::createReconcileUnrealizedCastsPass());
-#endif
-  };
-#endif
 
   // Set triple + data layout so index bitwidth derivation is consistent.
   if ((TM == TargetModelType::HIP || TM == TargetModelType::HOST_HIP) &&
@@ -250,243 +531,32 @@ MLIRLoweringResult lowerMLIRModuleToLLVM(mlir::ModuleOp Module,
     reportFatalError(Prefix.str() +
                      ": HIP device lowering requires a non-empty device arch "
                      "(call setDeviceArch(\"gfx*\"))");
-  SetModuleTargetAttrs();
+  setModuleTargetAttrs(Module, Builder, TargetTriple, CPU, Features, Prefix);
 
-  if (TM == TargetModelType::HOST) {
-    // HOST path: input is host-side structured IR (func/scf/arith/math/
-    // memref); output is host-targeted LLVM dialect before translation.
-#if LLVM_VERSION_MAJOR >= 22
-    PM.addPass(mlir::createSCFToControlFlowPass());
-#else
-    PM.addPass(mlir::createConvertSCFToCFPass());
-#endif
-    {
-      mlir::ConvertControlFlowToLLVMPassOptions Opts;
-      Opts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
-      PM.addPass(mlir::createConvertControlFlowToLLVMPass(Opts));
-    }
-#if LLVM_VERSION_MAJOR >= 22
-    AddGenericToLLVMConversion();
-#else
-    PM.addPass(mlir::createArithToLLVMConversionPass());
-    PM.addPass(mlir::createConvertMathToLLVMPass());
-    PM.addPass(mlir::createFinalizeMemRefToLLVMConversionPass());
-    PM.addPass(mlir::createConvertFuncToLLVMPass());
-    PM.addPass(mlir::createReconcileUnrealizedCastsPass());
-#endif
-  } else if (TM == TargetModelType::CUDA) {
-#if PROTEUS_ENABLE_CUDA
-    // CUDA path: lower device-only gpu.module/gpu.func to NVVM/LLVM dialect.
-    // This pass is defined on gpu.module, so schedule it as a nested pass.
-    mlir::ConvertGpuOpsToNVVMOpsOptions NVVMOpts;
-    NVVMOpts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
-    // Use bare pointer call convention so kernel argument ABI matches the
-    // existing Proteus CUDA dispatcher launch path (raw pointer parameters).
-    NVVMOpts.useBarePtrCallConv = true;
-
-    // NOTE: ConvertControlFlowToLLVMPass is restricted to `builtin.module`,
-    // so it cannot be added to a nested `gpu.module` pass manager. Run it at
-    // the top-level before GPU->NVVM conversion creates llvm.func bodies.
-    AddCommonGpuLoweringPrelude();
-    PM.nest<gpu::GPUModuleOp>().addPass(
-        mlir::createConvertGpuOpsToNVVMOps(NVVMOpts));
-    AddCommonGpuLLVMFinalization();
-#else
-    reportFatalError(Prefix.str() +
-                     ": CUDA target requested but Proteus was built with "
-                     "PROTEUS_ENABLE_CUDA=OFF");
-#endif
-  } else if (TM == TargetModelType::HIP) {
-#if PROTEUS_ENABLE_HIP
-    // HIP path: input is device-only gpu.module/gpu.func + gpu.* ops;
-    // output is ROCDL/LLVM dialect that can be translated to AMDGPU LLVM IR.
-    // Step 1 (gpu -> rocdl/llvm): lower gpu.module/gpu.func and gpu.* ops.
-    // This pass is defined on gpu.module, so schedule it as a nested pass
-    // instead of directly on builtin.module.
-    // Use bare pointer call convention so kernel argument ABI matches the
-    // existing Proteus HIP dispatcher launch path (raw pointer parameters).
-    // The ROCDL lowering pass requires a non-empty chipset name.
-    const std::string HipChipset = CPU.str();
-
-    // NOTE: ConvertControlFlowToLLVMPass is restricted to `builtin.module`,
-    // so it cannot be added to a nested `gpu.module` pass manager. Run it at
-    // the top-level before GPU->ROCDL conversion creates llvm.func bodies.
-    AddCommonGpuLoweringPrelude();
-
-#if LLVM_VERSION_MAJOR >= 22
-    mlir::ConvertGpuOpsToROCDLOpsOptions ROCDLOpts;
-    ROCDLOpts.chipset = HipChipset;
-    ROCDLOpts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
-    ROCDLOpts.useBarePtrCallConv = true;
-    PM.nest<gpu::GPUModuleOp>().addPass(
-        mlir::createConvertGpuOpsToROCDLOps(ROCDLOpts));
-#else
-    PM.nest<gpu::GPUModuleOp>().addPass(mlir::createLowerGpuOpsToROCDLOpsPass(
-        /*chipset=*/HipChipset,
-        /*indexBitwidth=*/mlir::kDeriveIndexBitwidthFromDataLayout,
-        /*useBarePtrCallConv=*/true));
-#endif
-    AddCommonGpuLLVMFinalization();
-#else
-    reportFatalError(Prefix.str() +
-                     ": HIP target requested but Proteus was built with "
-                     "PROTEUS_ENABLE_HIP=OFF");
-#endif
-  } else if (TM == TargetModelType::HOST_CUDA ||
-             TM == TargetModelType::HOST_HIP) {
-    reportFatalError(Prefix.str() +
-                     ": mixed host+device MLIR lowering is not yet supported");
-  } else {
-    reportFatalError(Prefix.str() +
-                     ": lowering only supported for HOST/CUDA/HIP");
-  }
-
+  mlir::PassManager PM(Context);
+  addTargetLoweringPipeline(PM, TM, CPU, Prefix);
   if (failed(PM.run(Module)))
     reportFatalError(Prefix.str() +
                      ": failed to lower MLIR module to LLVM dialect");
 
   MLIRLoweringResult Result;
   Result.Ctx = std::make_unique<llvm::LLVMContext>();
-
-  // Register dialect translations used by translateModuleToLLVMIR.
-  mlir::registerBuiltinDialectTranslation(*Context);
-  mlir::registerLLVMDialectTranslation(*Context);
-  if (TM == TargetModelType::CUDA || TM == TargetModelType::HIP)
-    mlir::registerGPUDialectTranslation(*Context);
-  if (TM == TargetModelType::CUDA) {
-#if PROTEUS_ENABLE_CUDA
-    mlir::registerNVVMDialectTranslation(*Context);
-#else
-    reportFatalError(Prefix.str() +
-                     ": CUDA target requested but Proteus was built with "
-                     "PROTEUS_ENABLE_CUDA=OFF");
-#endif
-  }
-  if (TM == TargetModelType::HIP) {
-#if PROTEUS_ENABLE_HIP
-    mlir::registerROCDLDialectTranslation(*Context);
-#else
-    reportFatalError(Prefix.str() +
-                     ": HIP target requested but Proteus was built with "
-                     "PROTEUS_ENABLE_HIP=OFF");
-#endif
-  }
+  registerLLVMTranslations(*Context, TM, Prefix);
 
   Operation *OperationToSerialize = Module.getOperation();
-  if (TM == TargetModelType::CUDA || TM == TargetModelType::HIP) {
-    auto DeviceSym = Module.lookupSymbol<gpu::GPUModuleOp>("kernels");
-    if (!DeviceSym)
-      reportFatalError(Prefix.str() +
-                       ": expected gpu.module @kernels for device lowering");
-    mlir::PassManager DevicePM(Context);
-    DevicePM.nest<gpu::GPUModuleOp>().addPass(
-        mlir::createReconcileUnrealizedCastsPass());
-    if (failed(DevicePM.run(Module)))
-      reportFatalError(
-          Prefix.str() +
-          ": failed to reconcile device gpu.module after lowering");
-
-    DeviceSym = Module.lookupSymbol<gpu::GPUModuleOp>("kernels");
-    if (!DeviceSym)
-      reportFatalError(Prefix.str() +
-                       ": reconciled device module lost gpu.module @kernels");
-
-    bool HasUnrealizedCasts = false;
-    DeviceSym.walk(
-        [&](mlir::UnrealizedConversionCastOp) { HasUnrealizedCasts = true; });
-    if (HasUnrealizedCasts) {
-      llvm::errs() << "[proteus][" << Prefix
-                   << "] Lowered device gpu.module still contains "
-                      "builtin.unrealized_conversion_cast:\n";
-      DeviceSym.print(llvm::errs());
-      llvm::errs() << "\n";
-      reportFatalError(Prefix.str() +
-                       ": device gpu.module still contains unrealized "
-                       "conversion casts after reconciliation");
-    }
-
-    OperationToSerialize = DeviceSym.getOperation();
-  }
-
-  if (TM == TargetModelType::CUDA || TM == TargetModelType::HIP) {
-    mlir::LLVM::ModuleToObject Serializer(*OperationToSerialize, TargetTriple,
-                                          CPU, Features, Options.OptLevel);
-    std::optional<SmallVector<char, 0>> Serialized = Serializer.run();
-    if (!Serialized)
-      reportFatalError(Prefix.str() +
-                       ": failed to serialize device module to LLVM bitcode");
-
-    llvm::MemoryBufferRef Buffer(
-        llvm::StringRef(Serialized->data(), Serialized->size()),
-        "DeviceBitcode");
-    auto ParsedModule = llvm::parseBitcodeFile(Buffer, *Result.Ctx);
-    if (!ParsedModule)
-      reportFatalError(Prefix.str() +
-                       ": failed to parse serialized device LLVM bitcode: " +
-                       llvm::toString(ParsedModule.takeError()));
-    Result.Mod = std::move(*ParsedModule);
+  if (isStandaloneDeviceTarget(TM)) {
+    auto DeviceModule = getDeviceModuleForSerialization(Module, Prefix);
+    OperationToSerialize = DeviceModule.getOperation();
+    Result.Mod = serializeDeviceModuleToLLVMIR(
+        *OperationToSerialize, *Result.Ctx, TargetTriple, CPU, Features,
+        Options.OptLevel, Prefix);
+    validateDeviceLLVMModule(*Result.Mod, *OperationToSerialize, Prefix);
+    normalizeDeviceKernelSymbols(*Result.Mod, Prefix);
   } else {
-    Result.Mod =
-        mlir::translateModuleToLLVMIR(Module.getOperation(), *Result.Ctx);
-    if (!Result.Mod)
-      reportFatalError(Prefix.str() +
-                       ": failed to translate LLVM dialect to LLVM IR module");
+    Result.Mod = translateHostModuleToLLVMIR(Module, *Result.Ctx, Prefix);
   }
 
-  if (TM == TargetModelType::CUDA || TM == TargetModelType::HIP) {
-    if (!hasLLVMFunctionDefinitions(*Result.Mod)) {
-      llvm::errs() << "[proteus][" << Prefix
-                   << "] Device translation produced no function definitions. "
-                      "MLIR device module was:\n";
-      OperationToSerialize->print(llvm::errs());
-      llvm::errs() << "\n";
-      reportFatalError(Prefix.str() +
-                       ": device translation produced an empty LLVM IR module");
-    }
-
-    // MLIR device lowering may qualify kernel function symbols (e.g. with the
-    // gpu.module name). Normalize known prefixes so the rest of Proteus can
-    // resolve functions by their frontend names.
-    llvm::SmallVector<std::pair<llvm::Function *, std::string>> ToRename;
-    llvm::StringSet<> NewNames;
-    for (auto &Fn : Result.Mod->functions()) {
-      if (Fn.isDeclaration())
-        continue;
-
-      llvm::StringRef Name = Fn.getName();
-      static constexpr llvm::StringLiteral KernelsPrefix = "kernels.";
-      if (!Name.starts_with(KernelsPrefix))
-        continue;
-
-      llvm::StringRef Stripped = Name.drop_front(KernelsPrefix.size());
-      if (Stripped.empty())
-        continue;
-
-      if (Result.Mod->getFunction(Stripped))
-        reportFatalError(Prefix.str() + ": device symbol name collision for " +
-                         Stripped.str());
-
-      if (!NewNames.insert(Stripped).second)
-        reportFatalError(Prefix.str() + ": multiple device symbols map to " +
-                         Stripped.str());
-
-      ToRename.emplace_back(&Fn, Stripped.str());
-    }
-
-    for (auto &[Fn, NewName] : ToRename)
-      Fn->setName(NewName);
-  }
-
-  if (!TargetTriple.empty()) {
-#if LLVM_VERSION_MAJOR >= 22
-    Result.Mod->setTargetTriple(llvm::Triple{TargetTriple});
-#else
-    Result.Mod->setTargetTriple(TargetTriple);
-#endif
-    if (TM == TargetModelType::CUDA || TM == TargetModelType::HIP)
-      Result.Mod->setDataLayout(
-          computeTargetDataLayout(TargetTriple, CPU, Features, Prefix));
-  }
+  setFinalLLVMTargetAttrs(*Result.Mod, TM, TargetTriple, CPU, Features, Prefix);
 
   return Result;
 }
