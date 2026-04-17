@@ -1,6 +1,7 @@
 [![docs (gh-pages)](https://github.com/Olympus-HPC/proteus/actions/workflows/gh-pages-docs.yml/badge.svg)](https://github.com/Olympus-HPC/proteus/actions/workflows/gh-pages-docs.yml)
 [![Build and test](https://github.com/Olympus-HPC/proteus/actions/workflows/ci-build-test.yml/badge.svg)](https://github.com/Olympus-HPC/proteus/actions/workflows/ci-build-test.yml)
 [![codecov](https://codecov.io/github/Olympus-HPC/proteus/graph/badge.svg?token=MEB0M2D0AC)](https://codecov.io/github/Olympus-HPC/proteus)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 ![License: Apache 2.0 with LLVM exceptions](https://img.shields.io/badge/license-Apache%202.0%20with%20LLVM%20exceptions-blue.svg)
 
 # <img src="docs/assets/proteus-logo.png" width="128" align="middle" /> Proteus
