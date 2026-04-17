@@ -61,11 +61,10 @@ variables:
 # included files.
 workflow:
   rules:
-    # Don't compare main to itself; default-branch pipelines should always run.
+    # For default-branch push pipelines, rules:changes compares against the
+    # previous commit on the branch. Non-default branches compare to main.
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-      when: always
-    - changes:
-        compare_to: &compare_to_ref "refs/heads/main"
+      changes:
         paths: &pipeline_trigger_paths
           - ".gitlab-ci.yml"
           - ".gitlab/**/*"
@@ -77,8 +76,13 @@ workflow:
           - "tests/**/*"
           - "packaging/spack/**/*"
       when: always
-    - changes:
-        compare_to: *compare_to_ref
+    - if: '$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
+      changes:
+        compare_to: &compare_to_ref "refs/heads/main"
+        paths: *pipeline_trigger_paths
+      when: always
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      changes:
         paths: &meta_only_paths
           - ".github/**/*"
           - "docs/**/*"
@@ -88,6 +92,11 @@ workflow:
           - "COPYRIGHT"
           - "LICENSE"
           - "NOTICE"
+      when: always
+    - if: '$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
+      changes:
+        compare_to: *compare_to_ref
+        paths: *meta_only_paths
       when: always
     - when: always
 
@@ -105,8 +114,10 @@ meta-only:
   tags: [shell, oslic]
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
-      when: never
-    - changes:
+      changes:
+        paths: *meta_only_paths
+    - if: '$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
+      changes:
         compare_to: *compare_to_ref
         paths: *meta_only_paths
   script:
