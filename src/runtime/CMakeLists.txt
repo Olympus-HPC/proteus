@@ -363,10 +363,20 @@ install(
   LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
   ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 
-# Install headers preserving directory structure
+# Install headers preserving directory structure.
+set(PROTEUS_PUBLIC_HEADER_INSTALL_EXCLUDES)
+if(NOT PROTEUS_ENABLE_MLIR)
+  # Exclude MLIR-specific headers from installation if MLIR support is not
+  # enabled.
+  list(APPEND PROTEUS_PUBLIC_HEADER_INSTALL_EXCLUDES
+    PATTERN "proteus/Frontend/MLIRCodeBuilder.h" EXCLUDE
+    PATTERN "proteus/MLIRJitModule.h" EXCLUDE
+  )
+endif()
 install(DIRECTORY ${PROTEUS_PROJECT_INCLUDE_DIR}/
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
   FILES_MATCHING PATTERN "*.h"
+  ${PROTEUS_PUBLIC_HEADER_INSTALL_EXCLUDES}
 )
 
 if(PROTEUS_INSTALL_IMPL_HEADERS)
