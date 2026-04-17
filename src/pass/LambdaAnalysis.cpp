@@ -474,19 +474,6 @@ private:
     return StubToKernelMap;
   }
 
-  FunctionCallee getJitRegisterVarFn(Module &M) {
-    // The prototype is
-    // __jit_register_var(void *Handle, const void *HostAddr, const char
-    // *VarName, uint64_t VarSize).
-    FunctionType *JitRegisterVarFnTy = FunctionType::get(
-        Types.VoidTy, {Types.PtrTy, Types.PtrTy, Types.PtrTy, Types.Int64Ty},
-        /* isVarArg=*/false);
-    FunctionCallee JitRegisterVarFn =
-        M.getOrInsertFunction("__jit_register_var", JitRegisterVarFnTy);
-
-    return JitRegisterVarFn;
-  }
-
   void getUnderlyingLambdaTypeFromFunctors(
       Module &M, DenseMap<StructType *, StructType *> &FunctorToLambdaType,
       DenseMap<StructType *, StructType *> &LambdaToFunctorType) {
@@ -502,34 +489,13 @@ private:
     }
   }
 
-  FunctionCallee getJitRegisterFunctionFn(Module &M) {
-    // The prototype is
-    // __jit_register_function(void *Handle,
-    //                         void *Kernel,
-    //                         char const *KernelName,
-    //                         RuntimeConstantInfo **RCInfoArrayPtr,
-    //                         int32_t NumRCs)
-    FunctionType *JitRegisterFunctionFnTy = FunctionType::get(
-        Types.VoidTy,
-        {Types.PtrTy, Types.PtrTy, Types.PtrTy, Types.PtrTy, Types.Int32Ty},
-        /* isVarArg=*/false);
-    FunctionCallee JitRegisterKernelFn = M.getOrInsertFunction(
-        "__jit_register_function", JitRegisterFunctionFnTy);
-
-    return JitRegisterKernelFn;
-  }
-
   FunctionCallee getJitRegisterLambdaRuntimeConstant(Module &M) {
-    // __jit_register_variable_instance_raw(
-    //   int32_t Type, int32_t Pos, int32_t Offset,
-    //   void const* ValuePtr, int32_t Size,
-    //   char const* LambdaType, void const* Key)
     FunctionType *FnTy =
         FunctionType::get(Types.VoidTy,
                           {Types.Int32Ty, Types.Int32Ty, Types.Int32Ty,
                            Types.PtrTy, Types.Int64Ty},
                           /*isVarArg=*/false);
-    return M.getOrInsertFunction("__jit_register_lambda_runtime_constant",
+    return M.getOrInsertFunction("__proteus_register_lambda_runtime_constant",
                                  FnTy);
   }
 
@@ -680,8 +646,8 @@ private:
                          "register_lambda analysis");
       ReturnInst *RetInst = Rets[0];
 
-      // Insert __jit_push_lambda_runtime_constant calls for each lambda type
-      // participating in this kernel launch.
+      // Insert __proteus_register_lambda_runtime_constant calls for each lambda
+      // type participating in this kernel launch.
       IRBuilder<> Builder(RetInst);
       auto JitVarFn = getJitRegisterLambdaRuntimeConstant(M);
       for (auto JitVarInfo :

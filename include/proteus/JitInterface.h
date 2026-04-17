@@ -23,12 +23,12 @@
 #include <utility>
 
 extern "C" __attribute__((used)) void
-__jit_register_lambda_runtime_constant(int32_t Type, int32_t Pos,
-                                       int32_t Offset, const void *ValuePtr,
-                                       uint64_t functor_id);
+__proteus_register_lambda_runtime_constant(int32_t Type, int32_t Pos,
+                                           int32_t Offset, const void *ValuePtr,
+                                           uint64_t functor_id);
 
-extern "C" void __jit_take_address(void const *) noexcept;
-extern "C" void __jit_var(void const *) noexcept;
+extern "C" void __proteus_take_address(void const *) noexcept;
+extern "C" void __proteus_var(void const *) noexcept;
 
 namespace proteus {
 
@@ -115,7 +115,6 @@ template <uint64_t FunctorID, typename Lambda> struct LambdaFunctorWrapper {
   __attribute__((annotate("proteus.wrapper_call", functor_id))) decltype(auto)
   operator()(Args &&...args) noexcept(
       noexcept(lambda(std::forward<Args>(args)...))) {
-    register_functor();
     return lambda(std::forward<Args>(args)...);
   }
 };
@@ -141,7 +140,7 @@ __register_lambda_impl(T &&t) noexcept {
   // lambda name.
   using LambdaType = std::decay_t<T>;
   LambdaType local = t;
-  __jit_take_address(&local);
+  __proteus_take_address(&local);
   auto result = tag_functor<ID>(std::forward<T>(t));
   return result;
 }
