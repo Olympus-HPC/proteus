@@ -375,12 +375,33 @@ static void registerLLVMTranslations(mlir::MLIRContext &Context,
   }
 }
 
+static gpu::GPUModuleOp getSingleDeviceModule(mlir::ModuleOp Module,
+                                              llvm::StringRef Prefix) {
+  llvm::SmallVector<gpu::GPUModuleOp, 2> DeviceModules;
+  for (auto DeviceModule : Module.getOps<gpu::GPUModuleOp>())
+    DeviceModules.push_back(DeviceModule);
+
+  if (DeviceModules.empty())
+    reportFatalError(Prefix.str() +
+                     ": expected exactly one gpu.module for device lowering, "
+                     "found none");
+
+  if (DeviceModules.size() > 1) {
+    std::string Message;
+    llvm::raw_string_ostream OS(Message);
+    OS << Prefix << ": expected exactly one gpu.module for device lowering, "
+       << "found " << DeviceModules.size() << ":";
+    for (gpu::GPUModuleOp DeviceModule : DeviceModules)
+      OS << " @" << DeviceModule.getName();
+    reportFatalError(OS.str());
+  }
+
+  return DeviceModules.front();
+}
+
 static gpu::GPUModuleOp
 getDeviceModuleForSerialization(mlir::ModuleOp Module, llvm::StringRef Prefix) {
-  auto DeviceSym = Module.lookupSymbol<gpu::GPUModuleOp>("kernels");
-  if (!DeviceSym)
-    reportFatalError(Prefix.str() +
-                     ": expected gpu.module @kernels for device lowering");
+  auto DeviceSym = getSingleDeviceModule(Module, Prefix);
 
   mlir::PassManager DevicePM(Module.getContext());
   DevicePM.nest<gpu::GPUModuleOp>().addPass(
@@ -389,10 +410,9 @@ getDeviceModuleForSerialization(mlir::ModuleOp Module, llvm::StringRef Prefix) {
     reportFatalError(Prefix.str() +
                      ": failed to reconcile device gpu.module after lowering");
 
-  DeviceSym = Module.lookupSymbol<gpu::GPUModuleOp>("kernels");
-  if (!DeviceSym)
-    reportFatalError(Prefix.str() +
-                     ": reconciled device module lost gpu.module @kernels");
+  // Re-select after running the pass manager because MLIR passes may mutate the
+  // IR; this also revalidates that device lowering still has one gpu.module.
+  DeviceSym = getSingleDeviceModule(Module, Prefix);
 
   bool HasUnrealizedCasts = false;
   DeviceSym.walk(

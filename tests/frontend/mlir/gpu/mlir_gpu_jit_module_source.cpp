@@ -26,7 +26,7 @@ int main() {
 
   static constexpr const char *Code = R"mlir(
 module attributes {gpu.container_module} {
-  gpu.module @kernels {
+  gpu.module @user_device_module {
     gpu.func @write42(%out: !llvm.ptr) kernel {
       %c42 = arith.constant 42 : i32
       llvm.store %c42, %out : i32, !llvm.ptr
