@@ -106,23 +106,6 @@ static cl::opt<bool> ForceProteusAnnotateAll(
     "force-proteus-jit-annotate-all",
     cl::desc("Apply the 'jit' annotation on all GPU kernels"), cl::init(false));
 
-std::optional<std::string> getGlobalString(const GlobalVariable *GV) {
-  if (!GV || !GV->hasInitializer())
-    return std::nullopt;
-
-  const Constant *Init = GV->getInitializer();
-
-  if (auto *CDS = dyn_cast<ConstantDataSequential>(Init))
-    if (CDS->isString())
-      return CDS->getAsCString().str(); // drops trailing '\0'
-
-  if (auto *CDA = dyn_cast<ConstantDataArray>(Init))
-    if (CDA->isString())
-      return CDA->getAsCString().str();
-
-  return std::nullopt;
-}
-
 class ProteusPassImpl {
 public:
   ProteusPassImpl(Module &M) : Types(M) {}

@@ -128,7 +128,7 @@ class LambdaPassImpl {
 public:
   LambdaPassImpl(Module &M) : Types(M) {}
 
-  bool run(Module &M, bool IsLTO) {
+  bool run(Module &M, bool) {
     AnnotationHandler AnnotHandler{M};
     // Attach Metadata nodes corresponding to llvm.global.annotations to
     // individual function calls.

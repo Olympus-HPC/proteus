@@ -593,7 +593,6 @@ JitEngineDevice<ImplT>::compileAndRun(
     return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
       ShmemSize, Stream);
 
-
   // NOTE: we don't need a suffix to differentiate kernels, each
   // specialization will be in its own module uniquely identify by HashValue.
   // It exists only for debugging purposes to verify that the jitted kernel
@@ -614,6 +613,7 @@ JitEngineDevice<ImplT>::compileAndRun(
           BinInfo.getVarNameToGlobalInfo());
 
       CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
+
       return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
                                   ShmemSize, Stream);
     }
