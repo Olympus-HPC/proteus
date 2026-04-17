@@ -759,25 +759,30 @@ llvm::PassPluginLibraryInfo getLambdaPassPluginInfo() {
   // PB.registerOptimizerLastEPCallback(
   // PM.registerPipelineEarlySimplificationEPCallback
 #if LLVM_VERSION_MAJOR >= 20
-    PB.registerPipelineStartEPCallback([&](ModulePassManager &MPM,
-                                           OptimizationLevel,
-                                           ThinOrFullLTOPhase LTOPhase) {
-      if (LTOPhase != ThinOrFullLTOPhase::None) {
-        reportFatalError("Expected registration only for non-LTO");
-      }
+    PB.registerPipelineStartEPCallback(
+        [&](ModulePassManager &MPM, OptimizationLevel) {
+          MPM.addPass(LambdaPass{false});
+        });
 #else
     PB.registerPipelineStartEPCallback(
         [&](ModulePassManager &MPM, OptimizationLevel) {
+          MPM.addPass(LambdaPass{false});
+          return true;
+        });
 #endif
-      MPM.addPass(LambdaPass{false});
-      return true;
-    });
 
+#if LLVM_VERSION_MAJOR >= 20
+    PB.registerFullLinkTimeOptimizationEarlyEPCallback(
+        [&](ModulePassManager &MPM, OptimizationLevel) {
+          MPM.addPass(LambdaPass{true});
+        });
+#else
     PB.registerFullLinkTimeOptimizationEarlyEPCallback(
         [&](ModulePassManager &MPM, auto) {
           MPM.addPass(LambdaPass{true});
           return true;
         });
+#endif
   };
 
   return {LLVM_PLUGIN_API_VERSION, "LambdaPass", LLVM_VERSION_STRING, Callback};
