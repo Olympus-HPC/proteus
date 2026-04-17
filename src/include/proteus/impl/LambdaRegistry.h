@@ -53,11 +53,6 @@ public:
     return std::nullopt;
   }
 
-  // Because JIT variables are loaded dynamically into the registry using
-  // __jit_register_lambda_runtime_constant, we need to clear out the registry
-  // after we have accessed the variables.
-  void flushJitVariables() { JitVariableMap.clear(); }
-
   bool empty() { return JitVariableMap.empty(); }
 
 private:

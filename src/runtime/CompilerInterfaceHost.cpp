@@ -32,14 +32,9 @@ __proteus_entry(char *FnName, char *IR, int IRSize, void **Args,
 }
 
 extern "C" __attribute__((used)) void
-__proteus_register_variable(RuntimeConstant RC, const char *LambdaName) {
-  LambdaRegistry::instance().setJitVariable(LambdaName, RC);
-}
-
-extern "C" __attribute__((used)) void
-__jit_register_lambda_runtime_constant(int32_t Type, int32_t Pos,
-                                       int32_t Offset, const void *ValuePtr,
-                                       uint64_t ID) {
+__proteus_register_lambda_runtime_constant(int32_t Type, int32_t Pos,
+                                           int32_t Offset, const void *ValuePtr,
+                                           uint64_t ID) {
   RuntimeConstant RC{static_cast<RuntimeConstantType>(Type), Pos, Offset};
   // ValuePtr points at the lambda field storage (e.g., an i32 capture). It is
   // not a pointer to a full RuntimeConstantValue, so only copy the bytes
@@ -69,11 +64,8 @@ __jit_register_lambda_runtime_constant(int32_t Type, int32_t Pos,
     break;
   default:
     reportFatalError(
-        "__jit_push_lambda_runtime_constant only supports scalar captures");
+        "__proteus_push_lambda_runtime_constant only supports scalar captures");
   }
-
-extern "C" __attribute__((used)) void
-__jit_register_lambda(const char *LambdaName) {
   LambdaRegistry::instance().setJitVariable(ID, RC);
 }
 
