@@ -262,9 +262,8 @@ static void addCommonGpuLLVMFinalization(mlir::PassManager &PM) {
 }
 #endif
 
-static void addCUDALoweringPipeline(mlir::PassManager &PM,
-                                    llvm::StringRef Prefix) {
 #if PROTEUS_ENABLE_CUDA
+static void addCUDALoweringPipeline(mlir::PassManager &PM) {
   // CUDA path: lower device-only gpu.module/gpu.func to NVVM/LLVM dialect.
   // This pass is defined on gpu.module, so schedule it as a nested pass.
   mlir::ConvertGpuOpsToNVVMOpsOptions NVVMOpts;
@@ -280,17 +279,11 @@ static void addCUDALoweringPipeline(mlir::PassManager &PM,
   PM.nest<gpu::GPUModuleOp>().addPass(
       mlir::createConvertGpuOpsToNVVMOps(NVVMOpts));
   addCommonGpuLLVMFinalization(PM);
-#else
-  (void)PM;
-  reportFatalError(Prefix.str() +
-                   ": CUDA target requested but Proteus was built with "
-                   "PROTEUS_ENABLE_CUDA=OFF");
-#endif
 }
+#endif
 
-static void addHIPLoweringPipeline(mlir::PassManager &PM, llvm::StringRef CPU,
-                                   llvm::StringRef Prefix) {
 #if PROTEUS_ENABLE_HIP
+static void addHIPLoweringPipeline(mlir::PassManager &PM, llvm::StringRef CPU) {
   // HIP path: input is device-only gpu.module/gpu.func + gpu.* ops;
   // output is ROCDL/LLVM dialect that can be translated to AMDGPU LLVM IR.
   // Step 1 (gpu -> rocdl/llvm): lower gpu.module/gpu.func and gpu.* ops.
@@ -320,14 +313,8 @@ static void addHIPLoweringPipeline(mlir::PassManager &PM, llvm::StringRef CPU,
       /*useBarePtrCallConv=*/true));
 #endif
   addCommonGpuLLVMFinalization(PM);
-#else
-  (void)PM;
-  (void)CPU;
-  reportFatalError(Prefix.str() +
-                   ": HIP target requested but Proteus was built with "
-                   "PROTEUS_ENABLE_HIP=OFF");
-#endif
 }
+#endif
 
 static void addTargetLoweringPipeline(mlir::PassManager &PM, TargetModelType TM,
                                       llvm::StringRef CPU,
@@ -335,9 +322,22 @@ static void addTargetLoweringPipeline(mlir::PassManager &PM, TargetModelType TM,
   if (TM == TargetModelType::HOST) {
     addHostLoweringPipeline(PM);
   } else if (TM == TargetModelType::CUDA) {
-    addCUDALoweringPipeline(PM, Prefix);
+#if PROTEUS_ENABLE_CUDA
+    addCUDALoweringPipeline(PM);
+#else
+    reportFatalError(Prefix.str() +
+                     ": CUDA target requested but Proteus was built with "
+                     "PROTEUS_ENABLE_CUDA=OFF");
+#endif
   } else if (TM == TargetModelType::HIP) {
-    addHIPLoweringPipeline(PM, CPU, Prefix);
+#if PROTEUS_ENABLE_HIP
+    addHIPLoweringPipeline(PM, CPU);
+#else
+    reportFatalError(Prefix.str() +
+                     ": HIP target requested but Proteus was built with "
+                     "PROTEUS_ENABLE_HIP=OFF; requested device arch: " +
+                     CPU.str());
+#endif
   } else if (isMixedHostDeviceTarget(TM)) {
     reportFatalError(Prefix.str() +
                      ": mixed host+device MLIR lowering is not yet supported");
