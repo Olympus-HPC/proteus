@@ -1,0 +1,29 @@
+name: docs
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "include/**"
+      - "mkdocs.yml"
+      - "src/**"
+      - ".github/workflows/ci-pr-docs.yml"
+      - ".github/workflows/gh-pages-docs.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run doxygen and mkdocs
+        run: |
+          sudo apt-get install -y graphviz doxygen
+          pushd docs
+          doxygen
+          popd
+          pip install mkdocs-material
+          mkdocs build --strict
