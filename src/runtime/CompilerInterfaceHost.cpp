@@ -32,13 +32,41 @@ __proteus_entry(char *FnName, char *IR, int IRSize, void **Args,
 }
 
 extern "C" __attribute__((used)) void
-__proteus_register_variable(RuntimeConstant RC, const char *LambdaName) {
-  LambdaRegistry::instance().setJitVariable(LambdaName, RC);
-}
-
-extern "C" __attribute__((used)) void
-__proteus_register_lambda(const char *LambdaName) {
-  LambdaRegistry::instance().registerLambda(LambdaName);
+__proteus_register_lambda_runtime_constant(int32_t Type, int32_t Pos,
+                                           int32_t Offset, const void *ValuePtr,
+                                           uint64_t ID) {
+  RuntimeConstant RC{static_cast<RuntimeConstantType>(Type), Pos, Offset};
+  // ValuePtr points at the lambda field storage (e.g., an i32 capture). It is
+  // not a pointer to a full RuntimeConstantValue, so only copy the bytes
+  // corresponding to the scalar type to avoid reading past the field (which
+  // makes hashing/caching nondeterministic across runs).
+  switch (static_cast<RuntimeConstantType>(Type)) {
+  case RuntimeConstantType::BOOL:
+    std::memcpy(&RC.Value.BoolVal, ValuePtr, sizeof(RC.Value.BoolVal));
+    break;
+  case RuntimeConstantType::INT8:
+    std::memcpy(&RC.Value.Int8Val, ValuePtr, sizeof(RC.Value.Int8Val));
+    break;
+  case RuntimeConstantType::INT32:
+    std::memcpy(&RC.Value.Int32Val, ValuePtr, sizeof(RC.Value.Int32Val));
+    break;
+  case RuntimeConstantType::INT64:
+    std::memcpy(&RC.Value.Int64Val, ValuePtr, sizeof(RC.Value.Int64Val));
+    break;
+  case RuntimeConstantType::FLOAT:
+    std::memcpy(&RC.Value.FloatVal, ValuePtr, sizeof(RC.Value.FloatVal));
+    break;
+  case RuntimeConstantType::DOUBLE:
+    std::memcpy(&RC.Value.DoubleVal, ValuePtr, sizeof(RC.Value.DoubleVal));
+    break;
+  case RuntimeConstantType::PTR:
+    std::memcpy(&RC.Value.PtrVal, ValuePtr, sizeof(RC.Value.PtrVal));
+    break;
+  default:
+    reportFatalError(
+        "__proteus_push_lambda_runtime_constant only supports scalar captures");
+  }
+  LambdaRegistry::instance().setJitVariable(ID, RC);
 }
 
 extern "C" void __proteus_enable_host() {

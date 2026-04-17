@@ -17,15 +17,21 @@ public:
   auto operator()() { return Lambda(); }
 };
 
-void printInt(int I) { printf("Integer = %d\n", I); }
+static void printInt(int I) { printf("Integer = %d\n", I); }
 
-template <typename T> void run(T &&LB) {
-  proteus::register_lambda(LB);
+template <typename T>
+static void run(T &&LB) {
   Abstraction<T> Abs(LB);
-  run2(Abs);
+  run_internal(Abs);
 }
 
-template <typename T> void run2(T &&LB) { LB(); }
+template <typename T>
+static void run_internal(T &&LB) { LB(); }
+
+template<typename Lambda>
+static void registerRun(Lambda&& Lam) {
+  run(PROTEUS_REGISTER_LAMBDA(Lam));
+}
 
 int main() {
   int Zero = 0;
@@ -41,9 +47,9 @@ int main() {
   auto TwoLambda = [=, C = proteus::jit_variable(Two)]()
                        __attribute__((annotate("jit"))) { printInt(C); };
 
-  run(ZeroLambda);
-  run(OneLambda);
-  run(TwoLambda);
+  registerRun(ZeroLambda);
+  registerRun(OneLambda);
+  registerRun(TwoLambda);
 
   return 0;
 }

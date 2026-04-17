@@ -25,7 +25,7 @@ private:
   dim3 BlockDim;
   dim3 GridDim;
   SmallVector<RuntimeConstant> RCVec;
-  SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo;
+  SmallVector<std::pair<Function*, uint64_t>> LambdaCalleeInfo;
   std::unordered_map<std::string, GlobalVarInfo> VarNameToGlobalInfo;
   SmallPtrSet<void *, 8> GlobalLinkedBinaries;
   std::string DeviceArch;
@@ -80,7 +80,7 @@ public:
       MemoryBufferRef Bitcode, HashT HashValue, const std::string &KernelName,
       std::string &Suffix, dim3 BlockDim, dim3 GridDim,
       const SmallVector<RuntimeConstant> &RCVec,
-      const SmallVector<std::pair<std::string, StringRef>> &LambdaCalleeInfo,
+      const SmallVector<std::pair<Function*, uint64_t>>  &LambdaCalleeInfo,
       const std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo,
       const SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
       const std::string &DeviceArch, const CodeGenerationConfig &CGConfig,

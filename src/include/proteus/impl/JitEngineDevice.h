@@ -229,7 +229,8 @@ class JITKernelInfo {
   std::optional<std::unique_ptr<MemoryBuffer>> Bitcode;
   std::optional<std::reference_wrapper<BinaryInfo>> BinInfo;
   std::optional<HashT> StaticHash;
-  std::optional<SmallVector<std::pair<std::string, StringRef>>>
+  // LambdaCalleeInfo optionally contains a vector with all annotated LambdaFunctorWrapper annotators and thei unique IDs
+  std::optional<SmallVector<std::pair<Function*, uint64_t>>>
       LambdaCalleeInfo;
 
 public:
@@ -271,7 +272,7 @@ public:
   bool hasLambdaCalleeInfo() { return LambdaCalleeInfo.has_value(); }
   const auto &getLambdaCalleeInfo() { return LambdaCalleeInfo.value(); }
   void setLambdaCalleeInfo(
-      SmallVector<std::pair<std::string, StringRef>> &&LambdaInfo) {
+      SmallVector<std::pair<Function*, uint64_t>> &&LambdaInfo) {
     LambdaCalleeInfo = std::move(LambdaInfo);
   }
 };
@@ -415,7 +416,7 @@ public:
   }
 
   void getLambdaJitValues(JITKernelInfo &KernelInfo,
-                          SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
+                          DenseMap<uint64_t, DenseMap<int32_t, RuntimeConstant>> &LambdaJitValuesMap) {
     TIMESCOPE(JitEngineDevice, getLambdaJitValues);
     LambdaRegistry &LR = LambdaRegistry::instance();
     if (LR.empty()) {
@@ -430,25 +431,22 @@ public:
                   << "Caller trigger " << KernelInfo.getName() << " -> "
                   << demangle(KernelInfo.getName()) << "\n");
 
-      SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo;
-      for (auto &F : KernelModule.getFunctionList()) {
-        PROTEUS_DBG(Logger::logs("proteus")
-                    << " Trying F " << demangle(F.getName().str()) << "\n ");
-        auto OptionalMapIt =
-            LambdaRegistry::instance().matchJitVariableMap(F.getName());
-        if (OptionalMapIt)
-          LambdaCalleeInfo.emplace_back(F.getName(),
-                                        OptionalMapIt.value()->first);
-      }
+	      SmallVector<std::pair<Function*, uint64_t>> LambdaCalleeInfo;
+	      findFunctionsWithU64Metadata(KernelModule, "proteus.wrapper_call", LambdaCalleeInfo);
 
+      for (auto [F, ID] : LambdaCalleeInfo ) {
+        PROTEUS_DBG(Logger::logs("proteus")
+                  << "Lambda wrapper = " << *F
+                  << " : " << "ID = " << ID << "\n";)
+      }
       KernelInfo.setLambdaCalleeInfo(std::move(LambdaCalleeInfo));
     }
 
-    for (auto &[FnName, LambdaType] : KernelInfo.getLambdaCalleeInfo()) {
-      const SmallVector<RuntimeConstant> &Values =
-          LR.getJitVariables(LambdaType);
-      LambdaJitValuesVec.insert(LambdaJitValuesVec.end(), Values.begin(),
-                                Values.end());
+    for (auto &[FnName, LambdaID] : KernelInfo.getLambdaCalleeInfo()) {
+      auto RCMapOpt = LR.getJitVariables(LambdaID);
+      if (!RCMapOpt)
+        continue;
+      LambdaJitValuesMap[LambdaID] = RCMapOpt.value();
     }
   }
 
@@ -576,12 +574,14 @@ JitEngineDevice<ImplT>::compileAndRun(
   SmallVector<RuntimeConstant> RCVec =
       getRuntimeConstantValues(KernelArgs, KernelInfo.getRCInfoArray());
 
-  SmallVector<RuntimeConstant> LambdaJitValuesVec;
-  getLambdaJitValues(KernelInfo, LambdaJitValuesVec);
+	  DenseMap<uint64_t, DenseMap<int32_t, RuntimeConstant>> LambdaJitValuesMap;
+	  auto& LR = LambdaRegistry::instance();
+	  getLambdaJitValues(KernelInfo, LambdaJitValuesMap);
+
   // Determine the hash based on dimension specialization.  If we do not
   // specialize IR based on grid dimensions, avoid hashing on those to
   // eliminate repeated compilation overhead.
-  HashT HashValue = hash(getStaticHash(KernelInfo), RCVec, LambdaJitValuesVec,
+  HashT HashValue = hash(getStaticHash(KernelInfo), RCVec, LambdaJitValuesMap,
                          BlockDim.x, BlockDim.y, BlockDim.z);
   if (Config::get().getCGConfig().specializeDims() ||
       Config::get().getCGConfig().specializeDimsRange())
@@ -591,7 +591,7 @@ JitEngineDevice<ImplT>::compileAndRun(
       CodeCache.lookup(HashValue);
   if (KernelFunc)
     return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
-                                ShmemSize, Stream);
+      ShmemSize, Stream);
 
   // NOTE: we don't need a suffix to differentiate kernels, each
   // specialization will be in its own module uniquely identify by HashValue.

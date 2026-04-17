@@ -9,6 +9,8 @@ template <typename T> struct Privatizer {
   __host__ __device__ Privatizer(const T &o) : priv{o} {}
 
   __host__ __device__ reference_type get_priv() { return priv; }
+
+  __host__ __device__ auto operator()(size_t I) { return priv(I); }
 };
 
 template <typename T>
@@ -20,10 +22,10 @@ template <typename Lambda>
 __global__ __attribute__((annotate("jit", 2))) void globalWrapper(Lambda lam,
                                                                   size_t N) {
   auto privatizer = threadPrivatize(lam);
-  auto &body = privatizer.get_priv();
+  // auto &body = privatizer.get_priv();
   std::size_t idx = blockIdx.x * 256 + threadIdx.x;
   if (idx < N) {
-    body(idx);
+    privatizer(idx);
   }
 }
 
