@@ -1,9 +1,9 @@
 #ifndef PROTEUS_MLIRJITMODULE_H
 #define PROTEUS_MLIRJITMODULE_H
 
-#include "proteus/CppJitFuncAttribute.h"
 #include "proteus/Frontend/Dispatcher.h"
 #include "proteus/Frontend/TargetModel.h"
+#include "proteus/JitFuncAttribute.h"
 
 #include <memory>
 #include <string>
@@ -24,7 +24,7 @@ private:
   std::unique_ptr<CompiledLibrary> Library;
   bool IsCompiled = false;
 
-  void setFuncAttribute(void *KernelFunc, CppJitFuncAttribute Attr, int Value);
+  void setFuncAttribute(void *KernelFunc, JitFuncAttribute Attr, int Value);
   void *getFunctionAddress(const std::string &Name);
   DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
                         LaunchDims BlockDim, void *KernelArgs[],
@@ -78,7 +78,7 @@ public:
       static_assert(std::is_void_v<RetT>, "Kernel function must return void");
     }
 
-    void setFuncAttribute(CppJitFuncAttribute Attr, int Value) {
+    void setFuncAttribute(JitFuncAttribute Attr, int Value) {
       M.setFuncAttribute(FuncPtr, Attr, Value);
     }
 

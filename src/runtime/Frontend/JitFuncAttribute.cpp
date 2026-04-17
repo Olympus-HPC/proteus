@@ -1,4 +1,4 @@
-#include "proteus/impl/Frontend/CppJitFuncAttribute.h"
+#include "proteus/impl/Frontend/JitFuncAttribute.h"
 
 #include "proteus/Error.h"
 
@@ -13,7 +13,7 @@
 namespace proteus {
 
 void setFuncAttribute(TargetModelType TargetModel, void *KernelFunc,
-                      CppJitFuncAttribute Attr, int Value) {
+                      JitFuncAttribute Attr, int Value) {
   if (Value < 0)
     reportFatalError("Function attribute value must be non-negative");
 
@@ -21,7 +21,7 @@ void setFuncAttribute(TargetModelType TargetModel, void *KernelFunc,
 #if PROTEUS_ENABLE_CUDA
   case TargetModelType::CUDA:
     switch (Attr) {
-    case CppJitFuncAttribute::MaxDynamicSharedMemorySize:
+    case JitFuncAttribute::MaxDynamicSharedMemorySize:
       proteusCuErrCheck(cuFuncSetAttribute(
           reinterpret_cast<CUfunction>(KernelFunc),
           CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, Value));
@@ -34,7 +34,7 @@ void setFuncAttribute(TargetModelType TargetModel, void *KernelFunc,
 #if PROTEUS_ENABLE_HIP
   case TargetModelType::HIP:
     switch (Attr) {
-    case CppJitFuncAttribute::MaxDynamicSharedMemorySize:
+    case JitFuncAttribute::MaxDynamicSharedMemorySize:
       proteusHipErrCheck(hipFuncSetAttribute(
           reinterpret_cast<hipFunction_t>(KernelFunc),
           hipFuncAttributeMaxDynamicSharedMemorySize, Value));

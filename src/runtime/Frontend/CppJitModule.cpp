@@ -2,7 +2,7 @@
 #include "proteus/TimeTracing.h"
 #include "proteus/impl/CompiledLibrary.h"
 #include "proteus/impl/Frontend/CppJitCompiler.h"
-#include "proteus/impl/Frontend/CppJitFuncAttribute.h"
+#include "proteus/impl/Frontend/JitFuncAttribute.h"
 
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
@@ -78,7 +78,7 @@ void CppJitModule::compile() {
   IsCompiled = true;
 }
 
-void CppJitModule::setFuncAttribute(void *KernelFunc, CppJitFuncAttribute Attr,
+void CppJitModule::setFuncAttribute(void *KernelFunc, JitFuncAttribute Attr,
                                     int Value) {
   proteus::setFuncAttribute(TargetModel, KernelFunc, Attr, Value);
 }

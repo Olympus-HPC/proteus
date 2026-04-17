@@ -2,7 +2,7 @@
 
 #include "proteus/TimeTracing.h"
 #include "proteus/impl/CompiledLibrary.h"
-#include "proteus/impl/Frontend/CppJitFuncAttribute.h"
+#include "proteus/impl/Frontend/JitFuncAttribute.h"
 #include "proteus/impl/Frontend/MLIRLower.h"
 #include "proteus/impl/Hashing.h"
 
@@ -68,7 +68,7 @@ void MLIRJitModule::compile(bool Verify) {
   IsCompiled = true;
 }
 
-void MLIRJitModule::setFuncAttribute(void *KernelFunc, CppJitFuncAttribute Attr,
+void MLIRJitModule::setFuncAttribute(void *KernelFunc, JitFuncAttribute Attr,
                                      int Value) {
   proteus::setFuncAttribute(TargetModel, KernelFunc, Attr, Value);
 }
