@@ -1,6 +1,8 @@
 .base-job:
   extends: .job_on_matrix
   interruptible: true
+  # Limit actual Matrix runner jobs to two global lanes across child pipelines.
+  resource_group: "matrix-ci-${MATRIX_CI_LANE}"
   before_script:
     - echo "=== Start CI Integration Tests ==="
   after_script:
@@ -11,20 +13,32 @@
 .variants:
   parallel:
     matrix:
-      - PROTEUS_CI_INTEGRATION_TEST:
-        - cmake-shared_libs-shared_proteus
-        - cmake-shared_proteus
-        - cmake-shared_libs-static_proteus
-        - cmake-static_proteus
-        - make-static_proteus
-        - make-shared_proteus
-        - cmake-proteusCore
-        - cmake-shared_lib_and_exe-static_proteus
-        - cmake-proteusFrontend
-        - cmake-clang_plugin-proteusFrontend
-        - cmake-proteusFrontend-gcc
-        - cmake-link_llvm-shared_proteus
-        - mpi-shared-cache
+      - PROTEUS_CI_INTEGRATION_TEST: "cmake-shared_libs-shared_proteus"
+        MATRIX_CI_LANE: "0"
+      - PROTEUS_CI_INTEGRATION_TEST: "cmake-shared_proteus"
+        MATRIX_CI_LANE: "1"
+      - PROTEUS_CI_INTEGRATION_TEST: "cmake-shared_libs-static_proteus"
+        MATRIX_CI_LANE: "0"
+      - PROTEUS_CI_INTEGRATION_TEST: "cmake-static_proteus"
+        MATRIX_CI_LANE: "1"
+      - PROTEUS_CI_INTEGRATION_TEST: "make-static_proteus"
+        MATRIX_CI_LANE: "0"
+      - PROTEUS_CI_INTEGRATION_TEST: "make-shared_proteus"
+        MATRIX_CI_LANE: "1"
+      - PROTEUS_CI_INTEGRATION_TEST: "cmake-proteusCore"
+        MATRIX_CI_LANE: "0"
+      - PROTEUS_CI_INTEGRATION_TEST: "cmake-shared_lib_and_exe-static_proteus"
+        MATRIX_CI_LANE: "1"
+      - PROTEUS_CI_INTEGRATION_TEST: "cmake-proteusFrontend"
+        MATRIX_CI_LANE: "0"
+      - PROTEUS_CI_INTEGRATION_TEST: "cmake-clang_plugin-proteusFrontend"
+        MATRIX_CI_LANE: "1"
+      - PROTEUS_CI_INTEGRATION_TEST: "cmake-proteusFrontend-gcc"
+        MATRIX_CI_LANE: "0"
+      - PROTEUS_CI_INTEGRATION_TEST: "cmake-link_llvm-shared_proteus"
+        MATRIX_CI_LANE: "1"
+      - PROTEUS_CI_INTEGRATION_TEST: "mpi-shared-cache"
+        MATRIX_CI_LANE: "0"
 
 test-integration-matrix:
   extends: [.base-job, .variants]

@@ -1,6 +1,8 @@
 .base-job:
   extends: .job_on_matrix
   interruptible: true
+  # Limit actual Matrix runner jobs to two global lanes across child pipelines.
+  resource_group: "matrix-ci-${MATRIX_CI_LANE}"
   before_script:
     - echo "=== Start CI Benchmarking ==="
   after_script:
@@ -9,6 +11,8 @@
 
 proteus-benchmarks-matrix:
   extends: [.base-job]
+  variables:
+    MATRIX_CI_LANE: "1"
   artifacts:
     paths:
       - proteus-benchmarks/results/*.csv
