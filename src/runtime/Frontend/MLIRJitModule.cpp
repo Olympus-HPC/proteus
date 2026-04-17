@@ -6,22 +6,25 @@
 #include "proteus/impl/Frontend/MLIRLower.h"
 #include "proteus/impl/Hashing.h"
 
-#include <llvm/ADT/SmallVector.h>
-#include <llvm/Bitcode/BitcodeWriter.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Support/MemoryBuffer.h>
-#include <llvm/Support/raw_ostream.h>
 
 #include <mlir/IR/BuiltinOps.h>
 #include <mlir/IR/MLIRContext.h>
 #include <mlir/Parser/Parser.h>
 
 namespace proteus {
-
 MLIRJitModule::MLIRJitModule(TargetModelType TargetModel,
                              const std::string &Code)
     : TargetModel(TargetModel), Code(Code),
-      Dispatch(Dispatcher::getDispatcher(TargetModel)) {}
+      Dispatch(Dispatcher::getDispatcher(TargetModel)) {
+  // Hash the MLIR source and include the target model because the same MLIR
+  // lowers to different artifacts for host, CUDA, HIP.
+  ModuleHash =
+      std::make_unique<HashT>(hash(static_cast<int>(TargetModel), Code));
+}
 
 MLIRJitModule::MLIRJitModule(const std::string &Target, const std::string &Code)
     : MLIRJitModule(parseTargetModel(Target), Code) {}
@@ -33,6 +36,11 @@ void MLIRJitModule::compile(bool Verify) {
 
   if (IsCompiled)
     return;
+
+  if ((Library = Dispatch.lookupCompiledLibrary(*ModuleHash))) {
+    IsCompiled = true;
+    return;
+  }
 
   mlir::MLIRContext Context;
   loadMLIRLoweringDialects(Context);
@@ -54,17 +62,6 @@ void MLIRJitModule::compile(bool Verify) {
 
   if (Verify && verifyModule(*Lowered.Mod, &llvm::errs()))
     reportFatalError("Broken module found, JIT compilation aborted!");
-
-  llvm::SmallVector<char, 0> Buffer;
-  llvm::raw_svector_ostream OS(Buffer);
-  llvm::WriteBitcodeToFile(*Lowered.Mod, OS);
-  ModuleHash = std::make_unique<HashT>(
-      hash(llvm::StringRef{Buffer.data(), Buffer.size()}));
-
-  if ((Library = Dispatch.lookupCompiledLibrary(*ModuleHash))) {
-    IsCompiled = true;
-    return;
-  }
 
   Library = std::make_unique<CompiledLibrary>(Dispatch.compile(
       std::move(Lowered.Ctx), std::move(Lowered.Mod), *ModuleHash));
