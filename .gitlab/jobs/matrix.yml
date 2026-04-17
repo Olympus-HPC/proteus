@@ -46,8 +46,8 @@ variables:
 .base-job:
   extends: .job_on_matrix
   interruptible: true
-  # Serialize actual Matrix runner jobs across all Matrix child pipelines.
-  resource_group: "matrix-ci"
+  # Limit actual Matrix runner jobs to two global lanes across child pipelines.
+  resource_group: "matrix-ci-${MATRIX_CI_LANE}"
   before_script:
     - echo "=== Start CI Build and Test==="
   after_script:
@@ -59,8 +59,10 @@ variables:
   parallel:
     matrix:
       - PROTEUS_CI_BUILD_SHARED: "on"
+        MATRIX_CI_LANE: "0"
       - PROTEUS_CI_BUILD_SHARED: "off"
         PROTEUS_CODECOV_VARIANT_SELECTED: "1"
+        MATRIX_CI_LANE: "1"
 
 build-and-test-matrix:
   extends: [.base-job, .build-variants]
