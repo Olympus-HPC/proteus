@@ -575,7 +575,6 @@ JitEngineDevice<ImplT>::compileAndRun(
       getRuntimeConstantValues(KernelArgs, KernelInfo.getRCInfoArray());
 
 	  DenseMap<uint64_t, DenseMap<int32_t, RuntimeConstant>> LambdaJitValuesMap;
-	  auto& LR = LambdaRegistry::instance();
 	  getLambdaJitValues(KernelInfo, LambdaJitValuesMap);
 
   // Determine the hash based on dimension specialization.  If we do not
