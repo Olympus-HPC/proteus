@@ -131,32 +131,37 @@ public:
     DenseMap<StructType *, SmallVector<LambdaJitVariableInfo, 16>>
         LambdaStorageTypeToJitIndices;
     DenseMap<Type *, GlobalVariable *> LambdaTypeToGlobalName;
+    DenseSet<StructType *> RegisteredLambdaStorageClasses;
 
-    DenseMap<StructType *, StructType *> FunctorTypeToLambdaType;
-    DenseMap<StructType *, StructType *> LambdaTypeToFunctorType;
-
-    // new pipeline: LambdaAnalysis sees early LLVM IR emitted with
-    // proteus__register_lambda --> proteus::__register_lambda_impl (1) make a
-    // DenseMap from lambda functor types to their underlying storage class (2)
-    // Find jit_variable calls and associate with class.anon types (3) Look at
-    // register lambda calls, identify the call operators of the functors from
-    // the callsite
-    //      (a) collect lambda ops in a map to functor ops, if there are two
-    //      functor using the same one we need to clone and inject the
-    //          clone at the callsite
-    //     (b) make the call operators strings. inject register_jit_variable
-    //     with the call operator functor string as the key
+    // clang-format off
+    // new pipeline: LambdaAnalysis sees early LLVM IR emitted at StartEPCallback.
+    // Our preprocessor macro PROTEUS_REGISTER_LAMBDA emits unique a LambdaFunctorWrapper
+    // template instantiation for every macro invocation.  The goal of this analysis 
+    // is to determine which slots in a Functor/Lambda's storage will be folded into LLVM
+    // IR at runtime and treated as constants. The analysis uses the following steps:
+    //  (1) make a DenseSet containing anonymous lambda classes (class.anon type) 
+    //      as registered by __proteus_take_address inside __register_lambda_impl
+    //  (2) Find jit_variable calls and associate the calls offset with registered, 
+    //      class.anon types
+    //  (3) Look at register_lambda calls, identify the call operators of the functors 
+    //      from the callsite
+    //      (a) If there are two LambdaFunctorWrapper::operator() functions
+    //          using the same lambda:::operator(), we need to clone lambda:::operator()
+    //          and inject the clone at the callsite
+    //      (b) Inject __proteus_register_lambda_runtime_constant into the register_lambda_impl
+    //          IR with the call operator functor ID as the key.  Use the analysis from (2) to
+    //          determine which llvm::Value to pass to the call.
     // (4) (RUNTIME) Look at all the call operators within a kernel, replace
     // with runtime constants now propagated from the registry.
     //
     // NOTE: We need this for both host and device modules, since the runtime
     // specialization paths expect the function metadata to be present after
     // cloning/extraction.
+    // clang-format on
     makeLambdaCallsUniquePerFunctorOperator(M);
     if (!isDeviceCompilation(M)) {
-      getUnderlyingLambdaTypeFromFunctors(M, FunctorTypeToLambdaType,
-                                          LambdaTypeToFunctorType);
-      instrumentJitVariableStructIndex(M, LambdaTypeToFunctorType,
+      getUnderlyingLambdaTypeFromFunctors(M, RegisteredLambdaStorageClasses);
+      instrumentJitVariableStructIndex(M, RegisteredLambdaStorageClasses,
                                        LambdaStorageTypeToJitIndices);
       registerLambdaFunctions(M, LambdaStorageTypeToJitIndices);
     }
@@ -348,14 +353,22 @@ private:
 
     return NewFunc;
   }
-
+  // Go through all of the functor operator() methods emitted by the
+  // PROTEUS_REGISTER_LAMBDA expansion from the preprocessor.  Each operator()
+  // has a unique ID, but multiple functor::operator() methods may call the same
+  // lambda::operator() method.  Because each one needs to be specialized
+  // separately at runtime, clone duplicate lambda::operator() methods.
   void makeLambdaCallsUniquePerFunctorOperator(Module &M) {
     SmallVector<std::pair<Function *, uint64_t>> FunctorOperatorMethods;
     DenseMap<Function *, SmallVector<std::pair<CallBase *, uint64_t>, 8>>
         LambdaCallToFunctor;
+    // The preprocessor tags each operator() with a proteus.wrapper_call.  Use
+    // the annotation to find the LambdaFunctorWrapper::operator() calls.
     findAnnotatedFunctions(M, "proteus.wrapper_call", FunctorOperatorMethods);
 
     for (auto &[FunctorOperator, FunctorId] : FunctorOperatorMethods) {
+      // Proteus will prune llvm.global.annotations, so add a metadata node with
+      // the preprocessor-emitted FunctorID and proteus.wrapper_call keyword.
       setU64FunctionMetadata(FunctorOperator, "proteus.wrapper_call",
                              FunctorId);
       for (auto &BB : *FunctorOperator) {
@@ -391,10 +404,7 @@ private:
     }
 
     DenseMap<Function *, uint64_t> FunctionsToAnnotate;
-    for (auto &Entry : LambdaCallToFunctor) {
-      Function *LambdaOperator = Entry.first;
-      auto &LambdaOperatorCBVec = Entry.second;
-
+    for (auto [LambdaOperator, LambdaOperatorCBVec] : LambdaCallToFunctor) {
       DenseMap<uint64_t, SmallVector<CallBase *, 8>> CallsByFunctorId;
       for (auto &[LambdaOpCB, CallerId] : LambdaOperatorCBVec)
         CallsByFunctorId[CallerId].push_back(LambdaOpCB);
@@ -410,9 +420,7 @@ private:
 
       FunctionsToAnnotate.try_emplace(LambdaOperator, PrimaryFunctorId);
 
-      for (auto &KV : CallsByFunctorId) {
-        uint64_t CallerId = KV.first;
-        auto &Calls = KV.second;
+      for (auto &[CallerId, Calls] : CallsByFunctorId) {
         if (CallerId == PrimaryFunctorId)
           continue;
 
@@ -464,19 +472,31 @@ private:
       }
     return StubToKernelMap;
   }
+  StructType *getAnonClassPtr(CallBase *CB) {
+    auto Alloca = dyn_cast<AllocaInst>(CB->getArgOperand(0));
+    if (!Alloca)
+      reportFatalError("Non alloca passed to CB\n");
+    auto AnonClassTy = dyn_cast<StructType>(Alloca->getAllocatedType());
+    if (!AnonClassTy)
+      reportFatalError(
+          "Non struct type allocated and passed to __proteus_take_address");
+    return AnonClassTy;
+  }
 
   void getUnderlyingLambdaTypeFromFunctors(
-      Module &M, DenseMap<StructType *, StructType *> &FunctorToLambdaType,
-      DenseMap<StructType *, StructType *> &LambdaToFunctorType) {
-    for (llvm::StructType *ST : M.getIdentifiedStructTypes()) {
-      if (!ST->getStructName().contains("LambdaFunctorWrapper"))
-        continue;
-      auto *UnderlyingStruct = dyn_cast<StructType>(ST->getElementType(0));
-      if (!UnderlyingStruct)
-        reportFatalError("Internal Proteus Error: LambdaFunctorWrapper "
-                         "underlying class not initialized correctly.");
-      FunctorToLambdaType[ST] = UnderlyingStruct;
-      LambdaToFunctorType[UnderlyingStruct] = ST;
+      Module &M, DenseSet<StructType *> &RegisteredLambdaStorageClasses) {
+    SmallVector<std::pair<Function *, uint64_t>> RegisterFunctions;
+    findAnnotatedFunctions(M, "proteus.register_call", RegisterFunctions);
+    SmallVector<CallBase *> AnonAllocaCB;
+    for (auto [RegisterFunc, _] : RegisterFunctions) {
+      for (auto &BB : *RegisterFunc)
+        for (auto &I : BB) {
+          auto *CB = dyn_cast<CallBase>(&I);
+          if (!CB || !CB->getCalledFunction()->getName().contains(
+                         "__proteus_take_address"))
+            continue;
+          RegisteredLambdaStorageClasses.insert(getAnonClassPtr(CB));
+        }
     }
   }
 
@@ -513,7 +533,7 @@ private:
   /// todo(bowen): add assert on jit_variable having an alloca within the same
   /// procedure
   void instrumentJitVariableStructIndex(
-      Module &M, DenseMap<StructType *, StructType *> &LambdaTypeToFunctorType,
+      Module &M, DenseSet<StructType *> &RegisteredLambdaStorageClasses,
       DenseMap<StructType *, SmallVector<LambdaJitVariableInfo, 16>>
           &JitIndices) {
     DEBUG(Logger::logs("lambda-pass") << "finding jit variables" << "\n");
@@ -562,7 +582,7 @@ private:
           auto *PossibleLamType =
               dyn_cast<StructType>(Alloca->getAllocatedType());
           if (!PossibleLamType ||
-              !LambdaTypeToFunctorType.contains(PossibleLamType))
+              !RegisteredLambdaStorageClasses.contains(PossibleLamType))
             continue;
           ++numSlotsFound;
           JitIndices[PossibleLamType].emplace_back(
@@ -574,7 +594,7 @@ private:
           StructType *PossibleLamType =
               dyn_cast<StructType>(GEP->getSourceElementType());
           if (!PossibleLamType ||
-              !LambdaTypeToFunctorType.contains(PossibleLamType))
+              !RegisteredLambdaStorageClasses.contains(PossibleLamType))
             continue;
           auto *Slot = GEP->getOperand(GEP->getNumOperands() - 1);
           const StructLayout *SL =
