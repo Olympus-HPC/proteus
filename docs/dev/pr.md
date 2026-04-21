@@ -18,7 +18,7 @@ changing:
 
 - `src/pass` for annotation discovery and instrumentation
 - `src/runtime` for specialization, dispatch, caching, and execution
-- `src/runtime/Frontend` for the DSL and C++ frontend implementations
+- `src/runtime/Frontend` for the DSL, C++ frontend, and MLIR frontend implementations
 - `include/proteus` for public headers and API surface
 - `docs/` for user and developer documentation
 

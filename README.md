@@ -6,28 +6,41 @@
 
 # <img src="docs/assets/proteus-logo.png" width="128" align="middle" /> Proteus
 
-Proteus is a programmable Just-In-Time (JIT) compiler based on LLVM.
-It embeds seamlessly into existing C++ codebases and accelerates CUDA, HIP, and
-host-only C/C++ applications by leveraging runtime context to achieve
+Proteus is a programmable runtime specialization and Just-In-Time (JIT) layer
+built on LLVM. It embeds into existing C++ codebases and accelerates host, CUDA,
+and HIP applications by using runtime context to specialize code and enable
 optimizations beyond static compilation.
 
 ## Description
 Standard ahead-of-time (AOT) compilation can only optimize a program with the
-information available at build time.
-Proteus goes further.
+information available at build time. Proteus goes further by embedding
+optimizing JIT compilation directly into C/C++ applications.
 
-Proteus provides APIs to embed optimizing JIT compilation directly into C/C++
-applications.
-By leveraging runtime context—such as the actual values of
-variables during execution—Proteus can **specialize** code on the fly and apply
-advanced compiler optimizations that accelerate performance beyond what static
-compilation allows.
+Runtime context, such as the actual values of variables during execution, lets
+it **specialize** code on the fly and apply advanced compiler optimizations that
+accelerate performance beyond what static compilation allows.
 
-You can use Proteus in three ways:
+Several frontends are available, depending on how you want to describe JIT code:
 
-* **Code annotations** – mark regions of existing code for JIT compilation.
-* **Embedded DSL API** – build JIT code at runtime using high-level constructs.
-* **C++ frontend API** – provide C++ code as strings for JIT compilation and optimization.
+| Interface | Input style | Best for | Specialization model | Requires Clang AOT? |
+| --- | --- | --- | --- | --- |
+| **Code annotations** | Existing C/C++/CUDA/HIP code | Incremental adoption in existing applications | Values, arrays, objects, and launch configuration | Yes |
+| **C++ frontend API** | C++ source strings | Runtime-generated C++ and templates | Values, arrays, objects, and launch configuration | No |
+| **MLIR frontend API** | MLIR source strings | Direct access to MLIR lowering | Encoded in the provided MLIR source | No |
+| **Embedded DSL API** | Programmatic builders | Runtime code generation with high-level constructs | Values, arrays, and launch configuration | No |
+
+These frontends can target host, CUDA, and HIP execution paths, with backend
+support depending on how Proteus was configured:
+
+| Interface | Host | CUDA | HIP | Notes |
+| --- | --- | --- | --- | --- |
+| **Code annotations** | Yes | Yes | Yes | Requires compiling with Clang and uses the Proteus LLVM pass |
+| **C++ frontend API** | Yes | Yes | Yes | Uses Clang by default; CUDA paths can use NVCC |
+| **MLIR frontend API** | Yes | Yes | Yes | Requires `PROTEUS_ENABLE_MLIR=ON` |
+| **Embedded DSL API** | Yes | Yes | Yes | Uses the LLVM backend by default; MLIR backend requires `PROTEUS_ENABLE_MLIR=ON` |
+
+CUDA, HIP, and MLIR support are available when Proteus is built with the
+corresponding configuration options enabled.
 
 Proteus includes both in-memory and persistent caching, ensuring that once code
 has been compiled and optimized, the cost of recompilation is avoided.
@@ -36,17 +49,18 @@ Proteus consists of an LLVM pass and a runtime library that implements JIT
 compilation and optimization using LLVM as a library.
 
 * The **code annotation** interface requires compiling your application with Clang so the Proteus LLVM pass can parse annotations.
-* The **DSL** and **C++ frontend** APIs don’t depend on which AOT compiler you use.
+* The **DSL**, **C++ frontend**, and **MLIR frontend** APIs don’t depend on which AOT compiler you use.
 
-In all cases, you link your application against the Proteus runtime library—details are provided [later](#integrating-with-your-build-system).
+In all cases, you link your application against the Proteus runtime library.
+Details are provided [later](#integrating-with-your-build-system).
 
 ## Installation
 Proteus can be installed from source or via [spack](https://github.com/spack/spack).
 
 ### Spack
-We provide a packaging recipe for Spack in the subdirectory`packaging/spack`.
+We provide a packaging recipe for Spack in the subdirectory `packaging/spack`.
 
-Assuming you have a Spack installation and preferrably using an isolated Spack
+Assuming you have a Spack installation and preferably using an isolated Spack
 environment, you can add the spack repo by cloning Proteus and then install it
 by running:
 ```bash
@@ -78,23 +92,23 @@ spack install proteus +mpi
 ### Building from source
 The project uses `cmake` and requires an LLVM installation.
 CI tests currently cover LLVM 19, 20, 22 with CUDA versions 12.2, and AMD
-ROCm versions 6.4.3 (based on LLVM 19) , 7.1.1 (based on LLVM 20), 7.2.0 (based
+ROCm versions 6.4.3 (based on LLVM 19), 7.1.1 (based on LLVM 20), 7.2.0 (based
 on LLVM 22).
 
 See the top-level `CMakeLists.txt` for the available build options.
 A typical build looks like this:
 ```
 mkdir -p build && cd build
-cmake -DCMAKE_INSTALL_PREFIX=<install_path> ..
+cmake -DLLVM_INSTALL_DIR=<llvm_install_path> -DCMAKE_INSTALL_PREFIX=<install_path> ..
 make install
 ```
 
 The `scripts` directory contains setup scripts for building on different targets
 (host-only, CUDA, ROCm) used on LLNL machines.
-They also server as good starting points to adapt for other environments.
+They also serve as good starting points to adapt for other environments.
 Run them from the repository root:
 ```bash
-source setup-<target>.sh
+source scripts/setup-<target>.sh
 ```
 These scripts load environment modules (specific to LLNL systems) and create a
 `build-<hostname>-<target>-<version>` directory with a
@@ -103,9 +117,10 @@ working configuration.
 ## Integrating with your build system
 
 ### CMake
-Integration with CMake is straightforward.
-Make sure the Proteus install directory is in
-`CMAKE_PREFIX_PATH`, or pass it explicitly with `-Dproteus_DIR=<install_path>` during configuration.
+To integrate Proteus with CMake, add the install prefix to `CMAKE_PREFIX_PATH`,
+or pass it explicitly with
+`-Dproteus_DIR=<install_path>/<libdir>/cmake/proteus` during configuration
+where `<libdir>` is typically `lib` or `lib64`.
 Then, in your project's `CMakeLists.txt` add:
 ```cmake
 find_package(proteus CONFIG REQUIRED)
@@ -113,7 +128,7 @@ find_package(proteus CONFIG REQUIRED)
 add_proteus(<target>)
 ```
 
-If you only need the DSL or C++ frontend APIs, you can link directly against
+If you only need the DSL, C++ frontend, or MLIR frontend APIs, you can link directly against
 `proteusFrontend`.
 In this case, you don’t need to compile your target with Clang:
 
@@ -124,151 +139,36 @@ target_link_libraries(<target> ... proteusFrontend ...)
 ```
 
 ### Make
-With `make`, integrating Proteus requires adding compilation and
+With `make`, annotation-based integration requires adding compilation and
 linking flags, for example:
 ```bash
-CXXFLAGS += -I<install_path>/include -fpass-plugin=<install_path>/lib64/libProteusPass.so
+CXXFLAGS += -I<install_path>/include -fpass-plugin=<install_path>/<libdir>/libProteusPass.so
 
-LDFLAGS += -L <install_path>/lib64 -Wl,-rpath,<install_path>/lib64 -lproteus $(llvm-config --libs) -lclang-cpp
+LDFLAGS += -L<install_path>/<libdir> -Wl,-rpath,<install_path>/<libdir> -lproteus $(llvm-config --libs) -lclang-cpp
 ```
 If you don't use code annotations, you can omit the `-fpass-plugin` option,
-since he LLVM pass is only needed for processing annotations.
+since the LLVM pass is only needed for processing annotations.
 
 ## Using
-
-To use Proteus into your application, you need to:
-
-1. Define your JIT code and specializations by either:
-   - annotating functions (or GPU kernels),
-   - building JIT compile code with the DSL API,
-   - providing your source code as-a-string through the CPP frontend API
-
-2. Update your build system to link against the Proteus runtime library. If you use the code annotation interface, you must also compile with Clang and include the Proteus LLVM plugin pass.
-
 
 Proteus's core optimization technique is **runtime constant folding**.
 It replaces runtime values with constants during JIT compilation, which in turn
 turbo-charges classical compiler optimizations such as loop unrolling,
 control-flow simplification, and constant propagation.
-Think of it as doing
-`constexpr`—but at runtime.
+Think of it as doing `constexpr`, but at runtime.
 
-Values that can be folded include function or kernel arguments, kernel launch dimensions, launch bounds, and other runtime variables.
+Values that can be folded include function or kernel arguments, kernel launch
+dimensions, launch bounds, and other runtime variables.
 
-Here are examples of a scaled vector addition (daxpy) kernel specialized through the
-different interfaces:
+Choose the interface that matches how your application wants to describe JIT
+work:
 
-### Code annotation interface
-
-We add the attribute `annotate` with the `"jit"` specifier to the kernel
-function `daxpy`.
-We specialize it for the scaling factor argument `A` (index 1),
-and the vector size argument `N` (index 2).
-
-```cpp
-__attribute__((annotate("jit", 1, 2)))
-__global__
-void daxpy(double A, size_t N, double *X, double *Y)
-{
-  int tid = threadIdx.x + (blockIdx.x * blockDim.x);
-  int stride = blockDim.x * gidDim.x;
-  for(int i=tid; i<N; i+=stride)
-    X[i] = A*X[i] + Y[i];
-}
-```
-
-### C++ frontend interface
-
-We define the source code as a string and use `std::format` (assumes C++20, but
-any string substitution method works) to specialize on the runtime values of `A`
-and `N`.
-
-```cpp
-#include <format>
-#include <proteus/CppJitModule.h>
-
-std::string Code = std::format(R"cpp(
-  extern "C"
-  __global__
-  void daxpy(double *X, double *Y)
-  {{
-    int tid = threadIdx.x + (blockIdx.x * blockDim.x);
-    int stride = blockDim.x * gidDim.x;
-    for(int i=tid; i<{0}; i+=stride)
-      X[i] = {1}*X[i] + Y[i];
-  }})cpp", N, A);
-
-CppJitModule CJM{"cuda", Code};
-auto Kernel = CJM.getKernel<void(double *, double *)>("daxpy");
-Kernel.launch(
-  /* GridDim */ {NumBlocks, 1, 1},
-  /* BlockDim */ {ThreadsPerBlock, 1, 1},
-  /* ShmemSize */ 0,
-  /* Stream */ nullptr,
-  X, Y);
-```
-
-### DSL interface
-
-Here we use the DSL API to build the kernel function using the DSL's programming
-abstractions.
-The runtime values for `A` and `N` are embedded directly in the generated code.
-
-```cpp
-#include <proteus/JitFrontend.h>
-
-auto createJitKernel(double A, size_t N) {
-  // Targeting cuda, other targets are hip, host.
-  auto J = std::make_unique<JitModule>("cuda");
-
-  // Add the kernel with signature: void add_vectors(double *X, double *Y)
-  auto KernelHandle = J->addKernel<double *, double *>("daxpy");
-  auto &F = KernelHandle.F;
-
-  F.beginFunction();
-  {
-    // Declare local variables and argument getters.
-    auto &I = F.declVar<size_t>("I");
-    auto &Inc = F.declVar<size_t>("Inc");
-    auto [X, Y] = F.getArgs();
-    auto &RunConstA = F.defRuntimeConst(A);
-    auto &RunConstN = F.defRuntimeConst(N);
-
-    // Compute the global thread index.
-    I = F.callBuiltin(getBlockIdX) * F.callBuiltin(getBlockDimX) +
-        F.callBuiltin(getThreadIdX);
-
-    // Compute the stride (total number of threads).
-    Inc = F.callBuiltin(getGridDimX) * F.callBuiltin(getBlockDimX);
-
-    // Strided loop.
-    F.beginFor(I, I, RunConstN, Inc);
-    {
-      X[I] = RunConstA*X[I] + Y[I];
-    }
-    F.endFor();
-
-    F.ret();
-  }
-  F.endFunction();
-
-  return std::make_pair(std::move(J), KernelHandle);
-}
-...
-auto [J, KernelHandle] = createJitKernel(N);
-
-// Configure the CUDA kernel launch parameters.
-constexpr unsigned ThreadsPerBlock = 256;
-unsigned NumBlocks = (N + ThreadsPerBlock - 1) / ThreadsPerBlock;
-
-KernelHandle.launch(
-  /* GridDim */ {NumBlocks, 1, 1},
-  /* BlockDim */ {ThreadsPerBlock, 1, 1},
-  /* ShmemSize */ 0,
-  /* Stream */ nullptr,
-  X, Y);
-...
-```
+| Interface | Detailed guide |
+| --- | --- |
+| Code annotations | [Code Annotations](https://olympus-hpc.github.io/proteus/user/annotations/) |
+| C++ frontend API | [C++ Frontend API](https://olympus-hpc.github.io/proteus/user/cpp-frontend/) |
+| MLIR frontend API | [MLIR Frontend API](https://olympus-hpc.github.io/proteus/user/mlir-frontend/) |
+| DSL API | [DSL API](https://olympus-hpc.github.io/proteus/user/dsl/) |
 
 Proteus generates a unique specialization for each distinct set of runtime
 values and caches them in memory and on disk, so JIT overhead is minimized

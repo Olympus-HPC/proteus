@@ -10,8 +10,10 @@ Building Proteus installs two components:
 
 The LLVM plugin pass is necessary **only if** you use the Code annotation
 interface and requires compiling your application with Clang, besides linking with `libproteus`.
-If you use the DSL or C++ frontend APIs, you only need to link your code with `libproteus`.
-Both must be integrated into your application build system.
+If you use the DSL, C++ frontend, or MLIR frontend APIs, you only need to link
+your code with `libproteus`.
+Integrate the components required by your chosen interface into your application
+build system.
 See the [Integration](integration.md) section for more details on integrating with your build system.
 
 ## Spack
