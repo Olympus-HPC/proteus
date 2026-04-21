@@ -2,6 +2,13 @@ name: spack CI
 
 on:
   pull_request:
+    paths:
+      - ".github/workflows/ci-test-spack.yml"
+      - "CMakeLists.txt"
+      - "cmake/**"
+      - "include/**"
+      - "packaging/spack/**"
+      - "src/**"
 
 jobs:
   build-and-test:
