@@ -2,9 +2,8 @@
 
 ## CMake
 
-Integration with CMake is straightforward.
-Add the Proteus install prefix to `CMAKE_PREFIX_PATH`, or set `proteus_DIR` to
-the directory containing `proteusConfig.cmake`, typically
+To integrate Proteus with CMake, add the install prefix to `CMAKE_PREFIX_PATH`,
+or set `proteus_DIR` to the directory containing `proteusConfig.cmake`, typically
 `<install-prefix>/lib/cmake/proteus` or `<install-prefix>/lib64/cmake/proteus`.
 
 Then, in your project's `CMakeLists.txt` add:
@@ -20,7 +19,7 @@ find the matching LLVM and Clang packages, plus any backend-specific
 dependencies that Proteus was built with, such as `CUDAToolkit`, `hip`,
 `hiprtc`, `LLD`, or `MPI`.
 
-If you only need the DSL or C++ frontend APIs, you can link directly against
+If you only need the DSL, C++ frontend, or MLIR frontend APIs, you can link directly against
 `proteusFrontend`.
 In this case, you don't need to compile your target with Clang:
 
@@ -30,22 +29,17 @@ find_package(proteus CONFIG REQUIRED)
 target_link_libraries(<target> ... proteusFrontend ...)
 ```
 
-!!! warning
-    You may need to build `libproteus` with the Position Independent Code (PIC)
-    flag (`-fPIC` or `CMAKE_POSITION_INDEPENDENT_CODE=on` in CMake), if you want
-    to integrate Proteus as a static library to a dynamic library target.
-
 ## Make
 
-With `make`, integrating Proteus requires adding compilation and
+With `make`, annotation-based integration requires adding compilation and
 linking flags, for example:
 
 ```bash
 CXXFLAGS += -I<install_path>/include \
-    -fpass-plugin=<install_path>/lib64/libProteusPass.so
+    -fpass-plugin=<install_path>/<libdir>/libProteusPass.so
 
-LDFLAGS += -L <install_path>/lib64 \
-    -Wl,-rpath,<install_path>/lib64 \
+LDFLAGS += -L<install_path>/<libdir> \
+    -Wl,-rpath,<install_path>/<libdir> \
     -lproteus $(llvm-config --libs) -lclang-cpp
 ```
 

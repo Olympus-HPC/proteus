@@ -25,20 +25,20 @@ Proteus is built around two main products:
 - `libproteus`: the runtime library that performs JIT compilation, caching,
   loading, and execution
 
-The split matters because the three user-facing interfaces do not all enter the
+The split matters because the user-facing interfaces do not all enter the
 system the same way.
 The annotation interface uses both the pass and the runtime library: the pass
 finds annotated regions during normal compilation and rewrites them to route
 through the runtime.
-The DSL and C++ frontend APIs skip the pass and build JIT units directly through
-runtime library APIs.
+The DSL, C++ frontend, and MLIR frontend APIs skip the pass and build JIT units
+directly through runtime library APIs.
 
 Conceptually, the pass handles compile-time instrumentation, while the runtime
 library handles runtime compilation and execution.
 
-## Three Frontends, One Runtime Pipeline
+## Frontends, One Runtime Pipeline
 
-Proteus exposes three main ways to define JIT work:
+Proteus exposes several ways to define JIT work:
 
 - **Code annotations**: source code is compiled ahead of time, and the pass
   extracts and instruments JIT-annotated regions
@@ -46,6 +46,8 @@ Proteus exposes three main ways to define JIT work:
   builders
 - **C++ frontend API**: source strings are compiled on demand through Clang or,
   for CUDA, optionally NVCC
+- **MLIR frontend API**: MLIR source strings are lowered and compiled through
+  Proteus's MLIR path
 
 These paths look different at the API level, but they converge on the same core
 runtime machinery.
@@ -65,9 +67,9 @@ stack.
 - **LLVM**: the main substrate for Proteus. The pass operates on LLVM IR, and
   the runtime ultimately specializes, optimizes, and compiles LLVM-based IR for
   execution.
-- **MLIR**: an optional frontend path for the DSL. When enabled, Proteus can
-  build code in MLIR first and then lower it into LLVM IR before continuing
-  through the normal runtime pipeline.
+- **MLIR**: an optional compiler path used by the MLIR frontend and by the DSL's
+  MLIR backend. When enabled, Proteus can lower MLIR into LLVM IR before
+  continuing through the normal runtime pipeline.
 - **Clang**: used both ahead of time and at runtime. The annotation interface
   depends on Clang-compatible compilation so the pass can observe annotations,
   and the C++ frontend can invoke Clang to compile source strings on demand.
@@ -86,7 +88,7 @@ IR infrastructure, lowering, compilation, and linking machinery underneath.
 
 ## Execution Model
 
-Across the three frontends, the common lifecycle is:
+Across the frontends, the common lifecycle is:
 
 1. identify or build a JIT unit
 2. collect runtime constants or other specialization inputs
@@ -98,8 +100,8 @@ Across the three frontends, the common lifecycle is:
 The main difference between the frontends is how the JIT unit is created.
 The annotation path starts from ahead-of-time compiled code and produces
 instrumented stubs that call into the runtime.
-The DSL and C++ frontend paths construct modules directly in the runtime,
-either as IR or as source-to-compile requests.
+The DSL, C++ frontend, and MLIR frontend paths construct modules directly in the
+runtime, either as IR or as source-to-compile requests.
 
 Host and device execution follow the same high-level model.
 What changes is the backend work required to materialize and launch the compiled
@@ -161,8 +163,8 @@ points:
 - `src/pass`: annotation discovery, host/device instrumentation, and pass-side
   extraction logic
 - `src/runtime`: JIT engines, dispatch, caching, and runtime services
-- `src/runtime/Frontend`: the DSL and C++ frontend implementations that build
-  JIT work directly through the runtime
+- `src/runtime/Frontend`: the DSL, C++ frontend, and MLIR frontend
+  implementations that build JIT work directly through the runtime
 - `include/proteus`: the public API surface exposed to applications
 
 A useful mental model is:
