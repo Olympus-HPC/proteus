@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <iostream>
+#include <optional>
 #include <string>
 
 #include <proteus/Error.h>
@@ -45,7 +46,9 @@ int main(int argc, char **argv) {
   auto Mod = std::move(ModuleOrErr.get());
   proteus::pruneIR(*Mod);
   proteus::internalize(*Mod, KernelSym);
-  proteus::optimizeIR(*Mod, DeviceArch, '1', 1);
+  proteus::optimizeIR(
+      *Mod, DeviceArch,
+      proteus::OptimizationPipelineConfig(std::nullopt, '1', 1));
   auto DeviceObject =
       proteus::codegenObject(*Mod, DeviceArch, GlobalLinkedBinaries);
   if (!DeviceObject)
