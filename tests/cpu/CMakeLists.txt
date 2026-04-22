@@ -2,10 +2,12 @@ function(CREATE_CPU_TEST exe check_source)
     add_executable(${exe} ${check_source} ${ARGN})
 
     get_target_property(PROTEUS_PASS_SOURCES ProteusPass SOURCES)
+    get_target_property(LAMBDA_PASS_SOURCES LambdaPass SOURCES)
     set_source_files_properties(${check_source} PROPERTIES
-        OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES}"
+        OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES};${LAMBDA_PASS_SOURCES}"
     )
     add_dependencies(${exe} ProteusPass)
+    add_dependencies(${exe} LambdaPass)
 
     target_link_libraries(${exe} PUBLIC proteus)
 
@@ -19,6 +21,7 @@ function(CREATE_CPU_TEST exe check_source)
         ${exe}
         PUBLIC
         -fpass-plugin=$<TARGET_FILE:ProteusPass>
+        -fpass-plugin=$<TARGET_FILE:LambdaPass>
         ${NATIVE_OPT_FLAGS}
     )
 
@@ -64,6 +67,7 @@ CREATE_CPU_TEST(types types.cpp)
 CREATE_CPU_TEST(types_api types_api.cpp)
 CREATE_CPU_TEST(lambda lambda.cpp)
 CREATE_CPU_TEST(lambda_def lambda_def.cpp)
+CREATE_CPU_TEST(lambda_def_register_once lambda_def_register_once.cpp)
 CREATE_CPU_TEST(lambda_multiple lambda_multiple.cpp)
 CREATE_CPU_TEST(lambda_multiple_api lambda_multiple_api.cpp)
 CREATE_CPU_TEST(lambda_spec_test lambda_spec_test.cpp)

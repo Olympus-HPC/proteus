@@ -6,6 +6,8 @@ function(add_proteus target)
         target_compile_options(${target} PRIVATE
             # -fplugin loading is needed to register the plugin command line
             # option.
+            "-fplugin=$<TARGET_FILE:LambdaPass>"
+            "-fpass-plugin=$<TARGET_FILE:LambdaPass>"
             "-fplugin=$<TARGET_FILE:ProteusPass>"
             "-fpass-plugin=$<TARGET_FILE:ProteusPass>"
             "SHELL:-Xclang -mllvm -Xclang -force-proteus-jit-annotate-all"
@@ -13,11 +15,13 @@ function(add_proteus target)
     else()
         target_compile_options(${target} PRIVATE
             "-fpass-plugin=\$<TARGET_FILE:ProteusPass>"
+            "-fpass-plugin=\$<TARGET_FILE:LambdaPass>"
         )
     endif()
 
     target_link_options(${target} PRIVATE
-        "SHELL:\$<\$<LINK_LANGUAGE:HIP>:-Xoffload-linker --load-pass-plugin=\$<TARGET_FILE:ProteusPass>>")
+        "SHELL:\$<\$<LINK_LANGUAGE:HIP>:-Xoffload-linker --load-pass-plugin=\$<TARGET_FILE:ProteusPass>>"
+        "SHELL:\$<\$<LINK_LANGUAGE:HIP>:-Xoffload-linker --load-pass-plugin=\$<TARGET_FILE:LambdaPass>>")
 
     get_target_property(target_type ${target} TYPE)
     if(target_type STREQUAL "EXECUTABLE")

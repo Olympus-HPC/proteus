@@ -8,10 +8,8 @@
 
 #include <iostream>
 
-#include "proteus/JitInterface.h"
-
 #include "gpu_common.h"
-#include <proteus/JitInterface.h>
+#include "proteus/JitInterface.h"
 
 template <typename T>
 __global__ __attribute__((annotate("jit"))) void kernel(T LB) {
@@ -28,16 +26,14 @@ __global__ __attribute__((annotate("jit"))) void kernel(size_t N, T LB) {
 }
 
 template <typename T> void registerRun(T &&LB) {
-  proteus::register_lambda(LB);
-  kernel<<<1, 1>>>(LB);
+  kernel<<<1, 1>>>(PROTEUS_REGISTER_LAMBDA(LB));
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
 template <typename T> void registerRun(int N, T &&LB) {
-  proteus::register_lambda(LB);
   constexpr int BlockSize = 256;
   const int NumBlocks = (N + BlockSize - 1) / BlockSize;
-  kernel<<<NumBlocks, BlockSize>>>(N, LB);
+  kernel<<<NumBlocks, BlockSize>>>(N, PROTEUS_REGISTER_LAMBDA(LB));
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
@@ -69,7 +65,7 @@ int main() {
 
   std::cout << "x[0:1] = " << X[0] << "," << X[1] << "\n";
 
-  run(proteus::register_lambda(
+  run(PROTEUS_REGISTER_LAMBDA(
       [=, A = proteus::jit_variable(A), B = proteus::jit_variable(B)] __device__
       __attribute__((annotate("jit"))) () { X[0] = A + B; }));
   std::cout << "x[0] = " << X[0] << "\n";

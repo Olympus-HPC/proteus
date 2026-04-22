@@ -156,12 +156,13 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
   }
 
   TransformArgumentSpecialization::transform(M, *F, RCArray);
-
-  if (!LambdaRegistry::instance().empty()) {
+  SmallVector<std::pair<Function *, uint64_t>> LambdaCalleeInfo;
+  findFunctionsWithU64Metadata(M, "proteus.wrapper_call", LambdaCalleeInfo);
+  for (auto [F, ID] : LambdaCalleeInfo) {
     if (auto OptionalMapIt =
-            LambdaRegistry::instance().matchJitVariableMap(F->getName())) {
-      auto &RCVec = OptionalMapIt.value()->getSecond();
-      TransformLambdaSpecialization::transform(M, *F, RCVec);
+            LambdaRegistry::instance().matchJitVariableMap(ID)) {
+      auto &RCVec = OptionalMapIt.value();
+      TransformLambdaSpecialization::transform(M, *F, ID, RCVec);
     }
   }
 
@@ -173,27 +174,6 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
     else
       Logger::logs("proteus") << "Module verified!\n";
   }
-}
-
-void getLambdaJitValues(StringRef FnName,
-                        SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
-  TIMESCOPE("proteus::getLambdaJitValues");
-  LambdaRegistry &LR = LambdaRegistry::instance();
-  if (LR.empty())
-    return;
-
-  PROTEUS_DBG(Logger::logs("proteus") << "=== Host LAMBDA MATCHING\n"
-                                      << "Caller trigger " << FnName << " -> "
-                                      << demangle(FnName.str()) << "\n");
-
-  SmallVector<StringRef> LambdaCalleeInfo;
-  PROTEUS_DBG(Logger::logs("proteus")
-              << " Trying F " << demangle(FnName.str()) << "\n ");
-  auto OptionalMapIt = LR.matchJitVariableMap(FnName);
-  if (!OptionalMapIt)
-    return;
-
-  LambdaJitValuesVec = OptionalMapIt.value()->getSecond();
 }
 
 void *
@@ -216,21 +196,28 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 
   SmallVector<RuntimeConstant> RCVec =
       getRuntimeConstantValues(Args, RCInfoArray);
-  SmallVector<RuntimeConstant> LambdaJitValuesVec;
-  getLambdaJitValues(FnName, LambdaJitValuesVec);
+  DenseMap<uint64_t, DenseMap<int32_t, RuntimeConstant>> LambdaJitValuesMap;
+  SmallVector<std::pair<Function *, uint64_t>> LambdaCalleeInfo;
+  findFunctionsWithU64Metadata(*M, "proteus.wrapper_call", LambdaCalleeInfo);
+  LambdaRegistry &LR = LambdaRegistry::instance();
+  for (auto [_, ID] : LambdaCalleeInfo) {
+    auto RCMapOpt = LR.getJitVariables(ID);
+    if (!RCMapOpt)
+      continue;
+    LambdaJitValuesMap[ID] = RCMapOpt.value();
+  }
 
-  HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesVec);
+  HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesMap);
   if (Config::get().ProteusDebugOutput) {
     Logger::logs("proteus")
         << "Hashing: " << " FnName " << FnName << " RCVec [ ";
     for (const auto &RC : RCVec)
       Logger::logs("proteus") << RC.Value.Int64Val << ",";
-    Logger::logs("proteus") << " ] LambdaVec [ ";
-    for (auto &RC : LambdaJitValuesVec)
-      Logger::logs("proteus") << RC.Value.Int64Val << ",";
+    Logger::logs("proteus") << " ] LambdaMap [ ";
+    for (auto &KV : LambdaJitValuesMap)
+      Logger::logs("proteus") << KV.first << ":" << KV.second.size() << ",";
     Logger::logs("proteus") << " ] -> Hash " << HashValue.getValue() << "\n";
   }
-
   // Lookup the function pointer in the code cache.
   void *JitFnPtr = CodeCache.lookup(HashValue);
   if (JitFnPtr)

@@ -6,13 +6,17 @@
 #include "proteus/impl/RuntimeConstantTypeHelpers.h"
 
 #include <llvm/ADT/ArrayRef.h>
+#include <llvm/ADT/DenseMap.h>
+#include <llvm/ADT/SmallVector.h>
 #if LLVM_VERSION_MAJOR >= 18
 #include <llvm/ADT/StableHashing.h>
 #else
 #include <llvm/CodeGen/StableHashing.h>
 #endif
 
+#include <algorithm>
 #include <string>
+#include <type_traits>
 
 namespace proteus {
 
@@ -122,6 +126,41 @@ inline HashT hashArrayRefElement(const RuntimeConstant &RC) {
   reportFatalError("Unsupported type " + toString(RC.Type));
 }
 
+inline HashT hashValue(const RuntimeConstant &RC) {
+  HashT H = hashValue(static_cast<int32_t>(RC.Type));
+  H = stable_hash_combine(H.getValue(), hashValue(RC.Pos).getValue());
+  H = stable_hash_combine(H.getValue(), hashValue(RC.Offset).getValue());
+
+  if (RC.Type == RuntimeConstantType::ARRAY ||
+      RC.Type == RuntimeConstantType::STATIC_ARRAY ||
+      RC.Type == RuntimeConstantType::VECTOR) {
+    H = stable_hash_combine(H.getValue(),
+                            hashValue(RC.ArrInfo.NumElts).getValue());
+    H = stable_hash_combine(H.getValue(),
+                            hashValue(static_cast<int32_t>(RC.ArrInfo.EltType))
+                                .getValue());
+    H = stable_hash_combine(H.getValue(), hashArrayRefElement(RC).getValue());
+    return H;
+  }
+
+  if (RC.Type == RuntimeConstantType::OBJECT) {
+    H = stable_hash_combine(H.getValue(), hashValue(RC.ObjInfo.Size).getValue());
+    H = stable_hash_combine(H.getValue(),
+                            hashValue(static_cast<int32_t>(RC.ObjInfo.PassByValue))
+                                .getValue());
+    H = stable_hash_combine(H.getValue(), hashArrayRefElement(RC).getValue());
+    return H;
+  }
+
+  if (isScalarRuntimeConstantType(RC.Type)) {
+    H = stable_hash_combine(H.getValue(), hashArrayRefElement(RC).getValue());
+    return H;
+  }
+
+  // For NONE/unsupported values, the type/pos/offset hash above is all we keep.
+  return H;
+}
+
 inline HashT hashValue(ArrayRef<RuntimeConstant> Arr) {
   if (Arr.empty())
     return 0;
@@ -132,6 +171,39 @@ inline HashT hashValue(ArrayRef<RuntimeConstant> Arr) {
                                     hashArrayRefElement(Arr[I]).getValue());
 
   return HashValue;
+}
+
+template <typename Key, typename Value>
+inline std::enable_if_t<std::is_integral<Key>::value || std::is_enum<Key>::value,
+                        HashT>
+hashValue(const DenseMap<Key, Value> &Map) {
+  if (Map.empty())
+    return 0;
+
+  SmallVector<Key, 32> Keys;
+  Keys.reserve(Map.size());
+  for (const auto &KV : Map)
+    Keys.push_back(KV.first);
+
+  std::sort(Keys.begin(), Keys.end());
+
+  HashT H = hashValue(static_cast<uint64_t>(Map.size()));
+  for (Key K : Keys) {
+    auto It = Map.find(K);
+    if (It == Map.end())
+      reportFatalError("Internal error: DenseMap key vanished during hashing");
+
+    HashT PairH = stable_hash_combine(hashValue(K).getValue(),
+                                      hashValue(It->second).getValue());
+    H = stable_hash_combine(H.getValue(), PairH.getValue());
+  }
+
+  return H;
+}
+
+template <typename Key, typename Value>
+inline HashT hashValue(DenseMap<Key, Value> &Map) {
+  return hashValue(static_cast<const DenseMap<Key, Value> &>(Map));
 }
 
 inline HashT hashCombine(HashT A, HashT B) {
