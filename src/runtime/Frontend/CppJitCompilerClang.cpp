@@ -125,12 +125,18 @@ private:
     std::string SourceName = Request.ModuleHash.toString() + ".cpp";
 
     std::vector<std::string> ArgStorage;
+    // Keep Clang in optimized frontend/codegen mode so it emits optimized-mode
+    // IR features such as fmuladd, but skip Clang's LLVM pass pipeline. Proteus
+    // runs its configured middle-end pipeline when the dispatcher compiles the
+    // returned LLVM IR.
     if (Request.TargetModel == TargetModelType::HOST) {
       ArgStorage = {PROTEUS_CLANGXX_BIN,
                     "-emit-llvm",
                     "-S",
                     "-std=c++17",
                     CppJitCompiler::FrontendOptLevelFlag,
+                    "-Xclang",
+                    "-disable-llvm-passes",
                     "-x",
                     "c++",
                     "-fPIC",
@@ -143,6 +149,8 @@ private:
           "-S",
           "-std=c++17",
           CppJitCompiler::FrontendOptLevelFlag,
+          "-Xclang",
+          "-disable-llvm-passes",
           "-x",
           (Request.TargetModel == TargetModelType::HIP ? "hip" : "cuda"),
           "--offload-device-only",

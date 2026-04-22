@@ -27,6 +27,8 @@
 #include <llvm/Support/WithColor.h>
 #include <llvm/Target/TargetMachine.h>
 
+#include <optional>
+
 #if LLVM_VERSION_MAJOR >= 18
 #include <lld/Common/Driver.h>
 LLD_HAS_DRIVER(elf)
@@ -188,7 +190,8 @@ codegenSerial(Module &M, StringRef DeviceArch,
 
 inline SmallVector<std::unique_ptr<sys::fs::TempFile>>
 codegenParallel(Module &M, StringRef DeviceArch, unsigned int OptLevel = 3,
-                int CodegenOptLevel = 3) {
+                int CodegenOptLevel = 3,
+                std::optional<std::string> OptPipeline = std::nullopt) {
   TIMESCOPE("proteus::codegenParallel");
   // Use regular LTO with parallelism enabled to parallelize codegen.
   std::atomic<bool> LTOError = false;
@@ -246,6 +249,10 @@ codegenParallel(Module &M, StringRef DeviceArch, unsigned int OptLevel = 3,
   Conf.VerifyEach = false;
   Conf.DiagHandler = DiagnosticHandler;
   Conf.OptLevel = OptLevel;
+  // Parallel codegen lets LTO own optimization, so custom textual pipelines
+  // must be forwarded to the LTO configuration instead of run beforehand.
+  if (OptPipeline)
+    Conf.OptPipeline = OptPipeline.value();
   Conf.CGOptLevel = static_cast<CodeGenOptLevel>(CodegenOptLevel);
 
   unsigned ParallelCodeGenParallelismLevel =
@@ -443,7 +450,8 @@ inline void setLaunchBoundsForKernel(Function &F, int MaxNumWorkGroups,
 inline std::unique_ptr<MemoryBuffer>
 codegenObject(Module &M, StringRef DeviceArch,
               [[maybe_unused]] SmallPtrSetImpl<void *> &GlobalLinkedBinaries,
-              CodegenOption CGOption = CodegenOption::RTC) {
+              CodegenOption CGOption = CodegenOption::RTC,
+              std::optional<std::string> OptPipeline = std::nullopt) {
   TIMESCOPE("proteus::codegenObjectHIP");
   assert(GlobalLinkedBinaries.empty() &&
          "Expected empty linked binaries for HIP");
@@ -461,7 +469,8 @@ codegenObject(Module &M, StringRef DeviceArch,
     ObjectFiles = detail::codegenSerial(M, DeviceArch);
     break;
   case CodegenOption::Parallel:
-    ObjectFiles = detail::codegenParallel(M, DeviceArch);
+    ObjectFiles = detail::codegenParallel(M, DeviceArch, /*OptLevel=*/3,
+                                          /*CodegenOptLevel=*/3, OptPipeline);
     break;
 #endif
   default:

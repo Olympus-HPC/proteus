@@ -170,8 +170,7 @@ JitEngineDeviceCUDA::compileOnly(Module &M, bool DisableIROpt) {
   TIMESCOPE(JitEngineDeviceCUDA, compileOnly);
   if (!DisableIROpt) {
     const auto &CGConfig = Config::get().getCGConfig();
-    proteus::optimizeIR(M, DeviceArch, CGConfig.optLevel(),
-                        CGConfig.codeGenOptLevel());
+    proteus::optimizeIR(M, DeviceArch, OptimizationPipelineConfig(CGConfig));
   } else {
     if (Config::get().traceSpecializations())
       Logger::trace("[SkipOpt] Skipping JitEngine IR optimization\n");

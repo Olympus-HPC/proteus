@@ -68,8 +68,7 @@ void CppJitModule::compile() {
     break;
   case CppJitArtifact::Kind::LLVMIR: {
     auto ObjectModule = Dispatch.compile(std::move(Artifact.Ctx),
-                                         std::move(Artifact.Mod), *ModuleHash,
-                                         /*DisableIROpt=*/true);
+                                         std::move(Artifact.Mod), *ModuleHash);
     Library = std::make_unique<CompiledLibrary>(std::move(ObjectModule));
     break;
   }

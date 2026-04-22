@@ -219,7 +219,10 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   SmallVector<RuntimeConstant> LambdaJitValuesVec;
   getLambdaJitValues(FnName, LambdaJitValuesVec);
 
-  HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesVec);
+  const auto &CGConfig = Config::get().getCGConfig();
+  HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesVec,
+                         hashCodeGenConfig(CGConfig),
+                         hashRuntimeSpecializationConfig(CGConfig));
   if (Config::get().ProteusDebugOutput) {
     Logger::logs("proteus")
         << "Hashing: " << " FnName " << FnName << " RCVec [ ";
@@ -297,12 +300,7 @@ std::unique_ptr<MemoryBuffer> JitEngineHost::compileOnly(Module &M,
   // Add optimization passes.
   if (!DisableIROpt) {
     const auto &CGConfig = Config::get().getCGConfig();
-    if (CGConfig.optPipeline()) {
-      optimizeIR(M, sys::getHostCPUName(), CGConfig.optPipeline().value(),
-                 CGConfig.codeGenOptLevel());
-    } else
-      optimizeIR(M, sys::getHostCPUName(), CGConfig.optLevel(),
-                 CGConfig.codeGenOptLevel());
+    optimizeIR(M, sys::getHostCPUName(), OptimizationPipelineConfig(CGConfig));
   } else {
     if (Config::get().traceSpecializations())
       Logger::trace("[SkipOpt] Skipping JitEngine IR optimization\n");

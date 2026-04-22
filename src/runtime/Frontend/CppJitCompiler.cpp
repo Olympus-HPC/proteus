@@ -55,6 +55,8 @@ HashT computeCppJitModuleHash(TargetModelType TM, CppJitCompilerBackend Backend,
                               const std::string &Code,
                               const std::vector<std::string> &ExtraArgs) {
   HashT H = hash(static_cast<int>(TM), static_cast<int>(Backend), Code);
+  if (Backend == CppJitCompilerBackend::Clang)
+    H = hashCombine(H, hashCodeGenConfig(Config::get().getCGConfig()));
   for (const auto &Arg : ExtraArgs)
     H = hashCombine(H, hash(Arg));
   return H;

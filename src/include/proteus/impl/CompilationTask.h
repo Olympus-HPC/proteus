@@ -53,23 +53,18 @@ private:
 
   void invokeOptimizeIR(Module &M) {
     TIMESCOPE(CompilationTask, invokeOptimizeIR);
+    OptimizationPipelineConfig OptConfig(PassPipeline, OptLevel,
+                                         CodegenOptLevel);
 #if PROTEUS_ENABLE_CUDA
     // For CUDA we always run the optimization pipeline.
-    if (!PassPipeline)
-      optimizeIR(M, DeviceArch, OptLevel, CodegenOptLevel);
-    else
-      optimizeIR(M, DeviceArch, PassPipeline.value(), CodegenOptLevel);
+    optimizeIR(M, DeviceArch, OptConfig);
 #elif PROTEUS_ENABLE_HIP
-    // For HIP we run the optimization pipeline only for Serial codegen. HIP RTC
-    // and Parallel codegen, which uses LTO, invoke optimization internally.
+    // For HIP we run the optimization pipeline here only for Serial codegen.
+    // Parallel codegen forwards custom pipelines to LTO; HIP RTC invokes
+    // optimization internally.
     // TODO: Move optimizeIR inside the codegen routines?
-    if (CGOption == CodegenOption::Serial) {
-      if (!PassPipeline) {
-        optimizeIR(M, DeviceArch, OptLevel, CodegenOptLevel);
-      } else {
-        optimizeIR(M, DeviceArch, PassPipeline.value(), CodegenOptLevel);
-      }
-    }
+    if (CGOption == CodegenOption::Serial)
+      optimizeIR(M, DeviceArch, OptConfig);
 #else
 #error "JitEngineDevice requires PROTEUS_ENABLE_CUDA or PROTEUS_ENABLE_HIP"
 #endif
@@ -179,8 +174,13 @@ public:
                  *M);
     }
 
+#if PROTEUS_ENABLE_CUDA
     auto ObjBuf =
         proteus::codegenObject(*M, DeviceArch, GlobalLinkedBinaries, CGOption);
+#elif PROTEUS_ENABLE_HIP
+    auto ObjBuf = proteus::codegenObject(*M, DeviceArch, GlobalLinkedBinaries,
+                                         CGOption, PassPipeline);
+#endif
 
     if (!RelinkGlobalsByCopy)
       proteus::relinkGlobalsObject(ObjBuf->getMemBufferRef(),

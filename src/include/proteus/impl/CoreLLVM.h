@@ -44,6 +44,10 @@ static_assert(__cplusplus >= 201703L,
 #include <llvm/Transforms/IPO/StripSymbols.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
+#include <optional>
+#include <string>
+#include <utility>
+
 namespace proteus {
 using namespace llvm;
 
@@ -180,35 +184,53 @@ struct InitLLVMTargets {
   }
 };
 
-inline void optimizeIR(Module &M, StringRef Arch, char OptLevel,
-                       unsigned CodegenOptLevel) {
-  TIMESCOPE("proteus::optimizeIR");
-  Timer T(Config::get().ProteusEnableTimers);
-  detail::runOptimizationPassPipeline(M, Arch, OptLevel, CodegenOptLevel);
-  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
-                       << "optimizeIR optlevel " << OptLevel << " codegenopt "
-                       << CodegenOptLevel << " " << T.elapsed() << " ms\n");
-}
+struct OptimizationPipelineConfig {
+  std::optional<std::string> PassPipeline;
+  char OptLevel;
+  unsigned CodegenOptLevel;
+
+  explicit OptimizationPipelineConfig(const CodeGenerationConfig &CGConfig)
+      : OptLevel(CGConfig.optLevel()),
+        CodegenOptLevel(CGConfig.codeGenOptLevel()) {
+    if (auto Pipeline = CGConfig.optPipeline())
+      PassPipeline = Pipeline.value();
+  }
+
+  OptimizationPipelineConfig(std::optional<std::string> PassPipeline,
+                             char OptLevel, unsigned CodegenOptLevel)
+      : PassPipeline(std::move(PassPipeline)), OptLevel(OptLevel),
+        CodegenOptLevel(CodegenOptLevel) {}
+};
 
 inline void optimizeIR(Module &M, StringRef Arch,
-                       const std::string &PassPipeline,
-                       unsigned CodegenOptLevel) {
+                       const OptimizationPipelineConfig &OptConfig) {
   TIMESCOPE("proteus::optimizeIR");
   Timer T(Config::get().ProteusEnableTimers);
-  auto TraceOut = [](const std::string &PassPipeline) {
-    SmallString<128> S;
-    raw_svector_ostream OS(S);
-    OS << "[CustomPipeline] " << PassPipeline << "\n";
-    return S;
-  };
 
-  if (Config::get().traceSpecializations())
-    Logger::trace(TraceOut(PassPipeline));
+  if (OptConfig.PassPipeline) {
+    auto TraceOut = [](const std::string &PassPipeline) {
+      SmallString<128> S;
+      raw_svector_ostream OS(S);
+      OS << "[CustomPipeline] " << PassPipeline << "\n";
+      return S;
+    };
 
-  detail::runOptimizationPassPipeline(M, Arch, PassPipeline, CodegenOptLevel);
+    if (Config::get().traceSpecializations())
+      Logger::trace(TraceOut(OptConfig.PassPipeline.value()));
+
+    detail::runOptimizationPassPipeline(M, Arch, OptConfig.PassPipeline.value(),
+                                        OptConfig.CodegenOptLevel);
+  } else {
+    detail::runOptimizationPassPipeline(M, Arch, OptConfig.OptLevel,
+                                        OptConfig.CodegenOptLevel);
+  }
+
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
-                       << "optimizeIR optlevel " << PassPipeline
-                       << " codegenopt " << CodegenOptLevel << " "
+                       << "optimizeIR optlevel "
+                       << (OptConfig.PassPipeline
+                               ? StringRef(OptConfig.PassPipeline.value())
+                               : StringRef(&OptConfig.OptLevel, 1))
+                       << " codegenopt " << OptConfig.CodegenOptLevel << " "
                        << T.elapsed() << " ms\n");
 }
 

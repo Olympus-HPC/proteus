@@ -75,11 +75,11 @@ void JitModule::compile(bool Verify) {
   raw_svector_ostream OS(Buffer);
   WriteBitcodeToFile(*Mod, OS);
 
-  // Create a unique module hash based on the bitcode and append to all
-  // function names to make them unique.
+  // Create a unique module hash based on the bitcode and codegen config, then
+  // append it to all function names to make them unique.
   // TODO: Is this necessary?
-  ModuleHash =
-      std::make_unique<HashT>(hash(StringRef{Buffer.data(), Buffer.size()}));
+  ModuleHash = std::make_unique<HashT>(hash(
+      StringRef{Buffer.data(), Buffer.size()}, Config::get().getCGConfig()));
   for (auto &JitF : Functions) {
     const std::string OldName = JitF->getName();
     const std::string NewName = OldName + ModuleHash->toMangledSuffix();
