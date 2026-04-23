@@ -37,9 +37,7 @@ private:
   bool SpecializeDims;
   bool SpecializeDimsRange;
   bool SpecializeLaunchBounds;
-  char OptLevel;
-  unsigned CodegenOptLevel;
-  std::optional<std::string> PassPipeline;
+  OptimizationPipelineConfig OptConfig;
 
   std::unique_ptr<Module> cloneKernelModule(LLVMContext &Ctx) {
     TIMESCOPE(CompilationTask, cloneKernelModule);
@@ -53,8 +51,6 @@ private:
 
   void invokeOptimizeIR(Module &M) {
     TIMESCOPE(CompilationTask, invokeOptimizeIR);
-    OptimizationPipelineConfig OptConfig(PassPipeline, OptLevel,
-                                         CodegenOptLevel);
 #if PROTEUS_ENABLE_CUDA
     // For CUDA we always run the optimization pipeline.
     optimizeIR(M, DeviceArch, OptConfig);
@@ -93,9 +89,7 @@ public:
         SpecializeDims(CGConfig.specializeDims()),
         SpecializeDimsRange(CGConfig.specializeDimsRange()),
         SpecializeLaunchBounds(CGConfig.specializeLaunchBounds()),
-        OptLevel(CGConfig.optLevel()),
-        CodegenOptLevel(CGConfig.codeGenOptLevel()),
-        PassPipeline(CGConfig.optPipeline()) {
+        OptConfig(CGConfig) {
     if (Config::get().traceSpecializations()) {
       llvm::SmallString<128> S;
       llvm::raw_svector_ostream OS(S);
@@ -179,7 +173,7 @@ public:
         proteus::codegenObject(*M, DeviceArch, GlobalLinkedBinaries, CGOption);
 #elif PROTEUS_ENABLE_HIP
     auto ObjBuf = proteus::codegenObject(*M, DeviceArch, GlobalLinkedBinaries,
-                                         CGOption, PassPipeline);
+                                         CGOption, OptConfig);
 #endif
 
     if (!RelinkGlobalsByCopy)

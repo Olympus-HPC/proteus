@@ -384,6 +384,7 @@ JitEngineDeviceHIP::compileOnly(Module &M, bool DisableIROpt) {
   }
   const auto &CGConfig = Config::get().getCGConfig();
   auto DeviceObject = proteus::codegenObject(
-      M, DeviceArch, GlobalLinkedBinaries, CGConfig.codeGenOption());
+      M, DeviceArch, GlobalLinkedBinaries, CGConfig.codeGenOption(),
+      OptimizationPipelineConfig(CGConfig));
   return DeviceObject;
 }
