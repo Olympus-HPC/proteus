@@ -159,11 +159,10 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
   SmallVector<std::pair<Function *, uint64_t>> LambdaCalleeInfo;
   findFunctionsWithU64Metadata(M, "proteus.wrapper_call", LambdaCalleeInfo);
   for (auto [F, ID] : LambdaCalleeInfo) {
-    if (auto OptionalMapIt =
-            LambdaRegistry::instance().matchJitVariableMap(ID)) {
-      auto &RCVec = OptionalMapIt.value();
-      TransformLambdaSpecialization::transform(M, *F, ID, RCVec);
-    }
+    auto VariantsOpt = LambdaRegistry::instance().getJitVariants(ID);
+    if (!VariantsOpt)
+      continue;
+    TransformLambdaSpecialization::transform(M, *F, ID, VariantsOpt.value());
   }
 
   F->setName(FnName + Suffix);
@@ -196,15 +195,17 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 
   SmallVector<RuntimeConstant> RCVec =
       getRuntimeConstantValues(Args, RCInfoArray);
-  DenseMap<uint64_t, DenseMap<int32_t, RuntimeConstant>> LambdaJitValuesMap;
+  DenseMap<uint64_t, LambdaRegistry::JitVariantVec> LambdaJitValuesMap;
   SmallVector<std::pair<Function *, uint64_t>> LambdaCalleeInfo;
   findFunctionsWithU64Metadata(*M, "proteus.wrapper_call", LambdaCalleeInfo);
   LambdaRegistry &LR = LambdaRegistry::instance();
   for (auto [_, ID] : LambdaCalleeInfo) {
-    auto RCMapOpt = LR.getJitVariables(ID);
-    if (!RCMapOpt)
+    auto VariantsOpt = LR.getJitVariants(ID);
+    if (!VariantsOpt)
       continue;
-    LambdaJitValuesMap[ID] = RCMapOpt.value();
+    LambdaRegistry::JitVariantVec Vars;
+    Vars.append(VariantsOpt->begin(), VariantsOpt->end());
+    LambdaJitValuesMap[ID] = std::move(Vars);
   }
 
   HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesMap);

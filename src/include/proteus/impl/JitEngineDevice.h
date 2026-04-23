@@ -25,6 +25,7 @@
 #include "proteus/impl/Hashing.h"
 #include "proteus/impl/JitEngine.h"
 #include "proteus/impl/JitEngineInfoRegistry.h"
+#include "proteus/impl/LambdaRegistry.h"
 #include "proteus/impl/Utils.h"
 
 #include <llvm/ADT/SmallPtrSet.h>
@@ -416,7 +417,8 @@ public:
   }
 
   void getLambdaJitValues(JITKernelInfo &KernelInfo,
-                          DenseMap<uint64_t, DenseMap<int32_t, RuntimeConstant>> &LambdaJitValuesMap) {
+                          DenseMap<uint64_t, LambdaRegistry::JitVariantVec>
+                              &LambdaJitValuesMap) {
     TIMESCOPE(JitEngineDevice, getLambdaJitValues);
     LambdaRegistry &LR = LambdaRegistry::instance();
     if (LR.empty()) {
@@ -443,10 +445,12 @@ public:
     }
 
     for (auto &[FnName, LambdaID] : KernelInfo.getLambdaCalleeInfo()) {
-      auto RCMapOpt = LR.getJitVariables(LambdaID);
-      if (!RCMapOpt)
+      auto VariantsOpt = LR.getJitVariants(LambdaID);
+      if (!VariantsOpt)
         continue;
-      LambdaJitValuesMap[LambdaID] = RCMapOpt.value();
+      LambdaRegistry::JitVariantVec Vars;
+      Vars.append(VariantsOpt->begin(), VariantsOpt->end());
+      LambdaJitValuesMap[LambdaID] = std::move(Vars);
     }
   }
 
@@ -574,8 +578,8 @@ JitEngineDevice<ImplT>::compileAndRun(
   SmallVector<RuntimeConstant> RCVec =
       getRuntimeConstantValues(KernelArgs, KernelInfo.getRCInfoArray());
 
-	  DenseMap<uint64_t, DenseMap<int32_t, RuntimeConstant>> LambdaJitValuesMap;
-	  getLambdaJitValues(KernelInfo, LambdaJitValuesMap);
+  DenseMap<uint64_t, LambdaRegistry::JitVariantVec> LambdaJitValuesMap;
+  getLambdaJitValues(KernelInfo, LambdaJitValuesMap);
 
   // Determine the hash based on dimension specialization.  If we do not
   // specialize IR based on grid dimensions, avoid hashing on those to

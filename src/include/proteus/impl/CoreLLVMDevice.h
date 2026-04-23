@@ -301,10 +301,10 @@ inline void specializeIR(
   auto &LR = LambdaRegistry::instance();
 
   for (auto &[F, ID] : LambdaCalleeInfo) {
-    auto RCMapOpt = LR.getJitVariables(ID);
-    if (!RCMapOpt)
+    auto VariantsOpt = LR.getJitVariants(ID);
+    if (!VariantsOpt)
       continue;
-    TransformLambdaSpecialization::transform(M, *F, ID, RCMapOpt.value());
+    TransformLambdaSpecialization::transform(M, *F, ID, VariantsOpt.value());
   }
 
   // Run the shared array transform after any value specialization (arguments,

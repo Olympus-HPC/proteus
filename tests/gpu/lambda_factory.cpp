@@ -8,6 +8,7 @@
 
 #include <climits>
 #include <cstdio>
+#include <tuple>
 
 #include "gpu_common.h"
 #include <proteus/JitInterface.h>
@@ -19,14 +20,27 @@ __global__ __attribute__((annotate("jit"))) void kernel(T LB) {
   LB();
 }
 
+template<typename L1, typename L2, typename L3>
+struct Abstraction {
+  L1 lambda_1;
+  L2 lambda_2;
+  L3 lambda_3;
+  Abstraction(L1&& l1, L2&& l2, L3&& l3) : lambda_1(l1), lambda_2(l2), lambda_3(l3){};
+
+  __host__ __device__ auto operator()() {
+    lambda_1();
+    lambda_2();
+    lambda_3();
+  }
+};
 
 auto declareLambda(int rc1, int rc2) {
-  return [=, C = proteus::jit_variable(rc1), D = 5,
+  return PROTEUS_REGISTER_LAMBDA([=, C = proteus::jit_variable(rc1), D = 5,
           C2 = proteus::jit_variable(rc2)]() __attribute__((annotate("jit"))) {
     printInt(C);
     printInt(C2);
     printInt(D);
-  };
+  });
 }
 
 auto declareLambdaThree(int rc1, int rc2, int rc3) {
@@ -40,13 +54,13 @@ auto declareLambdaThree(int rc1, int rc2, int rc3) {
              };
 }
 
-auto forwardLambda(int rc1, int rc2, int rc3) {
+auto forwardLambda(int rc1, int, int rc3) {
   int loc = 1;
   return declareLambdaThree(rc1, loc, rc3);
 }
 
 template <typename T> void run(T &&LB) {
-  kernel<<<1, 1>>>(PROTEUS_REGISTER_LAMBDA(LB));
+  kernel<<<1, 1>>>(LB);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
@@ -68,13 +82,16 @@ int main() {
 
   auto TwoLambda = declareLambda(Two, Zero);
 
-  auto BigLam = declareLambdaThree(Zero, One, Two);
+  auto BigLam = PROTEUS_REGISTER_LAMBDA(declareLambdaThree(Zero, One, Two));
 
-  auto ForLam = forwardLambda(Zero, One, Two);
+  auto ForLam = PROTEUS_REGISTER_LAMBDA(forwardLambda(Zero, One, Two));
 
-  run(ZeroLambda);
-  run(OneLambda);
-  run(TwoLambda);
+  Abstraction A (std::move(ZeroLambda), std::move(OneLambda), std::move(TwoLambda));
+
+  run(A);
+  // run(ZeroLambda);
+  // run(OneLambda);
+  // run(TwoLambda);
   run(BigLam);
   run(ForLam);
 

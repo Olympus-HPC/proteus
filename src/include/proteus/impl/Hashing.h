@@ -173,6 +173,23 @@ inline HashT hashValue(ArrayRef<RuntimeConstant> Arr) {
   return HashValue;
 }
 
+template <typename T>
+inline HashT hashValue(ArrayRef<T> Arr) {
+  if (Arr.empty())
+    return 0;
+
+  HashT H = hashValue(static_cast<uint64_t>(Arr.size()));
+  for (const auto &Elt : Arr)
+    H = stable_hash_combine(H.getValue(), hashValue(Elt).getValue());
+
+  return H;
+}
+
+template <typename T, unsigned N>
+inline HashT hashValue(const SmallVector<T, N> &Vec) {
+  return hashValue(ArrayRef<T>(Vec));
+}
+
 template <typename Key, typename Value>
 inline std::enable_if_t<std::is_integral<Key>::value || std::is_enum<Key>::value,
                         HashT>
