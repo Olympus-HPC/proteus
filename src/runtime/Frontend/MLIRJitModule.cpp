@@ -20,10 +20,10 @@ MLIRJitModule::MLIRJitModule(TargetModelType TargetModel,
                              const std::string &Code)
     : TargetModel(TargetModel), Code(Code),
       Dispatch(Dispatcher::getDispatcher(TargetModel)) {
-  // Hash the MLIR source and include the target model because the same MLIR
-  // lowers to different artifacts for host, CUDA, HIP.
-  ModuleHash =
-      std::make_unique<HashT>(hash(static_cast<int>(TargetModel), Code));
+  // Hash the MLIR source, target model, and codegen config because each can
+  // lower/compile to a different artifact.
+  ModuleHash = std::make_unique<HashT>(
+      hash(static_cast<int>(TargetModel), Code, Config::get().getCGConfig()));
 }
 
 MLIRJitModule::MLIRJitModule(const std::string &Target, const std::string &Code)

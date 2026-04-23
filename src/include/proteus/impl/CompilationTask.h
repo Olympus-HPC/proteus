@@ -37,9 +37,7 @@ private:
   bool SpecializeDims;
   bool SpecializeDimsRange;
   bool SpecializeLaunchBounds;
-  char OptLevel;
-  unsigned CodegenOptLevel;
-  std::optional<std::string> PassPipeline;
+  OptimizationPipelineConfig OptConfig;
 
   std::unique_ptr<Module> cloneKernelModule(LLVMContext &Ctx) {
     TIMESCOPE(CompilationTask, cloneKernelModule);
@@ -55,21 +53,14 @@ private:
     TIMESCOPE(CompilationTask, invokeOptimizeIR);
 #if PROTEUS_ENABLE_CUDA
     // For CUDA we always run the optimization pipeline.
-    if (!PassPipeline)
-      optimizeIR(M, DeviceArch, OptLevel, CodegenOptLevel);
-    else
-      optimizeIR(M, DeviceArch, PassPipeline.value(), CodegenOptLevel);
+    optimizeIR(M, DeviceArch, OptConfig);
 #elif PROTEUS_ENABLE_HIP
-    // For HIP we run the optimization pipeline only for Serial codegen. HIP RTC
-    // and Parallel codegen, which uses LTO, invoke optimization internally.
+    // For HIP we run the optimization pipeline here only for Serial codegen.
+    // Parallel codegen forwards custom pipelines to LTO; HIP RTC invokes
+    // optimization internally.
     // TODO: Move optimizeIR inside the codegen routines?
-    if (CGOption == CodegenOption::Serial) {
-      if (!PassPipeline) {
-        optimizeIR(M, DeviceArch, OptLevel, CodegenOptLevel);
-      } else {
-        optimizeIR(M, DeviceArch, PassPipeline.value(), CodegenOptLevel);
-      }
-    }
+    if (CGOption == CodegenOption::Serial)
+      optimizeIR(M, DeviceArch, OptConfig);
 #else
 #error "JitEngineDevice requires PROTEUS_ENABLE_CUDA or PROTEUS_ENABLE_HIP"
 #endif
@@ -98,9 +89,7 @@ public:
         SpecializeDims(CGConfig.specializeDims()),
         SpecializeDimsRange(CGConfig.specializeDimsRange()),
         SpecializeLaunchBounds(CGConfig.specializeLaunchBounds()),
-        OptLevel(CGConfig.optLevel()),
-        CodegenOptLevel(CGConfig.codeGenOptLevel()),
-        PassPipeline(CGConfig.optPipeline()) {
+        OptConfig(CGConfig) {
     if (Config::get().traceSpecializations()) {
       llvm::SmallString<128> S;
       llvm::raw_svector_ostream OS(S);
@@ -179,8 +168,13 @@ public:
                  *M);
     }
 
+#if PROTEUS_ENABLE_CUDA
     auto ObjBuf =
         proteus::codegenObject(*M, DeviceArch, GlobalLinkedBinaries, CGOption);
+#elif PROTEUS_ENABLE_HIP
+    auto ObjBuf = proteus::codegenObject(*M, DeviceArch, GlobalLinkedBinaries,
+                                         CGOption, OptConfig);
+#endif
 
     if (!RelinkGlobalsByCopy)
       proteus::relinkGlobalsObject(ObjBuf->getMemBufferRef(),

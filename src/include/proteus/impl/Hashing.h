@@ -3,6 +3,7 @@
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/TimeTracing.h"
+#include "proteus/impl/Config.h"
 #include "proteus/impl/RuntimeConstantTypeHelpers.h"
 
 #include <llvm/ADT/ArrayRef.h>
@@ -136,6 +137,31 @@ inline HashT hashValue(ArrayRef<RuntimeConstant> Arr) {
 
 inline HashT hashCombine(HashT A, HashT B) {
   return stable_hash_combine(A.getValue(), B.getValue());
+}
+
+inline HashT hashCodeGenConfig(const CodeGenerationConfig &CGConfig) {
+  HashT H = hashValue(static_cast<int>(CGConfig.codeGenOption()));
+  H = hashCombine(H, hashValue(CGConfig.optLevel()));
+  H = hashCombine(H, hashValue(CGConfig.codeGenOptLevel()));
+  if (auto Pipeline = CGConfig.optPipeline())
+    H = hashCombine(H, hashValue(Pipeline.value()));
+  return H;
+}
+
+inline HashT
+hashRuntimeSpecializationConfig(const CodeGenerationConfig &CGConfig) {
+  HashT H = hashValue(CGConfig.specializeArgs());
+  H = hashCombine(H, hashValue(CGConfig.specializeDims()));
+  H = hashCombine(H, hashValue(CGConfig.specializeDimsRange()));
+  H = hashCombine(H, hashValue(CGConfig.specializeLaunchBounds()));
+  return H;
+}
+
+// The generic CodeGenerationConfig hash is codegen-only so frontend module
+// caches do not depend on runtime specialization policy. Runtime JIT cache keys
+// add hashRuntimeSpecializationConfig explicitly where those flags apply.
+inline HashT hashValue(const CodeGenerationConfig &CGConfig) {
+  return hashCodeGenConfig(CGConfig);
 }
 
 template <typename FirstT, typename... RestTs>

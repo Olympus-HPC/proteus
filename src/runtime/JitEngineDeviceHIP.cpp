@@ -377,14 +377,14 @@ JitEngineDeviceHIP::compileOnly(Module &M, bool DisableIROpt) {
   TIMESCOPE(JitEngineDeviceHIP, compileOnly);
   if (!DisableIROpt) {
     const auto &CGConfig = Config::get().getCGConfig();
-    proteus::optimizeIR(M, DeviceArch, CGConfig.optLevel(),
-                        CGConfig.codeGenOptLevel());
+    proteus::optimizeIR(M, DeviceArch, OptimizationPipelineConfig(CGConfig));
   } else {
     if (Config::get().traceSpecializations())
       Logger::trace("[SkipOpt] Skipping JitEngine IR optimization\n");
   }
   const auto &CGConfig = Config::get().getCGConfig();
   auto DeviceObject = proteus::codegenObject(
-      M, DeviceArch, GlobalLinkedBinaries, CGConfig.codeGenOption());
+      M, DeviceArch, GlobalLinkedBinaries, CGConfig.codeGenOption(),
+      OptimizationPipelineConfig(CGConfig));
   return DeviceObject;
 }

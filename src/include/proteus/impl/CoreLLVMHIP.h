@@ -27,6 +27,8 @@
 #include <llvm/Support/WithColor.h>
 #include <llvm/Target/TargetMachine.h>
 
+#include <optional>
+
 #if LLVM_VERSION_MAJOR >= 18
 #include <lld/Common/Driver.h>
 LLD_HAS_DRIVER(elf)
@@ -187,8 +189,9 @@ codegenSerial(Module &M, StringRef DeviceArch,
 }
 
 inline SmallVector<std::unique_ptr<sys::fs::TempFile>>
-codegenParallel(Module &M, StringRef DeviceArch, unsigned int OptLevel = 3,
-                int CodegenOptLevel = 3) {
+codegenParallel(Module &M, StringRef DeviceArch,
+                const OptimizationPipelineConfig &OptConfig =
+                    OptimizationPipelineConfig(std::nullopt, '3', 3)) {
   TIMESCOPE("proteus::codegenParallel");
   // Use regular LTO with parallelism enabled to parallelize codegen.
   std::atomic<bool> LTOError = false;
@@ -217,8 +220,8 @@ codegenParallel(Module &M, StringRef DeviceArch, unsigned int OptLevel = 3,
   };
 
   // Create TargetMachine and extract options/features.
-  auto ExpectedTM =
-      proteus::detail::createTargetMachine(M, DeviceArch, CodegenOptLevel);
+  auto ExpectedTM = proteus::detail::createTargetMachine(
+      M, DeviceArch, OptConfig.CodegenOptLevel);
   if (!ExpectedTM)
     reportFatalError(toString(ExpectedTM.takeError()));
   std::unique_ptr<TargetMachine> TM = std::move(*ExpectedTM);
@@ -245,8 +248,12 @@ codegenParallel(Module &M, StringRef DeviceArch, unsigned int OptLevel = 3,
   Conf.DebugPassManager = false;
   Conf.VerifyEach = false;
   Conf.DiagHandler = DiagnosticHandler;
-  Conf.OptLevel = OptLevel;
-  Conf.CGOptLevel = static_cast<CodeGenOptLevel>(CodegenOptLevel);
+  Conf.OptLevel = OptConfig.OptLevel;
+  // Parallel codegen lets LTO own optimization, so custom textual pipelines
+  // must be forwarded to the LTO configuration instead of run beforehand.
+  if (OptConfig.PassPipeline)
+    Conf.OptPipeline = OptConfig.PassPipeline.value();
+  Conf.CGOptLevel = static_cast<CodeGenOptLevel>(OptConfig.CodegenOptLevel);
 
   unsigned ParallelCodeGenParallelismLevel =
       std::max(1u, std::thread::hardware_concurrency());
@@ -443,7 +450,9 @@ inline void setLaunchBoundsForKernel(Function &F, int MaxNumWorkGroups,
 inline std::unique_ptr<MemoryBuffer>
 codegenObject(Module &M, StringRef DeviceArch,
               [[maybe_unused]] SmallPtrSetImpl<void *> &GlobalLinkedBinaries,
-              CodegenOption CGOption = CodegenOption::RTC) {
+              CodegenOption CGOption = CodegenOption::RTC,
+              const OptimizationPipelineConfig &OptConfig =
+                  OptimizationPipelineConfig(std::nullopt, '3', 3)) {
   TIMESCOPE("proteus::codegenObjectHIP");
   assert(GlobalLinkedBinaries.empty() &&
          "Expected empty linked binaries for HIP");
@@ -461,7 +470,7 @@ codegenObject(Module &M, StringRef DeviceArch,
     ObjectFiles = detail::codegenSerial(M, DeviceArch);
     break;
   case CodegenOption::Parallel:
-    ObjectFiles = detail::codegenParallel(M, DeviceArch);
+    ObjectFiles = detail::codegenParallel(M, DeviceArch, OptConfig);
     break;
 #endif
   default:

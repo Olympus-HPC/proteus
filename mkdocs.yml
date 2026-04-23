@@ -15,6 +15,9 @@ nav:
       - Resources : user/resources.md
   - Developer's manual:
     - Concepts: dev/concepts.md
+    - Proteus Internals:
+      - Overview: dev/proteus-internals.md
+      - Optimization Pipeline: dev/optimization-pipeline.md
     - Creating a PR: dev/pr.md
     - API Reference: dev/api.md
 repo_url: https://github.com/Olympus-HPC/proteus

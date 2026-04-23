@@ -187,7 +187,6 @@ int main(int argc, char *argv[]) {
 // CHECK-NEXT: init p[9] = 0.559506
 // CHECK-NEXT: Creating JIT module
 // CHECK: Compiling JIT module
-// CHECK-FIRST: [SkipOpt] Skipping JitEngine IR optimization
 // CHECK-NEXT: Average kernel execution time {{.*}} (ms)
 // Low-order digits vary slightly across CUDA/HIP toolchains and LLVM versions.
 // CHECK-NEXT: p[0] = -0.5729{{[0-9]*}}
