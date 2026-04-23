@@ -21,6 +21,7 @@ option(ENABLE_TESTS "Enable tests" OFF)
 option(ENABLE_COVERAGE "Enable host-side coverage instrumentation" OFF)
 option(ENABLE_DEVELOPER_COMPILER_FLAGS "Enable developer compiler flags: -Wall -Wextra -Werror" OFF)
 option(PROTEUS_INSTALL_IMPL_HEADERS "Install implementation headers" OFF)
+option(PROTEUS_ENABLE_PYTHON "Build Python bindings" OFF)
 
 # Enforce LLVM_INSTALL_DIR requirement.
 if(NOT DEFINED LLVM_INSTALL_DIR OR LLVM_INSTALL_DIR STREQUAL "")
@@ -144,6 +145,13 @@ add_subdirectory(src)
 
 if(ENABLE_TESTS)
   enable_testing()
+endif()
+
+if(PROTEUS_ENABLE_PYTHON)
+  add_subdirectory(bindings/python)
+endif()
+
+if(ENABLE_TESTS)
   add_subdirectory(tests)
 endif()
 

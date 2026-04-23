@@ -69,6 +69,7 @@ workflow:
           - ".gitlab-ci.yml"
           - ".gitlab/**/*"
           - "CMakeLists.txt"
+          - "bindings/python/**/*"
           - "cmake/**/*"
           - "include/**/*"
           - "src/**/*"
