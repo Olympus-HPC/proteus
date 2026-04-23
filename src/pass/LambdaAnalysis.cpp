@@ -301,6 +301,13 @@ private:
 
   void setRegisteredLambdaMetadata(Function *F, uint64_t Id) {
     setU64FunctionMetadata(F, "proteus.registered_lambda", Id);
+    if (!F)
+      return;
+    // Keep the lambda call operator as a distinct call target so runtime
+    // multiversioning can dispatch to specialized clones.
+    F->removeFnAttr(Attribute::AlwaysInline);
+    F->removeFnAttr(Attribute::InlineHint);
+    F->addFnAttr(Attribute::NoInline);
   }
 
   void setU64FunctionMetadata(Function *F, StringRef Key, uint64_t Id) {
