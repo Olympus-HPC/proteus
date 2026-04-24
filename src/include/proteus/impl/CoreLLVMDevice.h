@@ -286,7 +286,7 @@ inline void relinkGlobalsObject(
 inline void specializeIR(
     Module &M, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
     dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
-    const SmallVector<std::pair<Function*, uint64_t>> LambdaCalleeInfo,
+    const SmallVector<uint64_t> LambdaCalleeInfo,
     bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsRange,
     bool SpecializeLaunchBounds, int MinBlocksPerSM) {
   TIMESCOPE("proteus::specializeIR");
@@ -300,11 +300,14 @@ inline void specializeIR(
 
   auto &LR = LambdaRegistry::instance();
 
-  for (auto &[F, ID] : LambdaCalleeInfo) {
+  for (auto &ID : LambdaCalleeInfo) {
     auto VariantsOpt = LR.getJitVariants(ID);
-    if (!VariantsOpt)
+    // llvm::outs() << "    " << Lam->getName() << "\n";
+    if (!VariantsOpt) {
+      // llvm::outs() << "    skipping " << Lam->getName() << "\n";
       continue;
-    TransformLambdaSpecialization::transform(M, *F, ID, VariantsOpt.value());
+    }
+    TransformLambdaSpecialization::transform(M, ID, VariantsOpt.value());
   }
 
   // Run the shared array transform after any value specialization (arguments,

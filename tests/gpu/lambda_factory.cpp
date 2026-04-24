@@ -34,6 +34,8 @@ struct Abstraction {
   }
 };
 
+// Macro can be invoked function style, either within a Function where the arguments passed
+// to jit_variable are function parameters, or Constants as below
 auto declareLambda(int rc1, int rc2) {
   return PROTEUS_REGISTER_LAMBDA([=, C = proteus::jit_variable(rc1), D = 5,
           C2 = proteus::jit_variable(rc2)]() __attribute__((annotate("jit"))) {
@@ -89,9 +91,6 @@ int main() {
   Abstraction A (std::move(ZeroLambda), std::move(OneLambda), std::move(TwoLambda));
 
   run(A);
-  // run(ZeroLambda);
-  // run(OneLambda);
-  // run(TwoLambda);
   run(BigLam);
   run(ForLam);
 
@@ -101,16 +100,16 @@ int main() {
 // clang-format off
 // CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 1
 // CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 0
+// CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 2
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 1
+// CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 0
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 2
 // CHECK: Integer = 0
 // CHECK: Integer = 1
 // CHECK: Integer = 5
-// CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 2
-// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 1
 // CHECK: Integer = 1
 // CHECK: Integer = 2
 // CHECK: Integer = 5
-// CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 0
-// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 2
 // CHECK: Integer = 2
 // CHECK: Integer = 0
 // CHECK: Integer = 5
@@ -121,11 +120,14 @@ int main() {
 // CHECK: Integer = 1
 // CHECK: Integer = 2
 // CHECK: Integer = 4
+// CHECK-FIRST: [LambdaSpec] Replacing slot 3 with i32 2
+// CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 1
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 0
 // CHECK: Integer = 0
 // CHECK: Integer = 1
 // CHECK: Integer = 2
 // CHECK: Integer = 4
-// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 2 NumHits 1
+// CHECK-FIRST: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 3
 // CHECK-COUNT-3: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 4
-// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 4 accesses 4
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 3
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 3 accesses 3
