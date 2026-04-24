@@ -48,8 +48,8 @@ add_library(ProteusPassOffload SHARED
 
 # Allow undefined symbols in shared objects on Darwin (this is the default
 # behaviour on Linux)
-target_link_libraries(ProteusPass
-  "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+target_link_options(ProteusPass
+  PRIVATE "$<$<PLATFORM_ID:Darwin>:LINKER:SHELL:-undefined dynamic_lookup>")
 
 target_link_libraries(ProteusPassOffload
   PRIVATE ${proteus_pass_offload_link_libs}
