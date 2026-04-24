@@ -1,13 +1,8 @@
 function(CREATE_CPU_TEST exe check_source)
     add_executable(${exe} ${check_source} ${ARGN})
 
-    get_target_property(PROTEUS_PASS_SOURCES ProteusPass SOURCES)
-    set_source_files_properties(${check_source} PROPERTIES
-        OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES}"
-    )
-    add_dependencies(${exe} ProteusPass)
-
     target_link_libraries(${exe} PUBLIC proteus)
+    proteus_attach_pass_plugin_rebuild_dep(${exe} ${check_source})
 
     if(${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "ppc64le")
         set(NATIVE_OPT_FLAGS "-mcpu=native" "-mtune=native")
@@ -18,7 +13,6 @@ function(CREATE_CPU_TEST exe check_source)
     target_compile_options(
         ${exe}
         PUBLIC
-        -fpass-plugin=$<TARGET_FILE:ProteusPass>
         ${NATIVE_OPT_FLAGS}
     )
 

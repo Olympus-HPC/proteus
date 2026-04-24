@@ -17,7 +17,7 @@ function(add_proteus target)
     endif()
 
     target_link_options(${target} PRIVATE
-        "SHELL:\$<\$<LINK_LANGUAGE:HIP>:-Xoffload-linker --load-pass-plugin=\$<TARGET_FILE:ProteusPass>>")
+        "SHELL:\$<\$<LINK_LANGUAGE:HIP>:-Xoffload-linker --load-pass-plugin=\$<TARGET_FILE:ProteusPassOffload>>")
 
     get_target_property(target_type ${target} TYPE)
     if(target_type STREQUAL "EXECUTABLE")

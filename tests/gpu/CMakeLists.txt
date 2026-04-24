@@ -11,20 +11,9 @@ endif()
 # (without checks) to compile for generating the executable.
 function(CREATE_GPU_TEST exe check_source)
     add_executable(${exe}.${lang} ${check_source} ${ARGN})
-    get_target_property(PROTEUS_PASS_SOURCES ProteusPass SOURCES)
-    set_source_files_properties(${check_source} ${ARGN} PROPERTIES
-        LANGUAGE ${lang}
-        OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES}"
-    )
-    add_dependencies(${exe}.${lang} ProteusPass)
-
+    set_source_files_properties(${check_source} ${ARGN} PROPERTIES LANGUAGE ${lang})
     target_link_libraries(${exe}.${lang} PUBLIC proteus)
-
-    target_compile_options(
-        ${exe}.${lang}
-        PUBLIC
-        -fpass-plugin=$<TARGET_FILE:ProteusPass>
-    )
+    proteus_attach_pass_plugin_rebuild_dep(${exe}.${lang} ${check_source} ${ARGN})
 
     add_test(NAME ${exe}.${lang} COMMAND ${LIT} -vv -D EXT=${lang} -DFILECHECK=${FILECHECK} ${check_source})
     set_tests_properties(${exe}.${lang} PROPERTIES LABELS "gpu;gpu-basic")
@@ -32,14 +21,9 @@ endfunction()
 
 function(CREATE_GPU_TEST_RDC exe check_source)
     add_executable(${exe}.${lang}.rdc ${check_source} ${ARGN})
-    get_target_property(PROTEUS_PASS_SOURCES ProteusPass SOURCES)
-    set_source_files_properties(${check_source} ${ARGN} PROPERTIES
-        LANGUAGE ${lang}
-        OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES}"
-    )
-    add_dependencies(${exe}.${lang}.rdc ProteusPass)
-
+    set_source_files_properties(${check_source} ${ARGN} PROPERTIES LANGUAGE ${lang})
     target_link_libraries(${exe}.${lang}.rdc PUBLIC proteus)
+    proteus_attach_pass_plugin_rebuild_dep(${exe}.${lang}.rdc ${check_source} ${ARGN})
 
     if(PROTEUS_ENABLE_HIP)
         # This is unsupported see: https://gitlab.kitware.com/cmake/cmake/-/issues/23210
@@ -50,7 +34,6 @@ function(CREATE_GPU_TEST_RDC exe check_source)
             ${exe}.${lang}.rdc
             PUBLIC
             -fgpu-rdc
-            -fpass-plugin=$<TARGET_FILE:ProteusPass>
         )
 
         target_link_options(
@@ -58,14 +41,9 @@ function(CREATE_GPU_TEST_RDC exe check_source)
             PUBLIC
             -fgpu-rdc
             --hip-link
-            -Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPass>
+            -Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPassOffload>
         )
     elseif(PROTEUS_ENABLE_CUDA)
-        target_compile_options(
-            ${exe}.${lang}.rdc
-            PUBLIC
-            -fpass-plugin=$<TARGET_FILE:ProteusPass>
-        )
         target_compile_options(${exe}.${lang}.rdc PRIVATE --no-offload-new-driver)
 
         set_target_properties(${exe}.${lang}.rdc PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
@@ -126,13 +104,8 @@ function(CREATE_PROTEUS_GPU_LIBRARY lib source)
     add_library(${lib} ${source} ${ARGN})
 
     set_source_files_properties(${source} ${ARGN} PROPERTIES LANGUAGE ${lang})
-    get_target_property(PROTEUS_PASS_SOURCES ProteusPass SOURCES)
-    set_source_files_properties(${source} ${ARGN} PROPERTIES
-        LANGUAGE ${lang}
-        OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES}"
-    )
-    add_dependencies(${lib} ProteusPass)
     target_link_libraries(${lib} PUBLIC proteus)
+    proteus_attach_pass_plugin_rebuild_dep(${lib} ${source} ${ARGN})
 
     if(PROTEUS_ENABLE_HIP)
         # This is unsupported see: https://gitlab.kitware.com/cmake/cmake/-/issues/23210
@@ -141,16 +114,10 @@ function(CREATE_PROTEUS_GPU_LIBRARY lib source)
           ${lib}
             PUBLIC
             -fgpu-rdc
-            -fpass-plugin=$<TARGET_FILE:ProteusPass>
         )
 
         target_link_options(${lib} PUBLIC -fgpu-rdc --hip-link)
     elseif(PROTEUS_ENABLE_CUDA)
-        target_compile_options(
-            ${lib}
-            PUBLIC
-            -fpass-plugin=$<TARGET_FILE:ProteusPass>
-        )
         target_compile_options(${lib} PRIVATE --no-offload-new-driver)
         set_target_properties(${lib} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
     else()
