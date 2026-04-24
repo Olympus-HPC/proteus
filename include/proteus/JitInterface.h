@@ -28,7 +28,7 @@ __proteus_register_lambda_runtime_constant(int32_t Type, int32_t Pos,
                                            uint64_t functor_id);
 
 extern "C" void __proteus_take_address(void const *) noexcept;
-extern "C" __attribute__((used)) void __proteus_tag_ptr(void const *Ptr,
+extern "C" __attribute__((used)) void __proteus_finalize_register(void const *Ptr,
                                                         uint64_t Tag) noexcept;
 extern "C" void __proteus_var(void const *) noexcept;
 
@@ -143,7 +143,7 @@ __register_lambda_impl(T &&t) noexcept {
   using LambdaType = std::decay_t<T>;
   LambdaType local = t;
   __proteus_take_address(&local);
-  __proteus_tag_ptr(&local, ID);
+  __proteus_finalize_register(&local, ID);
   auto result = tag_functor<ID>(std::forward<T>(t));
   return result;
 }

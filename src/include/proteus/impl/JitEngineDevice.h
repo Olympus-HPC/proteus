@@ -231,7 +231,7 @@ class JITKernelInfo {
   std::optional<std::reference_wrapper<BinaryInfo>> BinInfo;
   std::optional<HashT> StaticHash;
   // LambdaCalleeInfo optionally contains a vector with all annotated LambdaFunctorWrapper annotators and thei unique IDs
-  std::optional<SmallVector<std::pair<Function*, uint64_t>>>
+  std::optional<SmallVector<uint64_t>>
       LambdaCalleeInfo;
 
 public:
@@ -273,7 +273,7 @@ public:
   bool hasLambdaCalleeInfo() { return LambdaCalleeInfo.has_value(); }
   const auto &getLambdaCalleeInfo() { return LambdaCalleeInfo.value(); }
   void setLambdaCalleeInfo(
-      SmallVector<std::pair<Function*, uint64_t>> &&LambdaInfo) {
+      SmallVector<uint64_t> &&LambdaInfo) {
     LambdaCalleeInfo = std::move(LambdaInfo);
   }
 };
@@ -433,18 +433,17 @@ public:
                   << "Caller trigger " << KernelInfo.getName() << " -> "
                   << demangle(KernelInfo.getName()) << "\n");
 
-	      SmallVector<std::pair<Function*, uint64_t>> LambdaCalleeInfo;
+	      SmallVector<uint64_t> LambdaCalleeInfo;
 	      findFunctionsWithU64Metadata(KernelModule, "proteus.wrapper_call", LambdaCalleeInfo);
 
-      for (auto [F, ID] : LambdaCalleeInfo ) {
+      for (auto ID : LambdaCalleeInfo ) {
         PROTEUS_DBG(Logger::logs("proteus")
-                  << "Lambda wrapper = " << *F
-                  << " : " << "ID = " << ID << "\n";)
+                  << "Lambda wrapper ID = " << ID << "\n";)
       }
       KernelInfo.setLambdaCalleeInfo(std::move(LambdaCalleeInfo));
     }
 
-    for (auto &[FnName, LambdaID] : KernelInfo.getLambdaCalleeInfo()) {
+    for (auto LambdaID : KernelInfo.getLambdaCalleeInfo()) {
       auto VariantsOpt = LR.getJitVariants(LambdaID);
       if (!VariantsOpt)
         continue;

@@ -77,11 +77,11 @@ extern "C" void __proteus_enable_host() {
 extern "C" __attribute__((noinline)) void
 __proteus_take_address(void const *) noexcept {}
 
-extern "C" __attribute__((noinline)) void __proteus_tag_ptr(void const *,
+extern "C" __attribute__((noinline)) void __proteus_finalize_register(void const *,
                                                             uint64_t ID) noexcept {
   // The LambdaAnalysis pass injects calls to
   // __proteus_register_lambda_runtime_constant in __register_lambda_impl.
-  // __register_lambda_impl calls __proteus_tag_ptr once per wrapper creation,
+  // __register_lambda_impl calls __proteus_finalize_register once per wrapper creation,
   // after those injected calls. Use it as a boundary to commit the tuple.
   LambdaRegistry::instance().commitJitVariables(ID);
 }

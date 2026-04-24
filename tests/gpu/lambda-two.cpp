@@ -36,8 +36,10 @@ template <typename T, typename L> void registerRun(T &&LB, L &&LB2) {
   constexpr int BlockSize = 256;
   constexpr int N = 1000;
   const int NumBlocks = (N + BlockSize - 1) / BlockSize;
-  kernel<<<NumBlocks, BlockSize>>>(PROTEUS_REGISTER_LAMBDA(LB),
-                                   PROTEUS_REGISTER_LAMBDA(LB2));
+  auto F2 = PROTEUS_REGISTER_LAMBDA(LB2);
+  auto F1 = PROTEUS_REGISTER_LAMBDA(LB);
+  kernel<<<NumBlocks, BlockSize>>>(F1,
+                                   F2);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
