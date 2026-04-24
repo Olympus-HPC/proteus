@@ -138,7 +138,16 @@ private:
     return nullptr;
   }
 
-  static CallBase *findDirectCallTo(Function &Caller, const Function &Callee) {
+  static Function *findFunctorFunctorOperatorFunctionOperatorFromID(Module &M, uint64_t FunctorID) {
+    SmallVector<std::pair<Function *, uint64_t>> FunctorOperators;
+    findFunctionsWithU64Metadata(M, "proteus.wrapper_call", FunctorOperators);
+    for (auto [Lambda, ID] : FunctorOperators)
+      if (ID == FunctorID)
+        return Lambda;
+    return nullptr;
+  }
+
+  static CallBase *findDirectCallTo(Function &Caller, Function *Callee) {
     for (BasicBlock &BB : Caller) {
       for (Instruction &I : BB) {
         auto *CB = dyn_cast<CallBase>(&I);
@@ -147,7 +156,7 @@ private:
         Function *Called = CB->getCalledFunction();
         if (!Called)
           continue;
-        if (Called == &Callee)
+        if (Called == Callee)
           return CB;
       }
     }
@@ -339,19 +348,26 @@ private:
   }
 
 public:
-  static void transform(Module &M, Function &FunctorOperatorFunction,
+  static void transform(Module &M,
                         uint64_t FunctorID,
                         ArrayRef<JitVariantMap> Variants) {
     if (Variants.empty())
       return;
-
+    Function *FunctorOperatorFunction = findFunctorFunctorOperatorFunctionOperatorFromID(M, FunctorID);
     Function *LambdaOperatorMethod = findLambdaOperatorForFunctor(M, FunctorID);
+    if (!FunctorOperatorFunction) {
+      if (Config::get().traceSpecializations())
+        Logger::trace("[LambdaSpec] Internal lambda specialization error:"
+                          "no wrapper found for ID " + std::to_string(FunctorID));
+      return;
+    }
+
     if (!LambdaOperatorMethod) {
       // On host (and sometimes device) the lambda call operator may be fully
-      // inlined into the functor wrapper call operator, leaving no separate
+      // inlined into the functor FunctorOperatorFunction call operator, leaving no separate
       // `lambda::operator()` function to tag.
       if (Variants.size() == 1)
-        specializeCallOperator(M, FunctorOperatorFunction, Variants.front());
+        specializeCallOperator(M, *FunctorOperatorFunction, Variants.front());
       return;
     }
 
@@ -361,7 +377,7 @@ public:
     }
 
     CallBase *OrigCall =
-        findDirectCallTo(FunctorOperatorFunction, *LambdaOperatorMethod);
+        findDirectCallTo(*FunctorOperatorFunction, LambdaOperatorMethod);
     if (!OrigCall)
       return;
 
@@ -396,24 +412,23 @@ public:
     Instruction *AfterCallIP = OrigCall->getNextNode();
     OrigCall->eraseFromParent();
 
-    Function *Wrapper = &FunctorOperatorFunction;
     LLVMContext &Ctx = M.getContext();
 
     BasicBlock *FallbackBB =
-        BasicBlock::Create(Ctx, "proteus.lambda_dispatch.fallback", Wrapper);
+        BasicBlock::Create(Ctx, "proteus.lambda_dispatch.fallback", FunctorOperatorFunction);
 
     // Build the chain of check blocks (entry -> check0 -> ... -> fallback).
     BasicBlock *CurCheckBB = EntryBB;
     for (size_t I = 0, E = Variants.size(); I < E; ++I) {
       BasicBlock *VariantBB = BasicBlock::Create(
-          Ctx, "proteus.lambda_dispatch.variant." + Twine(I), Wrapper);
+          Ctx, "proteus.lambda_dispatch.variant." + Twine(I), FunctorOperatorFunction);
       BasicBlock *NextCheckBB =
           (I + 1 == E)
               ? FallbackBB
               : BasicBlock::Create(Ctx,
                                    "proteus.lambda_dispatch.check." +
                                        Twine(I + 1),
-                                   Wrapper);
+                                   FunctorOperatorFunction);
 
       {
         IRBuilder<> B(CurCheckBB);

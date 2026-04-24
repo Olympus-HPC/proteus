@@ -277,6 +277,25 @@ inline void findFunctionsWithU64Metadata(
   }
 }
 
+inline void findFunctionsWithU64Metadata(
+    llvm::Module &M, llvm::StringRef Key,
+    llvm::SmallVectorImpl<std::uint64_t> &Out) {
+  llvm::SmallDenseMap<llvm::Function *, std::uint64_t, 32> Seen;
+  for (llvm::Function &F : M) {
+    llvm::MDNode *Node = F.getMetadata(Key);
+    if (!Node || Node->getNumOperands() < 1)
+      continue;
+    auto *CAM = llvm::dyn_cast<llvm::ConstantAsMetadata>(Node->getOperand(0));
+    auto *CI = CAM ? llvm::dyn_cast<llvm::ConstantInt>(CAM->getValue())
+                   : nullptr;
+    if (!CI)
+      continue;
+    std::uint64_t Id = CI->getZExtValue();
+    if (Seen.try_emplace(&F, Id).second)
+      Out.emplace_back(Id);
+  }
+}
+
 inline void pruneIR(Module &M, bool UnsetExternallyInitialized = true) {
   // Remove llvm.global.annotations now that we have read them.
   if (auto *GlobalAnnotations = M.getGlobalVariable("llvm.global.annotations"))
