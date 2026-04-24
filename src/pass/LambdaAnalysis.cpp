@@ -136,14 +136,14 @@ public:
     // clang-format off
     // new pipeline: LambdaAnalysis sees early LLVM IR emitted at StartEPCallback.
     // Our preprocessor macro PROTEUS_REGISTER_LAMBDA emits unique a LambdaFunctorWrapper
-    // template instantiation for every macro invocation.  The goal of this analysis 
+    // template instantiation for every macro invocation.  The goal of this analysis
     // is to determine which slots in a Functor/Lambda's storage will be folded into LLVM
     // IR at runtime and treated as constants. The analysis uses the following steps:
-    //  (1) make a DenseSet containing anonymous lambda classes (class.anon type) 
+    //  (1) make a DenseSet containing anonymous lambda classes (class.anon type)
     //      as registered by __proteus_take_address inside __register_lambda_impl
-    //  (2) Find jit_variable calls and associate the calls offset with registered, 
+    //  (2) Find jit_variable calls and associate the calls offset with registered,
     //      class.anon types
-    //  (3) Look at register_lambda calls, identify the call operators of the functors 
+    //  (3) Look at register_lambda calls, identify the call operators of the functors
     //      from the callsite
     //      (a) If there are two LambdaFunctorWrapper::operator() functions
     //          using the same lambda:::operator(), we need to clone lambda:::operator()
@@ -635,12 +635,13 @@ private:
     SmallVector<std::pair<Function *, uint64_t>, 16> RegisterFunctions;
     findAnnotatedFunctions(M, "proteus.register_call", RegisterFunctions);
     for (auto [Function, ID] : RegisterFunctions) {
-      SmallVector<ReturnInst *> Rets;
       AllocaInst *AnonClassAlloca = nullptr;
+      CallBase *FinalizeCall = nullptr;
       for (auto &BB : *Function) {
-        if (auto *RI = llvm::dyn_cast<llvm::ReturnInst>(BB.getTerminator()))
-          Rets.push_back(RI);
         for (Instruction &I : BB) {
+          auto* CB = dyn_cast<CallBase>(&I);
+          if (CB && CB->getCalledFunction()->getName().contains("__proteus_finalize_register"))
+            FinalizeCall = CB;
           auto *Alloca = dyn_cast<AllocaInst>(&I);
           if (!Alloca)
             continue;
@@ -652,9 +653,8 @@ private:
           AnonClassAlloca = Alloca;
         }
       }
-      if (Rets.size() != 1)
-        reportFatalError("internal proteus error: expected single return from "
-                         "register func");
+      if (!FinalizeCall)
+        reportFatalError("internal proteus error: __register_lambda_impl call does not contain finalize call");
       if (!AnonClassAlloca)
         reportFatalError("internal proteus error: expected anon class alloca");
       StructType *RegisterFuncAllocatedType =
@@ -662,11 +662,11 @@ private:
       if (!RegisterFuncAllocatedType)
         reportFatalError("internal proteus error: error in logic of "
                          "register_lambda analysis");
-      ReturnInst *RetInst = Rets[0];
 
       // Insert __proteus_register_lambda_runtime_constant calls for each lambda
-      // type participating in this kernel launch.
-      IRBuilder<> Builder(RetInst);
+      // type participating in this kernel launch.  The insertion point is right before
+      // the finalization call.
+      IRBuilder<> Builder(FinalizeCall);
       auto JitVarFn = getJitRegisterLambdaRuntimeConstant(M);
       for (auto JitVarInfo :
            LambdaStorageTypeToJitIndices.find(RegisterFuncAllocatedType)
