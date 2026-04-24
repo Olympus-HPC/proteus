@@ -28,6 +28,28 @@ else()
     message(STATUS "Found Filecheck at ${FILECHECK}")
 endif()
 
+function(proteus_attach_pass_plugin_rebuild_dep target)
+    set(proteus_pass_stamp "${CMAKE_CURRENT_BINARY_DIR}/${target}.proteuspass.stamp")
+
+    # Rebuild test sources when the pass plugin is rebuilt, since the compiler
+    # consumes the plugin during compilation via -fpass-plugin.
+    add_custom_command(
+        OUTPUT "${proteus_pass_stamp}"
+        COMMAND ${CMAKE_COMMAND} -E touch "${proteus_pass_stamp}"
+        DEPENDS ProteusPass
+        VERBATIM
+    )
+
+    set_source_files_properties(${ARGN} PROPERTIES
+        OBJECT_DEPENDS "${proteus_pass_stamp}"
+    )
+    target_compile_options(
+        ${target}
+        PUBLIC
+        -fpass-plugin=$<TARGET_FILE:ProteusPass>
+    )
+endfunction()
+
 add_subdirectory(cpu)
 
 if(PROTEUS_ENABLE_HIP OR PROTEUS_ENABLE_CUDA)
