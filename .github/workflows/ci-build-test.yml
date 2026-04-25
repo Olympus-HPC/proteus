@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/ci-build-test.yml"
       - "CMakeLists.txt"
+      - "bindings/python/**"
       - "cmake/**"
       - "include/**"
       - "src/**"
@@ -15,6 +16,7 @@ on:
     paths:
       - ".github/workflows/ci-build-test.yml"
       - "CMakeLists.txt"
+      - "bindings/python/**"
       - "cmake/**"
       - "include/**"
       - "src/**"
@@ -42,6 +44,8 @@ jobs:
         run: |
           conda create -y -n llvm-env -c conda-forge \
             conda-pack \
+            python=3.12 \
+            pybind11 \
             clang=${{ matrix.llvm }} \
             clangxx=${{ matrix.llvm }} \
             clangdev=${{ matrix.llvm }} \
@@ -103,6 +107,7 @@ jobs:
             -DENABLE_TESTS=on \
             -DLLVM_INSTALL_DIR=$(llvm-config --prefix) \
             -DPROTEUS_ENABLE_MLIR=${{ matrix.mlir }} \
+            -DPROTEUS_ENABLE_PYTHON=on \
             -DBUILD_SHARED=${{ matrix.build_shared }} |& tee cmake_output.log
           if grep -q "Manually-specified variables were not used by the project:" cmake_output.log; then
             echo "Error: Unused variables detected"
@@ -135,20 +140,28 @@ jobs:
       - name: Install lit
         run: |
           brew install lit
+      - name: Install Python bindings dependencies
+        run: |
+          brew install python pybind11
       - name: Configure LLVM environment
         run: |
           LLVM_PREFIX="$(brew --prefix llvm@${{ matrix.llvm }})"
+          PYTHON_PREFIX="$(brew --prefix python)"
+          PYBIND11_PREFIX="$(brew --prefix pybind11)"
           echo "LLVM_PREFIX=$LLVM_PREFIX" >> "$GITHUB_ENV"
+          echo "PYTHON_PREFIX=$PYTHON_PREFIX" >> "$GITHUB_ENV"
+          echo "PYBIND11_PREFIX=$PYBIND11_PREFIX" >> "$GITHUB_ENV"
           echo "CC=$LLVM_PREFIX/bin/clang" >> "$GITHUB_ENV"
           echo "CXX=$LLVM_PREFIX/bin/clang++" >> "$GITHUB_ENV"
           echo "$LLVM_PREFIX/bin" >> "$GITHUB_PATH"
+          echo "$PYTHON_PREFIX/bin" >> "$GITHUB_PATH"
       - name: Build build_shared=${{ matrix.build_shared }}
         run: |
           mkdir -p build
           pushd build
           set -o pipefail
           cmake .. \
-            -DCMAKE_PREFIX_PATH="$LLVM_PREFIX" \
+            -DCMAKE_PREFIX_PATH="$LLVM_PREFIX;$PYTHON_PREFIX;$PYBIND11_PREFIX" \
             -DCMAKE_C_COMPILER="$CC" \
             -DCMAKE_CXX_COMPILER="$CXX" \
             -DCMAKE_OSX_SYSROOT="$(xcrun --sdk macosx --show-sdk-path)" \
@@ -156,6 +169,7 @@ jobs:
             -DENABLE_TESTS=on \
             -DLLVM_INSTALL_DIR="$LLVM_PREFIX" \
             -DPROTEUS_ENABLE_MLIR=${{ matrix.mlir }} \
+            -DPROTEUS_ENABLE_PYTHON=on \
             -DBUILD_SHARED=${{ matrix.build_shared }} 2>&1 | tee cmake_output.log
           if grep -q "Manually-specified variables were not used by the project:" cmake_output.log; then
             echo "Error: Unused variables detected"
