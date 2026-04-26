@@ -349,6 +349,8 @@ public:
   unsigned ProteusTraceConfig;
   bool ProteusDebugOutput;
   std::optional<const std::string> ProteusCacheDir;
+  std::optional<const std::string> ProteusClangxxBin;
+  std::optional<const std::string> ProteusNvccBin;
   std::string ProteusObjectCacheChain;
   bool ProteusEnableTimeTrace;
   std::string ProteusTimeTraceFile;
@@ -392,6 +394,8 @@ public:
 
     OS << "PROTEUS_USE_STORED_CACHE " << ProteusUseStoredCache << "\n";
     OS << "PROTEUS_CACHE_DIR " << Config::get().ProteusCacheDir << "\n";
+    OS << "PROTEUS_CLANGXX_BIN " << Config::get().ProteusClangxxBin << "\n";
+    OS << "PROTEUS_NVCC_BIN " << Config::get().ProteusNvccBin << "\n";
 
     OS << PrintOut("Default", GlobalCodeGenConfig) << "\n";
     for (auto &KV : TunedConfigs) {
@@ -404,7 +408,9 @@ private:
       : GlobalCodeGenConfig(CodeGenerationConfig::createFromEnv()),
         TunedConfigs(
             parseJSONConfig(getEnvOrDefaultString("PROTEUS_TUNED_KERNELS"))),
-        ProteusCacheDir(getEnvOrDefaultString("PROTEUS_CACHE_DIR")) {
+        ProteusCacheDir(getEnvOrDefaultString("PROTEUS_CACHE_DIR")),
+        ProteusClangxxBin(getEnvOrDefaultString("PROTEUS_CLANGXX_BIN")),
+        ProteusNvccBin(getEnvOrDefaultString("PROTEUS_NVCC_BIN")) {
     ProteusUseStoredCache =
         getEnvOrDefaultBool("PROTEUS_USE_STORED_CACHE", true);
     ProteusDisable = getEnvOrDefaultBool("PROTEUS_DISABLE", false);

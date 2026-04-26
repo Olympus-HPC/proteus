@@ -78,9 +78,13 @@ set_target_properties(ProteusPass ProteusPassOffload PROPERTIES
   INSTALL_RPATH        "$<IF:$<PLATFORM_ID:Darwin>,@loader_path,\$ORIGIN>"
 )
 
-install(
-  TARGETS ProteusPass ProteusPassOffload
-  EXPORT proteusTargets
-  RUNTIME DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-  LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-  ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+# TODO: Teach wheel builds to optionally ship ProteusPass once the Python wheel
+# is ready to support Clang/LLVM pass consumers too.
+if(NOT PROTEUS_PYTHON_WHEEL)
+  install(
+    TARGETS ProteusPass ProteusPassOffload
+    EXPORT proteusTargets
+    RUNTIME DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+endif()
