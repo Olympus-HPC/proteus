@@ -60,10 +60,11 @@ jobs:
             LLVM_DIR=/opt/miniforge/envs/proteus-llvm22/lib/cmake/llvm
             MLIR_DIR=/opt/miniforge/envs/proteus-llvm22/lib/cmake/mlir
             Clang_DIR=/opt/miniforge/envs/proteus-llvm22/lib/cmake/clang
-            CC=/opt/miniforge/envs/proteus-llvm22/bin/clang
-            CXX=/opt/miniforge/envs/proteus-llvm22/bin/clang++
             PATH=/opt/miniforge/envs/proteus-llvm22/bin:$PATH
             LD_LIBRARY_PATH=/opt/miniforge/envs/proteus-llvm22/lib:$LD_LIBRARY_PATH
+            CMAKE_ARGS='-DCMAKE_C_COMPILER=/opt/miniforge/envs/proteus-llvm22/bin/clang
+            -DCMAKE_CXX_COMPILER=/opt/miniforge/envs/proteus-llvm22/bin/clang++
+            -DCMAKE_ASM_COMPILER=/opt/miniforge/envs/proteus-llvm22/bin/clang'
           CIBW_ENVIRONMENT_MACOS: >-
             MACOSX_DEPLOYMENT_TARGET=14.0
             LLVM_INSTALL_DIR=/opt/homebrew/opt/llvm
