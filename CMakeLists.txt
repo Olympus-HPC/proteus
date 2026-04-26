@@ -22,6 +22,19 @@ option(ENABLE_COVERAGE "Enable host-side coverage instrumentation" OFF)
 option(ENABLE_DEVELOPER_COMPILER_FLAGS "Enable developer compiler flags: -Wall -Wextra -Werror" OFF)
 option(PROTEUS_INSTALL_IMPL_HEADERS "Install implementation headers" OFF)
 option(PROTEUS_ENABLE_PYTHON "Build Python bindings" OFF)
+option(PROTEUS_PYTHON_WHEEL "Build wheel-oriented Python package layout" OFF)
+
+set(PROTEUS_PYTHON_PACKAGE_DIR "proteus" CACHE STRING
+  "Install-relative path for the Proteus Python package")
+
+# Wheel builds provide LLVM_INSTALL_DIR through the environment, so mirror it
+# into the CMake cache when the caller did not pass -DLLVM_INSTALL_DIR.
+if((NOT DEFINED LLVM_INSTALL_DIR OR LLVM_INSTALL_DIR STREQUAL "")
+   AND DEFINED ENV{LLVM_INSTALL_DIR}
+   AND NOT "$ENV{LLVM_INSTALL_DIR}" STREQUAL "")
+  set(LLVM_INSTALL_DIR "$ENV{LLVM_INSTALL_DIR}" CACHE PATH
+    "Path to the LLVM installation used to build Proteus" FORCE)
+endif()
 
 # Enforce LLVM_INSTALL_DIR requirement.
 if(NOT DEFINED LLVM_INSTALL_DIR OR LLVM_INSTALL_DIR STREQUAL "")
@@ -135,23 +148,27 @@ if(ENABLE_TESTS)
   add_subdirectory(tests)
 endif()
 
-configure_package_config_file(
-  "${PROJECT_SOURCE_DIR}/cmake/proteusConfig.cmake.in"
-  "${PROJECT_BINARY_DIR}/proteusConfig.cmake"
-  INSTALL_DESTINATION
-  ${CMAKE_INSTALL_LIBDIR}/cmake/proteus)
+# TODO: Teach wheel builds to optionally ship the exported CMake package and
+# headers once the Python wheel is ready to support C++ SDK consumers too.
+if(NOT PROTEUS_PYTHON_WHEEL)
+  configure_package_config_file(
+    "${PROJECT_SOURCE_DIR}/cmake/proteusConfig.cmake.in"
+    "${PROJECT_BINARY_DIR}/proteusConfig.cmake"
+    INSTALL_DESTINATION
+    ${CMAKE_INSTALL_LIBDIR}/cmake/proteus)
 
-write_basic_package_version_file(
-  "${PROJECT_BINARY_DIR}/proteusConfigVersion.cmake"
-  VERSION ${PROJECT_VERSION}
-  COMPATIBILITY AnyNewerVersion)
+  write_basic_package_version_file(
+    "${PROJECT_BINARY_DIR}/proteusConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion)
 
-install(EXPORT proteusTargets
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/proteus)
+  install(EXPORT proteusTargets
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/proteus)
 
-install(FILES
-  "${PROJECT_BINARY_DIR}/proteusConfigVersion.cmake"
-  "${PROJECT_BINARY_DIR}/proteusConfig.cmake"
-  "${PROJECT_SOURCE_DIR}/cmake/ProteusFunctions.cmake"
-  DESTINATION
-  ${CMAKE_INSTALL_LIBDIR}/cmake/proteus)
+  install(FILES
+    "${PROJECT_BINARY_DIR}/proteusConfigVersion.cmake"
+    "${PROJECT_BINARY_DIR}/proteusConfig.cmake"
+    "${PROJECT_SOURCE_DIR}/cmake/ProteusFunctions.cmake"
+    DESTINATION
+    ${CMAKE_INSTALL_LIBDIR}/cmake/proteus)
+endif()

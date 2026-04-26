@@ -7,6 +7,11 @@ set(PROTEUS_PYTHON_SOURCES
   PythonBindings.cpp
   CppBindings.cpp
 )
+set(PROTEUS_PYTHON_PACKAGE_SOURCE_DIR
+  "${PROJECT_SOURCE_DIR}/python/proteus")
+set(PROTEUS_PYTHON_BUILD_PACKAGE_DIR
+  "${CMAKE_BINARY_DIR}/python/proteus")
+file(MAKE_DIRECTORY "${PROTEUS_PYTHON_BUILD_PACKAGE_DIR}")
 
 if(PROTEUS_ENABLE_MLIR)
   # Add the MLIR entrypoint only when that backend is available in the build.
@@ -26,9 +31,26 @@ target_compile_definitions(proteus_python PRIVATE
 
 # Emit the extension as `proteus.*` in a dedicated build-tree Python package dir.
 set_target_properties(proteus_python PROPERTIES
-  OUTPUT_NAME proteus
-  LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/python"
+  OUTPUT_NAME _proteus
+  LIBRARY_OUTPUT_DIRECTORY "${PROTEUS_PYTHON_BUILD_PACKAGE_DIR}"
+  INSTALL_RPATH "$<IF:$<PLATFORM_ID:Darwin>,@loader_path,$ORIGIN>"
 )
+
+configure_file(
+  "${PROTEUS_PYTHON_PACKAGE_SOURCE_DIR}/__init__.py"
+  "${PROTEUS_PYTHON_BUILD_PACKAGE_DIR}/__init__.py"
+  COPYONLY
+)
+
+if(PROTEUS_PYTHON_WHEEL)
+  install(TARGETS proteus_python
+    LIBRARY DESTINATION "${PROTEUS_PYTHON_PACKAGE_DIR}"
+  )
+  install(FILES
+    "${PROTEUS_PYTHON_PACKAGE_SOURCE_DIR}/__init__.py"
+    DESTINATION "${PROTEUS_PYTHON_PACKAGE_DIR}"
+  )
+endif()
 
 if(ENABLE_TESTS)
   # Keep the Python binding tests colocated with the extension target.

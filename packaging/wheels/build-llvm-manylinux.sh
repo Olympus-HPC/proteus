@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+LLVM_VER="${LLVM_VER:-22.1.3}"
+PREFIX="${PREFIX:-/opt/llvm-${LLVM_VER}}"
+WORKDIR="${WORKDIR:-/tmp}"
+TARBALL="llvm-project-${LLVM_VER}.src.tar.xz"
+SRCDIR="llvm-project-${LLVM_VER}.src"
+URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-${LLVM_VER}/${TARBALL}"
+
+if [ -x "${PREFIX}/bin/clang++" ]; then
+  echo "Reusing existing LLVM toolchain at ${PREFIX}"
+  exit 0
+fi
+
+mkdir -p "${WORKDIR}"
+cd "${WORKDIR}"
+
+yum install -y \
+  cmake \
+  curl \
+  gcc \
+  gcc-c++ \
+  git \
+  libffi-devel \
+  make \
+  python3 \
+  python3-pip \
+  tar \
+  xz \
+  zlib-devel
+
+python3 -m pip install --upgrade pip
+python3 -m pip install --upgrade ninja
+
+[ -f "${TARBALL}" ] || curl -LO "${URL}"
+[ -d "${SRCDIR}" ] || tar -xf "${TARBALL}"
+
+cd "${SRCDIR}"
+rm -rf build
+
+cmake -G Ninja -S llvm -B build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX="${PREFIX}" \
+  -DLLVM_ENABLE_PROJECTS="clang;mlir" \
+  -DLLVM_TARGETS_TO_BUILD="Native;NVPTX;AMDGPU" \
+  -DLLVM_INCLUDE_TESTS=OFF \
+  -DLLVM_INCLUDE_EXAMPLES=OFF \
+  -DLLVM_INCLUDE_BENCHMARKS=OFF \
+  -DLLVM_INCLUDE_DOCS=OFF \
+  -DLLVM_BUILD_UTILS=OFF \
+  -DLLVM_INCLUDE_GO_TESTS=OFF \
+  -DCLANG_INCLUDE_TESTS=OFF \
+  -DMLIR_INCLUDE_TESTS=OFF \
+  -DLLVM_BUILD_LLVM_DYLIB=ON \
+  -DLLVM_LINK_LLVM_DYLIB=ON \
+  -DLLVM_INSTALL_TOOLCHAIN_ONLY=ON
+
+cmake --build build --parallel "$(getconf _NPROCESSORS_ONLN)" --target install
+
+echo
+echo "Installed LLVM ${LLVM_VER} to: ${PREFIX}"
