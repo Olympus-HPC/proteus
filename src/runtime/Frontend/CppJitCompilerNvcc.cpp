@@ -29,10 +29,7 @@ class CppJitCompilerNvcc : public CppJitCompiler {
 private:
   CppJitArtifact compileToCubin(const CppJitCompileRequest &Request) {
     TIMESCOPE(CppJitCompilerNvcc, compileToCubin);
-#if !defined(PROTEUS_NVCC_BIN)
-    reportFatalError(
-        "NVCC backend selected but PROTEUS_NVCC_BIN is not configured");
-#else
+    const ResolvedToolPath &Nvcc = resolveNvcc();
     SmallString<128> SourcePath;
     std::error_code EC =
         sys::fs::createTemporaryFile("proteus", "cu", SourcePath);
@@ -61,7 +58,7 @@ private:
       OS << Request.Code;
     }
 
-    std::vector<std::string> ArgStorage = {PROTEUS_NVCC_BIN,
+    std::vector<std::string> ArgStorage = {Nvcc.Path,
                                            "-std=c++17",
                                            "-cubin",
                                            "--gpu-architecture=" +
@@ -85,8 +82,8 @@ private:
 
     std::string ErrMsg;
     bool ExecutionFailed = false;
-    int Res = sys::ExecuteAndWait(PROTEUS_NVCC_BIN, Args, std::nullopt,
-                                  Redirects, 0, 0, &ErrMsg, &ExecutionFailed);
+    int Res = sys::ExecuteAndWait(Nvcc.Path, Args, std::nullopt, Redirects, 0,
+                                  0, &ErrMsg, &ExecutionFailed);
 
     if (ExecutionFailed || Res != 0) {
       std::string Command;
@@ -124,15 +121,11 @@ private:
 
     return CppJitArtifact::deviceBinary(MemoryBuffer::getMemBufferCopy(
         (*Cubin)->getBuffer(), "proteus-nvcc-cubin"));
-#endif
   }
 
   CppJitArtifact compileToDynamicLibrary(const CppJitCompileRequest &Request) {
     TIMESCOPE(CppJitCompilerNvcc, compileToDynamicLibrary);
-#if !defined(PROTEUS_NVCC_BIN)
-    reportFatalError(
-        "NVCC backend selected but PROTEUS_NVCC_BIN is not configured");
-#else
+    const ResolvedToolPath &Nvcc = resolveNvcc();
     SmallString<128> SourcePath;
     std::error_code EC =
         sys::fs::createTemporaryFile("proteus", "cu", SourcePath);
@@ -161,7 +154,7 @@ private:
     if (EC)
       reportFatalError("Failed to create temp nvcc stderr file");
 
-    std::vector<std::string> ArgStorage = {PROTEUS_NVCC_BIN,
+    std::vector<std::string> ArgStorage = {Nvcc.Path,
                                            "-shared",
                                            "-std=c++17",
                                            CppJitCompiler::FrontendOptLevelFlag,
@@ -186,8 +179,8 @@ private:
 
     std::string ErrMsg;
     bool ExecutionFailed = false;
-    int Res = sys::ExecuteAndWait(PROTEUS_NVCC_BIN, Args, std::nullopt,
-                                  Redirects, 0, 0, &ErrMsg, &ExecutionFailed);
+    int Res = sys::ExecuteAndWait(Nvcc.Path, Args, std::nullopt, Redirects, 0,
+                                  0, &ErrMsg, &ExecutionFailed);
 
     if (ExecutionFailed || Res != 0) {
       std::string Command;
@@ -220,7 +213,6 @@ private:
     sys::fs::remove(StderrPath);
 
     return CppJitArtifact::sharedLibrary(OutputPath.c_str());
-#endif
   }
 
 public:

@@ -17,6 +17,11 @@ class Module;
 
 namespace proteus {
 
+struct ResolvedToolPath {
+  std::string Path;
+  std::string Origin;
+};
+
 // Compiler-facing input assembled by CppJitModule.
 struct CppJitCompileRequest {
   TargetModelType TargetModel;
@@ -64,6 +69,10 @@ public:
 HashT computeCppJitModuleHash(TargetModelType TM, CppJitCompilerBackend Backend,
                               const std::string &Code,
                               const std::vector<std::string> &ExtraArgs);
+const ResolvedToolPath &resolveClangxx();
+#if PROTEUS_ENABLE_CUDA
+const ResolvedToolPath &resolveNvcc();
+#endif
 std::unique_ptr<CppJitCompiler>
 createCppJitCompiler(const CppJitCompileRequest &Request);
 

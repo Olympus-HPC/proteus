@@ -103,26 +103,6 @@ if(PROTEUS_ENABLE_CUDA)
   add_definitions("-DPROTEUS_ENABLE_CUDA")
 
   find_package(CUDAToolkit 12 REQUIRED)
-  set(PROTEUS_NVCC_BIN "${PROTEUS_NVCC_BIN}" CACHE FILEPATH
-      "Path to nvcc used for CppJitCudaCompiler::Nvcc")
-  if(NOT PROTEUS_NVCC_BIN)
-    if(CUDAToolkit_NVCC_EXECUTABLE)
-      set(PROTEUS_NVCC_BIN "${CUDAToolkit_NVCC_EXECUTABLE}" CACHE FILEPATH
-          "Path to nvcc used for CppJitCudaCompiler::Nvcc" FORCE)
-    else()
-      find_program(PROTEUS_NVCC_BIN
-        NAMES nvcc
-        HINTS
-          "${CUDAToolkit_BIN_DIR}"
-      )
-    endif()
-  endif()
-
-  if(PROTEUS_NVCC_BIN)
-    message(STATUS "Found nvcc: ${PROTEUS_NVCC_BIN}")
-  else()
-    message(STATUS "nvcc not found; CppJitCudaCompiler::Nvcc will be unavailable at runtime")
-  endif()
 
   find_file(LIBDEVICE_BC_FILE
     NAMES libdevice.10.bc
