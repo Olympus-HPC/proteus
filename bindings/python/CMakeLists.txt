@@ -6,6 +6,7 @@ find_package(pybind11 CONFIG REQUIRED)
 set(PROTEUS_PYTHON_SOURCES
   PythonBindings.cpp
   CppBindings.cpp
+  LLVMIRBindings.cpp
 )
 set(PROTEUS_PYTHON_PACKAGE_SOURCE_DIR
   "${PROJECT_SOURCE_DIR}/python/proteus")

@@ -49,6 +49,10 @@ createCppModule(const std::string &Target, const std::string &Code,
                 const std::vector<std::string> &ExtraArgs,
                 const std::string &Compiler);
 
+// Builds a module directly from LLVM IR source for the requested target.
+std::shared_ptr<ModuleBase> createLLVMIRModule(const std::string &Target,
+                                               const std::string &Code);
+
 #if PROTEUS_ENABLE_MLIR
 // Builds a module from MLIR source for the requested backend target.
 std::shared_ptr<ModuleBase> createMLIRModule(const std::string &Target,
