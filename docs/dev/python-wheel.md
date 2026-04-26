@@ -51,6 +51,8 @@ requirement.
 The wheel is built against one pinned LLVM/Clang version per Proteus release.
 The current wheel CI pin is LLVM `22.1.3` on Linux and Homebrew LLVM 22 on
 macOS.
+On `macos-14`, Homebrew LLVM 22 and its vendored dependencies currently imply
+`MACOSX_DEPLOYMENT_TARGET=14.0` for repaired wheels.
 
 You currently need:
 
@@ -72,6 +74,7 @@ python3 -m venv /tmp/proteus-wheel-venv
 
 brew install llvm
 
+MACOSX_DEPLOYMENT_TARGET=14.0 \
 LLVM_INSTALL_DIR=/opt/homebrew/opt/llvm \
   /tmp/proteus-wheel-venv/bin/python -m build --wheel
 ```
