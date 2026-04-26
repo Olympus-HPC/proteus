@@ -13,6 +13,7 @@ set(SOURCES
   Frontend/CppJitCompilerClang.cpp
   Frontend/JitFuncAttribute.cpp
   Frontend/CppJitModule.cpp
+  Frontend/LLVMIRJitModule.cpp
   Frontend/CppJitCompilerNvcc.cpp
   Frontend/Builtins.cpp
   Frontend/Dispatcher.cpp

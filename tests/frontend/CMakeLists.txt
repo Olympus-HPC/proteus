@@ -8,3 +8,5 @@ endif()
 if(PROTEUS_ENABLE_MLIR)
     add_subdirectory(mlir)
 endif()
+
+add_subdirectory(llvmir)
