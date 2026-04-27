@@ -115,10 +115,9 @@ After repair, the wheel includes vendored libraries under
 ### Linux
 
 The Linux wheel path is analogous, but uses `auditwheel`.
-In CI, the Linux toolchain is built from source inside the
-`manylinux_2_28` image by
-[`packaging/wheels/build-llvm-manylinux.sh`](../../packaging/wheels/build-llvm-manylinux.sh),
-which installs LLVM `22.1.3` into `/opt/llvm-22.1.3`.
+In CI, the Linux toolchain now comes from a prebuilt custom container based on
+`manylinux_2_28` with LLVM `22.1.3` already installed at
+`/opt/llvm-22.1.3`.
 
 ```bash
 bash packaging/wheels/build-llvm-manylinux.sh
@@ -136,6 +135,33 @@ auditwheel repair -w wheelhouse dist/<wheel-name>.whl
 
 The repaired wheel should contain the vendored ELF dependencies that
 `libproteus` and `_proteus` need at runtime.
+
+## Building the Linux Container
+
+The Linux wheel workflow expects a container image published to GHCR with LLVM
+`22.1.3` preinstalled. The image build inputs are:
+
+- [`packaging/wheels/manylinux-llvm.Dockerfile`](../../packaging/wheels/manylinux-llvm.Dockerfile)
+- [`packaging/wheels/build-llvm-manylinux.sh`](../../packaging/wheels/build-llvm-manylinux.sh)
+- [`packaging/wheels/build-manylinux-llvm-container.sh`](../../packaging/wheels/build-manylinux-llvm-container.sh)
+
+From a machine with Docker and enough CPU/RAM to build LLVM efficiently:
+
+```bash
+docker login ghcr.io
+bash packaging/wheels/build-manylinux-llvm-container.sh
+```
+
+By default, this builds and pushes:
+
+- image: `ghcr.io/olympus-hpc/proteus-manylinux-llvm:22.1.3`
+
+Useful overrides:
+
+```bash
+PUSH=0 bash packaging/wheels/build-manylinux-llvm-container.sh
+IMAGE_TAG=test LLVM_VER=22.1.3 bash packaging/wheels/build-manylinux-llvm-container.sh
+```
 
 ## Installed-Wheel Verification
 
@@ -191,37 +217,17 @@ The workflow:
 
 1. checks out the repository
 2. provisions the pinned LLVM toolchain for the platform
-3. builds LLVM from source on Linux inside the `manylinux_2_28` image
+3. pulls the prebuilt Linux LLVM container image on `manylinux_2_28`
 4. builds wheels with `cibuildwheel`
 5. repairs wheels with `delocate` or `auditwheel`
 6. uploads the wheel artifacts
 
 On macOS, the workflow uses Homebrew `llvm` for LLVM 22.
-On Linux, the workflow builds LLVM/Clang/MLIR from source for compatibility,
-while the current wheel still keeps `PROTEUS_ENABLE_MLIR=OFF`.
+On Linux, the workflow uses the prebuilt `ghcr.io/olympus-hpc/proteus-manylinux-llvm:22.1.3`
+image, while the current wheel still keeps `PROTEUS_ENABLE_MLIR=OFF`.
 
 The `cibuildwheel` test command runs the installed-wheel Python tests rather
 than build-tree imports.
-
-## Alternate Miniforge Workflow
-
-There is also an alternate workflow at
-[`ci-wheels-miniforge.yml`](../../.github/workflows/ci-wheels-miniforge.yml).
-
-This workflow keeps the same wheel scope and macOS setup, but changes the Linux
-toolchain provisioning strategy:
-
-- Linux still builds in `manylinux_2_28`
-- Miniforge supplies LLVM/Clang/MLIR, CMake, and Ninja
-- the conda environment pins `sysroot_linux-64=2.28`
-- `auditwheel show` is treated as the compatibility gate before repair
-
-The Linux helper scripts for this path are:
-
-- [`packaging/wheels/setup-miniforge-manylinux.sh`](../../packaging/wheels/setup-miniforge-manylinux.sh)
-- [`packaging/wheels/auditwheel-repair-manylinux.sh`](../../packaging/wheels/auditwheel-repair-manylinux.sh)
-
-The source-built LLVM workflow remains the baseline comparison path.
 
 ## Scope Boundaries
 
