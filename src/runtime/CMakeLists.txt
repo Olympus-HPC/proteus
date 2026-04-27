@@ -198,6 +198,7 @@ if(PROTEUS_ENABLE_MLIR)
 endif()
 
 if(NOT LLVM_ENABLE_RTTI)
+  target_compile_options(proteus PRIVATE -fno-rtti)
   target_compile_options(proteusCore INTERFACE -fno-rtti)
 endif()
 

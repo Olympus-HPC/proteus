@@ -54,8 +54,8 @@ if [ "${CI_MACHINE}" == "matrix" ]; then
   # compiler.
   conda create -y -q -n proteus --override-channels -c conda-forge \
       python=${PYTHON_VERSION} clang=${PROTEUS_CI_LLVM_VERSION} clangxx=${PROTEUS_CI_LLVM_VERSION} \
-      clangdev=${PROTEUS_CI_LLVM_VERSION} llvmdev=${PROTEUS_CI_LLVM_VERSION} lit=${PROTEUS_CI_LLVM_VERSION} \
-      mlir=${PROTEUS_CI_LLVM_VERSION} gcc=12 gxx=12
+      pybind11 clangdev=${PROTEUS_CI_LLVM_VERSION} llvmdev=${PROTEUS_CI_LLVM_VERSION} \
+      lit=${PROTEUS_CI_LLVM_VERSION} mlir=${PROTEUS_CI_LLVM_VERSION} gcc=12 gxx=12
   conda activate proteus
 
   LLVM_INSTALL_DIR=$(llvm-config --prefix)
@@ -77,14 +77,14 @@ elif [ "${CI_MACHINE}" == "tioga" ] || [ "${CI_MACHINE}" == "tuolumne" ]; then
   fi
 
   LLVM_INSTALL_DIR=${ROCM_PATH}/llvm
-  CMAKE_OPTIONS_MACHINE=" -DPROTEUS_ENABLE_HIP=on"
-  CMAKE_OPTIONS_MACHINE+=" -DCMAKE_HIP_ARCHITECTURES=gfx942;gfx90a"
+  install_miniforge "${WORKDIR}/miniforge3"
+  conda create -y -q -n proteus --override-channels -c conda-forge \
+    python=${PYTHON_VERSION} pybind11
+  conda activate proteus
 
-  if [ "${ENABLE_CODECOV_UPLOAD}" = "1" ]; then
-    install_miniforge "${WORKDIR}/miniforge3"
-    conda create -y -q -n proteus-codecov --override-channels -c conda-forge python=${PYTHON_VERSION}
-    conda activate proteus-codecov
-  fi
+  CMAKE_OPTIONS_MACHINE=" -DCMAKE_PREFIX_PATH=$CONDA_PREFIX;$CONDA_PREFIX/lib/cmake"
+  CMAKE_OPTIONS_MACHINE+=" -DPROTEUS_ENABLE_HIP=on"
+  CMAKE_OPTIONS_MACHINE+=" -DCMAKE_HIP_ARCHITECTURES=gfx942;gfx90a"
 else
   echo "Unsupported machine ${CI_MACHINE}"
   exit 1
@@ -97,6 +97,7 @@ CMAKE_OPTIONS+=" -DCMAKE_BUILD_TYPE=Release"
 CMAKE_OPTIONS+=" -DCMAKE_C_COMPILER=$LLVM_INSTALL_DIR/bin/clang -DCMAKE_CXX_COMPILER=$LLVM_INSTALL_DIR/bin/clang++"
 CMAKE_OPTIONS+=" -DENABLE_DEVELOPER_COMPILER_FLAGS=on"
 CMAKE_OPTIONS+=" -DPROTEUS_ENABLE_MLIR=on"
+CMAKE_OPTIONS+=" -DPROTEUS_ENABLE_PYTHON=on"
 CMAKE_OPTIONS+=" -DENABLE_TESTS=on"
 CMAKE_OPTIONS+=" -DENABLE_COVERAGE=$([ "${ENABLE_CODECOV_UPLOAD}" = "1" ] && echo on || echo off)"
 CMAKE_OPTIONS+=${CMAKE_OPTIONS_MACHINE}

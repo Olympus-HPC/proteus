@@ -24,18 +24,35 @@ private:
   std::unique_ptr<CompiledLibrary> Library;
   bool IsCompiled = false;
 
-  void setFuncAttribute(void *KernelFunc, JitFuncAttribute Attr, int Value);
-  void *getFunctionAddress(const std::string &Name);
-  DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
-                        LaunchDims BlockDim, void *KernelArgs[],
-                        uint64_t ShmemSize, void *Stream);
-
 public:
   explicit MLIRJitModule(TargetModelType TargetModel, const std::string &Code);
   explicit MLIRJitModule(const std::string &Target, const std::string &Code);
   ~MLIRJitModule();
 
   void compile(bool Verify = false);
+
+  // Expose the target model so higher-level bindings can reject invalid API
+  // combinations before dispatch.
+  TargetModelType getTargetModel() const { return TargetModel; }
+
+  void setFuncAttribute(void *KernelFunc, JitFuncAttribute Attr, int Value);
+  void *getFunctionAddress(const std::string &Name);
+  void *getKernelAddress(const std::string &Name) {
+    if (!IsCompiled)
+      compile();
+
+    if (TargetModel == TargetModelType::HOST)
+      reportFatalError(
+          "Error: getKernelAddress() applies only to device modules");
+
+    // Kernel symbols are loaded through the same compiled image as host
+    // function symbols once target validation is complete.
+    return getFunctionAddress(Name);
+  }
+
+  DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
+                        LaunchDims BlockDim, void *KernelArgs[],
+                        uint64_t ShmemSize, void *Stream);
 
   CompiledLibrary &getLibrary() {
     if (!IsCompiled)
