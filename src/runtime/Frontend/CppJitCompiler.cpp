@@ -1,12 +1,93 @@
 #include "proteus/impl/Frontend/CppJitCompiler.h"
 #include "proteus/TimeTracing.h"
+#include "proteus/impl/Config.h"
 
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/Support/FileSystem.h>
 #include <llvm/Support/MemoryBuffer.h>
+#include <llvm/Support/Path.h>
+#include <llvm/Support/Program.h>
+
+#include <mutex>
+#include <optional>
 
 namespace proteus {
+
+namespace {
+
+std::string resolveProgramPath(llvm::StringRef Program) {
+  if (llvm::sys::path::has_parent_path(Program)) {
+    if (!llvm::sys::fs::can_execute(Program))
+      return {};
+
+    llvm::SmallString<256> RealPath;
+    if (!llvm::sys::fs::real_path(Program, RealPath))
+      return RealPath.str().str();
+    return Program.str();
+  }
+
+  auto Found = llvm::sys::findProgramByName(Program);
+  if (!Found)
+    return {};
+  return *Found;
+}
+
+ResolvedToolPath resolveToolPath(
+    llvm::StringRef Program, const std::optional<const std::string> &Override,
+    std::optional<llvm::StringRef> ToolchainHintDir = std::nullopt) {
+  if (Override) {
+    return {resolveProgramPath(*Override), *Override};
+  }
+
+  if (ToolchainHintDir) {
+    llvm::SmallString<256> Candidate(*ToolchainHintDir);
+    llvm::sys::path::append(Candidate, Program);
+    std::string Path = resolveProgramPath(Candidate);
+    if (!Path.empty()) {
+      return {std::move(Path),
+              "LLVM toolchain hint " + ToolchainHintDir->str()};
+    }
+  }
+
+  return {resolveProgramPath(Program), "PATH"};
+}
+
+const ResolvedToolPath &
+resolveTool(std::mutex &CacheMutex, std::optional<ResolvedToolPath> &Cache,
+            llvm::StringRef Program,
+            const std::optional<const std::string> &Override,
+            llvm::StringRef OverrideVar, llvm::StringRef MissingContext,
+            std::optional<llvm::StringRef> ToolchainHintDir = std::nullopt) {
+  // Fast path if it is already cached.
+  if (Cache)
+    return *Cache;
+
+  std::lock_guard<std::mutex> Lock(CacheMutex);
+
+  // Another thread may have populated the cache while we were waiting.
+  if (Cache)
+    return *Cache;
+
+  ResolvedToolPath Tool = resolveToolPath(Program, Override, ToolchainHintDir);
+
+  if (Tool.Path.empty()) {
+    if (Override) {
+      reportFatalError("Failed to resolve " + Program.str() + " from " +
+                       OverrideVar.str() + "=" + *Override);
+    }
+    reportFatalError(MissingContext.str() + " Set " + OverrideVar.str() +
+                     " or ensure " + Program.str() + " is on PATH.");
+  }
+
+  if (Override)
+    Tool.Origin = OverrideVar.str() + "=" + Tool.Origin;
+
+  Cache = std::move(Tool);
+  return *Cache;
+}
+
+} // namespace
 
 bool CppJitCompiler::isBackendSupported(TargetModelType TM,
                                         CppJitCompilerBackend Backend) {
@@ -78,5 +159,32 @@ createCppJitCompiler(const CppJitCompileRequest &Request) {
 
   reportFatalError("Unsupported CppJit compiler backend");
 }
+
+const ResolvedToolPath &resolveClangxx() {
+  static std::mutex CacheMutex;
+  static std::optional<ResolvedToolPath> Cache;
+
+#ifdef PROTEUS_LLVM_TOOLS_BINDIR
+  constexpr llvm::StringRef ToolchainHintDir = PROTEUS_LLVM_TOOLS_BINDIR;
+#else
+  constexpr std::optional<llvm::StringRef> ToolchainHintDir = std::nullopt;
+#endif
+
+  return resolveTool(CacheMutex, Cache, "clang++",
+                     Config::get().ProteusClangxxBin, "PROTEUS_CLANGXX_BIN",
+                     "Failed to resolve required host compiler clang++.",
+                     ToolchainHintDir);
+}
+
+#if PROTEUS_ENABLE_CUDA
+const ResolvedToolPath &resolveNvcc() {
+  static std::mutex CacheMutex;
+  static std::optional<ResolvedToolPath> Cache;
+  return resolveTool(CacheMutex, Cache, "nvcc", Config::get().ProteusNvccBin,
+                     "PROTEUS_NVCC_BIN",
+                     "CUDA support is enabled in this build, but nvcc was not "
+                     "found.");
+}
+#endif
 
 } // namespace proteus

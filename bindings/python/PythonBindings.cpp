@@ -381,7 +381,7 @@ Module compile(py::object Source, const std::string &Frontend,
 
 using namespace proteus_python;
 
-PYBIND11_MODULE(proteus, M) {
+PYBIND11_MODULE(_proteus, M) {
   M.doc() = "Thin Python bindings for Proteus JIT frontends";
 
   // Expose the builtin scalar/pointer descriptors as module-level singletons.
