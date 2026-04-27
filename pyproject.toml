@@ -1,0 +1,56 @@
+[build-system]
+requires = [
+  "pybind11>=2.12",
+  "scikit-build-core>=0.10",
+  "setuptools-scm>=8",
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "proteus-python"
+dynamic = ["version"]
+description = "Runtime specialization and JIT compilation built on LLVM"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0 WITH LLVM-exception"
+license-files = ["LICENSE", "NOTICE"]
+authors = [
+  { name = "Giorgis Georgakoudis" },
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: C++",
+  "Topic :: Software Development :: Compilers",
+]
+
+[tool.scikit-build]
+cmake.version = ">=3.18"
+cmake.build-type = "Release"
+build-dir = "build/{wheel_tag}"
+wheel.install-dir = ""
+metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
+
+[tool.scikit-build.cmake.define]
+BUILD_SHARED = "ON"
+ENABLE_TESTS = "OFF"
+PROTEUS_ENABLE_CUDA = "OFF"
+PROTEUS_ENABLE_HIP = "OFF"
+PROTEUS_ENABLE_MLIR = "OFF"
+PROTEUS_ENABLE_MPI = "OFF"
+PROTEUS_ENABLE_PYTHON = "ON"
+PROTEUS_PYTHON_WHEEL = "ON"
+PROTEUS_PYTHON_PACKAGE_DIR = "proteus"
+
+[tool.cibuildwheel]
+build = "cp310-* cp311-* cp312-* cp313-*"
+skip = "*-musllinux_*"
+test-command = "python {project}/bindings/python/tests/test_host_cpp_smoke.py && python {project}/bindings/python/tests/test_host_cpp_validation.py && python {project}/bindings/python/tests/test_wheel_layout.py && python {project}/bindings/python/tests/test_invalid_clang_override.py"
+
+[tool.setuptools_scm]

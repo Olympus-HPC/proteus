@@ -18,7 +18,6 @@
 #include <llvm/TargetParser/Triple.h>
 
 #include <memory>
-
 namespace proteus {
 
 #if PROTEUS_ENABLE_CUDA
@@ -45,11 +44,55 @@ void initializeCompilerInstance(CompilerInstance &Compiler) {
     reportFatalError("Compiler instance has no diagnostics");
 }
 
+std::shared_ptr<CompilerInvocation> createCompilerInvocation(
+    const ResolvedToolPath &Clangxx, const std::vector<std::string> &ArgStorage,
+    CompilerInstance &Compiler, llvm::StringRef ExpectedContext,
+    bool CheckInputsExist = false) {
+  std::vector<const char *> DriverArgs;
+  DriverArgs.reserve(ArgStorage.size());
+  for (const auto &S : ArgStorage)
+    DriverArgs.push_back(S.c_str());
+
+  clang::driver::Driver D(Clangxx.Path, sys::getDefaultTargetTriple(),
+                          Compiler.getDiagnostics());
+  D.setCheckInputsExist(CheckInputsExist);
+
+  auto C = std::unique_ptr<clang::driver::Compilation>(
+      D.BuildCompilation(DriverArgs));
+  if (!C || Compiler.getDiagnostics().hasErrorOccurred()) {
+    reportFatalError(ExpectedContext.str() +
+                     ": failed to build Clang compilation with compiler '" +
+                     Clangxx.Path + "' selected from " + Clangxx.Origin + ".");
+  }
+
+  if (C->getJobs().empty())
+    reportFatalError(ExpectedContext.str() +
+                     ": expected compilation job, found empty joblist");
+
+  const clang::driver::Command &Cmd =
+      llvm::cast<clang::driver::Command>(*C->getJobs().begin());
+  const auto &CC1Args = Cmd.getArguments();
+  if (!llvm::is_contained(CC1Args, StringRef{"-cc1"})) {
+    reportFatalError(ExpectedContext.str() +
+                     ": expected first job to be the compilation");
+  }
+
+  auto Invocation = std::make_shared<CompilerInvocation>();
+  if (!CompilerInvocation::CreateFromArgs(*Invocation, CC1Args,
+                                          Compiler.getDiagnostics())) {
+    reportFatalError(ExpectedContext.str() +
+                     ": failed to create compiler invocation");
+  }
+
+  return Invocation;
+}
+
 // Clang-backed implementation for IR and shared-library compilation paths.
 class CppJitCompilerClang : public CppJitCompiler {
 private:
   CppJitArtifact compileToDynamicLibrary(const CppJitCompileRequest &Request) {
     TIMESCOPE(CppJitCompilerClang, compileToDynamicLibrary);
+    const ResolvedToolPath &Clangxx = resolveClangxx();
     CompilerInstance Compiler;
     initializeCompilerInstance(Compiler);
 
@@ -74,7 +117,7 @@ private:
     std::string OffloadArch = "--offload-arch=" + Request.DeviceArch;
 
     std::vector<std::string> ArgStorage = {
-        PROTEUS_CLANGXX_BIN,
+        Clangxx.Path,
         "-shared",
         "-std=c++17",
         CppJitCompiler::FrontendOptLevelFlag,
@@ -95,7 +138,7 @@ private:
     for (const auto &S : ArgStorage)
       DriverArgs.push_back(S.c_str());
 
-    clang::driver::Driver D(PROTEUS_CLANGXX_BIN, sys::getDefaultTargetTriple(),
+    clang::driver::Driver D(Clangxx.Path, sys::getDefaultTargetTriple(),
                             Compiler.getDiagnostics());
 
     auto *C = D.BuildCompilation(DriverArgs);
@@ -119,6 +162,7 @@ private:
 
   CppJitArtifact compileToIR(const CppJitCompileRequest &Request) {
     TIMESCOPE(CppJitCompilerClang, compileToIR);
+    const ResolvedToolPath &Clangxx = resolveClangxx();
     CompilerInstance TempCompiler;
     initializeCompilerInstance(TempCompiler);
 
@@ -130,7 +174,7 @@ private:
     // runs its configured middle-end pipeline when the dispatcher compiles the
     // returned LLVM IR.
     if (Request.TargetModel == TargetModelType::HOST) {
-      ArgStorage = {PROTEUS_CLANGXX_BIN,
+      ArgStorage = {Clangxx.Path,
                     "-emit-llvm",
                     "-S",
                     "-std=c++17",
@@ -144,7 +188,7 @@ private:
     } else {
       std::string OffloadArch = "--offload-arch=" + Request.DeviceArch;
       ArgStorage = {
-          PROTEUS_CLANGXX_BIN,
+          Clangxx.Path,
           "-emit-llvm",
           "-S",
           "-std=c++17",
@@ -161,33 +205,8 @@ private:
     ArgStorage.insert(ArgStorage.end(), Request.ExtraArgs.begin(),
                       Request.ExtraArgs.end());
 
-    std::vector<const char *> DriverArgs;
-    DriverArgs.reserve(ArgStorage.size());
-    for (const auto &S : ArgStorage)
-      DriverArgs.push_back(S.c_str());
-
-    clang::driver::Driver D(PROTEUS_CLANGXX_BIN, sys::getDefaultTargetTriple(),
-                            TempCompiler.getDiagnostics());
-    D.setCheckInputsExist(false);
-    auto *C = D.BuildCompilation(DriverArgs);
-    if (!C || TempCompiler.getDiagnostics().hasErrorOccurred())
-      reportFatalError("Building Driver failed");
-
-    const clang::driver::JobList &Jobs = C->getJobs();
-    if (Jobs.empty())
-      reportFatalError("Expected compilation job, found empty joblist");
-
-    const clang::driver::Command &Cmd =
-        llvm::cast<clang::driver::Command>(*Jobs.begin());
-    const auto &CC1Args = Cmd.getArguments();
-    if (!llvm::is_contained(CC1Args, StringRef{"-cc1"}))
-      reportFatalError("Expected first job to be the compilation");
-
-    auto Invocation = std::make_shared<CompilerInvocation>();
-    if (!CompilerInvocation::CreateFromArgs(*Invocation, CC1Args,
-                                            TempCompiler.getDiagnostics())) {
-      throw std::runtime_error("Failed to create compiler invocation");
-    }
+    auto Invocation = createCompilerInvocation(Clangxx, ArgStorage,
+                                               TempCompiler, "Clang IR build");
 
 #if LLVM_VERSION_MAJOR >= 22
     CompilerInstance Compiler(Invocation);

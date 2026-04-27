@@ -70,6 +70,11 @@ add_library(proteusFrontend INTERFACE)
 target_compile_definitions(proteus PRIVATE ${LLVM_DEFINITIONS})
 target_compile_definitions(proteusCore INTERFACE ${LLVM_DEFINITIONS})
 
+if(DEFINED LLVM_INSTALL_PREFIX AND NOT LLVM_INSTALL_PREFIX STREQUAL "")
+  target_compile_definitions(
+    proteus PRIVATE PROTEUS_LLVM_TOOLS_BINDIR="${LLVM_INSTALL_PREFIX}/bin")
+endif()
+
 if(PROTEUS_ENABLE_MPI)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_MPI)
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_MPI)
@@ -258,17 +263,6 @@ if(PROTEUS_ENABLE_MPI)
   target_link_libraries(proteus PRIVATE MPI::MPI_CXX)
 endif()
 
-find_program(CLANGXX
-  NAMES clang++
-  NO_DEFAULT_PATH
-  REQUIRED
-  PATHS
-    "${LLVM_BINARY_DIR}/bin"
-)
-get_filename_component(CLANGXX_REALPATH "${CLANGXX}" REALPATH)
-message(STATUS "Found clang++: ${CLANGXX}")
-message(STATUS "Resolved clang++: ${CLANGXX_REALPATH}")
-
 # Find required clang libraries in the LLVM installation.
 if(CLANG_LINK_CLANG_DYLIB)
     list(APPEND clang_libs clang-cpp)
@@ -285,14 +279,6 @@ else()
 endif()
 message(STATUS "Found Clang libraries: ${clang_libs}")
 target_link_libraries(proteus PRIVATE ${clang_libs})
-
-# Add the clangxx binary path as a compile definition for use in the runtime,
-# which needs it for the CPP frontend to resolve system path.
-target_compile_definitions(proteus PRIVATE PROTEUS_CLANGXX_BIN="${CLANGXX_REALPATH}")
-
-if(PROTEUS_ENABLE_CUDA AND PROTEUS_NVCC_BIN)
-  target_compile_definitions(proteus PRIVATE PROTEUS_NVCC_BIN="${PROTEUS_NVCC_BIN}")
-endif()
 
 find_package(Threads REQUIRED)
 target_link_libraries(proteus PRIVATE Threads::Threads)
@@ -348,41 +334,54 @@ target_link_libraries(proteusFrontend INTERFACE proteus "$<$<PLATFORM_ID:Darwin>
 target_link_libraries(proteusCore INTERFACE proteus "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
 
 set_target_properties(proteus PROPERTIES
+  BUILD_WITH_INSTALL_RPATH TRUE
+  INSTALL_RPATH "$<IF:$<PLATFORM_ID:Darwin>,@loader_path,\$ORIGIN>"
   INSTALL_RPATH_USE_LINK_PATH TRUE
   INTERFACE_LINK_DIRECTORIES "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}"
 )
 
-set(PROTEUS_INSTALL_TARGETS proteus proteusCore proteusFrontend)
-if(PROTEUS_ENABLE_CUDA)
-    list(APPEND PROTEUS_INSTALL_TARGETS proteus_cudart_builtins)
-endif()
-
-install(
-  TARGETS ${PROTEUS_INSTALL_TARGETS}
-  EXPORT proteusTargets
-  RUNTIME DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-  LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-  ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-
-# Install headers preserving directory structure.
-set(PROTEUS_PUBLIC_HEADER_INSTALL_EXCLUDES)
-if(NOT PROTEUS_ENABLE_MLIR)
-  # Exclude MLIR-specific headers from installation if MLIR support is not
-  # enabled.
-  list(APPEND PROTEUS_PUBLIC_HEADER_INSTALL_EXCLUDES
-    PATTERN "proteus/Frontend/MLIRCodeBuilder.h" EXCLUDE
-    PATTERN "proteus/MLIRJitModule.h" EXCLUDE
+# TODO: Teach wheel builds to optionally ship the exported C++ SDK surface
+# (headers, interface targets, and related install metadata) once that becomes
+# a supported packaging contract.
+if(PROTEUS_PYTHON_WHEEL)
+  install(
+    TARGETS proteus
+    LIBRARY DESTINATION "${PROTEUS_PYTHON_PACKAGE_DIR}"
+    RUNTIME DESTINATION "${PROTEUS_PYTHON_PACKAGE_DIR}"
   )
-endif()
-install(DIRECTORY ${PROTEUS_PROJECT_INCLUDE_DIR}/
-  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-  FILES_MATCHING PATTERN "*.h"
-  ${PROTEUS_PUBLIC_HEADER_INSTALL_EXCLUDES}
-)
+else()
+  set(PROTEUS_INSTALL_TARGETS proteus proteusCore proteusFrontend)
+  if(PROTEUS_ENABLE_CUDA)
+      list(APPEND PROTEUS_INSTALL_TARGETS proteus_cudart_builtins)
+  endif()
 
-if(PROTEUS_INSTALL_IMPL_HEADERS)
-  install(DIRECTORY ${PROJECT_SOURCE_DIR}/src/include/
+  install(
+    TARGETS ${PROTEUS_INSTALL_TARGETS}
+    EXPORT proteusTargets
+    RUNTIME DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+
+  # Install headers preserving directory structure.
+  set(PROTEUS_PUBLIC_HEADER_INSTALL_EXCLUDES)
+  if(NOT PROTEUS_ENABLE_MLIR)
+    # Exclude MLIR-specific headers from installation if MLIR support is not
+    # enabled.
+    list(APPEND PROTEUS_PUBLIC_HEADER_INSTALL_EXCLUDES
+      PATTERN "proteus/Frontend/MLIRCodeBuilder.h" EXCLUDE
+      PATTERN "proteus/MLIRJitModule.h" EXCLUDE
+    )
+  endif()
+  install(DIRECTORY ${PROTEUS_PROJECT_INCLUDE_DIR}/
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     FILES_MATCHING PATTERN "*.h"
+    ${PROTEUS_PUBLIC_HEADER_INSTALL_EXCLUDES}
   )
+
+  if(PROTEUS_INSTALL_IMPL_HEADERS)
+    install(DIRECTORY ${PROJECT_SOURCE_DIR}/src/include/
+      DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+      FILES_MATCHING PATTERN "*.h"
+    )
+  endif()
 endif()

@@ -18,6 +18,7 @@ nav:
     - Proteus Internals:
       - Overview: dev/proteus-internals.md
       - Optimization Pipeline: dev/optimization-pipeline.md
+    - Python Wheel Build: dev/python-wheel.md
     - Creating a PR: dev/pr.md
     - API Reference: dev/api.md
 repo_url: https://github.com/Olympus-HPC/proteus

@@ -57,6 +57,16 @@ Details are provided [later](#integrating-with-your-build-system).
 ## Installation
 Proteus can be installed from source or via [spack](https://github.com/spack/spack).
 
+### Python wheels
+The first Python wheel target is CPU-only and ships the Python bindings,
+`libproteus`, and the LLVM/Clang runtime libraries needed by Proteus itself.
+CUDA, HIP/ROCm, MLIR, and MPI are not included in this first wheel.
+
+The host C++ JIT frontend remains available, but it still requires a compatible
+host `clang++` installation at runtime. Proteus resolves `clang++` from
+`PROTEUS_CLANGXX_BIN`, then from an LLVM-adjacent toolchain hint, then from
+`PATH`.
+
 ### Spack
 We provide a packaging recipe for Spack in the subdirectory `packaging/spack`.
 
