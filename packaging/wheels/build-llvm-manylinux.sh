@@ -42,6 +42,7 @@ rm -rf build
 cmake -G Ninja -S llvm -B build \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="${PREFIX}" \
+  -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
   -DLLVM_ENABLE_PROJECTS="clang;mlir" \
   -DLLVM_ENABLE_RUNTIMES="" \
   -DLLVM_TARGETS_TO_BUILD="Native;NVPTX;AMDGPU" \
@@ -55,11 +56,15 @@ cmake -G Ninja -S llvm -B build \
   -DLLVM_OPTIMIZED_TABLEGEN=ON \
   -DCLANG_INCLUDE_TESTS=OFF \
   -DMLIR_INCLUDE_TESTS=OFF \
-  -DLLVM_BUILD_LLVM_DYLIB=ON \
-  -DLLVM_LINK_LLVM_DYLIB=ON \
-  -DLLVM_INSTALL_TOOLCHAIN_ONLY=ON
+  -DLLVM_BUILD_LLVM_DYLIB=OFF \
+  -DLLVM_LINK_LLVM_DYLIB=OFF
 
 cmake --build build --parallel "$(getconf _NPROCESSORS_ONLN)" --target install
+
+test -f "${PREFIX}/lib/cmake/llvm/LLVMConfig.cmake"
+test -f "${PREFIX}/lib/cmake/clang/ClangConfig.cmake"
+test -f "${PREFIX}/lib/libLLVMCore.a"
+test -f "${PREFIX}/lib/libclangFrontend.a"
 
 echo
 echo "Installed LLVM ${LLVM_VER} to: ${PREFIX}"
