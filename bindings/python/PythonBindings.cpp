@@ -359,6 +359,12 @@ Module compile(py::object Source, const std::string &Frontend,
   std::shared_ptr<ModuleBase> Impl;
   if (Frontend == "cpp") {
     Impl = createCppModule(Target, Code, ExtraArgs, Compiler);
+  } else if (Frontend == "llvmir") {
+    if (Compiler != "clang")
+      throw py::value_error("LLVMIR frontend does not support compiler='nvcc'");
+    if (!ExtraArgs.empty())
+      throw py::value_error("LLVMIR frontend does not support extra_args");
+    Impl = createLLVMIRModule(Target, Code);
   } else if (Frontend == "mlir") {
     if (Compiler != "clang")
       throw py::value_error("MLIR frontend does not support compiler='nvcc'");
@@ -370,7 +376,7 @@ Module compile(py::object Source, const std::string &Frontend,
     throw py::value_error("MLIR frontend requires PROTEUS_ENABLE_MLIR");
 #endif
   } else {
-    throw py::value_error("frontend must be 'cpp' or 'mlir'");
+    throw py::value_error("frontend must be 'cpp', 'llvmir', or 'mlir'");
   }
   Impl->compile(Verify);
   return Module(std::move(Impl));

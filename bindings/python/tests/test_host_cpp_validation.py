@@ -22,7 +22,7 @@ def main():
     expect_raises(
         ValueError,
         lambda: proteus.compile(source, frontend="nope", target="host"),
-        "frontend must be 'cpp' or 'mlir'",
+        "frontend must be 'cpp', 'llvmir', or 'mlir'",
     )
     expect_raises(
         ValueError,
