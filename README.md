@@ -26,6 +26,7 @@ Several frontends are available, depending on how you want to describe JIT code:
 | --- | --- | --- | --- | --- |
 | **Code annotations** | Existing C/C++/CUDA/HIP code | Incremental adoption in existing applications | Values, arrays, objects, and launch configuration | Yes |
 | **C++ frontend API** | C++ source strings | Runtime-generated C++ and templates | Values, arrays, objects, and launch configuration | No |
+| **LLVM IR frontend API** | LLVM IR text or bitcode | Reusing externally generated LLVM IR with Proteus caching and dispatch | Encoded in the provided LLVM IR | No |
 | **MLIR frontend API** | MLIR source strings | Direct access to MLIR lowering | Encoded in the provided MLIR source | No |
 | **Embedded DSL API** | Programmatic builders | Runtime code generation with high-level constructs | Values, arrays, and launch configuration | No |
 
@@ -36,6 +37,7 @@ support depending on how Proteus was configured:
 | --- | --- | --- | --- | --- |
 | **Code annotations** | Yes | Yes | Yes | Requires compiling with Clang and uses the Proteus LLVM pass |
 | **C++ frontend API** | Yes | Yes | Yes | Uses Clang by default; CUDA paths can use NVCC |
+| **LLVM IR frontend API** | Yes | Yes | Yes | Accepts LLVM IR text or bitcode and compiles it directly through LLVM |
 | **MLIR frontend API** | Yes | Yes | Yes | Requires `PROTEUS_ENABLE_MLIR=ON` |
 | **Embedded DSL API** | Yes | Yes | Yes | Uses the LLVM backend by default; MLIR backend requires `PROTEUS_ENABLE_MLIR=ON` |
 
@@ -49,7 +51,7 @@ Proteus consists of an LLVM pass and a runtime library that implements JIT
 compilation and optimization using LLVM as a library.
 
 * The **code annotation** interface requires compiling your application with Clang so the Proteus LLVM pass can parse annotations.
-* The **DSL**, **C++ frontend**, and **MLIR frontend** APIs don’t depend on which AOT compiler you use.
+* The **DSL**, **C++ frontend**, **LLVM IR frontend**, and **MLIR frontend** APIs don’t depend on which AOT compiler you use.
 
 In all cases, you link your application against the Proteus runtime library.
 Details are provided [later](#integrating-with-your-build-system).
@@ -62,10 +64,11 @@ The first Python wheel target is CPU-only and ships the Python bindings,
 `libproteus`, and the LLVM/Clang runtime libraries needed by Proteus itself.
 CUDA, HIP/ROCm, MLIR, and MPI are not included in this first wheel.
 
-The host C++ JIT frontend remains available, but it still requires a compatible
-host `clang++` installation at runtime. Proteus resolves `clang++` from
-`PROTEUS_CLANGXX_BIN`, then from an LLVM-adjacent toolchain hint, then from
-`PATH`.
+The host LLVM IR frontend is available in the wheel as-is.
+The host C++ JIT frontend also remains available, but it still requires a
+compatible host `clang++` installation at runtime.
+Proteus resolves `clang++` from `PROTEUS_CLANGXX_BIN`, then from an
+LLVM-adjacent toolchain hint, then from `PATH`.
 
 ### Spack
 We provide a packaging recipe for Spack in the subdirectory `packaging/spack`.
@@ -138,7 +141,7 @@ find_package(proteus CONFIG REQUIRED)
 add_proteus(<target>)
 ```
 
-If you only need the DSL, C++ frontend, or MLIR frontend APIs, you can link directly against
+If you only need the DSL, C++ frontend, LLVM IR frontend, or MLIR frontend APIs, you can link directly against
 `proteusFrontend`.
 In this case, you don’t need to compile your target with Clang:
 
@@ -177,6 +180,7 @@ work:
 | --- | --- |
 | Code annotations | [Code Annotations](https://olympus-hpc.github.io/proteus/user/annotations/) |
 | C++ frontend API | [C++ Frontend API](https://olympus-hpc.github.io/proteus/user/cpp-frontend/) |
+| LLVM IR frontend API | [LLVM IR Frontend API](https://olympus-hpc.github.io/proteus/user/llvmir-frontend/) |
 | MLIR frontend API | [MLIR Frontend API](https://olympus-hpc.github.io/proteus/user/mlir-frontend/) |
 | DSL API | [DSL API](https://olympus-hpc.github.io/proteus/user/dsl/) |
 
