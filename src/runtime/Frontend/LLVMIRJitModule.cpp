@@ -15,6 +15,7 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/TargetParser/Host.h>
+#include <llvm/TargetParser/Triple.h>
 
 namespace proteus {
 namespace {
@@ -94,7 +95,11 @@ void LLVMIRJitModule::compile(bool Verify) {
     reportFatalError("LLVMIRJitModule: expected non-null parsed LLVM module");
 
   if (Module->getTargetTriple().empty())
+#if LLVM_VERSION_MAJOR >= 22
+    Module->setTargetTriple(llvm::Triple(getTargetTriple(TargetModel)));
+#else
     Module->setTargetTriple(getTargetTriple(TargetModel));
+#endif
 
   if (Module->getDataLayout().isDefault()) {
     const llvm::StringRef Arch = isHostTargetModel(TargetModel)
