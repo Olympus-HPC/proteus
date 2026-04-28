@@ -3,10 +3,16 @@
 
 #if PROTEUS_ENABLE_CUDA
 
+#include "proteus/Error.h"
 #include "proteus/Frontend/Dispatcher.h"
 #include "proteus/TimeTracing.h"
 #include "proteus/impl/Caching/ObjectCacheChain.h"
+#include "proteus/impl/Frontend/CUDAToolchain.h"
 #include "proteus/impl/JitEngineDeviceCUDA.h"
+
+#include <llvm/Bitcode/BitcodeReader.h>
+#include <llvm/Linker/Linker.h>
+#include <llvm/Support/MemoryBuffer.h>
 
 namespace proteus {
 
@@ -27,10 +33,17 @@ public:
     auto CtxOwner = std::move(Ctx);
     auto ModOwner = std::move(Mod);
 
-    // CMake finds LIBDEVICE_BC_PATH.
-    auto LibDeviceBuffer = llvm::MemoryBuffer::getFile(LIBDEVICE_BC_PATH);
+    const auto &Toolchain = resolveCUDAToolchain();
+    auto LibDeviceBuffer = llvm::MemoryBuffer::getFile(Toolchain.LibDevicePath);
+    if (!LibDeviceBuffer || !LibDeviceBuffer.get())
+      reportFatalError("DispatchCUDA: failed to read libdevice from " +
+                       Toolchain.LibDevicePath + " (" + Toolchain.Origin + ")");
+
     auto LibDeviceModule = llvm::parseBitcodeFile(
         LibDeviceBuffer->get()->getMemBufferRef(), ModOwner->getContext());
+    if (!LibDeviceModule)
+      reportFatalError("DispatchCUDA: failed to parse libdevice from " +
+                       Toolchain.LibDevicePath + " (" + Toolchain.Origin + ")");
 
     llvm::Linker linker(*ModOwner);
     linker.linkInModule(std::move(LibDeviceModule.get()),

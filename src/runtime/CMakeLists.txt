@@ -11,6 +11,7 @@ set(SOURCES
   Caching/StorageCache.cpp
   Frontend/CppJitCompiler.cpp
   Frontend/CppJitCompilerClang.cpp
+  Frontend/CUDAToolchain.cpp
   Frontend/JitFuncAttribute.cpp
   Frontend/CppJitModule.cpp
   Frontend/LLVMIRJitModule.cpp
@@ -88,8 +89,8 @@ if(PROTEUS_ENABLE_HIP)
     proteus PRIVATE PROTEUS_ROCM_BITCODE_DIR="${PROTEUS_ROCM_AMDGCN_BITCODE_DIR}")
 elseif(PROTEUS_ENABLE_CUDA)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_CUDA)
-  target_compile_definitions(proteus PRIVATE LIBDEVICE_BC_PATH="${LIBDEVICE_BC_FILE}")
-  target_compile_definitions(proteus PRIVATE PROTEUS_CUDA_LIBDIR="${CUDAToolkit_LIBRARY_DIR}")
+  target_compile_definitions(
+    proteus PRIVATE PROTEUS_CUDA_TOOLKIT_VERSION="${CUDAToolkit_VERSION}")
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_CUDA)
 endif()
 

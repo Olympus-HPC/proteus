@@ -1,4 +1,5 @@
 #include "proteus/TimeTracing.h"
+#include "proteus/impl/Frontend/CUDAToolchain.h"
 #include "proteus/impl/Frontend/CppJitCompiler.h"
 
 #include <clang/CodeGen/CodeGenAction.h>
@@ -20,17 +21,29 @@
 #include <memory>
 namespace proteus {
 
-#if PROTEUS_ENABLE_CUDA
-static std::vector<std::string> ExtraToolchainArgs = {"-L" PROTEUS_CUDA_LIBDIR,
-                                                      "-lcudart"};
-#else
-static std::vector<std::string> ExtraToolchainArgs = {};
-#endif
-
 using namespace clang;
 using namespace llvm;
 
 namespace {
+
+void appendCUDAToolchainArgs(std::vector<std::string> &ArgStorage,
+                             TargetModelType TargetModel) {
+  if (TargetModel != TargetModelType::CUDA &&
+      TargetModel != TargetModelType::HOST_CUDA)
+    return;
+
+  const auto &Toolchain = resolveCUDAToolchain();
+  if (Toolchain.Root.empty())
+    reportFatalError("CUDA Clang compilation requires a CUDA toolkit root. Set "
+                     "PROTEUS_CUDA_HOME, CUDA_HOME, or CUDA_PATH.");
+
+  ArgStorage.push_back("--cuda-path=" + Toolchain.Root);
+
+  if (TargetModel == TargetModelType::HOST_CUDA) {
+    ArgStorage.push_back("-L" + Toolchain.RuntimeLibDir);
+    ArgStorage.push_back("-lcudart");
+  }
+}
 
 void initializeCompilerInstance(CompilerInstance &Compiler) {
 #if LLVM_VERSION_MAJOR >= 22
@@ -129,8 +142,7 @@ private:
         OutputPath.c_str(),
         SourcePath.c_str()};
 
-    ArgStorage.insert(ArgStorage.end(), ExtraToolchainArgs.begin(),
-                      ExtraToolchainArgs.end());
+    appendCUDAToolchainArgs(ArgStorage, Request.TargetModel);
     ArgStorage.insert(ArgStorage.end(), Request.ExtraArgs.begin(),
                       Request.ExtraArgs.end());
 
@@ -200,6 +212,7 @@ private:
           "--offload-device-only",
           OffloadArch,
           SourceName};
+      appendCUDAToolchainArgs(ArgStorage, Request.TargetModel);
     }
 
     ArgStorage.insert(ArgStorage.end(), Request.ExtraArgs.begin(),
