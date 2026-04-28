@@ -7,7 +7,7 @@ CUDA runtime library directory into `libproteus` at CMake configure time.
 
 Instead, CUDA builds resolve the runtime toolkit from the process environment on
 first use in
-[`src/runtime/Frontend/CUDAToolchain.cpp`](../../src/runtime/Frontend/CUDAToolchain.cpp).
+`src/runtime/Frontend/CUDAToolchain.cpp`.
 
 This affects two CUDA compilation paths:
 
