@@ -227,15 +227,10 @@ ResolvedCUDAToolchain resolveCUDAToolchainImpl() {
 } // namespace
 
 const ResolvedCUDAToolchain &resolveCUDAToolchain() {
-  static std::mutex CacheMutex;
+  static std::once_flag CacheOnce;
   static std::optional<ResolvedCUDAToolchain> Cache;
 
-  if (Cache)
-    return *Cache;
-
-  std::lock_guard<std::mutex> Lock(CacheMutex);
-  if (!Cache)
-    Cache = resolveCUDAToolchainImpl();
+  std::call_once(CacheOnce, []() { Cache = resolveCUDAToolchainImpl(); });
   return *Cache;
 }
 
