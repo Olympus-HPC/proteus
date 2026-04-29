@@ -53,22 +53,11 @@ ResolvedToolPath resolveToolPath(
   return {resolveProgramPath(Program), "PATH"};
 }
 
-const ResolvedToolPath &
-resolveTool(std::mutex &CacheMutex, std::optional<ResolvedToolPath> &Cache,
-            llvm::StringRef Program,
+ResolvedToolPath
+resolveTool(llvm::StringRef Program,
             const std::optional<const std::string> &Override,
             llvm::StringRef OverrideVar, llvm::StringRef MissingContext,
             std::optional<llvm::StringRef> ToolchainHintDir = std::nullopt) {
-  // Fast path if it is already cached.
-  if (Cache)
-    return *Cache;
-
-  std::lock_guard<std::mutex> Lock(CacheMutex);
-
-  // Another thread may have populated the cache while we were waiting.
-  if (Cache)
-    return *Cache;
-
   ResolvedToolPath Tool = resolveToolPath(Program, Override, ToolchainHintDir);
 
   if (Tool.Path.empty()) {
@@ -83,8 +72,7 @@ resolveTool(std::mutex &CacheMutex, std::optional<ResolvedToolPath> &Cache,
   if (Override)
     Tool.Origin = OverrideVar.str() + "=" + Tool.Origin;
 
-  Cache = std::move(Tool);
-  return *Cache;
+  return Tool;
 }
 
 } // namespace
@@ -161,7 +149,7 @@ createCppJitCompiler(const CppJitCompileRequest &Request) {
 }
 
 const ResolvedToolPath &resolveClangxx() {
-  static std::mutex CacheMutex;
+  static std::once_flag CacheOnce;
   static std::optional<ResolvedToolPath> Cache;
 
 #ifdef PROTEUS_LLVM_TOOLS_BINDIR
@@ -170,20 +158,25 @@ const ResolvedToolPath &resolveClangxx() {
   constexpr std::optional<llvm::StringRef> ToolchainHintDir = std::nullopt;
 #endif
 
-  return resolveTool(CacheMutex, Cache, "clang++",
-                     Config::get().ProteusClangxxBin, "PROTEUS_CLANGXX_BIN",
-                     "Failed to resolve required host compiler clang++.",
-                     ToolchainHintDir);
+  std::call_once(CacheOnce, [ToolchainHintDir]() {
+    Cache = resolveTool(
+        "clang++", Config::get().ProteusClangxxBin, "PROTEUS_CLANGXX_BIN",
+        "Failed to resolve required host compiler clang++.", ToolchainHintDir);
+  });
+  return *Cache;
 }
 
 #if PROTEUS_ENABLE_CUDA
 const ResolvedToolPath &resolveNvcc() {
-  static std::mutex CacheMutex;
+  static std::once_flag CacheOnce;
   static std::optional<ResolvedToolPath> Cache;
-  return resolveTool(CacheMutex, Cache, "nvcc", Config::get().ProteusNvccBin,
-                     "PROTEUS_NVCC_BIN",
-                     "CUDA support is enabled in this build, but nvcc was not "
-                     "found.");
+  std::call_once(CacheOnce, []() {
+    Cache =
+        resolveTool("nvcc", Config::get().ProteusNvccBin, "PROTEUS_NVCC_BIN",
+                    "CUDA support is enabled in this build, but nvcc was "
+                    "not found.");
+  });
+  return *Cache;
 }
 #endif
 
