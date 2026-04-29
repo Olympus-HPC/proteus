@@ -21,6 +21,7 @@ nav:
       - Optimization Pipeline: dev/optimization-pipeline.md
     - Python Wheel Build: dev/python-wheel.md
     - Detecting CUDA Toolchain: dev/runtime-cuda-toolchain.md
+    - Detecting HIP Assets: dev/runtime-hip-toolchain.md
     - Creating a PR: dev/pr.md
     - API Reference: dev/api.md
 repo_url: https://github.com/Olympus-HPC/proteus

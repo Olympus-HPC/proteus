@@ -12,6 +12,7 @@ set(SOURCES
   Frontend/CppJitCompiler.cpp
   Frontend/CppJitCompilerClang.cpp
   Frontend/CUDAToolchain.cpp
+  Frontend/HIPToolchain.cpp
   Frontend/JitFuncAttribute.cpp
   Frontend/CppJitModule.cpp
   Frontend/LLVMIRJitModule.cpp
@@ -86,7 +87,7 @@ if(PROTEUS_ENABLE_HIP)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_HIP)
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_HIP)
   target_compile_definitions(
-    proteus PRIVATE PROTEUS_ROCM_BITCODE_DIR="${PROTEUS_ROCM_AMDGCN_BITCODE_DIR}")
+    proteus PRIVATE PROTEUS_HIP_VERSION="${hip_VERSION}")
 elseif(PROTEUS_ENABLE_CUDA)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_CUDA)
   target_compile_definitions(

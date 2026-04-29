@@ -7,6 +7,7 @@
 #include "proteus/Frontend/Dispatcher.h"
 #include "proteus/TimeTracing.h"
 #include "proteus/impl/Caching/ObjectCacheChain.h"
+#include "proteus/impl/Frontend/HIPToolchain.h"
 #include "proteus/impl/JitEngineDeviceHIP.h"
 
 #include <llvm/Bitcode/BitcodeReader.h>
@@ -32,30 +33,31 @@ public:
     // trigger a lifetime bug.
     auto CtxOwner = std::move(Ctx);
     auto ModOwner = std::move(Mod);
+    const auto &Toolchain = resolveHIPToolchain();
 
     auto LoadBitcode = [&](const llvm::SmallString<256> &Path) {
       auto BufferOrErr = llvm::MemoryBuffer::getFile(Path);
       if (!BufferOrErr || !BufferOrErr.get())
         reportFatalError("DispatchHIP: failed to read ROCm bitcode file: " +
-                         Path.str().str());
+                         Path.str().str() + " (" + Toolchain.Origin + ")");
       auto Parsed = llvm::parseBitcodeFile(
           BufferOrErr->get()->getMemBufferRef(), ModOwner->getContext());
       if (!Parsed)
         reportFatalError("DispatchHIP: failed to parse ROCm bitcode file: " +
-                         Path.str().str());
+                         Path.str().str() + " (" + Toolchain.Origin + ")");
       return std::move(Parsed.get());
     };
 
     auto AppendBitcodePath =
         [&](llvm::SmallVectorImpl<llvm::SmallString<256>> &Paths,
             llvm::StringRef Filename) {
-          llvm::SmallString<256> Path{PROTEUS_ROCM_BITCODE_DIR};
+          llvm::SmallString<256> Path{Toolchain.DeviceLibDir};
           llvm::sys::path::append(Path, Filename);
           Paths.push_back(std::move(Path));
         };
 
     auto Exists = [&](llvm::StringRef Filename) -> bool {
-      llvm::SmallString<256> Path{PROTEUS_ROCM_BITCODE_DIR};
+      llvm::SmallString<256> Path{Toolchain.DeviceLibDir};
       llvm::sys::path::append(Path, Filename);
       return llvm::sys::fs::exists(Path);
     };
@@ -85,8 +87,8 @@ public:
     } else {
       reportFatalError(
           std::string("DispatchHIP: missing oclc ABI bitcode under ") +
-          PROTEUS_ROCM_BITCODE_DIR +
-          " (expected oclc_abi_version_{600,500,400}.bc)");
+          Toolchain.DeviceLibDir + " (" + Toolchain.Origin +
+          "; expected oclc_abi_version_{600,500,400}.bc)");
     }
 
     // ISA: derived from device arch like "gfx90a" -> "90a".
@@ -98,8 +100,8 @@ public:
     const std::string IsaFile = ("oclc_isa_version_" + IsaSuffix + ".bc").str();
     if (!Exists(IsaFile))
       reportFatalError(std::string("DispatchHIP: missing ISA bitcode file ") +
-                       IsaFile + " under " + PROTEUS_ROCM_BITCODE_DIR +
-                       " (DeviceArch=" + DeviceArch + ")");
+                       IsaFile + " under " + Toolchain.DeviceLibDir + " (" +
+                       Toolchain.Origin + "; DeviceArch=" + DeviceArch + ")");
     AppendBitcodePath(LibsToLink, IsaFile);
 
     // Math/FP mode defaults (safe defaults, can be revisited later).
