@@ -1,254 +1,267 @@
-# Building the Python Wheel
+# Building the Python Wheels
 
-This page describes the first Python wheel workflow for Proteus.
-It is intentionally scoped to the current minimal wheel target:
+Proteus now builds Python wheels as a package family rather than a single
+monolithic wheel:
 
-- CPU-only
-- `libproteus` vendored into the wheel
-- LLVM/Clang runtime libraries vendored during wheel repair
-- LLVM 22 toolchains on both Linux and macOS
-- host C++ JIT enabled, but requiring a host `clang++` at runtime
-- no CUDA, HIP/ROCm, MLIR, or MPI in this wheel
+- `proteus-python`
+  - pure-Python shim package
+  - installs the host backend by default
+- `proteus-python-backend-host`
+  - native host backend wheel for Linux and macOS
+- `proteus-python-backend-cu12`
+  - native CUDA 12 superset backend wheel for Linux `x86_64`
 
-The wheel path is designed for binary distribution first.
-It does not try to replace the existing native CMake install flow for C++
-consumers.
+The user-facing import surface remains:
 
-The current wheel matrix targets CPython `3.10` through `3.14`.
-Free-threaded `cp314t` wheels are intentionally not built yet.
+```python
+import proteus
+```
 
-## Current Packaging Model
+At runtime, the shim discovers installed backend entry points and prefers the
+highest-priority backend:
 
-The Python package is built with `scikit-build-core` from `pyproject.toml`.
-The CMake build is driven with these wheel-oriented settings:
+1. `cuda12`
+2. `host`
 
-- `BUILD_SHARED=ON`
-- `PROTEUS_ENABLE_PYTHON=ON`
-- `PROTEUS_PYTHON_WHEEL=ON`
-- `PROTEUS_ENABLE_CUDA=OFF`
-- `PROTEUS_ENABLE_HIP=OFF`
-- `PROTEUS_ENABLE_MLIR=OFF`
-- `PROTEUS_ENABLE_MPI=OFF`
+## Packaging Model
 
-The resulting package layout is:
+The shim package is built from the repository root with `setuptools`.
 
-- `proteus/__init__.py`
-- `proteus/_proteus.*`
-- `proteus/libproteus.*`
-- repaired wheel payload for vendored LLVM/Clang libraries
+The backend packages are built from dedicated subprojects:
 
-The extension itself stays lightweight.
-Shared library vendoring is handled by the platform repair step:
+- `packaging/python/backend-host`
+- `packaging/python/backend-cu12`
 
-- `delocate` on macOS
-- `auditwheel` on Linux
+Those backend projects use `scikit-build-core` and the repository CMake build,
+but they install their native payload into backend-local packages instead of
+directly under `proteus/`:
+
+- `proteus_backend_host/`
+- `proteus_backend_cu12/`
+
+Each backend package contains:
+
+- backend-local `_proteus.*`
+- backend-local `libproteus.*`
+- repaired vendored LLVM/Clang shared libraries
+- backend registration metadata under the `proteus.backends` entry-point group
+
+The shim package exports:
+
+- `proteus.active_backend`
+- `proteus.available_backends()`
+- the selected backend's native API re-exported from `proteus`
 
 ## Build-Time Requirements
 
-Wheel builds still require an LLVM installation at build time.
-Proteus discovers it through `LLVM_INSTALL_DIR`.
+All backend wheel builds require:
 
-For wheel builds, this is a build-environment concern, not a user runtime
-requirement.
-The wheel is built against one pinned LLVM/Clang version per Proteus release.
-The current wheel CI pin is LLVM `22.1.3` on Linux and Homebrew LLVM 22 on
-macOS.
-On `macos-14`, Homebrew LLVM 22 and its vendored dependencies currently imply
-`MACOSX_DEPLOYMENT_TARGET=14.0` for repaired wheels.
-
-You currently need:
-
-- Python with `build` and `scikit-build-core`
+- Python with `build`
 - CMake
 - `pybind11`
-- a usable LLVM/Clang installation
-- platform repair tooling:
-  - `delocate` on macOS
-  - `auditwheel` on Linux
+- `scikit-build-core`
+- a usable LLVM/Clang installation discovered via `LLVM_INSTALL_DIR`
 
-## Local Wheel Build
+Platform-specific requirements:
 
-On macOS arm64, a typical local wheel build looks like this:
+- macOS host backend:
+  - Homebrew LLVM 22
+  - `delocate`
+- Linux host backend:
+  - the `manylinux_2_28` LLVM container
+  - `auditwheel`
+- Linux CUDA backend:
+  - the CUDA-capable `manylinux_2_28` LLVM container
+  - CUDA Toolkit 12 with `libnvptxcompiler_static.a`
+  - `auditwheel`
+
+## Local Builds
+
+### Shim Wheel
 
 ```bash
 python3 -m venv /tmp/proteus-wheel-venv
-/tmp/proteus-wheel-venv/bin/python -m pip install -U pip build scikit-build-core
+/tmp/proteus-wheel-venv/bin/python -m pip install -U pip build setuptools setuptools-scm
+/tmp/proteus-wheel-venv/bin/python -m build --wheel --outdir dist .
+```
 
-brew install llvm
+### Host Backend Wheel on macOS arm64
+
+```bash
+python3 -m venv /tmp/proteus-wheel-venv
+/tmp/proteus-wheel-venv/bin/python -m pip install -U pip build scikit-build-core pybind11 delocate
+
+brew install llvm@22
 
 MACOSX_DEPLOYMENT_TARGET=14.0 \
 LLVM_INSTALL_DIR=/opt/homebrew/opt/llvm \
-  /tmp/proteus-wheel-venv/bin/python -m build --wheel
+  /tmp/proteus-wheel-venv/bin/python -m build --wheel \
+  --outdir wheelhouse \
+  packaging/python/backend-host
 ```
 
-This produces a wheel in `dist/`.
-
-The raw wheel contains:
-
-- the `proteus` Python package
-- `_proteus` extension module
-- `libproteus`
-
-It does not yet contain vendored LLVM/Clang libraries until the repair step is
-run.
-
-## Repair Step
-
-The repair step rewrites loader paths and copies non-system shared libraries
-into the wheel.
-
-### macOS
+### Host Backend Wheel on Linux
 
 ```bash
-/tmp/proteus-wheel-venv/bin/python -m pip install delocate
-mkdir -p dist-repaired
-/tmp/proteus-wheel-venv/bin/delocate-wheel \
-  -w dist-repaired \
-  -v dist/<wheel-name>.whl
+bash packaging/python/image-scripts/build-manylinux-llvm-container.sh
+
+python -m pip install -U pip build cibuildwheel
+CIBW_MANYLINUX_X86_64_IMAGE=ghcr.io/olympus-hpc/proteus-manylinux-llvm:22.1.3 \
+  python -m cibuildwheel packaging/python/backend-host --output-dir wheelhouse
 ```
 
-After repair, the wheel includes vendored libraries under
-`proteus/.dylibs/`, such as:
-
-- `libLLVM.dylib`
-- `libclang-cpp.dylib`
-- any non-system secondary dependency such as `libzstd`
-
-### Linux
-
-The Linux wheel path is analogous, but uses `auditwheel`.
-In CI, the Linux toolchain now comes from a prebuilt custom container based on
-`manylinux_2_28` with LLVM `22.1.3` already installed at
-`/opt/llvm-22.1.3`.
-Proteus uses that prefix for LLVM package discovery and tool lookup, but the
-wheel build itself uses the container's native GCC host compiler so the final
-`libproteus.so` link matches the toolchain that built the static LLVM/Clang
-archives in the image.
+### CUDA 12 Backend Wheel on Linux
 
 ```bash
-bash packaging/wheels/build-llvm-manylinux.sh
+bash packaging/python/image-scripts/build-manylinux-cuda-llvm-container.sh
 
-LLVM_INSTALL_DIR=/opt/llvm-22.1.3 \
-  python -m build --wheel
+python -m pip install -U pip build cibuildwheel
+CIBW_MANYLINUX_X86_64_IMAGE=ghcr.io/olympus-hpc/proteus-manylinux-cuda-llvm:12.4.1-22.1.3 \
+  python -m cibuildwheel packaging/python/backend-cu12 --output-dir wheelhouse
 ```
 
-Repair is then handled with:
+## Linux Container Images
 
-```bash
-mkdir -p wheelhouse
-auditwheel repair -w wheelhouse dist/<wheel-name>.whl
-```
+The Linux wheel workflows use prebuilt GHCR images.
 
-The repaired wheel should contain the vendored ELF dependencies that
-`libproteus` and `_proteus` need at runtime.
+Host backend image inputs:
 
-## Building the Linux Container
+- `packaging/python/image-scripts/manylinux-llvm.Dockerfile`
+- `packaging/python/image-scripts/build-llvm-manylinux.sh`
+- `packaging/python/image-scripts/build-manylinux-llvm-container.sh`
 
-The Linux wheel workflow expects a container image published to GHCR with LLVM
-`22.1.3` preinstalled. The image build inputs are:
+CUDA backend image inputs:
 
-- `packaging/wheels/manylinux-llvm.Dockerfile`
-- `packaging/wheels/build-llvm-manylinux.sh`
-- `packaging/wheels/build-manylinux-llvm-container.sh`
+- `packaging/python/image-scripts/manylinux-cuda-llvm.Dockerfile`
+- `packaging/python/image-scripts/build-llvm-manylinux.sh`
+- `packaging/python/image-scripts/build-manylinux-cuda-llvm-container.sh`
 
-From a machine with Docker and enough CPU/RAM to build LLVM efficiently:
+The CUDA image installs:
 
-```bash
-docker login ghcr.io
-bash packaging/wheels/build-manylinux-llvm-container.sh
-```
-
-By default, this builds and pushes:
-
-- image: `ghcr.io/olympus-hpc/proteus-manylinux-llvm:22.1.3`
-
-Useful overrides:
-
-```bash
-PUSH=0 bash packaging/wheels/build-manylinux-llvm-container.sh
-IMAGE_TAG=test LLVM_VER=22.1.3 bash packaging/wheels/build-manylinux-llvm-container.sh
-```
+- LLVM `22.1.3`
+- CUDA Toolkit `12.4`
+- static `libnvptxcompiler_static.a`
 
 ## Installed-Wheel Verification
 
-Do not treat build-tree import checks as sufficient.
-The important validation step is to install the repaired wheel into a clean
-environment and test that install directly.
+Do not treat build-tree imports as sufficient. Install from built wheels into a
+clean environment.
 
-A minimal local validation flow is:
+### Default Host Install
 
 ```bash
-/tmp/proteus-wheel-venv/bin/python -m pip install --force-reinstall \
-  dist-repaired/<wheel-name>.whl
+/tmp/proteus-wheel-venv/bin/python -m pip install \
+  --no-index \
+  --find-links dist \
+  --find-links wheelhouse \
+  dist/proteus_python-*.whl
 
+export PROTEUS_CLANGXX_BIN=/path/to/clang++-22
+
+/tmp/proteus-wheel-venv/bin/python bindings/python/tests/test_backend_loader.py
 /tmp/proteus-wheel-venv/bin/python bindings/python/tests/test_host_cpp_smoke.py
 /tmp/proteus-wheel-venv/bin/python bindings/python/tests/test_host_cpp_validation.py
+/tmp/proteus-wheel-venv/bin/python bindings/python/tests/test_host_cpp_std_headers.py
 /tmp/proteus-wheel-venv/bin/python bindings/python/tests/test_invalid_clang_override.py
 /tmp/proteus-wheel-venv/bin/python bindings/python/tests/test_wheel_layout.py
 ```
 
-These tests cover:
+### CUDA Superset Install
 
-- import without `PYTHONPATH`
-- host C++ JIT functionality
-- explicit failure on bad `PROTEUS_CLANGXX_BIN`
-- vendored library presence in the installed wheel
+Install the shim first, then the CUDA backend wheel from the local wheelhouse:
+
+```bash
+/tmp/proteus-wheel-venv/bin/python -m pip install \
+  --no-index \
+  --find-links dist \
+  --find-links wheelhouse \
+  dist/proteus_python-*.whl
+
+/tmp/proteus-wheel-venv/bin/python -m pip install \
+  --no-index \
+  --find-links wheelhouse \
+  proteus-python-backend-cu12==<version>
+```
+
+On CPU-only machines, validate the host path:
+
+```bash
+export PROTEUS_CLANGXX_BIN=/path/to/clang++-22
+
+/tmp/proteus-wheel-venv/bin/python bindings/python/tests/test_backend_loader.py
+/tmp/proteus-wheel-venv/bin/python bindings/python/tests/test_host_cpp_smoke.py
+/tmp/proteus-wheel-venv/bin/python bindings/python/tests/test_host_cpp_validation.py
+/tmp/proteus-wheel-venv/bin/python bindings/python/tests/test_host_cpp_std_headers.py
+/tmp/proteus-wheel-venv/bin/python bindings/python/tests/test_invalid_clang_override.py
+/tmp/proteus-wheel-venv/bin/python bindings/python/tests/test_wheel_layout.py
+```
+
+On Linux systems with an NVIDIA GPU and driver, additionally validate:
+
+```bash
+export CUDA_HOME=/usr/local/cuda
+
+/tmp/proteus-wheel-venv/bin/python bindings/python/tests/test_gpu_cpp_smoke.py
+/tmp/proteus-wheel-venv/bin/python bindings/python/tests/test_gpu_cpp_launch_validation.py
+/tmp/proteus-wheel-venv/bin/python bindings/python/tests/test_gpu_cpp_pointer_validation.py
+```
 
 ## Runtime Contract
 
-This first wheel ships Proteus and the LLVM/Clang runtime libraries it links
-against, but it does not ship a host C++ compiler toolchain.
+### Host Backend
 
-For `frontend="cpp", target="host"`, Proteus resolves `clang++` at runtime in
-this order:
+- ships Proteus and the LLVM/Clang runtime libraries it links against
+- does not ship a host C++ compiler toolchain
+- still requires a host `clang++` whose major version matches the bundled
+  LLVM/Clang runtime for `frontend="cpp", target="host"`
+- for the current wheel line, use `clang++-22` or equivalent and set
+  `PROTEUS_CLANGXX_BIN` when it is not the default `clang++` on `PATH`
+- a mismatched `clang++` may fail while resolving builtin/system headers during
+  the in-process frontend compile
 
-1. `PROTEUS_CLANGXX_BIN`
-2. LLVM-adjacent `clang++` hint
-3. `PATH`
+| Install | Backend | Target | Required compiler/toolchain |
+| --- | --- | --- | --- |
+| `pip install proteus-python` | `proteus-python[host]` | Host CPU | LLVM/Clang 22.x |
+| `pip install proteus-python[cuda12]` | `proteus-python[cuda12]` | Host CPU + NVIDIA CUDA GPU | LLVM/Clang 22.x, or the NVIDIA toolchain when using NVCC for host/device compilation |
 
-That means wheel users still need a compatible host `clang++` installed when
-they use the host C++ JIT path.
+### CUDA 12 Backend
+
+- is a superset backend: host functionality remains available
+- does not vendor `libcuda.so`, `libcudart`, or the CUDA Toolkit
+- requires an installed NVIDIA driver for CUDA functionality
+- requires a matching CUDA 12 toolkit root for runtime compilation
+
+CUDA toolkit resolution remains:
+
+1. `PROTEUS_CUDA_HOME`
+2. `CUDA_HOME`
+3. `CUDA_PATH`
+
+For wheel-targeted CUDA builds on Linux, Proteus now resolves `libcuda.so.1`
+with `dlopen()` at runtime instead of linking the wheel directly against the
+CUDA driver shared library. This keeps the wheel compatible with manylinux
+repair and lets host-only functionality work on machines without an NVIDIA
+driver.
 
 ## CI Workflow
 
 The wheel workflow is defined in `.github/workflows/ci-wheels.yml`.
 
-It currently targets:
+It produces three artifact groups:
 
-- `macOS arm64`
-- `manylinux_2_28 x86_64`
-- CPython `3.10` through `3.14`
+- shim wheel
+- host backend wheels
+- CUDA backend wheels
 
-The workflow uses `cibuildwheel 3.4.1`.
-It explicitly skips free-threaded `cp313t`/`cp314t` builds until Proteus is
-validated for that runtime model.
+Current target matrix:
 
-The workflow:
+- shim: pure Python
+- host backend:
+  - `macOS arm64`
+  - `manylinux_2_28 x86_64`
+- CUDA backend:
+  - `manylinux_2_28 x86_64`
 
-1. checks out the repository
-2. provisions the pinned LLVM toolchain for the platform
-3. pulls the prebuilt Linux LLVM container image on `manylinux_2_28`
-4. builds wheels with `cibuildwheel`
-5. repairs wheels with `delocate` or `auditwheel`
-6. uploads the wheel artifacts
-
-On macOS, the workflow uses Homebrew `llvm` for LLVM 22.
-On Linux, the workflow uses the prebuilt `ghcr.io/olympus-hpc/proteus-manylinux-llvm:22.1.3`
-image, while the current wheel still keeps `PROTEUS_ENABLE_MLIR=OFF`.
-
-The `cibuildwheel` test command runs the installed-wheel Python tests rather
-than build-tree imports.
-
-## Scope Boundaries
-
-This wheel path is intentionally narrow.
-It does not yet attempt to solve:
-
-- CUDA wheel packaging
-- HIP/ROCm wheel packaging
-- MLIR-enabled wheels
-- MPI-enabled wheels
-- source-install UX for end users
-
-Those are follow-on packaging tracks and should be treated separately from the
-first CPU-only wheel.
+The workflow builds all backend wheels with `cibuildwheel`, then performs
+explicit installed-wheel validation using the newly built shim and backend
+wheels from the local artifact directories.

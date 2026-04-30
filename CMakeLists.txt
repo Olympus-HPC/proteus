@@ -26,6 +26,13 @@ option(PROTEUS_PYTHON_WHEEL "Build wheel-oriented Python package layout" OFF)
 
 set(PROTEUS_PYTHON_PACKAGE_DIR "proteus" CACHE STRING
   "Install-relative path for the Proteus Python package")
+set(PROTEUS_PYTHON_PACKAGE_SOURCE_DIR "python/proteus_backend" CACHE STRING
+  "Source-relative path to the Python package template used for native backend builds")
+
+if(NOT IS_ABSOLUTE "${PROTEUS_PYTHON_PACKAGE_SOURCE_DIR}")
+  set(PROTEUS_PYTHON_PACKAGE_SOURCE_DIR
+    "${PROJECT_SOURCE_DIR}/${PROTEUS_PYTHON_PACKAGE_SOURCE_DIR}")
+endif()
 
 # Wheel builds provide LLVM_INSTALL_DIR through the environment, so mirror it
 # into the CMake cache when the caller did not pass -DLLVM_INSTALL_DIR.

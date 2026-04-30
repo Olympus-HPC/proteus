@@ -30,6 +30,10 @@ set(SOURCES
 set(PROTEUS_PROJECT_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include")
 
 if(PROTEUS_ENABLE_CUDA)
+  if(PROTEUS_PYTHON_WHEEL AND UNIX AND NOT APPLE)
+    list(APPEND SOURCES CUDADriverAPI.cpp)
+  endif()
+
   list(APPEND SOURCES
     CompilerInterfaceDevice.cpp
     JitEngineDeviceCUDA.cpp
@@ -253,10 +257,14 @@ if(PROTEUS_ENABLE_CUDA)
   message(STATUS "Found libnvptxcompiler: ${LIBNVPTXCOMPILER}")
 
   target_include_directories(proteus SYSTEM PRIVATE ${CUDAToolkit_INCLUDE_DIRS})
-  # Link just with the CUDA driver, leave the CUDA runtime to be linked by the
-  # application static or shared. Proteus resolves its CUDA runtimes
-  # dependencies at runtime through proteus builtins.
-  target_link_libraries(proteus PUBLIC CUDA::cuda_driver)
+  if(PROTEUS_PYTHON_WHEEL AND UNIX AND NOT APPLE)
+    target_link_libraries(proteus PRIVATE ${CMAKE_DL_LIBS})
+  else()
+    # Link just with the CUDA driver, leave the CUDA runtime to be linked by
+    # the application static or shared. Proteus resolves its CUDA runtime
+    # dependencies at runtime through proteus builtins.
+    target_link_libraries(proteus PUBLIC CUDA::cuda_driver)
+  endif()
   target_link_libraries(proteus PRIVATE "${LIBNVPTXCOMPILER}")
   target_include_directories(proteusCore SYSTEM INTERFACE ${CUDAToolkit_INCLUDE_DIRS})
 

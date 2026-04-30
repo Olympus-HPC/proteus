@@ -57,18 +57,8 @@ In all cases, you link your application against the Proteus runtime library.
 Details are provided [later](#integrating-with-your-build-system).
 
 ## Installation
-Proteus can be installed from source or via [spack](https://github.com/spack/spack).
-
-### Python wheels
-The first Python wheel target is CPU-only and ships the Python bindings,
-`libproteus`, and the LLVM/Clang runtime libraries needed by Proteus itself.
-CUDA, HIP/ROCm, MLIR, and MPI are not included in this first wheel.
-
-The host LLVM IR frontend is available in the wheel as-is.
-The host C++ JIT frontend also remains available, but it still requires a
-compatible host `clang++` installation at runtime.
-Proteus resolves `clang++` from `PROTEUS_CLANGXX_BIN`, then from an
-LLVM-adjacent toolchain hint, then from `PATH`.
+Python API users can install `proteus-python` from wheels. C++ users should
+install Proteus from source or via [spack](https://github.com/spack/spack).
 
 ### Spack
 We provide a packaging recipe for Spack in the subdirectory `packaging/spack`.
@@ -126,6 +116,24 @@ source scripts/setup-<target>.sh
 These scripts load environment modules (specific to LLNL systems) and create a
 `build-<hostname>-<target>-<version>` directory with a
 working configuration.
+
+### Python wheels
+Proteus now publishes a thin `proteus-python` shim package plus backend wheels.
+The default install pulls in the host backend, while
+`proteus-python[cuda12]` additionally installs the Linux CUDA 12 superset
+backend.
+
+Both backend wheels ship `libproteus` and the LLVM/Clang runtime libraries
+needed by Proteus itself. The host LLVM IR frontend is available in the wheel
+as-is. The host C++ JIT frontend still requires a compatible host `clang++`
+installation at runtime. Proteus resolves `clang++` from
+`PROTEUS_CLANGXX_BIN`, then from an LLVM-adjacent toolchain hint, then from
+`PATH`.
+
+| Install | Backend | Target | Required compiler/toolchain |
+| --- | --- | --- | --- |
+| `pip install proteus-python` | `proteus-python[host]` | Host CPU | LLVM/Clang 22.x |
+| `pip install proteus-python[cuda12]` | `proteus-python[cuda12]` | Host CPU + NVIDIA CUDA GPU | LLVM/Clang 22.x, or the NVIDIA toolchain when using NVCC for host/device compilation |
 
 ## Integrating with your build system
 
