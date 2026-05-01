@@ -3,9 +3,13 @@ from pathlib import Path
 from subprocess import DEVNULL, CalledProcessError, check_output
 
 from . import _proteus
+from ._backend import active_backend as _active_backend
+from ._backend import available_backends as _available_backends
 from ._proteus import *  # noqa: F401,F403
 
 __doc__ = _proteus.__doc__
+active_backend = _active_backend()
+available_backends = _available_backends
 
 
 def _fallback_version():

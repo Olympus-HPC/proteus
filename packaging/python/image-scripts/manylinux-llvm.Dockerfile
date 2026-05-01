@@ -8,7 +8,7 @@ LABEL org.opencontainers.image.description="manylinux_2_28 build image with LLVM
 ENV LLVM_VER=${LLVM_VER}
 ENV PREFIX=/opt/llvm-${LLVM_VER}
 
-COPY packaging/wheels/build-llvm-manylinux.sh /tmp/build-llvm-manylinux.sh
+COPY packaging/python/image-scripts/build-llvm-manylinux.sh /tmp/build-llvm-manylinux.sh
 
 RUN bash /tmp/build-llvm-manylinux.sh \
  && rm -f /tmp/build-llvm-manylinux.sh \
