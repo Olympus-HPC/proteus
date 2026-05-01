@@ -35,6 +35,7 @@
 #include "proteus/impl/Hashing.h"
 #include "proteus/impl/Logger.h"
 #include "proteus/impl/RuntimeConstantTypeHelpers.h"
+#include "KernelArgVisitor.h"
 
 #include <cstddef>
 #include <llvm/ADT/DenseMap.h>
@@ -132,8 +133,19 @@ public:
         LambdaStorageTypeToJitIndices;
     DenseMap<Type *, GlobalVariable *> LambdaTypeToGlobalName;
     DenseSet<StructType *> RegisteredLambdaStorageClasses;
-
+    if (isDeviceCompilation(M)) {
+      llvm::errs() <<"DEVICE MODULE ===== \n";
+    }
+      llvm::errs() << M;
+    if (isDeviceCompilation(M)) {
+      llvm::errs() <<" END DEVICE MODULE ===== \n";
+      llvm::errs().flush();
+    }
     // clang-format off
+    // Look at device module.  Track a map of lambda CB --> kernel arg + offset
+    // assign a unique metadata node for each lambda CB
+    // in the device stub, use the identical metadata node to add a call registering in thhe
+    // map
     // new pipeline: LambdaAnalysis sees early LLVM IR emitted at StartEPCallback.
     // Our preprocessor macro PROTEUS_REGISTER_LAMBDA emits unique a LambdaFunctorWrapper
     // template instantiation for every macro invocation.  The goal of this analysis
@@ -241,6 +253,37 @@ private:
 #endif
 
     return V;
+  }
+
+  static bool analyzeLambdaUses(llvm::Module &M) {
+    llvm::SmallVector<std::pair<llvm::Function *, std::uint64_t>> FunctorOperatorMethods;
+    findAnnotatedFunctions(M, "proteus.wrapper_call", FunctorOperatorMethods);
+    DenseMap<CallBase*, std::pair<uint32_t, int64_t>> CallBaseToArgOffset;
+    SmallVector<CallBase*> CBToAnalyze;
+    for (auto [F, _] : FunctorOperatorMethods) {
+      for (User* U : F->users()) {
+        auto* CB = dyn_cast<CallBase>(U);
+        if (!CB)
+          continue;
+        CBToAnalyze.push_back(CB);
+      }
+    }
+    for (auto* FunctorCB : CBToAnalyze) {
+      LambdaArgVisitor Visitor (FunctorCB, M);
+      while (!Visitor.empty()) {
+        auto* Inst = dyn_cast<Instruction>(Visitor.back());
+        Visitor.popBack();
+        if (!Inst)
+          continue;
+        Visitor.visitInstruction(*Inst);
+        if (Visitor.success())
+          break;
+      }
+      if (!Visitor.success())
+        reportFatalError("ANALYSIS FAILED :(");
+      CallBaseToArgOffset[FunctorCB] = Visitor.getKernelArgAndOffset();
+    }
+    return false;
   }
 
   static void findAnnotatedFunctions(
