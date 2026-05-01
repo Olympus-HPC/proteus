@@ -7,6 +7,11 @@
 #include <mutex>
 #include <string>
 
+// Stringize after macro expansion so dlsym resolves the exact ABI-selected
+// driver symbol name that cuda.h exposes for each unsuffixed API.
+#define PROTEUS_CUDA_STRINGIZE_IMPL(Symbol) #Symbol
+#define PROTEUS_CUDA_STRINGIZE(Symbol) PROTEUS_CUDA_STRINGIZE_IMPL(Symbol)
+
 namespace {
 
 void *getCUDADriverHandle() {
@@ -44,97 +49,111 @@ extern "C" {
 
 CUresult CUDAAPI cuGetErrorString(CUresult Error, const char **PStr) {
   using Fn = decltype(&cuGetErrorString);
-  static Fn Func = resolveCUDADriverSymbol<Fn>("cuGetErrorString");
+  static Fn Func =
+      resolveCUDADriverSymbol<Fn>(PROTEUS_CUDA_STRINGIZE(cuGetErrorString));
   return Func(Error, PStr);
 }
 
 CUresult CUDAAPI cuInit(unsigned int Flags) {
   using Fn = decltype(&cuInit);
-  static Fn Func = resolveCUDADriverSymbol<Fn>("cuInit");
+  static Fn Func = resolveCUDADriverSymbol<Fn>(PROTEUS_CUDA_STRINGIZE(cuInit));
   return Func(Flags);
 }
 
 CUresult CUDAAPI cuCtxGetCurrent(CUcontext *Pctx) {
   using Fn = decltype(&cuCtxGetCurrent);
-  static Fn Func = resolveCUDADriverSymbol<Fn>("cuCtxGetCurrent");
+  static Fn Func =
+      resolveCUDADriverSymbol<Fn>(PROTEUS_CUDA_STRINGIZE(cuCtxGetCurrent));
   return Func(Pctx);
 }
 
 CUresult CUDAAPI cuCtxSetCurrent(CUcontext Ctx) {
   using Fn = decltype(&cuCtxSetCurrent);
-  static Fn Func = resolveCUDADriverSymbol<Fn>("cuCtxSetCurrent");
+  static Fn Func =
+      resolveCUDADriverSymbol<Fn>(PROTEUS_CUDA_STRINGIZE(cuCtxSetCurrent));
   return Func(Ctx);
 }
 
 CUresult CUDAAPI cuCtxGetDevice(CUdevice *Device) {
   using Fn = decltype(&cuCtxGetDevice);
-  static Fn Func = resolveCUDADriverSymbol<Fn>("cuCtxGetDevice");
+  static Fn Func =
+      resolveCUDADriverSymbol<Fn>(PROTEUS_CUDA_STRINGIZE(cuCtxGetDevice));
   return Func(Device);
 }
 
 CUresult CUDAAPI cuDeviceGet(CUdevice *Device, int Ordinal) {
   using Fn = decltype(&cuDeviceGet);
-  static Fn Func = resolveCUDADriverSymbol<Fn>("cuDeviceGet");
+  static Fn Func =
+      resolveCUDADriverSymbol<Fn>(PROTEUS_CUDA_STRINGIZE(cuDeviceGet));
   return Func(Device, Ordinal);
 }
 
 CUresult CUDAAPI cuDevicePrimaryCtxRetain(CUcontext *Pctx, CUdevice Dev) {
   using Fn = decltype(&cuDevicePrimaryCtxRetain);
-  static Fn Func = resolveCUDADriverSymbol<Fn>("cuDevicePrimaryCtxRetain");
+  static Fn Func = resolveCUDADriverSymbol<Fn>(
+      PROTEUS_CUDA_STRINGIZE(cuDevicePrimaryCtxRetain));
   return Func(Pctx, Dev);
 }
 
 CUresult CUDAAPI cuDeviceGetAttribute(int *Pi, CUdevice_attribute Attrib,
                                       CUdevice Dev) {
   using Fn = decltype(&cuDeviceGetAttribute);
-  static Fn Func = resolveCUDADriverSymbol<Fn>("cuDeviceGetAttribute");
+  static Fn Func =
+      resolveCUDADriverSymbol<Fn>(PROTEUS_CUDA_STRINGIZE(cuDeviceGetAttribute));
   return Func(Pi, Attrib, Dev);
 }
 
 CUresult CUDAAPI cuModuleLoadData(CUmodule *Module, const void *Image) {
   using Fn = decltype(&cuModuleLoadData);
-  static Fn Func = resolveCUDADriverSymbol<Fn>("cuModuleLoadData");
+  static Fn Func =
+      resolveCUDADriverSymbol<Fn>(PROTEUS_CUDA_STRINGIZE(cuModuleLoadData));
   return Func(Module, Image);
 }
 
 CUresult CUDAAPI cuModuleUnload(CUmodule Hmod) {
   using Fn = decltype(&cuModuleUnload);
-  static Fn Func = resolveCUDADriverSymbol<Fn>("cuModuleUnload");
+  static Fn Func =
+      resolveCUDADriverSymbol<Fn>(PROTEUS_CUDA_STRINGIZE(cuModuleUnload));
   return Func(Hmod);
 }
 
 CUresult CUDAAPI cuModuleGetFunction(CUfunction *Hfunc, CUmodule Hmod,
                                      const char *Name) {
   using Fn = decltype(&cuModuleGetFunction);
-  static Fn Func = resolveCUDADriverSymbol<Fn>("cuModuleGetFunction");
+  static Fn Func =
+      resolveCUDADriverSymbol<Fn>(PROTEUS_CUDA_STRINGIZE(cuModuleGetFunction));
   return Func(Hfunc, Hmod, Name);
 }
 
 CUresult CUDAAPI cuModuleGetGlobal(CUdeviceptr *Dptr, size_t *Bytes,
                                    CUmodule Hmod, const char *Name) {
   using Fn = decltype(&cuModuleGetGlobal);
-  static Fn Func = resolveCUDADriverSymbol<Fn>("cuModuleGetGlobal");
+  static Fn Func =
+      resolveCUDADriverSymbol<Fn>(PROTEUS_CUDA_STRINGIZE(cuModuleGetGlobal));
   return Func(Dptr, Bytes, Hmod, Name);
 }
 
 CUresult CUDAAPI cuMemcpyHtoD(CUdeviceptr DstDevice, const void *SrcHost,
                               size_t ByteCount) {
   using Fn = decltype(&cuMemcpyHtoD);
-  static Fn Func = resolveCUDADriverSymbol<Fn>("cuMemcpyHtoD");
+  static Fn Func =
+      resolveCUDADriverSymbol<Fn>(PROTEUS_CUDA_STRINGIZE(cuMemcpyHtoD));
   return Func(DstDevice, SrcHost, ByteCount);
 }
 
 CUresult CUDAAPI cuMemcpyDtoH(void *DstHost, CUdeviceptr SrcDevice,
                               size_t ByteCount) {
   using Fn = decltype(&cuMemcpyDtoH);
-  static Fn Func = resolveCUDADriverSymbol<Fn>("cuMemcpyDtoH");
+  static Fn Func =
+      resolveCUDADriverSymbol<Fn>(PROTEUS_CUDA_STRINGIZE(cuMemcpyDtoH));
   return Func(DstHost, SrcDevice, ByteCount);
 }
 
 CUresult CUDAAPI cuFuncSetAttribute(CUfunction Hfunc,
                                     CUfunction_attribute Attrib, int Value) {
   using Fn = decltype(&cuFuncSetAttribute);
-  static Fn Func = resolveCUDADriverSymbol<Fn>("cuFuncSetAttribute");
+  static Fn Func =
+      resolveCUDADriverSymbol<Fn>(PROTEUS_CUDA_STRINGIZE(cuFuncSetAttribute));
   return Func(Hfunc, Attrib, Value);
 }
 
@@ -145,7 +164,8 @@ CUresult CUDAAPI cuLaunchKernel(CUfunction F, unsigned int GridDimX,
                                 unsigned int SharedMemBytes, CUstream HStream,
                                 void **KernelParams, void **Extra) {
   using Fn = decltype(&cuLaunchKernel);
-  static Fn Func = resolveCUDADriverSymbol<Fn>("cuLaunchKernel");
+  static Fn Func =
+      resolveCUDADriverSymbol<Fn>(PROTEUS_CUDA_STRINGIZE(cuLaunchKernel));
   return Func(F, GridDimX, GridDimY, GridDimZ, BlockDimX, BlockDimY, BlockDimZ,
               SharedMemBytes, HStream, KernelParams, Extra);
 }
@@ -153,7 +173,8 @@ CUresult CUDAAPI cuLaunchKernel(CUfunction F, unsigned int GridDimX,
 CUresult CUDAAPI cuLinkCreate(unsigned int NumOptions, CUjit_option *Options,
                               void **OptionValues, CUlinkState *StateOut) {
   using Fn = decltype(&cuLinkCreate);
-  static Fn Func = resolveCUDADriverSymbol<Fn>("cuLinkCreate");
+  static Fn Func =
+      resolveCUDADriverSymbol<Fn>(PROTEUS_CUDA_STRINGIZE(cuLinkCreate));
   return Func(NumOptions, Options, OptionValues, StateOut);
 }
 
@@ -162,14 +183,16 @@ CUresult CUDAAPI cuLinkAddData(CUlinkState State, CUjitInputType Type,
                                unsigned int NumOptions, CUjit_option *Options,
                                void **OptionValues) {
   using Fn = decltype(&cuLinkAddData);
-  static Fn Func = resolveCUDADriverSymbol<Fn>("cuLinkAddData");
+  static Fn Func =
+      resolveCUDADriverSymbol<Fn>(PROTEUS_CUDA_STRINGIZE(cuLinkAddData));
   return Func(State, Type, Data, Size, Name, NumOptions, Options, OptionValues);
 }
 
 CUresult CUDAAPI cuLinkComplete(CUlinkState State, void **CubinOut,
                                 size_t *SizeOut) {
   using Fn = decltype(&cuLinkComplete);
-  static Fn Func = resolveCUDADriverSymbol<Fn>("cuLinkComplete");
+  static Fn Func =
+      resolveCUDADriverSymbol<Fn>(PROTEUS_CUDA_STRINGIZE(cuLinkComplete));
   return Func(State, CubinOut, SizeOut);
 }
 
