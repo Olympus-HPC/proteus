@@ -1,0 +1,66 @@
+name: reusable pages deploy
+
+on:
+  workflow_call:
+    inputs:
+      host-backend-package:
+        description: Host backend distribution name
+        required: true
+        type: string
+      cuda-backend-package:
+        description: CUDA backend distribution name
+        required: true
+        type: string
+      rocm-backend-package:
+        description: ROCm backend distribution name
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: "pages"
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run doxygen and mkdocs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y graphviz doxygen
+          pushd docs
+          doxygen
+          popd
+          pip install mkdocs-material
+          mkdocs build --strict
+
+      - name: Generate wheel index
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/generate_simple_wheel_index.py \
+            --output-dir site/wheels \
+            --project "${{ inputs.host-backend-package }}" \
+            --project "${{ inputs.cuda-backend-package }}" \
+            --project "${{ inputs.rocm-backend-package }}"
+
+      - name: Setup Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d8af841ac341d06640cbe393899ae55e59e77c00 # v4.0.1

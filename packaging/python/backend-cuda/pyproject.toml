@@ -7,9 +7,9 @@ requires = [
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "proteus-python-backend-cu12"
+name = "proteus-python-backend-cuda12-llvm22"
 dynamic = ["version"]
-description = "CUDA 12 backend wheel for Proteus Python"
+description = "CUDA backend wheel for Proteus Python"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0 WITH LLVM-exception"
@@ -31,11 +31,9 @@ classifiers = [
 ]
 
 [project.entry-points."proteus.backends"]
-cuda12 = "proteus_backend_cu12:get_backend"
+cuda = "proteus_backend_cuda:get_backend"
 
 [tool.scikit-build]
-# This backend manifest lives under packaging/python/backend-cu12/, so point
-# scikit-build back at the repository-root CMake project.
 cmake.version = ">=3.18"
 cmake.build-type = "Release"
 cmake.source-dir = "../../.."
@@ -52,12 +50,8 @@ PROTEUS_ENABLE_MLIR = "OFF"
 PROTEUS_ENABLE_MPI = "OFF"
 PROTEUS_ENABLE_PYTHON = "ON"
 PROTEUS_PYTHON_WHEEL = "ON"
-PROTEUS_PYTHON_PACKAGE_DIR = "proteus_backend_cu12"
-# The top-level CMakeLists.txt normalizes this against the repository root
-# before bindings/python/CMakeLists.txt copies the backend package template.
-PROTEUS_PYTHON_PACKAGE_SOURCE_DIR = "python/proteus_backend_cu12"
+PROTEUS_PYTHON_PACKAGE_DIR = "proteus_backend_cuda"
+PROTEUS_PYTHON_PACKAGE_SOURCE_DIR = "python/proteus_backend_cuda"
 
 [tool.setuptools_scm]
-# setuptools_scm also needs the repository root because this manifest is not
-# located alongside .git metadata.
 root = "../../.."

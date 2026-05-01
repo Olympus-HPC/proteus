@@ -7,9 +7,9 @@ requires = [
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "proteus-python-backend-host-llvm22"
+name = "proteus-python-backend-rocm72"
 dynamic = ["version"]
-description = "Host backend wheel for Proteus Python"
+description = "ROCm backend wheel for Proteus Python"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0 WITH LLVM-exception"
@@ -31,11 +31,9 @@ classifiers = [
 ]
 
 [project.entry-points."proteus.backends"]
-host = "proteus_backend_host:get_backend"
+rocm = "proteus_backend_rocm:get_backend"
 
 [tool.scikit-build]
-# This backend manifest lives under packaging/python/backend-host/, so point
-# scikit-build back at the repository-root CMake project.
 cmake.version = ">=3.18"
 cmake.build-type = "Release"
 cmake.source-dir = "../../.."
@@ -47,17 +45,13 @@ metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
 BUILD_SHARED = "ON"
 ENABLE_TESTS = "OFF"
 PROTEUS_ENABLE_CUDA = "OFF"
-PROTEUS_ENABLE_HIP = "OFF"
+PROTEUS_ENABLE_HIP = "ON"
 PROTEUS_ENABLE_MLIR = "OFF"
 PROTEUS_ENABLE_MPI = "OFF"
 PROTEUS_ENABLE_PYTHON = "ON"
 PROTEUS_PYTHON_WHEEL = "ON"
-PROTEUS_PYTHON_PACKAGE_DIR = "proteus_backend_host"
-# The top-level CMakeLists.txt normalizes this against the repository root
-# before bindings/python/CMakeLists.txt copies the backend package template.
-PROTEUS_PYTHON_PACKAGE_SOURCE_DIR = "python/proteus_backend_host"
+PROTEUS_PYTHON_PACKAGE_DIR = "proteus_backend_rocm"
+PROTEUS_PYTHON_PACKAGE_SOURCE_DIR = "python/proteus_backend_rocm"
 
 [tool.setuptools_scm]
-# setuptools_scm also needs the repository root because this manifest is not
-# located alongside .git metadata.
 root = "../../.."

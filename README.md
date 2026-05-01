@@ -119,21 +119,41 @@ working configuration.
 
 ### Python wheels
 Proteus now publishes a thin `proteus-python` shim package plus backend wheels.
-The default install pulls in the host backend, while
-`proteus-python[cuda12]` additionally installs the Linux CUDA 12 superset
-backend.
+The default install is shim-only from PyPI. Install an explicit backend from
+the Olympus-HPC wheel index.
 
-Both backend wheels ship `libproteus` and the LLVM/Clang runtime libraries
-needed by Proteus itself. The host LLVM IR frontend is available in the wheel
-as-is. The host C++ JIT frontend still requires a compatible host `clang++`
-installation at runtime. Proteus resolves `clang++` from
-`PROTEUS_CLANGXX_BIN`, then from an LLVM-adjacent toolchain hint, then from
-`PATH`.
+The shim package provides the Python import surface and backend discovery. The
+native payload lives in backend-specific wheels published outside PyPI.
 
 | Install | Backend | Target | Required compiler/toolchain |
 | --- | --- | --- | --- |
-| `pip install proteus-python` | `proteus-python[host]` | Host CPU | LLVM/Clang 22.x |
-| `pip install proteus-python[cuda12]` | `proteus-python[cuda12]` | Host CPU + NVIDIA CUDA GPU | LLVM/Clang 22.x, or the NVIDIA toolchain when using NVCC for host/device compilation |
+| `pip install proteus-python` | shim only | Python API only | none |
+| `pip install --index-url https://olympus-hpc.github.io/proteus/wheels/simple/ proteus-python-backend-host-llvm22` | `proteus-python-backend-host-llvm22` | Host CPU | LLVM/Clang 22.x |
+| `pip install --index-url https://olympus-hpc.github.io/proteus/wheels/simple/ proteus-python-backend-cuda12-llvm22` | `proteus-python-backend-cuda12-llvm22` | Host CPU + NVIDIA CUDA GPU | CUDA 12.x plus LLVM/Clang 22.x |
+| `pip install --index-url https://olympus-hpc.github.io/proteus/wheels/simple/ proteus-python-backend-rocm72` | `proteus-python-backend-rocm72` | Host CPU + AMD ROCm GPU | ROCm 7.2.x |
+
+Typical stable installs:
+
+```bash
+python -m pip install proteus-python
+python -m pip install --index-url https://olympus-hpc.github.io/proteus/wheels/simple/ \
+  proteus-python-backend-host-llvm22
+```
+
+```bash
+python -m pip install proteus-python
+python -m pip install --index-url https://olympus-hpc.github.io/proteus/wheels/simple/ \
+  proteus-python-backend-cuda12-llvm22
+```
+
+```bash
+python -m pip install proteus-python
+python -m pip install --index-url https://olympus-hpc.github.io/proteus/wheels/simple/ \
+  proteus-python-backend-rocm72
+```
+
+See [docs/dev/python-wheel.md](docs/dev/python-wheel.md) for packaging and
+release details.
 
 ## Integrating with your build system
 

@@ -21,11 +21,6 @@ setup(
     package_dir={"": "python"},
     packages=find_packages(where="python", include=["proteus"]),
     include_package_data=True,
-    install_requires=[f"proteus-python-backend-host=={VERSION}"],
-    extras_require={
-        "host": [],
-        "cuda12": [f"proteus-python-backend-cu12=={VERSION}"],
-    },
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
