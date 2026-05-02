@@ -409,6 +409,7 @@ public:
                         void** KernelArgs,
                         uint64_t FunctorID,
                         ArrayRef<JitVariantMap> Variants) {
+    llvm::errs() << M;
     Function *FunctorOperatorFunction = findFunctorFunctorOperatorFunctionOperatorFromID(M, FunctorID);
     Function *LambdaOperatorMethod = findLambdaOperatorForFunctor(M, FunctorID);
     DenseMap<CallBase*, std::pair<uint32_t, int64_t>> CallBaseToArgOffset;
@@ -421,28 +422,27 @@ public:
       llvm::outs() << "ERROR: analysis failed\n";
       exit(1);
     }
+    int VariantIndex = 0;
     for (auto [CB, Pair] : CallBaseToArgOffset) {
+      ++VariantIndex;
       auto& [KernelArgIndex, Offset] = Pair;
+      llvm::outs() << "CALLBASE " << *CB << " GETS " <<KernelArgIndex << " " << Offset <<"\n";
       JitVariantMap CBRuntimeConstants;
       for (auto [slot, RC] : Variants[0]) {
         CBRuntimeConstants[slot] = readRuntimeConstantFromKernelArgs(KernelArgs,
           KernelArgIndex, Offset, RC.Type, RC.Pos, RC.Offset);
-        llvm::outs() << "Reading rc value = " << CBRuntimeConstants[slot].Value.Int32Val <<  "\n";
-        llvm::outs() << "Reading rc slot = " << CBRuntimeConstants[slot].Pos <<  "\n";
-        llvm::outs() << "Reading rc offset = " << CBRuntimeConstants[slot].Offset <<  "\n";
       }
       if (!LambdaOperatorMethod) {
         // On host (and sometimes device) the lambda call operator may be fully
         // inlined into the functor FunctorOperatorFunction call operator, leaving no separate
         // `lambda::operator()` function to tag.
-        if (Variants.size() == 1)
-          specializeCallOperator(M, *FunctorOperatorFunction, CBRuntimeConstants);
-        return;
-      }
-
-      if (Variants.size() == 1) {
-        specializeCallOperator(M, *LambdaOperatorMethod, CBRuntimeConstants);
-        return;
+        auto* Clone = cloneForVariant(*FunctorOperatorFunction, FunctorID, VariantIndex);
+        specializeCallOperator(M, *Clone, CBRuntimeConstants);
+        CB->setCalledFunction(Clone);
+      } else {
+        auto* Clone = cloneForVariant(*LambdaOperatorMethod, FunctorID, VariantIndex);
+        specializeCallOperator(M, *Clone, CBRuntimeConstants);
+        CB->setCalledFunction(Clone);
       }
     }
   }
