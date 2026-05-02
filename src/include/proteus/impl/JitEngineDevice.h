@@ -632,7 +632,7 @@ JitEngineDevice<ImplT>::compileAndRun(
                                           << HashValue.toString() << "\n");
 
       AsyncCompiler->compile(CompilationTask{
-          KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
+          KernelBitcode, HashValue, KernelArgs, KernelInfo.getName(), Suffix, BlockDim,
           GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(),
           BinInfo.getVarNameToGlobalInfo(), GlobalLinkedBinaries, DeviceArch,
           /*CodeGenConfig */ CGConfig,
@@ -652,7 +652,7 @@ JitEngineDevice<ImplT>::compileAndRun(
   } else {
     // Process through synchronous compilation.
     ObjBuf = CompilerSync::instance().compile(CompilationTask{
-        KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
+        KernelBitcode, HashValue, KernelArgs, KernelInfo.getName(), Suffix, BlockDim,
         GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(),
         BinInfo.getVarNameToGlobalInfo(), GlobalLinkedBinaries, DeviceArch,
         /*CodeGenConfig */ CGConfig,

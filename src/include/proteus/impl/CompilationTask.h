@@ -20,6 +20,7 @@ class CompilationTask {
 private:
   MemoryBufferRef Bitcode;
   HashT HashValue;
+  void **KernelArgs;
   std::string KernelName;
   std::string Suffix;
   dim3 BlockDim;
@@ -68,7 +69,7 @@ private:
 
 public:
   CompilationTask(
-      MemoryBufferRef Bitcode, HashT HashValue, const std::string &KernelName,
+      MemoryBufferRef Bitcode, HashT HashValue, void** KernelArgs, const std::string &KernelName,
       std::string &Suffix, dim3 BlockDim, dim3 GridDim,
       const SmallVector<RuntimeConstant> &RCVec,
       const SmallVector<uint64_t>  &LambdaCalleeInfo,
@@ -76,7 +77,7 @@ public:
       const SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
       const std::string &DeviceArch, const CodeGenerationConfig &CGConfig,
       bool DumpIR, bool RelinkGlobalsByCopy)
-      : Bitcode(Bitcode), HashValue(HashValue), KernelName(KernelName),
+      : Bitcode(Bitcode), HashValue(HashValue), KernelArgs(KernelArgs), KernelName(KernelName),
         Suffix(Suffix), BlockDim(BlockDim), GridDim(GridDim), RCVec(RCVec),
         LambdaCalleeInfo(LambdaCalleeInfo),
         VarNameToGlobalInfo(VarNameToGlobalInfo),
@@ -142,7 +143,7 @@ public:
 
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".input.ll", *M));
 
-    proteus::specializeIR(*M, KernelName, Suffix, BlockDim, GridDim, RCVec,
+    proteus::specializeIR(*M, KernelArgs, KernelName, Suffix, BlockDim, GridDim, RCVec,
                           LambdaCalleeInfo, SpecializeArgs, SpecializeDims,
                           SpecializeDimsRange, SpecializeLaunchBounds,
                           MinBlocksPerSM);

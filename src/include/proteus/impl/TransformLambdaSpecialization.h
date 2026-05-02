@@ -12,9 +12,11 @@
 #define PROTEUS_TRANSFORM_LAMBDA_SPECIALIZATION_H
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Error.h"
 #include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/Debug.h"
 #include "proteus/impl/Utils.h"
+#include "proteus/impl/KernelArgVisitor.h"
 
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/Demangle/Demangle.h>
@@ -347,10 +349,105 @@ private:
     }
   }
 
+  static inline RuntimeConstant readRuntimeConstantFromKernelArgs(
+      void *const *KernelArgs,
+      uint32_t KernelArgIndex,
+      int64_t LambdaStorageBasePointerOffset,
+      RuntimeConstantType Type,
+      int32_t Pos,
+      int32_t RCOffset) {
+
+    if (!KernelArgs)
+      reportFatalError("KernelArgs is null");
+    if (LambdaStorageBasePointerOffset < 0)
+      reportFatalError("Negative KernelByteOffset");
+
+    auto *base =
+        static_cast<const unsigned char *>(KernelArgs[KernelArgIndex]);
+    if (!base)
+      reportFatalError("KernelArgs[KernelArgIndex] is null");
+
+    const unsigned char *ptr = base + static_cast<size_t>(LambdaStorageBasePointerOffset) + static_cast<size_t>(RCOffset);
+
+    RuntimeConstant RC{Type, Pos, RCOffset};
+
+    switch (Type) {
+    case RuntimeConstantType::BOOL:
+      std::memcpy(&RC.Value.BoolVal, ptr, sizeof(RC.Value.BoolVal));
+      break;
+    case RuntimeConstantType::INT8:
+      std::memcpy(&RC.Value.Int8Val, ptr, sizeof(RC.Value.Int8Val));
+      break;
+    case RuntimeConstantType::INT32:
+      std::memcpy(&RC.Value.Int32Val, ptr, sizeof(RC.Value.Int32Val));
+      break;
+    case RuntimeConstantType::INT64:
+      std::memcpy(&RC.Value.Int64Val, ptr, sizeof(RC.Value.Int64Val));
+      break;
+    case RuntimeConstantType::FLOAT:
+      std::memcpy(&RC.Value.FloatVal, ptr, sizeof(RC.Value.FloatVal));
+      break;
+    case RuntimeConstantType::DOUBLE:
+      std::memcpy(&RC.Value.DoubleVal, ptr, sizeof(RC.Value.DoubleVal));
+      break;
+    case RuntimeConstantType::LONG_DOUBLE:
+      std::memcpy(&RC.Value.LongDoubleVal, ptr, sizeof(RC.Value.LongDoubleVal));
+      break;
+    case RuntimeConstantType::PTR:
+      std::memcpy(&RC.Value.PtrVal, ptr, sizeof(RC.Value.PtrVal));
+      break;
+    default:
+      reportFatalError("Unsupported RuntimeConstantType in kernel-arg reader");
+    }
+
+    return RC;
+  }
+
+
 public:
   static void transform(Module &M,
+                        void** KernelArgs,
                         uint64_t FunctorID,
                         ArrayRef<JitVariantMap> Variants) {
+    Function *FunctorOperatorFunction = findFunctorFunctorOperatorFunctionOperatorFromID(M, FunctorID);
+    Function *LambdaOperatorMethod = findLambdaOperatorForFunctor(M, FunctorID);
+    DenseMap<CallBase*, std::pair<uint32_t, int64_t>> CallBaseToArgOffset;
+    SmallVector<CallBase*> CBToAnalyze;
+    for (auto* U : FunctorOperatorFunction->users()) {
+      if (auto* CB = dyn_cast<CallBase>(U))
+        CBToAnalyze.push_back(CB);
+    }
+    if (!analyzeLambdaUses(M, CallBaseToArgOffset, CBToAnalyze)) {
+      llvm::outs() << "ERROR: analysis failed\n";
+      exit(1);
+    }
+    for (auto [CB, Pair] : CallBaseToArgOffset) {
+      auto& [KernelArgIndex, Offset] = Pair;
+      JitVariantMap CBRuntimeConstants;
+      for (auto [slot, RC] : Variants[0]) {
+        CBRuntimeConstants[slot] = readRuntimeConstantFromKernelArgs(KernelArgs,
+          KernelArgIndex, Offset, RC.Type, RC.Pos, RC.Offset);
+        llvm::outs() << "Reading rc value = " << CBRuntimeConstants[slot].Value.Int32Val <<  "\n";
+        llvm::outs() << "Reading rc slot = " << CBRuntimeConstants[slot].Pos <<  "\n";
+        llvm::outs() << "Reading rc offset = " << CBRuntimeConstants[slot].Offset <<  "\n";
+      }
+      if (!LambdaOperatorMethod) {
+        // On host (and sometimes device) the lambda call operator may be fully
+        // inlined into the functor FunctorOperatorFunction call operator, leaving no separate
+        // `lambda::operator()` function to tag.
+        if (Variants.size() == 1)
+          specializeCallOperator(M, *FunctorOperatorFunction, CBRuntimeConstants);
+        return;
+      }
+
+      if (Variants.size() == 1) {
+        specializeCallOperator(M, *LambdaOperatorMethod, CBRuntimeConstants);
+        return;
+      }
+    }
+  }
+
+  static void transformConservative(Module &M, uint64_t FunctorID, ArrayRef<JitVariantMap> Variants) {
     if (Variants.empty())
       return;
     Function *FunctorOperatorFunction = findFunctorFunctorOperatorFunctionOperatorFromID(M, FunctorID);
