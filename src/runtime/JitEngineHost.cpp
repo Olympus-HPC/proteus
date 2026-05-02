@@ -162,7 +162,7 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
     auto VariantsOpt = LambdaRegistry::instance().getJitVariants(ID);
     if (!VariantsOpt)
       continue;
-    TransformLambdaSpecialization::transform(M, ID, VariantsOpt.value());
+    TransformLambdaSpecialization::transform(M, nullptr, ID, VariantsOpt.value());
   }
 
   F->setName(FnName + Suffix);
