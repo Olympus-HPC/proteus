@@ -284,7 +284,7 @@ inline void relinkGlobalsObject(
 }
 
 inline void specializeIR(
-    Module &M, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
+    Module &M, void** KernelArgs, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
     dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
     const SmallVector<uint64_t> LambdaCalleeInfo,
     bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsRange,
@@ -307,7 +307,7 @@ inline void specializeIR(
       // llvm::outs() << "    skipping " << Lam->getName() << "\n";
       continue;
     }
-    TransformLambdaSpecialization::transform(M, ID, VariantsOpt.value());
+    TransformLambdaSpecialization::transform(M, KernelArgs, ID, VariantsOpt.value());
   }
 
   // Run the shared array transform after any value specialization (arguments,
