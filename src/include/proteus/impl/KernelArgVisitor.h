@@ -86,13 +86,95 @@ LambdaArgVisitor(CallBase* LambdaCB_, Module& M, SmallVector<Value*> WorkList_, 
       Seen(std::move(Seen_)), Offset(0) {
   WorkList.push_back(LambdaCB_->getArgOperand(0));
 }
-LambdaArgVisitor(CallBase* LambdaCB_, Module& M)
-    : LambdaCB(LambdaCB_), DL(M.getDataLayout()), Offset(0) {
-  WorkList.push_back(LambdaCB_->getArgOperand(0));
-}
-void visitStoreInst (StoreInst &SI) { WorkList.push_back(SI.getPointerOperand()); }
-void visitBitCastInst (BitCastInst &BC) { WorkList.push_back(BC.getOperand(0)); }
-void visitAddrSpaceCastInst (AddrSpaceCastInst &ASC) { WorkList.push_back(ASC.getPointerOperand() ); }
+	LambdaArgVisitor(CallBase* LambdaCB_, Module& M)
+	    : LambdaCB(LambdaCB_), DL(M.getDataLayout()), Offset(0) {
+	  WorkList.push_back(LambdaCB_->getArgOperand(0));
+	}
+	void visitStoreInst (StoreInst &SI) { WorkList.push_back(SI.getPointerOperand()); }
+	void visitLoadInst (LoadInst &LI) {
+	  if (!LI.getType()->isPointerTy()) {
+	    AnalysisFailed = true;
+	    return;
+	  }
+
+	  int64_t LoadOff = 0;
+	  Value *LoadBase =
+	      GetPointerBaseWithConstantOffset(LI.getPointerOperand(), LoadOff, DL);
+	  if (!LoadBase) {
+	    AnalysisFailed = true;
+	    return;
+	  }
+	  LoadBase = LoadBase->stripPointerCasts();
+
+	  SmallVector<Value *, 8> PtrWorkList;
+	  SmallPtrSet<Value *, 16> LocalSeen;
+	  PtrWorkList.push_back(LoadBase);
+
+	  Value *CommonStoredVal = nullptr;
+	  bool FoundStore = false;
+
+	  while (!PtrWorkList.empty()) {
+	    Value *Cur = PtrWorkList.pop_back_val();
+	    if (!LocalSeen.insert(Cur).second)
+	      continue;
+
+	    for (User *U : Cur->users()) {
+	      if (auto *SI = dyn_cast<StoreInst>(U)) {
+	        int64_t StoreOff = 0;
+	        Value *StoreBase = GetPointerBaseWithConstantOffset(
+	            SI->getPointerOperand(), StoreOff, DL);
+	        if (!StoreBase)
+	          continue;
+	        StoreBase = StoreBase->stripPointerCasts();
+
+	        if (StoreBase != LoadBase || StoreOff != LoadOff)
+	          continue;
+
+	        Value *V = SI->getValueOperand();
+	        if (!V->getType()->isPointerTy())
+	          continue;
+
+	        V = V->stripPointerCasts();
+	        if (!FoundStore) {
+	          CommonStoredVal = V;
+	          FoundStore = true;
+	        } else if (CommonStoredVal != V) {
+	          AnalysisFailed = true;
+	          return;
+	        }
+	        continue;
+	      }
+
+	      if (isa<GetElementPtrInst>(U) || isa<BitCastInst>(U) ||
+	          isa<AddrSpaceCastInst>(U) || isa<PHINode>(U) ||
+	          isa<SelectInst>(U)) {
+	        PtrWorkList.push_back(cast<Value>(U));
+	        continue;
+	      }
+
+	      if (auto *II = dyn_cast<IntrinsicInst>(U)) {
+	        switch (II->getIntrinsicID()) {
+	        case Intrinsic::dbg_declare:
+	        case Intrinsic::dbg_value:
+	        case Intrinsic::lifetime_start:
+	        case Intrinsic::lifetime_end:
+	          continue;
+	        default:
+	          break;
+	        }
+	      }
+	    }
+	  }
+
+	  if (!FoundStore) {
+	    AnalysisFailed = true;
+	    return;
+	  }
+
+	  WorkList.push_back(CommonStoredVal);
+	}
+	void visitBitCastInst (BitCastInst &BC) { WorkList.push_back(BC.getOperand(0)); }
+	void visitAddrSpaceCastInst (AddrSpaceCastInst &ASC) { WorkList.push_back(ASC.getPointerOperand() ); }
 
 auto back() { return WorkList.back(); }
 void popBack() { WorkList.pop_back(); }
@@ -104,45 +186,72 @@ bool failed() { return AnalysisFailed; }
 auto getKernelArgAndOffset() { return std::make_pair(KernelArg, Offset); }
 
 void visitGetElementPtrInst (GetElementPtrInst &GEP) {
-  APInt GEPOffset;
-  if (!GEP.accumulateConstantOffset(DL, GEPOffset)) {
-    AnalysisFailed = true;
-    return;
-  }
-  if (!GEPOffset.isSignedIntN(64)) {
-    AnalysisFailed = true;
-    return;
-  }
-  int64_t GepOff = GEPOffset.getSExtValue(); // bytes
-  int64_t NewOff = 0;
-  if (__builtin_add_overflow(Offset, GepOff, &NewOff)) {
-    AnalysisFailed = true;
-    return;
-  }
-  Offset = NewOff;
+  int64_t GEPOffset = 0;
+  GetPointerBaseWithConstantOffset(&GEP, GEPOffset, DL);
+  Offset+=GEPOffset;
+  llvm::outs()<<"COMPUTED OFFSET " << GEPOffset << "\n";
   WorkList.push_back(GEP.getPointerOperand());
 }
 
-void visitAllocaInst (AllocaInst &Alloca) {
-  SmallVector<Value *, 8> PtrWorkList;
-  SmallPtrSet<Value *, 16> LocalSeen;
-  PtrWorkList.push_back(&Alloca);
+	void visitAllocaInst (AllocaInst &Alloca) {
+	  SmallVector<Value *, 8> PtrWorkList;
+	  SmallPtrSet<Value *, 16> LocalSeen;
+	  PtrWorkList.push_back(&Alloca);
 
-  bool FoundWriter = false;
-  while (!PtrWorkList.empty()) {
-    Value *Cur = PtrWorkList.pop_back_val();
-    if (!LocalSeen.insert(Cur).second)
-      continue;
+	  bool FoundWriter = false;
+	  Value *ChosenSrcBase = nullptr;
+	  int64_t ChosenNewOffset = 0;
+	  while (!PtrWorkList.empty()) {
+	    Value *Cur = PtrWorkList.pop_back_val();
+	    if (!LocalSeen.insert(Cur).second)
+	      continue;
 
-    for (User *U : Cur->users()) {
-      if (auto *MI = dyn_cast<MemIntrinsic>(U)) {
-        WorkList.push_back(MI);
-        FoundWriter = true;
-        continue;
-      }
+	    for (User *U : Cur->users()) {
+	      if (auto *MT = dyn_cast<MemTransferInst>(U)) {
+	        int64_t DstOff = 0, SrcOff = 0;
+	        Value *DstBase =
+	            GetPointerBaseWithConstantOffset(MT->getRawDest(), DstOff, DL);
+	        Value *SrcBase =
+	            GetPointerBaseWithConstantOffset(MT->getRawSource(), SrcOff, DL);
+	        if (!DstBase || !SrcBase) {
+	          AnalysisFailed = true;
+	          return;
+	        }
 
-      // Follow derived pointers to reach the memcpy/memmove destination.
-      if (isa<GetElementPtrInst>(U) || isa<BitCastInst>(U) ||
+	        DstBase = DstBase->stripPointerCasts();
+	        SrcBase = SrcBase->stripPointerCasts();
+
+	        if (DstBase != &Alloca)
+	          continue; // not copying into this alloca
+
+	        if (auto *LenC = dyn_cast<ConstantInt>(MT->getLength())) {
+	          uint64_t Len = LenC->getZExtValue();
+	          int64_t Rel = Offset - DstOff;
+	          if (Rel < 0 || uint64_t(Rel) >= Len)
+	            continue; // copy doesn't cover our tracked byte
+	        }
+
+	        int64_t NewOffset = 0;
+	        if (__builtin_add_overflow(Offset, -DstOff, &NewOffset) ||
+	            __builtin_add_overflow(NewOffset, SrcOff, &NewOffset)) {
+	          AnalysisFailed = true;
+	          return;
+	        }
+
+	        if (!FoundWriter) {
+	          FoundWriter = true;
+	          ChosenSrcBase = SrcBase;
+	          ChosenNewOffset = NewOffset;
+	        } else if (ChosenSrcBase != SrcBase || ChosenNewOffset != NewOffset) {
+	          AnalysisFailed = true; // ambiguous writers
+	          return;
+	        }
+
+	        continue;
+	      }
+
+	      // Follow derived pointers to reach the memcpy/memmove destination.
+	      if (isa<GetElementPtrInst>(U) || isa<BitCastInst>(U) ||
           isa<AddrSpaceCastInst>(U) || isa<PHINode>(U) ||
           isa<SelectInst>(U)) {
         PtrWorkList.push_back(cast<Value>(U));
@@ -163,11 +272,14 @@ void visitAllocaInst (AllocaInst &Alloca) {
     }
   }
 
-  if (!FoundWriter) {
-    AnalysisFailed = true;
-    return;
-  }
-}
+	  if (!FoundWriter) {
+	    AnalysisFailed = true;
+	    return;
+	  }
+
+	  Offset = ChosenNewOffset;
+	  WorkList.push_back(ChosenSrcBase);
+	}
 
 void visitMemIntrinsic(MemIntrinsic &I) {
   auto *MT = dyn_cast<MemTransferInst>(&I); // memcpy/memmove
@@ -204,9 +316,11 @@ void visitIntrinsicInst (IntrinsicInst &II) {
 }
 
 void visitArgument(Argument &A) {
+  llvm::outs() << "VISITING ARG " << A;
   Function* F = A.getParent();
+  llvm::outs() << "PARENT = " << *F;
   auto ArgNum = A.getArgNo();
-  if (F->hasFnAttribute("amdgpu_kernel")) {
+  if (F->getCallingConv() == CallingConv::AMDGPU_KERNEL) {
     AnalysisSuccess = true;
     KernelArg = ArgNum;
     return;
@@ -216,6 +330,9 @@ void visitArgument(Argument &A) {
     if (!CB)
       continue;
     WorkList.push_back(CB->getArgOperand(ArgNum));
+    for (auto* Usr : CB->getArgOperand(ArgNum)->users()) {
+      WorkList.push_back(Usr);
+    }
   }
 }
 
@@ -288,6 +405,7 @@ inline bool analyzeLambdaUses(llvm::Module &M,
 	      if (Visitor.seen(V))
 	        continue;
 	      Visitor.markAsSeen(V);
+      llvm::outs() << "VISITING " << *V <<"\n";
       if (auto *I = dyn_cast<Instruction>(V))
         Visitor.visit(*I);              // dispatches to visitFooInst or fallback
       else if (auto *A = dyn_cast<Argument>(V))
