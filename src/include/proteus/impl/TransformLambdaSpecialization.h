@@ -15,6 +15,7 @@
 #include "proteus/Error.h"
 #include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/Debug.h"
+#include "proteus/impl/LambdaRegistry.h"
 #include "proteus/impl/Utils.h"
 #include "proteus/impl/KernelArgVisitor.h"
 
@@ -69,7 +70,24 @@ inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
 class TransformLambdaSpecialization {
 private:
 
-  using JitVariantMap = DenseMap<int32_t, RuntimeConstant>;
+  using JitVariantMap = LambdaRegistry::JitVariantMap;
+  using JitVariantVec = LambdaRegistry::JitVariantVec;
+
+  static void collectWrapperCallsites(Function &FunctorOperatorFunction,
+                                      SmallVectorImpl<CallBase *> &CBToAnalyze) {
+    for (auto *U : FunctorOperatorFunction.users()) {
+      if (auto *CB = dyn_cast<CallBase>(U))
+        CBToAnalyze.push_back(CB);
+    }
+
+    llvm::sort(CBToAnalyze, [](const CallBase *L, const CallBase *R) {
+      const Function *LF = L->getFunction();
+      const Function *RF = R->getFunction();
+      if (LF != RF)
+        return LF->getName() < RF->getName();
+      return getInstructionOrder(L) < getInstructionOrder(R);
+    });
+  }
 
   static const RuntimeConstant *
   findArgByOffset(const JitVariantMap &RCMap, int32_t Offset) {
@@ -370,18 +388,18 @@ private:
       RuntimeConstantType Type,
       int32_t Pos,
       int32_t RCOffset) {
-
     if (!KernelArgs)
       reportFatalError("KernelArgs is null");
     if (LambdaStorageBasePointerOffset < 0)
       reportFatalError("Negative KernelByteOffset");
 
-    auto *base =
-        static_cast<const unsigned char *>(KernelArgs[KernelArgIndex]);
+    auto *base = static_cast<const unsigned char *>(KernelArgs[KernelArgIndex]);
     if (!base)
       reportFatalError("KernelArgs[KernelArgIndex] is null");
 
-    const unsigned char *ptr = base + static_cast<size_t>(LambdaStorageBasePointerOffset) + static_cast<size_t>(RCOffset);
+    const unsigned char *ptr =
+        base + static_cast<size_t>(LambdaStorageBasePointerOffset) +
+        static_cast<size_t>(RCOffset);
 
     RuntimeConstant RC{Type, Pos, RCOffset};
 
@@ -417,9 +435,140 @@ private:
     return RC;
   }
 
+  static inline RuntimeConstant readRuntimeConstantFromStorage(
+      const void *StorageBasePtr, RuntimeConstantType Type, int32_t Pos,
+      int32_t RCOffset) {
+    if (!StorageBasePtr)
+      reportFatalError("StorageBasePtr is null");
+    if (RCOffset < 0)
+      reportFatalError("Negative runtime constant offset");
+
+    const unsigned char *base =
+        static_cast<const unsigned char *>(StorageBasePtr);
+    const unsigned char *ptr = base + static_cast<size_t>(RCOffset);
+
+    RuntimeConstant RC{Type, Pos, RCOffset};
+
+    switch (Type) {
+    case RuntimeConstantType::BOOL:
+      std::memcpy(&RC.Value.BoolVal, ptr, sizeof(RC.Value.BoolVal));
+      break;
+    case RuntimeConstantType::INT8:
+      std::memcpy(&RC.Value.Int8Val, ptr, sizeof(RC.Value.Int8Val));
+      break;
+    case RuntimeConstantType::INT32:
+      std::memcpy(&RC.Value.Int32Val, ptr, sizeof(RC.Value.Int32Val));
+      break;
+    case RuntimeConstantType::INT64:
+      std::memcpy(&RC.Value.Int64Val, ptr, sizeof(RC.Value.Int64Val));
+      break;
+    case RuntimeConstantType::FLOAT:
+      std::memcpy(&RC.Value.FloatVal, ptr, sizeof(RC.Value.FloatVal));
+      break;
+    case RuntimeConstantType::DOUBLE:
+      std::memcpy(&RC.Value.DoubleVal, ptr, sizeof(RC.Value.DoubleVal));
+      break;
+    case RuntimeConstantType::LONG_DOUBLE:
+      std::memcpy(&RC.Value.LongDoubleVal, ptr, sizeof(RC.Value.LongDoubleVal));
+      break;
+    case RuntimeConstantType::PTR:
+      std::memcpy(&RC.Value.PtrVal, ptr, sizeof(RC.Value.PtrVal));
+      break;
+    default:
+      reportFatalError("Unsupported RuntimeConstantType in host-storage reader");
+    }
+
+    return RC;
+  }
+
 
 public:
-  static void transform(Module &M,
+  static bool analyzeKernelArgLocations(
+      Module &M, uint64_t FunctorID,
+      SmallVectorImpl<std::pair<uint32_t, int64_t>> &KernelArgLocations,
+      DenseMap<Function *, std::unique_ptr<FnMemCtx>> &FunctionAnalysisCache) {
+    Function *FunctorOperatorFunction =
+        findFunctorFunctorOperatorFunctionOperatorFromID(M, FunctorID);
+    if (!FunctorOperatorFunction)
+      return false;
+
+    SmallVector<CallBase *> CBToAnalyze;
+    collectWrapperCallsites(*FunctorOperatorFunction, CBToAnalyze);
+
+    DenseMap<CallBase *, std::pair<uint32_t, int64_t>> CallBaseToArgOffset;
+    if (!analyzeLambdaUses(M, CallBaseToArgOffset, CBToAnalyze,
+                           FunctionAnalysisCache))
+      return false;
+
+    KernelArgLocations.clear();
+    KernelArgLocations.reserve(CBToAnalyze.size());
+    for (CallBase *CB : CBToAnalyze) {
+      auto It = CallBaseToArgOffset.find(CB);
+      if (It == CallBaseToArgOffset.end())
+        return false;
+      KernelArgLocations.push_back(It->second);
+    }
+
+    return true;
+  }
+
+  static LambdaRegistry::JitVariantVec
+  readRuntimeVariantsFromKernelArgs(
+      void *const *KernelArgs,
+      ArrayRef<std::pair<uint32_t, int64_t>> KernelArgLocations,
+      ArrayRef<LambdaRegistry::JitVariantMap> VariantSchemas) {
+    LambdaRegistry::JitVariantVec RuntimeVariants;
+    if (VariantSchemas.empty())
+      return RuntimeVariants;
+
+    RuntimeVariants.reserve(KernelArgLocations.size());
+    const JitVariantMap &VariantSchema = VariantSchemas.front();
+
+    for (auto [KernelArgIndex, Offset] : KernelArgLocations) {
+      JitVariantMap RuntimeVariant;
+      for (auto [Slot, RC] : VariantSchema) {
+        RuntimeVariant[Slot] = readRuntimeConstantFromKernelArgs(
+            KernelArgs, KernelArgIndex, Offset, RC.Type, RC.Pos, RC.Offset);
+      }
+      RuntimeVariants.push_back(std::move(RuntimeVariant));
+    }
+
+    return RuntimeVariants;
+  }
+
+  static JitVariantMap
+  readRuntimeVariantFromStorage(const void *StorageBasePtr,
+                                ArrayRef<LambdaRegistry::JitVariantMap>
+                                    VariantSchemas) {
+    JitVariantMap RuntimeVariant;
+    if (VariantSchemas.empty())
+      return RuntimeVariant;
+
+    const JitVariantMap &VariantSchema = VariantSchemas.front();
+    for (auto [Slot, RC] : VariantSchema) {
+      RuntimeVariant[Slot] = readRuntimeConstantFromStorage(
+          StorageBasePtr, RC.Type, RC.Pos, RC.Offset);
+    }
+
+    return RuntimeVariant;
+  }
+
+  static void transformHostFunction(Module &M, uint64_t FunctorID,
+                                    const JitVariantMap &RuntimeVariant) {
+    Function *FunctorOperatorFunction =
+        findFunctorFunctorOperatorFunctionOperatorFromID(M, FunctorID);
+    if (!FunctorOperatorFunction)
+      reportFatalError("Expected wrapper for host lambda specialization");
+
+    specializeCallOperator(M, *FunctorOperatorFunction, RuntimeVariant);
+
+    if (Function *LambdaOperatorMethod =
+            findLambdaOperatorForFunctor(M, FunctorID)) {
+      specializeCallOperator(M, *LambdaOperatorMethod, RuntimeVariant);
+    }
+  }
+
+  static void transformDeviceKernel(Module &M,
                         void** KernelArgs,
                         uint64_t FunctorID,
                         ArrayRef<JitVariantMap> Variants) {
@@ -427,17 +576,7 @@ public:
     Function *LambdaOperatorMethod = findLambdaOperatorForFunctor(M, FunctorID);
     DenseMap<CallBase*, std::pair<uint32_t, int64_t>> CallBaseToArgOffset;
     SmallVector<CallBase*> CBToAnalyze;
-    for (auto* U : FunctorOperatorFunction->users()) {
-      if (auto* CB = dyn_cast<CallBase>(U))
-        CBToAnalyze.push_back(CB);
-    }
-    llvm::sort(CBToAnalyze, [](const CallBase *L, const CallBase *R) {
-      const Function *LF = L->getFunction();
-      const Function *RF = R->getFunction();
-      if (LF != RF)
-        return LF->getName() < RF->getName();
-      return getInstructionOrder(L) < getInstructionOrder(R);
-    });
+    collectWrapperCallsites(*FunctorOperatorFunction, CBToAnalyze);
 
     DenseMap<Function*, std::unique_ptr<FnMemCtx>> tmp;
     if (!analyzeLambdaUses(M, CallBaseToArgOffset, CBToAnalyze, tmp))

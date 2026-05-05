@@ -308,7 +308,7 @@ inline void specializeIR(
     if (!VariantsOpt)
       continue;
 
-    TransformLambdaSpecialization::transform(M, KernelArgs, ID, VariantsOpt.value());
+    TransformLambdaSpecialization::transformDeviceKernel(M, KernelArgs, ID, VariantsOpt.value());
   }
 
   // Run the shared array transform after any value specialization (arguments,

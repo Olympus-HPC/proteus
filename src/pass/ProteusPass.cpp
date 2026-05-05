@@ -814,7 +814,7 @@ private:
 
     ArrayType *ArgPtrsTy = ArrayType::get(Types.PtrTy, StubFn->arg_size());
     Value *ArgPtrs = nullptr;
-    if (NumRuntimeConstants > 0) {
+    if (!StubFn->arg_empty()) {
       ArgPtrs = Builder.CreateAlloca(ArgPtrsTy);
       // Create an alloca for each argument to store a pointer to the argument,
       // mimicking how arguments are passed for GPU kernels. This is done so
