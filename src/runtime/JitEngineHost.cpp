@@ -156,14 +156,14 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
   }
   TransformArgumentSpecialization::transform(M, *F, RCArray);
   // todo: make this analysis simpler for the cpu case
-  TransformLambdaSpecialization LambdaTransformer;
+  // TransformLambdaSpecialization LambdaTransformer;
   SmallVector<std::pair<Function *, uint64_t>> LambdaCalleeInfo;
   findFunctionsWithU64Metadata(M, "proteus.wrapper_call", LambdaCalleeInfo);
   for (auto [F, ID] : LambdaCalleeInfo) {
     auto VariantsOpt = LambdaRegistry::instance().getJitVariants(ID);
     if (!VariantsOpt)
       continue;
-    LambdaTransformer.transform(M, nullptr, ID, VariantsOpt.value());
+    TransformLambdaSpecialization::transform(M, nullptr, ID, VariantsOpt.value());
   }
 
   F->setName(FnName + Suffix);
