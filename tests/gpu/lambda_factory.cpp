@@ -77,9 +77,9 @@ int main() {
   int Zero = 0;
   int One = 1;
   int Two = 2;
-
+  // auto RUNTIME_CONSTANT_TUPLE_ONE = {Zero, One};
   auto ZeroLambda = declareLambda(Zero, One);
-
+  // proteus::LamdbaFunctorWrapper<RUNTIME_CONSTANT_TUPLE_ONE>
   auto OneLambda = declareLambda(One, Two);
 
   auto TwoLambda = declareLambda(Two, Zero);
@@ -98,6 +98,7 @@ int main() {
 }
 
 // clang-format off
+// TODO: is this ordering stable?
 // CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 1
 // CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 0
 // CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 2
