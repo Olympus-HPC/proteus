@@ -30,6 +30,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <memory>
 
 namespace proteus {
 
@@ -67,6 +68,8 @@ inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
 
 class TransformLambdaSpecialization {
 private:
+
+  DenseMap<Function*, std::unique_ptr<FnMemCtx>> FunctionAnalysisCache;
   using JitVariantMap = DenseMap<int32_t, RuntimeConstant>;
 
   static const RuntimeConstant *
@@ -409,6 +412,7 @@ public:
                         void** KernelArgs,
                         uint64_t FunctorID,
                         ArrayRef<JitVariantMap> Variants) {
+
     llvm::errs() << M;
     Function *FunctorOperatorFunction = findFunctorFunctorOperatorFunctionOperatorFromID(M, FunctorID);
     Function *LambdaOperatorMethod = findLambdaOperatorForFunctor(M, FunctorID);
@@ -418,30 +422,32 @@ public:
       if (auto* CB = dyn_cast<CallBase>(U))
         CBToAnalyze.push_back(CB);
     }
-    if (!analyzeLambdaUses(M, CallBaseToArgOffset, CBToAnalyze)) {
+    DenseMap<Function*, std::unique_ptr<FnMemCtx>> tmp;
+    if (!analyzeLambdaUses(M, CallBaseToArgOffset, CBToAnalyze, tmp)) {
       llvm::outs() << "ERROR: analysis failed\n";
       exit(1);
     }
     int VariantIndex = 0;
+    DenseMap<CallBase*, JitVariantMap> CBRuntimeConstants;
     for (auto [CB, Pair] : CallBaseToArgOffset) {
       ++VariantIndex;
       auto& [KernelArgIndex, Offset] = Pair;
-      llvm::outs() << "CALLBASE " << *CB << " GETS " <<KernelArgIndex << " " << Offset <<"\n";
-      JitVariantMap CBRuntimeConstants;
       for (auto [slot, RC] : Variants[0]) {
-        CBRuntimeConstants[slot] = readRuntimeConstantFromKernelArgs(KernelArgs,
+        CBRuntimeConstants[CB][slot] = readRuntimeConstantFromKernelArgs(KernelArgs,
           KernelArgIndex, Offset, RC.Type, RC.Pos, RC.Offset);
       }
+    }
+    for (auto [CB, Variants] : CBRuntimeConstants) {
       if (!LambdaOperatorMethod) {
         // On host (and sometimes device) the lambda call operator may be fully
         // inlined into the functor FunctorOperatorFunction call operator, leaving no separate
         // `lambda::operator()` function to tag.
         auto* Clone = cloneForVariant(*FunctorOperatorFunction, FunctorID, VariantIndex);
-        specializeCallOperator(M, *Clone, CBRuntimeConstants);
+        specializeCallOperator(M, *Clone, Variants);
         CB->setCalledFunction(Clone);
       } else {
         auto* Clone = cloneForVariant(*LambdaOperatorMethod, FunctorID, VariantIndex);
-        specializeCallOperator(M, *Clone, CBRuntimeConstants);
+        specializeCallOperator(M, *Clone, Variants);
         CB->setCalledFunction(Clone);
       }
     }

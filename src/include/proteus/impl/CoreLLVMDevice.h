@@ -300,14 +300,15 @@ inline void specializeIR(
 
   auto &LR = LambdaRegistry::instance();
 
+  // We add a per-function cache for memory ssa so that we don't have to duplicate
+  // results.
+  TransformLambdaSpecialization LambdaTransformer;
   for (auto &ID : LambdaCalleeInfo) {
     auto VariantsOpt = LR.getJitVariants(ID);
-    // llvm::outs() << "    " << Lam->getName() << "\n";
-    if (!VariantsOpt) {
-      // llvm::outs() << "    skipping " << Lam->getName() << "\n";
+    if (!VariantsOpt)
       continue;
-    }
-    TransformLambdaSpecialization::transform(M, KernelArgs, ID, VariantsOpt.value());
+
+    LambdaTransformer.transform(M, KernelArgs, ID, VariantsOpt.value());
   }
 
   // Run the shared array transform after any value specialization (arguments,
