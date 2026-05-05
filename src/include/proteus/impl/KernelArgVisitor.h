@@ -10,7 +10,43 @@
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/DenseSet.h>
 #include <llvm/ADT/SmallVector.h>
+#include <llvm/Analysis/MemorySSA.h>
+#include <llvm/Analysis/MemoryLocation.h>
+#include <llvm/Passes/PassBuilder.h>
+#include <llvm/Analysis/MemorySSA.h>
+#include <llvm/Analysis/TargetLibraryInfo.h>
+#include <llvm/Analysis/MemoryLocation.h>
+#include <llvm/Analysis/AliasAnalysis.h>
+#include <llvm/Analysis/AssumptionCache.h>
+#include <llvm/Analysis/BasicAliasAnalysis.h>
+#include <llvm/Analysis/CaptureTracking.h>
+#include <memory>
 
+
+namespace proteus {
+using namespace llvm;
+struct FnMemCtx {
+  llvm::DominatorTree DT;
+  llvm::AssumptionCache AC;
+  llvm::TargetLibraryInfoImpl TLII;
+  llvm::TargetLibraryInfo TLI;
+  llvm::BasicAAResult BAA;
+  llvm::AAResults AA;
+  llvm::MemorySSA MSSA;
+  llvm::MemorySSAWalker *Walker = nullptr;
+
+  FnMemCtx(llvm::Function &F)
+      : DT(F),                         // computes dominators
+        AC(F),                         // scans assumptions in F
+        TLII(llvm::Triple(F.getParent()->getTargetTriple())),
+        TLI(TLII, &F),                 // applies nobuiltin attrs, etc
+        BAA(F.getParent()->getDataLayout(), F, TLI, AC, &DT),
+        AA(TLI),
+        MSSA(F, &AA, &DT) {            // builds MemorySSA immediately
+    AA.addAAResult(BAA);
+    Walker = MSSA.getWalker();
+  }
+};
 
 static void findAnnotatedFunctions(
       llvm::Module &M, llvm::StringRef Wanted,
@@ -68,29 +104,46 @@ static void findAnnotatedFunctions(
     }
   }
 
-using namespace llvm;
-namespace proteus {
-class LambdaArgVisitor : public InstVisitor<LambdaArgVisitor> {
-private:
-  CallBase* LambdaCB;
-  const DataLayout &DL;
-  SmallVector<Value*> WorkList;
-  SmallDenseSet<Value*> Seen;
-  int64_t Offset;
-  uint32_t KernelArg = 0;
-  bool AnalysisSuccess = false;
-  bool AnalysisFailed = false;
-public:
-LambdaArgVisitor(CallBase* LambdaCB_, Module& M, SmallVector<Value*> WorkList_, SmallDenseSet<Value*> Seen_)
-    : LambdaCB(LambdaCB_), DL(M.getDataLayout()), WorkList(std::move(WorkList_)),
-      Seen(std::move(Seen_)), Offset(0) {
-  WorkList.push_back(LambdaCB_->getArgOperand(0));
-}
-	LambdaArgVisitor(CallBase* LambdaCB_, Module& M)
-	    : LambdaCB(LambdaCB_), DL(M.getDataLayout()), Offset(0) {
-	  WorkList.push_back(LambdaCB_->getArgOperand(0));
-	}
-	void visitStoreInst (StoreInst &SI) { WorkList.push_back(SI.getPointerOperand()); }
+	class LambdaArgVisitor : public InstVisitor<LambdaArgVisitor> {
+	private:
+	  CallBase* LambdaCB;
+	  const DataLayout &DL;
+    SmallVector<Value*> WorkList;
+    SmallDenseSet<Value*> Seen;
+    int64_t Offset;
+    uint32_t KernelArg = 0;
+	  bool AnalysisSuccess = false;
+	  bool AnalysisFailed = false;
+	  DenseMap<Function*, std::unique_ptr<FnMemCtx>>& FunctionAnalysisCache;
+
+    MemoryAccess* findClobberingWriteBeforeCB(CallBase *CB, int ArgNum) {
+      Function* CallerFunction = CB->getCaller();
+      if (!FunctionAnalysisCache.contains(CallerFunction))
+        FunctionAnalysisCache[CallerFunction] = std::make_unique<FnMemCtx>(*CallerFunction);
+      auto& CachedAnalysis = *FunctionAnalysisCache[CallerFunction];
+      MemoryAccess *MA = CachedAnalysis.MSSA.getMemoryAccess(CB);
+      auto *UD = cast<MemoryUseOrDef>(MA);
+      MemoryAccess *BeforeCB = UD->getDefiningAccess();
+      MemoryLocation Loc = MemoryLocation::getForArgument(CB, /*ArgIdx=*/ArgNum, CachedAnalysis.TLI);
+      return CachedAnalysis.MSSA.getWalker()->getClobberingMemoryAccess(BeforeCB, Loc);
+    }
+
+	public:
+		LambdaArgVisitor(CallBase* LambdaCB_, Module& M,
+		                 DenseMap<Function*, std::unique_ptr<FnMemCtx>>& Cache_)
+		    : LambdaCB(LambdaCB_), DL(M.getDataLayout()), FunctionAnalysisCache(Cache_), Offset(0) {
+      llvm::outs() << "CONSTRUCTIN VISITOR FOR "<< *LambdaCB <<"\n";
+      auto* ClosurePtr = LambdaCB->getArgOperand(0);
+      // auto* Clobber = findClobberingWriteBeforeCB(LambdaCB, 0);
+      // if (auto *MD = dyn_cast<MemoryDef>(Clobber);  MD->getMemoryInst()) {
+      //   llvm::outs() << "STARTING ANALYSIS AT " << *MD->getMemoryInst() <<"\n";
+      //   PointerMayBeCapturedBefore()
+      //   WorkList.push_back(MD->getMemoryInst());
+      // }
+      WorkList.push_back(ClosurePtr);
+		}
+	void visitStoreInst (StoreInst &SI) { WorkList.push_back(SI.getValueOperand()); }
+  void visitCallBase (CallBase &) {}
 	void visitLoadInst (LoadInst &LI) {
 	  if (!LI.getType()->isPointerTy()) {
 	    AnalysisFailed = true;
@@ -173,8 +226,6 @@ LambdaArgVisitor(CallBase* LambdaCB_, Module& M, SmallVector<Value*> WorkList_, 
 
 	  WorkList.push_back(CommonStoredVal);
 	}
-	void visitBitCastInst (BitCastInst &BC) { WorkList.push_back(BC.getOperand(0)); }
-	void visitAddrSpaceCastInst (AddrSpaceCastInst &ASC) { WorkList.push_back(ASC.getPointerOperand() ); }
 
 auto back() { return WorkList.back(); }
 void popBack() { WorkList.pop_back(); }
@@ -189,97 +240,28 @@ void visitGetElementPtrInst (GetElementPtrInst &GEP) {
   int64_t GEPOffset = 0;
   GetPointerBaseWithConstantOffset(&GEP, GEPOffset, DL);
   Offset+=GEPOffset;
-  llvm::outs()<<"COMPUTED OFFSET " << GEPOffset << "\n";
+  // llvm::outs()<<"COMPUTED OFFSET " << GEPOffset << "\n";
   WorkList.push_back(GEP.getPointerOperand());
 }
 
-	void visitAllocaInst (AllocaInst &Alloca) {
-	  SmallVector<Value *, 8> PtrWorkList;
-	  SmallPtrSet<Value *, 16> LocalSeen;
-	  PtrWorkList.push_back(&Alloca);
+// todo: these three methods need to be changed to find a dominating store
+void visitAllocaInst (AllocaInst &Alloca) {
+  for (auto* User : Alloca.users())
+    if (!Seen.contains(User))
+      WorkList.push_back(User);
+}
 
-	  bool FoundWriter = false;
-	  Value *ChosenSrcBase = nullptr;
-	  int64_t ChosenNewOffset = 0;
-	  while (!PtrWorkList.empty()) {
-	    Value *Cur = PtrWorkList.pop_back_val();
-	    if (!LocalSeen.insert(Cur).second)
-	      continue;
+void visitBitCastInst (BitCastInst &BC) {
+  for (auto* User : BC.users())
+    if (!Seen.contains(User))
+      WorkList.push_back(User);
+}
 
-	    for (User *U : Cur->users()) {
-	      if (auto *MT = dyn_cast<MemTransferInst>(U)) {
-	        int64_t DstOff = 0, SrcOff = 0;
-	        Value *DstBase =
-	            GetPointerBaseWithConstantOffset(MT->getRawDest(), DstOff, DL);
-	        Value *SrcBase =
-	            GetPointerBaseWithConstantOffset(MT->getRawSource(), SrcOff, DL);
-	        if (!DstBase || !SrcBase) {
-	          AnalysisFailed = true;
-	          return;
-	        }
-
-	        DstBase = DstBase->stripPointerCasts();
-	        SrcBase = SrcBase->stripPointerCasts();
-
-	        if (DstBase != &Alloca)
-	          continue; // not copying into this alloca
-
-	        if (auto *LenC = dyn_cast<ConstantInt>(MT->getLength())) {
-	          uint64_t Len = LenC->getZExtValue();
-	          int64_t Rel = Offset - DstOff;
-	          if (Rel < 0 || uint64_t(Rel) >= Len)
-	            continue; // copy doesn't cover our tracked byte
-	        }
-
-	        int64_t NewOffset = 0;
-	        if (__builtin_add_overflow(Offset, -DstOff, &NewOffset) ||
-	            __builtin_add_overflow(NewOffset, SrcOff, &NewOffset)) {
-	          AnalysisFailed = true;
-	          return;
-	        }
-
-	        if (!FoundWriter) {
-	          FoundWriter = true;
-	          ChosenSrcBase = SrcBase;
-	          ChosenNewOffset = NewOffset;
-	        } else if (ChosenSrcBase != SrcBase || ChosenNewOffset != NewOffset) {
-	          AnalysisFailed = true; // ambiguous writers
-	          return;
-	        }
-
-	        continue;
-	      }
-
-	      // Follow derived pointers to reach the memcpy/memmove destination.
-	      if (isa<GetElementPtrInst>(U) || isa<BitCastInst>(U) ||
-          isa<AddrSpaceCastInst>(U) || isa<PHINode>(U) ||
-          isa<SelectInst>(U)) {
-        PtrWorkList.push_back(cast<Value>(U));
-        continue;
-      }
-
-      if (auto *II = dyn_cast<IntrinsicInst>(U)) {
-        switch (II->getIntrinsicID()) {
-        case Intrinsic::dbg_declare:
-        case Intrinsic::dbg_value:
-        case Intrinsic::lifetime_start:
-        case Intrinsic::lifetime_end:
-          continue;
-        default:
-          break;
-        }
-      }
-    }
-  }
-
-	  if (!FoundWriter) {
-	    AnalysisFailed = true;
-	    return;
-	  }
-
-	  Offset = ChosenNewOffset;
-	  WorkList.push_back(ChosenSrcBase);
-	}
+void visitAddrSpaceCastInst (AddrSpaceCastInst &ASC) {
+  for (auto* User : ASC.users())
+    if (!Seen.contains(User))
+      WorkList.push_back(User);
+}
 
 void visitMemIntrinsic(MemIntrinsic &I) {
   auto *MT = dyn_cast<MemTransferInst>(&I); // memcpy/memmove
@@ -316,23 +298,33 @@ void visitIntrinsicInst (IntrinsicInst &II) {
 }
 
 void visitArgument(Argument &A) {
-  llvm::outs() << "VISITING ARG " << A;
+  // llvm::outs() << "VISITING ARG " << A;
   Function* F = A.getParent();
-  llvm::outs() << "PARENT = " << *F;
+  // llvm::outs() << "PARENT = " << *F;
   auto ArgNum = A.getArgNo();
-  if (F->getCallingConv() == CallingConv::AMDGPU_KERNEL) {
+  // termination case:  we have reached the parent calling kernel
+  // todo: we could just pass in the kernel pointer here and check equality
+  if (F->getCallingConv() == CallingConv::AMDGPU_KERNEL ||
+      F->getCallingConv() == CallingConv::PTX_Kernel) {
     AnalysisSuccess = true;
     KernelArg = ArgNum;
     return;
   }
+  if (!FunctionAnalysisCache.contains(F))
+    FunctionAnalysisCache[F] = std::make_unique<FnMemCtx>(*F);
+
   for (User* U : F->users()) {
     auto* CB = dyn_cast<CallBase>(U);
     if (!CB)
       continue;
+    // llvm::outs() << "    USER = " << *U << "\n";
     WorkList.push_back(CB->getArgOperand(ArgNum));
-    for (auto* Usr : CB->getArgOperand(ArgNum)->users()) {
-      WorkList.push_back(Usr);
-    }
+    // auto *Clobber = findClobberingWriteBeforeCB(CB, ArgNum);
+    // if (auto *MD = dyn_cast<MemoryDef>(Clobber);  MD->getMemoryInst()) {
+    //   Instruction *Writer = MD->getMemoryInst();
+    //   // llvm::outs() << "    FOUND ACCESS " << *Writer << " DOMINATING " << A <<"\n";
+    //   WorkList.push_back(Writer);
+    // }
   }
 }
 
@@ -396,23 +388,26 @@ void visitSelectInst(SelectInst &S) {
 
 inline bool analyzeLambdaUses(llvm::Module &M,
  DenseMap<CallBase*, std::pair<uint32_t, int64_t>> &CallBaseToArgOffset,
-	  const SmallVector<CallBase*> &CBToAnalyze) {
+	  const SmallVector<CallBase*> &CBToAnalyze,
+    DenseMap<Function*, std::unique_ptr<FnMemCtx>>& FunctionAnalysisCache) {
 	  for (auto* FunctorCB : CBToAnalyze) {
-	    LambdaArgVisitor Visitor (FunctorCB, M);
+	    LambdaArgVisitor Visitor (FunctorCB, M, FunctionAnalysisCache);
 	    while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {
 	      auto* V = (Visitor.back());
 	      Visitor.popBack();
+        // Prevent loops/infinite recursion
 	      if (Visitor.seen(V))
 	        continue;
 	      Visitor.markAsSeen(V);
-      llvm::outs() << "VISITING " << *V <<"\n";
-      if (auto *I = dyn_cast<Instruction>(V))
-        Visitor.visit(*I);              // dispatches to visitFooInst or fallback
-      else if (auto *A = dyn_cast<Argument>(V))
-        Visitor.visitArgument(*A);      // Argument isn’t an Instruction
-      else
-        continue;
-	    }
+        // Analyze the instruction
+        llvm::outs() << "VISITING " << *V <<"\n";
+        if (auto *I = dyn_cast<Instruction>(V))
+          Visitor.visit(*I);
+        else if (auto *A = dyn_cast<Argument>(V))
+          Visitor.visitArgument(*A);
+        else
+          continue;
+        }
 		    if (!Visitor.success() || Visitor.failed())
 		      return false;
 		    CallBaseToArgOffset[FunctorCB] = Visitor.getKernelArgAndOffset();
