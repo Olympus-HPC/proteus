@@ -34,11 +34,67 @@
 #include <llvm/Object/SymbolSize.h>
 #include <llvm/TargetParser/Host.h>
 
+#include <cstring>
 #include <memory>
 
 using namespace proteus;
 using namespace llvm;
 using namespace llvm::orc;
+
+namespace {
+
+std::optional<uint64_t> getFunctionU64Metadata(Function &F, StringRef Key) {
+  MDNode *Node = F.getMetadata(Key);
+  if (!Node || Node->getNumOperands() < 1)
+    return std::nullopt;
+
+  auto *CAM = dyn_cast<ConstantAsMetadata>(Node->getOperand(0));
+  auto *CI = CAM ? dyn_cast<ConstantInt>(CAM->getValue()) : nullptr;
+  if (!CI)
+    return std::nullopt;
+
+  return CI->getZExtValue();
+}
+
+void *readHostPointerArgumentValue(void **Args, size_t ArgIndex) {
+  if (!Args || !Args[ArgIndex])
+    return nullptr;
+
+  void *Ptr = nullptr;
+  std::memcpy(&Ptr, Args[ArgIndex], sizeof(Ptr));
+  return Ptr;
+}
+
+DenseMap<uint64_t, LambdaRegistry::JitVariantVec>
+collectCurrentLambdaJitValues(Function &Entry, void **Args) {
+  DenseMap<uint64_t, LambdaRegistry::JitVariantVec> LambdaJitValuesMap;
+
+  auto FunctorID = getFunctionU64Metadata(Entry, "proteus.wrapper_call");
+  if (!FunctorID)
+    return LambdaJitValuesMap;
+
+  auto VariantsOpt = LambdaRegistry::instance().getJitVariants(*FunctorID);
+  if (!VariantsOpt || VariantsOpt->empty())
+    return LambdaJitValuesMap;
+
+  if (Entry.arg_empty() || !Entry.getArg(0)->getType()->isPointerTy())
+    reportFatalError("Expected host lambda wrapper entry to take a closure "
+                     "pointer as its first argument");
+
+  void *ClosurePtr = readHostPointerArgumentValue(Args, 0);
+  if (!ClosurePtr)
+    reportFatalError("Expected non-null closure pointer for host lambda "
+                     "specialization");
+
+  LambdaRegistry::JitVariantVec Vars;
+  Vars.push_back(TransformLambdaSpecialization::readRuntimeVariantFromStorage(
+      ClosurePtr, VariantsOpt.value()));
+  LambdaJitValuesMap[*FunctorID] = std::move(Vars);
+
+  return LambdaJitValuesMap;
+}
+
+} // namespace
 
 JitEngineHost &JitEngineHost::instance() {
   static JitEngineHost Jit;
@@ -134,7 +190,8 @@ JitEngineHost::~JitEngineHost() {
 }
 
 void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
-                                 ArrayRef<RuntimeConstant> RCArray) {
+                                 ArrayRef<RuntimeConstant> RCArray,
+                                 void **Args) {
   TIMESCOPE(JitEngineHost, specializeIR);
   Function *F = M.getFunction(FnName);
   assert(F && "Expected non-null function!");
@@ -155,15 +212,14 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
     ArgPos.push_back(ArgNo);
   }
   TransformArgumentSpecialization::transform(M, *F, RCArray);
-  // todo: make this analysis simpler for the cpu case
-  // TransformLambdaSpecialization LambdaTransformer;
-  SmallVector<std::pair<Function *, uint64_t>> LambdaCalleeInfo;
-  findFunctionsWithU64Metadata(M, "proteus.wrapper_call", LambdaCalleeInfo);
-  for (auto [F, ID] : LambdaCalleeInfo) {
-    auto VariantsOpt = LambdaRegistry::instance().getJitVariants(ID);
-    if (!VariantsOpt)
-      continue;
-    TransformLambdaSpecialization::transform(M, nullptr, ID, VariantsOpt.value());
+
+  auto LambdaJitValuesMap = collectCurrentLambdaJitValues(*F, Args);
+  if (auto FunctorID = getFunctionU64Metadata(*F, "proteus.wrapper_call")) {
+    auto It = LambdaJitValuesMap.find(*FunctorID);
+    if (It != LambdaJitValuesMap.end() && !It->second.empty()) {
+      TransformLambdaSpecialization::transformHostFunction(
+          M, *FunctorID, It->second.front());
+    }
   }
 
   F->setName(FnName + Suffix);
@@ -194,20 +250,15 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus") << "Parse IR " << FnName << " "
                                                << T.elapsed() << " ms\n");
 
+  Function *Entry = M->getFunction(FnName);
+  if (!Entry)
+    reportFatalError(std::string("Expected JIT entry function ") +
+                     FnName.str() + " in parsed host module");
+
   SmallVector<RuntimeConstant> RCVec =
       getRuntimeConstantValues(Args, RCInfoArray);
-  DenseMap<uint64_t, LambdaRegistry::JitVariantVec> LambdaJitValuesMap;
-  SmallVector<std::pair<Function *, uint64_t>> LambdaCalleeInfo;
-  findFunctionsWithU64Metadata(*M, "proteus.wrapper_call", LambdaCalleeInfo);
-  LambdaRegistry &LR = LambdaRegistry::instance();
-  for (auto [_, ID] : LambdaCalleeInfo) {
-    auto VariantsOpt = LR.getJitVariants(ID);
-    if (!VariantsOpt)
-      continue;
-    LambdaRegistry::JitVariantVec Vars;
-    Vars.append(VariantsOpt->begin(), VariantsOpt->end());
-    LambdaJitValuesMap[ID] = std::move(Vars);
-  }
+  DenseMap<uint64_t, LambdaRegistry::JitVariantVec> LambdaJitValuesMap =
+      collectCurrentLambdaJitValues(*Entry, Args);
 
   const auto &CGConfig = Config::get().getCGConfig();
   HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesMap,
@@ -239,7 +290,7 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   } else {
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".input.ll", *M));
     // Specialize the module using runtime values.
-    specializeIR(*M, FnName, Suffix, RCVec);
+    specializeIR(*M, FnName, Suffix, RCVec, Args);
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".specialized.ll", *M));
     // Compile the object.
     auto ObjectModule = compileOnly(*M);

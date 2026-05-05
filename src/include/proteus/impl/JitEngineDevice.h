@@ -26,6 +26,7 @@
 #include "proteus/impl/JitEngine.h"
 #include "proteus/impl/JitEngineInfoRegistry.h"
 #include "proteus/impl/LambdaRegistry.h"
+#include "proteus/impl/TransformLambdaSpecialization.h"
 #include "proteus/impl/Utils.h"
 
 #include <llvm/ADT/SmallPtrSet.h>
@@ -78,6 +79,11 @@ struct FatbinWrapperT {
   const char *Binary;
   void **PrelinkedFatbins;
 };
+
+using LambdaKernelArgLocation = std::pair<uint32_t, int64_t>;
+using LambdaKernelArgLocationVec = SmallVector<LambdaKernelArgLocation, 4>;
+using LambdaKernelArgLocationMap =
+    DenseMap<uint64_t, LambdaKernelArgLocationVec>;
 
 class BinaryInfo {
 private:
@@ -233,6 +239,7 @@ class JITKernelInfo {
   // LambdaCalleeInfo optionally contains a vector with all annotated LambdaFunctorWrapper annotators and thei unique IDs
   std::optional<SmallVector<uint64_t>>
       LambdaCalleeInfo;
+  std::optional<LambdaKernelArgLocationMap> LambdaKernelArgLocationInfo;
 
 public:
   JITKernelInfo(void *Kernel, BinaryInfo &BinInfo, char const *Name,
@@ -240,7 +247,8 @@ public:
       : Kernel(Kernel), Ctx(std::make_unique<LLVMContext>()), Name(Name),
         RCInfoArray(RCInfoArray), ExtractedModule(std::nullopt),
         Bitcode{std::nullopt}, BinInfo(BinInfo),
-        LambdaCalleeInfo(std::nullopt) {}
+        LambdaCalleeInfo(std::nullopt),
+        LambdaKernelArgLocationInfo(std::nullopt) {}
 
   JITKernelInfo() = default;
   void *getKernel() const {
@@ -275,6 +283,16 @@ public:
   void setLambdaCalleeInfo(
       SmallVector<uint64_t> &&LambdaInfo) {
     LambdaCalleeInfo = std::move(LambdaInfo);
+  }
+
+  bool hasLambdaKernelArgLocationInfo() const {
+    return LambdaKernelArgLocationInfo.has_value();
+  }
+  const auto &getLambdaKernelArgLocationInfo() const {
+    return LambdaKernelArgLocationInfo.value();
+  }
+  void setLambdaKernelArgLocationInfo(LambdaKernelArgLocationMap &&Info) {
+    LambdaKernelArgLocationInfo = std::move(Info);
   }
 };
 
@@ -418,14 +436,9 @@ public:
 
   void getLambdaJitValues(JITKernelInfo &KernelInfo,
                           DenseMap<uint64_t, LambdaRegistry::JitVariantVec>
-                              &LambdaJitValuesMap) {
+                              &LambdaJitValuesMap,
+                          void **KernelArgs) {
     TIMESCOPE(JitEngineDevice, getLambdaJitValues);
-    LambdaRegistry &LR = LambdaRegistry::instance();
-    if (LR.empty()) {
-      KernelInfo.setLambdaCalleeInfo({});
-      return;
-    }
-
     if (!KernelInfo.hasLambdaCalleeInfo()) {
       Module &KernelModule = getModule(KernelInfo);
       PROTEUS_DBG(Logger::logs("proteus")
@@ -443,13 +456,48 @@ public:
       KernelInfo.setLambdaCalleeInfo(std::move(LambdaCalleeInfo));
     }
 
+    LambdaRegistry &LR = LambdaRegistry::instance();
+    if (LR.empty())
+      return;
+
+    if (!KernelInfo.hasLambdaKernelArgLocationInfo()) {
+      Module &KernelModule = getModule(KernelInfo);
+      DenseMap<Function *, std::unique_ptr<FnMemCtx>> FunctionAnalysisCache;
+      LambdaKernelArgLocationMap KernelArgLocationMap;
+
+      for (auto LambdaID : KernelInfo.getLambdaCalleeInfo()) {
+        auto VariantsOpt = LR.getJitVariants(LambdaID);
+        if (!VariantsOpt)
+          continue;
+
+        LambdaKernelArgLocationVec Locations;
+        if (!TransformLambdaSpecialization::analyzeKernelArgLocations(
+                KernelModule, LambdaID, Locations, FunctionAnalysisCache))
+          reportFatalError("Failed to analyze lambda kernel arguments for " +
+                           std::to_string(LambdaID));
+
+        KernelArgLocationMap[LambdaID] = std::move(Locations);
+      }
+
+      KernelInfo.setLambdaKernelArgLocationInfo(
+          std::move(KernelArgLocationMap));
+    }
+
+    const auto &KernelArgLocationInfo =
+        KernelInfo.getLambdaKernelArgLocationInfo();
     for (auto LambdaID : KernelInfo.getLambdaCalleeInfo()) {
       auto VariantsOpt = LR.getJitVariants(LambdaID);
       if (!VariantsOpt)
         continue;
-      LambdaRegistry::JitVariantVec Vars;
-      Vars.append(VariantsOpt->begin(), VariantsOpt->end());
-      LambdaJitValuesMap[LambdaID] = std::move(Vars);
+
+      auto It = KernelArgLocationInfo.find(LambdaID);
+      if (It == KernelArgLocationInfo.end())
+        reportFatalError("Missing cached lambda kernel-arg locations for " +
+                         std::to_string(LambdaID));
+
+      LambdaJitValuesMap[LambdaID] =
+          TransformLambdaSpecialization::readRuntimeVariantsFromKernelArgs(
+              KernelArgs, It->second, VariantsOpt.value());
     }
   }
 
@@ -578,7 +626,7 @@ JitEngineDevice<ImplT>::compileAndRun(
       getRuntimeConstantValues(KernelArgs, KernelInfo.getRCInfoArray());
 
   DenseMap<uint64_t, LambdaRegistry::JitVariantVec> LambdaJitValuesMap;
-  getLambdaJitValues(KernelInfo, LambdaJitValuesMap);
+  getLambdaJitValues(KernelInfo, LambdaJitValuesMap, KernelArgs);
 
   // Determine the hash based on dimension specialization.  If we do not
   // specialize IR based on grid dimensions, avoid hashing on those to
