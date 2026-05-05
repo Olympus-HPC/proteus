@@ -9,31 +9,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "proteus/impl/CompilerInterfaceDevice.h"
-#include "proteus/RecordInterface.h"
+#include "proteus/KernelMetadata.h"
 #include "proteus/TimeTracing.h"
 #include "proteus/impl/CompilerInterfaceDeviceInternal.h"
 #include "proteus/impl/JitEngineDevice.h"
 #include "proteus/impl/JitEngineInfoRegistry.h"
 
-#include <memory>
-#include <string>
+#include <utility>
 #include <vector>
 
 using namespace proteus;
-
-struct ProteusRecordedKernel {
-  struct Global {
-    std::string Name;
-    const void *HostAddr;
-    const void *DevAddr;
-    uint64_t Size;
-  };
-
-  std::string Name;
-  uint64_t StaticHash;
-  std::string Bitcode;
-  std::vector<Global> Globals;
-};
 
 // NOLINTBEGIN(readability-identifier-naming)
 
@@ -98,82 +83,35 @@ extern "C" void __proteus_disable_device() {
   Jit.disable();
 }
 
-extern "C" ProteusRecordStatus
-__proteus_record_capture_kernel(const void *Kernel,
-                                ProteusRecordedKernel **Out) {
-  if (!Out)
-    return PROTEUS_RECORD_ERROR;
+namespace proteus::runtime {
 
-  *Out = nullptr;
+std::optional<KernelMetadata> captureKernelMetadata(const void *Kernel) {
   auto &Jit = JitDeviceImplT::instance();
   auto OptionalKernelInfo = Jit.getJITKernelInfo(Kernel);
   if (!OptionalKernelInfo)
-    return PROTEUS_RECORD_KERNEL_NOT_FOUND;
+    return std::nullopt;
 
   auto &KInfo = OptionalKernelInfo.value().get();
   Jit.extractModuleAndBitcode(KInfo);
   auto StaticHash = Jit.getStaticHash(KInfo);
   auto Bitcode = KInfo.getBitcode().getBuffer();
+  if (Bitcode.empty())
+    reportFatalError("Proteus captured kernel metadata has empty bitcode");
+
   auto &GlobalVars = KInfo.getBinaryInfo().getVarNameToGlobalInfo();
 
-  auto Record = std::make_unique<ProteusRecordedKernel>();
-  Record->Name = KInfo.getName();
-  Record->StaticHash = StaticHash.getValue();
-  Record->Bitcode.assign(Bitcode.data(), Bitcode.size());
-  Record->Globals.reserve(GlobalVars.size());
+  std::vector<char> BitcodeBytes(Bitcode.data(),
+                                 Bitcode.data() + Bitcode.size());
+  GlobalMetadataMap Globals;
+  Globals.reserve(GlobalVars.size());
   for (const auto &[Name, GV] : GlobalVars)
-    Record->Globals.push_back({Name, GV.HostAddr, GV.DevAddr, GV.VarSize});
+    Globals.try_emplace(Name,
+                        GlobalMetadata{GV.HostAddr, GV.DevAddr, GV.VarSize});
 
-  *Out = Record.release();
-  return PROTEUS_RECORD_OK;
+  return KernelMetadata(KInfo.getName(), StaticHash.getValue(),
+                        std::move(BitcodeBytes), std::move(Globals));
 }
 
-extern "C" void __proteus_record_release_kernel(ProteusRecordedKernel *Record) {
-  delete Record;
-}
-
-extern "C" const char *
-__proteus_record_kernel_name(const ProteusRecordedKernel *Record) {
-  if (!Record)
-    return nullptr;
-  return Record->Name.c_str();
-}
-
-extern "C" uint64_t
-__proteus_record_static_hash(const ProteusRecordedKernel *Record) {
-  if (!Record)
-    return 0;
-  return Record->StaticHash;
-}
-
-extern "C" const void *
-__proteus_record_bitcode_data(const ProteusRecordedKernel *Record) {
-  if (!Record)
-    return nullptr;
-  return Record->Bitcode.data();
-}
-
-extern "C" size_t
-__proteus_record_bitcode_size(const ProteusRecordedKernel *Record) {
-  if (!Record)
-    return 0;
-  return Record->Bitcode.size();
-}
-
-extern "C" size_t
-__proteus_record_global_count(const ProteusRecordedKernel *Record) {
-  if (!Record)
-    return 0;
-  return Record->Globals.size();
-}
-
-extern "C" ProteusRecordedGlobal
-__proteus_record_global_at(const ProteusRecordedKernel *Record, size_t Index) {
-  if (!Record || Index >= Record->Globals.size())
-    return {nullptr, nullptr, nullptr, 0};
-
-  const auto &Global = Record->Globals[Index];
-  return {Global.Name.c_str(), Global.HostAddr, Global.DevAddr, Global.Size};
-}
+} // namespace proteus::runtime
 
 // NOLINTEND(readability-identifier-naming)
