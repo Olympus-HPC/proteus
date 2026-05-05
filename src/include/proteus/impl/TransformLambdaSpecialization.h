@@ -69,7 +69,6 @@ inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
 class TransformLambdaSpecialization {
 private:
 
-  DenseMap<Function*, std::unique_ptr<FnMemCtx>> FunctionAnalysisCache;
   using JitVariantMap = DenseMap<int32_t, RuntimeConstant>;
 
   static const RuntimeConstant *
@@ -166,6 +165,18 @@ private:
       }
     }
     return nullptr;
+  }
+
+  static uint64_t getInstructionOrder(const Instruction *I) {
+    uint64_t Order = 0;
+    for (const BasicBlock &BB : *I->getFunction()) {
+      for (const Instruction &Cur : BB) {
+        if (&Cur == I)
+          return Order;
+        ++Order;
+      }
+    }
+    reportFatalError("Instruction not found in parent function");
   }
 
   static Function *cloneForVariant(Function &F, uint64_t FunctorID,
@@ -412,8 +423,6 @@ public:
                         void** KernelArgs,
                         uint64_t FunctorID,
                         ArrayRef<JitVariantMap> Variants) {
-
-    llvm::errs() << M;
     Function *FunctorOperatorFunction = findFunctorFunctorOperatorFunctionOperatorFromID(M, FunctorID);
     Function *LambdaOperatorMethod = findLambdaOperatorForFunctor(M, FunctorID);
     DenseMap<CallBase*, std::pair<uint32_t, int64_t>> CallBaseToArgOffset;
@@ -422,34 +431,57 @@ public:
       if (auto* CB = dyn_cast<CallBase>(U))
         CBToAnalyze.push_back(CB);
     }
+    llvm::sort(CBToAnalyze, [](const CallBase *L, const CallBase *R) {
+      const Function *LF = L->getFunction();
+      const Function *RF = R->getFunction();
+      if (LF != RF)
+        return LF->getName() < RF->getName();
+      return getInstructionOrder(L) < getInstructionOrder(R);
+    });
+
     DenseMap<Function*, std::unique_ptr<FnMemCtx>> tmp;
-    if (!analyzeLambdaUses(M, CallBaseToArgOffset, CBToAnalyze, tmp)) {
-      llvm::outs() << "ERROR: analysis failed\n";
-      exit(1);
-    }
-    int VariantIndex = 0;
-    DenseMap<CallBase*, JitVariantMap> CBRuntimeConstants;
-    for (auto [CB, Pair] : CallBaseToArgOffset) {
-      ++VariantIndex;
-      auto& [KernelArgIndex, Offset] = Pair;
+    if (!analyzeLambdaUses(M, CallBaseToArgOffset, CBToAnalyze, tmp))
+      reportFatalError("Lambda kernel-arg analysis failed");
+
+    size_t VariantIndex = 0;
+    for (CallBase *CB : CBToAnalyze) {
+      auto It = CallBaseToArgOffset.find(CB);
+      if (It == CallBaseToArgOffset.end())
+        reportFatalError("Missing lambda specialization info for callsite");
+
+      auto &[KernelArgIndex, Offset] = It->second;
+
+      JitVariantMap RuntimeVariant;
       for (auto [slot, RC] : Variants[0]) {
-        CBRuntimeConstants[CB][slot] = readRuntimeConstantFromKernelArgs(KernelArgs,
-          KernelArgIndex, Offset, RC.Type, RC.Pos, RC.Offset);
+        RuntimeVariant[slot] = readRuntimeConstantFromKernelArgs(
+            KernelArgs, KernelArgIndex, Offset, RC.Type, RC.Pos, RC.Offset);
       }
-    }
-    for (auto [CB, Variants] : CBRuntimeConstants) {
+
+      ++VariantIndex;
+      Function *WrapperClone =
+          cloneForVariant(*FunctorOperatorFunction, FunctorID, VariantIndex);
+      specializeCallOperator(M, *WrapperClone, RuntimeVariant);
+
       if (!LambdaOperatorMethod) {
         // On host (and sometimes device) the lambda call operator may be fully
         // inlined into the functor FunctorOperatorFunction call operator, leaving no separate
         // `lambda::operator()` function to tag.
-        auto* Clone = cloneForVariant(*FunctorOperatorFunction, FunctorID, VariantIndex);
-        specializeCallOperator(M, *Clone, Variants);
-        CB->setCalledFunction(Clone);
-      } else {
-        auto* Clone = cloneForVariant(*LambdaOperatorMethod, FunctorID, VariantIndex);
-        specializeCallOperator(M, *Clone, Variants);
-        CB->setCalledFunction(Clone);
+        CB->setCalledFunction(WrapperClone);
+        continue;
       }
+
+      Function *LambdaClone =
+          cloneForVariant(*LambdaOperatorMethod, FunctorID, VariantIndex);
+      specializeCallOperator(M, *LambdaClone, RuntimeVariant);
+
+      if (CallBase *WrapperToLambdaCall =
+              findDirectCallTo(*WrapperClone, LambdaOperatorMethod)) {
+        WrapperToLambdaCall->setCalledFunction(LambdaClone);
+      } else {
+        reportFatalError("Expected wrapper clone to call registered lambda");
+      }
+
+      CB->setCalledFunction(WrapperClone);
     }
   }
 

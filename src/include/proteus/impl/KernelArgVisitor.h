@@ -10,42 +10,42 @@
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/DenseSet.h>
 #include <llvm/ADT/SmallVector.h>
-#include <llvm/Analysis/MemorySSA.h>
-#include <llvm/Analysis/MemoryLocation.h>
-#include <llvm/Passes/PassBuilder.h>
-#include <llvm/Analysis/MemorySSA.h>
-#include <llvm/Analysis/TargetLibraryInfo.h>
-#include <llvm/Analysis/MemoryLocation.h>
-#include <llvm/Analysis/AliasAnalysis.h>
-#include <llvm/Analysis/AssumptionCache.h>
-#include <llvm/Analysis/BasicAliasAnalysis.h>
-#include <llvm/Analysis/CaptureTracking.h>
+// #include <llvm/Analysis/MemorySSA.h>
+// #include <llvm/Analysis/MemoryLocation.h>
+// #include <llvm/Passes/PassBuilder.h>
+// #include <llvm/Analysis/MemorySSA.h>
+// #include <llvm/Analysis/TargetLibraryInfo.h>
+// #include <llvm/Analysis/MemoryLocation.h>
+// #include <llvm/Analysis/AliasAnalysis.h>
+// #include <llvm/Analysis/AssumptionCache.h>
+// #include <llvm/Analysis/BasicAliasAnalysis.h>
+// #include <llvm/Analysis/CaptureTracking.h>
 #include <memory>
 
 
 namespace proteus {
 using namespace llvm;
 struct FnMemCtx {
-  llvm::DominatorTree DT;
-  llvm::AssumptionCache AC;
-  llvm::TargetLibraryInfoImpl TLII;
-  llvm::TargetLibraryInfo TLI;
-  llvm::BasicAAResult BAA;
-  llvm::AAResults AA;
-  llvm::MemorySSA MSSA;
-  llvm::MemorySSAWalker *Walker = nullptr;
+//   llvm::DominatorTree DT;
+//   llvm::AssumptionCache AC;
+//   llvm::TargetLibraryInfoImpl TLII;
+//   llvm::TargetLibraryInfo TLI;
+//   llvm::BasicAAResult BAA;
+//   llvm::AAResults AA;
+//   llvm::MemorySSA MSSA;
+//   llvm::MemorySSAWalker *Walker = nullptr;
 
-  FnMemCtx(llvm::Function &F)
-      : DT(F),                         // computes dominators
-        AC(F),                         // scans assumptions in F
-        TLII(llvm::Triple(F.getParent()->getTargetTriple())),
-        TLI(TLII, &F),                 // applies nobuiltin attrs, etc
-        BAA(F.getParent()->getDataLayout(), F, TLI, AC, &DT),
-        AA(TLI),
-        MSSA(F, &AA, &DT) {            // builds MemorySSA immediately
-    AA.addAAResult(BAA);
-    Walker = MSSA.getWalker();
-  }
+  FnMemCtx(llvm::Function &) {}
+//       : DT(F),                         // computes dominators
+//         AC(F),                         // scans assumptions in F
+//         TLII(llvm::Triple(F.getParent()->getTargetTriple())),
+//         TLI(TLII, &F),                 // applies nobuiltin attrs, etc
+//         BAA(F.getParent()->getDataLayout(), F, TLI, AC, &DT),
+//         AA(TLI),
+//         MSSA(F, &AA, &DT) {            // builds MemorySSA immediately
+//     AA.addAAResult(BAA);
+//     Walker = MSSA.getWalker();
+//   }
 };
 
 static void findAnnotatedFunctions(
@@ -116,23 +116,22 @@ static void findAnnotatedFunctions(
 	  bool AnalysisFailed = false;
 	  DenseMap<Function*, std::unique_ptr<FnMemCtx>>& FunctionAnalysisCache;
 
-    MemoryAccess* findClobberingWriteBeforeCB(CallBase *CB, int ArgNum) {
-      Function* CallerFunction = CB->getCaller();
-      if (!FunctionAnalysisCache.contains(CallerFunction))
-        FunctionAnalysisCache[CallerFunction] = std::make_unique<FnMemCtx>(*CallerFunction);
-      auto& CachedAnalysis = *FunctionAnalysisCache[CallerFunction];
-      MemoryAccess *MA = CachedAnalysis.MSSA.getMemoryAccess(CB);
-      auto *UD = cast<MemoryUseOrDef>(MA);
-      MemoryAccess *BeforeCB = UD->getDefiningAccess();
-      MemoryLocation Loc = MemoryLocation::getForArgument(CB, /*ArgIdx=*/ArgNum, CachedAnalysis.TLI);
-      return CachedAnalysis.MSSA.getWalker()->getClobberingMemoryAccess(BeforeCB, Loc);
-    }
+    // MemoryAccess* findClobberingWriteBeforeCB(CallBase *CB, int ArgNum) {
+    //   Function* CallerFunction = CB->getCaller();
+    //   if (!FunctionAnalysisCache.contains(CallerFunction))
+    //     FunctionAnalysisCache[CallerFunction] = std::make_unique<FnMemCtx>(*CallerFunction);
+    //   auto& CachedAnalysis = *FunctionAnalysisCache[CallerFunction];
+    //   MemoryAccess *MA = CachedAnalysis.MSSA.getMemoryAccess(CB);
+    //   auto *UD = cast<MemoryUseOrDef>(MA);
+    //   MemoryAccess *BeforeCB = UD->getDefiningAccess();
+    //   MemoryLocation Loc = MemoryLocation::getForArgument(CB, /*ArgIdx=*/ArgNum, CachedAnalysis.TLI);
+    //   return CachedAnalysis.MSSA.getWalker()->getClobberingMemoryAccess(BeforeCB, Loc);
+    // }
 
 	public:
 		LambdaArgVisitor(CallBase* LambdaCB_, Module& M,
 		                 DenseMap<Function*, std::unique_ptr<FnMemCtx>>& Cache_)
 		    : LambdaCB(LambdaCB_), DL(M.getDataLayout()), FunctionAnalysisCache(Cache_), Offset(0) {
-      llvm::outs() << "CONSTRUCTIN VISITOR FOR "<< *LambdaCB <<"\n";
       auto* ClosurePtr = LambdaCB->getArgOperand(0);
       // auto* Clobber = findClobberingWriteBeforeCB(LambdaCB, 0);
       // if (auto *MD = dyn_cast<MemoryDef>(Clobber);  MD->getMemoryInst()) {
@@ -400,7 +399,6 @@ inline bool analyzeLambdaUses(llvm::Module &M,
 	        continue;
 	      Visitor.markAsSeen(V);
         // Analyze the instruction
-        llvm::outs() << "VISITING " << *V <<"\n";
         if (auto *I = dyn_cast<Instruction>(V))
           Visitor.visit(*I);
         else if (auto *A = dyn_cast<Argument>(V))
