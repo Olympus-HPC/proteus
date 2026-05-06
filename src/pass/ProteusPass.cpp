@@ -32,7 +32,10 @@
 #include "proteus/Error.h"
 #include "proteus/Frontend/IRFunction.h"
 #include "proteus/impl/Cloning.h"
+#include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/Hashing.h"
+#include "proteus/impl/KernelArgVisitor.h"
+#include "proteus/impl/LambdaCallsite.h"
 #include "proteus/impl/Logger.h"
 #include "proteus/impl/RuntimeConstantTypeHelpers.h"
 
@@ -92,6 +95,8 @@
 #include <llvm/Transforms/Utils/Cloning.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
+#include <cstdio>
+#include <filesystem>
 #include <queue>
 #include <string>
 
@@ -105,6 +110,48 @@ namespace {
 static cl::opt<bool> ForceProteusAnnotateAll(
     "force-proteus-jit-annotate-all",
     cl::desc("Apply the 'jit' annotation on all GPU kernels"), cl::init(false));
+
+namespace helpers {
+#if defined(_WIN32)
+#include <tlhelp32.h>
+#include <windows.h>
+#else
+#include <sys/types.h>
+#include <unistd.h>
+#endif
+
+static uint32_t getParentProcessId() {
+#if defined(_WIN32)
+  DWORD pid = GetCurrentProcessId();
+  uint32_t ppid = 0;
+  HANDLE h = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+  if (h == INVALID_HANDLE_VALUE)
+    return 0;
+  PROCESSENTRY32 pe;
+  pe.dwSize = sizeof(pe);
+  if (Process32First(h, &pe)) {
+    do {
+      if (pe.th32ProcessID == pid) {
+        ppid = pe.th32ParentProcessID;
+        break;
+      }
+    } while (Process32Next(h, &pe));
+  }
+  CloseHandle(h);
+  return ppid;
+#else
+  return getppid();
+#endif
+}
+} // namespace helpers
+
+struct LambdaManifestRecord {
+  uint64_t LambdaID;
+  uint32_t CallsiteIndex;
+  uint32_t KernelArgIndex;
+  int64_t Offset;
+  RuntimeConstantType StorageType;
+};
 
 class ProteusPassImpl {
 public:
@@ -125,13 +172,13 @@ public:
     DEBUG(Logger::logs("proteus-pass")
           << "=== Pre Original Host Module\n"
           << M << "=== End of Pre Original Host Module\n");
-
     // ==================
     // Device compilation
     // ==================
     // For device compilation, just extract the module IR of device code
     // and return.
     if (isDeviceCompilation(M)) {
+      emitLambdaDeviceCallsiteManifest(M);
       emitJitModuleDevice(M, IsLTO);
       return true;
     }
@@ -147,6 +194,7 @@ public:
     instrumentRegisterFunction(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
+      instrumentLambdaLaunchCallsites(M, StubToKernelMap);
       emitJitLaunchKernelCall(M);
     }
 
@@ -232,6 +280,278 @@ private:
     ModulePassManager Passes =
         PB.buildPerModuleDefaultPipeline(OptimizationLevel::O3);
     Passes.run(M, MAM);
+  }
+
+  static uint64_t getInstructionOrder(const Instruction *I) {
+    uint64_t Order = 0;
+    for (const BasicBlock &BB : *I->getFunction()) {
+      for (const Instruction &Cur : BB) {
+        if (&Cur == I)
+          return Order;
+        ++Order;
+      }
+    }
+    reportFatalError("Instruction not found in parent function");
+  }
+
+  static void collectWrapperCallsites(Function &FunctorOperatorFunction,
+                                      SmallVectorImpl<CallBase *> &CBToAnalyze) {
+    for (auto *U : FunctorOperatorFunction.users()) {
+      if (auto *CB = dyn_cast<CallBase>(U))
+        CBToAnalyze.push_back(CB);
+    }
+
+    llvm::sort(CBToAnalyze, [](const CallBase *L, const CallBase *R) {
+      const Function *LF = L->getFunction();
+      const Function *RF = R->getFunction();
+      if (LF != RF)
+        return LF->getName() < RF->getName();
+      return getInstructionOrder(L) < getInstructionOrder(R);
+    });
+  }
+
+  SmallString<64> getUniqueLambdaManifestFilename(Module &M) {
+    auto TmpPath = std::filesystem::temp_directory_path();
+
+    return {TmpPath.string(),
+            "/",
+            "proteus-lambda-manifest-",
+            std::to_string(helpers::getParentProcessId()),
+            "-",
+            getUniqueFileID(M),
+            ".json"};
+  }
+
+  static llvm::StringRef getGlobalString(const llvm::GlobalVariable &GV) {
+    if (!GV.hasInitializer())
+      return {};
+
+    const llvm::Constant *Init = GV.getInitializer();
+    if (auto *CDS = llvm::dyn_cast<llvm::ConstantDataSequential>(Init)) {
+      if (CDS->isCString())
+        return CDS->getAsCString();
+      if (CDS->isString())
+        return CDS->getAsString();
+    }
+
+    if (auto *CDA = llvm::dyn_cast<llvm::ConstantDataArray>(Init)) {
+      if (CDA->isCString())
+        return CDA->getAsCString();
+      if (CDA->isString())
+        return CDA->getAsString();
+    }
+
+    return {};
+  }
+
+  void createLambdaDeviceManifestFile(
+      Module &M,
+      const StringMap<SmallVector<LambdaManifestRecord, 4>> &KernelManifest) {
+    if (KernelManifest.empty())
+      return;
+
+    SmallString<64> UniqueFilename = getUniqueLambdaManifestFilename(M);
+
+    int FD = -1;
+    std::error_code EC = sys::fs::openFileForWrite(UniqueFilename, FD);
+    if (EC)
+      reportFatalError("Error creating lambda manifest file: " +
+                       UniqueFilename.str().str() + ", error: " + EC.message());
+    raw_fd_ostream OS(FD, /*shouldClose=*/true);
+    if (OS.has_error())
+      reportFatalError("Error opening lambda manifest file: " +
+                       UniqueFilename.str().str() + ", error: " +
+                       OS.error().message());
+
+    json::Object ManifestInfo;
+    json::Array KernelArray;
+    for (const auto &KV : KernelManifest) {
+      json::Object KernelObject;
+      KernelObject["symbol"] = KV.getKey().str();
+
+      json::Array CallsiteArray;
+      for (const auto &Record : KV.getValue()) {
+        json::Object CallsiteObject;
+        CallsiteObject["lambda-id"] = static_cast<int64_t>(Record.LambdaID);
+        CallsiteObject["callsite-index"] =
+            static_cast<int64_t>(Record.CallsiteIndex);
+        CallsiteObject["kernel-arg"] =
+            static_cast<int64_t>(Record.KernelArgIndex);
+        CallsiteObject["offset"] = Record.Offset;
+        CallsiteObject["storage-type"] =
+            static_cast<int64_t>(Record.StorageType);
+        CallsiteArray.push_back(std::move(CallsiteObject));
+      }
+
+      KernelObject["lambda-callsites"] = std::move(CallsiteArray);
+      KernelArray.push_back(std::move(KernelObject));
+    }
+
+    ManifestInfo["manifest"] = std::move(KernelArray);
+    OS << formatv("{0:2}", json::Value(std::move(ManifestInfo)));
+    OS.close();
+  }
+
+  StringMap<SmallVector<LambdaManifestRecord, 4>>
+  parseLambdaManifestFile(Module &M) {
+    StringMap<SmallVector<LambdaManifestRecord, 4>> KernelManifest;
+    SmallString<64> UniqueFilename = getUniqueLambdaManifestFilename(M);
+    if (!sys::fs::exists(UniqueFilename))
+      return KernelManifest;
+
+    auto ErrorOrManifestBuf = MemoryBuffer::getFile(UniqueFilename);
+    if (!ErrorOrManifestBuf)
+      reportFatalError("Error reading lambda manifest file " +
+                       UniqueFilename.str().str());
+
+    std::unique_ptr<MemoryBuffer> ManifestBuf = std::move(*ErrorOrManifestBuf);
+    auto ExpectedJsonValue = json::parse(ManifestBuf->getBuffer());
+    if (auto E = ExpectedJsonValue.takeError())
+      reportFatalError("Failed to parse lambda manifest json: " +
+                       toString(std::move(E)));
+
+    json::Value ManifestValue = *ExpectedJsonValue;
+    json::Object *Manifest = ManifestValue.getAsObject();
+    if (!Manifest)
+      reportFatalError("Failed to parse lambda manifest object");
+
+    json::Array *KernelArray = Manifest->getArray("manifest");
+    if (!KernelArray)
+      reportFatalError("Failed to parse lambda manifest kernel array");
+
+    for (auto &Entry : *KernelArray) {
+      json::Object *KernelObject = Entry.getAsObject();
+      if (!KernelObject)
+        reportFatalError("Failed parsing lambda manifest kernel object");
+
+      auto OptionalKernelSym = KernelObject->getString("symbol");
+      if (!OptionalKernelSym)
+        reportFatalError("Failed parsing lambda manifest kernel symbol");
+
+      json::Array *CallsiteArray = KernelObject->getArray("lambda-callsites");
+      if (!CallsiteArray)
+        reportFatalError("Failed parsing lambda manifest callsite array");
+
+      auto &Records = KernelManifest[*OptionalKernelSym];
+      for (auto &CallsiteEntry : *CallsiteArray) {
+        json::Object *CallsiteObject = CallsiteEntry.getAsObject();
+        if (!CallsiteObject)
+          reportFatalError("Failed parsing lambda manifest callsite object");
+
+        auto LambdaID = CallsiteObject->getInteger("lambda-id");
+        auto CallsiteIndex = CallsiteObject->getInteger("callsite-index");
+        auto KernelArgIndex = CallsiteObject->getInteger("kernel-arg");
+        auto Offset = CallsiteObject->getInteger("offset");
+        auto StorageType = CallsiteObject->getInteger("storage-type");
+        if (!LambdaID || !CallsiteIndex || !KernelArgIndex || !Offset ||
+            !StorageType)
+          reportFatalError("Failed parsing lambda manifest callsite payload");
+
+        Records.push_back(LambdaManifestRecord{
+            static_cast<uint64_t>(*LambdaID),
+            static_cast<uint32_t>(*CallsiteIndex),
+            static_cast<uint32_t>(*KernelArgIndex),
+            static_cast<int64_t>(*Offset),
+            static_cast<RuntimeConstantType>(*StorageType)});
+      }
+    }
+
+    std::remove(UniqueFilename.c_str());
+    return KernelManifest;
+  }
+
+  FunctionCallee getJitRegisterLambdaCallsiteLocationFn(Module &M) {
+    FunctionType *FnTy =
+        FunctionType::get(Types.VoidTy,
+                          {Types.PtrTy, Types.Int64Ty, Types.Int32Ty,
+                           Types.Int32Ty, Types.Int64Ty, Types.Int32Ty},
+                          /*isVarArg=*/false);
+    return M.getOrInsertFunction("__proteus_register_lambda_callsite_location",
+                                 FnTy);
+  }
+
+  void emitLambdaDeviceCallsiteManifest(Module &M) {
+    StringMap<SmallVector<LambdaManifestRecord, 4>> KernelManifest;
+    SmallVector<std::pair<Function *, uint64_t>, 16> FunctorOperatorMethods;
+    findFunctionsWithU64Metadata(M, "proteus.wrapper_call", FunctorOperatorMethods);
+
+    DenseMap<Function *, std::unique_ptr<FnMemCtx>> FunctionAnalysisCache;
+    for (auto &[FunctorOperator, FunctorId] : FunctorOperatorMethods) {
+      SmallVector<CallBase *> CBToAnalyze;
+      collectWrapperCallsites(*FunctorOperator, CBToAnalyze);
+      if (CBToAnalyze.empty())
+        continue;
+
+      DenseMap<CallBase *, LambdaKernelArgAnalysis> CallBaseToArgOffset;
+      if (!analyzeLambdaUses(M, CallBaseToArgOffset, CBToAnalyze,
+                             FunctionAnalysisCache))
+        reportFatalError("Lambda kernel-arg analysis failed for functor " +
+                         std::to_string(FunctorId));
+
+      uint32_t CallsiteIndex = 0;
+      for (CallBase *CB : CBToAnalyze) {
+        auto It = CallBaseToArgOffset.find(CB);
+        if (It == CallBaseToArgOffset.end() || !It->second.KernelFunction)
+          reportFatalError("Missing lambda kernel-arg analysis result");
+
+        setLambdaCallsiteMetadata(*CB, FunctorId, CallsiteIndex);
+        auto &Records = KernelManifest[It->second.KernelFunction->getName()];
+        Records.push_back(LambdaManifestRecord{
+            FunctorId, CallsiteIndex, It->second.KernelArgIndex,
+            It->second.Offset,
+            It->second.ChangedRCLayout.value_or(RuntimeConstantType::NONE)});
+        ++CallsiteIndex;
+      }
+    }
+
+    createLambdaDeviceManifestFile(M, KernelManifest);
+  }
+
+  void instrumentLambdaLaunchCallsites(
+      Module &M, const DenseMap<Value *, GlobalVariable *> &StubToKernelMap) {
+    auto KernelManifest = parseLambdaManifestFile(M);
+    if (KernelManifest.empty())
+      return;
+
+    Function *LaunchKernelFn = M.getFunction(LaunchFunctionName);
+    if (!LaunchKernelFn)
+      return;
+
+    SmallVector<CallBase *, 16> LaunchCalls;
+    for (User *Usr : LaunchKernelFn->users())
+      if (auto *CB = dyn_cast<CallBase>(Usr))
+        LaunchCalls.push_back(CB);
+
+    FunctionCallee RegisterFn = getJitRegisterLambdaCallsiteLocationFn(M);
+    for (CallBase *LaunchCB : LaunchCalls) {
+      Value *KernelKey = getStubGV(LaunchCB->getArgOperand(0));
+      if (!KernelKey)
+        continue;
+      KernelKey = KernelKey->stripPointerCasts();
+
+      auto StubIt = StubToKernelMap.find(KernelKey);
+      if (StubIt == StubToKernelMap.end())
+        continue;
+
+      StringRef KernelSym = getGlobalString(*StubIt->second);
+      if (KernelSym.empty())
+        continue;
+
+      auto ManifestIt = KernelManifest.find(KernelSym);
+      if (ManifestIt == KernelManifest.end())
+        continue;
+
+      IRBuilder<> Builder(LaunchCB);
+      for (const auto &Record : ManifestIt->getValue()) {
+        Builder.CreateCall(
+            RegisterFn,
+            {LaunchCB->getArgOperand(0), Builder.getInt64(Record.LambdaID),
+             Builder.getInt32(Record.CallsiteIndex),
+             Builder.getInt32(Record.KernelArgIndex),
+             Builder.getInt64(Record.Offset),
+             Builder.getInt32(static_cast<int32_t>(Record.StorageType))});
+      }
+    }
   }
 
   void emitJitModuleHost(Module &M,

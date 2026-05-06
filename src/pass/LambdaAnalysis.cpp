@@ -120,7 +120,6 @@ public:
   LambdaPassImpl(Module &M) : Types(M) {}
 
   bool run(Module &M, bool) {
-    AnnotationHandler AnnotHandler{M};
     // Attach Metadata nodes corresponding to llvm.global.annotations to
     // individual function calls.
     materializeWrapperCallMetadata(M);
@@ -132,14 +131,6 @@ public:
         LambdaStorageTypeToJitIndices;
     DenseMap<Type *, GlobalVariable *> LambdaTypeToGlobalName;
     DenseSet<StructType *> RegisteredLambdaStorageClasses;
-    // if (isDeviceCompilation(M)) {
-    //   llvm::errs() <<"DEVICE MODULE ===== \n";
-    // }
-    //   llvm::errs() << M;
-    // if (isDeviceCompilation(M)) {
-    //   llvm::errs() <<" END DEVICE MODULE ===== \n";
-    //   llvm::errs().flush();
-    // }
     // clang-format off
     // Look at device module.  Track a map of lambda CB --> kernel arg + offset
     // assign a unique metadata node for each lambda CB
@@ -793,7 +784,16 @@ llvm::PassPluginLibraryInfo getLambdaPassPluginInfo() {
           MPM.addPass(LambdaPass{false});
         });
 #else
-    PB.registerPipelineStartEPCallback(
+// #if LLVM_VERSION_MAJOR >= 20
+//     PB.registerPipelineEarlySimplificationEPCallback(
+//         [&](ModulePassManager &MPM, OptimizationLevel,
+//           ThinOrFullLTOPhase LTOPhase) {
+//           if (LTOPhase != ThinOrFullLTOPhase::None)
+//             reportFatalError("Expected registration only for non-LTO");
+//           MPM.addPass(LambdaPass{false});
+//         });
+// #else
+    PB.registerPipelineEarlySimplificationEPCallback(
         [&](ModulePassManager &MPM, OptimizationLevel) {
           MPM.addPass(LambdaPass{false});
           return true;
