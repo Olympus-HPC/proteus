@@ -287,6 +287,7 @@ inline void specializeIR(
     Module &M, void** KernelArgs, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
     dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
     const SmallVector<uint64_t> LambdaCalleeInfo,
+    const LambdaCallsiteLocationMap &LambdaCallsiteLocations,
     bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsRange,
     bool SpecializeLaunchBounds, int MinBlocksPerSM) {
   TIMESCOPE("proteus::specializeIR");
@@ -308,9 +309,16 @@ inline void specializeIR(
     if (!VariantsOpt)
       continue;
 
-    TransformLambdaSpecialization::transformDeviceKernel(M, KernelArgs, ID, VariantsOpt.value());
+    auto It = LambdaCallsiteLocations.find(ID);
+    if (It == LambdaCallsiteLocations.end())
+      reportFatalError("Missing lambda callsite locations for functor " +
+                       std::to_string(ID));
+    TransformLambdaSpecialization::transformDeviceKernel(
+        M, KernelArgs, ID, VariantsOpt.value(), It->second);
   }
-
+  // llvm::outs() << M;
+  // llvm::outs().flush();
+  // Logger::logs("proteus").flush();
   // Run the shared array transform after any value specialization (arguments,
   // captures) to propagate any constants.
   TransformSharedArray::transform(M);

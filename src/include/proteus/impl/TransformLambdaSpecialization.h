@@ -489,16 +489,25 @@ public:
       DenseMap<Function *, std::unique_ptr<FnMemCtx>> &FunctionAnalysisCache) {
     Function *FunctorOperatorFunction =
         findFunctorFunctorOperatorFunctionOperatorFromID(M, FunctorID);
-    if (!FunctorOperatorFunction)
+    if (!FunctorOperatorFunction) {
+      errs() << "[proteus][debug] no wrapper for functor id " << FunctorID
+             << "\n";
       return false;
+    }
 
     SmallVector<CallBase *> CBToAnalyze;
     collectWrapperCallsites(*FunctorOperatorFunction, CBToAnalyze);
 
     DenseMap<CallBase *, std::pair<uint32_t, int64_t>> CallBaseToArgOffset;
     if (!analyzeLambdaUses(M, CallBaseToArgOffset, CBToAnalyze,
-                           FunctionAnalysisCache))
+                           FunctionAnalysisCache)) {
+      errs() << "[proteus][debug] lambda arg analysis failed for functor id "
+             << FunctorID << " wrapper " << FunctorOperatorFunction->getName()
+             << " callsites " << CBToAnalyze.size() << "\n";
+      for (CallBase *CB : CBToAnalyze)
+        errs() << "  callsite: " << *CB << "\n";
       return false;
+    }
 
     KernelArgLocations.clear();
     KernelArgLocations.reserve(CBToAnalyze.size());

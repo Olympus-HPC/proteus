@@ -65,6 +65,19 @@ __proteus_register_function(void *Handle, void *Kernel, char *KernelName,
   JitEngineInfo.registerFunction(Handle, Kernel, KernelName, RCInfoArray);
 }
 
+extern "C" __attribute__((used)) void
+__proteus_register_lambda_callsite_location(void *Kernel, uint64_t LambdaID,
+                                            uint32_t CallsiteIndex,
+                                            uint32_t KernelArgIndex,
+                                            int64_t Offset,
+                                            int32_t StorageType) {
+  auto &Jit = JitDeviceImplT::instance();
+  Jit.registerLambdaCallsiteLocation(Kernel, LambdaID, CallsiteIndex,
+                                     KernelArgIndex, Offset,
+                                     static_cast<RuntimeConstantType>(
+                                         StorageType));
+}
+
 extern "C" proteus::DeviceTraits<JitDeviceImplT>::DeviceError_t
 __proteus_launch_kernel(void *Kernel, dim3 GridDim, dim3 BlockDim,
                         void **KernelArgs, uint64_t ShmemSize, void *Stream) {
