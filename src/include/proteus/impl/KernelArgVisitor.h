@@ -1,6 +1,8 @@
 #ifndef PROTEUS_KERNELARGVISITOR_H
 #define PROTEUS_KERNELARGVISITOR_H
 
+#include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/impl/RuntimeConstantTypeHelpers.h"
 #include <alloca.h>
 #include <cstdint>
 
@@ -9,18 +11,34 @@
 #include <llvm/ADT/Hashing.h>
 #include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/ADT/SmallVector.h>
-#include <llvm/Analysis/ValueTracking.h>
-#include <llvm/IR/Dominators.h>
-#include <llvm/IR/InstrTypes.h>
-#include <llvm/IR/Instruction.h>
-#include <llvm/IR/InstVisitor.h>
-#include <llvm/IR/IntrinsicInst.h>
+// #include <llvm/Analysis/MemorySSA.h>
+// #include <llvm/Analysis/MemoryLocation.h>
+// #include <llvm/Passes/PassBuilder.h>
+// #include <llvm/Analysis/MemorySSA.h>
+// #include <llvm/Analysis/TargetLibraryInfo.h>
+// #include <llvm/Analysis/MemoryLocation.h>
+// #include <llvm/Analysis/AliasAnalysis.h>
+// #include <llvm/Analysis/AssumptionCache.h>
+// #include <llvm/Analysis/BasicAliasAnalysis.h>
+// #include <llvm/Analysis/CaptureTracking.h>
+#include <llvm/IR/Type.h>
+#include <memory>
+#include <optional>
 
 #include <memory>
 #include <optional>
 
 namespace proteus {
 using namespace llvm;
+
+struct LambdaKernelArgAnalysis {
+  Function *KernelFunction = nullptr;
+  uint32_t KernelArgIndex = 0;
+  int64_t Offset = 0;
+  // Sometimes instructions like ptrtoint --> inttoptr change the layout of
+  // the kernel args.
+  std::optional<RuntimeConstantType> ChangedRCLayout = std::nullopt;
+};
 
 struct FnMemCtx {
   llvm::DominatorTree DT;
@@ -148,9 +166,156 @@ private:
     return *Entry;
   }
 
-  void pushWork(Value *V, Instruction *UseSite, int64_t Offset) {
-    WorkList.push_back({V, UseSite, Offset});
+	class LambdaArgVisitor : public InstVisitor<LambdaArgVisitor> {
+	private:
+	  CallBase* LambdaCB;
+	  const DataLayout &DL;
+    SmallVector<Value*> WorkList;
+    SmallDenseSet<Value*> Seen;
+    int64_t Offset;
+    uint32_t KernelArg = 0;
+    Function *KernelFunction = nullptr;
+    // instructions like inttoptr can change the runtimeconstant type
+    // we to read from the Blob
+    std::optional<RuntimeConstantType> ChangedRC = std::nullopt;
+	  bool AnalysisSuccess = false;
+	  bool AnalysisFailed = false;
+	  DenseMap<Function*, std::unique_ptr<FnMemCtx>>& FunctionAnalysisCache;
+
+    // MemoryAccess* findClobberingWriteBeforeCB(CallBase *CB, int ArgNum) {
+    //   Function* CallerFunction = CB->getCaller();
+    //   if (!FunctionAnalysisCache.contains(CallerFunction))
+    //     FunctionAnalysisCache[CallerFunction] = std::make_unique<FnMemCtx>(*CallerFunction);
+    //   auto& CachedAnalysis = *FunctionAnalysisCache[CallerFunction];
+    //   MemoryAccess *MA = CachedAnalysis.MSSA.getMemoryAccess(CB);
+    //   auto *UD = cast<MemoryUseOrDef>(MA);
+    //   MemoryAccess *BeforeCB = UD->getDefiningAccess();
+    //   MemoryLocation Loc = MemoryLocation::getForArgument(CB, /*ArgIdx=*/ArgNum, CachedAnalysis.TLI);
+    //   return CachedAnalysis.MSSA.getWalker()->getClobberingMemoryAccess(BeforeCB, Loc);
+    // }
+
+	public:
+		LambdaArgVisitor(CallBase* LambdaCB_, Module& M,
+		                 DenseMap<Function*, std::unique_ptr<FnMemCtx>>& Cache_)
+		    : LambdaCB(LambdaCB_), DL(M.getDataLayout()), FunctionAnalysisCache(Cache_), Offset(0) {
+      auto* ClosurePtr = LambdaCB->getArgOperand(0);
+      WorkList.push_back(ClosurePtr);
+		}
+	void visitStoreInst (StoreInst &SI) { WorkList.push_back(SI.getValueOperand()); }
+  void visitCallBase (CallBase &) {}
+  void visitIntToPtr (IntToPtrInst& ITP) {
+    auto* IntegerVal = ITP.getOperand(0);
+    auto* Ptr = dyn_cast<PtrToIntInst>(IntegerVal);
+    if (!Ptr) {
+      AnalysisSuccess = false;
+      AnalysisFailed = true;
+      return;
+    }
+    ChangedRC = convertTypeToRuntimeConstantType(Ptr->getType());
+
+    WorkList.push_back(Ptr->getPointerOperand());
   }
+
+	void visitLoadInst (LoadInst &LI) {
+	  if (!LI.getType()->isPointerTy()) {
+	    AnalysisFailed = true;
+	    return;
+	  }
+
+	  int64_t LoadOff = 0;
+	  Value *LoadBase =
+	      GetPointerBaseWithConstantOffset(LI.getPointerOperand(), LoadOff, DL);
+	  if (!LoadBase) {
+	    AnalysisFailed = true;
+	    return;
+	  }
+	  LoadBase = LoadBase->stripPointerCasts();
+
+	  SmallVector<Value *, 8> PtrWorkList;
+	  SmallPtrSet<Value *, 16> LocalSeen;
+	  PtrWorkList.push_back(LoadBase);
+
+	  Value *CommonStoredVal = nullptr;
+	  bool FoundStore = false;
+
+	  while (!PtrWorkList.empty()) {
+	    Value *Cur = PtrWorkList.pop_back_val();
+	    if (!LocalSeen.insert(Cur).second)
+	      continue;
+
+	    for (User *U : Cur->users()) {
+	      if (auto *SI = dyn_cast<StoreInst>(U)) {
+	        int64_t StoreOff = 0;
+	        Value *StoreBase = GetPointerBaseWithConstantOffset(
+	            SI->getPointerOperand(), StoreOff, DL);
+	        if (!StoreBase)
+	          continue;
+	        StoreBase = StoreBase->stripPointerCasts();
+
+	        if (StoreBase != LoadBase || StoreOff != LoadOff)
+	          continue;
+
+	        Value *V = SI->getValueOperand();
+	        if (!V->getType()->isPointerTy())
+	          continue;
+
+	        V = V->stripPointerCasts();
+	        if (!FoundStore) {
+	          CommonStoredVal = V;
+	          FoundStore = true;
+	        } else if (CommonStoredVal != V) {
+	          AnalysisFailed = true;
+	          return;
+	        }
+	        continue;
+	      }
+
+	      if (isa<GetElementPtrInst>(U) || isa<BitCastInst>(U) ||
+	          isa<AddrSpaceCastInst>(U) || isa<PHINode>(U) ||
+	          isa<SelectInst>(U)) {
+	        PtrWorkList.push_back(cast<Value>(U));
+	        continue;
+	      }
+
+	      if (auto *II = dyn_cast<IntrinsicInst>(U)) {
+	        switch (II->getIntrinsicID()) {
+	        case Intrinsic::dbg_declare:
+	        case Intrinsic::dbg_value:
+	        case Intrinsic::lifetime_start:
+	        case Intrinsic::lifetime_end:
+	          continue;
+	        default:
+	          break;
+	        }
+	      }
+	    }
+	  }
+
+	  if (!FoundStore) {
+	    AnalysisFailed = true;
+	    return;
+	  }
+
+	  WorkList.push_back(CommonStoredVal);
+	}
+
+auto back() { return WorkList.back(); }
+void popBack() { WorkList.pop_back(); }
+bool seen(Value* Val) { return Seen.contains(Val); }
+void markAsSeen(Value* Val) { Seen.insert(Val); }
+bool empty() { return WorkList.empty(); }
+	bool success() { return AnalysisSuccess; }
+	bool failed() { return AnalysisFailed; }
+	LambdaKernelArgAnalysis getKernelArgInfo() {
+      return LambdaKernelArgAnalysis{KernelFunction, KernelArg, Offset, ChangedRC};
+    }
+
+void visitGetElementPtrInst (GetElementPtrInst &GEP) {
+  int64_t GEPOffset = 0;
+  GetPointerBaseWithConstantOffset(&GEP, GEPOffset, DL);
+  Offset += GEPOffset;
+  WorkList.push_back(GEP.getPointerOperand());
+}
 
   static bool isIgnoredIntrinsic(const IntrinsicInst &II) {
     switch (II.getIntrinsicID()) {
@@ -501,17 +666,26 @@ public:
     return Seen.contains({Item.V, Item.UseSite, Item.Offset});
   }
 
-  void markAsSeen(const WorkItem &Item) {
-    Seen.insert({Item.V, Item.UseSite, Item.Offset});
-  }
+void visitArgument(Argument &A) {
+  Function* F = A.getParent();
+  auto ArgNum = A.getArgNo();
+  // termination case:  we have reached the parent calling kernel
+  // todo: we could just pass in the kernel pointer here and check equality
+	  if (F->getCallingConv() == CallingConv::AMDGPU_KERNEL ||
+	      F->getCallingConv() == CallingConv::PTX_Kernel) {
+	    AnalysisSuccess = true;
+	    KernelArg = ArgNum;
+        KernelFunction = F;
+	    return;
+	  }
+  if (!FunctionAnalysisCache.contains(F))
+    FunctionAnalysisCache[F] = std::make_unique<FnMemCtx>(*F);
 
-  bool empty() { return WorkList.empty(); }
-  bool success() { return AnalysisSuccess; }
-  bool failed() { return AnalysisFailed; }
-
-  void setCurrentItem(const WorkItem &Item) {
-    CurrentUseSite = Item.UseSite;
-    CurrentOffset = Item.Offset;
+  for (User* U : F->users()) {
+    auto* CB = dyn_cast<CallBase>(U);
+    if (!CB)
+      continue;
+    WorkList.push_back(CB->getArgOperand(ArgNum));
   }
 
   auto getKernelArgAndOffset() {
@@ -653,50 +827,38 @@ public:
   }
 };
 
-inline bool analyzeLambdaUses(
-    llvm::Module &M,
-    DenseMap<CallBase *, std::pair<uint32_t, int64_t>> &CallBaseToArgOffset,
-    const SmallVector<CallBase *> &CBToAnalyze,
-    DenseMap<Function *, std::unique_ptr<FnMemCtx>> &FunctionAnalysisCache) {
-  for (auto *FunctorCB : CBToAnalyze) {
-    LambdaArgVisitor Visitor(FunctorCB, M, FunctionAnalysisCache);
-    Value *LastValue = nullptr;
-    Instruction *LastUseSite = nullptr;
-    int64_t LastOffset = 0;
-    while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {
-      auto Item = Visitor.back();
-      Visitor.popBack();
-
-      if (Visitor.seen(Item))
-        continue;
-      Visitor.markAsSeen(Item);
-      Visitor.setCurrentItem(Item);
-      LastValue = Item.V;
-      LastUseSite = Item.UseSite;
-      LastOffset = Item.Offset;
-
-      auto *V = Item.V;
-      if (auto *I = dyn_cast<Instruction>(V))
-        Visitor.visit(*I);
-      else if (auto *A = dyn_cast<Argument>(V))
-        Visitor.visitArgument(*A);
-      else
-        continue;
-    }
-
-    if (!Visitor.success() || Visitor.failed()) {
-      errs() << "[proteus][debug] analyzeLambdaUses failed for callsite "
-             << *FunctorCB << "\n";
-      if (LastValue)
-        errs() << "  last value: " << *LastValue << "\n";
-      if (LastUseSite)
-        errs() << "  last use-site: " << *LastUseSite << "\n";
-      errs() << "  last offset: " << LastOffset << "\n";
-      return false;
-    }
-    CallBaseToArgOffset[FunctorCB] = Visitor.getKernelArgAndOffset();
-  }
-  return true;
+inline bool analyzeLambdaUses(llvm::Module &M,
+ DenseMap<CallBase*, LambdaKernelArgAnalysis> &CallBaseToArgOffset,
+		  const SmallVector<CallBase*> &CBToAnalyze,
+	    DenseMap<Function*, std::unique_ptr<FnMemCtx>>& FunctionAnalysisCache) {
+    // llvm::outs() << M;
+	  for (auto* FunctorCB : CBToAnalyze) {
+	    LambdaArgVisitor Visitor (FunctorCB, M,
+        FunctionAnalysisCache);
+	    while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {
+	      auto* V = (Visitor.back());
+	      Visitor.popBack();
+        // Prevent loops/infinite recursion
+	      if (Visitor.seen(V))
+	        continue;
+	      Visitor.markAsSeen(V);
+        // Analyze the instruction
+	        if (auto *I = dyn_cast<Instruction>(V))
+	          Visitor.visit(*I);
+        else if (auto *A = dyn_cast<Argument>(V))
+          Visitor.visitArgument(*A);
+        else
+          continue;
+	        }
+		    if (!Visitor.success() || Visitor.failed())
+		      return false;
+            LambdaKernelArgAnalysis Info = Visitor.getKernelArgInfo();
+            if (!Info.KernelFunction)
+              return false;
+		    CallBaseToArgOffset[FunctorCB] = Info;
+		  }
+		  return true;
+		}
 }
 } // namespace proteus
 
