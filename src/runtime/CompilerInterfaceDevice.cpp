@@ -72,10 +72,9 @@ __proteus_register_lambda_callsite_location(void *Kernel, uint64_t LambdaID,
                                             int64_t Offset,
                                             int32_t StorageType) {
   auto &Jit = JitDeviceImplT::instance();
-  Jit.registerLambdaCallsiteLocation(Kernel, LambdaID, CallsiteIndex,
-                                     KernelArgIndex, Offset,
-                                     static_cast<RuntimeConstantType>(
-                                         StorageType));
+  Jit.registerLambdaCallsiteLocation(
+      Kernel, LambdaID, CallsiteIndex, KernelArgIndex, Offset,
+      static_cast<RuntimeConstantType>(StorageType));
 }
 
 extern "C" proteus::DeviceTraits<JitDeviceImplT>::DeviceError_t

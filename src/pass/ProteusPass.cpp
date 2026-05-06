@@ -294,8 +294,9 @@ private:
     reportFatalError("Instruction not found in parent function");
   }
 
-  static void collectWrapperCallsites(Function &FunctorOperatorFunction,
-                                      SmallVectorImpl<CallBase *> &CBToAnalyze) {
+  static void
+  collectWrapperCallsites(Function &FunctorOperatorFunction,
+                          SmallVectorImpl<CallBase *> &CBToAnalyze) {
     for (auto *U : FunctorOperatorFunction.users()) {
       if (auto *CB = dyn_cast<CallBase>(U))
         CBToAnalyze.push_back(CB);
@@ -359,9 +360,9 @@ private:
                        UniqueFilename.str().str() + ", error: " + EC.message());
     raw_fd_ostream OS(FD, /*shouldClose=*/true);
     if (OS.has_error())
-      reportFatalError("Error opening lambda manifest file: " +
-                       UniqueFilename.str().str() + ", error: " +
-                       OS.error().message());
+      reportFatalError(
+          "Error opening lambda manifest file: " + UniqueFilename.str().str() +
+          ", error: " + OS.error().message());
 
     json::Object ManifestInfo;
     json::Array KernelArray;
@@ -473,7 +474,8 @@ private:
   void emitLambdaDeviceCallsiteManifest(Module &M) {
     StringMap<SmallVector<LambdaManifestRecord, 4>> KernelManifest;
     SmallVector<std::pair<Function *, uint64_t>, 16> FunctorOperatorMethods;
-    findFunctionsWithU64Metadata(M, "proteus.wrapper_call", FunctorOperatorMethods);
+    findFunctionsWithU64Metadata(M, "proteus.wrapper_call",
+                                 FunctorOperatorMethods);
 
     DenseMap<Function *, std::unique_ptr<FnMemCtx>> FunctionAnalysisCache;
     for (auto &[FunctorOperator, FunctorId] : FunctorOperatorMethods) {

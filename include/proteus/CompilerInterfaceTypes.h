@@ -75,8 +75,8 @@ struct RuntimeConstant {
   RuntimeConstantType Type;
   int32_t Pos;
   int32_t Offset;
-  //todo make this a template, eliminate RuntimeConstantType
-  // using type = T;
+  // todo make this a template, eliminate RuntimeConstantType
+  //  using type = T;
   ArrayInfo ArrInfo{0, RuntimeConstantType::NONE, nullptr};
   ObjectInfo ObjInfo{0, false, nullptr};
 

@@ -283,13 +283,13 @@ inline void relinkGlobalsObject(
   }
 }
 
-inline void specializeIR(
-    Module &M, void** KernelArgs, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
-    dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
-    const SmallVector<uint64_t> LambdaCalleeInfo,
-    const LambdaCallsiteLocationMap &LambdaCallsiteLocations,
-    bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsRange,
-    bool SpecializeLaunchBounds, int MinBlocksPerSM) {
+inline void
+specializeIR(Module &M, void **KernelArgs, StringRef FnName, StringRef Suffix,
+             dim3 &BlockDim, dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
+             const SmallVector<uint64_t> LambdaCalleeInfo,
+             const LambdaCallsiteLocationMap &LambdaCallsiteLocations,
+             bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsRange,
+             bool SpecializeLaunchBounds, int MinBlocksPerSM) {
   TIMESCOPE("proteus::specializeIR");
   Timer T(Config::get().ProteusEnableTimers);
   Function *F = M.getFunction(FnName);
@@ -301,9 +301,8 @@ inline void specializeIR(
 
   auto &LR = LambdaRegistry::instance();
 
-  // We add a per-function cache for memory ssa so that we don't have to duplicate
-  // results.
-  // TransformLambdaSpecialization LambdaTransformer;
+  // We add a per-function cache for memory ssa so that we don't have to
+  // duplicate results. TransformLambdaSpecialization LambdaTransformer;
   for (auto &ID : LambdaCalleeInfo) {
     auto VariantsOpt = LR.getJitVariants(ID);
     if (!VariantsOpt)

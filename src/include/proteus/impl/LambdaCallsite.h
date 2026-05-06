@@ -37,7 +37,8 @@ inline void setLambdaCallsiteMetadata(CallBase &CB, uint64_t LambdaID,
       ConstantInt::get(Type::getInt64Ty(Ctx), LambdaID));
   auto *IndexMD = ConstantAsMetadata::get(
       ConstantInt::get(Type::getInt32Ty(Ctx), CallsiteIndex));
-  CB.setMetadata(LambdaCallsiteMetadataName, MDNode::get(Ctx, {LambdaMD, IndexMD}));
+  CB.setMetadata(LambdaCallsiteMetadataName,
+                 MDNode::get(Ctx, {LambdaMD, IndexMD}));
 }
 
 inline std::optional<std::pair<uint64_t, uint32_t>>
@@ -59,17 +60,16 @@ getLambdaCallsiteMetadata(const CallBase &CB) {
                         static_cast<uint32_t>(IndexCI->getZExtValue()));
 }
 
-inline std::optional<uint32_t> getLambdaCallsiteIndex(const CallBase &CB,
-                                                      uint64_t ExpectedLambdaID) {
+inline std::optional<uint32_t>
+getLambdaCallsiteIndex(const CallBase &CB, uint64_t ExpectedLambdaID) {
   auto Metadata = getLambdaCallsiteMetadata(CB);
   if (!Metadata || Metadata->first != ExpectedLambdaID)
     return std::nullopt;
   return Metadata->second;
 }
 
-inline LambdaKernelArgLocationVec
-getOrderedLambdaKernelArgLocations(const DenseMap<uint32_t, LambdaKernelArgLocation>
-                                       &CallsiteLocations) {
+inline LambdaKernelArgLocationVec getOrderedLambdaKernelArgLocations(
+    const DenseMap<uint32_t, LambdaKernelArgLocation> &CallsiteLocations) {
   LambdaKernelArgLocationVec Ordered;
   if (CallsiteLocations.empty())
     return Ordered;

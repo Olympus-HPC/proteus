@@ -7,11 +7,11 @@
 #include "proteus/impl/Debug.h"
 #include "proteus/impl/Logger.h"
 
+#include <cstring>
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Demangle/Demangle.h>
-#include <cstring>
 #include <optional>
 
 namespace proteus {
@@ -61,7 +61,7 @@ public:
     JitVariantVec &Variants = JitVariableVariants[ID];
 
     auto RuntimeConstantEqual = [](const RuntimeConstant &A,
-                                  const RuntimeConstant &B) -> bool {
+                                   const RuntimeConstant &B) -> bool {
       if (A.Type != B.Type)
         return false;
       if (A.Pos != B.Pos)
@@ -111,7 +111,6 @@ private:
   // within the lambda storage.
   DenseMap<uint64_t, JitVariantVec> JitVariableVariants;
   DenseMap<uint64_t, JitVariantMap> PendingJitVariables;
-
 };
 
 } // namespace proteus

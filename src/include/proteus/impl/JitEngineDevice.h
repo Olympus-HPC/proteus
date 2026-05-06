@@ -232,9 +232,9 @@ class JITKernelInfo {
   std::optional<std::unique_ptr<MemoryBuffer>> Bitcode;
   std::optional<std::reference_wrapper<BinaryInfo>> BinInfo;
   std::optional<HashT> StaticHash;
-  // LambdaCalleeInfo optionally contains a vector with all annotated LambdaFunctorWrapper annotators and thei unique IDs
-  std::optional<SmallVector<uint64_t>>
-      LambdaCalleeInfo;
+  // LambdaCalleeInfo optionally contains a vector with all annotated
+  // LambdaFunctorWrapper annotators and thei unique IDs
+  std::optional<SmallVector<uint64_t>> LambdaCalleeInfo;
   std::optional<LambdaCallsiteLocationMap> LambdaCallsiteLocationInfo;
 
 public:
@@ -242,8 +242,7 @@ public:
                 ArrayRef<RuntimeConstantInfo *> RCInfoArray)
       : Kernel(Kernel), Ctx(std::make_unique<LLVMContext>()), Name(Name),
         RCInfoArray(RCInfoArray), ExtractedModule(std::nullopt),
-        Bitcode{std::nullopt}, BinInfo(BinInfo),
-        LambdaCalleeInfo(std::nullopt),
+        Bitcode{std::nullopt}, BinInfo(BinInfo), LambdaCalleeInfo(std::nullopt),
         LambdaCallsiteLocationInfo(std::nullopt) {}
 
   JITKernelInfo() = default;
@@ -276,8 +275,7 @@ public:
 
   bool hasLambdaCalleeInfo() { return LambdaCalleeInfo.has_value(); }
   const auto &getLambdaCalleeInfo() { return LambdaCalleeInfo.value(); }
-  void setLambdaCalleeInfo(
-      SmallVector<uint64_t> &&LambdaInfo) {
+  void setLambdaCalleeInfo(SmallVector<uint64_t> &&LambdaInfo) {
     LambdaCalleeInfo = std::move(LambdaInfo);
   }
 
@@ -447,10 +445,10 @@ public:
     return KernelInfo.getBitcode();
   }
 
-  void getLambdaJitValues(JITKernelInfo &KernelInfo,
-                          DenseMap<uint64_t, LambdaRegistry::JitVariantVec>
-                              &LambdaJitValuesMap,
-                          void **KernelArgs) {
+  void getLambdaJitValues(
+      JITKernelInfo &KernelInfo,
+      DenseMap<uint64_t, LambdaRegistry::JitVariantVec> &LambdaJitValuesMap,
+      void **KernelArgs) {
     TIMESCOPE(JitEngineDevice, getLambdaJitValues);
     if (!KernelInfo.hasLambdaCalleeInfo()) {
       Module &KernelModule = getModule(KernelInfo);
@@ -459,12 +457,13 @@ public:
                   << "Caller trigger " << KernelInfo.getName() << " -> "
                   << demangle(KernelInfo.getName()) << "\n");
 
-	      SmallVector<uint64_t> LambdaCalleeInfo;
-	      findFunctionsWithU64Metadata(KernelModule, "proteus.wrapper_call", LambdaCalleeInfo);
+      SmallVector<uint64_t> LambdaCalleeInfo;
+      findFunctionsWithU64Metadata(KernelModule, "proteus.wrapper_call",
+                                   LambdaCalleeInfo);
 
-      for (auto ID : LambdaCalleeInfo ) {
+      for (auto ID : LambdaCalleeInfo) {
         PROTEUS_DBG(Logger::logs("proteus")
-                  << "Lambda wrapper ID = " << ID << "\n";)
+                        << "Lambda wrapper ID = " << ID << "\n";)
       }
       KernelInfo.setLambdaCalleeInfo(std::move(LambdaCalleeInfo));
     }
@@ -518,8 +517,7 @@ public:
                         ArrayRef<RuntimeConstantInfo *> RCInfoArray);
   void registerLambdaCallsiteLocation(void *Kernel, uint64_t LambdaID,
                                       uint32_t CallsiteIndex,
-                                      uint32_t KernelArgIndex,
-                                      int64_t Offset,
+                                      uint32_t KernelArgIndex, int64_t Offset,
                                       RuntimeConstantType StorageType);
 
   std::unordered_map<std::string, FatbinWrapperT *> ModuleIdToFatBinary;
@@ -643,7 +641,7 @@ JitEngineDevice<ImplT>::compileAndRun(
       CodeCache.lookup(HashValue);
   if (KernelFunc)
     return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
-      ShmemSize, Stream);
+                                ShmemSize, Stream);
 
   // NOTE: we don't need a suffix to differentiate kernels, each
   // specialization will be in its own module uniquely identify by HashValue.
