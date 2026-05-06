@@ -641,8 +641,9 @@ private:
       CallBase *FinalizeCall = nullptr;
       for (auto &BB : *Function) {
         for (Instruction &I : BB) {
-          auto* CB = dyn_cast<CallBase>(&I);
-          if (CB && CB->getCalledFunction()->getName().contains("__proteus_finalize_register"))
+          auto *CB = dyn_cast<CallBase>(&I);
+          if (CB && CB->getCalledFunction()->getName().contains(
+                        "__proteus_finalize_register"))
             FinalizeCall = CB;
           auto *Alloca = dyn_cast<AllocaInst>(&I);
           if (!Alloca)
@@ -656,7 +657,8 @@ private:
         }
       }
       if (!FinalizeCall)
-        reportFatalError("internal proteus error: __register_lambda_impl call does not contain finalize call");
+        reportFatalError("internal proteus error: __register_lambda_impl call "
+                         "does not contain finalize call");
       if (!AnonClassAlloca)
         reportFatalError("internal proteus error: expected anon class alloca");
       StructType *RegisterFuncAllocatedType =
@@ -666,8 +668,8 @@ private:
                          "register_lambda analysis");
 
       // Insert __proteus_register_lambda_runtime_constant calls for each lambda
-      // type participating in this kernel launch.  The insertion point is right before
-      // the finalization call.
+      // type participating in this kernel launch.  The insertion point is right
+      // before the finalization call.
       IRBuilder<> Builder(FinalizeCall);
       auto JitVarFn = getJitRegisterLambdaRuntimeConstant(M);
       for (auto JitVarInfo :
@@ -784,15 +786,15 @@ llvm::PassPluginLibraryInfo getLambdaPassPluginInfo() {
           MPM.addPass(LambdaPass{false});
         });
 #else
-// #if LLVM_VERSION_MAJOR >= 20
-//     PB.registerPipelineEarlySimplificationEPCallback(
-//         [&](ModulePassManager &MPM, OptimizationLevel,
-//           ThinOrFullLTOPhase LTOPhase) {
-//           if (LTOPhase != ThinOrFullLTOPhase::None)
-//             reportFatalError("Expected registration only for non-LTO");
-//           MPM.addPass(LambdaPass{false});
-//         });
-// #else
+    // #if LLVM_VERSION_MAJOR >= 20
+    //     PB.registerPipelineEarlySimplificationEPCallback(
+    //         [&](ModulePassManager &MPM, OptimizationLevel,
+    //           ThinOrFullLTOPhase LTOPhase) {
+    //           if (LTOPhase != ThinOrFullLTOPhase::None)
+    //             reportFatalError("Expected registration only for non-LTO");
+    //           MPM.addPass(LambdaPass{false});
+    //         });
+    // #else
     PB.registerPipelineEarlySimplificationEPCallback(
         [&](ModulePassManager &MPM, OptimizationLevel) {
           MPM.addPass(LambdaPass{false});

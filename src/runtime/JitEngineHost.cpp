@@ -217,8 +217,8 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
   if (auto FunctorID = getFunctionU64Metadata(*F, "proteus.wrapper_call")) {
     auto It = LambdaJitValuesMap.find(*FunctorID);
     if (It != LambdaJitValuesMap.end() && !It->second.empty()) {
-      TransformLambdaSpecialization::transformHostFunction(
-          M, *FunctorID, It->second.front());
+      TransformLambdaSpecialization::transformHostFunction(M, *FunctorID,
+                                                           It->second.front());
     }
   }
 
