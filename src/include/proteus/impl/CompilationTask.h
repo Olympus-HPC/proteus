@@ -71,18 +71,18 @@ private:
 
 public:
   CompilationTask(
-      MemoryBufferRef Bitcode, HashT HashValue, void** KernelArgs, const std::string &KernelName,
-      std::string &Suffix, dim3 BlockDim, dim3 GridDim,
-      const SmallVector<RuntimeConstant> &RCVec,
-      const SmallVector<uint64_t>  &LambdaCalleeInfo,
+      MemoryBufferRef Bitcode, HashT HashValue, void **KernelArgs,
+      const std::string &KernelName, std::string &Suffix, dim3 BlockDim,
+      dim3 GridDim, const SmallVector<RuntimeConstant> &RCVec,
+      const SmallVector<uint64_t> &LambdaCalleeInfo,
       const LambdaCallsiteLocationMap &LambdaCallsiteLocations,
       const std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo,
       const SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
       const std::string &DeviceArch, const CodeGenerationConfig &CGConfig,
       bool DumpIR, bool RelinkGlobalsByCopy)
-      : Bitcode(Bitcode), HashValue(HashValue), KernelArgs(KernelArgs), KernelName(KernelName),
-        Suffix(Suffix), BlockDim(BlockDim), GridDim(GridDim), RCVec(RCVec),
-        LambdaCalleeInfo(LambdaCalleeInfo),
+      : Bitcode(Bitcode), HashValue(HashValue), KernelArgs(KernelArgs),
+        KernelName(KernelName), Suffix(Suffix), BlockDim(BlockDim),
+        GridDim(GridDim), RCVec(RCVec), LambdaCalleeInfo(LambdaCalleeInfo),
         LambdaCallsiteLocations(LambdaCallsiteLocations),
         VarNameToGlobalInfo(VarNameToGlobalInfo),
         GlobalLinkedBinaries(GlobalLinkedBinaries), DeviceArch(DeviceArch),
@@ -147,11 +147,10 @@ public:
 
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".input.ll", *M));
 
-    proteus::specializeIR(*M, KernelArgs, KernelName, Suffix, BlockDim, GridDim, RCVec,
-                          LambdaCalleeInfo, LambdaCallsiteLocations,
-                          SpecializeArgs, SpecializeDims,
-                          SpecializeDimsRange, SpecializeLaunchBounds,
-                          MinBlocksPerSM);
+    proteus::specializeIR(*M, KernelArgs, KernelName, Suffix, BlockDim, GridDim,
+                          RCVec, LambdaCalleeInfo, LambdaCallsiteLocations,
+                          SpecializeArgs, SpecializeDims, SpecializeDimsRange,
+                          SpecializeLaunchBounds, MinBlocksPerSM);
 
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".specialized.ll", *M));
 

@@ -10,6 +10,7 @@ static_assert(__cplusplus >= 201703L,
 #include "proteus/impl/Debug.h"
 #include "proteus/impl/Logger.h"
 
+#include <llvm/Analysis/ValueTracking.h>
 #include <llvm/CodeGen/CommandFlags.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DebugInfo.h>
@@ -18,7 +19,6 @@ static_assert(__cplusplus >= 201703L,
 #include <llvm/IR/PassManager.h>
 #include <llvm/Linker/Linker.h>
 #include <llvm/MC/TargetRegistry.h>
-#include <llvm/Analysis/ValueTracking.h>
 #include <llvm/Passes/PassBuilder.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Target/TargetMachine.h>
@@ -289,8 +289,8 @@ inline void findFunctionsWithU64Metadata(
     if (!Node || Node->getNumOperands() < 1)
       continue;
     auto *CAM = llvm::dyn_cast<llvm::ConstantAsMetadata>(Node->getOperand(0));
-    auto *CI = CAM ? llvm::dyn_cast<llvm::ConstantInt>(CAM->getValue())
-                   : nullptr;
+    auto *CI =
+        CAM ? llvm::dyn_cast<llvm::ConstantInt>(CAM->getValue()) : nullptr;
     if (!CI)
       continue;
     std::uint64_t Id = CI->getZExtValue();
@@ -299,17 +299,17 @@ inline void findFunctionsWithU64Metadata(
   }
 }
 
-inline void findFunctionsWithU64Metadata(
-    llvm::Module &M, llvm::StringRef Key,
-    llvm::SmallVectorImpl<std::uint64_t> &Out) {
+inline void
+findFunctionsWithU64Metadata(llvm::Module &M, llvm::StringRef Key,
+                             llvm::SmallVectorImpl<std::uint64_t> &Out) {
   llvm::SmallDenseMap<llvm::Function *, std::uint64_t, 32> Seen;
   for (llvm::Function &F : M) {
     llvm::MDNode *Node = F.getMetadata(Key);
     if (!Node || Node->getNumOperands() < 1)
       continue;
     auto *CAM = llvm::dyn_cast<llvm::ConstantAsMetadata>(Node->getOperand(0));
-    auto *CI = CAM ? llvm::dyn_cast<llvm::ConstantInt>(CAM->getValue())
-                   : nullptr;
+    auto *CI =
+        CAM ? llvm::dyn_cast<llvm::ConstantInt>(CAM->getValue()) : nullptr;
     if (!CI)
       continue;
     std::uint64_t Id = CI->getZExtValue();

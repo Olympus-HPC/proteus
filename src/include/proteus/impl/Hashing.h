@@ -137,18 +137,19 @@ inline HashT hashValue(const RuntimeConstant &RC) {
       RC.Type == RuntimeConstantType::VECTOR) {
     H = stable_hash_combine(H.getValue(),
                             hashValue(RC.ArrInfo.NumElts).getValue());
-    H = stable_hash_combine(H.getValue(),
-                            hashValue(static_cast<int32_t>(RC.ArrInfo.EltType))
-                                .getValue());
+    H = stable_hash_combine(
+        H.getValue(),
+        hashValue(static_cast<int32_t>(RC.ArrInfo.EltType)).getValue());
     H = stable_hash_combine(H.getValue(), hashArrayRefElement(RC).getValue());
     return H;
   }
 
   if (RC.Type == RuntimeConstantType::OBJECT) {
-    H = stable_hash_combine(H.getValue(), hashValue(RC.ObjInfo.Size).getValue());
     H = stable_hash_combine(H.getValue(),
-                            hashValue(static_cast<int32_t>(RC.ObjInfo.PassByValue))
-                                .getValue());
+                            hashValue(RC.ObjInfo.Size).getValue());
+    H = stable_hash_combine(
+        H.getValue(),
+        hashValue(static_cast<int32_t>(RC.ObjInfo.PassByValue)).getValue());
     H = stable_hash_combine(H.getValue(), hashArrayRefElement(RC).getValue());
     return H;
   }
@@ -174,8 +175,7 @@ inline HashT hashValue(ArrayRef<RuntimeConstant> Arr) {
   return HashValue;
 }
 
-template <typename T>
-inline HashT hashValue(ArrayRef<T> Arr) {
+template <typename T> inline HashT hashValue(ArrayRef<T> Arr) {
   if (Arr.empty())
     return 0;
 
@@ -192,8 +192,8 @@ inline HashT hashValue(const SmallVector<T, N> &Vec) {
 }
 
 template <typename Key, typename Value>
-inline std::enable_if_t<std::is_integral<Key>::value || std::is_enum<Key>::value,
-                        HashT>
+inline std::enable_if_t<
+    std::is_integral<Key>::value || std::is_enum<Key>::value, HashT>
 hashValue(const DenseMap<Key, Value> &Map) {
   if (Map.empty())
     return 0;

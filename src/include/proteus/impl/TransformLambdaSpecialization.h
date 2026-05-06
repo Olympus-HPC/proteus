@@ -15,10 +15,10 @@
 #include "proteus/Error.h"
 #include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/Debug.h"
+#include "proteus/impl/KernelArgVisitor.h"
 #include "proteus/impl/LambdaCallsite.h"
 #include "proteus/impl/LambdaRegistry.h"
 #include "proteus/impl/Utils.h"
-#include "proteus/impl/KernelArgVisitor.h"
 
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/Demangle/Demangle.h>
@@ -72,12 +72,12 @@ inline Constant *getConstant(LLVMContext &Ctx, Type *ArgType,
 
 class TransformLambdaSpecialization {
 private:
-
   using JitVariantMap = LambdaRegistry::JitVariantMap;
   using JitVariantVec = LambdaRegistry::JitVariantVec;
 
-  static void collectWrapperCallsites(Function &FunctorOperatorFunction,
-                                      SmallVectorImpl<CallBase *> &CBToAnalyze) {
+  static void
+  collectWrapperCallsites(Function &FunctorOperatorFunction,
+                          SmallVectorImpl<CallBase *> &CBToAnalyze) {
     for (auto *U : FunctorOperatorFunction.users()) {
       if (auto *CB = dyn_cast<CallBase>(U))
         CBToAnalyze.push_back(CB);
@@ -92,8 +92,8 @@ private:
     });
   }
 
-  static const RuntimeConstant *
-  findArgByOffset(const JitVariantMap &RCMap, int32_t Offset) {
+  static const RuntimeConstant *findArgByOffset(const JitVariantMap &RCMap,
+                                                int32_t Offset) {
     for (auto &[_, Arg] : RCMap) {
       if (Arg.Offset == Offset)
         return &Arg;
@@ -101,8 +101,8 @@ private:
     return nullptr;
   };
 
-  static const RuntimeConstant *
-  findArgByPos(const JitVariantMap &RCMap, int32_t Pos) {
+  static const RuntimeConstant *findArgByPos(const JitVariantMap &RCMap,
+                                             int32_t Pos) {
     auto It = RCMap.find(Pos);
     if (It == RCMap.end())
       return nullptr;
@@ -156,14 +156,17 @@ private:
 
   static Function *findLambdaOperatorForFunctor(Module &M, uint64_t FunctorID) {
     SmallVector<std::pair<Function *, uint64_t>> LambdaOperators;
-    findFunctionsWithU64Metadata(M, "proteus.registered_lambda", LambdaOperators);
+    findFunctionsWithU64Metadata(M, "proteus.registered_lambda",
+                                 LambdaOperators);
     for (auto [Lambda, ID] : LambdaOperators)
       if (ID == FunctorID)
         return Lambda;
     return nullptr;
   }
 
-  static Function *findFunctorFunctorOperatorFunctionOperatorFromID(Module &M, uint64_t FunctorID) {
+  static Function *
+  findFunctorFunctorOperatorFunctionOperatorFromID(Module &M,
+                                                   uint64_t FunctorID) {
     SmallVector<std::pair<Function *, uint64_t>> FunctorOperators;
     findFunctionsWithU64Metadata(M, "proteus.wrapper_call", FunctorOperators);
     for (auto [Lambda, ID] : FunctorOperators)
@@ -274,8 +277,8 @@ private:
   }
 
   static Value *buildSingleCompare(IRBuilder<> &B, const DataLayout &DL,
-                                  Value *LambdaObjPtr, StructType *LambdaTy,
-                                  const RuntimeConstant &RC) {
+                                   Value *LambdaObjPtr, StructType *LambdaTy,
+                                   const RuntimeConstant &RC) {
     Value *FieldPtr = nullptr;
     if (LambdaTy && RC.Pos >= 0 &&
         static_cast<uint64_t>(RC.Pos) < LambdaTy->getNumElements()) {
@@ -317,8 +320,7 @@ private:
       return B.CreateICmpEQ(LoadedBits, C);
     }
     case RuntimeConstantType::DOUBLE: {
-      Value *LoadedF =
-          B.CreateAlignedLoad(B.getDoubleTy(), FieldPtr, Align(1));
+      Value *LoadedF = B.CreateAlignedLoad(B.getDoubleTy(), FieldPtr, Align(1));
       Value *LoadedBits = B.CreateBitCast(LoadedF, B.getInt64Ty());
       uint64_t Bits = 0;
       std::memcpy(&Bits, &RC.Value.DoubleVal, sizeof(Bits));
@@ -339,8 +341,8 @@ private:
   }
 
   static Value *buildVariantMatch(IRBuilder<> &B, const DataLayout &DL,
-                                 Value *LambdaObjPtr, StructType *LambdaTy,
-                                 const JitVariantMap &Variant) {
+                                  Value *LambdaObjPtr, StructType *LambdaTy,
+                                  const JitVariantMap &Variant) {
     if (Variant.empty())
       return B.getInt1(true);
 
@@ -385,13 +387,9 @@ private:
   }
 
   static inline RuntimeConstant readRuntimeConstantFromKernelArgs(
-      void *const *KernelArgs,
-      uint32_t KernelArgIndex,
-      int64_t LambdaStorageBasePointerOffset,
-      RuntimeConstantType StorageType,
-      RuntimeConstantType Type,
-      int32_t Pos,
-      int32_t RCOffset) {
+      void *const *KernelArgs, uint32_t KernelArgIndex,
+      int64_t LambdaStorageBasePointerOffset, RuntimeConstantType StorageType,
+      RuntimeConstantType Type, int32_t Pos, int32_t RCOffset) {
     if (!KernelArgs)
       reportFatalError("KernelArgs is null");
     if (LambdaStorageBasePointerOffset < 0)
@@ -465,9 +463,10 @@ private:
     return RC;
   }
 
-  static inline RuntimeConstant readRuntimeConstantFromStorage(
-      const void *StorageBasePtr, RuntimeConstantType Type, int32_t Pos,
-      int32_t RCOffset) {
+  static inline RuntimeConstant
+  readRuntimeConstantFromStorage(const void *StorageBasePtr,
+                                 RuntimeConstantType Type, int32_t Pos,
+                                 int32_t RCOffset) {
     if (!StorageBasePtr)
       reportFatalError("StorageBasePtr is null");
     if (RCOffset < 0)
@@ -505,57 +504,15 @@ private:
       std::memcpy(&RC.Value.PtrVal, ptr, sizeof(RC.Value.PtrVal));
       break;
     default:
-      reportFatalError("Unsupported RuntimeConstantType in host-storage reader");
+      reportFatalError(
+          "Unsupported RuntimeConstantType in host-storage reader");
     }
 
     return RC;
   }
 
-
 public:
-<<<<<<< Updated upstream
-  static bool analyzeKernelArgLocations(
-      Module &M, uint64_t FunctorID,
-      SmallVectorImpl<std::pair<uint32_t, int64_t>> &KernelArgLocations,
-      DenseMap<Function *, std::unique_ptr<FnMemCtx>> &FunctionAnalysisCache) {
-    Function *FunctorOperatorFunction =
-        findFunctorFunctorOperatorFunctionOperatorFromID(M, FunctorID);
-    if (!FunctorOperatorFunction) {
-      errs() << "[proteus][debug] no wrapper for functor id " << FunctorID
-             << "\n";
-      return false;
-    }
-
-    SmallVector<CallBase *> CBToAnalyze;
-    collectWrapperCallsites(*FunctorOperatorFunction, CBToAnalyze);
-
-    DenseMap<CallBase *, std::pair<uint32_t, int64_t>> CallBaseToArgOffset;
-    if (!analyzeLambdaUses(M, CallBaseToArgOffset, CBToAnalyze,
-                           FunctionAnalysisCache)) {
-      errs() << "[proteus][debug] lambda arg analysis failed for functor id "
-             << FunctorID << " wrapper " << FunctorOperatorFunction->getName()
-             << " callsites " << CBToAnalyze.size() << "\n";
-      for (CallBase *CB : CBToAnalyze)
-        errs() << "  callsite: " << *CB << "\n";
-      return false;
-    }
-
-    KernelArgLocations.clear();
-    KernelArgLocations.reserve(CBToAnalyze.size());
-    for (CallBase *CB : CBToAnalyze) {
-      auto It = CallBaseToArgOffset.find(CB);
-      if (It == CallBaseToArgOffset.end())
-        return false;
-      KernelArgLocations.push_back(It->second);
-    }
-
-    return true;
-  }
-
-=======
->>>>>>> Stashed changes
-  static LambdaRegistry::JitVariantVec
-  readRuntimeVariantsFromKernelArgs(
+  static LambdaRegistry::JitVariantVec readRuntimeVariantsFromKernelArgs(
       void *const *KernelArgs,
       ArrayRef<LambdaKernelArgLocation> KernelArgLocations,
       ArrayRef<LambdaRegistry::JitVariantMap> VariantSchemas) {
@@ -579,10 +536,9 @@ public:
     return RuntimeVariants;
   }
 
-  static JitVariantMap
-  readRuntimeVariantFromStorage(const void *StorageBasePtr,
-                                ArrayRef<LambdaRegistry::JitVariantMap>
-                                    VariantSchemas) {
+  static JitVariantMap readRuntimeVariantFromStorage(
+      const void *StorageBasePtr,
+      ArrayRef<LambdaRegistry::JitVariantMap> VariantSchemas) {
     JitVariantMap RuntimeVariant;
     if (VariantSchemas.empty())
       return RuntimeVariant;
@@ -611,15 +567,14 @@ public:
     }
   }
 
-  static void transformDeviceKernel(Module &M,
-                        void** KernelArgs,
-                        uint64_t FunctorID,
-                        ArrayRef<JitVariantMap> Variants,
-                        const DenseMap<uint32_t, LambdaKernelArgLocation>
-                            &CallsiteLocations) {
-    Function *FunctorOperatorFunction = findFunctorFunctorOperatorFunctionOperatorFromID(M, FunctorID);
+  static void transformDeviceKernel(
+      Module &M, void **KernelArgs, uint64_t FunctorID,
+      ArrayRef<JitVariantMap> Variants,
+      const DenseMap<uint32_t, LambdaKernelArgLocation> &CallsiteLocations) {
+    Function *FunctorOperatorFunction =
+        findFunctorFunctorOperatorFunctionOperatorFromID(M, FunctorID);
     Function *LambdaOperatorMethod = findLambdaOperatorForFunctor(M, FunctorID);
-    SmallVector<CallBase*> CBToAnalyze;
+    SmallVector<CallBase *> CBToAnalyze;
     collectWrapperCallsites(*FunctorOperatorFunction, CBToAnalyze);
 
     size_t VariantIndex = 0;
@@ -648,8 +603,8 @@ public:
 
       if (!LambdaOperatorMethod) {
         // On host (and sometimes device) the lambda call operator may be fully
-        // inlined into the functor FunctorOperatorFunction call operator, leaving no separate
-        // `lambda::operator()` function to tag.
+        // inlined into the functor FunctorOperatorFunction call operator,
+        // leaving no separate `lambda::operator()` function to tag.
         CB->setCalledFunction(WrapperClone);
         continue;
       }
@@ -669,11 +624,11 @@ public:
     }
     // Remove the old wrapper/lambda methods from the module if they are unused.
     // If we actually specialized anything, we cloned and removed the original
-    // methods from the IR.  Pruning is important so that downstream optimizations
-    // like TransformSharedArray don't operate on dead code, containing calls to
-    // shared_array without a constant argument.
-    // Delete the wrapper first, because usually the only remaining user of the
-    // lambda is the wrapper
+    // methods from the IR.  Pruning is important so that downstream
+    // optimizations like TransformSharedArray don't operate on dead code,
+    // containing calls to shared_array without a constant argument. Delete the
+    // wrapper first, because usually the only remaining user of the lambda is
+    // the wrapper
     if (FunctorOperatorFunction->users().empty())
       FunctorOperatorFunction->eraseFromParent();
 
@@ -681,22 +636,25 @@ public:
       LambdaOperatorMethod->eraseFromParent();
   }
 
-  static void transformConservative(Module &M, uint64_t FunctorID, ArrayRef<JitVariantMap> Variants) {
+  static void transformConservative(Module &M, uint64_t FunctorID,
+                                    ArrayRef<JitVariantMap> Variants) {
     if (Variants.empty())
       return;
-    Function *FunctorOperatorFunction = findFunctorFunctorOperatorFunctionOperatorFromID(M, FunctorID);
+    Function *FunctorOperatorFunction =
+        findFunctorFunctorOperatorFunctionOperatorFromID(M, FunctorID);
     Function *LambdaOperatorMethod = findLambdaOperatorForFunctor(M, FunctorID);
     if (!FunctorOperatorFunction) {
       if (Config::get().traceSpecializations())
         Logger::trace("[LambdaSpec] Internal lambda specialization error:"
-                          "no wrapper found for ID " + std::to_string(FunctorID));
+                      "no wrapper found for ID " +
+                      std::to_string(FunctorID));
       return;
     }
 
     if (!LambdaOperatorMethod) {
       // On host (and sometimes device) the lambda call operator may be fully
-      // inlined into the functor FunctorOperatorFunction call operator, leaving no separate
-      // `lambda::operator()` function to tag.
+      // inlined into the functor FunctorOperatorFunction call operator, leaving
+      // no separate `lambda::operator()` function to tag.
       if (Variants.size() == 1)
         specializeCallOperator(M, *FunctorOperatorFunction, Variants.front());
       return;
@@ -725,7 +683,8 @@ public:
 
     // Split out the original call (and everything after it) into a tail block.
     BasicBlock *EntryBB = OrigCall->getParent();
-    BasicBlock *TailBB = EntryBB->splitBasicBlock(OrigCall, "proteus.after_call");
+    BasicBlock *TailBB =
+        EntryBB->splitBasicBlock(OrigCall, "proteus.after_call");
 
     // Remove the unconditional branch produced by splitBasicBlock.
     EntryBB->getTerminator()->eraseFromParent();
@@ -734,9 +693,9 @@ public:
     PHINode *ResultPhi = nullptr;
     Type *RetTy = OrigCall->getType();
     if (!RetTy->isVoidTy()) {
-      ResultPhi = PHINode::Create(RetTy, Variants.size() + 1,
-                                  "proteus.lambda_dispatch.result",
-                                  &*TailBB->begin());
+      ResultPhi =
+          PHINode::Create(RetTy, Variants.size() + 1,
+                          "proteus.lambda_dispatch.result", &*TailBB->begin());
       OrigCall->replaceAllUsesWith(ResultPhi);
     }
 
@@ -745,21 +704,21 @@ public:
 
     LLVMContext &Ctx = M.getContext();
 
-    BasicBlock *FallbackBB =
-        BasicBlock::Create(Ctx, "proteus.lambda_dispatch.fallback", FunctorOperatorFunction);
+    BasicBlock *FallbackBB = BasicBlock::Create(
+        Ctx, "proteus.lambda_dispatch.fallback", FunctorOperatorFunction);
 
     // Build the chain of check blocks (entry -> check0 -> ... -> fallback).
     BasicBlock *CurCheckBB = EntryBB;
     for (size_t I = 0, E = Variants.size(); I < E; ++I) {
-      BasicBlock *VariantBB = BasicBlock::Create(
-          Ctx, "proteus.lambda_dispatch.variant." + Twine(I), FunctorOperatorFunction);
+      BasicBlock *VariantBB =
+          BasicBlock::Create(Ctx, "proteus.lambda_dispatch.variant." + Twine(I),
+                             FunctorOperatorFunction);
       BasicBlock *NextCheckBB =
           (I + 1 == E)
               ? FallbackBB
-              : BasicBlock::Create(Ctx,
-                                   "proteus.lambda_dispatch.check." +
-                                       Twine(I + 1),
-                                   FunctorOperatorFunction);
+              : BasicBlock::Create(
+                    Ctx, "proteus.lambda_dispatch.check." + Twine(I + 1),
+                    FunctorOperatorFunction);
 
       {
         IRBuilder<> B(CurCheckBB);
