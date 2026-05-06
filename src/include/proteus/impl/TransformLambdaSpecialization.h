@@ -15,6 +15,7 @@
 #include "proteus/Error.h"
 #include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/Debug.h"
+#include "proteus/impl/LambdaCallsite.h"
 #include "proteus/impl/LambdaRegistry.h"
 #include "proteus/impl/Utils.h"
 #include "proteus/impl/KernelArgVisitor.h"
@@ -24,7 +25,9 @@
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/Type.h>
 #include <llvm/Support/Casting.h>
 #include <llvm/Support/Debug.h>
 #include <llvm/Transforms/Utils/Cloning.h>
@@ -385,6 +388,7 @@ private:
       void *const *KernelArgs,
       uint32_t KernelArgIndex,
       int64_t LambdaStorageBasePointerOffset,
+      RuntimeConstantType StorageType,
       RuntimeConstantType Type,
       int32_t Pos,
       int32_t RCOffset) {
@@ -397,9 +401,35 @@ private:
     if (!base)
       reportFatalError("KernelArgs[KernelArgIndex] is null");
 
-    const unsigned char *ptr =
-        base + static_cast<size_t>(LambdaStorageBasePointerOffset) +
-        static_cast<size_t>(RCOffset);
+    const unsigned char *StorageBase = nullptr;
+    if (StorageType == RuntimeConstantType::NONE) {
+      StorageBase = base + static_cast<size_t>(LambdaStorageBasePointerOffset);
+    } else {
+      const unsigned char *IndirectStoragePtr =
+          base + static_cast<size_t>(LambdaStorageBasePointerOffset);
+      uintptr_t StorageAddr = 0;
+      switch (StorageType) {
+      case RuntimeConstantType::INT64: {
+        uint64_t Bits = 0;
+        std::memcpy(&Bits, IndirectStoragePtr, sizeof(Bits));
+        StorageAddr = static_cast<uintptr_t>(Bits);
+        break;
+      }
+      case RuntimeConstantType::PTR: {
+        void *PtrVal = nullptr;
+        std::memcpy(&PtrVal, IndirectStoragePtr, sizeof(PtrVal));
+        StorageAddr = reinterpret_cast<uintptr_t>(PtrVal);
+        break;
+      }
+      default:
+        reportFatalError("Unsupported kernel lambda storage type");
+      }
+      StorageBase = reinterpret_cast<const unsigned char *>(StorageAddr);
+      if (!StorageBase)
+        reportFatalError("Null indirect kernel lambda storage pointer");
+    }
+
+    const unsigned char *ptr = StorageBase + static_cast<size_t>(RCOffset);
 
     RuntimeConstant RC{Type, Pos, RCOffset};
 
@@ -483,6 +513,7 @@ private:
 
 
 public:
+<<<<<<< Updated upstream
   static bool analyzeKernelArgLocations(
       Module &M, uint64_t FunctorID,
       SmallVectorImpl<std::pair<uint32_t, int64_t>> &KernelArgLocations,
@@ -521,10 +552,12 @@ public:
     return true;
   }
 
+=======
+>>>>>>> Stashed changes
   static LambdaRegistry::JitVariantVec
   readRuntimeVariantsFromKernelArgs(
       void *const *KernelArgs,
-      ArrayRef<std::pair<uint32_t, int64_t>> KernelArgLocations,
+      ArrayRef<LambdaKernelArgLocation> KernelArgLocations,
       ArrayRef<LambdaRegistry::JitVariantMap> VariantSchemas) {
     LambdaRegistry::JitVariantVec RuntimeVariants;
     if (VariantSchemas.empty())
@@ -533,11 +566,12 @@ public:
     RuntimeVariants.reserve(KernelArgLocations.size());
     const JitVariantMap &VariantSchema = VariantSchemas.front();
 
-    for (auto [KernelArgIndex, Offset] : KernelArgLocations) {
+    for (const auto &Location : KernelArgLocations) {
       JitVariantMap RuntimeVariant;
       for (auto [Slot, RC] : VariantSchema) {
         RuntimeVariant[Slot] = readRuntimeConstantFromKernelArgs(
-            KernelArgs, KernelArgIndex, Offset, RC.Type, RC.Pos, RC.Offset);
+            KernelArgs, Location.KernelArgIndex, Location.Offset,
+            Location.StorageType, RC.Type, RC.Pos, RC.Offset);
       }
       RuntimeVariants.push_back(std::move(RuntimeVariant));
     }
@@ -580,29 +614,31 @@ public:
   static void transformDeviceKernel(Module &M,
                         void** KernelArgs,
                         uint64_t FunctorID,
-                        ArrayRef<JitVariantMap> Variants) {
+                        ArrayRef<JitVariantMap> Variants,
+                        const DenseMap<uint32_t, LambdaKernelArgLocation>
+                            &CallsiteLocations) {
     Function *FunctorOperatorFunction = findFunctorFunctorOperatorFunctionOperatorFromID(M, FunctorID);
     Function *LambdaOperatorMethod = findLambdaOperatorForFunctor(M, FunctorID);
-    DenseMap<CallBase*, std::pair<uint32_t, int64_t>> CallBaseToArgOffset;
     SmallVector<CallBase*> CBToAnalyze;
     collectWrapperCallsites(*FunctorOperatorFunction, CBToAnalyze);
 
-    DenseMap<Function*, std::unique_ptr<FnMemCtx>> tmp;
-    if (!analyzeLambdaUses(M, CallBaseToArgOffset, CBToAnalyze, tmp))
-      reportFatalError("Lambda kernel-arg analysis failed");
-
     size_t VariantIndex = 0;
     for (CallBase *CB : CBToAnalyze) {
-      auto It = CallBaseToArgOffset.find(CB);
-      if (It == CallBaseToArgOffset.end())
+      auto CallsiteIndex = getLambdaCallsiteIndex(*CB, FunctorID);
+      if (!CallsiteIndex)
+        reportFatalError("Missing lambda callsite metadata for callsite");
+
+      auto It = CallsiteLocations.find(*CallsiteIndex);
+      if (It == CallsiteLocations.end())
         reportFatalError("Missing lambda specialization info for callsite");
 
-      auto &[KernelArgIndex, Offset] = It->second;
+      const auto &Location = It->second;
 
       JitVariantMap RuntimeVariant;
       for (auto [slot, RC] : Variants[0]) {
         RuntimeVariant[slot] = readRuntimeConstantFromKernelArgs(
-            KernelArgs, KernelArgIndex, Offset, RC.Type, RC.Pos, RC.Offset);
+            KernelArgs, Location.KernelArgIndex, Location.Offset,
+            Location.StorageType, RC.Type, RC.Pos, RC.Offset);
       }
 
       ++VariantIndex;
@@ -631,6 +667,18 @@ public:
 
       CB->setCalledFunction(WrapperClone);
     }
+    // Remove the old wrapper/lambda methods from the module if they are unused.
+    // If we actually specialized anything, we cloned and removed the original
+    // methods from the IR.  Pruning is important so that downstream optimizations
+    // like TransformSharedArray don't operate on dead code, containing calls to
+    // shared_array without a constant argument.
+    // Delete the wrapper first, because usually the only remaining user of the
+    // lambda is the wrapper
+    if (FunctorOperatorFunction->users().empty())
+      FunctorOperatorFunction->eraseFromParent();
+
+    if (LambdaOperatorMethod->users().empty())
+      LambdaOperatorMethod->eraseFromParent();
   }
 
   static void transformConservative(Module &M, uint64_t FunctorID, ArrayRef<JitVariantMap> Variants) {
