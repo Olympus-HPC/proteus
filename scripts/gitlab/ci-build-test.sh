@@ -54,7 +54,7 @@ if [ "${CI_MACHINE}" == "matrix" ]; then
   # compiler.
   conda create -y -q -n proteus --override-channels -c conda-forge \
       python=${PYTHON_VERSION} clang=${PROTEUS_CI_LLVM_VERSION} clangxx=${PROTEUS_CI_LLVM_VERSION} \
-      pybind11 clangdev=${PROTEUS_CI_LLVM_VERSION} llvmdev=${PROTEUS_CI_LLVM_VERSION} \
+      pip pybind11 clangdev=${PROTEUS_CI_LLVM_VERSION} llvmdev=${PROTEUS_CI_LLVM_VERSION} \
       lit=${PROTEUS_CI_LLVM_VERSION} mlir=${PROTEUS_CI_LLVM_VERSION} gcc=12 gxx=12
   conda activate proteus
 
@@ -79,7 +79,7 @@ elif [ "${CI_MACHINE}" == "tioga" ] || [ "${CI_MACHINE}" == "tuolumne" ]; then
   LLVM_INSTALL_DIR=${ROCM_PATH}/llvm
   install_miniforge "${WORKDIR}/miniforge3"
   conda create -y -q -n proteus --override-channels -c conda-forge \
-    python=${PYTHON_VERSION} pybind11
+    python=${PYTHON_VERSION} pip pybind11
   conda activate proteus
 
   CMAKE_OPTIONS_MACHINE=" -DCMAKE_PREFIX_PATH=$CONDA_PREFIX;$CONDA_PREFIX/lib/cmake"
