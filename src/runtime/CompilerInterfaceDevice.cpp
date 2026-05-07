@@ -9,10 +9,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "proteus/impl/CompilerInterfaceDevice.h"
+#include "proteus/KernelMetadata.h"
 #include "proteus/TimeTracing.h"
 #include "proteus/impl/CompilerInterfaceDeviceInternal.h"
 #include "proteus/impl/JitEngineDevice.h"
 #include "proteus/impl/JitEngineInfoRegistry.h"
+
+#include <utility>
+#include <vector>
 
 using namespace proteus;
 
@@ -78,5 +82,36 @@ extern "C" void __proteus_disable_device() {
   auto &Jit = JitDeviceImplT::instance();
   Jit.disable();
 }
+
+namespace proteus::runtime {
+
+std::optional<KernelMetadata> captureKernelMetadata(const void *Kernel) {
+  auto &Jit = JitDeviceImplT::instance();
+  auto OptionalKernelInfo = Jit.getJITKernelInfo(Kernel);
+  if (!OptionalKernelInfo)
+    return std::nullopt;
+
+  auto &KInfo = OptionalKernelInfo.value().get();
+  Jit.extractModuleAndBitcode(KInfo);
+  auto StaticHash = Jit.getStaticHash(KInfo);
+  auto Bitcode = KInfo.getBitcode().getBuffer();
+  if (Bitcode.empty())
+    reportFatalError("Proteus captured kernel metadata has empty bitcode");
+
+  auto &GlobalVars = KInfo.getBinaryInfo().getVarNameToGlobalInfo();
+
+  std::vector<char> BitcodeBytes(Bitcode.data(),
+                                 Bitcode.data() + Bitcode.size());
+  GlobalMetadataMap Globals;
+  Globals.reserve(GlobalVars.size());
+  for (const auto &[Name, GV] : GlobalVars)
+    Globals.try_emplace(Name,
+                        GlobalMetadata{GV.HostAddr, GV.DevAddr, GV.VarSize});
+
+  return KernelMetadata(KInfo.getName(), StaticHash.getValue(),
+                        std::move(BitcodeBytes), std::move(Globals));
+}
+
+} // namespace proteus::runtime
 
 // NOLINTEND(readability-identifier-naming)

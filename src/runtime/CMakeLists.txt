@@ -3,6 +3,7 @@ set(SOURCES
   CompilerInterfaceRuntimeConstantInfo.cpp
   CompiledLibrary.cpp
   Error.cpp
+  KernelMetadata.cpp
   JitEngine.cpp
   JitEngineHost.cpp
   Init.cpp
