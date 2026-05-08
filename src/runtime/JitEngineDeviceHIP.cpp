@@ -366,7 +366,7 @@ void JitEngineDeviceHIP::extractModules(BinaryInfo &BinInfo) {
 JitEngineDeviceHIP::JitEngineDeviceHIP() {
   TIMESCOPE(JitEngineDeviceHIP, JitEngineDeviceHIP);
   hipDeviceProp_t DevProp;
-  proteusHipErrCheck(hipGetDeviceProperties(&DevProp, 0));
+  proteusHipErrCheck(proteus::hipdyn::getDeviceProperties(&DevProp, 0));
 
   DeviceArch = DevProp.gcnArchName;
   DeviceArch = DeviceArch.substr(0, DeviceArch.find_first_of(":"));

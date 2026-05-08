@@ -35,7 +35,7 @@ void setFuncAttribute(TargetModelType TargetModel, void *KernelFunc,
   case TargetModelType::HIP:
     switch (Attr) {
     case JitFuncAttribute::MaxDynamicSharedMemorySize:
-      proteusHipErrCheck(hipFuncSetAttribute(
+      proteusHipErrCheck(proteus::hipdyn::funcSetAttribute(
           reinterpret_cast<hipFunction_t>(KernelFunc),
           hipFuncAttributeMaxDynamicSharedMemorySize, Value));
       return;

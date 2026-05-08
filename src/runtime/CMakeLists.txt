@@ -43,6 +43,7 @@ endif()
 
 if(PROTEUS_ENABLE_HIP)
   list(APPEND SOURCES
+    HIPRuntimeAPI.cpp
     CompilerInterfaceDevice.cpp
     JitEngineDeviceHIP.cpp
   )
@@ -217,8 +218,22 @@ endif()
 
 if(PROTEUS_ENABLE_HIP)
   target_include_directories(proteus SYSTEM PRIVATE ${hip_INCLUDE_DIRS})
-  target_link_libraries(proteus PRIVATE hip::host hiprtc::hiprtc)
   target_include_directories(proteusCore SYSTEM INTERFACE ${hip_INCLUDE_DIRS})
+  target_compile_definitions(
+    proteus PRIVATE
+    $<TARGET_PROPERTY:hip::host,INTERFACE_COMPILE_DEFINITIONS>)
+  target_compile_options(
+    proteus PRIVATE
+    $<TARGET_PROPERTY:hip::host,INTERFACE_COMPILE_OPTIONS>)
+  target_compile_definitions(
+    proteusCore INTERFACE
+    $<TARGET_PROPERTY:hip::host,INTERFACE_COMPILE_DEFINITIONS>)
+  target_compile_options(
+    proteusCore INTERFACE
+    $<TARGET_PROPERTY:hip::host,INTERFACE_COMPILE_OPTIONS>)
+  if(UNIX)
+    target_link_libraries(proteus PRIVATE ${CMAKE_DL_LIBS})
+  endif()
 
   # NOTE: HIP compilation (-x hip) is needed to include the HIP_SYMBOL macro,
   # which depends on the target architecture AMD or NVIDIA.  We define this
