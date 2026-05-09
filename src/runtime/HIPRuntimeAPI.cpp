@@ -7,10 +7,38 @@
 #include <mutex>
 #include <string>
 
+#ifndef PROTEUS_HIP_RUNTIME_LIBRARY_SONAME
+#define PROTEUS_HIP_RUNTIME_LIBRARY_SONAME "libamdhip64.so"
+#endif
+
+#ifndef PROTEUS_HIPRTC_LIBRARY_SONAME
+#define PROTEUS_HIPRTC_LIBRARY_SONAME "libhiprtc.so"
+#endif
+
+#ifndef PROTEUS_HIP_INSTALL_ROOT
+#define PROTEUS_HIP_INSTALL_ROOT ""
+#endif
+
+#define PROTEUS_STRINGIFY_IMPL(X) #X
+#define PROTEUS_STRINGIFY(X) PROTEUS_STRINGIFY_IMPL(X)
+
 namespace {
 
 void *loadLibrary(const char *PrimaryName, const char *FallbackName,
                   const char *Description) {
+  std::string BuildRoot = PROTEUS_HIP_INSTALL_ROOT;
+  if (!BuildRoot.empty()) {
+    std::string PrimaryPath = BuildRoot + "/lib/" + PrimaryName;
+    dlerror();
+    if (void *Handle = dlopen(PrimaryPath.c_str(), RTLD_NOW | RTLD_LOCAL))
+      return Handle;
+
+    std::string FallbackPath = BuildRoot + "/lib/" + FallbackName;
+    dlerror();
+    if (void *Handle = dlopen(FallbackPath.c_str(), RTLD_NOW | RTLD_LOCAL))
+      return Handle;
+  }
+
   dlerror();
   if (void *Handle = dlopen(PrimaryName, RTLD_NOW | RTLD_LOCAL))
     return Handle;
@@ -40,7 +68,7 @@ void *getHIPRuntimeHandle() {
   static void *Handle = nullptr;
   static std::once_flag Once;
   std::call_once(Once, []() {
-    Handle = loadLibrary("libamdhip64.so.7", "libamdhip64.so",
+    Handle = loadLibrary(PROTEUS_HIP_RUNTIME_LIBRARY_SONAME, "libamdhip64.so",
                          "the ROCm HIP runtime library");
   });
   return Handle;
@@ -50,7 +78,7 @@ void *getHIPRTCHandle() {
   static void *Handle = nullptr;
   static std::once_flag Once;
   std::call_once(Once, []() {
-    Handle = loadLibrary("libhiprtc.so.7", "libhiprtc.so",
+    Handle = loadLibrary(PROTEUS_HIPRTC_LIBRARY_SONAME, "libhiprtc.so",
                          "the ROCm HIPRTC library");
   });
   return Handle;
@@ -88,7 +116,8 @@ const char *getErrorString(hipError_t Error) {
 
 hipError_t getDeviceProperties(hipDeviceProp_t *Prop, int DeviceId) {
   using Fn = decltype(&::hipGetDeviceProperties);
-  static Fn Func = resolveHIPRuntimeSymbol<Fn>("hipGetDeviceProperties");
+  static Fn Func =
+      resolveHIPRuntimeSymbol<Fn>(PROTEUS_STRINGIFY(hipGetDeviceProperties));
   return Func(Prop, DeviceId);
 }
 
@@ -101,7 +130,7 @@ hipError_t getSymbolAddress(void **DevPtr, const void *Symbol) {
 hipError_t memcpyHtoD(hipDeviceptr_t Dst, const void *Src, size_t SizeBytes) {
   using Fn = decltype(&::hipMemcpyHtoD);
   static Fn Func = resolveHIPRuntimeSymbol<Fn>("hipMemcpyHtoD");
-  return Func(Dst, Src, SizeBytes);
+  return Func(Dst, const_cast<void *>(Src), SizeBytes);
 }
 
 hipError_t moduleLoadData(hipModule_t *Module, const void *Image) {

@@ -92,8 +92,16 @@ endif()
 if(PROTEUS_ENABLE_HIP)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_HIP)
   target_compile_definitions(proteusCore INTERFACE PROTEUS_ENABLE_HIP)
+  string(REGEX MATCH "^[0-9]+" PROTEUS_HIP_VERSION_MAJOR "${hip_VERSION}")
+  string(REGEX MATCH "^[0-9]+" PROTEUS_HIPRTC_VERSION_MAJOR "${hiprtc_VERSION}")
+  get_filename_component(PROTEUS_HIP_INSTALL_ROOT
+    "${hip_DIR}/../../.." REALPATH)
   target_compile_definitions(
-    proteus PRIVATE PROTEUS_HIP_VERSION="${hip_VERSION}")
+    proteus PRIVATE
+    PROTEUS_HIP_VERSION="${hip_VERSION}"
+    PROTEUS_HIP_INSTALL_ROOT="${PROTEUS_HIP_INSTALL_ROOT}"
+    PROTEUS_HIP_RUNTIME_LIBRARY_SONAME="libamdhip64.so.${PROTEUS_HIP_VERSION_MAJOR}"
+    PROTEUS_HIPRTC_LIBRARY_SONAME="libhiprtc.so.${PROTEUS_HIPRTC_VERSION_MAJOR}")
 elseif(PROTEUS_ENABLE_CUDA)
   target_compile_definitions(proteus PUBLIC PROTEUS_ENABLE_CUDA)
   target_compile_definitions(
