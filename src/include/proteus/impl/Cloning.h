@@ -16,16 +16,6 @@ namespace proteus {
 
 using namespace llvm;
 
-inline void copyProteusFunctionMetadata(const Function *Src, Function *Dst) {
-  if (!Src || !Dst)
-    return;
-  constexpr const char *Keys[] = {"proteus.wrapper_call",
-                                  "proteus.registered_lambda"};
-  for (const char *Key : Keys)
-    if (MDNode *Node = Src->getMetadata(Key))
-      Dst->setMetadata(Key, Node);
-}
-
 inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, StringRef Name,
                                                      CallGraph &CG) {
   auto KernelModuleTmp = std::make_unique<Module>("JitModule", M.getContext());
@@ -112,7 +102,6 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, StringRef Name,
                                          F->getAddressSpace(), F->getName(),
                                          KernelModuleTmp.get());
     NewFunction->copyAttributesFrom(F);
-    copyProteusFunctionMetadata(F, NewFunction);
     VMap[F] = NewFunction;
   }
 
@@ -121,7 +110,6 @@ inline std::unique_ptr<Module> cloneKernelFromModule(Module &M, StringRef Name,
                                          F->getAddressSpace(), F->getName(),
                                          KernelModuleTmp.get());
     NewFunction->copyAttributesFrom(F);
-    copyProteusFunctionMetadata(F, NewFunction);
     NewFunction->setLinkage(GlobalValue::ExternalLinkage);
     VMap[F] = NewFunction;
   }
@@ -414,7 +402,6 @@ struct LinkingCloner {
                                         F->getAddressSpace(), F->getName(),
                                         ModuleOut.get());
         NF->copyAttributesFrom(F);
-        copyProteusFunctionMetadata(F, NF);
         VMap[F] = NF;
 
         for (auto *DeclGV : ResolvedMap[F])
