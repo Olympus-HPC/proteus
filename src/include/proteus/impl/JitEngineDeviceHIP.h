@@ -13,6 +13,7 @@
 
 #include "proteus/impl/JitEngineDevice.h"
 #include "proteus/impl/Utils.h"
+#include "proteus/impl/UtilsHIP.h"
 
 namespace proteus {
 

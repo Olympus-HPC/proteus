@@ -11,6 +11,8 @@
 #ifndef PROTEUS_UTILS_HIP_H
 #define PROTEUS_UTILS_HIP_H
 
+#include "proteus/impl/HIPRuntimeAPI.h"
+
 #include <hip/hip_runtime.h>
 #include <hip/hip_runtime_api.h>
 #include <hip/hiprtc.h>
@@ -20,7 +22,7 @@
     hipError_t err = CALL;                                                     \
     if (err != hipSuccess) {                                                   \
       printf("ERROR @ %s:%d ->  %s\n", __FILE__, __LINE__,                     \
-             hipGetErrorString(err));                                          \
+             proteus::hipdyn::getErrorString(err));                            \
       abort();                                                                 \
     }                                                                          \
   }
@@ -30,7 +32,7 @@
     hiprtcResult err = CALL;                                                   \
     if (err != HIPRTC_SUCCESS) {                                               \
       printf("ERROR @ %s:%d ->  %s\n", __FILE__, __LINE__,                     \
-             hiprtcGetErrorString(err));                                       \
+             proteus::hipdyn::getRTCErrorString(err));                         \
       abort();                                                                 \
     }                                                                          \
   }

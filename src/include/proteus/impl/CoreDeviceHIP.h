@@ -22,7 +22,8 @@ using namespace llvm;
 
 inline void *resolveDeviceGlobalAddr(const void *Addr) {
   void *DevPtr = nullptr;
-  proteusHipErrCheck(hipGetSymbolAddress(&DevPtr, HIP_SYMBOL(Addr)));
+  proteusHipErrCheck(
+      proteus::hipdyn::getSymbolAddress(&DevPtr, HIP_SYMBOL(Addr)));
   assert(DevPtr && "Expected non-null device pointer for global");
 
   return DevPtr;
@@ -31,8 +32,8 @@ inline void *resolveDeviceGlobalAddr(const void *Addr) {
 inline hipError_t launchKernelDirect(void *KernelFunc, dim3 GridDim,
                                      dim3 BlockDim, void **KernelArgs,
                                      uint64_t ShmemSize, hipStream_t Stream) {
-  return hipLaunchKernel(KernelFunc, GridDim, BlockDim, KernelArgs, ShmemSize,
-                         Stream);
+  return proteus::hipdyn::launchKernel(KernelFunc, GridDim, BlockDim,
+                                       KernelArgs, ShmemSize, Stream);
 }
 
 inline hipFunction_t getKernelFunctionFromImage(
@@ -41,7 +42,7 @@ inline hipFunction_t getKernelFunctionFromImage(
   hipModule_t HipModule;
   hipFunction_t KernelFunc;
 
-  proteusHipErrCheck(hipModuleLoadData(&HipModule, Image));
+  proteusHipErrCheck(proteus::hipdyn::moduleLoadData(&HipModule, Image));
   if (RelinkGlobalsByCopy) {
     for (auto &[GlobalName, GVI] : VarNameToGlobalInfo) {
       if (!GVI.DevAddr)
@@ -50,15 +51,15 @@ inline hipFunction_t getKernelFunctionFromImage(
 
       hipDeviceptr_t Dptr;
       size_t Bytes;
-      proteusHipErrCheck(hipModuleGetGlobal(&Dptr, &Bytes, HipModule,
-                                            (GlobalName + "$ptr").c_str()));
+      proteusHipErrCheck(proteus::hipdyn::moduleGetGlobal(
+          &Dptr, &Bytes, HipModule, (GlobalName + "$ptr").c_str()));
 
       uint64_t PtrVal = (uint64_t)GVI.DevAddr;
-      proteusHipErrCheck(hipMemcpyHtoD(Dptr, &PtrVal, Bytes));
+      proteusHipErrCheck(proteus::hipdyn::memcpyHtoD(Dptr, &PtrVal, Bytes));
     }
   }
-  proteusHipErrCheck(
-      hipModuleGetFunction(&KernelFunc, HipModule, KernelName.str().c_str()));
+  proteusHipErrCheck(proteus::hipdyn::moduleGetFunction(
+      &KernelFunc, HipModule, KernelName.str().c_str()));
 
   return KernelFunc;
 }
@@ -66,9 +67,9 @@ inline hipFunction_t getKernelFunctionFromImage(
 inline hipError_t launchKernelFunction(hipFunction_t KernelFunc, dim3 GridDim,
                                        dim3 BlockDim, void **KernelArgs,
                                        uint64_t ShmemSize, hipStream_t Stream) {
-  return hipModuleLaunchKernel(KernelFunc, GridDim.x, GridDim.y, GridDim.z,
-                               BlockDim.x, BlockDim.y, BlockDim.z, ShmemSize,
-                               Stream, KernelArgs, nullptr);
+  return proteus::hipdyn::moduleLaunchKernel(
+      KernelFunc, GridDim.x, GridDim.y, GridDim.z, BlockDim.x, BlockDim.y,
+      BlockDim.z, ShmemSize, Stream, KernelArgs, nullptr);
 }
 
 } // namespace proteus

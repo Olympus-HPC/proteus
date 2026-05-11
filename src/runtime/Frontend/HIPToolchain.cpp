@@ -15,6 +15,10 @@
 #include <optional>
 #include <utility>
 
+#ifndef PROTEUS_HIP_INSTALL_ROOT
+#define PROTEUS_HIP_INSTALL_ROOT ""
+#endif
+
 namespace proteus {
 
 namespace {
@@ -56,6 +60,17 @@ resolveRootFromEnv(llvm::StringRef VarName) {
 
   return std::pair<std::string, std::string>{
       requireExistingDirectory(*Value, VarName), VarName.str() + "=" + *Value};
+}
+
+std::optional<std::pair<std::string, std::string>> resolveRootFromBuild() {
+  if (llvm::StringRef(PROTEUS_HIP_INSTALL_ROOT).empty())
+    return std::nullopt;
+
+  return std::pair<std::string, std::string>{
+      requireExistingDirectory(PROTEUS_HIP_INSTALL_ROOT,
+                               "Build-time ROCm installation root"),
+      "build-time ROCm installation root " +
+          std::string(PROTEUS_HIP_INSTALL_ROOT)};
 }
 
 std::string resolveDeviceLibDirFromRoot(llvm::StringRef Root) {
@@ -222,6 +237,8 @@ ResolvedHIPToolchain resolveHIPToolchainImpl() {
     if (Root)
       break;
   }
+  if (!Root)
+    Root = resolveRootFromBuild();
 
   if (!Root) {
     reportFatalError("Failed to resolve the ROCm installation root. Set "

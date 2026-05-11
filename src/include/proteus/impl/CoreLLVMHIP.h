@@ -406,18 +406,18 @@ inline std::unique_ptr<MemoryBuffer> codegenRTC(Module &M,
       HIPRTC_JIT_IR_TO_ISA_OPT_EXT, HIPRTC_JIT_IR_TO_ISA_OPT_COUNT_EXT};
   size_t OptArgsSize = 1;
   const void *JITOptionsValues[] = {(void *)OptArgs, (void *)(OptArgsSize)};
-  proteusHiprtcErrCheck(hiprtcLinkCreate(JITOptions.size(), JITOptions.data(),
-                                         (void **)JITOptionsValues,
-                                         &HipLinkStatePtr));
+  proteusHiprtcErrCheck(proteus::hipdyn::rtcLinkCreate(
+      JITOptions.size(), JITOptions.data(), (void **)JITOptionsValues,
+      &HipLinkStatePtr));
   // NOTE: the following version of te code does not set options.
   // proteusHiprtcErrCheck(hiprtcLinkCreate(0, nullptr, nullptr,
   // &hip_link_state_ptr));
 
-  proteusHiprtcErrCheck(hiprtcLinkAddData(
+  proteusHiprtcErrCheck(proteus::hipdyn::rtcLinkAddData(
       HipLinkStatePtr, HIPRTC_JIT_INPUT_LLVM_BITCODE, (void *)ModuleBuf.data(),
       ModuleBuf.size(), "", 0, nullptr, nullptr));
-  proteusHiprtcErrCheck(
-      hiprtcLinkComplete(HipLinkStatePtr, (void **)&BinOut, &BinSize));
+  proteusHiprtcErrCheck(proteus::hipdyn::rtcLinkComplete(
+      HipLinkStatePtr, (void **)&BinOut, &BinSize));
 
   return MemoryBuffer::getMemBuffer(StringRef{BinOut, BinSize});
 }
