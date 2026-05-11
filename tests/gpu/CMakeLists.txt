@@ -42,7 +42,6 @@ function(CREATE_GPU_TEST_RDC exe check_source)
             -fgpu-rdc
             --hip-link
             -Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPassOffload>
-            -Xoffload-linker --load-pass-plugin=$<TARGET_FILE:LambdaPass>
         )
     elseif(PROTEUS_ENABLE_CUDA)
         target_compile_options(${exe}.${lang}.rdc PRIVATE --no-offload-new-driver)
@@ -130,32 +129,18 @@ function(CREATE_PROTEUS_GPU_SHARED_LIBRARY lib source)
     add_library(${lib} SHARED ${source} ${ARGN})
 
     set_source_files_properties(${source} ${ARGN} PROPERTIES LANGUAGE ${lang})
-    get_target_property(PROTEUS_PASS_SOURCES ProteusPass SOURCES)
-    get_target_property(LAMBDA_PASS_SOURCES LambdaPass SOURCES)
-    set_source_files_properties(${source} ${ARGN} PROPERTIES
-        LANGUAGE ${lang}
-        OBJECT_DEPENDS "${PROTEUS_PASS_SOURCES};${LAMBDA_PASS_SOURCES}"
-    )
-    add_dependencies(${lib} ProteusPass LambdaPass)
     target_link_libraries(${lib} PUBLIC proteus)
+    proteus_attach_pass_plugin_rebuild_dep(${lib} ${source} ${ARGN})
 
     if(PROTEUS_ENABLE_HIP)
         target_compile_options(
           ${lib}
             PUBLIC
             -fgpu-rdc
-            -fpass-plugin=$<TARGET_FILE:ProteusPass>
-            -fpass-plugin=$<TARGET_FILE:LambdaPass>
         )
 
         target_link_options(${lib} PUBLIC -fgpu-rdc --hip-link)
     elseif(PROTEUS_ENABLE_CUDA)
-        target_compile_options(
-            ${lib}
-            PUBLIC
-            -fpass-plugin=$<TARGET_FILE:ProteusPass>
-            -fpass-plugin=$<TARGET_FILE:LambdaPass>
-        )
         target_compile_options(${lib} PRIVATE --no-offload-new-driver)
         set_target_properties(${lib} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
     else()
@@ -283,7 +268,6 @@ CREATE_PROTEUS_GPU_SHARED_LIBRARY(lambda_factory_so_tu1 lambda_factory_tu1.cpp)
 CREATE_PROTEUS_GPU_SHARED_LIBRARY(lambda_factory_so_tu2 lambda_factory_tu2.cpp)
 CREATE_GPU_TEST_LIBS(lambda_factory_so_runner "lambda_factory_so_tu1;lambda_factory_so_tu2" lambda_factory_so_runner.cpp)
 CREATE_GPU_TEST(lambda_pathological lambda_pathological.cpp)
-CREATE_GPU_TEST(lambda_phi_launcher lambda_phi_launcher.cpp)
 CREATE_GPU_TEST(lambda_host_device lambda_host_device.cpp)
 CREATE_GPU_TEST(lambda_spec_test lambda_spec_test.cpp)
 CREATE_GPU_TEST(builtin_globals builtin_globals.cpp)

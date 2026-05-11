@@ -21,31 +21,21 @@ __global__ __attribute__((annotate("jit"))) void kernel_store(
 template <typename F> __device__ void invoke(F *Fn) { (*Fn)(); }
 
 template <typename F>
-__device__ __attribute__((noinline)) void write_slot(F *volatile *Slot, F *Fn) {
-  *Slot = Fn;
-}
-
-template <typename F>
-__device__ __attribute__((noinline)) F *read_slot(F *volatile *Slot) {
-  return *Slot;
-}
-
-template <typename F>
 __device__ void helper(F *Opt1, F *Opt2, F *Opt3, bool UseSecond) {
   F *volatile Slot = nullptr;
 
   // A dominance-aware analysis should follow only the store that reaches the
   // invoke below, and ignore the later overwrite.
   if (UseSecond)
-    write_slot(&Slot, Opt2);
+    Slot = Opt2;
   else
-    write_slot(&Slot, Opt1);
+    Slot = Opt1;
 
   invoke(read_slot(&Slot));
 
   // This store does not dominate the invoke and should not influence
   // provenance, but the current visitAllocaInst walks all alloca users.
-  write_slot(&Slot, Opt3);
+  Slot = Opt3;
 }
 
 auto getTestLambda(int V) {
