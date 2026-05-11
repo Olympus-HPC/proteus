@@ -141,12 +141,12 @@ private:
   //   Loc);
   // }
   // Constructor used for cloning and merging branches of phi node analysis
-  LambdaArgVisitor(Value* Start, int64_t Off, const DataLayout &_DL,
+  LambdaArgVisitor(Value *Start, int64_t Off, const DataLayout &_DL,
                    DenseMap<Function *, std::unique_ptr<FnMemCtx>> &Cache_)
-      : DL(_DL),
-        FunctionAnalysisCache(Cache_), Offset(Off) {
+      : DL(_DL), FunctionAnalysisCache(Cache_), Offset(Off) {
     WorkList.push_back(Start);
   }
+
 public:
   LambdaKernelArgAnalysis getKernelArgInfo() {
     return LambdaKernelArgAnalysis{KernelFunction, KernelArg, Offset,
@@ -162,7 +162,7 @@ public:
 
 private:
   inline std::optional<LambdaKernelArgAnalysis>
-  cloneAndAnalyze(Value* Start, int64_t StartOffset) {
+  cloneAndAnalyze(Value *Start, int64_t StartOffset) {
     LambdaArgVisitor Visitor(Start, StartOffset, DL, FunctionAnalysisCache);
     while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {
       auto *V = (Visitor.back());
@@ -400,7 +400,8 @@ public:
 
     for (size_t Idx = 1; Idx < P.getNumIncomingValues(); ++Idx) {
       auto Analysis = cloneAndAnalyze(P.getIncomingValue(Idx), Offset);
-      if (!Analysis || Analysis->KernelArgIndex != BaseSlot || Analysis->Offset != BaseOffset) {
+      if (!Analysis || Analysis->KernelArgIndex != BaseSlot ||
+          Analysis->Offset != BaseOffset) {
         AnalysisFailed = true;
         AnalysisSuccess = false;
         return;
