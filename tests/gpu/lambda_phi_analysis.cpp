@@ -48,7 +48,7 @@ template <typename F> __device__ void helper_box(F *Fn) {
 }
 
 auto getTestLambda(int V) {
-  return  PROTEUS_REGISTER_LAMBDA([=, X = proteus::jit_variable(V)] __host__ __device__ {
+  return  proteus::register_lambda([=, X = proteus::jit_variable(V)] __host__ __device__ {
     printf("case phi %d\n", X);
   });
 }

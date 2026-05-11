@@ -37,7 +37,7 @@ struct Abstraction {
 // Macro can be invoked function style, either within a Function where the arguments passed
 // to jit_variable are function parameters, or Constants as below
 auto declareLambda(int rc1, int rc2) {
-  return PROTEUS_REGISTER_LAMBDA([=, C = proteus::jit_variable(rc1), D = 5,
+  return proteus::register_lambda([=, C = proteus::jit_variable(rc1), D = 5,
           C2 = proteus::jit_variable(rc2)]() __attribute__((annotate("jit"))) {
     printInt(C);
     printInt(C2);
@@ -77,16 +77,16 @@ int main() {
   int Zero = 0;
   int One = 1;
   int Two = 2;
-  // auto RUNTIME_CONSTANT_TUPLE_ONE = {Zero, One};
+
   auto ZeroLambda = declareLambda(Zero, One);
-  // proteus::LamdbaFunctorWrapper<RUNTIME_CONSTANT_TUPLE_ONE>
+
   auto OneLambda = declareLambda(One, Two);
 
   auto TwoLambda = declareLambda(Two, Zero);
 
-  auto BigLam = PROTEUS_REGISTER_LAMBDA(declareLambdaThree(Zero, One, Two));
+  auto BigLam = proteus::register_lambda(declareLambdaThree(Zero, One, Two));
 
-  auto ForLam = PROTEUS_REGISTER_LAMBDA(forwardLambda(Zero, One, Two));
+  auto ForLam = proteus::register_lambda(forwardLambda(Zero, One, Two));
 
   Abstraction A (std::move(ZeroLambda), std::move(OneLambda), std::move(TwoLambda));
 
@@ -98,7 +98,6 @@ int main() {
 }
 
 // clang-format off
-// TODO: is this ordering stable?
 // CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 1
 // CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 0
 // CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 2
@@ -121,14 +120,12 @@ int main() {
 // CHECK: Integer = 1
 // CHECK: Integer = 2
 // CHECK: Integer = 4
-// CHECK-FIRST: [LambdaSpec] Replacing slot 3 with i32 2
-// CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 1
-// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 0
 // CHECK: Integer = 0
 // CHECK: Integer = 1
 // CHECK: Integer = 2
 // CHECK: Integer = 4
-// CHECK-FIRST: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 3
-// CHECK-COUNT-3: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 3
-// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 3 accesses 3
+// CHECK-FIRST: [proteus][JitEngineDevice] MemoryCache rank 0 hits 1 accesses 3
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 2 NumHits 1
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 2
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 2 accesses 2

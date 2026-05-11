@@ -26,14 +26,14 @@ __global__ __attribute__((annotate("jit"))) void kernel(size_t N, T LB) {
 }
 
 template <typename T> void registerRun(T &&LB) {
-  kernel<<<1, 1>>>(PROTEUS_REGISTER_LAMBDA(LB));
+  kernel<<<1, 1>>>(proteus::register_lambda(LB));
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
 template <typename T> void registerRun(int N, T &&LB) {
   constexpr int BlockSize = 256;
   const int NumBlocks = (N + BlockSize - 1) / BlockSize;
-  kernel<<<NumBlocks, BlockSize>>>(N, PROTEUS_REGISTER_LAMBDA(LB));
+  kernel<<<NumBlocks, BlockSize>>>(N, proteus::register_lambda(LB));
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
@@ -65,7 +65,7 @@ int main() {
 
   std::cout << "x[0:1] = " << X[0] << "," << X[1] << "\n";
 
-  run(PROTEUS_REGISTER_LAMBDA(
+  run(proteus::register_lambda(
       [=, A = proteus::jit_variable(A), B = proteus::jit_variable(B)] __device__
       __attribute__((annotate("jit"))) () { X[0] = A + B; }));
   std::cout << "x[0] = " << X[0] << "\n";

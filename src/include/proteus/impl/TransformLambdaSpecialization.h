@@ -636,6 +636,7 @@ public:
       LambdaOperatorMethod->eraseFromParent();
   }
 
+#ifdef PROTEUS_TRANSFORM_CONSERVATIVE
   static void transformConservative(Module &M, uint64_t FunctorID,
                                     ArrayRef<JitVariantMap> Variants) {
     if (Variants.empty())
@@ -769,6 +770,7 @@ public:
     // still produced a valid tail block. No further fixup required.
     (void)AfterCallIP;
   }
+#endif
 };
 
 } // namespace proteus

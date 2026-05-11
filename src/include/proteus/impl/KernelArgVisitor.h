@@ -55,61 +55,6 @@ struct FnMemCtx {
   FnMemCtx(llvm::Function &) {}
 };
 
-static void findAnnotatedFunctions(
-    llvm::Module &M, llvm::StringRef Wanted,
-    llvm::SmallVectorImpl<std::pair<llvm::Function *, std::uint64_t>> &Out) {
-  auto *GA = M.getGlobalVariable("llvm.global.annotations");
-  if (!GA)
-    return;
-
-  auto *CA = llvm::dyn_cast<llvm::ConstantArray>(GA->getOperand(0));
-  if (!CA)
-    return;
-
-  llvm::SmallDenseMap<llvm::Function *, std::uint64_t, 32> Seen;
-
-  for (llvm::Value *Elt : CA->operands()) {
-    auto *CS = llvm::dyn_cast<llvm::ConstantStruct>(Elt);
-    if (!CS || CS->getNumOperands() < 5)
-      continue;
-
-    auto *F =
-        llvm::dyn_cast<llvm::Function>(CS->getOperand(0)->stripPointerCasts());
-    if (!F)
-      continue;
-
-    llvm::StringRef Ann;
-    if (!llvm::getConstantStringInfo(CS->getOperand(1)->stripPointerCasts(),
-                                     Ann))
-      continue;
-    if (Ann != Wanted)
-      continue;
-
-    std::uint64_t Id = 0;
-    llvm::Value *ArgsPtr = CS->getOperand(4)->stripPointerCasts();
-    if (llvm::isa<llvm::ConstantPointerNull>(ArgsPtr))
-      continue;
-
-    auto *ArgsGV = llvm::dyn_cast<llvm::GlobalVariable>(ArgsPtr);
-    if (!ArgsGV)
-      continue;
-
-    auto *ArgsInit = ArgsGV->getInitializer();
-    auto *ArgsCS = llvm::dyn_cast<llvm::ConstantStruct>(ArgsInit);
-    if (!ArgsCS || ArgsCS->getNumOperands() < 1)
-      continue;
-
-    auto *CI = llvm::dyn_cast<llvm::ConstantInt>(ArgsCS->getOperand(0));
-    if (!CI)
-      continue;
-
-    Id = CI->getZExtValue();
-
-    if (Seen.try_emplace(F, Id).second)
-      Out.emplace_back(F, Id);
-  }
-}
-
 class LambdaArgVisitor : public InstVisitor<LambdaArgVisitor> {
 private:
   CallBase *LambdaCB;
@@ -143,7 +88,7 @@ private:
   // Constructor used for cloning and merging branches of phi node analysis
   LambdaArgVisitor(Value *Start, int64_t Off, const DataLayout &_DL,
                    DenseMap<Function *, std::unique_ptr<FnMemCtx>> &Cache_)
-      : DL(_DL), FunctionAnalysisCache(Cache_), Offset(Off) {
+      : DL(_DL), Offset(Off), FunctionAnalysisCache(Cache_) {
     WorkList.push_back(Start);
   }
 
@@ -187,8 +132,8 @@ private:
 public:
   LambdaArgVisitor(CallBase *LambdaCB_, Module &M,
                    DenseMap<Function *, std::unique_ptr<FnMemCtx>> &Cache_)
-      : LambdaCB(LambdaCB_), DL(M.getDataLayout()),
-        FunctionAnalysisCache(Cache_), Offset(0) {
+      : LambdaCB(LambdaCB_), DL(M.getDataLayout()), Offset(0),
+        FunctionAnalysisCache(Cache_) {
     auto *ClosurePtr = LambdaCB->getArgOperand(0);
     WorkList.push_back(ClosurePtr);
   }
@@ -350,7 +295,7 @@ public:
     Offset = Offset - DstOff + SrcOff;
   }
 
-  void visitIntrinsicInst(IntrinsicInst &II) {
+  void visitIntrinsicInst(IntrinsicInst &) {
     AnalysisFailed = true;
     return;
   }

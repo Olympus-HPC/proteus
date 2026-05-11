@@ -17,7 +17,7 @@ __global__ __attribute__((annotate("jit"))) void kernel(T LB) {
 }
 
 template <typename T> void launcher(T &&LB) {
-  auto RegisteredFunctor = PROTEUS_REGISTER_LAMBDA(LB);
+  auto RegisteredFunctor = proteus::register_lambda(LB);
   kernel<<<1, 1>>>(RegisteredFunctor);
   gpuErrCheck(gpuDeviceSynchronize());
   RegisteredFunctor();
