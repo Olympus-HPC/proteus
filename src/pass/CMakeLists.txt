@@ -73,8 +73,7 @@ target_link_options(ProteusPassOffload
   PRIVATE "$<$<NOT:$<PLATFORM_ID:Darwin>>:-Wl,-Bsymbolic>")
 
 target_link_libraries(LambdaPass
-  PRIVATE IRLinker
-  "$<$<PLATFORM_ID:Darwin>:-undefined dynamic_lookup>")
+  PRIVATE "$<$<PLATFORM_ID:Darwin>:LINKER:SHELL:-undefined dynamic_lookup>")
 
 target_compile_options(
   LambdaPass
@@ -92,8 +91,7 @@ target_link_options(
   ProteusPass
   INTERFACE
 
-  "SHELL:$<$<LINK_LANGUAGE:HIP>:-Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPassOffload>>
-  --load-pass-plugin=$<TARGET_FILE:LambdaPass>>"
+  "SHELL:$<$<LINK_LANGUAGE:HIP>:-Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPassOffload>>"
 )
 
 set_target_properties(ProteusPass ProteusPassOffload PROPERTIES
@@ -115,4 +113,3 @@ if(NOT PROTEUS_PYTHON_WHEEL)
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 endif()
-

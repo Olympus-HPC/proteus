@@ -627,12 +627,13 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   DenseMap<uint64_t, LambdaRegistry::JitVariantVec> LambdaJitValuesMap;
   getLambdaJitValues(KernelInfo, LambdaJitValuesMap, KernelArgs);
-
+  const auto &CGConfig = Config::get().getCGConfig(KernelInfo.getName());
   // Determine the hash based on dimension specialization.  If we do not
   // specialize IR based on grid dimensions, avoid hashing on those to
   // eliminate repeated compilation overhead.
-  HashT HashValue = hash(getStaticHash(KernelInfo), RCVec, LambdaJitValuesMap,
-                         BlockDim.x, BlockDim.y, BlockDim.z, hashCodeGenConfig(CGConfig),
+  HashT HashValue =
+      hash(getStaticHash(KernelInfo), RCVec, LambdaJitValuesMap, BlockDim.x,
+           BlockDim.y, BlockDim.z, hashCodeGenConfig(CGConfig),
            hashRuntimeSpecializationConfig(CGConfig));
   if (CGConfig.specializeDims() || CGConfig.specializeDimsRange())
     HashValue = hash(HashValue, GridDim.x, GridDim.y, GridDim.z);
@@ -685,10 +686,10 @@ JitEngineDevice<ImplT>::compileAndRun(
                                           << HashValue.toString() << "\n");
 
       AsyncCompiler->compile(CompilationTask{
-          KernelBitcode, HashValue, KernelArgs, KernelInfo.getName(), Suffix, BlockDim,
-          GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(),
-          LambdaCallsiteLocations,
-          BinInfo.getVarNameToGlobalInfo(), GlobalLinkedBinaries, DeviceArch,
+          KernelBitcode, HashValue, KernelArgs, KernelInfo.getName(), Suffix,
+          BlockDim, GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(),
+          LambdaCallsiteLocations, BinInfo.getVarNameToGlobalInfo(),
+          GlobalLinkedBinaries, DeviceArch,
           /*CodeGenConfig */ CGConfig,
           /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
           /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy});
@@ -706,10 +707,10 @@ JitEngineDevice<ImplT>::compileAndRun(
   } else {
     // Process through synchronous compilation.
     ObjBuf = CompilerSync::instance().compile(CompilationTask{
-        KernelBitcode, HashValue, KernelArgs, KernelInfo.getName(), Suffix, BlockDim,
-        GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(),
-        LambdaCallsiteLocations,
-        BinInfo.getVarNameToGlobalInfo(), GlobalLinkedBinaries, DeviceArch,
+        KernelBitcode, HashValue, KernelArgs, KernelInfo.getName(), Suffix,
+        BlockDim, GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(),
+        LambdaCallsiteLocations, BinInfo.getVarNameToGlobalInfo(),
+        GlobalLinkedBinaries, DeviceArch,
         /*CodeGenConfig */ CGConfig,
         /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
         /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy});
