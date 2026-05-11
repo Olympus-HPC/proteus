@@ -25,6 +25,7 @@
 // #include <llvm/Analysis/CaptureTracking.h>
 #include <llvm/Analysis/ValueTracking.h>
 #include <llvm/IR/Constants.h>
+#include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/InstrTypes.h>
@@ -139,6 +140,49 @@ private:
   //   CachedAnalysis.MSSA.getWalker()->getClobberingMemoryAccess(BeforeCB,
   //   Loc);
   // }
+  // Constructor used for cloning and merging branches of phi node analysis
+  LambdaArgVisitor(Value* Start, int64_t Off, const DataLayout &_DL,
+                   DenseMap<Function *, std::unique_ptr<FnMemCtx>> &Cache_)
+      : DL(_DL),
+        FunctionAnalysisCache(Cache_), Offset(Off) {
+    WorkList.push_back(Start);
+  }
+public:
+  LambdaKernelArgAnalysis getKernelArgInfo() {
+    return LambdaKernelArgAnalysis{KernelFunction, KernelArg, Offset,
+                                   ChangedRC};
+  }
+  auto back() { return WorkList.back(); }
+  void popBack() { WorkList.pop_back(); }
+  bool seen(Value *Val) { return Seen.contains(Val); }
+  void markAsSeen(Value *Val) { Seen.insert(Val); }
+  bool empty() { return WorkList.empty(); }
+  bool success() { return AnalysisSuccess; }
+  bool failed() { return AnalysisFailed; }
+
+private:
+  inline std::optional<LambdaKernelArgAnalysis>
+  cloneAndAnalyze(Value* Start, int64_t StartOffset) {
+    LambdaArgVisitor Visitor(Start, StartOffset, DL, FunctionAnalysisCache);
+    while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {
+      auto *V = (Visitor.back());
+      Visitor.popBack();
+      // Prevent loops/infinite recursion
+      if (Visitor.seen(V))
+        continue;
+      Visitor.markAsSeen(V);
+      // Analyze the instruction
+      if (auto *I = dyn_cast<Instruction>(V))
+        Visitor.visit(*I);
+      else if (auto *A = dyn_cast<Argument>(V))
+        Visitor.visitArgument(*A);
+      else
+        continue;
+    }
+    if (!Visitor.success() || Visitor.failed())
+      return std::nullopt;
+    return Visitor.getKernelArgInfo();
+  }
 
 public:
   LambdaArgVisitor(CallBase *LambdaCB_, Module &M,
@@ -248,18 +292,6 @@ public:
     WorkList.push_back(CommonStoredVal);
   }
 
-  auto back() { return WorkList.back(); }
-  void popBack() { WorkList.pop_back(); }
-  bool seen(Value *Val) { return Seen.contains(Val); }
-  void markAsSeen(Value *Val) { Seen.insert(Val); }
-  bool empty() { return WorkList.empty(); }
-  bool success() { return AnalysisSuccess; }
-  bool failed() { return AnalysisFailed; }
-  LambdaKernelArgAnalysis getKernelArgInfo() {
-    return LambdaKernelArgAnalysis{KernelFunction, KernelArg, Offset,
-                                   ChangedRC};
-  }
-
   void visitGetElementPtrInst(GetElementPtrInst &GEP) {
     int64_t GEPOffset = 0;
     GetPointerBaseWithConstantOffset(&GEP, GEPOffset, DL);
@@ -357,30 +389,26 @@ public:
       return;
     }
 
-    Value *CommonBase = nullptr;
-    int64_t CommonIncOff = 0;
-    bool First = true;
+    auto FirstAnalysis = cloneAndAnalyze(P.getIncomingValue(0), Offset);
+    if (!FirstAnalysis) {
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
+      return;
+    }
+    auto BaseSlot = FirstAnalysis->KernelArgIndex;
+    auto BaseOffset = FirstAnalysis->Offset;
 
-    for (Value *Inc : P.incoming_values()) {
-      int64_t IncOff = 0;
-      Value *Base = GetPointerBaseWithConstantOffset(Inc, IncOff, DL);
-      Base = Base->stripPointerCasts();
-
-      if (First) {
-        CommonBase = Base;
-        CommonIncOff = IncOff;
-        First = false;
-        continue;
-      }
-
-      if (Base != CommonBase || IncOff != CommonIncOff) {
+    for (size_t Idx = 1; Idx < P.getNumIncomingValues(); ++Idx) {
+      auto Analysis = cloneAndAnalyze(P.getIncomingValue(Idx), Offset);
+      if (!Analysis || Analysis->KernelArgIndex != BaseSlot || Analysis->Offset != BaseOffset) {
         AnalysisFailed = true;
+        AnalysisSuccess = false;
         return;
       }
     }
-
-    WorkList.push_back(CommonBase);
-    Offset += CommonIncOff; // phi == CommonBase + CommonIncOff
+    KernelFunction = FirstAnalysis->KernelFunction;
+    AnalysisSuccess = true;
+    AnalysisFailed = false;
   }
 
   void visitSelectInst(SelectInst &S) {
@@ -408,7 +436,7 @@ inline bool analyzeLambdaUses(
     DenseMap<CallBase *, LambdaKernelArgAnalysis> &CallBaseToArgOffset,
     const SmallVector<CallBase *> &CBToAnalyze,
     DenseMap<Function *, std::unique_ptr<FnMemCtx>> &FunctionAnalysisCache) {
-  // llvm::outs() << M;
+
   for (auto *FunctorCB : CBToAnalyze) {
     LambdaArgVisitor Visitor(FunctorCB, M, FunctionAnalysisCache);
     while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {

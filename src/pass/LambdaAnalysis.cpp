@@ -160,6 +160,7 @@ public:
     // specialization paths expect the function metadata to be present after
     // cloning/extraction.
     // clang-format on
+
     makeLambdaCallsUniquePerFunctorOperator(M);
     if (!isDeviceCompilation(M)) {
       getUnderlyingLambdaTypeFromFunctors(M, RegisteredLambdaStorageClasses);
@@ -603,8 +604,10 @@ private:
           StructType *PossibleLamType =
               dyn_cast<StructType>(GEP->getSourceElementType());
           if (!PossibleLamType ||
-              !RegisteredLambdaStorageClasses.contains(PossibleLamType))
+              !RegisteredLambdaStorageClasses.contains(PossibleLamType)) {
+            reportFatalError("jit_variable called on unregistered lambda");
             continue;
+          }
           auto *Slot = GEP->getOperand(GEP->getNumOperands() - 1);
           const StructLayout *SL =
               M.getDataLayout().getStructLayout(PossibleLamType);
