@@ -14,7 +14,7 @@
 void printInt(int I) { printf("Integer = %d\n", I); }
 
 auto declareLambda(int rc1, int rc2) {
-  return PROTEUS_REGISTER_LAMBDA(
+  return proteus::register_lambda(
       [=, C = proteus::jit_variable(rc1), D = 5,
        C2 = proteus::jit_variable(rc2)]() __attribute__((annotate("jit"))) {
         printInt(C);
@@ -68,8 +68,8 @@ int main() {
   Abstraction A(std::move(ZeroLambda), std::move(OneLambda),
                 std::move(TwoLambda));
 
-  auto BigLam = PROTEUS_REGISTER_LAMBDA(declareLambdaThree(Zero, One, Two));
-  auto ForLam = PROTEUS_REGISTER_LAMBDA(forwardLambda(Zero, One, Two));
+  auto BigLam = proteus::register_lambda(declareLambdaThree(Zero, One, Two));
+  auto ForLam = proteus::register_lambda(forwardLambda(Zero, One, Two));
 
   A();
   BigLam();

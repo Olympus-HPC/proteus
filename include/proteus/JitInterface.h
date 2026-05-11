@@ -99,8 +99,7 @@ constexpr std::uint64_t fnv1a64(const char *s) {
 }
 
 // todo: make a test with lambda factory in a header, two separate cpp files
-template <std::uint64_t Ctr, class Lambda>
-constexpr std::uint64_t functor_id() {
+template <class Lambda> constexpr std::uint64_t functor_id() {
   return fnv1a64(__PRETTY_FUNCTION__); // includes Lambda + Ctr in the text
 }
 
@@ -148,27 +147,20 @@ __register_lambda_impl(T &&t) noexcept {
   return result;
 }
 
-template <std::uint64_t Ctr, class L>
+} // namespace detail
+
+template <class L>
 [[nodiscard]] inline auto register_lambda(L &&lambda) noexcept {
-  static_assert(!is_lambda_functor_wrapper<L>::value);
+  static_assert(!detail::is_lambda_functor_wrapper<L>::value);
   return ::proteus::detail::__register_lambda_impl<
-      ::proteus::detail::functor_id<Ctr, std::decay_t<L>>()>(
+      ::proteus::detail::functor_id<std::decay_t<L>>()>(
       std::forward<L>(lambda));
 }
-} // namespace detail
 
 template <typename T>
 static __attribute__((noinline)) T jit_variable(T V) noexcept {
   return V;
 }
-
-// Variadic to allow passing lambda literals that contain commas (e.g. capture
-// lists like `[=, x = ...]`), which the preprocessor would otherwise interpret
-// as macro argument separators.
-#define PROTEUS_REGISTER_LAMBDA(...)                                           \
-  ::proteus::detail::register_lambda<__COUNTER__>(__VA_ARGS__)
-#define PROTEUS_REGISTER_LAMBDA_IMPL(lam, ctr)                                 \
-  ::proteus::detail::register_lambda<(ctr)>(lam)
 
 #if defined(__CUDACC__) || defined(__HIP__)
 // The function needs to be static for RDC compilation to resolve the static

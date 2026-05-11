@@ -39,7 +39,7 @@ __device__ void helper(F *Opt1, F *Opt2, F *Opt3, bool UseSecond) {
 }
 
 auto getTestLambda(int V) {
-  return  PROTEUS_REGISTER_LAMBDA([=, X = proteus::jit_variable(V)] __host__ __device__ {
+  return  proteus::register_lambda([=, X = proteus::jit_variable(V)] __host__ __device__ {
     printf("case phi %d\n", X);
   });
 }

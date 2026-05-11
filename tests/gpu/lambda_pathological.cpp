@@ -55,7 +55,7 @@ __global__ __attribute__((annotate("jit"))) void kernel_case5(Lambda Body) {
 }
 
 template <typename Lambda> void run(Lambda Body) {
-  kernel<<<1, 1>>>(PROTEUS_REGISTER_LAMBDA(Body));
+  kernel<<<1, 1>>>(proteus::register_lambda(Body));
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
@@ -103,8 +103,8 @@ static void case1() {
     printf("case1 B %d\n", X);
   };
 
-  kernel_case1<<<1, 1>>>(PROTEUS_REGISTER_LAMBDA(LA),
-                         PROTEUS_REGISTER_LAMBDA(LB));
+  kernel_case1<<<1, 1>>>(proteus::register_lambda(LA),
+                         proteus::register_lambda(LB));
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
@@ -129,9 +129,9 @@ static void case2() {
   auto LB = [=, X = proteus::jit_variable(B)] __device__ {
     printf("case2 B %d\n", X);
   };
-  kernel_case2_a<<<1, 1>>>(PROTEUS_REGISTER_LAMBDA(LA));
+  kernel_case2_a<<<1, 1>>>(proteus::register_lambda(LA));
   gpuErrCheck(gpuDeviceSynchronize());
-  kernel_case2_b<<<1, 1>>>(PROTEUS_REGISTER_LAMBDA(LB));
+  kernel_case2_b<<<1, 1>>>(proteus::register_lambda(LB));
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
@@ -143,7 +143,7 @@ static void case3() {
   auto Body = [=, X = proteus::jit_variable(V)] __device__ {
     printf("case3 %d\n", X);
   };
-  kernel_case3<<<1, 1>>>(PROTEUS_REGISTER_LAMBDA(Body));
+  kernel_case3<<<1, 1>>>(proteus::register_lambda(Body));
   gpuErrCheck(gpuDeviceSynchronize());
 }
 #endif
@@ -154,7 +154,7 @@ static void case4() {
   auto Body = [=, X = proteus::jit_variable(V)] __device__ {
     printf("case4 %d\n", X);
   };
-  kernel_case4<<<1, 1>>>(PROTEUS_REGISTER_LAMBDA(Body));
+  kernel_case4<<<1, 1>>>(proteus::register_lambda(Body));
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
@@ -164,7 +164,7 @@ static void case5() {
   auto Body = [=, X = proteus::jit_variable(V)] __device__ {
     printf("case5 %d\n", X);
   };
-  kernel_case5<<<1, 1>>>(PROTEUS_REGISTER_LAMBDA(Body));
+  kernel_case5<<<1, 1>>>(proteus::register_lambda(Body));
   gpuErrCheck(gpuDeviceSynchronize());
 }
 

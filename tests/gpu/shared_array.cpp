@@ -28,7 +28,7 @@ template <typename Lambda> void launcher(Lambda &&Body) {
 
 int main() {
   int Dims = 3;
-  launcher(PROTEUS_REGISTER_LAMBDA(
+  launcher(proteus::register_lambda(
       [=, Dims = proteus::jit_variable(Dims)] __host__ __device__() {
         double *Array = proteus::shared_array<double, 10>(Dims);
         Array[0] = 1.0;

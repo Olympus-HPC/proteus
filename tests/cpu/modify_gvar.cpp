@@ -17,7 +17,7 @@
 int GVar = 1;
 
 template <typename F> void run(F &&Func) {
-  PROTEUS_REGISTER_LAMBDA(Func)();
+  proteus::register_lambda(Func)();
 }
 
 __attribute__((annotate("jit"))) void modifyGVar() { GVar += 1; }

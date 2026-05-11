@@ -26,7 +26,7 @@ template <typename T> void run(T &&LB) {
 }
 
 void lambdaCaller(int V) {
-  run(PROTEUS_REGISTER_LAMBDA(
+  run(proteus::register_lambda(
       [=, V = proteus::jit_variable(V)] __device__() { printf("V %d\n", V); }));
 }
 

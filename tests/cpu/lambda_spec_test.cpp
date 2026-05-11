@@ -30,7 +30,7 @@ static void run_internal(T &&LB) { LB(); }
 
 template<typename Lambda>
 static void registerRun(Lambda&& Lam) {
-  run(PROTEUS_REGISTER_LAMBDA(Lam));
+  run(proteus::register_lambda(Lam));
 }
 
 int main() {
