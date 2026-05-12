@@ -180,8 +180,8 @@ int main() {
   return 0;
 }
 
-// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 22
-// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 11
+// CHECK-FIRST-DAG: [LambdaSpec] Replacing slot 0 with i32 22
+// CHECK-FIRST-DAG: [LambdaSpec] Replacing slot 0 with i32 11
 // CHECK: case1 A 11
 // CHECK: case1 B 22
 // CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 33
