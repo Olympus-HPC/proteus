@@ -15,13 +15,11 @@
 #include "proteus/impl/Logger.h"
 #include "proteus/impl/Utils.h"
 
-#include <llvm/ADT/DenseSet.h>
 #include <llvm/Analysis/ConstantFolding.h>
 #include <llvm/Demangle/Demangle.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Support/Debug.h>
-#include <llvm/Support/raw_ostream.h>
 
 namespace proteus {
 
