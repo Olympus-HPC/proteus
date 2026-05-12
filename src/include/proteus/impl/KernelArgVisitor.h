@@ -13,16 +13,7 @@
 #include <llvm/ADT/Hashing.h>
 #include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/ADT/SmallVector.h>
-// #include <llvm/Analysis/MemorySSA.h>
-// #include <llvm/Analysis/MemoryLocation.h>
-// #include <llvm/Passes/PassBuilder.h>
-// #include <llvm/Analysis/MemorySSA.h>
-// #include <llvm/Analysis/TargetLibraryInfo.h>
-// #include <llvm/Analysis/MemoryLocation.h>
-// #include <llvm/Analysis/AliasAnalysis.h>
-// #include <llvm/Analysis/AssumptionCache.h>
-// #include <llvm/Analysis/BasicAliasAnalysis.h>
-// #include <llvm/Analysis/CaptureTracking.h>
+
 #include <llvm/Analysis/ValueTracking.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
@@ -69,26 +60,10 @@ private:
   std::optional<RuntimeConstantType> ChangedRC = std::nullopt;
   bool AnalysisSuccess = false;
   bool AnalysisFailed = false;
-  DenseMap<Function *, std::unique_ptr<FnMemCtx>> &FunctionAnalysisCache;
 
-  // MemoryAccess* findClobberingWriteBeforeCB(CallBase *CB, int ArgNum) {
-  //   Function* CallerFunction = CB->getCaller();
-  //   if (!FunctionAnalysisCache.contains(CallerFunction))
-  //     FunctionAnalysisCache[CallerFunction] =
-  //     std::make_unique<FnMemCtx>(*CallerFunction);
-  //   auto& CachedAnalysis = *FunctionAnalysisCache[CallerFunction];
-  //   MemoryAccess *MA = CachedAnalysis.MSSA.getMemoryAccess(CB);
-  //   auto *UD = cast<MemoryUseOrDef>(MA);
-  //   MemoryAccess *BeforeCB = UD->getDefiningAccess();
-  //   MemoryLocation Loc = MemoryLocation::getForArgument(CB,
-  //   /*ArgIdx=*/ArgNum, CachedAnalysis.TLI); return
-  //   CachedAnalysis.MSSA.getWalker()->getClobberingMemoryAccess(BeforeCB,
-  //   Loc);
-  // }
   // Constructor used for cloning and merging branches of phi node analysis
-  LambdaArgVisitor(Value *Start, int64_t Off, const DataLayout &_DL,
-                   DenseMap<Function *, std::unique_ptr<FnMemCtx>> &Cache_)
-      : DL(_DL), Offset(Off), FunctionAnalysisCache(Cache_) {
+  LambdaArgVisitor(Value *Start, int64_t Off, const DataLayout &_DL)
+      : DL(_DL), Offset(Off) {
     WorkList.push_back(Start);
   }
 
@@ -108,7 +83,7 @@ public:
 private:
   inline std::optional<LambdaKernelArgAnalysis>
   cloneAndAnalyze(Value *Start, int64_t StartOffset) {
-    LambdaArgVisitor Visitor(Start, StartOffset, DL, FunctionAnalysisCache);
+    LambdaArgVisitor Visitor(Start, StartOffset, DL);
     while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {
       auto *V = (Visitor.back());
       Visitor.popBack();
@@ -130,10 +105,8 @@ private:
   }
 
 public:
-  LambdaArgVisitor(CallBase *LambdaCB_, Module &M,
-                   DenseMap<Function *, std::unique_ptr<FnMemCtx>> &Cache_)
-      : LambdaCB(LambdaCB_), DL(M.getDataLayout()), Offset(0),
-        FunctionAnalysisCache(Cache_) {
+  LambdaArgVisitor(CallBase *LambdaCB_, Module &M)
+      : LambdaCB(LambdaCB_), DL(M.getDataLayout()), Offset(0) {
     auto *ClosurePtr = LambdaCB->getArgOperand(0);
     WorkList.push_back(ClosurePtr);
   }
@@ -313,8 +286,6 @@ public:
       KernelFunction = F;
       return;
     }
-    if (!FunctionAnalysisCache.contains(F))
-      FunctionAnalysisCache[F] = std::make_unique<FnMemCtx>(*F);
 
     for (User *U : F->users()) {
       auto *CB = dyn_cast<CallBase>(U);
@@ -381,10 +352,9 @@ public:
 inline bool analyzeLambdaUses(
     llvm::Module &M,
     DenseMap<CallBase *, LambdaKernelArgAnalysis> &CallBaseToArgOffset,
-    const SmallVector<CallBase *> &CBToAnalyze,
-    DenseMap<Function *, std::unique_ptr<FnMemCtx>> &FunctionAnalysisCache) {
+    const SmallVector<CallBase *> &CBToAnalyze) {
   for (auto *FunctorCB : CBToAnalyze) {
-    LambdaArgVisitor Visitor(FunctorCB, M, FunctionAnalysisCache);
+    LambdaArgVisitor Visitor(FunctorCB, M);
     while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {
       auto *V = Visitor.back();
       Visitor.popBack();

@@ -315,9 +315,7 @@ specializeIR(Module &M, void **KernelArgs, StringRef FnName, StringRef Suffix,
     TransformLambdaSpecialization::transformDeviceKernel(
         M, KernelArgs, ID, VariantsOpt.value(), It->second);
   }
-  // llvm::outs() << M;
-  // llvm::outs().flush();
-  // Logger::logs("proteus").flush();
+
   // Run the shared array transform after any value specialization (arguments,
   // captures) to propagate any constants.
   TransformSharedArray::transform(M);
