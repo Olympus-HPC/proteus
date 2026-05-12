@@ -36,6 +36,22 @@ add_test(
 set_property(TEST python_host_llvmir_validation PROPERTY ENVIRONMENT ${PROTEUS_PYTHON_TEST_ENV})
 set_property(TEST python_host_llvmir_validation PROPERTY LABELS "python")
 
+add_test(
+  NAME python_backend_selection
+  COMMAND ${Python3_EXECUTABLE}
+          ${CMAKE_CURRENT_SOURCE_DIR}/test_backend_selection.py
+)
+set_property(TEST python_backend_selection PROPERTY ENVIRONMENT ${PROTEUS_PYTHON_TEST_ENV})
+set_property(TEST python_backend_selection PROPERTY LABELS "python")
+
+add_test(
+  NAME python_proteus_init_exports
+  COMMAND ${Python3_EXECUTABLE}
+          ${CMAKE_CURRENT_SOURCE_DIR}/test_proteus_init_exports.py
+)
+set_property(TEST python_proteus_init_exports PROPERTY ENVIRONMENT ${PROTEUS_PYTHON_TEST_ENV})
+set_property(TEST python_proteus_init_exports PROPERTY LABELS "python")
+
 if(PROTEUS_ENABLE_CUDA OR PROTEUS_ENABLE_HIP)
   # GPU C++ frontend coverage only makes sense when a device backend is enabled.
   add_test(
