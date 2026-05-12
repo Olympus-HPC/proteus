@@ -59,7 +59,7 @@ function(proteus_attach_pass_plugin_rebuild_dep target)
     add_custom_command(
         OUTPUT "${proteus_pass_stamp}"
         COMMAND ${CMAKE_COMMAND} -E touch "${proteus_pass_stamp}"
-        DEPENDS ProteusPass
+        DEPENDS ProteusPass LambdaPass
         VERBATIM
     )
 

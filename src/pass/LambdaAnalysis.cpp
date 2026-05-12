@@ -579,10 +579,10 @@ private:
 
       while (!WorkList.empty()) {
         Value *CurVal = WorkList.front();
+        WorkList.pop();
         if (Discovered.contains(CurVal))
           continue;
         Discovered.insert(CurVal);
-        WorkList.pop();
         // very simple use-def traversal only handles three cases, which we
         // expect at startEPCallBack
         if (StoreInst *Store = dyn_cast<StoreInst>(CurVal))
@@ -700,22 +700,6 @@ private:
     }
   }
 
-  // Detect a CUDA module by the presence of the __cuda_register_globals
-  // function.
-  bool isCUDAModule(Module &M) {
-    return M.getFunction("__cuda_register_globals") != nullptr;
-  }
-
-  // Add a call to __proteus_cudart_builtins_init to the global constructors of
-  // the module to initialize the Proteus CUDA runtime builtins.
-  void emitProteusCUDARuntimeBuiltinsInit(Module &M) {
-    FunctionCallee InitFn =
-        M.getOrInsertFunction("__proteus_cudart_builtins_init",
-                              FunctionType::get(Types.VoidTy, false));
-
-    appendToGlobalCtors(M, cast<Function>(InitFn.getCallee()), 65535);
-  }
-
   bool hasDeviceLaunchKernelCalls(Module &M) {
     Function *LaunchKernelFn = nullptr;
     if (!LaunchFunctionName) {
@@ -740,7 +724,6 @@ struct LambdaPass : PassInfoMixin<LambdaPass> {
 
     bool Changed = PPI.run(M, IsLTO);
     if (Changed)
-      // TODO: is anything preserved?
       return PreservedAnalyses::none();
 
     return PreservedAnalyses::all();
@@ -780,25 +763,13 @@ llvm::PassPluginLibraryInfo getLambdaPassPluginInfo() {
   // However, there are linking errors, working assumption is that the hiprtc
   // linker cannot re-link already linked device libraries and aborts.
 
-  // PB.registerPipelineStartEPCallback(
-  // PB.registerOptimizerLastEPCallback(
-  // PM.registerPipelineEarlySimplificationEPCallback
 #if LLVM_VERSION_MAJOR >= 20
     PB.registerPipelineStartEPCallback(
         [&](ModulePassManager &MPM, OptimizationLevel) {
           MPM.addPass(LambdaPass{false});
         });
 #else
-    // #if LLVM_VERSION_MAJOR >= 20
-    //     PB.registerPipelineEarlySimplificationEPCallback(
-    //         [&](ModulePassManager &MPM, OptimizationLevel,
-    //           ThinOrFullLTOPhase LTOPhase) {
-    //           if (LTOPhase != ThinOrFullLTOPhase::None)
-    //             reportFatalError("Expected registration only for non-LTO");
-    //           MPM.addPass(LambdaPass{false});
-    //         });
-    // #else
-    PB.registerPipelineEarlySimplificationEPCallback(
+    PB.registerPipelineStartEPCallback(
         [&](ModulePassManager &MPM, OptimizationLevel) {
           MPM.addPass(LambdaPass{false});
           return true;

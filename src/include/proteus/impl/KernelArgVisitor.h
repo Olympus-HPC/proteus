@@ -258,6 +258,7 @@ public:
   }
 
   void visitAddrSpaceCastInst(AddrSpaceCastInst &ASC) {
+    WorkList.push_back(ASC.getPointerOperand());
     for (auto *User : ASC.users())
       if (!Seen.contains(User))
         WorkList.push_back(User);
@@ -382,11 +383,10 @@ inline bool analyzeLambdaUses(
     DenseMap<CallBase *, LambdaKernelArgAnalysis> &CallBaseToArgOffset,
     const SmallVector<CallBase *> &CBToAnalyze,
     DenseMap<Function *, std::unique_ptr<FnMemCtx>> &FunctionAnalysisCache) {
-
   for (auto *FunctorCB : CBToAnalyze) {
     LambdaArgVisitor Visitor(FunctorCB, M, FunctionAnalysisCache);
     while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {
-      auto *V = (Visitor.back());
+      auto *V = Visitor.back();
       Visitor.popBack();
       // Prevent loops/infinite recursion
       if (Visitor.seen(V))
