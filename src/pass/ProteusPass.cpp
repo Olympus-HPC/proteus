@@ -39,6 +39,7 @@
 #include "proteus/impl/Logger.h"
 #include "proteus/impl/RuntimeConstantTypeHelpers.h"
 
+#include <llvm/ADT/DenseSet.h>
 #include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/ADT/StringMap.h>
 #include <llvm/ADT/StringRef.h>
@@ -509,6 +510,38 @@ private:
     createLambdaDeviceManifestFile(M, KernelManifest);
   }
 
+  RuntimeConstantType getKernelArgLayout(CallBase *LaunchKernelCB) {
+    if (!LaunchKernelCB)
+      reportFatalError("Error passing device stub pointer to layout analysis");
+    RuntimeConstantType LayoutType = RuntimeConstantType::NONE;
+    SmallVector<std::pair<Value *, size_t>> WorkList;
+    Value *KernelArgPack =
+        LaunchKernelCB->getArgOperand(LaunchKernelCB->arg_size() - 3);
+    WorkList.push_back({KernelArgPack, 0});
+    SmallDenseSet<Value *> Discovered;
+    while (!WorkList.empty()) {
+      auto [V, Depth] = WorkList.back();
+      // outs() << *V<<"\n";
+      // outs().flush();
+      WorkList.pop_back();
+      if (Discovered.contains(V))
+        continue;
+      Discovered.insert(V);
+      if (AllocaInst *Alloca = dyn_cast<AllocaInst>(V)) {
+        for (auto *Usr : Alloca->users())
+          WorkList.push_back({Usr, Depth + 1});
+        // Ptr to ptr type pack
+        if (Depth == 2 && Alloca->getAllocatedType()->isPointerTy())
+          return RuntimeConstantType::PTR;
+        if (Depth == 2 && Alloca->getAllocatedType()->isStructTy())
+          return RuntimeConstantType::NONE;
+      } else if (StoreInst *Store = dyn_cast<StoreInst>(V)) {
+        WorkList.push_back({Store->getValueOperand(), Depth + 1});
+      }
+    }
+    return LayoutType;
+  }
+
   void instrumentLambdaLaunchCallsites(
       Module &M, const DenseMap<Value *, GlobalVariable *> &StubToKernelMap) {
     auto KernelManifest = parseLambdaManifestFile(M);
@@ -542,7 +575,7 @@ private:
       auto ManifestIt = KernelManifest.find(KernelSym);
       if (ManifestIt == KernelManifest.end())
         continue;
-
+      auto KernelArgType = getKernelArgLayout(LaunchCB);
       IRBuilder<> Builder(LaunchCB);
       for (const auto &Record : ManifestIt->getValue()) {
         Builder.CreateCall(
@@ -551,7 +584,7 @@ private:
              Builder.getInt32(Record.CallsiteIndex),
              Builder.getInt32(Record.KernelArgIndex),
              Builder.getInt64(Record.Offset),
-             Builder.getInt32(static_cast<int32_t>(Record.StorageType))});
+             Builder.getInt32(static_cast<int32_t>(KernelArgType))});
       }
     }
   }

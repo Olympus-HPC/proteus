@@ -94,7 +94,7 @@ target_link_options(
   "SHELL:$<$<LINK_LANGUAGE:HIP>:-Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPassOffload>>"
 )
 
-set_target_properties(ProteusPass ProteusPassOffload PROPERTIES
+set_target_properties(ProteusPass ProteusPassOffload LambdaPass PROPERTIES
   # on macOS enable passing RPATH flags to the linker; no-ops on Linux
   MACOSX_RPATH          ON
   # let CMake use INSTALL_RPATH even in the build tree
