@@ -478,7 +478,6 @@ private:
     findFunctionsWithU64Metadata(M, "proteus.wrapper_call",
                                  FunctorOperatorMethods);
 
-    DenseMap<Function *, std::unique_ptr<FnMemCtx>> FunctionAnalysisCache;
     for (auto &[FunctorOperator, FunctorId] : FunctorOperatorMethods) {
       SmallVector<CallBase *> CBToAnalyze;
       collectWrapperCallsites(*FunctorOperator, CBToAnalyze);
@@ -486,8 +485,7 @@ private:
         continue;
 
       DenseMap<CallBase *, LambdaKernelArgAnalysis> CallBaseToArgOffset;
-      if (!analyzeLambdaUses(M, CallBaseToArgOffset, CBToAnalyze,
-                             FunctionAnalysisCache))
+      if (!analyzeLambdaUses(M, CallBaseToArgOffset, CBToAnalyze))
         reportFatalError("Lambda kernel-arg analysis failed for functor " +
                          std::to_string(FunctorId));
 
