@@ -125,6 +125,29 @@ function(CREATE_PROTEUS_GPU_LIBRARY lib source)
     endif()
 endfunction()
 
+function(CREATE_PROTEUS_GPU_SHARED_LIBRARY lib source)
+    add_library(${lib} SHARED ${source} ${ARGN})
+
+    set_source_files_properties(${source} ${ARGN} PROPERTIES LANGUAGE ${lang})
+    target_link_libraries(${lib} PUBLIC proteus)
+    proteus_attach_pass_plugin_rebuild_dep(${lib} ${source} ${ARGN})
+
+    if(PROTEUS_ENABLE_HIP)
+        target_compile_options(
+          ${lib}
+            PUBLIC
+            -fgpu-rdc
+        )
+
+        target_link_options(${lib} PUBLIC -fgpu-rdc --hip-link)
+    elseif(PROTEUS_ENABLE_CUDA)
+        target_compile_options(${lib} PRIVATE --no-offload-new-driver)
+        set_target_properties(${lib} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    else()
+        message(FATAL_ERROR "PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA must be defined for GPU tests")
+    endif()
+endfunction()
+
 function(CREATE_GPU_TEST_FORCE exe check_source)
     CREATE_GPU_TEST(${exe} ${check_source} ${ARGN})
     # Add flags for forced annotations.
@@ -132,6 +155,7 @@ function(CREATE_GPU_TEST_FORCE exe check_source)
         ${exe}.${lang}
         PUBLIC
             "-fplugin=$<TARGET_FILE:ProteusPass>"
+            "-fplugin=$<TARGET_FILE:LambdaPass>"
             "SHELL:-Xclang -mllvm -Xclang -force-proteus-jit-annotate-all"
     )
 endfunction()
@@ -143,6 +167,7 @@ function(CREATE_GPU_TEST_RDC_FORCE exe check_source)
         ${exe}.${lang}.rdc
         PUBLIC
             "-fplugin=$<TARGET_FILE:ProteusPass>"
+            "-fplugin=$<TARGET_FILE:LambdaPass>"
             "SHELL:-Xclang -mllvm -Xclang -force-proteus-jit-annotate-all"
     )
 endfunction()
@@ -228,10 +253,17 @@ CREATE_GPU_TEST(block_grid_dim_1d block_grid_dim_1d.cpp)
 CREATE_GPU_TEST(block_grid_dim_2d block_grid_dim_2d.cpp)
 CREATE_GPU_TEST(block_grid_dim_3d block_grid_dim_3d.cpp)
 CREATE_GPU_TEST(lambda lambda.cpp)
+CREATE_GPU_TEST(lambda-two lambda-two.cpp)
 CREATE_GPU_TEST(shared_array shared_array.cpp)
 CREATE_GPU_TEST(enable_disable enable_disable.cpp)
 CREATE_GPU_TEST(lambda_multiple lambda_multiple.cpp)
 CREATE_GPU_TEST(lambda_def lambda_def.cpp)
+CREATE_GPU_TEST(lambda_factory lambda_factory.cpp)
+CREATE_GPU_TEST(lambda_phi_analysis lambda_phi_analysis.cpp)
+CREATE_PROTEUS_GPU_SHARED_LIBRARY(lambda_factory_so_tu1 lambda_factory_tu1.cpp)
+CREATE_PROTEUS_GPU_SHARED_LIBRARY(lambda_factory_so_tu2 lambda_factory_tu2.cpp)
+CREATE_GPU_TEST_LIBS(lambda_factory_so_runner "lambda_factory_so_tu1;lambda_factory_so_tu2" lambda_factory_so_runner.cpp)
+CREATE_GPU_TEST(lambda_pathological lambda_pathological.cpp)
 CREATE_GPU_TEST(lambda_host_device lambda_host_device.cpp)
 CREATE_GPU_TEST(lambda_spec_test lambda_spec_test.cpp)
 CREATE_GPU_TEST(builtin_globals builtin_globals.cpp)

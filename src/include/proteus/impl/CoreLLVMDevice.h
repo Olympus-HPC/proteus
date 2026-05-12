@@ -283,12 +283,13 @@ inline void relinkGlobalsObject(
   }
 }
 
-inline void specializeIR(
-    Module &M, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
-    dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
-    const SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo,
-    bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsRange,
-    bool SpecializeLaunchBounds, int MinBlocksPerSM) {
+inline void
+specializeIR(Module &M, void **KernelArgs, StringRef FnName, StringRef Suffix,
+             dim3 &BlockDim, dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
+             const SmallVector<uint64_t> LambdaCalleeInfo,
+             const LambdaCallsiteLocationMap &LambdaCallsiteLocations,
+             bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsRange,
+             bool SpecializeLaunchBounds, int MinBlocksPerSM) {
   TIMESCOPE("proteus::specializeIR");
   Timer T(Config::get().ProteusEnableTimers);
   Function *F = M.getFunction(FnName);
@@ -299,12 +300,20 @@ inline void specializeIR(
     TransformArgumentSpecialization::transform(M, *F, RCArray);
 
   auto &LR = LambdaRegistry::instance();
-  for (auto &[FnName, LambdaType] : LambdaCalleeInfo) {
-    const SmallVector<RuntimeConstant> &RCVec = LR.getJitVariables(LambdaType);
-    Function *F = M.getFunction(FnName);
-    if (!F)
-      reportFatalError("Expected non-null Function");
-    TransformLambdaSpecialization::transform(M, *F, RCVec);
+
+  // We add a per-function cache for memory ssa so that we don't have to
+  // duplicate results. TransformLambdaSpecialization LambdaTransformer;
+  for (auto &ID : LambdaCalleeInfo) {
+    auto VariantsOpt = LR.getJitVariants(ID);
+    if (!VariantsOpt)
+      continue;
+
+    auto It = LambdaCallsiteLocations.find(ID);
+    if (It == LambdaCallsiteLocations.end())
+      reportFatalError("Missing lambda callsite locations for functor " +
+                       std::to_string(ID));
+    TransformLambdaSpecialization::transformDeviceKernel(
+        M, KernelArgs, ID, VariantsOpt.value(), It->second);
   }
 
   // Run the shared array transform after any value specialization (arguments,

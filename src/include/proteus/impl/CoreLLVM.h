@@ -10,8 +10,11 @@ static_assert(__cplusplus >= 201703L,
 #include "proteus/impl/Debug.h"
 #include "proteus/impl/Logger.h"
 
+#include <llvm/Analysis/ValueTracking.h>
 #include <llvm/CodeGen/CommandFlags.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/DebugInfo.h>
+#include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/PassManager.h>
 #include <llvm/Linker/Linker.h>
@@ -275,6 +278,44 @@ inline void runCleanupPassPipeline(Module &M) {
   Passes.run(M, MAM);
 
   StripDebugInfo(M);
+}
+
+inline void findFunctionsWithU64Metadata(
+    llvm::Module &M, llvm::StringRef Key,
+    llvm::SmallVectorImpl<std::pair<llvm::Function *, std::uint64_t>> &Out) {
+  llvm::SmallDenseMap<llvm::Function *, std::uint64_t, 32> Seen;
+  for (llvm::Function &F : M) {
+    llvm::MDNode *Node = F.getMetadata(Key);
+    if (!Node || Node->getNumOperands() < 1)
+      continue;
+    auto *CAM = llvm::dyn_cast<llvm::ConstantAsMetadata>(Node->getOperand(0));
+    auto *CI =
+        CAM ? llvm::dyn_cast<llvm::ConstantInt>(CAM->getValue()) : nullptr;
+    if (!CI)
+      continue;
+    std::uint64_t Id = CI->getZExtValue();
+    if (Seen.try_emplace(&F, Id).second)
+      Out.emplace_back(&F, Id);
+  }
+}
+
+inline void
+findFunctionsWithU64Metadata(llvm::Module &M, llvm::StringRef Key,
+                             llvm::SmallVectorImpl<std::uint64_t> &Out) {
+  llvm::SmallDenseMap<llvm::Function *, std::uint64_t, 32> Seen;
+  for (llvm::Function &F : M) {
+    llvm::MDNode *Node = F.getMetadata(Key);
+    if (!Node || Node->getNumOperands() < 1)
+      continue;
+    auto *CAM = llvm::dyn_cast<llvm::ConstantAsMetadata>(Node->getOperand(0));
+    auto *CI =
+        CAM ? llvm::dyn_cast<llvm::ConstantInt>(CAM->getValue()) : nullptr;
+    if (!CI)
+      continue;
+    std::uint64_t Id = CI->getZExtValue();
+    if (Seen.try_emplace(&F, Id).second)
+      Out.emplace_back(Id);
+  }
 }
 
 inline void pruneIR(Module &M, bool UnsetExternallyInitialized = true) {

@@ -10,6 +10,7 @@ add_library(ProteusPassObjects OBJECT
   ${PROTEUS_PASS_SOURCES}
 )
 
+
 llvm_map_components_to_libnames(
   proteus_pass_offload_llvm_libs
   BitWriter
@@ -34,8 +35,22 @@ target_include_directories(ProteusPassObjects
 target_include_directories(ProteusPassObjects
   SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
 
+add_library(LambdaPass SHARED
+  ${PROJECT_SOURCE_DIR}/src/pass/LambdaAnalysis.cpp
+)
+
+target_include_directories(LambdaPass
+  PRIVATE ${PROJECT_SOURCE_DIR}/include
+  PRIVATE ${PROJECT_SOURCE_DIR}/src/include
+  ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+target_include_directories(LambdaPass
+  SYSTEM PRIVATE ${LLVM_INCLUDE_DIRS})
+
 if(NOT LLVM_ENABLE_RTTI)
   target_compile_options(ProteusPassObjects PRIVATE -fno-rtti)
+  target_compile_options(LambdaPass PRIVATE -fno-rtti)
 endif()
 
 add_library(ProteusPass SHARED
@@ -57,6 +72,15 @@ target_link_libraries(ProteusPassOffload
 target_link_options(ProteusPassOffload
   PRIVATE "$<$<NOT:$<PLATFORM_ID:Darwin>>:-Wl,-Bsymbolic>")
 
+target_link_libraries(LambdaPass
+  PRIVATE "$<$<PLATFORM_ID:Darwin>:LINKER:SHELL:-undefined dynamic_lookup>")
+
+target_compile_options(
+  LambdaPass
+  INTERFACE
+  -fpass-plugin=$<TARGET_FILE:LambdaPass>
+)
+
 target_compile_options(
   ProteusPass
   INTERFACE
@@ -66,10 +90,11 @@ target_compile_options(
 target_link_options(
   ProteusPass
   INTERFACE
+
   "SHELL:$<$<LINK_LANGUAGE:HIP>:-Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPassOffload>>"
 )
 
-set_target_properties(ProteusPass ProteusPassOffload PROPERTIES
+set_target_properties(ProteusPass ProteusPassOffload LambdaPass PROPERTIES
   # on macOS enable passing RPATH flags to the linker; no-ops on Linux
   MACOSX_RPATH          ON
   # let CMake use INSTALL_RPATH even in the build tree
@@ -82,7 +107,7 @@ set_target_properties(ProteusPass ProteusPassOffload PROPERTIES
 # is ready to support Clang/LLVM pass consumers too.
 if(NOT PROTEUS_PYTHON_WHEEL)
   install(
-    TARGETS ProteusPass ProteusPassOffload
+    TARGETS ProteusPass ProteusPassOffload LambdaPass
     EXPORT proteusTargets
     RUNTIME DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"

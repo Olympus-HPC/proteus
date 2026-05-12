@@ -7,9 +7,13 @@
 #include "proteus/impl/Debug.h"
 #include "proteus/impl/Logger.h"
 
+#include <cstring>
 #include <llvm/ADT/DenseMap.h>
+#include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Demangle/Demangle.h>
+#include <optional>
+
 namespace proteus {
 
 using namespace llvm;
@@ -28,83 +32,85 @@ public:
   LambdaRegistry(LambdaRegistry &&) = delete;
   LambdaRegistry &operator=(LambdaRegistry &&) = delete;
 
-  std::optional<DenseMap<StringRef, SmallVector<RuntimeConstant>>::iterator>
-  matchJitVariableMap(StringRef FnName) {
-    std::string Operator = llvm::demangle(FnName.str());
-    std::size_t Sep = Operator.rfind("::operator()");
-    if (Sep == std::string::npos) {
-      PROTEUS_DBG(Logger::logs("proteus")
-                  << "... SKIP ::operator() not found\n");
-      return std::nullopt;
-    }
+  using JitVariantMap = DenseMap<int32_t, RuntimeConstant>;
+  using JitVariantVec = SmallVector<JitVariantMap, 4>;
 
-    StringRef LambdaType = StringRef{Operator}.slice(0, Sep);
-    if (Config::get().ProteusDebugOutput) {
-      Logger::logs("proteus")
-          << "Operator " << Operator << "\n=> LambdaType to match "
-          << LambdaType << "\n";
-      Logger::logs("proteus") << "Available Keys\n";
-      for (auto &[Key, Val] : JitVariableMap) {
-        Logger::logs("proteus") << "\tKey: " << Key << "\n";
-      }
-      Logger::logs("proteus") << "===\n";
-    }
-
-    const auto It = JitVariableMap.find(LambdaType);
-    if (It == JitVariableMap.end())
+  std::optional<ArrayRef<JitVariantMap>> getJitVariants(uint64_t ID) const {
+    if (JitVariableVariants.empty())
       return std::nullopt;
 
-    return It;
+    auto It = JitVariableVariants.find(ID);
+    if (It == JitVariableVariants.end())
+      return std::nullopt;
+
+    return ArrayRef<JitVariantMap>{It->second};
   }
 
-  void dump() {
-    Logger::logs("proteus") << "Dumping pending registry \n";
-    for (const auto &[Key, Value] : PendingJitVariableMap) {
-      Logger::logs("proteus") << Key << " : " << "\n";
-      for (const auto &V : Value) {
-        Logger::logs("proteus") << ", " << V.Value.DoubleVal;
+  void appendJitVariable(uint64_t ID, const RuntimeConstant &RC) {
+    PendingJitVariables[ID][RC.Pos] = RC;
+  }
+
+  void commitJitVariables(uint64_t ID) {
+    auto PendingIt = PendingJitVariables.find(ID);
+    if (PendingIt == PendingJitVariables.end())
+      return;
+    if (PendingIt->second.empty())
+      return;
+
+    JitVariantMap &Pending = PendingIt->second;
+    JitVariantVec &Variants = JitVariableVariants[ID];
+
+    auto RuntimeConstantEqual = [](const RuntimeConstant &A,
+                                   const RuntimeConstant &B) -> bool {
+      if (A.Type != B.Type)
+        return false;
+      if (A.Pos != B.Pos)
+        return false;
+      if (A.Offset != B.Offset)
+        return false;
+      // Today we only register scalar jit_variable captures via
+      // __proteus_register_lambda_runtime_constant.
+      return std::memcmp(&A.Value, &B.Value, sizeof(A.Value)) == 0;
+    };
+
+    auto VariantEqual = [&](const JitVariantMap &A,
+                            const JitVariantMap &B) -> bool {
+      if (A.size() != B.size())
+        return false;
+      for (const auto &KV : A) {
+        auto It = B.find(KV.first);
+        if (It == B.end())
+          return false;
+        if (!RuntimeConstantEqual(KV.second, It->second))
+          return false;
       }
-      Logger::logs("proteus") << "\n";
-    }
-    Logger::logs("proteus") << "Dumping finalized registry \n";
-    for (const auto &[Key, Value] : JitVariableMap) {
-      Logger::logs("proteus") << Key << " : " << "\n";
-      for (const auto &V : Value) {
-        Logger::logs("proteus") << ", " << V.Value.DoubleVal;
+      return true;
+    };
+
+    bool AlreadyPresent = false;
+    for (const auto &V : Variants) {
+      if (VariantEqual(Pending, V)) {
+        AlreadyPresent = true;
+        break;
       }
-      Logger::logs("proteus") << "\n";
     }
-  }
 
-  void setJitVariable(const char *LambdaType, RuntimeConstant &RC) {
-    assert(PendingJitVariableMap.contains(LambdaType) &&
-           "Lambda must be registered prior to register JIT variable!");
-    PendingJitVariableMap[LambdaType].emplace_back(RC);
-  }
-
-  inline void registerLambda(const char *LambdaType) {
-    const StringRef LambdaTypeRef{LambdaType};
-    PROTEUS_DBG(Logger::logs("proteus")
-                << "=> RegisterLambda " << LambdaTypeRef << "\n");
-    // Copy PendingJitVariables if there were changed, otherwise the runtime
-    // values for the lambda definition have not changed.
-    PROTEUS_DBG(dump());
-    if (!PendingJitVariableMap[LambdaTypeRef].empty()) {
-      JitVariableMap[LambdaTypeRef] = PendingJitVariableMap[LambdaTypeRef];
-      PendingJitVariableMap[LambdaTypeRef].clear();
+    if (!AlreadyPresent) {
+      Variants.push_back(Pending);
     }
+
+    Pending.clear();
   }
 
-  const SmallVector<RuntimeConstant> &getJitVariables(StringRef LambdaTypeRef) {
-    return JitVariableMap[LambdaTypeRef];
-  }
-
-  bool empty() { return JitVariableMap.empty(); }
+  bool empty() const { return JitVariableVariants.empty(); }
 
 private:
   explicit LambdaRegistry() = default;
-  DenseMap<StringRef, SmallVector<RuntimeConstant>> JitVariableMap;
-  DenseMap<StringRef, SmallVector<RuntimeConstant>> PendingJitVariableMap;
+  // First integral key is the preprocessor/constexpr functor ID generated
+  // inside PROTEUS_REGISTER_LAMBDA.  The key of the value DenseMap is the slot
+  // within the lambda storage.
+  DenseMap<uint64_t, JitVariantVec> JitVariableVariants;
+  DenseMap<uint64_t, JitVariantMap> PendingJitVariables;
 };
 
 } // namespace proteus
