@@ -66,7 +66,8 @@ __proteus_register_lambda_runtime_constant(int32_t Type, int32_t Pos,
     reportFatalError(
         "__proteus_push_lambda_runtime_constant only supports scalar captures");
   }
-  LambdaRegistry::instance().appendJitVariable(ID, RC);
+  auto &LR = LambdaRegistry::instance();
+  LR.appendJitVariable(ID, RC);
 }
 
 extern "C" void __proteus_enable_host() {
@@ -80,11 +81,13 @@ __proteus_take_address(void const *) noexcept {}
 extern "C" __attribute__((noinline)) void
 __proteus_finalize_register(void const *, uint64_t ID) noexcept {
   // The LambdaAnalysis pass injects calls to
-  // __proteus_register_lambda_runtime_constant in __register_lambda_impl.
+  // __proteus_register_lambda_ru
+  // ntime_constant in __register_lambda_impl.
   // __register_lambda_impl calls __proteus_finalize_register once per wrapper
   // creation, after those injected calls. Use it as a boundary to commit the
   // tuple.
-  LambdaRegistry::instance().commitJitVariables(ID);
+  auto &LR = LambdaRegistry::instance();
+  LR.commitJitVariables(ID);
 }
 
 extern "C" void __proteus_disable_host() {
