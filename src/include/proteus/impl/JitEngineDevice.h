@@ -450,16 +450,19 @@ public:
       LambdaCallsiteRuntimeConstantsMap &LambdaJitValuesMap,
       void **KernelArgs) {
     TIMESCOPE(JitEngineDevice, getLambdaJitValues);
-    if (!KernelInfo.hasLambdaCalleeInfo()) {
-      Module &KernelModule = getModule(KernelInfo);
-      PROTEUS_DBG(Logger::logs("proteus")
-                  << "=== LAMBDA MATCHING\n"
-                  << "Caller trigger " << KernelInfo.getName() << " -> "
-                  << demangle(KernelInfo.getName()) << "\n");
+    LambdaRegistry &LR = LambdaRegistry::instance();
+    if (LR.empty() || !KernelInfo.hasLambdaCallsiteLocationInfo()) {
+      KernelInfo.setLambdaCalleeInfo({});
+      return;
+    }
 
+    if (!KernelInfo.hasLambdaCalleeInfo()) {
+      const auto &CallsiteLocationInfo =
+          KernelInfo.getLambdaCallsiteLocationInfo();
       SmallVector<uint64_t> LambdaCalleeInfo;
-      findFunctionsWithU64Metadata(KernelModule, "proteus.wrapper_call",
-                                   LambdaCalleeInfo);
+      LambdaCalleeInfo.reserve(CallsiteLocationInfo.size());
+      for (const auto &KV : CallsiteLocationInfo)
+        LambdaCalleeInfo.push_back(KV.first);
 
       for (auto ID : LambdaCalleeInfo) {
         PROTEUS_DBG(Logger::logs("proteus")
@@ -468,9 +471,6 @@ public:
       KernelInfo.setLambdaCalleeInfo(std::move(LambdaCalleeInfo));
     }
 
-    LambdaRegistry &LR = LambdaRegistry::instance();
-    if (LR.empty())
-      return;
     for (auto LambdaID : KernelInfo.getLambdaCalleeInfo()) {
       auto VariantsOpt = LR.getJitVariants(LambdaID);
       if (!VariantsOpt)
