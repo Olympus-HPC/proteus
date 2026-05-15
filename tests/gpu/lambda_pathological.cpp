@@ -7,20 +7,10 @@
 // clang-format on
 
 // Pathological lambda-specialization cases for KernelArgVisitor.
-//
-// This file is intentionally not wired into tests/gpu/CMakeLists.txt yet.
 // Several cases are expected to fail under the current analysis and are meant
 // to motivate a redesign of the interprocedural visitor.
 //
-// To experiment manually, build this file as a normal GPU test and pick a case:
-//   -DPATHO_CASE=1  Multiple callers to the same helper
-//   -DPATHO_CASE=2  Shared helper reused from two kernels
-//   -DPATHO_CASE=3  Non-dominating stores to the same temporary slot: we do NOT want to support
-//   -DPATHO_CASE=4  Pointer round-trip through uintptr_t
-//   -DPATHO_CASE=5  Aggregate materialization through a local box
-//
-// Each case is set up so that, if lambda specialization works, it should print
-// a stable integer originating from a jit_variable capture.
+// Each case is set up so that, if lambda specialization works, it should print its own integer.
 
 #include <cstdint>
 #include <cstdio>

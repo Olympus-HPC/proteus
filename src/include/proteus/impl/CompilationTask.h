@@ -21,14 +21,13 @@ class CompilationTask {
 private:
   MemoryBufferRef Bitcode;
   HashT HashValue;
-  void **KernelArgs;
   std::string KernelName;
   std::string Suffix;
   dim3 BlockDim;
   dim3 GridDim;
   SmallVector<RuntimeConstant> RCVec;
   SmallVector<uint64_t> LambdaCalleeInfo;
-  LambdaCallsiteLocationMap LambdaCallsiteLocations;
+  LambdaCallsiteRuntimeConstantsMap LambdaCallsiteRuntimeConstants;
   std::unordered_map<std::string, GlobalVarInfo> VarNameToGlobalInfo;
   SmallPtrSet<void *, 8> GlobalLinkedBinaries;
   std::string DeviceArch;
@@ -71,19 +70,19 @@ private:
 
 public:
   CompilationTask(
-      MemoryBufferRef Bitcode, HashT HashValue, void **KernelArgs,
-      const std::string &KernelName, std::string &Suffix, dim3 BlockDim,
-      dim3 GridDim, const SmallVector<RuntimeConstant> &RCVec,
+      MemoryBufferRef Bitcode, HashT HashValue, const std::string &KernelName,
+      std::string &Suffix, dim3 BlockDim, dim3 GridDim,
+      const SmallVector<RuntimeConstant> &RCVec,
       const SmallVector<uint64_t> &LambdaCalleeInfo,
-      const LambdaCallsiteLocationMap &LambdaCallsiteLocations,
+      const LambdaCallsiteRuntimeConstantsMap &LambdaCallsiteRuntimeConstants,
       const std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo,
       const SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
       const std::string &DeviceArch, const CodeGenerationConfig &CGConfig,
       bool DumpIR, bool RelinkGlobalsByCopy)
-      : Bitcode(Bitcode), HashValue(HashValue), KernelArgs(KernelArgs),
-        KernelName(KernelName), Suffix(Suffix), BlockDim(BlockDim),
-        GridDim(GridDim), RCVec(RCVec), LambdaCalleeInfo(LambdaCalleeInfo),
-        LambdaCallsiteLocations(LambdaCallsiteLocations),
+      : Bitcode(Bitcode), HashValue(HashValue), KernelName(KernelName),
+        Suffix(Suffix), BlockDim(BlockDim), GridDim(GridDim), RCVec(RCVec),
+        LambdaCalleeInfo(LambdaCalleeInfo),
+        LambdaCallsiteRuntimeConstants(LambdaCallsiteRuntimeConstants),
         VarNameToGlobalInfo(VarNameToGlobalInfo),
         GlobalLinkedBinaries(GlobalLinkedBinaries), DeviceArch(DeviceArch),
         CGOption(CGConfig.codeGenOption()), DumpIR(DumpIR),
@@ -147,8 +146,8 @@ public:
 
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".input.ll", *M));
 
-    proteus::specializeIR(*M, KernelArgs, KernelName, Suffix, BlockDim, GridDim,
-                          RCVec, LambdaCalleeInfo, LambdaCallsiteLocations,
+    proteus::specializeIR(*M, KernelName, Suffix, BlockDim, GridDim, RCVec,
+                          LambdaCalleeInfo, LambdaCallsiteRuntimeConstants,
                           SpecializeArgs, SpecializeDims, SpecializeDimsRange,
                           SpecializeLaunchBounds, MinBlocksPerSM);
 

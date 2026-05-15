@@ -161,6 +161,10 @@ public:
     // cloning/extraction.
     // clang-format on
 
+    DEBUG(Logger::logs("lambda-pass")
+          << "=== Original Host Module\n"
+          << M << "=== End Original Host Module\n");
+
     makeLambdaCallsUniquePerFunctorOperator(M);
     if (!isDeviceCompilation(M)) {
       getUnderlyingLambdaTypeFromFunctors(M, RegisteredLambdaStorageClasses);
@@ -546,8 +550,7 @@ private:
       Module &M, DenseSet<StructType *> &RegisteredLambdaStorageClasses,
       DenseMap<StructType *, SmallVector<LambdaJitVariableInfo, 16>>
           &JitIndices) {
-    DEBUG(Logger::logs("lambda-pass") << "finding jit variables" << "\n");
-    DEBUG(Logger::logs("lambda-pass") << "users..." << "\n");
+    DEBUG(Logger::logs("lambda-pass") << "finding jit variables users..." << "\n");
 
     SmallVector<Function *, 16> JitFunctions;
 
@@ -563,14 +566,14 @@ private:
       auto *LoadType = FTy->getParamType(0);
       if (!LoadType)
         reportFatalError("jit function return type null??\n");
-      std::queue<Value *> WorkList;
+      SmallVector<Value *> WorkList;
       DenseSet<Value *> Discovered;
       for (auto *Usr : F->users()) {
         CallBase *CB = dyn_cast<CallBase>(Usr);
         if (!CB)
           continue;
         for (auto *Usr : CB->users())
-          WorkList.push(Usr);
+          WorkList.push_back(Usr);
       }
       // These two integers need to be equivalent--we track down each callsite
       // to an offset in the struct.
@@ -578,16 +581,16 @@ private:
       uint16_t numSlotsFound = 0;
 
       while (!WorkList.empty()) {
-        Value *CurVal = WorkList.front();
-        WorkList.pop();
+        Value *CurVal = WorkList.back();
+        WorkList.pop_back();
         if (Discovered.contains(CurVal))
           continue;
+        DEBUG(Logger::logs("lambda-pass") << "VISITING JIT VARIABLE OPERAND " << *CurVal << "\n");
         Discovered.insert(CurVal);
-        // very simple use-def traversal only handles three cases, which we
-        // expect at startEPCallBack
+
         if (StoreInst *Store = dyn_cast<StoreInst>(CurVal))
-          WorkList.push(Store->getPointerOperand());
-        if (AllocaInst *Alloca = dyn_cast<AllocaInst>(CurVal)) {
+          WorkList.push_back(Store->getPointerOperand());
+        else if (AllocaInst *Alloca = dyn_cast<AllocaInst>(CurVal)) {
           Constant *Slot = ConstantInt::get(Types.Int32Ty, 0);
           auto *PossibleLamType =
               dyn_cast<StructType>(Alloca->getAllocatedType());
@@ -600,7 +603,11 @@ private:
           if (!LoadType)
             reportFatalError("Load type is null\n");
         }
-        if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(CurVal)) {
+        else if (CastInst* Cast = dyn_cast<CastInst>(CurVal)) {
+          for (auto* Usr : Cast->users())
+            WorkList.push_back(Usr);
+        }
+        else if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(CurVal)) {
           StructType *PossibleLamType =
               dyn_cast<StructType>(GEP->getSourceElementType());
           if (!PossibleLamType ||
@@ -624,12 +631,16 @@ private:
         }
       }
 
-      if (numJitVars != numSlotsFound)
+      if (numJitVars != numSlotsFound) {
+        DEBUG(Logger::logs("lambda-pass").flush());
         reportFatalError(
             "Analysis found jit_variable callsite outside lambda capture list");
+      }
     }
   }
 
+  // Inject data about jit_variable pointer offsets into function calls within the
+  // body of register_lambda_impl
   void registerLambdaFunctions(
       Module &M, DenseMap<StructType *, SmallVector<LambdaJitVariableInfo, 16>>
                      &LambdaStorageTypeToJitIndices) {
@@ -642,6 +653,7 @@ private:
     for (auto [Function, ID] : RegisterFunctions) {
       AllocaInst *AnonClassAlloca = nullptr;
       CallBase *FinalizeCall = nullptr;
+
       for (auto &BB : *Function) {
         for (Instruction &I : BB) {
           auto *CB = dyn_cast<CallBase>(&I);
@@ -662,8 +674,10 @@ private:
       if (!FinalizeCall)
         reportFatalError("internal proteus error: __register_lambda_impl call "
                          "does not contain finalize call");
-      if (!AnonClassAlloca)
-        reportFatalError("internal proteus error: expected anon class alloca");
+      if (!AnonClassAlloca) {
+        DEBUG(Logger::logs("lambda-pass") << "Function does not contain anonymous class with jit_variables " << *Function << "\n");
+        continue;
+      }
       StructType *RegisterFuncAllocatedType =
           dyn_cast<StructType>(AnonClassAlloca->getAllocatedType());
       if (!RegisterFuncAllocatedType)

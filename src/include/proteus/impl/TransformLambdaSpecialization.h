@@ -512,6 +512,26 @@ private:
   }
 
 public:
+  static LambdaCallsiteRuntimeConstants readRuntimeConstantsForCallsite(
+      void *const *KernelArgs, const LambdaKernelArgLocation &Location,
+      const JitVariantMap &VariantSchema) {
+    LambdaCallsiteRuntimeConstants RuntimeConstants;
+    RuntimeConstants.reserve(VariantSchema.size());
+
+    for (auto [Slot, RC] : VariantSchema) {
+      (void)Slot;
+      RuntimeConstants.push_back(readRuntimeConstantFromKernelArgs(
+          KernelArgs, Location.KernelArgIndex, Location.Offset,
+          Location.StorageType, RC.Type, RC.Pos, RC.Offset));
+    }
+
+    llvm::sort(RuntimeConstants,
+               [](const RuntimeConstant &L, const RuntimeConstant &R) {
+                 return L.Pos < R.Pos;
+               });
+    return RuntimeConstants;
+  }
+
   static LambdaRegistry::JitVariantVec readRuntimeVariantsFromKernelArgs(
       void *const *KernelArgs,
       ArrayRef<LambdaKernelArgLocation> KernelArgLocations,
@@ -568,9 +588,8 @@ public:
   }
 
   static void transformDeviceKernel(
-      Module &M, void **KernelArgs, uint64_t FunctorID,
-      ArrayRef<JitVariantMap> Variants,
-      const DenseMap<uint32_t, LambdaKernelArgLocation> &CallsiteLocations) {
+      Module &M, uint64_t FunctorID,
+      const LambdaCallsiteRuntimeConstantsMap &CallsiteRuntimeConstants) {
     Function *FunctorOperatorFunction =
         findFunctorFunctorOperatorFunctionOperatorFromID(M, FunctorID);
     Function *LambdaOperatorMethod = findLambdaOperatorForFunctor(M, FunctorID);
@@ -583,17 +602,13 @@ public:
       if (!CallsiteIndex)
         reportFatalError("Missing lambda callsite metadata for callsite");
 
-      auto It = CallsiteLocations.find(*CallsiteIndex);
-      if (It == CallsiteLocations.end())
-        reportFatalError("Missing lambda specialization info for callsite");
-
-      const auto &Location = It->second;
+      auto It = CallsiteRuntimeConstants.find(*CallsiteIndex);
+      if (It == CallsiteRuntimeConstants.end())
+        reportFatalError("Missing lambda runtime constants for callsite");
 
       JitVariantMap RuntimeVariant;
-      for (auto [slot, RC] : Variants[0]) {
-        RuntimeVariant[slot] = readRuntimeConstantFromKernelArgs(
-            KernelArgs, Location.KernelArgIndex, Location.Offset,
-            Location.StorageType, RC.Type, RC.Pos, RC.Offset);
+      for (const auto &RC : It->second) {
+        RuntimeVariant[RC.Pos] = RC;
       }
 
       ++VariantIndex;

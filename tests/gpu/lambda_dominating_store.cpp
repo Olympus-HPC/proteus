@@ -31,7 +31,7 @@ __device__ void helper(F *Opt1, F *Opt2, F *Opt3, bool UseSecond) {
   else
     Slot = Opt1;
 
-  invoke(read_slot(&Slot));
+  invoke(&Slot);
 
   // This store does not dominate the invoke and should not influence
   // provenance, but the current visitAllocaInst walks all alloca users.

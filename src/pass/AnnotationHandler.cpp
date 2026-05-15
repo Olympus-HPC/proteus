@@ -309,8 +309,7 @@ static bool isLambdaFunction(const Function &F) {
 
 static bool isLambdaFunctorWrapperOperator(const Function &F) {
   std::string DemangledName = demangle(F.getName().str());
-  return StringRef{DemangledName}.contains("'lambda") &&
-         StringRef{DemangledName}.contains("LambdaFunctorWrapper") &&
+  return StringRef{DemangledName}.contains("LambdaFunctorWrapper") &&
          StringRef{DemangledName}.contains("::operator()");
 }
 
