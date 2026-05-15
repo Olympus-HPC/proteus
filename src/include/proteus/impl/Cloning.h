@@ -221,7 +221,7 @@ struct LinkingCloner {
         if (!F.isDeclaration())
           SymbolMaps.FuncDefs[F.getName()] = &F;
       for (GlobalVariable &G : M.globals())
-        if (G.hasInitializer())
+        if (G.hasInitializer() || G.hasExternalLinkage())
           SymbolMaps.GlobDefs[G.getName()] = &G;
     }
     return SymbolMaps;
@@ -532,6 +532,15 @@ inline std::unique_ptr<Module> cloneKernelFromModules(
   SmallVector<Function *> ToVisit{EntryF};
   SmallPtrSet<Function *, 32> VisitSet{EntryF};
   SmallPtrSet<GlobalValue *, 32> Reachable;
+
+  // External global variable addresses can be captured and passed as
+  // kernel argument. Prepopulate reachable with these values.
+  for (Module &M : Mods) {
+    for (GlobalVariable &G : M.globals())
+      if (G.hasExternalLinkage())
+        Reachable.insert(&G);
+  }
+
   while (!ToVisit.empty()) {
     auto *F = ToVisit.pop_back_val();
     // Due to lazy parsing, make sure the function is materialized before
