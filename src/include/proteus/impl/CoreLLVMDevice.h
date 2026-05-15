@@ -283,13 +283,13 @@ inline void relinkGlobalsObject(
   }
 }
 
-inline void
-specializeIR(Module &M, void **KernelArgs, StringRef FnName, StringRef Suffix,
-             dim3 &BlockDim, dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
-             const SmallVector<uint64_t> LambdaCalleeInfo,
-             const LambdaCallsiteLocationMap &LambdaCallsiteLocations,
-             bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsRange,
-             bool SpecializeLaunchBounds, int MinBlocksPerSM) {
+inline void specializeIR(
+    Module &M, StringRef FnName, StringRef Suffix, dim3 &BlockDim,
+    dim3 &GridDim, ArrayRef<RuntimeConstant> RCArray,
+    const SmallVector<uint64_t> LambdaCalleeInfo,
+    const LambdaCallsiteRuntimeConstantsMap &LambdaCallsiteRuntimeConstants,
+    bool SpecializeArgs, bool SpecializeDims, bool SpecializeDimsRange,
+    bool SpecializeLaunchBounds, int MinBlocksPerSM) {
   TIMESCOPE("proteus::specializeIR");
   Timer T(Config::get().ProteusEnableTimers);
   Function *F = M.getFunction(FnName);
@@ -299,21 +299,11 @@ specializeIR(Module &M, void **KernelArgs, StringRef FnName, StringRef Suffix,
   if (SpecializeArgs)
     TransformArgumentSpecialization::transform(M, *F, RCArray);
 
-  auto &LR = LambdaRegistry::instance();
-
   // We add a per-function cache for memory ssa so that we don't have to
   // duplicate results. TransformLambdaSpecialization LambdaTransformer;
   for (auto &ID : LambdaCalleeInfo) {
-    auto VariantsOpt = LR.getJitVariants(ID);
-    if (!VariantsOpt)
-      continue;
-
-    auto It = LambdaCallsiteLocations.find(ID);
-    if (It == LambdaCallsiteLocations.end())
-      reportFatalError("Missing lambda callsite locations for functor " +
-                       std::to_string(ID));
     TransformLambdaSpecialization::transformDeviceKernel(
-        M, KernelArgs, ID, VariantsOpt.value(), It->second);
+        M, ID, LambdaCallsiteRuntimeConstants);
   }
 
   // Run the shared array transform after any value specialization (arguments,

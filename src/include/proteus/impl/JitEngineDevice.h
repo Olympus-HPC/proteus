@@ -447,7 +447,7 @@ public:
 
   void getLambdaJitValues(
       JITKernelInfo &KernelInfo,
-      DenseMap<uint64_t, LambdaRegistry::JitVariantVec> &LambdaJitValuesMap,
+      LambdaCallsiteRuntimeConstantsMap &LambdaJitValuesMap,
       void **KernelArgs) {
     TIMESCOPE(JitEngineDevice, getLambdaJitValues);
     if (!KernelInfo.hasLambdaCalleeInfo()) {
@@ -488,10 +488,19 @@ public:
         reportFatalError("Missing cached lambda kernel-arg locations for " +
                          std::to_string(LambdaID));
 
-      LambdaJitValuesMap[LambdaID] =
-          TransformLambdaSpecialization::readRuntimeVariantsFromKernelArgs(
-              KernelArgs, getOrderedLambdaKernelArgLocations(It->second),
-              VariantsOpt.value());
+      if (VariantsOpt->empty())
+        continue;
+
+      for (const auto &KV : It->second) {
+        auto Existing = LambdaJitValuesMap.find(KV.first);
+        if (Existing != LambdaJitValuesMap.end())
+          reportFatalError("Duplicate lambda callsite index " +
+                           std::to_string(KV.first));
+
+        LambdaJitValuesMap[KV.first] =
+            TransformLambdaSpecialization::readRuntimeConstantsForCallsite(
+                KernelArgs, KV.second, VariantsOpt->front());
+      }
     }
   }
 
@@ -625,8 +634,27 @@ JitEngineDevice<ImplT>::compileAndRun(
   SmallVector<RuntimeConstant> RCVec =
       getRuntimeConstantValues(KernelArgs, KernelInfo.getRCInfoArray());
 
-  DenseMap<uint64_t, LambdaRegistry::JitVariantVec> LambdaJitValuesMap;
+  LambdaCallsiteRuntimeConstantsMap LambdaJitValuesMap;
   getLambdaJitValues(KernelInfo, LambdaJitValuesMap, KernelArgs);
+  SmallVector<uint64_t> LambdaCalleeInfoToSpecialize;
+  if (KernelInfo.hasLambdaCallsiteLocationInfo()) {
+    const auto &CallsiteLocationInfo = KernelInfo.getLambdaCallsiteLocationInfo();
+    for (auto LambdaID : KernelInfo.getLambdaCalleeInfo()) {
+      auto It = CallsiteLocationInfo.find(LambdaID);
+      if (It == CallsiteLocationInfo.end())
+        continue;
+
+      bool HasRuntimeConstants = false;
+      for (const auto &KV : It->second) {
+        if (LambdaJitValuesMap.contains(KV.first)) {
+          HasRuntimeConstants = true;
+          break;
+        }
+      }
+      if (HasRuntimeConstants)
+        LambdaCalleeInfoToSpecialize.push_back(LambdaID);
+    }
+  }
   const auto &CGConfig = Config::get().getCGConfig(KernelInfo.getName());
   // Determine the hash based on dimension specialization.  If we do not
   // specialize IR based on grid dimensions, avoid hashing on those to
@@ -672,11 +700,10 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   MemoryBufferRef KernelBitcode = getBitcode(KernelInfo);
   std::unique_ptr<MemoryBuffer> ObjBuf = nullptr;
-  const LambdaCallsiteLocationMap EmptyLambdaCallsiteLocations;
-  const auto &LambdaCallsiteLocations =
-      KernelInfo.hasLambdaCallsiteLocationInfo()
-          ? KernelInfo.getLambdaCallsiteLocationInfo()
-          : EmptyLambdaCallsiteLocations;
+  const LambdaCallsiteRuntimeConstantsMap EmptyLambdaCallsiteRuntimeConstants;
+  const auto &LambdaCallsiteRuntimeConstants =
+      LambdaJitValuesMap.empty() ? EmptyLambdaCallsiteRuntimeConstants
+                                 : LambdaJitValuesMap;
 
   if (Config::get().ProteusAsyncCompilation) {
     //  If there is no compilation pending for the specialization, post the
@@ -686,9 +713,9 @@ JitEngineDevice<ImplT>::compileAndRun(
                                           << HashValue.toString() << "\n");
 
       AsyncCompiler->compile(CompilationTask{
-          KernelBitcode, HashValue, KernelArgs, KernelInfo.getName(), Suffix,
-          BlockDim, GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(),
-          LambdaCallsiteLocations, BinInfo.getVarNameToGlobalInfo(),
+          KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
+          GridDim, RCVec, LambdaCalleeInfoToSpecialize,
+          LambdaCallsiteRuntimeConstants, BinInfo.getVarNameToGlobalInfo(),
           GlobalLinkedBinaries, DeviceArch,
           /*CodeGenConfig */ CGConfig,
           /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
@@ -707,9 +734,9 @@ JitEngineDevice<ImplT>::compileAndRun(
   } else {
     // Process through synchronous compilation.
     ObjBuf = CompilerSync::instance().compile(CompilationTask{
-        KernelBitcode, HashValue, KernelArgs, KernelInfo.getName(), Suffix,
-        BlockDim, GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(),
-        LambdaCallsiteLocations, BinInfo.getVarNameToGlobalInfo(),
+        KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
+        GridDim, RCVec, LambdaCalleeInfoToSpecialize,
+        LambdaCallsiteRuntimeConstants, BinInfo.getVarNameToGlobalInfo(),
         GlobalLinkedBinaries, DeviceArch,
         /*CodeGenConfig */ CGConfig,
         /*DumpIR*/ Config::get().ProteusDumpLLVMIR,

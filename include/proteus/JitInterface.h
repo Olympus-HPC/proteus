@@ -113,7 +113,7 @@ template <uint64_t FunctorID, typename Lambda> struct LambdaFunctorWrapper {
   template <typename... Args>
   PROTEUS_HOST_DEVICE __attribute__((annotate("jit")))
   __attribute__((annotate("proteus.wrapper_call", functor_id))) decltype(auto)
-  operator()(Args &&...args) noexcept(
+  operator()(Args &&...args) const noexcept(
       noexcept(lambda(std::forward<Args>(args)...))) {
     return lambda(std::forward<Args>(args)...);
   }
@@ -135,6 +135,7 @@ template <uint64_t ID, typename T>
 [[nodiscard]] static __attribute__((noinline))
 __attribute__((annotate("proteus.register_call", ID))) auto
 __register_lambda_impl(T &&t) noexcept {
+  static_assert(!detail::is_lambda_functor_wrapper<std::decay_t<T>>::value);
   // Force LLVM to generate an AllocaInst of the underlying Clang--generated
   // anonymous class for T.  We remove this after recording the demangled
   // lambda name.
@@ -150,7 +151,6 @@ __register_lambda_impl(T &&t) noexcept {
 
 template <class L>
 [[nodiscard]] inline auto register_lambda(L &&lambda) noexcept {
-  static_assert(!detail::is_lambda_functor_wrapper<L>::value);
   return ::proteus::detail::__register_lambda_impl<
       ::proteus::detail::functor_id<std::decay_t<L>>()>(
       std::forward<L>(lambda));

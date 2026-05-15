@@ -27,6 +27,9 @@ using LambdaKernelArgLocationMap =
     DenseMap<uint64_t, LambdaKernelArgLocationVec>;
 using LambdaCallsiteLocationMap =
     DenseMap<uint64_t, DenseMap<uint32_t, LambdaKernelArgLocation>>;
+using LambdaCallsiteRuntimeConstants = SmallVector<RuntimeConstant, 4>;
+using LambdaCallsiteRuntimeConstantsMap =
+    DenseMap<uint64_t, LambdaCallsiteRuntimeConstants>;
 
 inline constexpr char LambdaCallsiteMetadataName[] = "proteus.lambda_callsite";
 

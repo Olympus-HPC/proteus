@@ -477,6 +477,7 @@ private:
     SmallVector<std::pair<Function *, uint64_t>, 16> FunctorOperatorMethods;
     findFunctionsWithU64Metadata(M, "proteus.wrapper_call",
                                  FunctorOperatorMethods);
+    uint32_t NextCallsiteIndex = 0;
 
     for (auto &[FunctorOperator, FunctorId] : FunctorOperatorMethods) {
       SmallVector<CallBase *> CBToAnalyze;
@@ -489,19 +490,18 @@ private:
         reportFatalError("Lambda kernel-arg analysis failed for functor " +
                          std::to_string(FunctorId));
 
-      uint32_t CallsiteIndex = 0;
       for (CallBase *CB : CBToAnalyze) {
         auto It = CallBaseToArgOffset.find(CB);
         if (It == CallBaseToArgOffset.end() || !It->second.KernelFunction)
           reportFatalError("Missing lambda kernel-arg analysis result");
 
+        uint32_t CallsiteIndex = NextCallsiteIndex++;
         setLambdaCallsiteMetadata(*CB, FunctorId, CallsiteIndex);
         auto &Records = KernelManifest[It->second.KernelFunction->getName()];
         Records.push_back(LambdaManifestRecord{
             FunctorId, CallsiteIndex, It->second.KernelArgIndex,
             It->second.Offset,
             It->second.ChangedRCLayout.value_or(RuntimeConstantType::NONE)});
-        ++CallsiteIndex;
       }
     }
 
