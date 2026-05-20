@@ -15,7 +15,6 @@
 #include "proteus/Error.h"
 #include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/Debug.h"
-#include "proteus/impl/KernelArgVisitor.h"
 #include "proteus/impl/LambdaCallsite.h"
 #include "proteus/impl/LambdaRegistry.h"
 #include "proteus/impl/Utils.h"
@@ -274,98 +273,6 @@ private:
     }
 
     return dyn_cast<StructType>(CurTy);
-  }
-
-  static Value *buildSingleCompare(IRBuilder<> &B, const DataLayout &DL,
-                                   Value *LambdaObjPtr, StructType *LambdaTy,
-                                   const RuntimeConstant &RC) {
-    Value *FieldPtr = nullptr;
-    if (LambdaTy && RC.Pos >= 0 &&
-        static_cast<uint64_t>(RC.Pos) < LambdaTy->getNumElements()) {
-      FieldPtr = B.CreateStructGEP(LambdaTy, LambdaObjPtr, RC.Pos);
-    } else {
-      if (RC.Offset < 0)
-        return nullptr;
-      FieldPtr = B.CreateGEP(B.getInt8Ty(), LambdaObjPtr,
-                             B.getInt64(static_cast<uint64_t>(RC.Offset)));
-    }
-
-    switch (RC.Type) {
-    case RuntimeConstantType::BOOL: {
-      Value *Loaded = B.CreateAlignedLoad(B.getInt8Ty(), FieldPtr, Align(1));
-      Value *C = B.getInt8(RC.Value.BoolVal ? 1 : 0);
-      return B.CreateICmpEQ(Loaded, C);
-    }
-    case RuntimeConstantType::INT8: {
-      Value *Loaded = B.CreateAlignedLoad(B.getInt8Ty(), FieldPtr, Align(1));
-      Value *C = B.getInt8(static_cast<uint8_t>(RC.Value.Int8Val));
-      return B.CreateICmpEQ(Loaded, C);
-    }
-    case RuntimeConstantType::INT32: {
-      Value *Loaded = B.CreateAlignedLoad(B.getInt32Ty(), FieldPtr, Align(1));
-      Value *C = B.getInt32(static_cast<uint32_t>(RC.Value.Int32Val));
-      return B.CreateICmpEQ(Loaded, C);
-    }
-    case RuntimeConstantType::INT64: {
-      Value *Loaded = B.CreateAlignedLoad(B.getInt64Ty(), FieldPtr, Align(1));
-      Value *C = B.getInt64(static_cast<uint64_t>(RC.Value.Int64Val));
-      return B.CreateICmpEQ(Loaded, C);
-    }
-    case RuntimeConstantType::FLOAT: {
-      Value *LoadedF = B.CreateAlignedLoad(B.getFloatTy(), FieldPtr, Align(1));
-      Value *LoadedBits = B.CreateBitCast(LoadedF, B.getInt32Ty());
-      uint32_t Bits = 0;
-      std::memcpy(&Bits, &RC.Value.FloatVal, sizeof(Bits));
-      Value *C = B.getInt32(Bits);
-      return B.CreateICmpEQ(LoadedBits, C);
-    }
-    case RuntimeConstantType::DOUBLE: {
-      Value *LoadedF = B.CreateAlignedLoad(B.getDoubleTy(), FieldPtr, Align(1));
-      Value *LoadedBits = B.CreateBitCast(LoadedF, B.getInt64Ty());
-      uint64_t Bits = 0;
-      std::memcpy(&Bits, &RC.Value.DoubleVal, sizeof(Bits));
-      Value *C = B.getInt64(Bits);
-      return B.CreateICmpEQ(LoadedBits, C);
-    }
-    case RuntimeConstantType::PTR: {
-      Type *IntPtrTy = DL.getIntPtrType(B.getContext());
-      Value *Loaded = B.CreateAlignedLoad(IntPtrTy, FieldPtr, Align(1));
-      uint64_t Bits =
-          static_cast<uint64_t>(reinterpret_cast<uintptr_t>(RC.Value.PtrVal));
-      Value *C = ConstantInt::get(IntPtrTy, Bits);
-      return B.CreateICmpEQ(Loaded, C);
-    }
-    default:
-      return nullptr;
-    }
-  }
-
-  static Value *buildVariantMatch(IRBuilder<> &B, const DataLayout &DL,
-                                  Value *LambdaObjPtr, StructType *LambdaTy,
-                                  const JitVariantMap &Variant) {
-    if (Variant.empty())
-      return B.getInt1(true);
-
-    SmallVector<int32_t, 16> Keys;
-    Keys.reserve(Variant.size());
-    for (const auto &KV : Variant)
-      Keys.push_back(KV.first);
-
-    llvm::sort(Keys.begin(), Keys.end());
-
-    Value *Match = B.getInt1(true);
-    for (int32_t K : Keys) {
-      auto It = Variant.find(K);
-      if (It == Variant.end())
-        reportFatalError("Internal error: DenseMap key vanished during match");
-      Value *Cmp =
-          buildSingleCompare(B, DL, LambdaObjPtr, LambdaTy, It->second);
-      if (!Cmp)
-        return nullptr;
-      Match = B.CreateAnd(Match, Cmp);
-    }
-
-    return Match;
   }
 
   static void specializeCallOperator(Module &M, Function &CallOp,
@@ -784,6 +691,98 @@ public:
     // If the call was immediately followed by a terminator, splitBasicBlock
     // still produced a valid tail block. No further fixup required.
     (void)AfterCallIP;
+  }
+
+    static Value *buildSingleCompare(IRBuilder<> &B, const DataLayout &DL,
+                                   Value *LambdaObjPtr, StructType *LambdaTy,
+                                   const RuntimeConstant &RC) {
+    Value *FieldPtr = nullptr;
+    if (LambdaTy && RC.Pos >= 0 &&
+        static_cast<uint64_t>(RC.Pos) < LambdaTy->getNumElements()) {
+      FieldPtr = B.CreateStructGEP(LambdaTy, LambdaObjPtr, RC.Pos);
+    } else {
+      if (RC.Offset < 0)
+        return nullptr;
+      FieldPtr = B.CreateGEP(B.getInt8Ty(), LambdaObjPtr,
+                             B.getInt64(static_cast<uint64_t>(RC.Offset)));
+    }
+
+    switch (RC.Type) {
+    case RuntimeConstantType::BOOL: {
+      Value *Loaded = B.CreateAlignedLoad(B.getInt8Ty(), FieldPtr, Align(1));
+      Value *C = B.getInt8(RC.Value.BoolVal ? 1 : 0);
+      return B.CreateICmpEQ(Loaded, C);
+    }
+    case RuntimeConstantType::INT8: {
+      Value *Loaded = B.CreateAlignedLoad(B.getInt8Ty(), FieldPtr, Align(1));
+      Value *C = B.getInt8(static_cast<uint8_t>(RC.Value.Int8Val));
+      return B.CreateICmpEQ(Loaded, C);
+    }
+    case RuntimeConstantType::INT32: {
+      Value *Loaded = B.CreateAlignedLoad(B.getInt32Ty(), FieldPtr, Align(1));
+      Value *C = B.getInt32(static_cast<uint32_t>(RC.Value.Int32Val));
+      return B.CreateICmpEQ(Loaded, C);
+    }
+    case RuntimeConstantType::INT64: {
+      Value *Loaded = B.CreateAlignedLoad(B.getInt64Ty(), FieldPtr, Align(1));
+      Value *C = B.getInt64(static_cast<uint64_t>(RC.Value.Int64Val));
+      return B.CreateICmpEQ(Loaded, C);
+    }
+    case RuntimeConstantType::FLOAT: {
+      Value *LoadedF = B.CreateAlignedLoad(B.getFloatTy(), FieldPtr, Align(1));
+      Value *LoadedBits = B.CreateBitCast(LoadedF, B.getInt32Ty());
+      uint32_t Bits = 0;
+      std::memcpy(&Bits, &RC.Value.FloatVal, sizeof(Bits));
+      Value *C = B.getInt32(Bits);
+      return B.CreateICmpEQ(LoadedBits, C);
+    }
+    case RuntimeConstantType::DOUBLE: {
+      Value *LoadedF = B.CreateAlignedLoad(B.getDoubleTy(), FieldPtr, Align(1));
+      Value *LoadedBits = B.CreateBitCast(LoadedF, B.getInt64Ty());
+      uint64_t Bits = 0;
+      std::memcpy(&Bits, &RC.Value.DoubleVal, sizeof(Bits));
+      Value *C = B.getInt64(Bits);
+      return B.CreateICmpEQ(LoadedBits, C);
+    }
+    case RuntimeConstantType::PTR: {
+      Type *IntPtrTy = DL.getIntPtrType(B.getContext());
+      Value *Loaded = B.CreateAlignedLoad(IntPtrTy, FieldPtr, Align(1));
+      uint64_t Bits =
+          static_cast<uint64_t>(reinterpret_cast<uintptr_t>(RC.Value.PtrVal));
+      Value *C = ConstantInt::get(IntPtrTy, Bits);
+      return B.CreateICmpEQ(Loaded, C);
+    }
+    default:
+      return nullptr;
+    }
+  }
+
+  static Value *buildVariantMatch(IRBuilder<> &B, const DataLayout &DL,
+                                  Value *LambdaObjPtr, StructType *LambdaTy,
+                                  const JitVariantMap &Variant) {
+    if (Variant.empty())
+      return B.getInt1(true);
+
+    SmallVector<int32_t, 16> Keys;
+    Keys.reserve(Variant.size());
+    for (const auto &KV : Variant)
+      Keys.push_back(KV.first);
+
+    llvm::sort(Keys.begin(), Keys.end());
+
+    Value *Match = B.getInt1(true);
+    for (int32_t K : Keys) {
+      auto It = Variant.find(K);
+      if (It == Variant.end())
+        reportFatalError("Internal error: DenseMap key vanished during match");
+      Value *Cmp =
+          buildSingleCompare(B, DL, LambdaObjPtr, LambdaTy, It->second);
+      if (!Cmp)
+        return nullptr;
+      Match = B.CreateAnd(Match, Cmp);
+    }
+
+    return Match;
   }
 #endif
 };

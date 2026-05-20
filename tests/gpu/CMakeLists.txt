@@ -43,6 +43,7 @@ function(CREATE_GPU_TEST_RDC exe check_source)
             --hip-link
             -Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPassOffload>
         )
+        add_dependencies(${exe}.${lang}.rdc ProteusPassOffload)
     elseif(PROTEUS_ENABLE_CUDA)
         target_compile_options(${exe}.${lang}.rdc PRIVATE --no-offload-new-driver)
 

@@ -2,6 +2,8 @@
 #define PROTEUS_KERNELARGVISITOR_H
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "Helpers.h"
+#include "proteus/impl/Logger.h"
 #include "proteus/impl/RuntimeConstantTypeHelpers.h"
 #include <alloca.h>
 #include <cstdint>
@@ -281,6 +283,10 @@ public:
     // todo: we could just pass in the kernel pointer here and check equality
     if (F->getCallingConv() == CallingConv::AMDGPU_KERNEL ||
         F->getCallingConv() == CallingConv::PTX_Kernel) {
+      DEBUG(Logger::logs("proteus-pass") << "Found termination case " << A << "\n");
+      DEBUG(Logger::logs("proteus-pass").flush());
+      // outs() << "Found termination case " << A << "\n";
+      // outs().flush();
       AnalysisSuccess = true;
       KernelArg = ArgNum;
       KernelFunction = F;
@@ -353,6 +359,7 @@ inline bool analyzeLambdaUses(
     llvm::Module &M,
     DenseMap<CallBase *, LambdaKernelArgAnalysis> &CallBaseToArgOffset,
     const SmallVector<CallBase *> &CBToAnalyze) {
+  DEBUG(Logger::logs("proteus-pass") << "Beginning analysis " << "\n");
   for (auto *FunctorCB : CBToAnalyze) {
     LambdaArgVisitor Visitor(FunctorCB, M);
     while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {
@@ -362,6 +369,8 @@ inline bool analyzeLambdaUses(
       if (Visitor.seen(V))
         continue;
       Visitor.markAsSeen(V);
+      DEBUG(Logger::logs("proteus-pass") << "Visiting value " << *V << "\n");
+      DEBUG(Logger::logs("proteus-pass").flush());
       // Analyze the instruction
       if (auto *I = dyn_cast<Instruction>(V))
         Visitor.visit(*I);
