@@ -243,23 +243,10 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 
   Timer T(Config::get().ProteusEnableTimers);
   SMDiagnostic Diag;
-  auto M = parseIR(MemoryBufferRef(StrIR, "JitModule"), Diag, *Ctx);
-  if (!M)
-    reportFatalError("Error parsing IR: " + Diag.getMessage());
-
-  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus") << "Parse IR " << FnName << " "
-                                               << T.elapsed() << " ms\n");
-
-  Function *Entry = M->getFunction(FnName);
-  if (!Entry)
-    reportFatalError(std::string("Expected JIT entry function ") +
-                     FnName.str() + " in parsed host module");
-
   SmallVector<RuntimeConstant> RCVec =
       getRuntimeConstantValues(Args, RCInfoArray);
-  DenseMap<uint64_t, LambdaRegistry::JitVariantVec> LambdaJitValuesMap =
-      collectCurrentLambdaJitValues(*Entry, Args);
-
+  DenseMap<uint64_t, LambdaRegistry::JitVariantVec> LambdaJitValuesMap
+      {};//collectCurrentLambdaJitValues(*Entry, Args);
   const auto &CGConfig = Config::get().getCGConfig();
   HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesMap,
                          hashCodeGenConfig(CGConfig),
@@ -278,6 +265,23 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   void *JitFnPtr = CodeCache.lookup(HashValue);
   if (JitFnPtr)
     return JitFnPtr;
+  auto M = parseIR(MemoryBufferRef(StrIR, "JitModule"), Diag, *Ctx);
+  if (!M)
+    reportFatalError("Error parsing IR: " + Diag.getMessage());
+
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus") << "Parse IR " << FnName << " "
+                                               << T.elapsed() << " ms\n");
+
+  // Function *Entry = M->getFunction(FnName);
+  // if (!Entry)
+  //   reportFatalError(std::string("Expected JIT entry function ") +
+  //                    FnName.str() + " in parsed host module");
+
+
+
+
+
+
 
   std::string Suffix = HashValue.toMangledSuffix();
   std::string MangledFnName = FnName.str() + Suffix;

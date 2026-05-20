@@ -34,7 +34,7 @@
 #include "proteus/impl/Cloning.h"
 #include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/Hashing.h"
-#include "proteus/impl/KernelArgVisitor.h"
+#include "KernelArgVisitor.h"
 #include "proteus/impl/LambdaCallsite.h"
 #include "proteus/impl/Logger.h"
 #include "proteus/impl/RuntimeConstantTypeHelpers.h"
@@ -197,7 +197,7 @@ public:
     if (hasDeviceLaunchKernelCalls(M)) {
       instrumentLambdaLaunchCallsites(M, StubToKernelMap);
       emitJitLaunchKernelCall(M);
-    }
+    } else
 
     // Initialize Proteus CUDA runtime builtins if this is a CUDA module.
     if (isCUDAModule(M))
@@ -486,9 +486,11 @@ private:
         continue;
 
       DenseMap<CallBase *, LambdaKernelArgAnalysis> CallBaseToArgOffset;
-      if (!analyzeLambdaUses(M, CallBaseToArgOffset, CBToAnalyze))
+      if (!analyzeLambdaUses(M, CallBaseToArgOffset, CBToAnalyze)) {
+        continue;
         reportFatalError("Lambda kernel-arg analysis failed for functor " +
                          std::to_string(FunctorId));
+      }
 
       for (CallBase *CB : CBToAnalyze) {
         auto It = CallBaseToArgOffset.find(CB);
@@ -519,8 +521,6 @@ private:
     SmallDenseSet<Value *> Discovered;
     while (!WorkList.empty()) {
       auto [V, Depth] = WorkList.back();
-      // outs() << *V<<"\n";
-      // outs().flush();
       WorkList.pop_back();
       if (Discovered.contains(V))
         continue;

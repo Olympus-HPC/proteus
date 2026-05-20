@@ -30,11 +30,7 @@
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Error.h"
-#include "proteus/Frontend/IRFunction.h"
-#include "proteus/impl/Cloning.h"
-#include "proteus/impl/Hashing.h"
 #include "proteus/impl/Logger.h"
-#include "proteus/impl/RuntimeConstantTypeHelpers.h"
 
 #include <cstddef>
 #include <llvm/ADT/DenseMap.h>
@@ -310,11 +306,11 @@ private:
     setU64FunctionMetadata(F, "proteus.registered_lambda", Id);
     if (!F)
       return;
-    // Keep the lambda call operator as a distinct call target so runtime
-    // multiversioning can dispatch to specialized clones.
-    F->removeFnAttr(Attribute::AlwaysInline);
-    F->removeFnAttr(Attribute::InlineHint);
-    F->addFnAttr(Attribute::NoInline);
+    // We want tbe lambda clone to be inlined into the body of the operator()
+    // ultimately
+    // F->removeFnAttr(Attribute::AlwaysInline);
+    // F->removeFnAttr(Attribute::InlineHint);
+    F->addFnAttr(Attribute::AlwaysInline);
   }
 
   void setU64FunctionMetadata(Function *F, StringRef Key, uint64_t Id) {
@@ -701,7 +697,7 @@ private:
         const auto Idx = SlotC->getZExtValue();
         if (!ProteusRCType)
           reportFatalError("Proteus does not support user-specified type as a "
-                           "jit::variable");
+                           "jit_variable");
 
         Value *FieldPtr = Builder.CreateStructGEP(RegisterFuncAllocatedType,
                                                   AnonClassAlloca, Idx);

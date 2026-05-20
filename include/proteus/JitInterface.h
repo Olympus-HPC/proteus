@@ -106,15 +106,11 @@ template <uint64_t FunctorID, typename Lambda> struct LambdaFunctorWrapper {
   using LambdaType = Lambda;
   static constexpr std::uint64_t functor_id = FunctorID;
   LambdaType lambda;
-  // todo: this method is unused but could be useful in analysis where we
-  // need to map clang's generated names on device module to the host module.
-  PROTEUS_HOST_DEVICE __attribute__((noinline)) void register_functor() {}
 
   template <typename... Args>
   PROTEUS_HOST_DEVICE __attribute__((annotate("jit")))
   __attribute__((annotate("proteus.wrapper_call", functor_id))) decltype(auto)
-  operator()(Args &&...args) const noexcept(
-      noexcept(lambda(std::forward<Args>(args)...))) {
+  operator()(Args &&...args) const noexcept {
     return lambda(std::forward<Args>(args)...);
   }
 };
