@@ -29,7 +29,7 @@ __proteus_register_lambda_runtime_constant(int32_t Type, int32_t Pos,
 
 extern "C" void __proteus_take_address(void const *) noexcept;
 extern "C" __attribute__((used)) void
-__proteus_finalize_register(void const *Ptr, uint64_t Tag) noexcept;
+__proteus_finalize_register(uint64_t Tag) noexcept;
 
 namespace proteus {
 
@@ -129,7 +129,7 @@ PROTEUS_HOST_DEVICE inline auto tag_functor(L &&lambda) {
 
 template <uint64_t ID, typename T>
 [[nodiscard]] static __attribute__((noinline))
-__attribute__((annotate("proteus.register_call", ID))) auto
+__attribute__((annotate("proteus.register_call_impl", ID))) auto
 __register_lambda_impl(T &&t) noexcept {
   static_assert(!detail::is_lambda_functor_wrapper<std::decay_t<T>>::value);
   // Force LLVM to generate an AllocaInst of the underlying Clang--generated
@@ -138,7 +138,6 @@ __register_lambda_impl(T &&t) noexcept {
   using LambdaType = std::decay_t<T>;
   LambdaType local = t;
   __proteus_take_address(&local);
-  __proteus_finalize_register(&local, ID);
   auto result = tag_functor<ID>(std::forward<T>(t));
   return result;
 }
@@ -146,10 +145,14 @@ __register_lambda_impl(T &&t) noexcept {
 } // namespace detail
 
 template <class L>
-[[nodiscard]] inline auto register_lambda(L &&lambda) noexcept {
-  return ::proteus::detail::__register_lambda_impl<
+[[nodiscard]] inline auto
+__attribute__((annotate("proteus.register_call")))
+register_lambda(L &&lambda) noexcept {
+  auto registered_lambda = ::proteus::detail::__register_lambda_impl<
       ::proteus::detail::functor_id<std::decay_t<L>>()>(
       std::forward<L>(lambda));
+  __proteus_take_address(&registered_lambda);
+  return registered_lambda;
 }
 
 template <typename T>

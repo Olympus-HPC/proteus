@@ -79,7 +79,7 @@ extern "C" __attribute__((noinline)) void
 __proteus_take_address(void const *) noexcept {}
 
 extern "C" __attribute__((noinline)) void
-__proteus_finalize_register(void const *, uint64_t ID) noexcept {
+__proteus_finalize_register(uint64_t ID) noexcept {
   // The LambdaAnalysis pass injects calls to
   // __proteus_register_lambda_ru
   // ntime_constant in __register_lambda_impl.

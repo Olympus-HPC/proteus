@@ -479,19 +479,9 @@ public:
     return RuntimeVariant;
   }
 
-  static void transformHostFunction(Module &M, uint64_t FunctorID,
+  static void transformHostFunction(Module &M, Function &Lambda,
                                     const JitVariantMap &RuntimeVariant) {
-    Function *FunctorOperatorFunction =
-        findFunctorFunctorOperatorFunctionOperatorFromID(M, FunctorID);
-    if (!FunctorOperatorFunction)
-      reportFatalError("Expected wrapper for host lambda specialization");
-
-    specializeCallOperator(M, *FunctorOperatorFunction, RuntimeVariant);
-
-    if (Function *LambdaOperatorMethod =
-            findLambdaOperatorForFunctor(M, FunctorID)) {
-      specializeCallOperator(M, *LambdaOperatorMethod, RuntimeVariant);
-    }
+    specializeCallOperator(M, Lambda, RuntimeVariant);
   }
 
   static void transformDeviceKernel(

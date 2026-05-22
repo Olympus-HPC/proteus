@@ -434,6 +434,20 @@ inline void internalize(Module &M, StringRef PreserveFunctionName) {
   });
 }
 
+inline std::optional<uint64_t> getFunctionU64Metadata(Function &F,
+                                                      StringRef Key) {
+  MDNode *Node = F.getMetadata(Key);
+  if (!Node || Node->getNumOperands() < 1)
+    return std::nullopt;
+
+  auto *CAM = dyn_cast<ConstantAsMetadata>(Node->getOperand(0));
+  auto *CI = CAM ? dyn_cast<ConstantInt>(CAM->getValue()) : nullptr;
+  if (!CI)
+    return std::nullopt;
+
+  return CI->getZExtValue();
+}
+
 } // namespace proteus
 
 #endif

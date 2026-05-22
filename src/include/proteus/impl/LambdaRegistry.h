@@ -102,7 +102,23 @@ public:
     Pending.clear();
   }
 
+  void eraseJitVariables(uint64_t ID) {
+    if (JitVariableVariants.contains(ID))
+      JitVariableVariants.erase(ID);
+  }
+
   bool empty() const { return JitVariableVariants.empty(); }
+
+  auto getPending(uint64_t ID) { return PendingJitVariables[ID]; }
+
+  auto printCurrentKeys() {
+    for (auto [ID, _] : JitVariableVariants) {
+      errs() << "KEY = " << ID << "\n";
+    }
+    for (auto [ID, _] : PendingJitVariables) {
+      errs() << "PENDING KEY = " << ID << "\n";
+    }
+  }
 
 private:
   explicit LambdaRegistry() = default;
