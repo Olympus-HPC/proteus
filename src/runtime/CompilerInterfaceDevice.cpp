@@ -14,7 +14,9 @@
 #include "proteus/impl/CompilerInterfaceDeviceInternal.h"
 #include "proteus/impl/JitEngineDevice.h"
 #include "proteus/impl/JitEngineInfoRegistry.h"
+#include "proteus/impl/LambdaRegistry.h"
 
+#include <cstring>
 #include <utility>
 #include <vector>
 
@@ -75,6 +77,55 @@ __proteus_register_lambda_callsite_location(void *Kernel, uint64_t LambdaID,
   Jit.registerLambdaCallsiteLocation(
       Kernel, LambdaID, CallsiteIndex, KernelArgIndex, Offset,
       static_cast<RuntimeConstantType>(StorageType));
+}
+
+extern "C" __attribute__((used)) void __proteus_begin_device_lambda_launch() {
+  auto &LR = LambdaRegistry::instance();
+  LR.beginDeviceLaunch();
+}
+
+extern "C" __attribute__((used)) void
+__proteus_push_device_lambda_callsite_constant(uint64_t LambdaID,
+                                               uint32_t CallsiteIndex,
+                                               int32_t Type, int32_t Pos,
+                                               int32_t Offset,
+                                               const void *ValuePtr) {
+  RuntimeConstant RC{static_cast<RuntimeConstantType>(Type), Pos, Offset};
+  switch (static_cast<RuntimeConstantType>(Type)) {
+  case RuntimeConstantType::BOOL:
+    std::memcpy(&RC.Value.BoolVal, ValuePtr, sizeof(RC.Value.BoolVal));
+    break;
+  case RuntimeConstantType::INT8:
+    std::memcpy(&RC.Value.Int8Val, ValuePtr, sizeof(RC.Value.Int8Val));
+    break;
+  case RuntimeConstantType::INT32:
+    std::memcpy(&RC.Value.Int32Val, ValuePtr, sizeof(RC.Value.Int32Val));
+    break;
+  case RuntimeConstantType::INT64:
+    std::memcpy(&RC.Value.Int64Val, ValuePtr, sizeof(RC.Value.Int64Val));
+    break;
+  case RuntimeConstantType::FLOAT:
+    std::memcpy(&RC.Value.FloatVal, ValuePtr, sizeof(RC.Value.FloatVal));
+    break;
+  case RuntimeConstantType::DOUBLE:
+    std::memcpy(&RC.Value.DoubleVal, ValuePtr, sizeof(RC.Value.DoubleVal));
+    break;
+  case RuntimeConstantType::PTR:
+    std::memcpy(&RC.Value.PtrVal, ValuePtr, sizeof(RC.Value.PtrVal));
+    break;
+  default:
+    reportFatalError("__proteus_push_device_lambda_callsite_constant only "
+                     "supports scalar captures");
+  }
+
+  auto &LR = LambdaRegistry::instance();
+  LR.appendDeviceCallsiteRuntimeConstant(LambdaID, CallsiteIndex, RC);
+}
+
+extern "C" __attribute__((used)) void
+__proteus_finalize_device_lambda_launch() {
+  auto &LR = LambdaRegistry::instance();
+  LR.finalizeDeviceLaunch();
 }
 
 extern "C" proteus::DeviceTraits<JitDeviceImplT>::DeviceError_t

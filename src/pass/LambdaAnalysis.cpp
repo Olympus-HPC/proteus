@@ -27,6 +27,7 @@
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Error.h"
+#include "proteus/impl/LambdaCallsite.h"
 #include "proteus/impl/Logger.h"
 
 #include <cstddef>
@@ -127,6 +128,8 @@ public:
     DenseMap<Type *, GlobalVariable *> LambdaTypeToGlobalName;
     DenseSet<StructType *> RegisteredLambdaStorageClasses;
     DenseMap<StructType *, StructType *> FunctorTypeToLambdaTypeMap;
+    DenseMap<uint64_t, StructType *> FunctorIDToLambdaTypeMap;
+    DenseMap<uint64_t, StructType *> FunctorIDToFunctorTypeMap;
     // clang-format off
     // new pipeline: LambdaAnalysis sees early LLVM IR emitted at StartEPCallback.
     // proteus::register_lambda emits unique a LambdaFunctorWrapper
@@ -161,15 +164,19 @@ public:
 
     makeLambdaCallsUniquePerFunctorOperator(M);
     if (!isDeviceCompilation(M)) {
-      mapLambdaTypeToFunctorType(M, RegisteredLambdaStorageClasses,
-                                 FunctorTypeToLambdaTypeMap);
+      mapLambdaTypeToFunctorType(
+          M, RegisteredLambdaStorageClasses, FunctorTypeToLambdaTypeMap,
+          FunctorIDToLambdaTypeMap, FunctorIDToFunctorTypeMap);
       instrumentJitVariableStructIndex(M, RegisteredLambdaStorageClasses,
                                        LambdaStorageTypeToJitIndices);
+      emitLambdaSchemaMetadata(M, LambdaStorageTypeToJitIndices,
+                               FunctorIDToLambdaTypeMap);
       // Note: moving this outside the conditional will add host call to device
       // code, and break the semantics of the device runtime.  These
       // modifications can only occur to the Clang-generated host stub
       registerLambdaRuntimeConstants(M, LambdaStorageTypeToJitIndices,
-                                     FunctorTypeToLambdaTypeMap);
+                                     FunctorIDToLambdaTypeMap,
+                                     FunctorIDToFunctorTypeMap);
     }
 
     DEBUG(Logger::logs("lambda-pass")
@@ -335,6 +342,22 @@ private:
 
   bool hasU64Metadata(Function *F, StringRef Key) {
     return F->getMetadata(Key) != nullptr;
+  }
+
+  std::optional<uint64_t> getU64Metadata(Function *F, StringRef Key) {
+    if (!F)
+      return std::nullopt;
+
+    auto *Node = F->getMetadata(Key);
+    if (!Node || Node->getNumOperands() < 1)
+      return std::nullopt;
+
+    auto *CAM = dyn_cast<ConstantAsMetadata>(Node->getOperand(0));
+    auto *CI = CAM ? dyn_cast<ConstantInt>(CAM->getValue()) : nullptr;
+    if (!CI)
+      return std::nullopt;
+
+    return CI->getZExtValue();
   }
 
   void addMetadataNodeWithNameFromLLVMGlobal(Module &M,
@@ -530,7 +553,9 @@ private:
   /// functor type.
   void mapLambdaTypeToFunctorType(
       Module &M, DenseSet<StructType *> &RegisteredLambdaStorageClasses,
-      DenseMap<StructType *, StructType *> &FunctorTypeToLambdaTypeMap) {
+      DenseMap<StructType *, StructType *> &FunctorTypeToLambdaTypeMap,
+      DenseMap<uint64_t, StructType *> &FunctorIDToLambdaTypeMap,
+      DenseMap<uint64_t, StructType *> &FunctorIDToFunctorTypeMap) {
     SmallVector<Function *> RegisterFunctions;
     constexpr const char *ErrorMsg =
         "Error in Proteus JitInterface API.  Please report this bug at "
@@ -539,6 +564,7 @@ private:
     for (auto *RegisterFunc : RegisterFunctions) {
       StructType *AnonClassType = nullptr;
       StructType *FunctorType = nullptr;
+      std::optional<uint64_t> FunctorID;
       for (auto &BB : *RegisterFunc)
         for (auto &I : BB) {
           auto *CB = dyn_cast<CallBase>(&I);
@@ -546,8 +572,11 @@ private:
             continue;
           StructType *RegisteredTy =
               getRegisteredAnonClassFromCB(CB, RegisteredLambdaStorageClasses);
-          if (RegisteredTy)
+          if (RegisteredTy) {
             AnonClassType = RegisteredTy;
+            FunctorID = getU64Metadata(CB->getCalledFunction(),
+                                       "proteus.register_call_impl");
+          }
           if (!CB->getCalledFunction()->getName().contains(
                   "__proteus_take_address"))
             continue;
@@ -559,6 +588,10 @@ private:
       if (!FunctorType || !AnonClassType)
         reportFatalError(ErrorMsg);
       FunctorTypeToLambdaTypeMap[FunctorType] = AnonClassType;
+      if (FunctorID) {
+        FunctorIDToLambdaTypeMap[*FunctorID] = AnonClassType;
+        FunctorIDToFunctorTypeMap[*FunctorID] = FunctorType;
+      }
     }
   }
 
@@ -594,6 +627,47 @@ private:
     if (Ty->isPointerTy())
       return RuntimeConstantType::PTR;
     return std::nullopt;
+  }
+
+  void emitLambdaSchemaMetadata(
+      Module &M,
+      DenseMap<StructType *, SmallVector<LambdaJitVariableInfo, 16>>
+          &LambdaStorageTypeToJitIndices,
+      DenseMap<uint64_t, StructType *> &FunctorIDToLambdaTypeMap) {
+    if (LambdaStorageTypeToJitIndices.empty())
+      return;
+
+    NamedMDNode *SchemaMD =
+        M.getOrInsertNamedMetadata(LambdaSchemaMetadataName);
+    for (const auto &KV : FunctorIDToLambdaTypeMap) {
+      uint64_t FunctorID = KV.first;
+      auto *LambdaStorageType = KV.second;
+      auto It = LambdaStorageTypeToJitIndices.find(LambdaStorageType);
+      if (It == LambdaStorageTypeToJitIndices.end())
+        continue;
+
+      for (const auto &JitVarInfo : It->second) {
+        auto *SlotC = dyn_cast<ConstantInt>(JitVarInfo.Slot);
+        auto *OffsetC = dyn_cast<ConstantInt>(JitVarInfo.Offset);
+        auto RCType = getRCTypeForLLVMType(JitVarInfo.Type);
+        if (!SlotC || !OffsetC || !RCType)
+          reportFatalError("Failed to emit lambda schema metadata");
+
+        LLVMContext &Ctx = M.getContext();
+        Metadata *Ops[] = {
+            ConstantAsMetadata::get(
+                ConstantInt::get(Type::getInt64Ty(Ctx), FunctorID)),
+            ConstantAsMetadata::get(
+                ConstantInt::get(Type::getInt32Ty(Ctx),
+                                 static_cast<uint32_t>(SlotC->getZExtValue()))),
+            ConstantAsMetadata::get(ConstantInt::get(
+                Type::getInt32Ty(Ctx),
+                static_cast<uint32_t>(OffsetC->getZExtValue()))),
+            ConstantAsMetadata::get(ConstantInt::get(
+                Type::getInt32Ty(Ctx), static_cast<int32_t>(RCType.value())))};
+        SchemaMD->addOperand(MDNode::get(Ctx, Ops));
+      }
+    }
   }
 
   /// instrumentJitVariableStructIndex modifies calls to proteus::jit_variable
@@ -701,7 +775,8 @@ private:
       Module &M,
       DenseMap<StructType *, SmallVector<LambdaJitVariableInfo, 16>>
           &LambdaStorageTypeToJitIndices,
-      DenseMap<StructType *, StructType *> &FunctorTypeToLambdaTypeMap) {
+      DenseMap<uint64_t, StructType *> &FunctorIDToLambdaTypeMap,
+      DenseMap<uint64_t, StructType *> &FunctorIDToFunctorTypeMap) {
     constexpr const char *ErrorMsg =
         "Error in LambdaAnalysis pass caused by unexpected Clang LLVM IR "
         "within LambdaFunctorWrapper.   Please report this bug at "
@@ -716,8 +791,6 @@ private:
     // call the lambda.
     findAnnotatedFunctions(M, "proteus.wrapper_call", FunctorOperators);
     for (auto [Function, ID] : FunctorOperators) {
-      StructType *FunctorStructType = nullptr;
-      GetElementPtrInst *FunctorGep = nullptr;
       CallBase *LambdaCall = nullptr;
       for (auto &BB : *Function) {
         for (Instruction &I : BB) {
@@ -725,26 +798,16 @@ private:
           if (CB && hasU64Metadata(CB->getCalledFunction(),
                                    "proteus.registered_lambda"))
             LambdaCall = CB;
-          auto *GEP = dyn_cast<GetElementPtrInst>(&I);
-          if (!GEP)
-            continue;
-          auto *GepStructType =
-              dyn_cast<StructType>(GEP->getSourceElementType());
-          if (!GepStructType ||
-              !FunctorTypeToLambdaTypeMap.contains(GepStructType)) {
-            reportFatalError(ErrorMsg);
-          }
-          // Assert that there is only one struct GEP present
-          if (GepStructType && FunctorStructType)
-            reportFatalError(ErrorMsg);
-          FunctorStructType = GepStructType;
-          FunctorGep = GEP;
         }
       }
-      if (!FunctorStructType)
+      auto FunctorTypeIt = FunctorIDToFunctorTypeMap.find(ID);
+      auto LambdaTypeIt = FunctorIDToLambdaTypeMap.find(ID);
+      if (!LambdaCall || FunctorTypeIt == FunctorIDToFunctorTypeMap.end() ||
+          LambdaTypeIt == FunctorIDToLambdaTypeMap.end() ||
+          Function->arg_empty())
         reportFatalError(ErrorMsg);
-      StructType *AnonLambdaStorageType =
-          FunctorTypeToLambdaTypeMap[FunctorStructType];
+      StructType *FunctorStructType = FunctorTypeIt->second;
+      StructType *AnonLambdaStorageType = LambdaTypeIt->second;
 
       // Insert __proteus_register_lambda_runtime_constant calls for each lambda
       // type participating in this kernel launch.  The insertion point is right
@@ -755,6 +818,8 @@ private:
           "analysis result.   Please report this bug at "
           "https://github.com/Olympus-HPC/proteus.\n";
       IRBuilder<> Builder(LambdaCall);
+      Value *LambdaStoragePtr =
+          Builder.CreateStructGEP(FunctorStructType, Function->getArg(0), 0);
       auto JitVarFn = getJitRegisterLambdaRuntimeConstant(M);
       auto FinalizeFn = getProteusFinalizeCall(M);
       for (auto JitVarInfo :
@@ -771,8 +836,8 @@ private:
         if (!ProteusRCType)
           reportFatalError(InsertionErrorMsg);
 
-        Value *FieldPtr =
-            Builder.CreateStructGEP(AnonLambdaStorageType, FunctorGep, Idx);
+        Value *FieldPtr = Builder.CreateStructGEP(AnonLambdaStorageType,
+                                                  LambdaStoragePtr, Idx);
         Builder.CreateCall(
             JitVarFn,
             {Builder.getInt32(static_cast<int32_t>(ProteusRCType.value())),

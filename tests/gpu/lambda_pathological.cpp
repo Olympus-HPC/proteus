@@ -183,11 +183,7 @@ int main() {
 // CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 77
 // CHECK: case5 77
 // CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 5
-// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-COUNT-5: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: [proteus][JitEngineDevice] ObjectCacheChain rank 0 with 1 level(s):
 // CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 5
-// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 5 accesses
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 5 accesses 5
