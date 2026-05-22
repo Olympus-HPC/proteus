@@ -60,7 +60,7 @@ collectCurrentLambdaJitValues(std::optional<uint64_t> FunctorID) {
   if (!FunctorID)
     return EmptyMap;
 
-  auto VariantsOpt = LambdaRegistry::instance().getJitVariants(*FunctorID);
+  auto VariantsOpt = LambdaRegistry::instance().getHostJitVariants(*FunctorID);
   if (!VariantsOpt || VariantsOpt->empty())
     return EmptyMap;
   llvm::ArrayRef<llvm::DenseMap<int, proteus::RuntimeConstant>> Variants =
@@ -194,7 +194,7 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
   if (!LambdaJitValuesMap.empty()) {
     TransformLambdaSpecialization::transformHostFunction(M, *F,
                                                          LambdaJitValuesMap);
-    LambdaRegistry::instance().eraseJitVariables(*FunctorID);
+    LambdaRegistry::instance().eraseHostJitVariables(*FunctorID);
   }
 
   F->setName(FnName + Suffix);
@@ -244,7 +244,7 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   void *JitFnPtr = CodeCache.lookup(HashValue);
   if (JitFnPtr) {
     if (FunctorID)
-      LambdaRegistry::instance().eraseJitVariables(*FunctorID);
+      LambdaRegistry::instance().eraseHostJitVariables(*FunctorID);
     return JitFnPtr;
   }
 
@@ -294,7 +294,7 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
               << " RC HashValue " << HashValue.toString() << " Addr "
               << JitFnPtr << "\n");
   if (FunctorID)
-    LambdaRegistry::instance().eraseJitVariables(*FunctorID);
+    LambdaRegistry::instance().eraseHostJitVariables(*FunctorID);
   return JitFnPtr;
 }
 

@@ -5,10 +5,12 @@
 #include "proteus/Error.h"
 #include "proteus/impl/Config.h"
 #include "proteus/impl/Debug.h"
+#include "proteus/impl/LambdaCallsite.h"
 #include "proteus/impl/Logger.h"
 
 #include <cstring>
 #include <llvm/ADT/DenseMap.h>
+#include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Demangle/Demangle.h>
@@ -34,31 +36,36 @@ public:
 
   using JitVariantMap = DenseMap<int32_t, RuntimeConstant>;
   using JitVariantVec = SmallVector<JitVariantMap, 4>;
+  struct DeviceLaunchInfo {
+    SmallVector<uint64_t, 4> LambdaCalleeInfo;
+    LambdaCallsiteRuntimeConstantsMap CallsiteRuntimeConstants;
+  };
 
-  std::optional<ArrayRef<JitVariantMap>> getJitVariants(uint64_t ID) const {
-    if (JitVariableVariants.empty())
+  std::optional<ArrayRef<JitVariantMap>>
+  getHostJitVariants(uint64_t FunctorID) const {
+    if (HostJitVariableVariants.empty())
       return std::nullopt;
 
-    auto It = JitVariableVariants.find(ID);
-    if (It == JitVariableVariants.end())
+    auto It = HostJitVariableVariants.find(FunctorID);
+    if (It == HostJitVariableVariants.end())
       return std::nullopt;
 
     return ArrayRef<JitVariantMap>{It->second};
   }
 
-  void appendJitVariable(uint64_t ID, const RuntimeConstant &RC) {
-    PendingJitVariables[ID][RC.Pos] = RC;
+  void appendHostJitVariable(uint64_t FunctorID, const RuntimeConstant &RC) {
+    PendingHostJitVariables[FunctorID][RC.Pos] = RC;
   }
 
-  void commitJitVariables(uint64_t ID) {
-    auto PendingIt = PendingJitVariables.find(ID);
-    if (PendingIt == PendingJitVariables.end())
+  void commitHostJitVariables(uint64_t FunctorID) {
+    auto PendingIt = PendingHostJitVariables.find(FunctorID);
+    if (PendingIt == PendingHostJitVariables.end())
       return;
     if (PendingIt->second.empty())
       return;
 
     JitVariantMap &Pending = PendingIt->second;
-    JitVariantVec &Variants = JitVariableVariants[ID];
+    JitVariantVec &Variants = HostJitVariableVariants[FunctorID];
 
     auto RuntimeConstantEqual = [](const RuntimeConstant &A,
                                    const RuntimeConstant &B) -> bool {
@@ -102,22 +109,49 @@ public:
     Pending.clear();
   }
 
-  void eraseJitVariables(uint64_t ID) {
-    if (JitVariableVariants.contains(ID))
-      JitVariableVariants.erase(ID);
+  void eraseHostJitVariables(uint64_t FunctorID) {
+    if (HostJitVariableVariants.contains(FunctorID))
+      HostJitVariableVariants.erase(FunctorID);
   }
 
-  bool empty() const { return JitVariableVariants.empty(); }
+  bool emptyHost() const { return HostJitVariableVariants.empty(); }
 
-  auto getPending(uint64_t ID) { return PendingJitVariables[ID]; }
+  void beginDeviceLaunch() {
+    PendingDeviceLaunchInfo.LambdaCalleeInfo.clear();
+    PendingDeviceLaunchInfo.CallsiteRuntimeConstants.clear();
+    CurrentDeviceLaunchInfo.LambdaCalleeInfo.clear();
+    CurrentDeviceLaunchInfo.CallsiteRuntimeConstants.clear();
+  }
 
-  auto printCurrentKeys() {
-    for (auto [ID, _] : JitVariableVariants) {
-      errs() << "KEY = " << ID << "\n";
+  void appendDeviceCallsiteRuntimeConstant(uint64_t LambdaID,
+                                           uint32_t CallsiteIndex,
+                                           const RuntimeConstant &RC) {
+    auto &RCVec =
+        PendingDeviceLaunchInfo.CallsiteRuntimeConstants[CallsiteIndex];
+    RCVec.push_back(RC);
+    if (llvm::find(PendingDeviceLaunchInfo.LambdaCalleeInfo, LambdaID) ==
+        PendingDeviceLaunchInfo.LambdaCalleeInfo.end()) {
+      PendingDeviceLaunchInfo.LambdaCalleeInfo.push_back(LambdaID);
     }
-    for (auto [ID, _] : PendingJitVariables) {
-      errs() << "PENDING KEY = " << ID << "\n";
+  }
+
+  void finalizeDeviceLaunch() {
+    for (auto &KV : PendingDeviceLaunchInfo.CallsiteRuntimeConstants) {
+      llvm::sort(KV.second,
+                 [](const RuntimeConstant &L, const RuntimeConstant &R) {
+                   return L.Pos < R.Pos;
+                 });
     }
+    CurrentDeviceLaunchInfo = std::move(PendingDeviceLaunchInfo);
+    PendingDeviceLaunchInfo.LambdaCalleeInfo.clear();
+    PendingDeviceLaunchInfo.CallsiteRuntimeConstants.clear();
+  }
+
+  DeviceLaunchInfo takeDeviceLaunchInfo() {
+    DeviceLaunchInfo LaunchInfo = std::move(CurrentDeviceLaunchInfo);
+    CurrentDeviceLaunchInfo.LambdaCalleeInfo.clear();
+    CurrentDeviceLaunchInfo.CallsiteRuntimeConstants.clear();
+    return LaunchInfo;
   }
 
 private:
@@ -125,8 +159,10 @@ private:
   // First integral key is the preprocessor/constexpr functor ID generated
   // inside PROTEUS_REGISTER_LAMBDA.  The key of the value DenseMap is the slot
   // within the lambda storage.
-  DenseMap<uint64_t, JitVariantVec> JitVariableVariants;
-  DenseMap<uint64_t, JitVariantMap> PendingJitVariables;
+  DenseMap<uint64_t, JitVariantVec> HostJitVariableVariants;
+  DenseMap<uint64_t, JitVariantMap> PendingHostJitVariables;
+  DeviceLaunchInfo PendingDeviceLaunchInfo;
+  DeviceLaunchInfo CurrentDeviceLaunchInfo;
 };
 
 } // namespace proteus

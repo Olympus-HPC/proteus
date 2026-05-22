@@ -445,62 +445,18 @@ public:
     return KernelInfo.getBitcode();
   }
 
-  void getLambdaJitValues(JITKernelInfo &KernelInfo,
-                          LambdaCallsiteRuntimeConstantsMap &LambdaJitValuesMap,
-                          void **KernelArgs) {
+  void
+  getLambdaJitValues(JITKernelInfo &KernelInfo,
+                     SmallVector<uint64_t> &LambdaCalleeInfo,
+                     LambdaCallsiteRuntimeConstantsMap &LambdaJitValuesMap) {
     TIMESCOPE(JitEngineDevice, getLambdaJitValues);
     LambdaRegistry &LR = LambdaRegistry::instance();
-    if (LR.empty() || !KernelInfo.hasLambdaCallsiteLocationInfo()) {
-      KernelInfo.setLambdaCalleeInfo({});
+    auto LaunchInfo = LR.takeDeviceLaunchInfo();
+    if (LaunchInfo.CallsiteRuntimeConstants.empty()) {
       return;
     }
-
-    if (!KernelInfo.hasLambdaCalleeInfo()) {
-      const auto &CallsiteLocationInfo =
-          KernelInfo.getLambdaCallsiteLocationInfo();
-      SmallVector<uint64_t> LambdaCalleeInfo;
-      LambdaCalleeInfo.reserve(CallsiteLocationInfo.size());
-      for (const auto &KV : CallsiteLocationInfo)
-        LambdaCalleeInfo.push_back(KV.first);
-
-      for (auto ID : LambdaCalleeInfo) {
-        PROTEUS_DBG(Logger::logs("proteus")
-                        << "Lambda wrapper ID = " << ID << "\n";)
-      }
-      KernelInfo.setLambdaCalleeInfo(std::move(LambdaCalleeInfo));
-    }
-
-    for (auto LambdaID : KernelInfo.getLambdaCalleeInfo()) {
-      auto VariantsOpt = LR.getJitVariants(LambdaID);
-      if (!VariantsOpt)
-        continue;
-
-      if (!KernelInfo.hasLambdaCallsiteLocationInfo())
-        reportFatalError("Missing lambda callsite location info for kernel " +
-                         KernelInfo.getName());
-
-      const auto &CallsiteLocationInfo =
-          KernelInfo.getLambdaCallsiteLocationInfo();
-
-      auto It = CallsiteLocationInfo.find(LambdaID);
-      if (It == CallsiteLocationInfo.end())
-        reportFatalError("Missing cached lambda kernel-arg locations for " +
-                         std::to_string(LambdaID));
-
-      if (VariantsOpt->empty())
-        continue;
-
-      for (const auto &KV : It->second) {
-        auto Existing = LambdaJitValuesMap.find(KV.first);
-        if (Existing != LambdaJitValuesMap.end())
-          reportFatalError("Duplicate lambda callsite index " +
-                           std::to_string(KV.first));
-
-        LambdaJitValuesMap[KV.first] =
-            TransformLambdaSpecialization::readRuntimeConstantsForCallsite(
-                KernelArgs, KV.second, VariantsOpt->front());
-      }
-    }
+    LambdaCalleeInfo = std::move(LaunchInfo.LambdaCalleeInfo);
+    LambdaJitValuesMap = std::move(LaunchInfo.CallsiteRuntimeConstants);
   }
 
   void registerVar(void *Handle, const char *VarName, const void *HostAddr,
@@ -633,28 +589,10 @@ JitEngineDevice<ImplT>::compileAndRun(
   SmallVector<RuntimeConstant> RCVec =
       getRuntimeConstantValues(KernelArgs, KernelInfo.getRCInfoArray());
 
-  LambdaCallsiteRuntimeConstantsMap LambdaJitValuesMap;
-  getLambdaJitValues(KernelInfo, LambdaJitValuesMap, KernelArgs);
   SmallVector<uint64_t> LambdaCalleeInfoToSpecialize;
-  if (KernelInfo.hasLambdaCallsiteLocationInfo()) {
-    const auto &CallsiteLocationInfo =
-        KernelInfo.getLambdaCallsiteLocationInfo();
-    for (auto LambdaID : KernelInfo.getLambdaCalleeInfo()) {
-      auto It = CallsiteLocationInfo.find(LambdaID);
-      if (It == CallsiteLocationInfo.end())
-        continue;
-
-      bool HasRuntimeConstants = false;
-      for (const auto &KV : It->second) {
-        if (LambdaJitValuesMap.contains(KV.first)) {
-          HasRuntimeConstants = true;
-          break;
-        }
-      }
-      if (HasRuntimeConstants)
-        LambdaCalleeInfoToSpecialize.push_back(LambdaID);
-    }
-  }
+  LambdaCallsiteRuntimeConstantsMap LambdaJitValuesMap;
+  getLambdaJitValues(KernelInfo, LambdaCalleeInfoToSpecialize,
+                     LambdaJitValuesMap);
   const auto &CGConfig = Config::get().getCGConfig(KernelInfo.getName());
   // Determine the hash based on dimension specialization.  If we do not
   // specialize IR based on grid dimensions, avoid hashing on those to

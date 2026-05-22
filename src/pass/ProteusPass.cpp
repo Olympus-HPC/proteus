@@ -154,6 +154,13 @@ struct LambdaManifestRecord {
   RuntimeConstantType StorageType;
 };
 
+struct LambdaSchemaRecord {
+  uint64_t LambdaID;
+  uint32_t Pos;
+  uint32_t Offset;
+  RuntimeConstantType Type;
+};
+
 class ProteusPassImpl {
 public:
   ProteusPassImpl(Module &M) : Types(M) {}
@@ -462,6 +469,48 @@ private:
     return KernelManifest;
   }
 
+  DenseMap<uint64_t, SmallVector<LambdaSchemaRecord, 4>>
+  parseLambdaSchemaMetadata(Module &M) {
+    DenseMap<uint64_t, SmallVector<LambdaSchemaRecord, 4>> SchemaMap;
+    auto *SchemaMD = M.getNamedMetadata(LambdaSchemaMetadataName);
+    if (!SchemaMD)
+      return SchemaMap;
+
+    for (MDNode *Node : SchemaMD->operands()) {
+      if (!Node || Node->getNumOperands() < 4)
+        reportFatalError("Malformed lambda schema metadata");
+
+      auto *LambdaCAM = dyn_cast<ConstantAsMetadata>(Node->getOperand(0));
+      auto *PosCAM = dyn_cast<ConstantAsMetadata>(Node->getOperand(1));
+      auto *OffsetCAM = dyn_cast<ConstantAsMetadata>(Node->getOperand(2));
+      auto *TypeCAM = dyn_cast<ConstantAsMetadata>(Node->getOperand(3));
+      auto *LambdaCI =
+          LambdaCAM ? dyn_cast<ConstantInt>(LambdaCAM->getValue()) : nullptr;
+      auto *PosCI =
+          PosCAM ? dyn_cast<ConstantInt>(PosCAM->getValue()) : nullptr;
+      auto *OffsetCI =
+          OffsetCAM ? dyn_cast<ConstantInt>(OffsetCAM->getValue()) : nullptr;
+      auto *TypeCI =
+          TypeCAM ? dyn_cast<ConstantInt>(TypeCAM->getValue()) : nullptr;
+      if (!LambdaCI || !PosCI || !OffsetCI || !TypeCI)
+        reportFatalError("Malformed lambda schema metadata payload");
+
+      SchemaMap[LambdaCI->getZExtValue()].push_back(LambdaSchemaRecord{
+          LambdaCI->getZExtValue(),
+          static_cast<uint32_t>(PosCI->getZExtValue()),
+          static_cast<uint32_t>(OffsetCI->getZExtValue()),
+          static_cast<RuntimeConstantType>(TypeCI->getSExtValue())});
+    }
+
+    for (auto &KV : SchemaMap) {
+      llvm::sort(KV.second,
+                 [](const LambdaSchemaRecord &L, const LambdaSchemaRecord &R) {
+                   return L.Pos < R.Pos;
+                 });
+    }
+    return SchemaMap;
+  }
+
   FunctionCallee getJitRegisterLambdaCallsiteLocationFn(Module &M) {
     FunctionType *FnTy =
         FunctionType::get(Types.VoidTy,
@@ -488,8 +537,8 @@ private:
       DenseMap<CallBase *, LambdaKernelArgAnalysis> CallBaseToArgOffset;
       if (!analyzeLambdaUses(M, CallBaseToArgOffset, CBToAnalyze)) {
         continue;
-        reportFatalError("Lambda kernel-arg analysis failed for functor " +
-                         std::to_string(FunctorId));
+        // reportFatalError("Lambda kernel-arg analysis failed for functor " +
+        //                  std::to_string(FunctorId));
       }
 
       for (CallBase *CB : CBToAnalyze) {
@@ -540,10 +589,75 @@ private:
     return LayoutType;
   }
 
+  FunctionCallee getBeginDeviceLambdaLaunchFn(Module &M) {
+    auto *FnTy = FunctionType::get(Types.VoidTy, {}, /*isVarArg=*/false);
+    return M.getOrInsertFunction("__proteus_begin_device_lambda_launch", FnTy);
+  }
+
+  FunctionCallee getPushDeviceLambdaCallsiteConstantFn(Module &M) {
+    auto *FnTy = FunctionType::get(Types.VoidTy,
+                                   {Types.Int64Ty, Types.Int32Ty, Types.Int32Ty,
+                                    Types.Int32Ty, Types.Int32Ty, Types.PtrTy},
+                                   /*isVarArg=*/false);
+    return M.getOrInsertFunction(
+        "__proteus_push_device_lambda_callsite_constant", FnTy);
+  }
+
+  FunctionCallee getFinalizeDeviceLambdaLaunchFn(Module &M) {
+    auto *FnTy = FunctionType::get(Types.VoidTy, {}, /*isVarArg=*/false);
+    return M.getOrInsertFunction("__proteus_finalize_device_lambda_launch",
+                                 FnTy);
+  }
+
+  Value *materializeDeviceLambdaValuePtr(IRBuilder<> &Builder,
+                                         Value *KernelArgs,
+                                         const LambdaManifestRecord &Manifest,
+                                         const LambdaSchemaRecord &Schema) {
+    auto *I8PtrTy = PointerType::getUnqual(Builder.getInt8Ty());
+    auto *KernelArgsTy = PointerType::getUnqual(Types.PtrTy);
+    Value *KernelArgsCast = Builder.CreateBitCast(KernelArgs, KernelArgsTy);
+    Value *ArgSlotPtr = Builder.CreateInBoundsGEP(
+        Types.PtrTy, KernelArgsCast,
+        {Builder.getInt32(static_cast<int32_t>(Manifest.KernelArgIndex))});
+    Value *ArgStoragePtr = Builder.CreateLoad(Types.PtrTy, ArgSlotPtr);
+    Value *ArgStorageI8 = Builder.CreateBitCast(ArgStoragePtr, I8PtrTy);
+
+    Value *StorageBase = nullptr;
+    if (Manifest.StorageType == RuntimeConstantType::NONE) {
+      StorageBase =
+          Builder.CreateInBoundsGEP(Builder.getInt8Ty(), ArgStorageI8,
+                                    {Builder.getInt64(Manifest.Offset)});
+    } else {
+      Value *IndirectStoragePtr =
+          Builder.CreateInBoundsGEP(Builder.getInt8Ty(), ArgStorageI8,
+                                    {Builder.getInt64(Manifest.Offset)});
+      if (Manifest.StorageType == RuntimeConstantType::PTR) {
+        Value *LoadedPtr = Builder.CreateLoad(
+            Types.PtrTy,
+            Builder.CreateBitCast(IndirectStoragePtr,
+                                  PointerType::getUnqual(Types.PtrTy)));
+        StorageBase = Builder.CreateBitCast(LoadedPtr, I8PtrTy);
+      } else if (Manifest.StorageType == RuntimeConstantType::INT64) {
+        Value *LoadedBits = Builder.CreateLoad(
+            Types.Int64Ty,
+            Builder.CreateBitCast(IndirectStoragePtr,
+                                  PointerType::getUnqual(Types.Int64Ty)));
+        Value *LoadedPtr = Builder.CreateIntToPtr(LoadedBits, Types.PtrTy);
+        StorageBase = Builder.CreateBitCast(LoadedPtr, I8PtrTy);
+      } else {
+        reportFatalError("Unsupported lambda kernel storage type");
+      }
+    }
+
+    return Builder.CreateInBoundsGEP(Builder.getInt8Ty(), StorageBase,
+                                     {Builder.getInt64(Schema.Offset)});
+  }
+
   void instrumentLambdaLaunchCallsites(
       Module &M, const DenseMap<Value *, GlobalVariable *> &StubToKernelMap) {
     auto KernelManifest = parseLambdaManifestFile(M);
-    if (KernelManifest.empty())
+    auto LambdaSchema = parseLambdaSchemaMetadata(M);
+    if (KernelManifest.empty() || LambdaSchema.empty())
       return;
 
     Function *LaunchKernelFn = M.getFunction(LaunchFunctionName);
@@ -555,7 +669,6 @@ private:
       if (auto *CB = dyn_cast<CallBase>(Usr))
         LaunchCalls.push_back(CB);
 
-    FunctionCallee RegisterFn = getJitRegisterLambdaCallsiteLocationFn(M);
     for (CallBase *LaunchCB : LaunchCalls) {
       Value *KernelKey = getStubGV(LaunchCB->getArgOperand(0));
       if (!KernelKey)
@@ -573,17 +686,30 @@ private:
       auto ManifestIt = KernelManifest.find(KernelSym);
       if (ManifestIt == KernelManifest.end())
         continue;
-      auto KernelArgType = getKernelArgLayout(LaunchCB);
+
       IRBuilder<> Builder(LaunchCB);
+      Builder.CreateCall(getBeginDeviceLambdaLaunchFn(M), {});
       for (const auto &Record : ManifestIt->getValue()) {
-        Builder.CreateCall(
-            RegisterFn,
-            {LaunchCB->getArgOperand(0), Builder.getInt64(Record.LambdaID),
-             Builder.getInt32(Record.CallsiteIndex),
-             Builder.getInt32(Record.KernelArgIndex),
-             Builder.getInt64(Record.Offset),
-             Builder.getInt32(static_cast<int32_t>(KernelArgType))});
+        auto SchemaIt = LambdaSchema.find(Record.LambdaID);
+        if (SchemaIt == LambdaSchema.end())
+          reportFatalError("Missing lambda schema for launch callsite");
+
+        LambdaManifestRecord EffectiveRecord = Record;
+        EffectiveRecord.StorageType = getKernelArgLayout(LaunchCB);
+        for (const auto &Schema : SchemaIt->second) {
+          Value *ValuePtr = materializeDeviceLambdaValuePtr(
+              Builder, LaunchCB->getArgOperand(LaunchCB->arg_size() - 3),
+              EffectiveRecord, Schema);
+          Builder.CreateCall(
+              getPushDeviceLambdaCallsiteConstantFn(M),
+              {Builder.getInt64(Record.LambdaID),
+               Builder.getInt32(Record.CallsiteIndex),
+               Builder.getInt32(static_cast<int32_t>(Schema.Type)),
+               Builder.getInt32(Schema.Pos), Builder.getInt32(Schema.Offset),
+               ValuePtr});
+        }
       }
+      Builder.CreateCall(getFinalizeDeviceLambdaLaunchFn(M), {});
     }
   }
 

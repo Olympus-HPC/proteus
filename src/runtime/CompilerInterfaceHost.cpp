@@ -69,7 +69,7 @@ __proteus_register_lambda_runtime_constant(int32_t Type, int32_t Pos,
         "__proteus_push_lambda_runtime_constant only supports scalar captures");
   }
   auto &LR = LambdaRegistry::instance();
-  LR.appendJitVariable(ID, RC);
+  LR.appendHostJitVariable(ID, RC);
 }
 
 extern "C" void __proteus_enable_host() {
@@ -89,7 +89,7 @@ __proteus_finalize_register(uint64_t ID) noexcept {
   // creation, after those injected calls. Use it as a boundary to commit the
   // tuple.
   auto &LR = LambdaRegistry::instance();
-  LR.commitJitVariables(ID);
+  LR.commitHostJitVariables(ID);
 }
 
 extern "C" void __proteus_disable_host() {
