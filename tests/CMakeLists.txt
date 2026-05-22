@@ -28,6 +28,25 @@ else()
     message(STATUS "Found Filecheck at ${FILECHECK}")
 endif()
 
+add_library(JITTestPass SHARED JITTestPass.cpp)
+target_compile_definitions(JITTestPass PRIVATE ${LLVM_DEFINITIONS})
+target_include_directories(JITTestPass SYSTEM PRIVATE "${LLVM_INSTALL_DIR}/include")
+
+if(LLVM_LINK_LLVM_DYLIB)
+    set(jit_test_pass_llvm_libs LLVM)
+else()
+    llvm_map_components_to_libnames(jit_test_pass_llvm_libs
+        Core
+        Passes
+        Support
+    )
+endif()
+target_link_libraries(JITTestPass PRIVATE ${jit_test_pass_llvm_libs})
+
+if(NOT LLVM_ENABLE_RTTI)
+    target_compile_options(JITTestPass PRIVATE -fno-rtti)
+endif()
+
 function(proteus_attach_pass_plugin_rebuild_dep target)
     set(proteus_pass_stamp "${CMAKE_CURRENT_BINARY_DIR}/${target}.proteuspass.stamp")
 

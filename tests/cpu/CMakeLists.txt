@@ -65,5 +65,14 @@ CREATE_CPU_TEST(types_jit_array types_jit_array.cpp)
 CREATE_CPU_TEST(dynamic_jit_array dynamic_jit_array.cpp)
 CREATE_CPU_TEST(jit_struct jit_struct.cpp)
 CREATE_CPU_TEST(custom_pipeline custom_pipeline.cpp)
+CREATE_CPU_TEST(jit_pass_plugin jit_pass_plugin.cpp)
+target_compile_definitions(jit_pass_plugin PRIVATE
+    PROTEUS_TEST_JIT_PASS_PLUGIN_PATH="$<TARGET_FILE:JITTestPass>")
+add_dependencies(jit_pass_plugin JITTestPass)
+CREATE_CPU_TEST(jit_pass_plugin_cmake jit_pass_plugin_cmake.cpp)
+proteus_register_jit_pass_plugin(
+    jit_pass_plugin_cmake
+    PLUGIN_TARGET JITTestPass
+    PIPELINE jit-test-pass)
 CREATE_CPU_TEST(modify_gvar modify_gvar.cpp)
 CREATE_CPU_TEST(jit_eh jit_eh.cpp)

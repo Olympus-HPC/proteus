@@ -37,6 +37,9 @@ void MLIRJitModule::compile(bool Verify) {
   if (IsCompiled)
     return;
 
+  ModuleHash = std::make_unique<HashT>(
+      hash(static_cast<int>(TargetModel), Code, Config::get().getCGConfig()));
+
   if ((Library = Dispatch.lookupCompiledLibrary(*ModuleHash))) {
     IsCompiled = true;
     return;
