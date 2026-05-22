@@ -106,9 +106,8 @@ int main() {
 // CHECK: Integer = 2
 // CHECK: Integer = 4
 // CHECK-FIRST: [proteus][JitEngineHost] MemoryCache rank 0 hits 1 accesses 5
-// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 2 NumHits 1
-// CHECK-COUNT-2: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-COUNT-3: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: [proteus][JitEngineHost] StorageCache rank 0 hits 0 accesses 4
 // CHECK-SECOND: [proteus][JitEngineHost] StorageCache rank 0 hits 4 accesses 4
 // clang-format on

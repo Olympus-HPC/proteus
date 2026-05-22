@@ -145,8 +145,7 @@ __register_lambda_impl(T &&t) noexcept {
 } // namespace detail
 
 template <class L>
-[[nodiscard]] inline auto
-__attribute__((annotate("proteus.register_call")))
+[[nodiscard]] inline auto __attribute__((annotate("proteus.register_call")))
 register_lambda(L &&lambda) noexcept {
   auto registered_lambda = ::proteus::detail::__register_lambda_impl<
       ::proteus::detail::functor_id<std::decay_t<L>>()>(

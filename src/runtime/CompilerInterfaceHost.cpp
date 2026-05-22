@@ -21,12 +21,14 @@ using namespace llvm;
 
 extern "C" __attribute__((used)) void *
 __proteus_entry(char *FnName, char *IR, int IRSize, void **Args,
-                RuntimeConstantInfo **RCInfoArrayPtr, int NumRuntimeConstants) {
+                RuntimeConstantInfo **RCInfoArrayPtr, int NumRuntimeConstants,
+                uint64_t *FunctorIdOpt = nullptr) {
   TIMESCOPE("__proteus_entry");
   JitEngineHost &Jit = JitEngineHost::instance();
   ArrayRef<RuntimeConstantInfo *> RCInfoArray{
       RCInfoArrayPtr, static_cast<size_t>(NumRuntimeConstants)};
-  void *JitFnPtr = Jit.compileAndLink(FnName, IR, IRSize, Args, RCInfoArray);
+  void *JitFnPtr =
+      Jit.compileAndLink(FnName, IR, IRSize, Args, RCInfoArray, FunctorIdOpt);
 
   return JitFnPtr;
 }

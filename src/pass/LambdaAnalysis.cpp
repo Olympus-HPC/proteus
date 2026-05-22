@@ -156,9 +156,8 @@ public:
     // cloning/extraction.
     // clang-format on
 
-    DEBUG(Logger::logs("lambda-pass")
-          << "=== Original Host Module\n"
-          << M << "=== End Original Host Module\n");
+    DEBUG(Logger::logs("lambda-pass") << "=== Original Host Module\n"
+                                      << M << "=== End Original Host Module\n");
 
     makeLambdaCallsUniquePerFunctorOperator(M);
     if (!isDeviceCompilation(M)) {
@@ -338,7 +337,8 @@ private:
     return F->getMetadata(Key) != nullptr;
   }
 
-  void addMetadataNodeWithNameFromLLVMGlobal(Module &M, StringRef MetadataName) {
+  void addMetadataNodeWithNameFromLLVMGlobal(Module &M,
+                                             StringRef MetadataName) {
     SmallVector<std::pair<Function *, uint64_t>, 16> WrapperCallFunctions;
     findAnnotatedFunctions(M, MetadataName, WrapperCallFunctions);
     for (auto &[F, Id] : WrapperCallFunctions)
@@ -498,8 +498,9 @@ private:
   StructType *getRegisteredAnonClassFromCB(
       CallBase *CB, DenseSet<StructType *> &RegisteredLambdaStorageClasses) {
     Function *F = CB->getCalledFunction();
-    constexpr const char *ErrorMsg = "Error in Proteus JitInterface API.  Please report this bug at "
-              "https://github.com/Olympus-HPC/proteus.";
+    constexpr const char *ErrorMsg =
+        "Error in Proteus JitInterface API.  Please report this bug at "
+        "https://github.com/Olympus-HPC/proteus.";
     if (!hasU64Metadata(F, "proteus.register_call_impl")) {
       return nullptr;
     }
@@ -512,8 +513,7 @@ private:
           continue;
         auto *AnonTy = getStructAllocaFromCB(CB);
         if (!AnonTy)
-          reportFatalError(
-              ErrorMsg);
+          reportFatalError(ErrorMsg);
         RegisteredLambdaStorageClasses.insert(AnonTy);
         AnonLambdaType = AnonTy;
         return AnonLambdaType;
@@ -604,7 +604,8 @@ private:
       Module &M, DenseSet<StructType *> &RegisteredLambdaStorageClasses,
       DenseMap<StructType *, SmallVector<LambdaJitVariableInfo, 16>>
           &JitIndices) {
-    DEBUG(Logger::logs("lambda-pass") << "finding jit variables users..." << "\n");
+    DEBUG(Logger::logs("lambda-pass")
+          << "finding jit variables users..." << "\n");
 
     SmallVector<Function *, 16> JitFunctions;
 
@@ -639,7 +640,8 @@ private:
         WorkList.pop_back();
         if (Discovered.contains(CurVal))
           continue;
-        DEBUG(Logger::logs("lambda-pass") << "VISITING JIT VARIABLE OPERAND " << *CurVal << "\n");
+        DEBUG(Logger::logs("lambda-pass")
+              << "VISITING JIT VARIABLE OPERAND " << *CurVal << "\n");
         Discovered.insert(CurVal);
 
         if (StoreInst *Store = dyn_cast<StoreInst>(CurVal))
@@ -656,12 +658,11 @@ private:
               LambdaJitVariableInfo{Slot, Slot, LoadType});
           if (!LoadType)
             reportFatalError("Load type is null\n");
-        }
-        else if (CastInst* Cast = dyn_cast<CastInst>(CurVal)) {
-          for (auto* Usr : Cast->users())
+        } else if (CastInst *Cast = dyn_cast<CastInst>(CurVal)) {
+          for (auto *Usr : Cast->users())
             WorkList.push_back(Usr);
-        }
-        else if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(CurVal)) {
+        } else if (GetElementPtrInst *GEP =
+                       dyn_cast<GetElementPtrInst>(CurVal)) {
           StructType *PossibleLamType =
               dyn_cast<StructType>(GEP->getSourceElementType());
           if (!PossibleLamType ||
@@ -721,10 +722,8 @@ private:
       for (auto &BB : *Function) {
         for (Instruction &I : BB) {
           auto *CB = dyn_cast<CallBase>(&I);
-          // Assert that there is just a lambda call and a functor operator call
-          if (CB && LambdaCall)
-            reportFatalError(ErrorMsg);
-          if (CB)
+          if (CB && hasU64Metadata(CB->getCalledFunction(),
+                                   "proteus.registered_lambda"))
             LambdaCall = CB;
           auto *GEP = dyn_cast<GetElementPtrInst>(&I);
           if (!GEP)
@@ -763,11 +762,12 @@ private:
                ->getSecond()) {
         if (!JitVarInfo.Type)
           reportFatalError(InsertionErrorMsg);
-        auto ProteusRCType = getRCTypeForLLVMType(JitVarInfo.Type);
         ConstantInt *SlotC = dyn_cast<ConstantInt>(JitVarInfo.Slot);
         if (!SlotC)
           reportFatalError(InsertionErrorMsg);
         const auto Idx = SlotC->getZExtValue();
+        Type *FieldType = AnonLambdaStorageType->getElementType(Idx);
+        auto ProteusRCType = getRCTypeForLLVMType(FieldType);
         if (!ProteusRCType)
           reportFatalError(InsertionErrorMsg);
 

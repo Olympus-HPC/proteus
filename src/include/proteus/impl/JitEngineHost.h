@@ -49,7 +49,8 @@ public:
                     ArrayRef<RuntimeConstant> RCArray, void **Args);
 
   void *compileAndLink(StringRef FnName, char *IR, int IRSize, void **Args,
-                       ArrayRef<RuntimeConstantInfo *> RCInfoArray);
+                       ArrayRef<RuntimeConstantInfo *> RCInfoArray,
+                       uint64_t *FunctorIDPtr);
 
   std::unique_ptr<MemoryBuffer> compileOnly(Module &M,
                                             bool DisableIROpt = false);
