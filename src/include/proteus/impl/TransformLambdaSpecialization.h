@@ -419,9 +419,10 @@ private:
   }
 
 public:
-  static LambdaCallsiteRuntimeConstants readRuntimeConstantsForCallsite(
-      void *const *KernelArgs, const LambdaKernelArgLocation &Location,
-      const JitVariantMap &VariantSchema) {
+  static LambdaCallsiteRuntimeConstants
+  readRuntimeConstantsForCallsite(void *const *KernelArgs,
+                                  const LambdaKernelArgLocation &Location,
+                                  const JitVariantMap &VariantSchema) {
     LambdaCallsiteRuntimeConstants RuntimeConstants;
     RuntimeConstants.reserve(VariantSchema.size());
 
@@ -683,7 +684,7 @@ public:
     (void)AfterCallIP;
   }
 
-    static Value *buildSingleCompare(IRBuilder<> &B, const DataLayout &DL,
+  static Value *buildSingleCompare(IRBuilder<> &B, const DataLayout &DL,
                                    Value *LambdaObjPtr, StructType *LambdaTy,
                                    const RuntimeConstant &RC) {
     Value *FieldPtr = nullptr;

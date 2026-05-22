@@ -28,13 +28,13 @@
 #include "AnnotationHandler.h"
 #include "Helpers.h"
 
+#include "KernelArgVisitor.h"
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Error.h"
 #include "proteus/Frontend/IRFunction.h"
 #include "proteus/impl/Cloning.h"
 #include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/Hashing.h"
-#include "KernelArgVisitor.h"
 #include "proteus/impl/LambdaCallsite.h"
 #include "proteus/impl/Logger.h"
 #include "proteus/impl/RuntimeConstantTypeHelpers.h"
@@ -199,9 +199,9 @@ public:
       emitJitLaunchKernelCall(M);
     } else
 
-    // Initialize Proteus CUDA runtime builtins if this is a CUDA module.
-    if (isCUDAModule(M))
-      emitProteusCUDARuntimeBuiltinsInit(M);
+      // Initialize Proteus CUDA runtime builtins if this is a CUDA module.
+      if (isCUDAModule(M))
+        emitProteusCUDARuntimeBuiltinsInit(M);
 
     SmallVector<decltype(JitFunctionInfoMap)::value_type *, 16> JitWorkList;
     for (auto &JFI : JitFunctionInfoMap) {
@@ -908,12 +908,13 @@ private:
     //                 int IRSize,
     //                 void **Args,
     //                 RuntimeConstantInfo **RCInfoArrayPtr,
-    //                 int32_t NumRCs)
+    //                 int32_t NumRCs,
+    //                 uint64_t *FunctorIdOpt)
 
     FunctionType *JitEntryFnTy =
         FunctionType::get(Types.PtrTy,
                           {Types.PtrTy, Types.PtrTy, Types.Int32Ty, Types.PtrTy,
-                           Types.PtrTy, Types.Int32Ty},
+                           Types.PtrTy, Types.Int32Ty, Types.PtrTy},
                           /* isVarArg=*/false);
     FunctionCallee JitEntryFn =
         M.getOrInsertFunction("__proteus_entry", JitEntryFnTy);
@@ -1089,6 +1090,13 @@ private:
     auto *WrapperMeta = JITFn->getMetadata("proteus.wrapper_call");
     if (WrapperMeta)
       return;
+    auto *LambdaMeta = JITFn->getMetadata("proteus.registered_lambda");
+    ConstantInt *LambdaId = nullptr;
+    if (LambdaMeta && LambdaMeta->getNumOperands() > 0) {
+      auto *CAM = dyn_cast<ConstantAsMetadata>(LambdaMeta->getOperand(0));
+      LambdaId = CAM ? dyn_cast<ConstantInt>(CAM->getValue()) : nullptr;
+    }
+
     JitFunctionInfo &JFI = JITInfo.second;
     size_t NumRuntimeConstants = JFI.ConstantArgs.size();
 
@@ -1169,6 +1177,14 @@ private:
     // Create globals for the function name, the IR string.
     auto *FnNameGlobal = Builder.CreateGlobalString(StubFn->getName());
     auto *StrIRGlobal = Builder.CreateGlobalString(JFI.ModuleIR);
+    Value *FunctorIdOpt = ConstantPointerNull::get(PointerType::getUnqual(Ctx));
+    if (LambdaId) {
+      auto *FunctorIdGlobal = new GlobalVariable(
+          M, Types.Int64Ty, /*isConstant=*/true, GlobalValue::InternalLinkage,
+          ConstantInt::get(Types.Int64Ty, LambdaId->getZExtValue()),
+          ".proteus.registered_lambda." + FnName);
+      FunctorIdOpt = FunctorIdGlobal;
+    }
 
     ArrayType *ArgPtrsTy = ArrayType::get(Types.PtrTy, StubFn->arg_size());
     Value *ArgPtrs = nullptr;
@@ -1203,11 +1219,11 @@ private:
       ArgPtrs = Constant::getNullValue(PointerType::getUnqual(M.getContext()));
     }
 
-    auto *JitFnPtr =
-        Builder.CreateCall(JitEntryFn, {FnNameGlobal, StrIRGlobal,
-                                        Builder.getInt32(JFI.ModuleIR.size()),
-                                        ArgPtrs, RuntimeConstantInfoPtrArray,
-                                        Builder.getInt32(NumRuntimeConstants)});
+    auto *JitFnPtr = Builder.CreateCall(
+        JitEntryFn,
+        {FnNameGlobal, StrIRGlobal, Builder.getInt32(JFI.ModuleIR.size()),
+         ArgPtrs, RuntimeConstantInfoPtrArray,
+         Builder.getInt32(NumRuntimeConstants), FunctorIdOpt});
     SmallVector<Value *, 8> Args;
     for (auto &Arg : StubFn->args())
       Args.push_back(&Arg);

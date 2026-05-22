@@ -1,8 +1,8 @@
 #ifndef PROTEUS_KERNELARGVISITOR_H
 #define PROTEUS_KERNELARGVISITOR_H
 
-#include "proteus/CompilerInterfaceTypes.h"
 #include "Helpers.h"
+#include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/impl/Logger.h"
 #include "proteus/impl/RuntimeConstantTypeHelpers.h"
 #include <alloca.h>
@@ -283,7 +283,8 @@ public:
     // todo: we could just pass in the kernel pointer here and check equality
     if (F->getCallingConv() == CallingConv::AMDGPU_KERNEL ||
         F->getCallingConv() == CallingConv::PTX_Kernel) {
-      DEBUG(Logger::logs("proteus-pass") << "Found termination case " << A << "\n");
+      DEBUG(Logger::logs("proteus-pass")
+            << "Found termination case " << A << "\n");
       DEBUG(Logger::logs("proteus-pass").flush());
       // outs() << "Found termination case " << A << "\n";
       // outs().flush();

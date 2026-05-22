@@ -17,6 +17,7 @@
 #include "proteus/impl/LambdaRegistry.h"
 #include "proteus/impl/TransformArgumentSpecialization.h"
 #include "proteus/impl/TransformLambdaSpecialization.h"
+#include <optional>
 #if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
 #include "proteus/impl/CompilerInterfaceDevice.h"
 #endif
@@ -53,8 +54,7 @@ void *readHostPointerArgumentValue(void **Args, size_t ArgIndex) {
 }
 
 DenseMap<int, proteus::RuntimeConstant>
-collectCurrentLambdaJitValues(Function &Entry,
-                              std::optional<uint64_t> FunctorID) {
+collectCurrentLambdaJitValues(std::optional<uint64_t> FunctorID) {
   DenseMap<int, proteus::RuntimeConstant> EmptyMap{};
   auto &LR = LambdaRegistry::instance();
   if (!FunctorID)
@@ -65,11 +65,6 @@ collectCurrentLambdaJitValues(Function &Entry,
     return EmptyMap;
   llvm::ArrayRef<llvm::DenseMap<int, proteus::RuntimeConstant>> Variants =
       VariantsOpt.value();
-  // for (auto & V : Variants) {
-  //   for (auto [slot, RC] : V) {
-  //     errs()<< slot << " : "<< RC.Value.Int32Val<<"\n";
-  //   }
-  // }
 
   return Variants[0];
 }
@@ -194,7 +189,7 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
   TransformArgumentSpecialization::transform(M, *F, RCArray);
 
   auto FunctorID = getFunctionU64Metadata(*F, "proteus.registered_lambda");
-  auto LambdaJitValuesMap = collectCurrentLambdaJitValues(*F, FunctorID);
+  auto LambdaJitValuesMap = collectCurrentLambdaJitValues(FunctorID);
 
   if (!LambdaJitValuesMap.empty()) {
     TransformLambdaSpecialization::transformHostFunction(M, *F,
@@ -212,10 +207,10 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
   }
 }
 
-void *
-JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
-                              void **Args,
-                              ArrayRef<RuntimeConstantInfo *> RCInfoArray) {
+void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
+                                    void **Args,
+                                    ArrayRef<RuntimeConstantInfo *> RCInfoArray,
+                                    uint64_t *FunctorIDPtr) {
   TIMESCOPE(JitEngineHost, compileAndLink);
 
   StringRef StrIR(IR, IRSize);
@@ -225,9 +220,10 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   SMDiagnostic Diag;
   SmallVector<RuntimeConstant> RCVec =
       getRuntimeConstantValues(Args, RCInfoArray);
-  auto FunctorID = getFunctionU64Metadata(*Entry, "proteus.registered_lambda");
+  std::optional<uint64_t> FunctorID =
+      FunctorIDPtr ? std::optional<uint64_t>{*FunctorIDPtr} : std::nullopt;
   DenseMap<int, proteus::RuntimeConstant> LambdaJitValuesMap =
-      collectCurrentLambdaJitValues(*Entry, FunctorID);
+      collectCurrentLambdaJitValues(FunctorID);
 
   const auto &CGConfig = Config::get().getCGConfig();
   HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesMap,
@@ -251,6 +247,13 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
       LambdaRegistry::instance().eraseJitVariables(*FunctorID);
     return JitFnPtr;
   }
+
+  auto M = parseIR(MemoryBufferRef(StrIR, "JitModule"), Diag, *Ctx);
+  if (!M)
+    reportFatalError("Error parsing IR: " + Diag.getMessage());
+
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus") << "Parse IR " << FnName << " "
+                                               << T.elapsed() << " ms\n");
 
   std::string Suffix = HashValue.toMangledSuffix();
   std::string MangledFnName = FnName.str() + Suffix;

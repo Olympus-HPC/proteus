@@ -445,10 +445,9 @@ public:
     return KernelInfo.getBitcode();
   }
 
-  void getLambdaJitValues(
-      JITKernelInfo &KernelInfo,
-      LambdaCallsiteRuntimeConstantsMap &LambdaJitValuesMap,
-      void **KernelArgs) {
+  void getLambdaJitValues(JITKernelInfo &KernelInfo,
+                          LambdaCallsiteRuntimeConstantsMap &LambdaJitValuesMap,
+                          void **KernelArgs) {
     TIMESCOPE(JitEngineDevice, getLambdaJitValues);
     LambdaRegistry &LR = LambdaRegistry::instance();
     if (LR.empty() || !KernelInfo.hasLambdaCallsiteLocationInfo()) {
@@ -638,7 +637,8 @@ JitEngineDevice<ImplT>::compileAndRun(
   getLambdaJitValues(KernelInfo, LambdaJitValuesMap, KernelArgs);
   SmallVector<uint64_t> LambdaCalleeInfoToSpecialize;
   if (KernelInfo.hasLambdaCallsiteLocationInfo()) {
-    const auto &CallsiteLocationInfo = KernelInfo.getLambdaCallsiteLocationInfo();
+    const auto &CallsiteLocationInfo =
+        KernelInfo.getLambdaCallsiteLocationInfo();
     for (auto LambdaID : KernelInfo.getLambdaCalleeInfo()) {
       auto It = CallsiteLocationInfo.find(LambdaID);
       if (It == CallsiteLocationInfo.end())

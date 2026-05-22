@@ -21,6 +21,7 @@ int main() {
 
   run([=, Bits = reinterpret_cast<int *>(proteus::jit_variable(reinterpret_cast<std::uintptr_t>(Ptr)))]
           () __attribute__((annotate("jit"))) {
+            std::cout << *Bits << "\n";
             *Bits = 123;
             std::cout << *Bits << "\n";
           });
@@ -29,6 +30,7 @@ int main() {
 }
 
 // clang-format off
+// CHECK: 0
 // CHECK: 123
 // CHECK: [proteus][JitEngineHost] MemoryCache rank 0 hits 0 accesses 1
 // CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
