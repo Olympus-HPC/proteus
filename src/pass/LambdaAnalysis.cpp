@@ -7,11 +7,8 @@
 //===----------------------------------------------------------------------===//
 //
 // DESCRIPTION:
-//    Find functions annotated with "jit" plus input arguments that are
-//    amenable to runtime constant propagation. Stores the IR for those
-//    functions, replaces them with a stub function that calls the jit runtime
-//    library to compile the IR and call the function pointer of the jit'ed
-//    version.
+//    Instrument host lambda callsites to register runtime constants.  Record
+//    and instrument the data layout for user-specified jit_variable calls.
 //
 // USAGE:
 //    1. Legacy PM
@@ -118,7 +115,9 @@ public:
   bool run(Module &M, bool) {
     // Attach Metadata nodes corresponding to llvm.global.annotations to
     // individual function calls.
-    materializeWrapperCallMetadata(M);
+    addMetadataNodeWithNameFromLLVMGlobal(M, "proteus.wrapper_call");
+    addMetadataNodeWithNameFromLLVMGlobal(M, "proteus.register_call");
+    addMetadataNodeWithNameFromLLVMGlobal(M, "proteus.register_call_impl");
     // We need collect any kernel host stubs to pass to parse annotations, used
     // in forced annotations.
     const auto StubToKernelMap = getKernelHostStubs(M);
@@ -127,30 +126,30 @@ public:
         LambdaStorageTypeToJitIndices;
     DenseMap<Type *, GlobalVariable *> LambdaTypeToGlobalName;
     DenseSet<StructType *> RegisteredLambdaStorageClasses;
+    DenseMap<StructType *, StructType *> FunctorTypeToLambdaTypeMap;
     // clang-format off
-    // Look at device module.  Track a map of lambda CB --> kernel arg + offset
-    // assign a unique metadata node for each lambda CB
-    // in the device stub, use the identical metadata node to add a call registering in thhe
-    // map
     // new pipeline: LambdaAnalysis sees early LLVM IR emitted at StartEPCallback.
-    // Our preprocessor macro PROTEUS_REGISTER_LAMBDA emits unique a LambdaFunctorWrapper
-    // template instantiation for every macro invocation.  The goal of this analysis
+    // proteus::register_lambda emits unique a LambdaFunctorWrapper
+    // template instantiation for every function call.  The goal of this analysis
     // is to determine which slots in a Functor/Lambda's storage will be folded into LLVM
     // IR at runtime and treated as constants. The analysis uses the following steps:
+    // For the host module, we emit registration of runtime constants directly into the
+    // functor's wrapper operator() method.
     //  (1) make a DenseSet containing anonymous lambda classes (class.anon type)
-    //      as registered by __proteus_take_address inside __register_lambda_impl
+    //      as registered by __proteus_take_address inside __register_lambda_impl.
+    //      Also track functor type --> corresponding class.anon type
     //  (2) Find jit_variable calls and associate the calls offset with registered,
     //      class.anon types
     //  (3) Look at register_lambda calls, identify the call operators of the functors
     //      from the callsite
-    //      (a) If there are two LambdaFunctorWrapper::operator() functions
-    //          using the same lambda:::operator(), we need to clone lambda:::operator()
-    //          and inject the clone at the callsite
-    //      (b) Inject __proteus_register_lambda_runtime_constant into the register_lambda_impl
+    //      (a) (HOST ONLY) Inject __proteus_register_lambda_runtime_constant into the functor operator()
     //          IR with the call operator functor ID as the key.  Use the analysis from (2) to
     //          determine which llvm::Value to pass to the call.
-    // (4) (RUNTIME) Look at all the call operators within a kernel, replace
-    // with runtime constants now propagated from the registry.
+    // (4) (RUNTIME) (DEVICE) Look at all the call operators within a kernel, replace
+    //     with runtime constants now propagated from the registry.
+    // (5) (RUNTIME) (HOST) For host operator() calls, we trust the values registered
+    //     within the LambdaRegistry by __proteus_register_lambda_runtime_constant, and
+    //     cleanup those values after cache hit/specialization
     //
     // NOTE: We need this for both host and device modules, since the runtime
     // specialization paths expect the function metadata to be present after
@@ -163,10 +162,15 @@ public:
 
     makeLambdaCallsUniquePerFunctorOperator(M);
     if (!isDeviceCompilation(M)) {
-      getUnderlyingLambdaTypeFromFunctors(M, RegisteredLambdaStorageClasses);
+      mapLambdaTypeToFunctorType(M, RegisteredLambdaStorageClasses,
+                                 FunctorTypeToLambdaTypeMap);
       instrumentJitVariableStructIndex(M, RegisteredLambdaStorageClasses,
                                        LambdaStorageTypeToJitIndices);
-      registerLambdaFunctions(M, LambdaStorageTypeToJitIndices);
+      // Note: moving this outside the conditional will add host call to device
+      // code, and break the semantics of the device runtime.  These
+      // modifications can only occur to the Clang-generated host stub
+      registerLambdaRuntimeConstants(M, LambdaStorageTypeToJitIndices,
+                                     FunctorTypeToLambdaTypeMap);
     }
 
     DEBUG(Logger::logs("lambda-pass")
@@ -185,48 +189,6 @@ private:
   MapVector<Function *, JitFunctionInfo> JitFunctionInfoMap;
   SmallPtrSet<Function *, 16> ModuleDeviceKernels;
 
-  void runCleanupPassPipeline(Module &M) {
-    PassBuilder PB;
-    LoopAnalysisManager LAM;
-    FunctionAnalysisManager FAM;
-    CGSCCAnalysisManager CGAM;
-    ModuleAnalysisManager MAM;
-
-    PB.registerModuleAnalyses(MAM);
-    PB.registerCGSCCAnalyses(CGAM);
-    PB.registerFunctionAnalyses(FAM);
-    PB.registerLoopAnalyses(LAM);
-    PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-    ModulePassManager Passes;
-    Passes.addPass(GlobalOptPass());
-    Passes.addPass(GlobalDCEPass());
-    Passes.addPass(StripDeadDebugInfoPass());
-    Passes.addPass(StripDeadPrototypesPass());
-
-    Passes.run(M, MAM);
-
-    StripDebugInfo(M);
-  }
-
-  void runOptimizationPassPipeline(Module &M) {
-    PassBuilder PB;
-    LoopAnalysisManager LAM;
-    FunctionAnalysisManager FAM;
-    CGSCCAnalysisManager CGAM;
-    ModuleAnalysisManager MAM;
-
-    PB.registerModuleAnalyses(MAM);
-    PB.registerCGSCCAnalyses(CGAM);
-    PB.registerFunctionAnalyses(FAM);
-    PB.registerLoopAnalyses(LAM);
-    PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
-
-    ModulePassManager Passes =
-        PB.buildPerModuleDefaultPipeline(OptimizationLevel::O3);
-    Passes.run(M, MAM);
-  }
-
   Value *getStubGV([[maybe_unused]] Value *Operand) {
     // NOTE: when called by isDeviceKernelHostStub, Operand may not be a global
     // variable point to the stub, so we check and return null in that case.
@@ -244,6 +206,42 @@ private:
 #endif
 
     return V;
+  }
+
+  static void
+  findAnnotatedFunctions(llvm::Module &M, llvm::StringRef Wanted,
+                         llvm::SmallVectorImpl<llvm::Function *> &Out) {
+    auto *GA = M.getGlobalVariable("llvm.global.annotations");
+    if (!GA)
+      return;
+
+    auto *CA = llvm::dyn_cast<llvm::ConstantArray>(GA->getOperand(0));
+    if (!CA)
+      return;
+
+    llvm::SmallDenseSet<llvm::Function *, 32> Seen;
+
+    for (llvm::Value *Elt : CA->operands()) {
+      auto *CS = llvm::dyn_cast<llvm::ConstantStruct>(Elt);
+      if (!CS || CS->getNumOperands() < 5)
+        continue;
+
+      auto *F = llvm::dyn_cast<llvm::Function>(
+          CS->getOperand(0)->stripPointerCasts());
+      if (!F)
+        continue;
+
+      llvm::StringRef Ann;
+      if (!llvm::getConstantStringInfo(CS->getOperand(1)->stripPointerCasts(),
+                                       Ann))
+        continue;
+      if (Ann != Wanted)
+        continue;
+
+      if (!Seen.contains(F))
+        Out.emplace_back(F);
+      Seen.insert(F);
+    }
   }
 
   static void findAnnotatedFunctions(
@@ -336,11 +334,15 @@ private:
     F->setMetadata(Key, MDNode::get(Ctx, {IdMD}));
   }
 
-  void materializeWrapperCallMetadata(Module &M) {
+  bool hasU64Metadata(Function *F, StringRef Key) {
+    return F->getMetadata(Key) != nullptr;
+  }
+
+  void addMetadataNodeWithNameFromLLVMGlobal(Module &M, StringRef MetadataName) {
     SmallVector<std::pair<Function *, uint64_t>, 16> WrapperCallFunctions;
-    findAnnotatedFunctions(M, "proteus.wrapper_call", WrapperCallFunctions);
+    findAnnotatedFunctions(M, MetadataName, WrapperCallFunctions);
     for (auto &[F, Id] : WrapperCallFunctions)
-      setU64FunctionMetadata(F, "proteus.wrapper_call", Id);
+      setU64FunctionMetadata(F, MetadataName, Id);
   }
 
   Function *cloneLambdaOperator(Function *LambdaOperator, uint64_t Suffix) {
@@ -364,7 +366,7 @@ private:
     return NewFunc;
   }
   // Go through all of the functor operator() methods emitted by the
-  // PROTEUS_REGISTER_LAMBDA expansion from the preprocessor.  Each operator()
+  // proteus::register_lambda call.  Each operator()
   // has a unique ID, but multiple functor::operator() methods may call the same
   // lambda::operator() method.  Because each one needs to be specialized
   // separately at runtime, clone duplicate lambda::operator() methods.
@@ -482,32 +484,88 @@ private:
       }
     return StubToKernelMap;
   }
-  StructType *getAnonClassPtr(CallBase *CB) {
-    auto Alloca = dyn_cast<AllocaInst>(CB->getArgOperand(0));
+  StructType *getStructAllocaFromCB(CallBase *CB) {
+    auto *Alloca = dyn_cast<AllocaInst>(CB->getArgOperand(0));
     if (!Alloca)
       reportFatalError("Non alloca passed to CB\n");
-    auto AnonClassTy = dyn_cast<StructType>(Alloca->getAllocatedType());
+    auto *AnonClassTy = dyn_cast<StructType>(Alloca->getAllocatedType());
     if (!AnonClassTy)
       reportFatalError(
           "Non struct type allocated and passed to __proteus_take_address");
     return AnonClassTy;
   }
 
-  void getUnderlyingLambdaTypeFromFunctors(
-      Module &M, DenseSet<StructType *> &RegisteredLambdaStorageClasses) {
-    SmallVector<std::pair<Function *, uint64_t>> RegisterFunctions;
+  StructType *getRegisteredAnonClassFromCB(
+      CallBase *CB, DenseSet<StructType *> &RegisteredLambdaStorageClasses) {
+    Function *F = CB->getCalledFunction();
+    constexpr const char *ErrorMsg = "Error in Proteus JitInterface API.  Please report this bug at "
+              "https://github.com/Olympus-HPC/proteus.";
+    if (!hasU64Metadata(F, "proteus.register_call_impl")) {
+      return nullptr;
+    }
+    StructType *AnonLambdaType = nullptr;
+    for (auto &BB : *F)
+      for (auto &I : BB) {
+        auto *CB = dyn_cast<CallBase>(&I);
+        if (!CB || !CB->getCalledFunction()->getName().contains(
+                       "__proteus_take_address"))
+          continue;
+        auto *AnonTy = getStructAllocaFromCB(CB);
+        if (!AnonTy)
+          reportFatalError(
+              ErrorMsg);
+        RegisteredLambdaStorageClasses.insert(AnonTy);
+        AnonLambdaType = AnonTy;
+        return AnonLambdaType;
+      }
+    if (!AnonLambdaType)
+      reportFatalError(ErrorMsg);
+    return AnonLambdaType;
+  }
+
+  /// Look at all functions with register_call metadata.  Find call to
+  /// __proteus_take_address, identify functor type.  Find call to function
+  /// with metadata proteus.register_call_impl, find call to
+  /// __proteus_take_address in the nested implementation call, and map onto the
+  /// functor type.
+  void mapLambdaTypeToFunctorType(
+      Module &M, DenseSet<StructType *> &RegisteredLambdaStorageClasses,
+      DenseMap<StructType *, StructType *> &FunctorTypeToLambdaTypeMap) {
+    SmallVector<Function *> RegisterFunctions;
+    constexpr const char *ErrorMsg =
+        "Error in Proteus JitInterface API.  Please report this bug at "
+        "https://github.com/Olympus-HPC/proteus.";
     findAnnotatedFunctions(M, "proteus.register_call", RegisterFunctions);
-    SmallVector<CallBase *> AnonAllocaCB;
-    for (auto [RegisterFunc, _] : RegisterFunctions) {
+    for (auto *RegisterFunc : RegisterFunctions) {
+      StructType *AnonClassType = nullptr;
+      StructType *FunctorType = nullptr;
       for (auto &BB : *RegisterFunc)
         for (auto &I : BB) {
           auto *CB = dyn_cast<CallBase>(&I);
-          if (!CB || !CB->getCalledFunction()->getName().contains(
-                         "__proteus_take_address"))
+          if (!CB)
             continue;
-          RegisteredLambdaStorageClasses.insert(getAnonClassPtr(CB));
+          StructType *RegisteredTy =
+              getRegisteredAnonClassFromCB(CB, RegisteredLambdaStorageClasses);
+          if (RegisteredTy)
+            AnonClassType = RegisteredTy;
+          if (!CB->getCalledFunction()->getName().contains(
+                  "__proteus_take_address"))
+            continue;
+          auto *FunctorTy = getStructAllocaFromCB(CB);
+          if (!FunctorTy)
+            reportFatalError(ErrorMsg);
+          FunctorType = FunctorTy;
         }
+      if (!FunctorType || !AnonClassType)
+        reportFatalError(ErrorMsg);
+      FunctorTypeToLambdaTypeMap[FunctorType] = AnonClassType;
     }
+  }
+
+  FunctionCallee getProteusFinalizeCall(Module &M) {
+    FunctionType *FnTy = FunctionType::get(Types.VoidTy, {Types.Int64Ty},
+                                           /*isVarArg=*/false);
+    return M.getOrInsertFunction("__proteus_finalize_register", FnTy);
   }
 
   FunctionCallee getJitRegisterLambdaRuntimeConstant(Module &M) {
@@ -620,7 +678,7 @@ private:
 
           auto Offset = SL->getElementOffset(SlotC->getZExtValue());
           Constant *OffsetCI = ConstantInt::get(Types.Int32Ty, Offset);
-          // Type* LoadType = GEP->getAccessType();
+
           JitIndices[PossibleLamType].emplace_back(
               LambdaJitVariableInfo{Slot, OffsetCI, LoadType});
           ++numSlotsFound;
@@ -635,78 +693,94 @@ private:
     }
   }
 
-  // Inject data about jit_variable pointer offsets into function calls within the
-  // body of register_lambda_impl
-  void registerLambdaFunctions(
-      Module &M, DenseMap<StructType *, SmallVector<LambdaJitVariableInfo, 16>>
-                     &LambdaStorageTypeToJitIndices) {
+  /// Register runtime constants for host lambdas directly at the callsite by
+  /// reading off of the closure pointer using offsets deduced from the
+  /// jit_variable analysis earlier.
+  void registerLambdaRuntimeConstants(
+      Module &M,
+      DenseMap<StructType *, SmallVector<LambdaJitVariableInfo, 16>>
+          &LambdaStorageTypeToJitIndices,
+      DenseMap<StructType *, StructType *> &FunctorTypeToLambdaTypeMap) {
+    constexpr const char *ErrorMsg =
+        "Error in LambdaAnalysis pass caused by unexpected Clang LLVM IR "
+        "within LambdaFunctorWrapper.   Please report this bug at "
+        "https://github.com/Olympus-HPC/proteus.\n";
     if (LambdaStorageTypeToJitIndices.empty())
       return;
     DEBUG(Logger::logs("lambda-pass")
           << "registering lambda functions" << "\n");
-    SmallVector<std::pair<Function *, uint64_t>, 16> RegisterFunctions;
-    findAnnotatedFunctions(M, "proteus.register_call", RegisterFunctions);
-    for (auto [Function, ID] : RegisterFunctions) {
-      AllocaInst *AnonClassAlloca = nullptr;
-      CallBase *FinalizeCall = nullptr;
-
+    SmallVector<std::pair<Function *, uint64_t>, 16> FunctorOperators;
+    // At the start of the LLVM pipline, the lambda functor operator will
+    // allocate a typed struct corresponding to its storage class.  It will also
+    // call the lambda.
+    findAnnotatedFunctions(M, "proteus.wrapper_call", FunctorOperators);
+    for (auto [Function, ID] : FunctorOperators) {
+      StructType *FunctorStructType = nullptr;
+      GetElementPtrInst *FunctorGep = nullptr;
+      CallBase *LambdaCall = nullptr;
       for (auto &BB : *Function) {
         for (Instruction &I : BB) {
           auto *CB = dyn_cast<CallBase>(&I);
-          if (CB && CB->getCalledFunction()->getName().contains(
-                        "__proteus_finalize_register"))
-            FinalizeCall = CB;
-          auto *Alloca = dyn_cast<AllocaInst>(&I);
-          if (!Alloca)
+          // Assert that there is just a lambda call and a functor operator call
+          if (CB && LambdaCall)
+            reportFatalError(ErrorMsg);
+          if (CB)
+            LambdaCall = CB;
+          auto *GEP = dyn_cast<GetElementPtrInst>(&I);
+          if (!GEP)
             continue;
-          auto *AllocaStructType =
-              dyn_cast<StructType>(Alloca->getAllocatedType());
-          if (!AllocaStructType ||
-              !LambdaStorageTypeToJitIndices.contains(AllocaStructType))
-            continue;
-          AnonClassAlloca = Alloca;
+          auto *GepStructType =
+              dyn_cast<StructType>(GEP->getSourceElementType());
+          if (!GepStructType ||
+              !FunctorTypeToLambdaTypeMap.contains(GepStructType)) {
+            reportFatalError(ErrorMsg);
+          }
+          // Assert that there is only one struct GEP present
+          if (GepStructType && FunctorStructType)
+            reportFatalError(ErrorMsg);
+          FunctorStructType = GepStructType;
+          FunctorGep = GEP;
         }
       }
-      if (!FinalizeCall)
-        reportFatalError("internal proteus error: __register_lambda_impl call "
-                         "does not contain finalize call");
-      if (!AnonClassAlloca) {
-        DEBUG(Logger::logs("lambda-pass") << "Function does not contain anonymous class with jit_variables " << *Function << "\n");
-        continue;
-      }
-      StructType *RegisterFuncAllocatedType =
-          dyn_cast<StructType>(AnonClassAlloca->getAllocatedType());
-      if (!RegisterFuncAllocatedType)
-        reportFatalError("internal proteus error: error in logic of "
-                         "register_lambda analysis");
+      if (!FunctorStructType)
+        reportFatalError(ErrorMsg);
+      StructType *AnonLambdaStorageType =
+          FunctorTypeToLambdaTypeMap[FunctorStructType];
 
       // Insert __proteus_register_lambda_runtime_constant calls for each lambda
       // type participating in this kernel launch.  The insertion point is right
-      // before the finalization call.
-      IRBuilder<> Builder(FinalizeCall);
+      // before lambda launch--since we know we have a valid closure pointer at
+      // this point.
+      constexpr const char *InsertionErrorMsg =
+          "Error in LambdaAnalysis pass caused by unexpected jit_variable "
+          "analysis result.   Please report this bug at "
+          "https://github.com/Olympus-HPC/proteus.\n";
+      IRBuilder<> Builder(LambdaCall);
       auto JitVarFn = getJitRegisterLambdaRuntimeConstant(M);
+      auto FinalizeFn = getProteusFinalizeCall(M);
       for (auto JitVarInfo :
-           LambdaStorageTypeToJitIndices.find(RegisterFuncAllocatedType)
+           LambdaStorageTypeToJitIndices.find(AnonLambdaStorageType)
                ->getSecond()) {
         if (!JitVarInfo.Type)
-          reportFatalError("jit var info type is null\n");
+          reportFatalError(InsertionErrorMsg);
         auto ProteusRCType = getRCTypeForLLVMType(JitVarInfo.Type);
         ConstantInt *SlotC = dyn_cast<ConstantInt>(JitVarInfo.Slot);
         if (!SlotC)
-          reportFatalError("Expected constant slot");
+          reportFatalError(InsertionErrorMsg);
         const auto Idx = SlotC->getZExtValue();
         if (!ProteusRCType)
-          reportFatalError("Proteus does not support user-specified type as a "
-                           "jit_variable");
+          reportFatalError(InsertionErrorMsg);
 
-        Value *FieldPtr = Builder.CreateStructGEP(RegisterFuncAllocatedType,
-                                                  AnonClassAlloca, Idx);
+        Value *FieldPtr =
+            Builder.CreateStructGEP(AnonLambdaStorageType, FunctorGep, Idx);
         Builder.CreateCall(
             JitVarFn,
             {Builder.getInt32(static_cast<int32_t>(ProteusRCType.value())),
              Builder.getInt32(Idx), JitVarInfo.Offset, FieldPtr,
              Builder.getInt64(ID)});
       }
+      // Insert the finalize call
+      Builder.CreateCall(FinalizeFn, {Builder.getInt64(ID)});
     }
   }
 

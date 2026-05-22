@@ -43,19 +43,6 @@ using namespace llvm::orc;
 
 namespace {
 
-std::optional<uint64_t> getFunctionU64Metadata(Function &F, StringRef Key) {
-  MDNode *Node = F.getMetadata(Key);
-  if (!Node || Node->getNumOperands() < 1)
-    return std::nullopt;
-
-  auto *CAM = dyn_cast<ConstantAsMetadata>(Node->getOperand(0));
-  auto *CI = CAM ? dyn_cast<ConstantInt>(CAM->getValue()) : nullptr;
-  if (!CI)
-    return std::nullopt;
-
-  return CI->getZExtValue();
-}
-
 void *readHostPointerArgumentValue(void **Args, size_t ArgIndex) {
   if (!Args || !Args[ArgIndex])
     return nullptr;
@@ -65,33 +52,26 @@ void *readHostPointerArgumentValue(void **Args, size_t ArgIndex) {
   return Ptr;
 }
 
-DenseMap<uint64_t, LambdaRegistry::JitVariantVec>
-collectCurrentLambdaJitValues(Function &Entry, void **Args) {
-  DenseMap<uint64_t, LambdaRegistry::JitVariantVec> LambdaJitValuesMap;
-
-  auto FunctorID = getFunctionU64Metadata(Entry, "proteus.wrapper_call");
+DenseMap<int, proteus::RuntimeConstant>
+collectCurrentLambdaJitValues(Function &Entry,
+                              std::optional<uint64_t> FunctorID) {
+  DenseMap<int, proteus::RuntimeConstant> EmptyMap{};
+  auto &LR = LambdaRegistry::instance();
   if (!FunctorID)
-    return LambdaJitValuesMap;
+    return EmptyMap;
 
   auto VariantsOpt = LambdaRegistry::instance().getJitVariants(*FunctorID);
   if (!VariantsOpt || VariantsOpt->empty())
-    return LambdaJitValuesMap;
+    return EmptyMap;
+  llvm::ArrayRef<llvm::DenseMap<int, proteus::RuntimeConstant>> Variants =
+      VariantsOpt.value();
+  // for (auto & V : Variants) {
+  //   for (auto [slot, RC] : V) {
+  //     errs()<< slot << " : "<< RC.Value.Int32Val<<"\n";
+  //   }
+  // }
 
-  if (Entry.arg_empty() || !Entry.getArg(0)->getType()->isPointerTy())
-    reportFatalError("Expected host lambda wrapper entry to take a closure "
-                     "pointer as its first argument");
-
-  void *ClosurePtr = readHostPointerArgumentValue(Args, 0);
-  if (!ClosurePtr)
-    reportFatalError("Expected non-null closure pointer for host lambda "
-                     "specialization");
-
-  LambdaRegistry::JitVariantVec Vars;
-  Vars.push_back(TransformLambdaSpecialization::readRuntimeVariantFromStorage(
-      ClosurePtr, VariantsOpt.value()));
-  LambdaJitValuesMap[*FunctorID] = std::move(Vars);
-
-  return LambdaJitValuesMap;
+  return Variants[0];
 }
 
 } // namespace
@@ -213,13 +193,13 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
   }
   TransformArgumentSpecialization::transform(M, *F, RCArray);
 
-  auto LambdaJitValuesMap = collectCurrentLambdaJitValues(*F, Args);
-  if (auto FunctorID = getFunctionU64Metadata(*F, "proteus.wrapper_call")) {
-    auto It = LambdaJitValuesMap.find(*FunctorID);
-    if (It != LambdaJitValuesMap.end() && !It->second.empty()) {
-      TransformLambdaSpecialization::transformHostFunction(M, *FunctorID,
-                                                           It->second.front());
-    }
+  auto FunctorID = getFunctionU64Metadata(*F, "proteus.registered_lambda");
+  auto LambdaJitValuesMap = collectCurrentLambdaJitValues(*F, FunctorID);
+
+  if (!LambdaJitValuesMap.empty()) {
+    TransformLambdaSpecialization::transformHostFunction(M, *F,
+                                                         LambdaJitValuesMap);
+    LambdaRegistry::instance().eraseJitVariables(*FunctorID);
   }
 
   F->setName(FnName + Suffix);
@@ -245,8 +225,10 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   SMDiagnostic Diag;
   SmallVector<RuntimeConstant> RCVec =
       getRuntimeConstantValues(Args, RCInfoArray);
-  DenseMap<uint64_t, LambdaRegistry::JitVariantVec> LambdaJitValuesMap
-      {};//collectCurrentLambdaJitValues(*Entry, Args);
+  auto FunctorID = getFunctionU64Metadata(*Entry, "proteus.registered_lambda");
+  DenseMap<int, proteus::RuntimeConstant> LambdaJitValuesMap =
+      collectCurrentLambdaJitValues(*Entry, FunctorID);
+
   const auto &CGConfig = Config::get().getCGConfig();
   HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesMap,
                          hashCodeGenConfig(CGConfig),
@@ -258,30 +240,17 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
       Logger::logs("proteus") << RC.Value.Int64Val << ",";
     Logger::logs("proteus") << " ] LambdaMap [ ";
     for (auto &KV : LambdaJitValuesMap)
-      Logger::logs("proteus") << KV.first << ":" << KV.second.size() << ",";
+      Logger::logs("proteus")
+          << KV.first << ":" << KV.second.Value.Int32Val << ",";
     Logger::logs("proteus") << " ] -> Hash " << HashValue.getValue() << "\n";
   }
   // Lookup the function pointer in the code cache.
   void *JitFnPtr = CodeCache.lookup(HashValue);
-  if (JitFnPtr)
+  if (JitFnPtr) {
+    if (FunctorID)
+      LambdaRegistry::instance().eraseJitVariables(*FunctorID);
     return JitFnPtr;
-  auto M = parseIR(MemoryBufferRef(StrIR, "JitModule"), Diag, *Ctx);
-  if (!M)
-    reportFatalError("Error parsing IR: " + Diag.getMessage());
-
-  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus") << "Parse IR " << FnName << " "
-                                               << T.elapsed() << " ms\n");
-
-  // Function *Entry = M->getFunction(FnName);
-  // if (!Entry)
-  //   reportFatalError(std::string("Expected JIT entry function ") +
-  //                    FnName.str() + " in parsed host module");
-
-
-
-
-
-
+  }
 
   std::string Suffix = HashValue.toMangledSuffix();
   std::string MangledFnName = FnName.str() + Suffix;
@@ -321,6 +290,8 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
               << "=== JIT compile: " << FnName << " Mangled " << MangledFnName
               << " RC HashValue " << HashValue.toString() << " Addr "
               << JitFnPtr << "\n");
+  if (FunctorID)
+    LambdaRegistry::instance().eraseJitVariables(*FunctorID);
   return JitFnPtr;
 }
 

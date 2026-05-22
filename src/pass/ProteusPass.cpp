@@ -1084,6 +1084,11 @@ private:
                         std::pair<Function *, JitFunctionInfo> &JITInfo) {
 
     Function *JITFn = JITInfo.first;
+    // Don't rip out the lambda wrapper internals and add an entry call, instead
+    // do it inside the lambda call.
+    auto *WrapperMeta = JITFn->getMetadata("proteus.wrapper_call");
+    if (WrapperMeta)
+      return;
     JitFunctionInfo &JFI = JITInfo.second;
     size_t NumRuntimeConstants = JFI.ConstantArgs.size();
 

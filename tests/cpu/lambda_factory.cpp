@@ -79,15 +79,24 @@ int main() {
 }
 
 // clang-format off
+// CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 1
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 0
 // CHECK: Integer = 0
 // CHECK: Integer = 1
 // CHECK: Integer = 5
+// CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 2
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 1
 // CHECK: Integer = 1
 // CHECK: Integer = 2
 // CHECK: Integer = 5
+// CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 0
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 2
 // CHECK: Integer = 2
 // CHECK: Integer = 0
 // CHECK: Integer = 5
+// CHECK-FIRST: [LambdaSpec] Replacing slot 3 with i32 2
+// CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 1
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 0
 // CHECK: Integer = 0
 // CHECK: Integer = 1
 // CHECK: Integer = 2
@@ -96,10 +105,10 @@ int main() {
 // CHECK: Integer = 1
 // CHECK: Integer = 2
 // CHECK: Integer = 4
-// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 hits 2 accesses 5
-// CHECK-DAG: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 3 NumHits 2
-// CHECK-DAG: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-DAG: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: [proteus][JitEngineHost] StorageCache rank 0 hits 0 accesses 3
-// CHECK-SECOND: [proteus][JitEngineHost] StorageCache rank 0 hits 3 accesses 3
+// CHECK-FIRST: [proteus][JitEngineHost] MemoryCache rank 0 hits 1 accesses 5
+// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 2 NumHits 1
+// CHECK-COUNT-2: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineHost] StorageCache rank 0 hits 0 accesses 4
+// CHECK-SECOND: [proteus][JitEngineHost] StorageCache rank 0 hits 4 accesses 4
 // clang-format on
