@@ -44,19 +44,10 @@ using namespace llvm::orc;
 
 namespace {
 
-void *readHostPointerArgumentValue(void **Args, size_t ArgIndex) {
-  if (!Args || !Args[ArgIndex])
-    return nullptr;
-
-  void *Ptr = nullptr;
-  std::memcpy(&Ptr, Args[ArgIndex], sizeof(Ptr));
-  return Ptr;
-}
-
 DenseMap<int, proteus::RuntimeConstant>
 collectCurrentLambdaJitValues(std::optional<uint64_t> FunctorID) {
   DenseMap<int, proteus::RuntimeConstant> EmptyMap{};
-  auto &LR = LambdaRegistry::instance();
+
   if (!FunctorID)
     return EmptyMap;
 
@@ -165,8 +156,7 @@ JitEngineHost::~JitEngineHost() {
 }
 
 void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
-                                 ArrayRef<RuntimeConstant> RCArray,
-                                 void **Args) {
+                                 ArrayRef<RuntimeConstant> RCArray) {
   TIMESCOPE(JitEngineHost, specializeIR);
   Function *F = M.getFunction(FnName);
   assert(F && "Expected non-null function!");
@@ -266,7 +256,7 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   } else {
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".input.ll", *M));
     // Specialize the module using runtime values.
-    specializeIR(*M, FnName, Suffix, RCVec, Args);
+    specializeIR(*M, FnName, Suffix, RCVec);
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".specialized.ll", *M));
     // Compile the object.
     auto ObjectModule = compileOnly(*M);
