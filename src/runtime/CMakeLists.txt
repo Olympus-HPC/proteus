@@ -365,7 +365,7 @@ else()
     if(_exclude_archives)
       list(JOIN _exclude_archives ":" _exclude_libs_str)
       target_link_options(proteus INTERFACE
-        "$<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,SHARED_LIBRARY>:-Wl,--exclude-libs,${_exclude_libs_str}>"
+        "$<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,SHARED_LIBRARY>:$<HOST_LINK:LINKER:SHELL:--exclude-libs ${_exclude_libs_str}>>"
       )
     endif()
   endif()

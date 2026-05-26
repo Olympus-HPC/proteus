@@ -446,8 +446,7 @@ public:
   }
 
   void
-  getLambdaJitValues(JITKernelInfo &KernelInfo,
-                     SmallVector<uint64_t> &LambdaCalleeInfo,
+  getLambdaJitValues(SmallVector<uint64_t> &LambdaCalleeInfo,
                      LambdaCallsiteRuntimeConstantsMap &LambdaJitValuesMap) {
     TIMESCOPE(JitEngineDevice, getLambdaJitValues);
     LambdaRegistry &LR = LambdaRegistry::instance();
@@ -591,8 +590,7 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   SmallVector<uint64_t> LambdaCalleeInfoToSpecialize;
   LambdaCallsiteRuntimeConstantsMap LambdaJitValuesMap;
-  getLambdaJitValues(KernelInfo, LambdaCalleeInfoToSpecialize,
-                     LambdaJitValuesMap);
+  getLambdaJitValues(LambdaCalleeInfoToSpecialize, LambdaJitValuesMap);
   const auto &CGConfig = Config::get().getCGConfig(KernelInfo.getName());
   // Determine the hash based on dimension specialization.  If we do not
   // specialize IR based on grid dimensions, avoid hashing on those to
