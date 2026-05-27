@@ -177,15 +177,15 @@ public:
     AnnotHandler.parseAnnotations(JitFunctionInfoMap, StubToKernelMap,
                                   (!IsLTO && ForceProteusAnnotateAll));
 
-    DEBUG(Logger::logs("proteus-pass")
-          << "=== Pre Original Host Module\n"
-          << M << "=== End of Pre Original Host Module\n");
     // ==================
     // Device compilation
     // ==================
     // For device compilation, just extract the module IR of device code
     // and return.
     if (isDeviceCompilation(M)) {
+      DEBUG(Logger::logs("proteus-pass")
+            << "=== Pre Original Device Module\n"
+            << M << "=== End of Pre Original Device Module\n");
       emitLambdaDeviceCallsiteManifest(M);
       emitJitModuleDevice(M, IsLTO);
       return true;
@@ -194,6 +194,9 @@ public:
     // ================
     // Host compilation
     // ================
+    DEBUG(Logger::logs("proteus-pass")
+          << "=== Pre Original Host Module\n"
+          << M << "=== End of Pre Original Host Module\n");
 
     instrumentRegisterLinkedBinary(M);
     instrumentRegisterFatBinary(M);
@@ -204,11 +207,13 @@ public:
     if (hasDeviceLaunchKernelCalls(M)) {
       instrumentLambdaLaunchCallsites(M, StubToKernelMap);
       emitJitLaunchKernelCall(M);
-    } else
+    }
 
-      // Initialize Proteus CUDA runtime builtins if this is a CUDA module.
-      if (isCUDAModule(M))
-        emitProteusCUDARuntimeBuiltinsInit(M);
+    // Initialize Proteus CUDA runtime builtins for all CUDA host modules.
+    // Both rewritten launches and metadata/global-address queries depend on
+    // these runtime function pointers being available at process startup.
+    if (isCUDAModule(M))
+      emitProteusCUDARuntimeBuiltinsInit(M);
 
     SmallVector<decltype(JitFunctionInfoMap)::value_type *, 16> JitWorkList;
     for (auto &JFI : JitFunctionInfoMap) {
@@ -527,7 +532,8 @@ private:
     findFunctionsWithU64Metadata(M, "proteus.wrapper_call",
                                  FunctorOperatorMethods);
     uint32_t NextCallsiteIndex = 0;
-
+    // Iterate through user-registered functors wrapping lambdas and analyze
+    // their callsites.
     for (auto &[FunctorOperator, FunctorId] : FunctorOperatorMethods) {
       SmallVector<CallBase *> CBToAnalyze;
       collectWrapperCallsites(*FunctorOperator, CBToAnalyze);
@@ -535,11 +541,10 @@ private:
         continue;
 
       DenseMap<CallBase *, LambdaKernelArgAnalysis> CallBaseToArgOffset;
-      if (!analyzeLambdaUses(M, CallBaseToArgOffset, CBToAnalyze)) {
+      // If analysis fails we log the error in the above function call, and
+      // fallback to unspecialized IR at runtime.
+      if (!analyzeLambdaUses(M, CallBaseToArgOffset, CBToAnalyze))
         continue;
-        // reportFatalError("Lambda kernel-arg analysis failed for functor " +
-        //                  std::to_string(FunctorId));
-      }
 
       for (CallBase *CB : CBToAnalyze) {
         auto It = CallBaseToArgOffset.find(CB);

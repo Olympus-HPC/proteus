@@ -42,12 +42,6 @@ struct LambdaKernelArgAnalysis {
   std::optional<RuntimeConstantType> ChangedRCLayout = std::nullopt;
 };
 
-struct FnMemCtx {
-  // llvm::DominatorTree DT;
-
-  FnMemCtx(llvm::Function &) {}
-};
-
 class LambdaArgVisitor : public InstVisitor<LambdaArgVisitor> {
 private:
   CallBase *LambdaCB;
@@ -278,16 +272,22 @@ public:
 
   void visitArgument(Argument &A) {
     Function *F = A.getParent();
+    DEBUG(Logger::logs("proteus-pass")
+          << "Visiting argument with parent function = \n"
+          << *F << "\n");
     auto ArgNum = A.getArgNo();
     // termination case:  we have reached the parent calling kernel
     // todo: we could just pass in the kernel pointer here and check equality
+
     if (F->getCallingConv() == CallingConv::AMDGPU_KERNEL ||
-        F->getCallingConv() == CallingConv::PTX_Kernel) {
+        F->getCallingConv() == CallingConv::PTX_Kernel ||
+        (F->hasMetadata("proteus.jit") &&
+         !F->hasMetadata("proteus.wrapper_call") &&
+         !F->hasMetadata("proteus.registered_lambda"))) {
       DEBUG(Logger::logs("proteus-pass")
-            << "Found termination case " << A << "\n");
+            << "Found termination case from function " << F->getName() << "\n");
       DEBUG(Logger::logs("proteus-pass").flush());
-      // outs() << "Found termination case " << A << "\n";
-      // outs().flush();
+
       AnalysisSuccess = true;
       KernelArg = ArgNum;
       KernelFunction = F;
@@ -371,7 +371,6 @@ inline bool analyzeLambdaUses(
         continue;
       Visitor.markAsSeen(V);
       DEBUG(Logger::logs("proteus-pass") << "Visiting value " << *V << "\n");
-      DEBUG(Logger::logs("proteus-pass").flush());
       // Analyze the instruction
       if (auto *I = dyn_cast<Instruction>(V))
         Visitor.visit(*I);
@@ -380,8 +379,12 @@ inline bool analyzeLambdaUses(
       else
         continue;
     }
-    if (!Visitor.success() || Visitor.failed())
+    if (!Visitor.success() || Visitor.failed()) {
+      DEBUG(Logger::logs("proteus-pass")
+            << "[WARNING]: Kernel arg analysis failed for functor beginning at "
+            << *FunctorCB << "\n");
       return false;
+    }
     LambdaKernelArgAnalysis Info = Visitor.getKernelArgInfo();
     if (!Info.KernelFunction)
       return false;
