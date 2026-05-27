@@ -618,14 +618,12 @@ private:
                                          Value *KernelArgs,
                                          const LambdaManifestRecord &Manifest,
                                          const LambdaSchemaRecord &Schema) {
-    auto *I8PtrTy = PointerType::getUnqual(Builder.getInt8Ty());
-    auto *KernelArgsTy = PointerType::getUnqual(Types.PtrTy);
-    Value *KernelArgsCast = Builder.CreateBitCast(KernelArgs, KernelArgsTy);
+    Value *KernelArgsCast = Builder.CreateBitCast(KernelArgs, Types.PtrTy);
     Value *ArgSlotPtr = Builder.CreateInBoundsGEP(
         Types.PtrTy, KernelArgsCast,
         {Builder.getInt32(static_cast<int32_t>(Manifest.KernelArgIndex))});
     Value *ArgStoragePtr = Builder.CreateLoad(Types.PtrTy, ArgSlotPtr);
-    Value *ArgStorageI8 = Builder.CreateBitCast(ArgStoragePtr, I8PtrTy);
+    Value *ArgStorageI8 = Builder.CreateBitCast(ArgStoragePtr, Types.PtrTy);
 
     Value *StorageBase = nullptr;
     if (Manifest.StorageType == RuntimeConstantType::NONE) {
@@ -637,18 +635,13 @@ private:
           Builder.CreateInBoundsGEP(Builder.getInt8Ty(), ArgStorageI8,
                                     {Builder.getInt64(Manifest.Offset)});
       if (Manifest.StorageType == RuntimeConstantType::PTR) {
-        Value *LoadedPtr = Builder.CreateLoad(
-            Types.PtrTy,
-            Builder.CreateBitCast(IndirectStoragePtr,
-                                  PointerType::getUnqual(Types.PtrTy)));
-        StorageBase = Builder.CreateBitCast(LoadedPtr, I8PtrTy);
+        Value *LoadedPtr = Builder.CreateLoad(Types.PtrTy, IndirectStoragePtr);
+        StorageBase = Builder.CreateBitCast(LoadedPtr, Types.PtrTy);
       } else if (Manifest.StorageType == RuntimeConstantType::INT64) {
-        Value *LoadedBits = Builder.CreateLoad(
-            Types.Int64Ty,
-            Builder.CreateBitCast(IndirectStoragePtr,
-                                  PointerType::getUnqual(Types.Int64Ty)));
+        Value *LoadedBits =
+            Builder.CreateLoad(Types.Int64Ty, IndirectStoragePtr);
         Value *LoadedPtr = Builder.CreateIntToPtr(LoadedBits, Types.PtrTy);
-        StorageBase = Builder.CreateBitCast(LoadedPtr, I8PtrTy);
+        StorageBase = Builder.CreateBitCast(LoadedPtr, Types.PtrTy);
       } else {
         reportFatalError("Unsupported lambda kernel storage type");
       }
@@ -1308,7 +1301,8 @@ private:
     // Create globals for the function name, the IR string.
     auto *FnNameGlobal = Builder.CreateGlobalString(StubFn->getName());
     auto *StrIRGlobal = Builder.CreateGlobalString(JFI.ModuleIR);
-    Value *FunctorIdOpt = ConstantPointerNull::get(PointerType::getUnqual(Ctx));
+    Value *FunctorIdOpt =
+        ConstantPointerNull::get(cast<PointerType>(Types.PtrTy));
     if (LambdaId) {
       auto *FunctorIdGlobal = new GlobalVariable(
           M, Types.Int64Ty, /*isConstant=*/true, GlobalValue::InternalLinkage,
@@ -1347,7 +1341,7 @@ private:
         }
       }
     } else {
-      ArgPtrs = Constant::getNullValue(PointerType::getUnqual(M.getContext()));
+      ArgPtrs = Constant::getNullValue(Types.PtrTy);
     }
 
     auto *JitFnPtr = Builder.CreateCall(
