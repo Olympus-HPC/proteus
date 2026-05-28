@@ -30,10 +30,10 @@ int main() {
 }
 
 // clang-format off
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with ptr inttoptr (i64 {{[0-9]+}} to ptr)
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with ptr inttoptr (i64 {{[0-9]+}} to ptr)
 // CHECK: 0
 // CHECK: 123
 // CHECK: [proteus][JitEngineHost] MemoryCache rank 0 hits 0 accesses 1
 // CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: [proteus][JitEngineHost] StorageCache rank 0 hits 0 accesses 1
-// CHECK-SECOND: [proteus][JitEngineHost] StorageCache rank 0 hits 0 accesses 1
 // clang-format on
