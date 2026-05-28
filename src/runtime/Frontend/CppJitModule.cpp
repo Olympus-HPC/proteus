@@ -36,8 +36,8 @@ CppJitModule::~CppJitModule() = default;
 void CppJitModule::compile() {
   TIMESCOPE(CppJitModule, compile);
 
-  ModuleHash = std::make_unique<HashT>(computeCppJitModuleHash(
-      TargetModel, CompilerBackend, Code, ExtraArgs));
+  ModuleHash = std::make_unique<HashT>(
+      computeCppJitModuleHash(TargetModel, CompilerBackend, Code, ExtraArgs));
 
   if ((Library = Dispatch.lookupCompiledLibrary(*ModuleHash))) {
     IsCompiled = true;

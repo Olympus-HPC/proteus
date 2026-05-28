@@ -117,13 +117,12 @@ inline std::string getDefaultOptimizationPipeline(char OptLevel) {
   return "";
 }
 
-inline std::string
-composeOptimizationPassPipeline(std::optional<std::string> PassPipeline,
-                                char OptLevel,
-                                const std::vector<JITPassPluginConfig> &Plugins) {
-  std::string Pipeline =
-      PassPipeline ? std::move(PassPipeline.value())
-                   : getDefaultOptimizationPipeline(OptLevel);
+inline std::string composeOptimizationPassPipeline(
+    std::optional<std::string> PassPipeline, char OptLevel,
+    const std::vector<JITPassPluginConfig> &Plugins) {
+  std::string Pipeline = PassPipeline
+                             ? std::move(PassPipeline.value())
+                             : getDefaultOptimizationPipeline(OptLevel);
   for (const auto &Plugin : Plugins) {
     Pipeline += ",";
     Pipeline += Plugin.Pipeline;
@@ -145,11 +144,10 @@ loadJITPassPlugins(const std::vector<JITPassPluginConfig> &Plugins) {
   return LoadedPlugins;
 }
 
-inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
-                                        const std::string &PassPipeline,
-                                        unsigned CodegenOptLevel,
-                                        const std::vector<JITPassPluginConfig>
-                                            &Plugins = {}) {
+inline void runOptimizationPassPipeline(
+    Module &M, StringRef Arch, const std::string &PassPipeline,
+    unsigned CodegenOptLevel,
+    const std::vector<JITPassPluginConfig> &Plugins = {}) {
   PipelineTuningOptions PTO;
 
   std::optional<PGOOptions> PGOOpt;
