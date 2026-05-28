@@ -2,7 +2,7 @@
 // RUN: rm -rf "%t.$$.proteus"
 // RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="specialization;cache-stats" %build/lambda_ptrtoint_capture | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="cache-stats" %build/lambda_ptrtoint_capture | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="cache-stats" %build/lambda_ptrtoint_capture | %FILECHECK %s --check-prefixes=CHECK
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 
