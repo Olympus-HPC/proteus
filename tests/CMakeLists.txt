@@ -32,11 +32,20 @@ add_library(JITTestPass MODULE JITTestPass.cpp)
 target_compile_definitions(JITTestPass PRIVATE ${LLVM_DEFINITIONS})
 target_include_directories(JITTestPass SYSTEM PRIVATE "${LLVM_INSTALL_DIR}/include")
 
-# Build the test pass like a normal LLVM pass plugin: it should resolve LLVM
-# symbols from the hosting process rather than embedding a second copy of LLVM
-# into the plugin itself.
-target_link_options(JITTestPass
-    PRIVATE "$<$<PLATFORM_ID:Darwin>:LINKER:SHELL:-undefined dynamic_lookup>")
+if(LLVM_LINK_LLVM_DYLIB)
+    set(jit_test_pass_llvm_libs LLVM)
+else()
+    llvm_map_components_to_libnames(jit_test_pass_llvm_libs
+        Core
+        Passes
+        Support
+    )
+endif()
+target_link_libraries(JITTestPass PRIVATE ${jit_test_pass_llvm_libs})
+target_link_options(JITTestPass PRIVATE
+    "$<$<PLATFORM_ID:Darwin>:LINKER:SHELL:-undefined dynamic_lookup>"
+    "$<$<AND:$<NOT:$<PLATFORM_ID:Darwin>>,$<BOOL:${UNIX}>>:-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/JITTestPass.exports.map>"
+)
 
 if(NOT LLVM_ENABLE_RTTI)
     target_compile_options(JITTestPass PRIVATE -fno-rtti)
