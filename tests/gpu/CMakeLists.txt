@@ -14,9 +14,6 @@ function(CREATE_GPU_TEST exe check_source)
     set_source_files_properties(${check_source} ${ARGN} PROPERTIES LANGUAGE ${lang})
     target_link_libraries(${exe}.${lang} PUBLIC proteus)
     proteus_attach_pass_plugin_rebuild_dep(${exe}.${lang} ${check_source} ${ARGN})
-    target_link_options(${exe}.${lang} PRIVATE
-        $<LINK_ONLY:-rdynamic>
-    )
 
     add_test(NAME ${exe}.${lang} COMMAND ${LIT} -vv -D EXT=${lang} -DFILECHECK=${FILECHECK} ${check_source})
     set_tests_properties(${exe}.${lang} PROPERTIES LABELS "gpu;gpu-basic")
@@ -27,9 +24,6 @@ function(CREATE_GPU_TEST_RDC exe check_source)
     set_source_files_properties(${check_source} ${ARGN} PROPERTIES LANGUAGE ${lang})
     target_link_libraries(${exe}.${lang}.rdc PUBLIC proteus)
     proteus_attach_pass_plugin_rebuild_dep(${exe}.${lang}.rdc ${check_source} ${ARGN})
-    # target_link_options(${exe}.${lang}.rdc PRIVATE
-    #     $<LINK_ONLY:-rdynamic>
-    # )
 
     if(PROTEUS_ENABLE_HIP)
         # This is unsupported see: https://gitlab.kitware.com/cmake/cmake/-/issues/23210
