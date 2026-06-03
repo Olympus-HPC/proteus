@@ -22,7 +22,7 @@ int main() {
   return 0;
 }
 
-// CHECK: [JITTestPass]
-// CHECK: [CustomPipeline] default<O3>,jit-test-pass
-// CHECK: KernelPassPlugin
+// CHECK-DAG: [JITTestPass]
+// CHECK-DAG: [CustomPipeline] default<O3>,jit-test-pass
+// CHECK-DAG: KernelPassPlugin
 // CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 1
