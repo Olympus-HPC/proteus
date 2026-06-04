@@ -690,7 +690,7 @@ private:
       for (const auto &Record : ManifestIt->getValue()) {
         auto SchemaIt = LambdaSchema.find(Record.LambdaID);
         if (SchemaIt == LambdaSchema.end())
-          reportFatalError("Missing lambda schema for launch callsite");
+          continue;
 
         LambdaManifestRecord EffectiveRecord = Record;
         EffectiveRecord.StorageType = getKernelArgLayout(LaunchCB);
