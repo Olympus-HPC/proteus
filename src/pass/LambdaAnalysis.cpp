@@ -822,9 +822,10 @@ private:
           Builder.CreateStructGEP(FunctorStructType, Function->getArg(0), 0);
       auto JitVarFn = getJitRegisterLambdaRuntimeConstant(M);
       auto FinalizeFn = getProteusFinalizeCall(M);
-      for (auto JitVarInfo :
-           LambdaStorageTypeToJitIndices.find(AnonLambdaStorageType)
-               ->getSecond()) {
+      auto JitVarIt = LambdaStorageTypeToJitIndices.find(AnonLambdaStorageType);
+      if (JitVarIt == LambdaStorageTypeToJitIndices.end())
+        continue;
+      for (auto JitVarInfo : JitVarIt->getSecond()) {
         if (!JitVarInfo.Type)
           reportFatalError(InsertionErrorMsg);
         ConstantInt *SlotC = dyn_cast<ConstantInt>(JitVarInfo.Slot);
