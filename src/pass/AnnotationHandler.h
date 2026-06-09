@@ -90,6 +90,7 @@ private:
           &RCInfoMap);
 
   void removeJitGlobalAnnotations();
+  void removeProteusLambdaAnnotations();
 };
 
 } // namespace proteus
