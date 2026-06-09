@@ -270,6 +270,7 @@ CREATE_PROTEUS_GPU_SHARED_LIBRARY(lambda_factory_so_tu2 lambda_factory_tu2.cpp)
 CREATE_GPU_TEST_LIBS(lambda_factory_so_runner "lambda_factory_so_tu1;lambda_factory_so_tu2" lambda_factory_so_runner.cpp)
 CREATE_GPU_TEST(lambda_pathological lambda_pathological.cpp)
 CREATE_GPU_TEST(lambda_host_device lambda_host_device.cpp)
+CREATE_GPU_TEST(lambda_large_warning lambda_large_warning.cpp)
 CREATE_GPU_TEST(lambda_spec_test lambda_spec_test.cpp)
 CREATE_GPU_TEST(builtin_globals builtin_globals.cpp)
 CREATE_GPU_TEST(kernel_calls_indirect kernel_calls_indirect.cpp)
@@ -339,6 +340,7 @@ CREATE_GPU_TEST_RDC(enable_disable enable_disable.cpp)
 CREATE_GPU_TEST_RDC(lambda_multiple lambda_multiple.cpp)
 CREATE_GPU_TEST_RDC(lambda_def lambda_def.cpp)
 CREATE_GPU_TEST_RDC(lambda_host_device lambda_host_device.cpp)
+CREATE_GPU_TEST_RDC(lambda_large_warning lambda_large_warning.cpp)
 CREATE_GPU_TEST_RDC(builtin_globals builtin_globals.cpp)
 CREATE_GPU_TEST_RDC(kernel_calls_indirect kernel_calls_indirect.cpp)
 CREATE_GPU_TEST_RDC(global_var_register global_var_register.cpp)
@@ -360,6 +362,15 @@ CREATE_GPU_TEST_RDC(kernel_tuning kernel_tuning.cpp)
 CREATE_GPU_TEST_RDC(kernel_lambda kernel_lambda.cpp)
 CREATE_GPU_TEST_RDC(kernel_lambda_api kernel_lambda_api.cpp)
 CREATE_GPU_TEST_RDC_FORCE(force_annotations force_annotations.cpp)
+
+if(PROTEUS_ENABLE_HIP)
+    target_compile_options(lambda_large_warning.${lang} PRIVATE
+        -fno-inline
+        -fno-inline-functions)
+    target_compile_options(lambda_large_warning.${lang}.rdc PRIVATE
+        -fno-inline
+        -fno-inline-functions)
+endif()
 
 if(PROTEUS_ENABLE_HIP)
     if(LLVM_VERSION_MAJOR GREATER_EQUAL 18)

@@ -312,8 +312,7 @@ private:
       return;
     // We want tbe lambda clone to be inlined into the body of the operator()
     // ultimately
-    // F->removeFnAttr(Attribute::AlwaysInline);
-    // F->removeFnAttr(Attribute::InlineHint);
+    F->removeFnAttr(Attribute::NoInline);
     F->addFnAttr(Attribute::AlwaysInline);
   }
 
