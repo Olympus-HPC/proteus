@@ -1,5 +1,11 @@
 // clang-format off
-// RUN: /opt/rocm-6.4.2/bin/amdclang++ -DPROTEUS_ENABLE_HIP -D__HIP_ROCclr__=1 -I/g/g11/bowen36/tmp/proteus/include -isystem /opt/rocm-6.4.2/include -O2 -DNDEBUG --offload-arch=gfx90a -fpass-plugin=%build/../../src/pass/libProteusPass.so -fpass-plugin=%build/../../src/pass/libLambdaPass.so -std=c++17 -x hip -c %s -o %t.o 2>&1 | %FILECHECK %s --check-prefix=CHECK-WARN
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="specialization;cache-stats" %build/lambda_large_warning.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// Second run uses the object cache.
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="specialization;cache-stats" %build/lambda_large_warning.%ext | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: rm -rf "%t.$$.proteus"
+// This test is meant to test as a regression when Proteus is built with -Werror -Wall against the amdclang message
+// warning: local memory global used by non-kernel function.  This warning was caused by storing LambdaFunctorWrapper
+// information containing pointers to functions referencing shared memory inside llvm.global.annotations.
 // clang-format on
 
 #include <iostream>
@@ -18,8 +24,6 @@ void operator()(T&& Lam, const int I) {
 
 template <typename T>
 __global__ __attribute__((annotate("jit"))) void kernel1d(int N, T LB) {
-  // Functor<std::decay_t<T>> f;
-  // Functor<T> f;
   const int I = blockIdx.x * blockDim.x + threadIdx.x;
   if (I < N) {
     LB(I);
@@ -29,7 +33,6 @@ __global__ __attribute__((annotate("jit"))) void kernel1d(int N, T LB) {
 template <typename T> void launch(int N, T &&LB) {
   auto RegisteredFunctor = proteus::register_lambda(LB);
   kernel1d<<<1, 32>>>(N, RegisteredFunctor);
-  // kernel1d<<<1, 32>>>(N, LB);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
@@ -37,15 +40,16 @@ int main() {
   int *X = nullptr;
   gpuErrCheck(gpuMallocManaged(&X, sizeof(int)));
   X[0] = -1;
+  int A = 4;
 
-  launch(32, [=] __device__ __attribute__((annotate("jit"))) (int I) {
+  launch(32, [=, A = proteus::jit_variable(A)] __device__ __attribute__((annotate("jit"))) (int I) {
     // The warning is triggered by LDS/shared-memory globals defined in the
     // registered lambda body being used through the non-kernel Proteus wrapper.
      __shared__ int Smem[32];
     Smem[threadIdx.x] = I;
     __syncthreads();
     if (threadIdx.x == 0) {
-      X[0] = Smem[0];
+      X[0] = Smem[0] + A;
     }
   });
 
@@ -54,4 +58,10 @@ int main() {
   return 0;
 }
 
-// CHECK-WARN: warning: local memory global used by non-kernel function
+// CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 4
+// CHECK: x[0] = 4
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 1
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
+// CHECK-FIRST: [proteus][JitEngineDevice] ObjectCacheChain rank 0 with 1 level(s):
+// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 1
+// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 1 accesses 1

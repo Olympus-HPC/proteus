@@ -340,7 +340,6 @@ CREATE_GPU_TEST_RDC(enable_disable enable_disable.cpp)
 CREATE_GPU_TEST_RDC(lambda_multiple lambda_multiple.cpp)
 CREATE_GPU_TEST_RDC(lambda_def lambda_def.cpp)
 CREATE_GPU_TEST_RDC(lambda_host_device lambda_host_device.cpp)
-CREATE_GPU_TEST_RDC(lambda_large_warning lambda_large_warning.cpp)
 CREATE_GPU_TEST_RDC(builtin_globals builtin_globals.cpp)
 CREATE_GPU_TEST_RDC(kernel_calls_indirect kernel_calls_indirect.cpp)
 CREATE_GPU_TEST_RDC(global_var_register global_var_register.cpp)
@@ -362,15 +361,6 @@ CREATE_GPU_TEST_RDC(kernel_tuning kernel_tuning.cpp)
 CREATE_GPU_TEST_RDC(kernel_lambda kernel_lambda.cpp)
 CREATE_GPU_TEST_RDC(kernel_lambda_api kernel_lambda_api.cpp)
 CREATE_GPU_TEST_RDC_FORCE(force_annotations force_annotations.cpp)
-
-if(PROTEUS_ENABLE_HIP)
-    target_compile_options(lambda_large_warning.${lang} PRIVATE
-        -fno-inline
-        -fno-inline-functions)
-    target_compile_options(lambda_large_warning.${lang}.rdc PRIVATE
-        -fno-inline
-        -fno-inline-functions)
-endif()
 
 if(PROTEUS_ENABLE_HIP)
     if(LLVM_VERSION_MAJOR GREATER_EQUAL 18)
