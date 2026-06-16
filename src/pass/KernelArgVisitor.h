@@ -5,6 +5,7 @@
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/impl/Logger.h"
 #include "proteus/impl/RuntimeConstantTypeHelpers.h"
+#include "KernelArgPtrUseVisitor.h"
 #include <alloca.h>
 #include <cstdint>
 #include <llvm/Analysis/PtrUseVisitor.h>
@@ -48,6 +49,12 @@ private:
   const DataLayout &DL;
   SmallVector<Value *> WorkList;
   SmallDenseSet<Value *> Seen;
+  // Whenever the analysis encounters an instruction returning a Ptr
+  // memory analysis is required to identify a dominating write,
+  // which is where the LambdaArgVisitor continues its analysis.
+  // This pointer identifies which Ptr use the main analysis used
+  // to discover the Ptr needing analysis, so as to prevent cycles.
+  Value *MemoryAnalysisPtrUse = nullptr;
   int64_t Offset;
   uint32_t KernelArg = 0;
   Function *KernelFunction = nullptr;
@@ -57,10 +64,36 @@ private:
   bool AnalysisSuccess = false;
   bool AnalysisFailed = false;
 
+  void pushBack(Value *NextVal, Value* CurVal) {
+    if (needsDefUseAnalysis(NextVal))
+      MemoryAnalysisPtrUse = CurVal;
+    WorkList.push_back(NextVal);
+  }
+
   // Constructor used for cloning and merging branches of phi node analysis
   LambdaArgVisitor(Value *Start, int64_t Off, const DataLayout &_DL)
       : DL(_DL), Offset(Off) {
     WorkList.push_back(Start);
+  }
+
+  std::optional<Value*> getCallBaseIdentityArgOperand(CallBase& CB) {
+    auto *CalledFunction = CB.getCalledFunction();
+    DEBUG(Logger::logs("proteus-pass") << "Visiting CB with function " << *CalledFunction << "\n");
+    ReturnInst *RetInst = nullptr;
+    for (auto& BB : *CalledFunction) {
+      if (auto *TermInst = dyn_cast<ReturnInst>(BB.getTerminator()))
+        RetInst = TermInst;
+    }
+    if (!RetInst)
+      return std::nullopt;
+
+    DEBUG(Logger::logs("proteus-pass") << "CB called function return inst " << *RetInst->getReturnValue() << "\n");
+    for (size_t ArgNum = 0; ArgNum < CalledFunction->arg_size(); ++ArgNum) {
+      DEBUG(Logger::logs("proteus-pass") << "Called Fn arg " << *CalledFunction->getArg(ArgNum) << "\n");
+      if (RetInst->getReturnValue() == CalledFunction->getArg(ArgNum))
+        return CB.getArgOperand(ArgNum);
+    }
+    return std::nullopt;
   }
 
 public:
@@ -106,21 +139,18 @@ public:
     auto *ClosurePtr = LambdaCB->getArgOperand(0);
     WorkList.push_back(ClosurePtr);
   }
+
   void visitStoreInst(StoreInst &SI) {
-    WorkList.push_back(SI.getValueOperand());
+    pushBack(SI.getValueOperand(), &SI);
   }
-  void visitCallBase(CallBase &) {}
-  void visitIntToPtr(IntToPtrInst &ITP) {
-    auto *IntegerVal = ITP.getOperand(0);
-    auto *Ptr = dyn_cast<PtrToIntInst>(IntegerVal);
-    if (!Ptr) {
-      AnalysisSuccess = false;
-      AnalysisFailed = true;
+
+  void visitCallBase(CallBase &CB) {
+    // Check for the most basic case possible: a pass-through identity function.
+    auto OptionalValue = getCallBaseIdentityArgOperand(CB);
+    if (OptionalValue) {
+      WorkList.push_back(OptionalValue.value());
       return;
     }
-    ChangedRC = convertTypeToRuntimeConstantType(Ptr->getType());
-
-    WorkList.push_back(Ptr->getPointerOperand());
   }
 
   void visitLoadInst(LoadInst &LI) {
@@ -210,7 +240,7 @@ public:
     int64_t GEPOffset = 0;
     GetPointerBaseWithConstantOffset(&GEP, GEPOffset, DL);
     Offset += GEPOffset;
-    WorkList.push_back(GEP.getPointerOperand());
+    pushBack(GEP.getPointerOperand(), &GEP);
   }
 
   // todo: these three methods need to be changed to find a dominating store
@@ -231,6 +261,19 @@ public:
     for (auto *User : ASC.users())
       if (!Seen.contains(User))
         WorkList.push_back(User);
+  }
+
+  void visitIntToPtr(IntToPtrInst &ITP) {
+    auto *IntegerVal = ITP.getOperand(0);
+    auto *Ptr = dyn_cast<PtrToIntInst>(IntegerVal);
+    if (!Ptr) {
+      AnalysisSuccess = false;
+      AnalysisFailed = true;
+      return;
+    }
+    ChangedRC = convertTypeToRuntimeConstantType(Ptr->getType());
+
+    WorkList.push_back(Ptr->getPointerOperand());
   }
 
   void visitMemIntrinsic(MemIntrinsic &I) {
@@ -261,7 +304,7 @@ public:
       }
     }
 
-    WorkList.push_back(SrcBase->stripPointerCasts());
+    pushBack(SrcBase->stripPointerCasts(), &I);
     Offset = Offset - DstOff + SrcOff;
   }
 
@@ -298,7 +341,9 @@ public:
       auto *CB = dyn_cast<CallBase>(U);
       if (!CB)
         continue;
-      WorkList.push_back(CB->getArgOperand(ArgNum));
+      DEBUG(Logger::logs("proteus-pass")
+        << "Analysis crossed interprocedural boundary at " << *CB->getArgOperand(ArgNum) << "\n");
+      pushBack(CB->getArgOperand(ArgNum), CB);
     }
   }
 
@@ -351,7 +396,7 @@ public:
       return;
     }
 
-    WorkList.push_back(TBase);
+    pushBack(TBase, &S);
     Offset += TOff; // select == TBase + TOff
   }
 };
