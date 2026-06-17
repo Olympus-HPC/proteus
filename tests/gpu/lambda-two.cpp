@@ -38,8 +38,7 @@ template <typename T, typename L> void registerRun(T &&LB, L &&LB2) {
   const int NumBlocks = (N + BlockSize - 1) / BlockSize;
   auto F2 = proteus::register_lambda(LB2);
   auto F1 = proteus::register_lambda(LB);
-  kernel<<<NumBlocks, BlockSize>>>(F1,
-                                   F2);
+  kernel<<<NumBlocks, BlockSize>>>(F1, F2);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 

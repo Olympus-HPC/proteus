@@ -15,6 +15,7 @@
 #include "proteus/impl/JitEngineDevice.h"
 #include "proteus/impl/JitEngineInfoRegistry.h"
 #include "proteus/impl/LambdaRegistry.h"
+#include <llvm/ADT/DenseMap.h>
 
 #include <cstring>
 #include <utility>
@@ -82,6 +83,11 @@ __proteus_register_lambda_callsite_location(void *Kernel, uint64_t LambdaID,
 extern "C" __attribute__((used)) void __proteus_begin_device_lambda_launch() {
   auto &LR = LambdaRegistry::instance();
   LR.beginDeviceLaunch();
+}
+
+extern "C" __attribute__((used)) void __proteus_create_lambda_registration_function(void* Kernel, void *RegistrationFunc) {
+  auto &LR = LambdaRegistry::instance();
+  LR.populateLambdaRegistrationCodeCache(Kernel, RegistrationFunc);
 }
 
 extern "C" __attribute__((used)) void

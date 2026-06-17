@@ -154,6 +154,10 @@ public:
     return LaunchInfo;
   }
 
+  void populateLambdaRegistrationCodeCache(void *Kernel, void *RegistrationFunc) {
+    KernelToLambdaRegistration[Kernel] = RegistrationFunc;
+  }
+
 private:
   explicit LambdaRegistry() = default;
   // First integral key is the preprocessor/constexpr functor ID generated
@@ -161,6 +165,7 @@ private:
   // within the lambda storage.
   DenseMap<uint64_t, JitVariantVec> HostJitVariableVariants;
   DenseMap<uint64_t, JitVariantMap> PendingHostJitVariables;
+  DenseMap<void*, void*> KernelToLambdaRegistration;
   DeviceLaunchInfo PendingDeviceLaunchInfo;
   DeviceLaunchInfo CurrentDeviceLaunchInfo;
 };

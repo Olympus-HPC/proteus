@@ -564,35 +564,36 @@ private:
     createLambdaDeviceManifestFile(M, KernelManifest);
   }
 
-  RuntimeConstantType getKernelArgLayout(CallBase *LaunchKernelCB) {
-    if (!LaunchKernelCB)
-      reportFatalError("Error passing device stub pointer to layout analysis");
-    RuntimeConstantType LayoutType = RuntimeConstantType::NONE;
-    SmallVector<std::pair<Value *, size_t>> WorkList;
-    Value *KernelArgPack =
-        LaunchKernelCB->getArgOperand(LaunchKernelCB->arg_size() - 3);
-    WorkList.push_back({KernelArgPack, 0});
-    SmallDenseSet<Value *> Discovered;
-    while (!WorkList.empty()) {
-      auto [V, Depth] = WorkList.back();
-      WorkList.pop_back();
-      if (Discovered.contains(V))
-        continue;
-      Discovered.insert(V);
-      if (AllocaInst *Alloca = dyn_cast<AllocaInst>(V)) {
-        for (auto *Usr : Alloca->users())
-          WorkList.push_back({Usr, Depth + 1});
-        // Ptr to ptr type pack
-        if (Depth == 2 && Alloca->getAllocatedType()->isPointerTy())
-          return RuntimeConstantType::PTR;
-        if (Depth == 2 && Alloca->getAllocatedType()->isStructTy())
-          return RuntimeConstantType::NONE;
-      } else if (StoreInst *Store = dyn_cast<StoreInst>(V)) {
-        WorkList.push_back({Store->getValueOperand(), Depth + 1});
-      }
-    }
-    return LayoutType;
-  }
+  //todo do we still need
+  // RuntimeConstantType getKernelArgLayout(CallBase *LaunchKernelCB) {
+  //   if (!LaunchKernelCB)
+  //     reportFatalError("Error passing device stub pointer to layout analysis");
+  //   RuntimeConstantType LayoutType = RuntimeConstantType::NONE;
+  //   SmallVector<std::pair<Value *, size_t>> WorkList;
+  //   Value *KernelArgPack =
+  //       LaunchKernelCB->getArgOperand(LaunchKernelCB->arg_size() - 3);
+  //   WorkList.push_back({KernelArgPack, 0});
+  //   SmallDenseSet<Value *> Discovered;
+  //   while (!WorkList.empty()) {
+  //     auto [V, Depth] = WorkList.back();
+  //     WorkList.pop_back();
+  //     if (Discovered.contains(V))
+  //       continue;
+  //     Discovered.insert(V);
+  //     if (AllocaInst *Alloca = dyn_cast<AllocaInst>(V)) {
+  //       for (auto *Usr : Alloca->users())
+  //         WorkList.push_back({Usr, Depth + 1});
+  //       // Ptr to ptr type pack
+  //       if (Depth == 2 && Alloca->getAllocatedType()->isPointerTy())
+  //         return RuntimeConstantType::PTR;
+  //       if (Depth == 2 && Alloca->getAllocatedType()->isStructTy())
+  //         return RuntimeConstantType::NONE;
+  //     } else if (StoreInst *Store = dyn_cast<StoreInst>(V)) {
+  //       WorkList.push_back({Store->getValueOperand(), Depth + 1});
+  //     }
+  //   }
+  //   return LayoutType;
+  // }
 
   FunctionCallee getBeginDeviceLambdaLaunchFn(Module &M) {
     auto *FnTy = FunctionType::get(Types.VoidTy, {}, /*isVarArg=*/false);
@@ -658,34 +659,22 @@ private:
     if (KernelManifest.empty() || LambdaSchema.empty())
       return;
 
-    Function *LaunchKernelFn = M.getFunction(LaunchFunctionName);
-    if (!LaunchKernelFn)
-      return;
+    for (auto [_, KernelGV] : StubToKernelMap) {
 
-    SmallVector<CallBase *, 16> LaunchCalls;
-    for (User *Usr : LaunchKernelFn->users())
-      if (auto *CB = dyn_cast<CallBase>(Usr))
-        LaunchCalls.push_back(CB);
-
-    for (CallBase *LaunchCB : LaunchCalls) {
-      Value *KernelKey = getStubGV(LaunchCB->getArgOperand(0));
-      if (!KernelKey)
-        continue;
-      KernelKey = KernelKey->stripPointerCasts();
-
-      auto StubIt = StubToKernelMap.find(KernelKey);
-      if (StubIt == StubToKernelMap.end())
-        continue;
-
-      StringRef KernelSym = getGlobalString(*StubIt->second);
+      StringRef KernelSym = getGlobalString(*KernelGV);
       if (KernelSym.empty())
         continue;
 
       auto ManifestIt = KernelManifest.find(KernelSym);
       if (ManifestIt == KernelManifest.end())
         continue;
+      auto *RegFuncTy = FunctionType::get(Types.VoidTy, {Types.PtrTy}, false);
+      Function *F =
+          Function::Create(RegFuncTy, GlobalValue::InternalLinkage, "registerKernel"+KernelSym+"LambdaConstants", M);
+      F->arg_begin()->setName("kernel_args");
 
-      IRBuilder<> Builder(LaunchCB);
+      BasicBlock *Entry = BasicBlock::Create(M.getContext(), "entry", F);
+      IRBuilder<> Builder(Entry);
       Builder.CreateCall(getBeginDeviceLambdaLaunchFn(M), {});
       for (const auto &Record : ManifestIt->getValue()) {
         auto SchemaIt = LambdaSchema.find(Record.LambdaID);
