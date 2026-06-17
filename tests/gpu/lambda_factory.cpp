@@ -13,7 +13,7 @@
 #include "gpu_common.h"
 #include <proteus/JitInterface.h>
 
-__device__ void printInt(int I) { printf("Integer = %d\n", I); }
+__host__ __device__ void printInt(int I) { printf("Integer = %d\n", I); }
 
 template <typename T>
 __global__ __attribute__((annotate("jit"))) void kernel(T LB) {
@@ -62,7 +62,11 @@ auto forwardLambda(int rc1, int, int rc3) {
 }
 
 template <typename T> void run(T &&LB) {
-  kernel<<<1, 1>>>(LB);
+  using LambdaT = std::decay_t<T>;
+  LambdaT Body = std::forward<T>(LB);
+  auto func = reinterpret_cast<const void *>(&kernel<LambdaT>);
+  void *args[] = {&Body};
+  gpuErrCheck(hipLaunchKernel(func, dim3(1), dim3(1), args, 0, 0));
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
@@ -72,6 +76,9 @@ void forDeclareLambda() {
     run(lam);
   }
 }
+
+#define REGISTER_LAMBDA(Lambda) \
+return Functor<__COUNTER__>(Lambda);
 
 int main() {
   int Zero = 0;

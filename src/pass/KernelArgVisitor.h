@@ -43,18 +43,18 @@ struct LambdaKernelArgAnalysis {
   std::optional<RuntimeConstantType> ChangedRCLayout = std::nullopt;
 };
 
+struct WorkItem {
+  Value *CurVal;
+  Value *Src;
+};
+
 class LambdaArgVisitor : public InstVisitor<LambdaArgVisitor> {
 private:
   CallBase *LambdaCB;
   const DataLayout &DL;
-  SmallVector<Value *> WorkList;
+  SmallVector<WorkItem> WorkList;
   SmallDenseSet<Value *> Seen;
-  // Whenever the analysis encounters an instruction returning a Ptr
-  // memory analysis is required to identify a dominating write,
-  // which is where the LambdaArgVisitor continues its analysis.
-  // This pointer identifies which Ptr use the main analysis used
-  // to discover the Ptr needing analysis, so as to prevent cycles.
-  Value *MemoryAnalysisPtrUse = nullptr;
+
   int64_t Offset;
   uint32_t KernelArg = 0;
   Function *KernelFunction = nullptr;
@@ -64,16 +64,10 @@ private:
   bool AnalysisSuccess = false;
   bool AnalysisFailed = false;
 
-  void pushBack(Value *NextVal, Value* CurVal) {
-    if (needsDefUseAnalysis(NextVal))
-      MemoryAnalysisPtrUse = CurVal;
-    WorkList.push_back(NextVal);
-  }
-
   // Constructor used for cloning and merging branches of phi node analysis
-  LambdaArgVisitor(Value *Start, int64_t Off, const DataLayout &_DL)
+  LambdaArgVisitor(Value *Start, Value* LastSeen, int64_t Off, const DataLayout &_DL)
       : DL(_DL), Offset(Off) {
-    WorkList.push_back(Start);
+    WorkList.push_back({Start, LastSeen});
   }
 
   std::optional<Value*> getCallBaseIdentityArgOperand(CallBase& CB) {
@@ -101,6 +95,12 @@ public:
     return LambdaKernelArgAnalysis{KernelFunction, KernelArg, Offset,
                                    ChangedRC};
   }
+  // Whenever the analysis encounters an instruction returning a Ptr
+  // memory analysis is required to identify a dominating write,
+  // which is where the LambdaArgVisitor continues its analysis.
+  // This pointer identifies which Ptr use the main analysis used
+  // to discover the Ptr needing analysis, so as to prevent cycles.
+  Value *MemoryAnalysisPtrUse = nullptr;
   auto back() { return WorkList.back(); }
   void popBack() { WorkList.pop_back(); }
   bool seen(Value *Val) { return Seen.contains(Val); }
@@ -111,10 +111,11 @@ public:
 
 private:
   inline std::optional<LambdaKernelArgAnalysis>
-  cloneAndAnalyze(Value *Start, int64_t StartOffset) {
-    LambdaArgVisitor Visitor(Start, StartOffset, DL);
+  cloneAndAnalyze(Value *Start, Value *MemoryAnalysisPtrUse, int64_t StartOffset) {
+    LambdaArgVisitor Visitor(Start, MemoryAnalysisPtrUse, StartOffset, DL);
     while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {
-      auto *V = (Visitor.back());
+      auto [V, AccessedFrom] = Visitor.back();
+      Visitor.MemoryAnalysisPtrUse = AccessedFrom;
       Visitor.popBack();
       // Prevent loops/infinite recursion
       if (Visitor.seen(V))
@@ -137,23 +138,24 @@ public:
   LambdaArgVisitor(CallBase *LambdaCB_, Module &M)
       : LambdaCB(LambdaCB_), DL(M.getDataLayout()), Offset(0) {
     auto *ClosurePtr = LambdaCB->getArgOperand(0);
-    WorkList.push_back(ClosurePtr);
+    WorkList.push_back({ClosurePtr, LambdaCB});
   }
 
   void visitStoreInst(StoreInst &SI) {
-    pushBack(SI.getValueOperand(), &SI);
+    WorkList.push_back({SI.getValueOperand(), &SI});
   }
 
   void visitCallBase(CallBase &CB) {
     // Check for the most basic case possible: a pass-through identity function.
     auto OptionalValue = getCallBaseIdentityArgOperand(CB);
     if (OptionalValue) {
-      WorkList.push_back(OptionalValue.value());
+      WorkList.push_back({OptionalValue.value(), &CB});
       return;
     }
   }
 
   void visitLoadInst(LoadInst &LI) {
+    // TODO: Delete this?  We shouldn't reach this from a use-def
     if (!LI.getType()->isPointerTy()) {
       AnalysisFailed = true;
       return;
@@ -233,34 +235,61 @@ public:
       return;
     }
 
-    WorkList.push_back(CommonStoredVal);
+    WorkList.push_back({CommonStoredVal, &LI});
   }
 
   void visitGetElementPtrInst(GetElementPtrInst &GEP) {
     int64_t GEPOffset = 0;
     GetPointerBaseWithConstantOffset(&GEP, GEPOffset, DL);
     Offset += GEPOffset;
-    pushBack(GEP.getPointerOperand(), &GEP);
+    WorkList.push_back({GEP.getPointerOperand(), &GEP});
   }
 
   // todo: these three methods need to be changed to find a dominating store
   void visitAllocaInst(AllocaInst &Alloca) {
-    for (auto *User : Alloca.users())
-      if (!Seen.contains(User))
-        WorkList.push_back(User);
+    auto Res = getDominatingUse(DL, &Alloca, MemoryAnalysisPtrUse);
+    if (!Res) {
+      return;
+      // AnalysisFailed = true;
+      // AnalysisSuccess = false;
+      // DEBUG(Logger::logs("proteus-pass")
+      //     << "Analysis failed at = \n"
+      //     << Alloca << "\n");
+    }
+    WorkList.push_back({Res->DominatingWrite, &Alloca});
+    // Default is zero so we can safely add it
+    Offset += Res->Offset;
   }
 
   void visitBitCastInst(BitCastInst &BC) {
-    for (auto *User : BC.users())
-      if (!Seen.contains(User))
-        WorkList.push_back(User);
+    auto Res = getDominatingUse(DL, &BC, MemoryAnalysisPtrUse);
+    if (!Res) {
+      return;
+      // AnalysisFailed = true;
+      // AnalysisSuccess = false;
+      // DEBUG(Logger::logs("proteus-pass")
+      //     << "Analysis failed at = \n"
+      //     << BC << "\n");
+    }
+    WorkList.push_back({Res->DominatingWrite, &BC});
+    // Default is zero so we can safely add it
+    Offset += Res->Offset;
   }
 
   void visitAddrSpaceCastInst(AddrSpaceCastInst &ASC) {
-    WorkList.push_back(ASC.getPointerOperand());
-    for (auto *User : ASC.users())
-      if (!Seen.contains(User))
-        WorkList.push_back(User);
+    WorkList.push_back({ASC.getPointerOperand(), &ASC});
+    auto Res = getDominatingUse(DL, &ASC, MemoryAnalysisPtrUse);
+    if (!Res) {
+      return;
+      // AnalysisFailed = true;
+      // AnalysisSuccess = false;
+      // DEBUG(Logger::logs("proteus-pass")
+      //     << "Analysis failed at = \n"
+      //     << ASC << "\n");
+    }
+    WorkList.push_back({Res->DominatingWrite, &ASC});
+    // Default is zero so we can safely add it
+    Offset += Res->Offset;
   }
 
   void visitIntToPtr(IntToPtrInst &ITP) {
@@ -273,7 +302,7 @@ public:
     }
     ChangedRC = convertTypeToRuntimeConstantType(Ptr->getType());
 
-    WorkList.push_back(Ptr->getPointerOperand());
+    WorkList.push_back({Ptr->getPointerOperand(), &ITP});
   }
 
   void visitMemIntrinsic(MemIntrinsic &I) {
@@ -304,7 +333,7 @@ public:
       }
     }
 
-    pushBack(SrcBase->stripPointerCasts(), &I);
+    WorkList.push_back({SrcBase->stripPointerCasts(), &I});
     Offset = Offset - DstOff + SrcOff;
   }
 
@@ -343,7 +372,7 @@ public:
         continue;
       DEBUG(Logger::logs("proteus-pass")
         << "Analysis crossed interprocedural boundary at " << *CB->getArgOperand(ArgNum) << "\n");
-      pushBack(CB->getArgOperand(ArgNum), CB);
+      WorkList.push_back({CB->getArgOperand(ArgNum), CB});
     }
   }
 
@@ -358,7 +387,7 @@ public:
       return;
     }
 
-    auto FirstAnalysis = cloneAndAnalyze(P.getIncomingValue(0), Offset);
+    auto FirstAnalysis = cloneAndAnalyze(P.getIncomingValue(0),MemoryAnalysisPtrUse,  Offset);
     if (!FirstAnalysis) {
       AnalysisFailed = true;
       AnalysisSuccess = false;
@@ -368,7 +397,7 @@ public:
     auto BaseOffset = FirstAnalysis->Offset;
 
     for (size_t Idx = 1; Idx < P.getNumIncomingValues(); ++Idx) {
-      auto Analysis = cloneAndAnalyze(P.getIncomingValue(Idx), Offset);
+      auto Analysis = cloneAndAnalyze(P.getIncomingValue(Idx), MemoryAnalysisPtrUse, Offset);
       if (!Analysis || Analysis->KernelArgIndex != BaseSlot ||
           Analysis->Offset != BaseOffset) {
         AnalysisFailed = true;
@@ -396,7 +425,7 @@ public:
       return;
     }
 
-    pushBack(TBase, &S);
+    WorkList.push_back({TBase, &S});
     Offset += TOff; // select == TBase + TOff
   }
 };
@@ -409,7 +438,8 @@ inline bool analyzeLambdaUses(
   for (auto *FunctorCB : CBToAnalyze) {
     LambdaArgVisitor Visitor(FunctorCB, M);
     while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {
-      auto *V = Visitor.back();
+      auto [V, LastSeen] = Visitor.back();
+      Visitor.MemoryAnalysisPtrUse = LastSeen;
       Visitor.popBack();
       // Prevent loops/infinite recursion
       if (Visitor.seen(V))
