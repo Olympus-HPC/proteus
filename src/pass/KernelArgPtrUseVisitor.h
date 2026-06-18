@@ -15,7 +15,11 @@
 #include <llvm/ADT/Hashing.h>
 #include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/ADT/SmallVector.h>
-
+#include <llvm/Analysis/AssumptionCache.h>
+#include <llvm/Analysis/BasicAliasAnalysis.h>
+#include <llvm/Analysis/MemoryLocation.h>
+#include <llvm/Analysis/MemorySSA.h>
+#include <llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm/Analysis/ValueTracking.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
@@ -29,6 +33,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/PassManager.h>
 #include <llvm/IR/Type.h>
+#include <llvm/TargetParser/Triple.h>
 #include <memory>
 #include <optional>
 
@@ -53,6 +58,133 @@ struct CallerFrame {
   Value *ValEnteringCallBase;
   CallBase *CallerCB;
   Function *Callee;
+};
+
+inline std::optional<MemoryLocation>
+getTrackedPointerLocation(const DataLayout &DL, Value *Ptr) {
+  if (!Ptr || !Ptr->getType()->isPointerTy())
+    return std::nullopt;
+
+  Type *PointeeTy = nullptr;
+  if (auto *AI = dyn_cast<AllocaInst>(Ptr))
+    PointeeTy = AI->getAllocatedType();
+
+  if (!PointeeTy || !PointeeTy->isSized())
+    return MemoryLocation::getBeforeOrAfter(Ptr);
+
+  return MemoryLocation(Ptr, LocationSize::precise(DL.getTypeStoreSize(PointeeTy)));
+}
+
+class FunctionMemorySSAResolver {
+private:
+  struct FunctionAnalyses {
+    std::unique_ptr<TargetLibraryInfoImpl> TLII;
+    std::unique_ptr<TargetLibraryInfo> TLI;
+    std::unique_ptr<AssumptionCache> AC;
+    std::unique_ptr<DominatorTree> DT;
+    std::unique_ptr<AAResults> AA;
+    std::unique_ptr<BasicAAResult> BAA;
+    std::unique_ptr<MemorySSA> MSSA;
+  };
+
+  DenseMap<Function *, FunctionAnalyses> Cache;
+  const DataLayout &DL;
+
+  FunctionAnalyses &getAnalyses(Function &F) {
+    auto [It, Inserted] = Cache.try_emplace(&F);
+    if (Inserted) {
+      It->second.TLII = std::make_unique<TargetLibraryInfoImpl>(
+          Triple(F.getParent()->getTargetTriple()));
+      It->second.TLI =
+          std::make_unique<TargetLibraryInfo>(*It->second.TLII);
+      It->second.AC = std::make_unique<AssumptionCache>(F);
+      It->second.DT = std::make_unique<DominatorTree>(F);
+      It->second.AA = std::make_unique<AAResults>(*It->second.TLI);
+      It->second.BAA = std::make_unique<BasicAAResult>(
+          DL, F, *It->second.TLI, *It->second.AC, It->second.DT.get());
+      It->second.AA->addAAResult(*It->second.BAA);
+      It->second.MSSA = std::make_unique<MemorySSA>(
+          F, It->second.AA.get(), It->second.DT.get());
+    }
+    return It->second;
+  }
+
+  std::optional<LambdaPtrUseAnalysis>
+  resolveMemoryAccess(MemoryAccess *MA, int64_t Offset) {
+    if (!MA)
+      return std::nullopt;
+
+    if (auto *MP = dyn_cast<MemoryPhi>(MA)) {
+      std::optional<LambdaPtrUseAnalysis> Common;
+      for (Use &Incoming : MP->incoming_values()) {
+        auto *IncomingMA = dyn_cast<MemoryAccess>(Incoming.get());
+        if (!IncomingMA)
+          return std::nullopt;
+        auto Res = resolveMemoryAccess(IncomingMA, Offset);
+        if (!Res)
+          return std::nullopt;
+        if (!Common) {
+          Common = Res;
+          continue;
+        }
+        if (Common->DominatingWrite != Res->DominatingWrite ||
+            Common->Offset != Res->Offset ||
+            Common->ChangedRCLayout != Res->ChangedRCLayout)
+          return std::nullopt;
+      }
+      return Common;
+    }
+
+    auto *MD = dyn_cast<MemoryDef>(MA);
+    if (!MD)
+      return std::nullopt;
+
+    auto *MemI = dyn_cast_or_null<Instruction>(MD->getMemoryInst());
+    if (!MemI)
+      return std::nullopt;
+
+    if (auto *SI = dyn_cast<StoreInst>(MemI)) {
+      Value *Stored = SI->getValueOperand();
+      if (!Stored->getType()->isPointerTy())
+        return std::nullopt;
+      return LambdaPtrUseAnalysis{Stored, Offset, std::nullopt};
+    }
+
+    auto *MT = dyn_cast<MemTransferInst>(MemI);
+    if (!MT)
+      return std::nullopt;
+
+    int64_t DstOff = 0, SrcOff = 0;
+    Value *DstBase =
+        GetPointerBaseWithConstantOffset(MT->getRawDest(), DstOff, DL);
+    Value *SrcBase =
+        GetPointerBaseWithConstantOffset(MT->getRawSource(), SrcOff, DL);
+    if (!DstBase || !SrcBase)
+      return std::nullopt;
+
+    return LambdaPtrUseAnalysis{SrcBase, Offset - DstOff + SrcOff,
+                                std::nullopt};
+  }
+
+public:
+  explicit FunctionMemorySSAResolver(const DataLayout &DL_) : DL(DL_) {}
+
+  std::optional<LambdaPtrUseAnalysis> resolve(Value *TrackedPtr,
+                                              Instruction *UseI) {
+    auto Loc = getTrackedPointerLocation(DL, TrackedPtr);
+    if (!Loc)
+      return std::nullopt;
+
+    Function &F = *UseI->getFunction();
+    auto &Analyses = getAnalyses(F);
+    auto *MA = Analyses.MSSA->getMemoryAccess(UseI);
+    if (!MA)
+      return std::nullopt;
+
+    auto *Walker = Analyses.MSSA->getWalker();
+    auto *Clobber = Walker->getClobberingMemoryAccess(MA, *Loc);
+    return resolveMemoryAccess(Clobber, /*Offset=*/0);
+  }
 };
 
 // Given a newly allocated ptr encountered in def-use analysis beginning at a
@@ -228,6 +360,16 @@ inline std::optional<LambdaPtrUseAnalysis>
 getDominatingUse(const DataLayout &DL, Value *ValueNeedingAnalysis,
                  Value *SeenUse) {
   DEBUG(Logger::logs("proteus-pass") << "Beginning PtrUse analysis " << "\n");
+
+  if (auto *I = dyn_cast<Instruction>(SeenUse)) {
+    FunctionMemorySSAResolver Resolver(DL);
+    if (auto Res = Resolver.resolve(ValueNeedingAnalysis, I)) {
+      DEBUG(Logger::logs("proteus-pass")
+            << "  [PTR use analysis]: MemorySSA resolved "
+            << *ValueNeedingAnalysis << " at use " << *SeenUse << "\n");
+      return Res;
+    }
+  }
 
   LambdaInstUseVisitor Visitor(ValueNeedingAnalysis, SeenUse, DL);
   // Analysis loop
