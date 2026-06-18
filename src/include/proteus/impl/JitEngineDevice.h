@@ -634,6 +634,9 @@ JitEngineDevice<ImplT>::compileAndRun(
     }
   }
 
+  LambdaRegistry &LR = LambdaRegistry::instance();
+  LR.invokeRegisterLambdaConstants(KernelInfo.getKernel(), KernelArgs);
+
   MemoryBufferRef KernelBitcode = getBitcode(KernelInfo);
   std::unique_ptr<MemoryBuffer> ObjBuf = nullptr;
   const LambdaCallsiteRuntimeConstantsMap EmptyLambdaCallsiteRuntimeConstants;
