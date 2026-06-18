@@ -29,6 +29,7 @@
 #include "proteus/Error.h"
 #include "proteus/impl/LambdaCallsite.h"
 #include "proteus/impl/Logger.h"
+#include "proteus/impl/CoreLLVM.h"
 
 #include <cstddef>
 #include <llvm/ADT/DenseMap.h>
@@ -337,10 +338,6 @@ private:
     auto *IdMD =
         ConstantAsMetadata::get(ConstantInt::get(Type::getInt64Ty(Ctx), Id));
     F->setMetadata(Key, MDNode::get(Ctx, {IdMD}));
-  }
-
-  bool hasU64Metadata(Function *F, StringRef Key) {
-    return F->getMetadata(Key) != nullptr;
   }
 
   std::optional<uint64_t> getU64Metadata(Function *F, StringRef Key) {
@@ -682,6 +679,7 @@ private:
 
     SmallVector<Function *, 16> JitFunctions;
 
+    // todo(bowen) do this with metadata instead of name demangling
     for (auto &F : M.getFunctionList()) {
       std::string DemangledName = demangle(F.getName().str());
       if (StringRef{DemangledName}.contains("proteus::jit_variable")) {

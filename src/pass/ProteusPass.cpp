@@ -564,36 +564,50 @@ private:
     createLambdaDeviceManifestFile(M, KernelManifest);
   }
 
-  //todo do we still need
-  // RuntimeConstantType getKernelArgLayout(CallBase *LaunchKernelCB) {
-  //   if (!LaunchKernelCB)
-  //     reportFatalError("Error passing device stub pointer to layout analysis");
-  //   RuntimeConstantType LayoutType = RuntimeConstantType::NONE;
-  //   SmallVector<std::pair<Value *, size_t>> WorkList;
-  //   Value *KernelArgPack =
-  //       LaunchKernelCB->getArgOperand(LaunchKernelCB->arg_size() - 3);
-  //   WorkList.push_back({KernelArgPack, 0});
-  //   SmallDenseSet<Value *> Discovered;
-  //   while (!WorkList.empty()) {
-  //     auto [V, Depth] = WorkList.back();
-  //     WorkList.pop_back();
-  //     if (Discovered.contains(V))
-  //       continue;
-  //     Discovered.insert(V);
-  //     if (AllocaInst *Alloca = dyn_cast<AllocaInst>(V)) {
-  //       for (auto *Usr : Alloca->users())
-  //         WorkList.push_back({Usr, Depth + 1});
-  //       // Ptr to ptr type pack
-  //       if (Depth == 2 && Alloca->getAllocatedType()->isPointerTy())
-  //         return RuntimeConstantType::PTR;
-  //       if (Depth == 2 && Alloca->getAllocatedType()->isStructTy())
-  //         return RuntimeConstantType::NONE;
-  //     } else if (StoreInst *Store = dyn_cast<StoreInst>(V)) {
-  //       WorkList.push_back({Store->getValueOperand(), Depth + 1});
-  //     }
-  //   }
-  //   return LayoutType;
-  // }
+  CallBase* getStubLaunchCB(Module &M, Function *Stub) {
+    CallBase *LaunchKernelCB = nullptr;
+    Function *GPULauncher = M.getFunction(LaunchFunctionName);
+    for (auto &BB : *Stub)
+      for (auto &I : BB) {
+        if (auto *CB = dyn_cast<CallBase>(&I); CB && CB->getCalledFunction() == GPULauncher)
+          LaunchKernelCB = CB;
+    }
+    if (!LaunchKernelCB)
+      reportFatalError("Error passing device stub pointer to layout analysis");
+    return LaunchKernelCB;
+  }
+
+  /// Calling conventions for cuda/hiplaunchkernel can vary slightly.  Sometimes a ptr to ptr
+  /// is passed, sometimes a ptr to struct.  We need to check how the arg blob
+  /// is created to tell the difference.
+  RuntimeConstantType getKernelArgLayout(Module &M, Function *Stub) {
+    CallBase *LaunchKernelCB = getStubLaunchCB(M, Stub);
+    RuntimeConstantType LayoutType = RuntimeConstantType::NONE;
+    SmallVector<std::pair<Value *, size_t>> WorkList;
+    Value *KernelArgPack =
+        LaunchKernelCB->getArgOperand(LaunchKernelCB->arg_size() - 3);
+    WorkList.push_back({KernelArgPack, 0});
+    SmallDenseSet<Value *> Discovered;
+    while (!WorkList.empty()) {
+      auto [V, Depth] = WorkList.back();
+      WorkList.pop_back();
+      if (Discovered.contains(V))
+        continue;
+      Discovered.insert(V);
+      if (AllocaInst *Alloca = dyn_cast<AllocaInst>(V)) {
+        for (auto *Usr : Alloca->users())
+          WorkList.push_back({Usr, Depth + 1});
+        // Ptr to ptr type pack
+        if (Depth == 2 && Alloca->getAllocatedType()->isPointerTy())
+          return RuntimeConstantType::PTR;
+        if (Depth == 2 && Alloca->getAllocatedType()->isStructTy())
+          return RuntimeConstantType::NONE;
+      } else if (StoreInst *Store = dyn_cast<StoreInst>(V)) {
+        WorkList.push_back({Store->getValueOperand(), Depth + 1});
+      }
+    }
+    return LayoutType;
+  }
 
   FunctionCallee getBeginDeviceLambdaLaunchFn(Module &M) {
     auto *FnTy = FunctionType::get(Types.VoidTy, {}, /*isVarArg=*/false);
@@ -607,6 +621,14 @@ private:
                                    /*isVarArg=*/false);
     return M.getOrInsertFunction(
         "__proteus_push_device_lambda_callsite_constant", FnTy);
+  }
+
+    FunctionCallee getRegisterLambdaRegisterFunc(Module &M) {
+    auto *FnTy = FunctionType::get(Types.VoidTy,
+                                   {Types.PtrTy, Types.PtrTy},
+                                   /*isVarArg=*/false);
+    return M.getOrInsertFunction(
+        "__proteus_populate_lambda_registration_function", FnTy);
   }
 
   FunctionCallee getFinalizeDeviceLambdaLaunchFn(Module &M) {
@@ -659,8 +681,28 @@ private:
     if (KernelManifest.empty() || LambdaSchema.empty())
       return;
 
-    for (auto [_, KernelGV] : StubToKernelMap) {
-
+    // I can't think of a better place to put the call that actually registers
+    // all the global function values, let's just do it in a register_lambda call
+    BasicBlock *RegisterRegisterBB = nullptr;
+    for (Function& F : M.getFunctionList()) {
+      if (!hasU64Metadata(&F, "proteus.register_call_impl"))
+        continue;
+      RegisterRegisterBB = &F.getEntryBlock();
+      break;
+    }
+    if (!RegisterRegisterBB)
+      return;
+    IRBuilder<> RegRegBuilder(&*RegisterRegisterBB->getFirstInsertionPt());
+    FunctionCallee RegisterRegisterCall = getRegisterLambdaRegisterFunc(M);
+    // Iterate through all the stub/kernel combos, identify their argument layout
+    // (ptr to struct or ptr to ptr) and create a func that when called registers
+    // their lambda constants.  Add runtime hook that populates lambda registry
+    // This "registry of register functions" allows jit_launch_kernel to make the
+    // decision when the kernel ptr is available about which to register.
+    // This way, jit_launch_kernel will read all the runtime constants.  This is
+    // specifically necessary for indirect launches (Like in RAJA or Kokkos).
+    for (auto It = StubToKernelMap.begin(); It != StubToKernelMap.end(); ++It) {
+      auto [Stub, KernelGV] = *It;
       StringRef KernelSym = getGlobalString(*KernelGV);
       if (KernelSym.empty())
         continue;
@@ -669,24 +711,27 @@ private:
       if (ManifestIt == KernelManifest.end())
         continue;
       auto *RegFuncTy = FunctionType::get(Types.VoidTy, {Types.PtrTy}, false);
-      Function *F =
-          Function::Create(RegFuncTy, GlobalValue::InternalLinkage, "registerKernel"+KernelSym+"LambdaConstants", M);
-      F->arg_begin()->setName("kernel_args");
+      Function *RegFunc =
+          Function::Create(RegFuncTy, GlobalValue::InternalLinkage, "registerKernel"+demangle(KernelSym)+"LambdaConstants", M);
+      RegFunc->arg_begin()->setName("kernel_args");
 
-      BasicBlock *Entry = BasicBlock::Create(M.getContext(), "entry", F);
+      BasicBlock *Entry = BasicBlock::Create(M.getContext(), "entry", RegFunc);
       IRBuilder<> Builder(Entry);
+      Value *KernelArgs = RegFunc->getArg(0);
       Builder.CreateCall(getBeginDeviceLambdaLaunchFn(M), {});
+      Function *StubFn = dyn_cast<Function>(Stub);
+      RuntimeConstantType KernelArgsStorageType = getKernelArgLayout(M, StubFn);
+
       for (const auto &Record : ManifestIt->getValue()) {
         auto SchemaIt = LambdaSchema.find(Record.LambdaID);
         if (SchemaIt == LambdaSchema.end())
           continue;
 
         LambdaManifestRecord EffectiveRecord = Record;
-        EffectiveRecord.StorageType = getKernelArgLayout(LaunchCB);
+        EffectiveRecord.StorageType = KernelArgsStorageType;
         for (const auto &Schema : SchemaIt->second) {
           Value *ValuePtr = materializeDeviceLambdaValuePtr(
-              Builder, LaunchCB->getArgOperand(LaunchCB->arg_size() - 3),
-              EffectiveRecord, Schema);
+              Builder, KernelArgs, EffectiveRecord, Schema);
           Builder.CreateCall(
               getPushDeviceLambdaCallsiteConstantFn(M),
               {Builder.getInt64(Record.LambdaID),
@@ -697,6 +742,8 @@ private:
         }
       }
       Builder.CreateCall(getFinalizeDeviceLambdaLaunchFn(M), {});
+      Builder.CreateRetVoid();
+      RegRegBuilder.CreateCall(RegisterRegisterCall, {KernelGV, RegFunc});
     }
   }
 

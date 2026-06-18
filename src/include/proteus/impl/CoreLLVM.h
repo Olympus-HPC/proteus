@@ -386,6 +386,10 @@ findFunctionsWithU64Metadata(llvm::Module &M, llvm::StringRef Key,
   }
 }
 
+inline bool hasU64Metadata(Function *F, StringRef Key) {
+  return F->getMetadata(Key) != nullptr;
+}
+
 inline void pruneIR(Module &M, bool UnsetExternallyInitialized = true) {
   // Remove llvm.global.annotations now that we have read them.
   if (auto *GlobalAnnotations = M.getGlobalVariable("llvm.global.annotations"))

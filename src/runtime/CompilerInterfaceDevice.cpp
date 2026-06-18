@@ -85,7 +85,7 @@ extern "C" __attribute__((used)) void __proteus_begin_device_lambda_launch() {
   LR.beginDeviceLaunch();
 }
 
-extern "C" __attribute__((used)) void __proteus_create_lambda_registration_function(void* Kernel, void *RegistrationFunc) {
+extern "C" __attribute__((used)) void __proteus_populate_lambda_registration_function(void* Kernel, void *RegistrationFunc) {
   auto &LR = LambdaRegistry::instance();
   LR.populateLambdaRegistrationCodeCache(Kernel, RegistrationFunc);
 }

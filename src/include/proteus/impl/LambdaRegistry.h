@@ -158,11 +158,22 @@ public:
     KernelToLambdaRegistration[Kernel] = RegistrationFunc;
   }
 
+  void invokeRegisterLambdaConstants(void *Kernel, void** Args) {
+    if (!KernelToLambdaRegistration.contains(Kernel)) {
+      errs() << "Here with " << Kernel << "\n";
+      for (auto [Kern, _] : KernelToLambdaRegistration) {
+        errs() << Kern<< "\n";
+      }
+      return;
+    }
+    auto RegisterFunc = reinterpret_cast<void(*)(void **)>(KernelToLambdaRegistration[Kernel]);
+    // Hopefully this is safe!
+    RegisterFunc(Args);
+  }
+
 private:
   explicit LambdaRegistry() = default;
-  // First integral key is the preprocessor/constexpr functor ID generated
-  // inside PROTEUS_REGISTER_LAMBDA.  The key of the value DenseMap is the slot
-  // within the lambda storage.
+
   DenseMap<uint64_t, JitVariantVec> HostJitVariableVariants;
   DenseMap<uint64_t, JitVariantMap> PendingHostJitVariables;
   DenseMap<void*, void*> KernelToLambdaRegistration;
