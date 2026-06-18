@@ -202,12 +202,13 @@ public:
     instrumentRegisterFatBinary(M);
     instrumentRegisterFatBinaryEnd(M);
     instrumentRegisterVar(M);
-    instrumentRegisterFunction(M);
 
     if (hasDeviceLaunchKernelCalls(M)) {
       instrumentLambdaLaunchCallsites(M, StubToKernelMap);
       emitJitLaunchKernelCall(M);
     }
+
+    instrumentRegisterFunction(M);
 
     // Initialize Proteus CUDA runtime builtins for all CUDA host modules.
     // Both rewritten launches and metadata/global-address queries depend on
@@ -252,6 +253,7 @@ private:
 
   MapVector<Function *, JitFunctionInfo> JitFunctionInfoMap;
   SmallPtrSet<Function *, 16> ModuleDeviceKernels;
+  DenseMap<Value *, Function *> LambdaRegistrationHelpers;
 
   void runCleanupPassPipeline(Module &M) {
     PassBuilder PB;
@@ -564,22 +566,23 @@ private:
     createLambdaDeviceManifestFile(M, KernelManifest);
   }
 
-  CallBase* getStubLaunchCB(Module &M, Function *Stub) {
+  CallBase *getStubLaunchCB(Module &M, Function *Stub) {
     CallBase *LaunchKernelCB = nullptr;
     Function *GPULauncher = M.getFunction(LaunchFunctionName);
     for (auto &BB : *Stub)
       for (auto &I : BB) {
-        if (auto *CB = dyn_cast<CallBase>(&I); CB && CB->getCalledFunction() == GPULauncher)
+        if (auto *CB = dyn_cast<CallBase>(&I);
+            CB && CB->getCalledFunction() == GPULauncher)
           LaunchKernelCB = CB;
-    }
+      }
     if (!LaunchKernelCB)
       reportFatalError("Error passing device stub pointer to layout analysis");
     return LaunchKernelCB;
   }
 
-  /// Calling conventions for cuda/hiplaunchkernel can vary slightly.  Sometimes a ptr to ptr
-  /// is passed, sometimes a ptr to struct.  We need to check how the arg blob
-  /// is created to tell the difference.
+  /// Calling conventions for cuda/hiplaunchkernel can vary slightly.  Sometimes
+  /// a ptr to ptr is passed, sometimes a ptr to struct.  We need to check how
+  /// the arg blob is created to tell the difference.
   RuntimeConstantType getKernelArgLayout(Module &M, Function *Stub) {
     CallBase *LaunchKernelCB = getStubLaunchCB(M, Stub);
     RuntimeConstantType LayoutType = RuntimeConstantType::NONE;
@@ -623,9 +626,8 @@ private:
         "__proteus_push_device_lambda_callsite_constant", FnTy);
   }
 
-    FunctionCallee getRegisterLambdaRegisterFunc(Module &M) {
-    auto *FnTy = FunctionType::get(Types.VoidTy,
-                                   {Types.PtrTy, Types.PtrTy},
+  FunctionCallee getRegisterLambdaRegisterFunc(Module &M) {
+    auto *FnTy = FunctionType::get(Types.VoidTy, {Types.PtrTy, Types.PtrTy},
                                    /*isVarArg=*/false);
     return M.getOrInsertFunction(
         "__proteus_populate_lambda_registration_function", FnTy);
@@ -680,27 +682,6 @@ private:
     auto LambdaSchema = parseLambdaSchemaMetadata(M);
     if (KernelManifest.empty() || LambdaSchema.empty())
       return;
-
-    // I can't think of a better place to put the call that actually registers
-    // all the global function values, let's just do it in a register_lambda call
-    BasicBlock *RegisterRegisterBB = nullptr;
-    for (Function& F : M.getFunctionList()) {
-      if (!hasU64Metadata(&F, "proteus.register_call_impl"))
-        continue;
-      RegisterRegisterBB = &F.getEntryBlock();
-      break;
-    }
-    if (!RegisterRegisterBB)
-      return;
-    IRBuilder<> RegRegBuilder(&*RegisterRegisterBB->getFirstInsertionPt());
-    FunctionCallee RegisterRegisterCall = getRegisterLambdaRegisterFunc(M);
-    // Iterate through all the stub/kernel combos, identify their argument layout
-    // (ptr to struct or ptr to ptr) and create a func that when called registers
-    // their lambda constants.  Add runtime hook that populates lambda registry
-    // This "registry of register functions" allows jit_launch_kernel to make the
-    // decision when the kernel ptr is available about which to register.
-    // This way, jit_launch_kernel will read all the runtime constants.  This is
-    // specifically necessary for indirect launches (Like in RAJA or Kokkos).
     for (auto It = StubToKernelMap.begin(); It != StubToKernelMap.end(); ++It) {
       auto [Stub, KernelGV] = *It;
       StringRef KernelSym = getGlobalString(*KernelGV);
@@ -710,16 +691,23 @@ private:
       auto ManifestIt = KernelManifest.find(KernelSym);
       if (ManifestIt == KernelManifest.end())
         continue;
+
+      Function *StubFn = dyn_cast<Function>(Stub);
+      if (!StubFn)
+        reportFatalError("Expected stub function for lambda registration "
+                         "helper generation");
+      auto *LaunchCB = getStubLaunchCB(M, StubFn);
+
       auto *RegFuncTy = FunctionType::get(Types.VoidTy, {Types.PtrTy}, false);
-      Function *RegFunc =
-          Function::Create(RegFuncTy, GlobalValue::InternalLinkage, "registerKernel"+demangle(KernelSym)+"LambdaConstants", M);
+      Function *RegFunc = Function::Create(
+          RegFuncTy, GlobalValue::InternalLinkage,
+          "registerKernel" + demangle(KernelSym) + "LambdaConstants", M);
       RegFunc->arg_begin()->setName("kernel_args");
 
       BasicBlock *Entry = BasicBlock::Create(M.getContext(), "entry", RegFunc);
       IRBuilder<> Builder(Entry);
       Value *KernelArgs = RegFunc->getArg(0);
       Builder.CreateCall(getBeginDeviceLambdaLaunchFn(M), {});
-      Function *StubFn = dyn_cast<Function>(Stub);
       RuntimeConstantType KernelArgsStorageType = getKernelArgLayout(M, StubFn);
 
       for (const auto &Record : ManifestIt->getValue()) {
@@ -743,7 +731,8 @@ private:
       }
       Builder.CreateCall(getFinalizeDeviceLambdaLaunchFn(M), {});
       Builder.CreateRetVoid();
-      RegRegBuilder.CreateCall(RegisterRegisterCall, {KernelGV, RegFunc});
+
+      LambdaRegistrationHelpers[LaunchCB->getArgOperand(0)] = RegFunc;
     }
   }
 
@@ -1800,6 +1789,14 @@ private:
                           RegisterCB->getArgOperand(1),
                           RegisterCB->getArgOperand(2),
                           RuntimeConstantInfoPtrArray, NumRCsValue});
+
+      auto HelperIt =
+          LambdaRegistrationHelpers.find(RegisterCB->getArgOperand(1));
+      if (HelperIt != LambdaRegistrationHelpers.end()) {
+        FunctionCallee RegisterLambdaHelper = getRegisterLambdaRegisterFunc(M);
+        Builder.CreateCall(RegisterLambdaHelper,
+                           {RegisterCB->getArgOperand(1), HelperIt->second});
+      }
     }
   }
 

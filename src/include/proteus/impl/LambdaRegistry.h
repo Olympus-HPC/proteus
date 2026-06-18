@@ -154,19 +154,18 @@ public:
     return LaunchInfo;
   }
 
-  void populateLambdaRegistrationCodeCache(void *Kernel, void *RegistrationFunc) {
+  void populateLambdaRegistrationCodeCache(void *Kernel,
+                                           void *RegistrationFunc) {
     KernelToLambdaRegistration[Kernel] = RegistrationFunc;
   }
 
-  void invokeRegisterLambdaConstants(void *Kernel, void** Args) {
+  void invokeRegisterLambdaConstants(void *Kernel, void **Args) {
     if (!KernelToLambdaRegistration.contains(Kernel)) {
-      errs() << "Here with " << Kernel << "\n";
-      for (auto [Kern, _] : KernelToLambdaRegistration) {
-        errs() << Kern<< "\n";
-      }
+      beginDeviceLaunch();
       return;
     }
-    auto RegisterFunc = reinterpret_cast<void(*)(void **)>(KernelToLambdaRegistration[Kernel]);
+    auto RegisterFunc =
+        reinterpret_cast<void (*)(void **)>(KernelToLambdaRegistration[Kernel]);
     // Hopefully this is safe!
     RegisterFunc(Args);
   }
@@ -176,7 +175,7 @@ private:
 
   DenseMap<uint64_t, JitVariantVec> HostJitVariableVariants;
   DenseMap<uint64_t, JitVariantMap> PendingHostJitVariables;
-  DenseMap<void*, void*> KernelToLambdaRegistration;
+  DenseMap<void *, void *> KernelToLambdaRegistration;
   DeviceLaunchInfo PendingDeviceLaunchInfo;
   DeviceLaunchInfo CurrentDeviceLaunchInfo;
 };

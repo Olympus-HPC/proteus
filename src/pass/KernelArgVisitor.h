@@ -2,10 +2,10 @@
 #define PROTEUS_KERNELARGVISITOR_H
 
 #include "Helpers.h"
+#include "KernelArgPtrUseVisitor.h"
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/impl/Logger.h"
 #include "proteus/impl/RuntimeConstantTypeHelpers.h"
-#include "KernelArgPtrUseVisitor.h"
 #include <alloca.h>
 #include <cstdint>
 #include <llvm/Analysis/PtrUseVisitor.h>
@@ -65,25 +65,29 @@ private:
   bool AnalysisFailed = false;
 
   // Constructor used for cloning and merging branches of phi node analysis
-  LambdaArgVisitor(Value *Start, Value* LastSeen, int64_t Off, const DataLayout &_DL)
+  LambdaArgVisitor(Value *Start, Value *LastSeen, int64_t Off,
+                   const DataLayout &_DL)
       : DL(_DL), Offset(Off) {
     WorkList.push_back({Start, LastSeen});
   }
 
-  std::optional<Value*> getCallBaseIdentityArgOperand(CallBase& CB) {
+  std::optional<Value *> getCallBaseIdentityArgOperand(CallBase &CB) {
     auto *CalledFunction = CB.getCalledFunction();
-    DEBUG(Logger::logs("proteus-pass") << "Visiting CB with function " << *CalledFunction << "\n");
+    DEBUG(Logger::logs("proteus-pass")
+          << "Visiting CB with function " << *CalledFunction << "\n");
     ReturnInst *RetInst = nullptr;
-    for (auto& BB : *CalledFunction) {
+    for (auto &BB : *CalledFunction) {
       if (auto *TermInst = dyn_cast<ReturnInst>(BB.getTerminator()))
         RetInst = TermInst;
     }
     if (!RetInst)
       return std::nullopt;
 
-    DEBUG(Logger::logs("proteus-pass") << "CB called function return inst " << *RetInst->getReturnValue() << "\n");
+    DEBUG(Logger::logs("proteus-pass") << "CB called function return inst "
+                                       << *RetInst->getReturnValue() << "\n");
     for (size_t ArgNum = 0; ArgNum < CalledFunction->arg_size(); ++ArgNum) {
-      DEBUG(Logger::logs("proteus-pass") << "Called Fn arg " << *CalledFunction->getArg(ArgNum) << "\n");
+      DEBUG(Logger::logs("proteus-pass")
+            << "Called Fn arg " << *CalledFunction->getArg(ArgNum) << "\n");
       if (RetInst->getReturnValue() == CalledFunction->getArg(ArgNum))
         return CB.getArgOperand(ArgNum);
     }
@@ -111,7 +115,8 @@ public:
 
 private:
   inline std::optional<LambdaKernelArgAnalysis>
-  cloneAndAnalyze(Value *Start, Value *MemoryAnalysisPtrUse, int64_t StartOffset) {
+  cloneAndAnalyze(Value *Start, Value *MemoryAnalysisPtrUse,
+                  int64_t StartOffset) {
     LambdaArgVisitor Visitor(Start, MemoryAnalysisPtrUse, StartOffset, DL);
     while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {
       auto [V, AccessedFrom] = Visitor.back();
@@ -371,7 +376,8 @@ public:
       if (!CB)
         continue;
       DEBUG(Logger::logs("proteus-pass")
-        << "Analysis crossed interprocedural boundary at " << *CB->getArgOperand(ArgNum) << "\n");
+            << "Analysis crossed interprocedural boundary at "
+            << *CB->getArgOperand(ArgNum) << "\n");
       WorkList.push_back({CB->getArgOperand(ArgNum), CB});
     }
   }
@@ -387,7 +393,8 @@ public:
       return;
     }
 
-    auto FirstAnalysis = cloneAndAnalyze(P.getIncomingValue(0),MemoryAnalysisPtrUse,  Offset);
+    auto FirstAnalysis =
+        cloneAndAnalyze(P.getIncomingValue(0), MemoryAnalysisPtrUse, Offset);
     if (!FirstAnalysis) {
       AnalysisFailed = true;
       AnalysisSuccess = false;
@@ -397,7 +404,8 @@ public:
     auto BaseOffset = FirstAnalysis->Offset;
 
     for (size_t Idx = 1; Idx < P.getNumIncomingValues(); ++Idx) {
-      auto Analysis = cloneAndAnalyze(P.getIncomingValue(Idx), MemoryAnalysisPtrUse, Offset);
+      auto Analysis = cloneAndAnalyze(P.getIncomingValue(Idx),
+                                      MemoryAnalysisPtrUse, Offset);
       if (!Analysis || Analysis->KernelArgIndex != BaseSlot ||
           Analysis->Offset != BaseOffset) {
         AnalysisFailed = true;

@@ -27,9 +27,9 @@
 
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Error.h"
+#include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/LambdaCallsite.h"
 #include "proteus/impl/Logger.h"
-#include "proteus/impl/CoreLLVM.h"
 
 #include <cstddef>
 #include <llvm/ADT/DenseMap.h>
