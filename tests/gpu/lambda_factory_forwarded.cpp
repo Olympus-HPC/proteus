@@ -55,11 +55,11 @@ int main() {
 }
 
 // clang-format off
-// CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 1
+// CHECK-FIRST: [LambdaSpec] Replacing slot 1 with i32 1
 // CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 0
 // CHECK: Integer = 0
 // CHECK: Integer = 1
-// CHECK-FIRST: [LambdaSpec] Replacing slot 2 with i32 0
+// CHECK-FIRST: [LambdaSpec] Replacing slot 1 with i32 0
 // CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 1
 // CHECK: Integer = 1
 // CHECK: Integer = 0

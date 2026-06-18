@@ -85,7 +85,9 @@ extern "C" __attribute__((used)) void __proteus_begin_device_lambda_launch() {
   LR.beginDeviceLaunch();
 }
 
-extern "C" __attribute__((used)) void __proteus_populate_lambda_registration_function(void* Kernel, void *RegistrationFunc) {
+extern "C" __attribute__((used)) void
+__proteus_populate_lambda_registration_function(void *Kernel,
+                                                void *RegistrationFunc) {
   auto &LR = LambdaRegistry::instance();
   LR.populateLambdaRegistrationCodeCache(Kernel, RegistrationFunc);
 }
@@ -138,6 +140,8 @@ extern "C" proteus::DeviceTraits<JitDeviceImplT>::DeviceError_t
 __proteus_launch_kernel(void *Kernel, dim3 GridDim, dim3 BlockDim,
                         void **KernelArgs, uint64_t ShmemSize, void *Stream) {
   TIMESCOPE("__proteus_launch_kernel");
+  auto &LR = LambdaRegistry::instance();
+  LR.invokeRegisterLambdaConstants(Kernel, KernelArgs);
   return __proteus_launch_kernel_internal(Kernel, GridDim, BlockDim, KernelArgs,
                                           ShmemSize, Stream);
 }

@@ -491,6 +491,14 @@ public:
     Function *FunctorOperatorFunction =
         findFunctorFunctorOperatorFunctionOperatorFromID(M, FunctorID);
     Function *LambdaOperatorMethod = findLambdaOperatorForFunctor(M, FunctorID);
+    if (!FunctorOperatorFunction) {
+      if (Config::get().traceSpecializations())
+        Logger::trace("[LambdaSpec] Skipping lambda specialization: "
+                      "no wrapper found for ID " +
+                      std::to_string(FunctorID));
+      return;
+    }
+
     SmallVector<CallBase *> CBToAnalyze;
     collectWrapperCallsites(*FunctorOperatorFunction, CBToAnalyze);
 
@@ -545,7 +553,7 @@ public:
     if (FunctorOperatorFunction->users().empty())
       FunctorOperatorFunction->eraseFromParent();
 
-    if (LambdaOperatorMethod->users().empty())
+    if (LambdaOperatorMethod && LambdaOperatorMethod->users().empty())
       LambdaOperatorMethod->eraseFromParent();
   }
 
