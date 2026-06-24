@@ -5,7 +5,7 @@
 
 from spack_repo.builtin.build_systems.cuda import CudaPackage
 from spack_repo.builtin.build_systems.rocm import ROCmPackage
-
+from spack_repo.builtin.build_systems.cmake import CMakePackage
 from spack.package import *
 
 
@@ -25,6 +25,7 @@ class Proteus(CMakePackage, CudaPackage, ROCmPackage):
 
     version("main", branch="main")
     version("2026.01.0", tag="v2026.01.0")
+    version("2026.05.0", tag="v2026.05.0")
 
     # Variants to control build options.
     variant(
@@ -72,6 +73,9 @@ class Proteus(CMakePackage, CudaPackage, ROCmPackage):
 
     # Host-only (no CUDA or HIP).
     depends_on("llvm@18:20+clang", when="~rocm ~cuda")
+
+    requires("%[virtuals=c,cxx] llvm-amdgpu", when="+rocm")
+    requires("%[virtuals=c,cxx] llvm", when="+cuda")
 
     # CUDA and HIP dependencies.
     depends_on("cuda@12:", when="+cuda")

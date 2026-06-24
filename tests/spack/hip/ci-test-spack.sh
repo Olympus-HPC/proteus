@@ -19,7 +19,7 @@ spack external find
 spack external find hip hsa-rocr-dev llvm-amdgpu
 
 # Add repo and package.
-spack repo add ${CI_PROJECT_DIR}/packaging/spack
+spack repo add ${CI_PROJECT_DIR}/packaging/spack/spack_repo/proteus
 spack add proteus@git.${CI_COMMIT_SHA} +rocm amdgpu_target=${PROTEUS_CI_AMDGPU_TARGET} ^hip@${PROTEUS_CI_ROCM_VERSION} ^hsa-rocr-dev@${PROTEUS_CI_ROCM_VERSION} ^llvm-amdgpu@${PROTEUS_CI_ROCM_VERSION}
 
 # Concretize and install.

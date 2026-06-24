@@ -25,7 +25,7 @@ install the package with:
 
 ```shell
 git clone https://github.com/Olympus-HPC/proteus.git
-spack repo add proteus/packaging/spack
+spack repo add proteus/packaging/spack/spack_repo/proteus
 spack install proteus
 ```
 

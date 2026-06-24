@@ -43,7 +43,7 @@ jobs:
           # Find external dependencies
           spack external find
           # Add proteus package and install
-          spack repo add ${GITHUB_WORKSPACE}/packaging/spack
+          spack repo add ${GITHUB_WORKSPACE}/packaging/spack/spack_repo/proteus
           spack add proteus@git.${{ github.event.pull_request.head.sha }} ^llvm@${{ matrix.llvm }}
           spack concretize -f
           spack install -v
