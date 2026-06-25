@@ -65,7 +65,7 @@ __proteus_register_function(void *Handle, void *Kernel, char *KernelName,
   JitEngineInfo.registerFunction(Handle, Kernel, KernelName, RCInfoArray);
 }
 
-extern "C" proteus::DeviceTraits<JitDeviceImplT>::DeviceError_t
+extern "C" __attribute__((weak)) proteus::DeviceTraits<JitDeviceImplT>::DeviceError_t
 __proteus_launch_kernel(void *Kernel, dim3 GridDim, dim3 BlockDim,
                         void **KernelArgs, uint64_t ShmemSize, void *Stream) {
   TIMESCOPE("__proteus_launch_kernel");
