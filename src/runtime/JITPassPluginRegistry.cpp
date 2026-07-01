@@ -1,10 +1,11 @@
 #include "proteus/impl/JITPassPluginRegistry.h"
 
 #include "proteus/Error.h"
+#include "proteus/impl/Hashing.h"
 
 #include <llvm/ADT/SmallString.h>
 #include <llvm/Support/FileSystem.h>
-#include <llvm/Support/raw_ostream.h>
+#include <llvm/Support/MemoryBuffer.h>
 
 #include <algorithm>
 #include <mutex>
@@ -62,17 +63,11 @@ private:
   }
 
   static std::string computeFingerprint(const JITPassPluginConfig &Config) {
-    llvm::sys::fs::file_status Status;
-    if (llvm::sys::fs::status(Config.Path, Status))
+    auto BufOrErr = llvm::MemoryBuffer::getFile(Config.Path);
+    if (!BufOrErr)
       return Config.Path + "|" + Config.Pipeline;
 
-    llvm::SmallString<128> Storage;
-    llvm::raw_svector_ostream OS(Storage);
-    const llvm::sys::fs::UniqueID ID = Status.getUniqueID();
-    OS << Config.Path << "|" << Config.Pipeline << "|" << ID.getDevice() << ":"
-       << ID.getFile() << "|" << Status.getSize() << "|"
-       << Status.getLastModificationTime().time_since_epoch().count();
-    return std::string(OS.str());
+    return hashValue(BufOrErr.get()->getBuffer()).toString();
   }
 
   std::mutex Mutex;
