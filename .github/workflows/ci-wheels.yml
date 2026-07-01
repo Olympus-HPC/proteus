@@ -559,15 +559,13 @@ jobs:
             --repo "${{ github.repository }}"
 
   deploy-pages:
-    name: deploy docs and wheel index
+    name: publish gh-pages
     needs:
       - upload-backend-release-assets
     if: github.event_name == 'release'
     permissions:
-      contents: read
-      pages: write
-      id-token: write
-    uses: ./.github/workflows/deploy-pages.yml
+      contents: write
+    uses: ./.github/workflows/deploy-pages-release.yml
     with:
       host-backend-package: proteus-python-backend-host-llvm22
       cuda-backend-package: proteus-python-backend-cuda12-llvm22

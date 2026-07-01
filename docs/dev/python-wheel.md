@@ -446,6 +446,21 @@ GitHub Pages simple indexes:
 - release channel: `https://olympus-hpc.github.io/proteus/wheels/simple/`
 - prerelease channel: `https://olympus-hpc.github.io/proteus/wheels/test/`
 
+The Pages publishing model is split by ownership:
+
+- `.github/workflows/gh-pages-docs.yml`
+  - updates only the `main` docs version on the machine-owned `gh-pages` branch
+  - does not regenerate `/wheels/*`
+- `.github/workflows/ci-wheels.yml`
+  - on release or prerelease, publishes the released tag docs and retains all
+    prior stable and prerelease tags on `gh-pages`
+  - updates the `latest` or `prerelease` alias for the new tag
+  - regenerates `/wheels/simple/` and `/wheels/test/`
+  - pushes normal additive commits to `gh-pages`
+
+The remote `gh-pages` branch must exist before either Pages publishing workflow
+can update docs. Create it manually once before enabling the workflows.
+
 Trusted Publishing must be configured on both PyPI and TestPyPI for:
 
 - `proteus-python`

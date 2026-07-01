@@ -5,6 +5,13 @@ on:
   # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
+    paths:
+      - "docs/**"
+      - "include/**"
+      - "src/**"
+      - "mkdocs.yml"
+      - ".github/workflows/deploy-pages-main.yml"
+      - ".github/workflows/gh-pages-docs.yml"
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -12,11 +19,5 @@ on:
 jobs:
   deploy:
     permissions:
-      contents: read
-      pages: write
-      id-token: write
-    uses: ./.github/workflows/deploy-pages.yml
-    with:
-      host-backend-package: proteus-python-backend-host-llvm22
-      cuda-backend-package: proteus-python-backend-cuda12-llvm22
-      rocm-backend-package: proteus-python-backend-rocm72
+      contents: write
+    uses: ./.github/workflows/deploy-pages-main.yml
