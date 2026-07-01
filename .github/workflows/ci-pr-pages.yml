@@ -152,5 +152,19 @@ jobs:
           test -f "${wheel_dir}/simple/proteus-python-backend-rocm72/index.html"
           test -f "${wheel_dir}/test/proteus-python-backend-host-llvm22/index.html"
 
+          grep -n "<h1>Proteus wheel index: simple</h1>" "${wheel_dir}/simple/index.html"
+          grep -n "<h1>Proteus wheel index: test</h1>" "${wheel_dir}/test/index.html"
+          grep -n '<ul class="link-list">' "${wheel_dir}/simple/index.html"
+          grep -n '<li><a href="proteus-python-backend-host-llvm22/">' "${wheel_dir}/simple/index.html"
+          grep -n "<h1>proteus-python-backend-host-llvm22</h1>" "${wheel_dir}/simple/proteus-python-backend-host-llvm22/index.html"
+          grep -n "&larr; Back to simple index" "${wheel_dir}/simple/proteus-python-backend-host-llvm22/index.html"
           grep -n "proteus_python_backend_host_llvm22-0.2.0" "${wheel_dir}/simple/proteus-python-backend-host-llvm22/index.html"
           grep -n "proteus_python_backend_host_llvm22-0.3.0rc1" "${wheel_dir}/test/proteus-python-backend-host-llvm22/index.html"
+          if grep -q "proteus_python_backend_host_llvm22-0.3.0rc1" "${wheel_dir}/simple/proteus-python-backend-host-llvm22/index.html"; then
+            echo "prerelease wheel unexpectedly appeared in simple channel" >&2
+            exit 1
+          fi
+          if grep -q "proteus_python_backend_host_llvm22-0.2.0" "${wheel_dir}/test/proteus-python-backend-host-llvm22/index.html"; then
+            echo "stable wheel unexpectedly appeared in test channel" >&2
+            exit 1
+          fi
