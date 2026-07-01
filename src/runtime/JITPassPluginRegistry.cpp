@@ -8,6 +8,7 @@
 #include <llvm/Support/MemoryBuffer.h>
 
 #include <algorithm>
+#include <atomic>
 #include <mutex>
 
 namespace proteus {
@@ -41,14 +42,21 @@ public:
     }
 
     Plugins.push_back(std::move(Config));
+    HasPlugins.store(true, std::memory_order_release);
   }
 
   void clear() {
     std::lock_guard<std::mutex> Lock(Mutex);
     Plugins.clear();
+    HasPlugins.store(false, std::memory_order_release);
   }
 
   std::vector<JITPassPluginConfig> snapshot() {
+    // Fast path: avoid taking the lock on the common case where no plugins are
+    // registered, which happens on every JIT kernel launch.
+    if (!HasPlugins.load(std::memory_order_acquire))
+      return {};
+
     std::lock_guard<std::mutex> Lock(Mutex);
     return Plugins;
   }
@@ -71,6 +79,7 @@ private:
   }
 
   std::mutex Mutex;
+  std::atomic<bool> HasPlugins{false};
   std::vector<JITPassPluginConfig> Plugins;
 };
 
