@@ -14,8 +14,7 @@ namespace {
 
 class JITTestPass : public llvm::PassInfoMixin<JITTestPass> {
 public:
-  llvm::PreservedAnalyses run(llvm::Module &M,
-                              llvm::ModuleAnalysisManager &) {
+  llvm::PreservedAnalyses run(llvm::Module &M, llvm::ModuleAnalysisManager &) {
     llvm::outs() << "[JITTestPass] " << M.getName() << "\n";
     return llvm::PreservedAnalyses::all();
   }
