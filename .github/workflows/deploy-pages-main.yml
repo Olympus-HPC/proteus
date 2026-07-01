@@ -1,0 +1,47 @@
+name: reusable pages deploy (main)
+
+on:
+  workflow_call:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: "pages"
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Publish gh-pages main docs
+        run: |
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo apt-get install -y graphviz doxygen
+          pip install mike mkdocs-material
+
+          git config user.name "${GITHUB_ACTOR:-github-actions[bot]}"
+          git config user.email "${GITHUB_ACTOR:-github-actions[bot]}@users.noreply.github.com"
+
+          if ! git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            echo "remote branch origin/gh-pages does not exist yet; create it manually before running Pages publishes" >&2
+            exit 1
+          fi
+          git fetch --force --depth=1 origin gh-pages:refs/heads/gh-pages
+
+          pushd docs
+          doxygen
+          popd
+          mike deploy --branch gh-pages --remote origin --ignore-remote-status --update-aliases --title Development main
+          git push origin gh-pages

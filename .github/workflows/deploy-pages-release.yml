@@ -1,0 +1,105 @@
+name: reusable pages deploy (release)
+
+on:
+  workflow_call:
+    inputs:
+      host-backend-package:
+        description: Host backend distribution name
+        required: true
+        type: string
+      cuda-backend-package:
+        description: CUDA backend distribution name
+        required: true
+        type: string
+      rocm-backend-package:
+        description: ROCm backend distribution name
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: "pages"
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Publish gh-pages release docs and wheel indexes
+        env:
+          HOST_BACKEND_PACKAGE: ${{ inputs.host-backend-package }}
+          CUDA_BACKEND_PACKAGE: ${{ inputs.cuda-backend-package }}
+          ROCM_BACKEND_PACKAGE: ${{ inputs.rocm-backend-package }}
+        run: |
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo apt-get install -y graphviz doxygen
+          pip install mike mkdocs-material
+
+          git config user.name "${GITHUB_ACTOR:-github-actions[bot]}"
+          git config user.email "${GITHUB_ACTOR:-github-actions[bot]}@users.noreply.github.com"
+
+          if ! git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            echo "remote branch origin/gh-pages does not exist yet; create it manually before running Pages publishes" >&2
+            exit 1
+          fi
+          git fetch --force --depth=1 origin gh-pages:refs/heads/gh-pages
+
+          pushd docs
+          doxygen
+          popd
+
+          if [[ "${{ github.event.release.prerelease }}" == "true" ]]; then
+            mike deploy \
+              --branch gh-pages \
+              --remote origin \
+              --ignore-remote-status \
+              --update-aliases \
+              --title "${{ github.event.release.tag_name }}" \
+              "${{ github.event.release.tag_name }}" \
+              prerelease
+          else
+            mike deploy \
+              --branch gh-pages \
+              --remote origin \
+              --ignore-remote-status \
+              --update-aliases \
+              --title "${{ github.event.release.tag_name }}" \
+              "${{ github.event.release.tag_name }}" \
+              latest
+            mike set-default --branch gh-pages --remote origin --ignore-remote-status latest
+          fi
+
+          gh_pages_dir="$(mktemp -d)"
+          git worktree add --force --detach "$gh_pages_dir" gh-pages
+
+          python scripts/generate_simple_wheel_index.py \
+            --output-dir "$gh_pages_dir/wheels" \
+            --project "$HOST_BACKEND_PACKAGE" \
+            --project "$CUDA_BACKEND_PACKAGE" \
+            --project "$ROCM_BACKEND_PACKAGE"
+
+          pushd "$gh_pages_dir"
+          git config user.name "${GITHUB_ACTOR:-github-actions[bot]}"
+          git config user.email "${GITHUB_ACTOR:-github-actions[bot]}@users.noreply.github.com"
+
+          if [[ -n "$(git status --short)" ]]; then
+            git add -A
+            git commit -m "Update wheel indexes"
+          fi
+
+          git push origin HEAD:gh-pages
+          popd
+          git worktree remove --force "$gh_pages_dir"

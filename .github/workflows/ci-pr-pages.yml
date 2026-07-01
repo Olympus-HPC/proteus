@@ -1,0 +1,156 @@
+name: pages
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "include/**"
+      - "mkdocs.yml"
+      - "src/**"
+      - "scripts/generate_simple_wheel_index.py"
+      - ".github/workflows/ci-pr-pages.yml"
+      - ".github/workflows/deploy-pages-main.yml"
+      - ".github/workflows/deploy-pages-release.yml"
+      - ".github/workflows/gh-pages-docs.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      PROTEUS_HOST_BACKEND_PACKAGE: "proteus-python-backend-host-llvm22"
+      PROTEUS_CUDA_BACKEND_PACKAGE: "proteus-python-backend-cuda12-llvm22"
+      PROTEUS_ROCM_BACKEND_PACKAGE: "proteus-python-backend-rocm72"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Build docs
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y graphviz doxygen
+          python -m pip install --upgrade pip
+          python -m pip install mike mkdocs-material
+          pushd docs
+          doxygen
+          popd
+          mkdocs build --strict
+
+      - name: Smoke test mike publishing
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git tag -f v0.0.0-smoke
+          git tag -f v0.0.0rc1-smoke
+          git branch -f gh-pages-smoke HEAD
+
+          cleanup() {
+            local worktree_dir="${1:-}"
+            if [[ -n "${worktree_dir}" && -d "${worktree_dir}" ]]; then
+              git worktree remove --force "${worktree_dir}" || true
+            fi
+            git branch -D gh-pages-smoke || true
+            git tag -d v0.0.0-smoke || true
+            git tag -d v0.0.0rc1-smoke || true
+          }
+
+          smoke_dir="$(mktemp -d)"
+          trap 'cleanup "${smoke_dir}"' EXIT
+
+          mike deploy --branch gh-pages-smoke --update-aliases --title Development main
+          mike deploy \
+            --branch gh-pages-smoke \
+            --update-aliases \
+            --title v0.0.0-smoke \
+            v0.0.0-smoke \
+            latest
+          mike deploy \
+            --branch gh-pages-smoke \
+            --update-aliases \
+            --title v0.0.0rc1-smoke \
+            v0.0.0rc1-smoke \
+            prerelease
+          mike set-default --branch gh-pages-smoke latest
+
+          git worktree add --force "${smoke_dir}" gh-pages-smoke
+          test -f "${smoke_dir}/index.html"
+          test -f "${smoke_dir}/versions.json"
+          test -f "${smoke_dir}/main/index.html"
+          test -f "${smoke_dir}/v0.0.0-smoke/index.html"
+          test -f "${smoke_dir}/v0.0.0rc1-smoke/index.html"
+          test -f "${smoke_dir}/latest/index.html"
+          test -f "${smoke_dir}/prerelease/index.html"
+
+      - name: Smoke test wheel index generation
+        run: |
+          set -euo pipefail
+
+          releases_json="$(mktemp)"
+          wheel_dir="$(mktemp -d)"
+
+          cat > "${releases_json}" <<'JSON'
+          [
+            {
+              "tag_name": "v0.2.0",
+              "draft": false,
+              "prerelease": false,
+              "published_at": "2026-06-30T12:00:00Z",
+              "html_url": "https://github.com/Olympus-HPC/proteus/releases/tag/v0.2.0",
+              "assets": [
+                {
+                  "name": "proteus_python_backend_host_llvm22-0.2.0-cp312-cp312-manylinux_2_28_x86_64.whl",
+                  "browser_download_url": "https://github.com/Olympus-HPC/proteus/releases/download/v0.2.0/proteus_python_backend_host_llvm22-0.2.0-cp312-cp312-manylinux_2_28_x86_64.whl"
+                },
+                {
+                  "name": "proteus_python_backend_cuda12_llvm22-0.2.0-cp312-cp312-manylinux_2_28_x86_64.whl",
+                  "browser_download_url": "https://github.com/Olympus-HPC/proteus/releases/download/v0.2.0/proteus_python_backend_cuda12_llvm22-0.2.0-cp312-cp312-manylinux_2_28_x86_64.whl"
+                },
+                {
+                  "name": "proteus_python_backend_rocm72-0.2.0-cp312-cp312-manylinux_2_28_x86_64.whl",
+                  "browser_download_url": "https://github.com/Olympus-HPC/proteus/releases/download/v0.2.0/proteus_python_backend_rocm72-0.2.0-cp312-cp312-manylinux_2_28_x86_64.whl"
+                }
+              ]
+            },
+            {
+              "tag_name": "v0.3.0rc1",
+              "draft": false,
+              "prerelease": true,
+              "published_at": "2026-06-29T12:00:00Z",
+              "html_url": "https://github.com/Olympus-HPC/proteus/releases/tag/v0.3.0rc1",
+              "assets": [
+                {
+                  "name": "proteus_python_backend_host_llvm22-0.3.0rc1-cp312-cp312-manylinux_2_28_x86_64.whl",
+                  "browser_download_url": "https://github.com/Olympus-HPC/proteus/releases/download/v0.3.0rc1/proteus_python_backend_host_llvm22-0.3.0rc1-cp312-cp312-manylinux_2_28_x86_64.whl"
+                }
+              ]
+            }
+          ]
+          JSON
+
+          python scripts/generate_simple_wheel_index.py \
+            --releases-json "${releases_json}" \
+            --output-dir "${wheel_dir}" \
+            --project "${PROTEUS_HOST_BACKEND_PACKAGE}" \
+            --project "${PROTEUS_CUDA_BACKEND_PACKAGE}" \
+            --project "${PROTEUS_ROCM_BACKEND_PACKAGE}"
+
+          test -f "${wheel_dir}/simple/index.html"
+          test -f "${wheel_dir}/test/index.html"
+          test -f "${wheel_dir}/simple/proteus-python-backend-host-llvm22/index.html"
+          test -f "${wheel_dir}/simple/proteus-python-backend-cuda12-llvm22/index.html"
+          test -f "${wheel_dir}/simple/proteus-python-backend-rocm72/index.html"
+          test -f "${wheel_dir}/test/proteus-python-backend-host-llvm22/index.html"
+
+          grep -n "proteus_python_backend_host_llvm22-0.2.0" "${wheel_dir}/simple/proteus-python-backend-host-llvm22/index.html"
+          grep -n "proteus_python_backend_host_llvm22-0.3.0rc1" "${wheel_dir}/test/proteus-python-backend-host-llvm22/index.html"
