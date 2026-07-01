@@ -1,0 +1,11 @@
+<map id="proteus::JitEngineDeviceHIP" name="proteus::JitEngineDeviceHIP">
+<area shape="rect" id="Node000001" title=" " alt="" coords="128,285,331,311"/>
+<area shape="rect" id="Node000002" href="$classproteus_1_1JitEngineDevice.html" title=" " alt="" coords="139,196,320,236"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="232,250,232,285,227,285,227,250"/>
+<area shape="rect" id="Node000003" href="$classproteus_1_1JitEngine.html" title=" " alt="" coords="28,101,164,126"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="124,132,206,194,203,198,120,136"/>
+<area shape="rect" id="Node000004" href="$structproteus_1_1InitLLVMTargets.html" title=" " alt="" coords="5,5,187,31"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="99,44,99,101,93,101,93,44"/>
+<area shape="rect" id="Node000005" href="$classproteus_1_1MemoryCache.html" title=" " alt="" coords="188,93,361,133"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="263,147,240,197,235,195,258,145"/>
+</map>

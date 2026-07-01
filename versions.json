@@ -3,5 +3,12 @@
     "version": "main",
     "title": "Development",
     "aliases": []
+  },
+  {
+    "version": "v2026.07.0rc1",
+    "title": "v2026.07.0rc1",
+    "aliases": [
+      "prerelease"
+    ]
   }
 ]
