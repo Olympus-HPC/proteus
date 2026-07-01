@@ -1709,11 +1709,11 @@ GitHub Pages simple indexes:</p>
 <li>updates only the <code>main</code> docs version on the machine-owned <code>gh-pages</code> branch</li>
 <li>does not regenerate <code>/wheels/*</code></li>
 <li><code>.github/workflows/ci-wheels.yml</code></li>
-<li>on release or prerelease, publishes the released tag docs and retains all
-    prior stable and prerelease tags on <code>gh-pages</code></li>
+<li>on release or prerelease, publishes the released tag docs</li>
+<li>on full releases, removes prior prerelease docs from <code>gh-pages</code></li>
 <li>updates the <code>latest</code> or <code>prerelease</code> alias for the new tag</li>
 <li>regenerates <code>/wheels/simple/</code> and <code>/wheels/test/</code></li>
-<li>pushes normal additive commits to <code>gh-pages</code></li>
+<li>pushes normal commits to <code>gh-pages</code></li>
 </ul>
 <p>The remote <code>gh-pages</code> branch must exist before either Pages publishing workflow
 can update docs. Create it manually once before enabling the workflows.</p>
