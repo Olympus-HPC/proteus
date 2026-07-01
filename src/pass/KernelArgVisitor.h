@@ -24,6 +24,7 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Instruction.h>
+#include <llvm/IR/Instructions.h>
 #include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/PassManager.h>
@@ -34,9 +35,26 @@
 namespace proteus {
 using namespace llvm;
 
+std::optional<ReturnInst*> getRetInst(Function& F) {
+  for (auto &BB : F) {
+    if (auto *TermInst = dyn_cast<ReturnInst>(BB.getTerminator()))
+      return TermInst;
+  }
+  return std::nullopt;
+}
+
 struct LambdaKernelArgAnalysis {
   Function *KernelFunction = nullptr;
   uint32_t KernelArgIndex = 0;
+  int64_t Offset = 0;
+  // Sometimes instructions like ptrtoint --> inttoptr change the layout of
+  // the kernel args.
+  std::optional<RuntimeConstantType> ChangedRCLayout = std::nullopt;
+};
+
+struct FunctionAnalysis {
+  Value *PtrArgToCB = nullptr;
+  uint32_t ArgIndex = 0;
   int64_t Offset = 0;
   // Sometimes instructions like ptrtoint --> inttoptr change the layout of
   // the kernel args.
@@ -74,14 +92,11 @@ private:
   std::optional<Value *> getCallBaseIdentityArgOperand(CallBase &CB) {
     auto *CalledFunction = CB.getCalledFunction();
     DEBUG(Logger::logs("proteus-pass")
-          << "Visiting CB with function " << *CalledFunction << "\n");
-    ReturnInst *RetInst = nullptr;
-    for (auto &BB : *CalledFunction) {
-      if (auto *TermInst = dyn_cast<ReturnInst>(BB.getTerminator()))
-        RetInst = TermInst;
-    }
-    if (!RetInst)
+          << "Checking if function is identity " << *CalledFunction << "\n");
+    auto RetInstOpt = getRetInst(*CalledFunction);
+    if (!RetInstOpt)
       return std::nullopt;
+    auto *RetInst = *RetInstOpt;
 
     DEBUG(Logger::logs("proteus-pass") << "CB called function return inst "
                                        << *RetInst->getReturnValue() << "\n");
@@ -112,6 +127,7 @@ public:
   bool empty() { return WorkList.empty(); }
   bool success() { return AnalysisSuccess; }
   bool failed() { return AnalysisFailed; }
+  auto getOffset() { return Offset; }
 
 private:
   inline std::optional<LambdaKernelArgAnalysis>
@@ -139,6 +155,46 @@ private:
     return Visitor.getKernelArgInfo();
   }
 
+  inline std::optional<FunctionAnalysis>
+  analyzeFunction(CallBase &CB,
+                  int64_t StartOffset) {
+    FunctionAnalysis Result;
+    auto &F = *CB.getCalledFunction();
+    auto RetInstOpt = getRetInst(F);
+    if (!RetInstOpt)
+        return std::nullopt;
+    LambdaArgVisitor Visitor(RetInstOpt.value()->getReturnValue(), MemoryAnalysisPtrUse, StartOffset, DL);
+    while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {
+      auto [V, AccessedFrom] = Visitor.back();
+      DEBUG(Logger::logs("proteus-pass")
+          << "Function analysis visiting " << *V << " with offset " << Visitor.getOffset() << "\n");
+      Visitor.MemoryAnalysisPtrUse = AccessedFrom;
+      Visitor.popBack();
+      // Prevent loops/infinite recursion
+      if (Visitor.seen(V))
+        continue;
+      Visitor.markAsSeen(V);
+      // Analyze the instruction
+      if (auto *I = dyn_cast<Instruction>(V))
+        Visitor.visit(*I);
+      else if (auto *A = dyn_cast<Argument>(V)) {
+        if (A->getParent() == CB.getCalledFunction()) {
+          Result.PtrArgToCB = CB.getArgOperand(A->getArgNo());
+          Result.Offset = Visitor.Offset;
+          Result.ArgIndex = A->getArgNo();
+          DEBUG(Logger::logs("proteus-pass")
+            << "Function analysis found termination case " << *Result.PtrArgToCB << " with offset " << Visitor.getOffset() << "\n");
+          return Result;
+        }
+        Visitor.visitArgument(*A);
+
+      } else
+        continue;
+    }
+
+    return std::nullopt;
+  }
+
 public:
   LambdaArgVisitor(CallBase *LambdaCB_, Module &M)
       : LambdaCB(LambdaCB_), DL(M.getDataLayout()), Offset(0) {
@@ -151,12 +207,19 @@ public:
   }
 
   void visitCallBase(CallBase &CB) {
-    // Check for the most basic case possible: a pass-through identity function.
-    auto OptionalValue = getCallBaseIdentityArgOperand(CB);
-    if (OptionalValue) {
-      WorkList.push_back({OptionalValue.value(), &CB});
+    // Clone the visitor to determine if this function (a) returns a ptr
+    // and (b) which arg determines the value of that ptr, and at which offset
+    auto SubAnalysis = analyzeFunction(CB, Offset);
+    if (SubAnalysis) {
+      WorkList.push_back({SubAnalysis.value().PtrArgToCB, &CB});
+      Offset = SubAnalysis.value().Offset;
       return;
     }
+    DEBUG(Logger::logs("proteus-pass")
+          << "Function analysis of \n"
+          << *CB.getCalledFunction() << " failed \n");
+    AnalysisFailed = true;
+    AnalysisSuccess = false;
   }
 
   void visitLoadInst(LoadInst &LI) {
@@ -248,6 +311,45 @@ public:
     GetPointerBaseWithConstantOffset(&GEP, GEPOffset, DL);
     Offset += GEPOffset;
     WorkList.push_back({GEP.getPointerOperand(), &GEP});
+  }
+
+  void visitExtractValueInst(ExtractValueInst &EVI) {
+    int64_t EVIOffset = 0;
+    GetPointerBaseWithConstantOffset(&EVI, EVIOffset, DL);
+    Offset += EVIOffset;
+    WorkList.push_back({EVI.getAggregateOperand(), &EVI});
+  }
+
+  void visitInsertValueInst(InsertValueInst &IVI) {
+    // Check if all inserted values derive from the same base ptr.
+    int64_t IVIOffset = 0;
+    auto *BaseLoad = dyn_cast<LoadInst>(IVI.getInsertedValueOperand());
+      // auto *GEP = dyn_cast<GetElementPtrInst>(IVINext->getInsertedValueOperand());
+    Value *BasePtrToCheck = BaseLoad ? BaseLoad->getPointerOperand() : IVI.getInsertedValueOperand();
+    auto *InsertedValueBase = GetPointerBaseWithConstantOffset(BasePtrToCheck, IVIOffset, DL);
+    auto *IVINext = dyn_cast<InsertValueInst>(IVI.getAggregateOperand());
+    while (IVINext) {
+      int64_t NextOff = 0;
+      auto *Load = dyn_cast<LoadInst>(IVINext->getInsertedValueOperand());
+      // auto *GEP = dyn_cast<GetElementPtrInst>(IVINext->getInsertedValueOperand());
+      Value *PtrToCheck = Load ? Load->getPointerOperand() : IVINext->getInsertedValueOperand();
+      auto *NextAggregateBase = GetPointerBaseWithConstantOffset(PtrToCheck, NextOff, DL);
+      if (NextAggregateBase != InsertedValueBase) {
+        // todo: are there IR examples where this actually matters?
+        AnalysisFailed = true;
+        AnalysisSuccess = false;
+        return;
+      }
+      // Go up the chain
+      IVINext = dyn_cast<InsertValueInst>(IVINext->getAggregateOperand());
+    }
+
+    DEBUG(Logger::logs("proteus-pass")
+    << "Insert value analysis found common base ptr : \n"
+    << *InsertedValueBase << "\n");
+
+    Offset += IVIOffset;
+    WorkList.push_back({InsertedValueBase, IVI.getInsertedValueOperand()});
   }
 
   // todo: these three methods need to be changed to find a dominating store
