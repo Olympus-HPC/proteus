@@ -85,6 +85,10 @@ jobs:
           gh_pages_dir="$(mktemp -d)"
           git worktree add --force --detach "$gh_pages_dir" gh-pages
 
+          if [[ "${{ github.event.release.prerelease }}" != "true" ]]; then
+            python scripts/remove_prerelease_mike_docs.py --site-dir "$gh_pages_dir"
+          fi
+
           python scripts/generate_simple_wheel_index.py \
             --output-dir "$gh_pages_dir/wheels" \
             --project "$HOST_BACKEND_PACKAGE" \
@@ -97,7 +101,7 @@ jobs:
 
           if [[ -n "$(git status --short)" ]]; then
             git add -A
-            git commit -m "Update wheel indexes"
+            git commit -m "Update Pages content"
           fi
 
           git push origin HEAD:gh-pages
