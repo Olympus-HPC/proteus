@@ -452,11 +452,11 @@ The Pages publishing model is split by ownership:
   - updates only the `main` docs version on the machine-owned `gh-pages` branch
   - does not regenerate `/wheels/*`
 - `.github/workflows/ci-wheels.yml`
-  - on release or prerelease, publishes the released tag docs and retains all
-    prior stable and prerelease tags on `gh-pages`
+  - on release or prerelease, publishes the released tag docs
+  - on full releases, removes prior prerelease docs from `gh-pages`
   - updates the `latest` or `prerelease` alias for the new tag
   - regenerates `/wheels/simple/` and `/wheels/test/`
-  - pushes normal additive commits to `gh-pages`
+  - pushes normal commits to `gh-pages`
 
 The remote `gh-pages` branch must exist before either Pages publishing workflow
 can update docs. Create it manually once before enabling the workflows.

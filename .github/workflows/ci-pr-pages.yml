@@ -92,6 +92,15 @@ jobs:
           test -f "${smoke_dir}/latest/index.html"
           test -f "${smoke_dir}/prerelease/index.html"
 
+          python scripts/remove_prerelease_mike_docs.py --site-dir "${smoke_dir}"
+
+          test -f "${smoke_dir}/main/index.html"
+          test -f "${smoke_dir}/v0.0.0-smoke/index.html"
+          test -f "${smoke_dir}/latest/index.html"
+          test ! -e "${smoke_dir}/v0.0.0rc1-smoke"
+          test ! -e "${smoke_dir}/prerelease"
+          python -c 'import json, sys; from scripts.remove_prerelease_mike_docs import is_prerelease_version; versions = json.load(open(sys.argv[1], encoding="utf-8")); assert all(not is_prerelease_version(entry["version"]) for entry in versions); assert all("prerelease" not in entry.get("aliases", []) for entry in versions)' "${smoke_dir}/versions.json"
+
       - name: Smoke test wheel index generation
         run: |
           set -euo pipefail
