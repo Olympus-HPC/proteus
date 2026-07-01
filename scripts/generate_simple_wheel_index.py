@@ -21,6 +21,100 @@ _DEFAULT_PROJECTS = [
 ]
 _REPOSITORY = "Olympus-HPC/proteus"
 _API_URL = "https://api.github.com"
+_PAGE_CSS = """
+    :root {
+      color-scheme: light;
+      --bg: #f7f9fc;
+      --surface: #ffffff;
+      --border: #d8e0ea;
+      --text: #1f2937;
+      --muted: #5b6878;
+      --link: #0b63ce;
+      --link-hover: #084b9a;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 32px 20px 48px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 28px 32px 32px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+      line-height: 1.15;
+    }
+
+    p {
+      margin: 0 0 24px;
+      color: var(--muted);
+    }
+
+    .backlink {
+      display: inline-block;
+      margin-bottom: 20px;
+      font-weight: 600;
+    }
+
+    ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    li + li {
+      margin-top: 12px;
+    }
+
+    a {
+      color: var(--link);
+      text-decoration: none;
+    }
+
+    a:hover,
+    a:focus-visible {
+      color: var(--link-hover);
+      text-decoration: underline;
+    }
+
+    .link-list a {
+      display: block;
+      padding: 14px 16px;
+      background: #f9fbfd;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      font-size: 1rem;
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 20px 12px 32px;
+      }
+
+      main {
+        padding: 22px 18px 24px;
+        border-radius: 12px;
+      }
+    }
+""".strip()
 
 
 def _normalize_project_name(name: str) -> str:
@@ -145,45 +239,82 @@ def _bucket_release_assets(
     return channels
 
 
-def _render_root_page(project_entries: dict[str, list[dict[str, str]]]) -> str:
-    anchors = []
+def _render_page(title: str, heading: str, intro: str, body: str) -> str:
+    return f"""<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{html.escape(title)}</title>
+    <style>
+{_PAGE_CSS}
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>{html.escape(heading)}</h1>
+      <p>{html.escape(intro)}</p>
+{body}
+    </main>
+  </body>
+</html>
+"""
+
+
+def _render_root_page(channel_name: str, project_entries: dict[str, list[dict[str, str]]]) -> str:
+    items = []
     for project_name, entries in project_entries.items():
         if not entries:
             continue
         normalized = _normalize_project_name(project_name)
-        anchors.append(
-            f'    <a href="{normalized}/">{html.escape(project_name)}</a>'
+        items.append(
+            f'        <li><a href="{normalized}/">{html.escape(project_name)}</a></li>'
         )
 
-    body = "\n".join(anchors)
-    return f"""<!DOCTYPE html>
-<html>
-  <body>
-{body}
-  </body>
-</html>
-"""
+    body = "\n".join(
+        [
+            '      <ul class="link-list">',
+            *items,
+            "      </ul>",
+        ]
+    )
+    return _render_page(
+        title=f"Proteus wheel index: {channel_name}",
+        heading=f"Proteus wheel index: {channel_name}",
+        intro="Static Python package index for Proteus backend wheels.",
+        body=body,
+    )
 
 
-def _render_project_page(project_name: str, entries: list[dict[str, str]]) -> str:
-    anchors = "\n".join(
-        f'    <a href="{html.escape(entry["href"], quote=True)}">{html.escape(entry["filename"])}</a>'
+def _render_project_page(
+    channel_name: str, project_name: str, entries: list[dict[str, str]]
+) -> str:
+    items = "\n".join(
+        f'        <li><a href="{html.escape(entry["href"], quote=True)}">{html.escape(entry["filename"])}</a></li>'
         for entry in entries
     )
-    return f"""<!DOCTYPE html>
-<html>
-  <body>
-    <h1>{html.escape(project_name)}</h1>
-{anchors}
-  </body>
-</html>
-"""
+    body = "\n".join(
+        [
+            f'      <a class="backlink" href="../">&larr; Back to {html.escape(channel_name)} index</a>',
+            '      <ul class="link-list">',
+            items,
+            "      </ul>",
+        ]
+    )
+    return _render_page(
+        title=project_name,
+        heading=project_name,
+        intro=f"Available wheel files in the {channel_name} channel.",
+        body=body,
+    )
 
 
-def _write_channel(output_dir: Path, project_entries: dict[str, list[dict[str, str]]]) -> None:
+def _write_channel(
+    output_dir: Path, channel_name: str, project_entries: dict[str, list[dict[str, str]]]
+) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "index.html").write_text(
-        _render_root_page(project_entries), encoding="utf-8"
+        _render_root_page(channel_name, project_entries), encoding="utf-8"
     )
 
     for project_name, entries in project_entries.items():
@@ -192,7 +323,7 @@ def _write_channel(output_dir: Path, project_entries: dict[str, list[dict[str, s
         project_dir = output_dir / _normalize_project_name(project_name)
         project_dir.mkdir(parents=True, exist_ok=True)
         (project_dir / "index.html").write_text(
-            _render_project_page(project_name, entries), encoding="utf-8"
+            _render_project_page(channel_name, project_name, entries), encoding="utf-8"
         )
 
 
@@ -212,8 +343,8 @@ def main() -> int:
     channels = _bucket_release_assets(releases, project_names)
     if args.output_dir.exists():
         shutil.rmtree(args.output_dir)
-    _write_channel(args.output_dir / "simple", channels["simple"])
-    _write_channel(args.output_dir / "test", channels["test"])
+    _write_channel(args.output_dir / "simple", "simple", channels["simple"])
+    _write_channel(args.output_dir / "test", "test", channels["test"])
     return 0
 
 
