@@ -1,0 +1,18 @@
+var searchData=
+[
+  ['declargs_0',['declArgs',['../classproteus_1_1Func.html#aed1cb5d24df9047fc580de6b20660ca9',1,'proteus::Func']]],
+  ['declvar_1',['declvar',['../classproteus_1_1FuncBase.html#ae81027b2005227095389c324a4d92789',1,'proteus::FuncBase::declVar(const std::string &amp;Name=&quot;var&quot;)'],['../classproteus_1_1FuncBase.html#a0be095086c1d5c1aed09e2544dbeaf9e',1,'proteus::FuncBase::declVar(size_t NElem, AddressSpace AS=AddressSpace::DEFAULT, const std::string &amp;Name=&quot;array_var&quot;)'],['../namespaceproteus.html#a59425afc88651b8587551fff1a2e6d4a',1,'proteus::declVar()']]],
+  ['declvars_2',['declvars',['../classproteus_1_1FuncBase.html#ab37258a2c231c537466e6a232c2200c6',1,'proteus::FuncBase::declVars()'],['../classproteus_1_1FuncBase.html#a5151d810bd9a9a75b733cb8a5d305865',1,'proteus::FuncBase::declVars(NameTs &amp;&amp;...Names)']]],
+  ['defruntimeconst_3',['defruntimeconst',['../classproteus_1_1FuncBase.html#ac68417bf91e524047fa6e038abc54350',1,'proteus::FuncBase::defRuntimeConst(const T &amp;Val, const std::string &amp;Name=&quot;run.const.var&quot;)'],['../classproteus_1_1FuncBase.html#ab28d5e7c9bf29cd185017967bb60a621',1,'proteus::FuncBase::defRuntimeConst(std::pair&lt; T, NameT &gt; P)']]],
+  ['defruntimeconsts_4',['defRuntimeConsts',['../classproteus_1_1FuncBase.html#a433acad0cd6d31d422bc06b0abe52d94',1,'proteus::FuncBase']]],
+  ['defvar_5',['defvar',['../classproteus_1_1FuncBase.html#a33ce406f8eab9698d74425cd20164bb9',1,'proteus::FuncBase::defVar(const T &amp;Val, const std::string &amp;Name=&quot;var&quot;)'],['../classproteus_1_1FuncBase.html#a3624e7b29e4d7d90daaa901fb91fe063',1,'proteus::FuncBase::defVar(const Var&lt; U &gt; &amp;Val, const std::string &amp;Name=&quot;var&quot;)'],['../classproteus_1_1FuncBase.html#a4c1bae0f02013bd11385b278b45c854e',1,'proteus::FuncBase::defVar(const Var&lt; U &gt; &amp;Val, const std::string &amp;Name=&quot;var&quot;)'],['../classproteus_1_1FuncBase.html#a384df26959b94037db60b2549cc34d2a',1,'proteus::FuncBase::defVar(std::pair&lt; T, NameT &gt; P)'],['../namespaceproteus.html#ac53fb34b398cb449ef5c7a388717dfce',1,'proteus::defVar()']]],
+  ['defvars_6',['defVars',['../classproteus_1_1FuncBase.html#a56e012a1d48afca070e55586d7ac535f',1,'proteus::FuncBase']]],
+  ['devicebinary_7',['deviceBinary',['../structproteus_1_1CppJitArtifact.html#a9b99de6709689329703079e983a0ab17',1,'proteus::CppJitArtifact']]],
+  ['disable_8',['disable',['../classproteus_1_1JitEngine.html#a8df30224a63042b923da71432727d41d',1,'proteus::JitEngine::disable()'],['../namespaceproteus.html#a8bb39f5810f6d04eda164df11f1ebe6a',1,'proteus::disable()']]],
+  ['dispatcher_9',['Dispatcher',['../classproteus_1_1Dispatcher.html#af5755c5d77823e85becd004fa7fa9d87',1,'proteus::Dispatcher']]],
+  ['dispatcherhost_10',['DispatcherHost',['../classproteus_1_1DispatcherHost.html#ab412e976dfd8c9d65f4b41f82743466e',1,'proteus::DispatcherHost']]],
+  ['dispatchgetruntimeconstantvalue_11',['dispatchGetRuntimeConstantValue',['../namespaceproteus.html#af2e1d2801041e0ee26e55165dcf3aa7d',1,'proteus']]],
+  ['dispatchresult_12',['DispatchResult',['../structproteus_1_1DispatchResult.html#a5d06b77b074b4ee086119e8b9157ee97',1,'proteus::DispatchResult']]],
+  ['dump_13',['dump',['../classproteus_1_1CodeGenerationConfig.html#a18becaeaa7be4977dd71d7c5057c2b0c',1,'proteus::CodeGenerationConfig::dump()'],['../classproteus_1_1Config.html#a9973134e8b3af8f03645649360e70ae1',1,'proteus::Config::dump()'],['../classproteus_1_1LambdaRegistry.html#a46a9d61f10b7f601e96ff000d3c46612',1,'proteus::LambdaRegistry::dump()']]],
+  ['dumpsymbolinfo_14',['dumpSymbolInfo',['../classproteus_1_1JitEngineHost.html#a9f5d0a0c079f2ffc91ca9c1360202880',1,'proteus::JitEngineHost']]]
+];

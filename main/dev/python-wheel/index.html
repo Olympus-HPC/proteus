@@ -1,0 +1,1796 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://olympus-hpc.github.io/proteus/latest/dev/python-wheel/">
+      
+      
+        <link rel="prev" href="../optimization-pipeline/">
+      
+      
+        <link rel="next" href="../runtime-cuda-toolchain/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/proteus-logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Python Wheel Build - Proteus</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="light-blue" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#building-the-python-wheels" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Proteus" class="md-header__button md-logo" aria-label="Proteus" data-md-component="logo">
+      
+  <img src="../../assets/proteus-logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Proteus
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Python Wheel Build
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Olympus-HPC/proteus" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Proteus" class="md-nav__button md-logo" aria-label="Proteus" data-md-component="logo">
+      
+  <img src="../../assets/proteus-logo.png" alt="logo">
+
+    </a>
+    Proteus
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Olympus-HPC/proteus" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User's guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User's guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user/install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user/integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Build System Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Interface
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Interface
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user/interface/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user/annotations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code Annotations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user/cpp-frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C++ Frontend API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user/llvmir-frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    LLVM IR Frontend API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user/mlir-frontend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MLIR Frontend API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user/dsl/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    DSL API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user/config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../user/resources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer's manual
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer's manual
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concepts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Concepts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_2" id="__nav_3_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Proteus Internals
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Proteus Internals
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../proteus-internals/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../optimization-pipeline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimization Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Wheel Build
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Wheel Build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#packaging-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Packaging Model
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build-time-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Build-Time Requirements
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-builds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local Builds
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Local Builds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#shim-wheel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shim Wheel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#host-backend-wheel-on-macos-arm64" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Host Backend Wheel on macOS arm64
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#host-backend-wheel-on-linux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Host Backend Wheel on Linux
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cuda-12-backend-wheel-on-linux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CUDA 12 Backend Wheel on Linux
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rocm-backend-wheel-on-linux" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ROCm Backend Wheel on Linux
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#linux-container-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linux Container Images
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installed-wheel-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installed-Wheel Verification
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Installed-Wheel Verification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#published-install-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Published Install Commands
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#default-host-install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Default Host Install
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#shim-only-install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shim-Only Install
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cuda-backend-install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CUDA Backend Install
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rocm-backend-install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ROCm Backend Install
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime Contract
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Runtime Contract">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#host-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Host Backend
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#backend-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backend Selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cuda-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CUDA Backend
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rocm-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ROCm Backend
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ci-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI Workflow
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../runtime-cuda-toolchain/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Detecting CUDA Toolchain
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../runtime-hip-toolchain/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Detecting HIP Assets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Creating a PR
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="building-the-python-wheels">Building the Python Wheels</h1>
+<p>Proteus now builds Python wheels as a package family rather than a single
+monolithic wheel:</p>
+<ul>
+<li><code>proteus-python</code></li>
+<li>pure-Python shim package</li>
+<li>installs no native backend by default</li>
+<li><code>proteus-python-backend-host-llvm22</code></li>
+<li>native host backend wheel for Linux and macOS</li>
+<li><code>proteus-python-backend-cuda12-llvm22</code></li>
+<li>native CUDA backend wheel for Linux <code>x86_64</code></li>
+<li><code>proteus-python-backend-rocm72</code></li>
+<li>native ROCm backend wheel for Linux <code>x86_64</code></li>
+</ul>
+<p>The user-facing import surface remains:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">proteus</span>
+</code></pre></div>
+<p>At runtime, the shim discovers installed backend entry points and prefers the
+highest-priority compatible backend:</p>
+<ol>
+<li>explicit <code>PROTEUS_BACKEND_VARIANT</code></li>
+<li>explicit <code>PROTEUS_BACKEND_KIND</code></li>
+<li>runtime-compatible GPU backend</li>
+<li>host fallback</li>
+</ol>
+<h2 id="packaging-model">Packaging Model</h2>
+<p>The shim package is built from the repository root with <code>setuptools</code> and is the
+only Python distribution published to PyPI/TestPyPI. Backend wheels are built
+from dedicated subprojects, uploaded as GitHub Release assets, and exposed
+through a static PEP 503 simple index on GitHub Pages:</p>
+<ul>
+<li>release channel: <code>https://olympus-hpc.github.io/proteus/wheels/simple/</code></li>
+<li>prerelease channel: <code>https://olympus-hpc.github.io/proteus/wheels/test/</code></li>
+</ul>
+<p>The backend packages are built from dedicated subprojects:</p>
+<ul>
+<li><code>packaging/python/backend-host</code></li>
+<li><code>packaging/python/backend-cuda</code></li>
+<li><code>packaging/python/backend-rocm</code></li>
+</ul>
+<p>Those backend projects use <code>scikit-build-core</code> and the repository CMake build,
+but they install their native payload into backend-local packages instead of
+directly under <code>proteus/</code>:</p>
+<ul>
+<li><code>proteus_backend_host/</code></li>
+<li><code>proteus_backend_cuda/</code></li>
+<li><code>proteus_backend_rocm/</code></li>
+</ul>
+<p>Each backend package contains:</p>
+<ul>
+<li>backend-local <code>_proteus.*</code></li>
+<li>backend-local <code>libproteus.*</code></li>
+<li>a generated <code>manifest.json</code> describing the concrete built variant</li>
+<li>repaired vendored LLVM/Clang shared libraries when required by that backend</li>
+<li>backend registration metadata under the <code>proteus.backends</code> entry-point group</li>
+</ul>
+<p>The distribution names encode the supported toolchain family for that wheel
+line. Today that means:</p>
+<ul>
+<li>host backend: LLVM 22</li>
+<li>CUDA backend: CUDA 12 + LLVM 22</li>
+<li>ROCm backend: ROCm 7.2</li>
+</ul>
+<p>The shim package exports:</p>
+<ul>
+<li><code>proteus.active_backend</code></li>
+<li><code>proteus.active_backend_variant</code></li>
+<li><code>proteus.available_backends()</code></li>
+<li><code>proteus.available_backend_variants()</code></li>
+<li>the selected backend's native API re-exported from <code>proteus</code></li>
+</ul>
+<h2 id="build-time-requirements">Build-Time Requirements</h2>
+<p>All backend wheel builds require:</p>
+<ul>
+<li>Python with <code>build</code></li>
+<li>CMake</li>
+<li><code>pybind11</code></li>
+<li><code>scikit-build-core</code></li>
+<li>a usable LLVM/Clang installation discovered via <code>LLVM_INSTALL_DIR</code></li>
+</ul>
+<p>Platform-specific requirements:</p>
+<ul>
+<li>macOS host backend:</li>
+<li>Homebrew LLVM 22</li>
+<li><code>delocate</code></li>
+<li>Linux host backend:</li>
+<li>the LLVM-enabled <code>manylinux_2_28</code> container</li>
+<li><code>auditwheel</code></li>
+<li>Linux CUDA backend:</li>
+<li>a local CUDA image derived from the LLVM-enabled <code>manylinux_2_28</code> container</li>
+<li>CUDA Toolkit 12 with <code>libnvptxcompiler_static.a</code></li>
+<li><code>auditwheel</code></li>
+<li>Linux ROCm backend:</li>
+<li>a local ROCm image derived from stock <code>manylinux_2_28</code></li>
+<li>ROCm HIP development toolchain</li>
+<li><code>auditwheel</code></li>
+</ul>
+<h2 id="local-builds">Local Builds</h2>
+<h3 id="shim-wheel">Shim Wheel</h3>
+<div class="highlight"><pre><span></span><code>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>/tmp/proteus-wheel-venv
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span>pip<span class="w"> </span>build<span class="w"> </span>setuptools<span class="w"> </span>setuptools-scm
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>-m<span class="w"> </span>build<span class="w"> </span>--wheel<span class="w"> </span>--outdir<span class="w"> </span>dist<span class="w"> </span>.
+</code></pre></div>
+<h3 id="host-backend-wheel-on-macos-arm64">Host Backend Wheel on macOS arm64</h3>
+<div class="highlight"><pre><span></span><code>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>/tmp/proteus-wheel-venv
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span>pip<span class="w"> </span>build<span class="w"> </span>scikit-build-core<span class="w"> </span>pybind11<span class="w"> </span>delocate
+
+brew<span class="w"> </span>install<span class="w"> </span>llvm@22
+
+<span class="nv">MACOSX_DEPLOYMENT_TARGET</span><span class="o">=</span><span class="m">14</span>.0<span class="w"> </span><span class="se">\</span>
+<span class="nv">LLVM_INSTALL_DIR</span><span class="o">=</span>/opt/homebrew/opt/llvm<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>-m<span class="w"> </span>build<span class="w"> </span>--wheel<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--outdir<span class="w"> </span>wheelhouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>packaging/python/backend-host
+</code></pre></div>
+<h3 id="host-backend-wheel-on-linux">Host Backend Wheel on Linux</h3>
+<div class="highlight"><pre><span></span><code>bash<span class="w"> </span>packaging/python/image-scripts/build-manylinux-llvm-container.sh
+
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span>pip<span class="w"> </span>build<span class="w"> </span>cibuildwheel
+<span class="nv">CIBW_MANYLINUX_X86_64_IMAGE</span><span class="o">=</span>ghcr.io/olympus-hpc/proteus-manylinux-llvm:22.1.3<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>python<span class="w"> </span>-m<span class="w"> </span>cibuildwheel<span class="w"> </span>packaging/python/backend-host<span class="w"> </span>--output-dir<span class="w"> </span>wheelhouse
+</code></pre></div>
+<h3 id="cuda-12-backend-wheel-on-linux">CUDA 12 Backend Wheel on Linux</h3>
+<div class="highlight"><pre><span></span><code><span class="nv">BASE_IMAGE</span><span class="o">=</span>ghcr.io/olympus-hpc/proteus-manylinux-llvm:22.1.3<span class="w"> </span><span class="se">\</span>
+<span class="nv">CUDA_VERSION</span><span class="o">=</span><span class="m">12</span>.4.1<span class="w"> </span><span class="se">\</span>
+<span class="nv">CUDA_MAJOR_MINOR</span><span class="o">=</span><span class="m">12</span>-4<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>bash<span class="w"> </span>packaging/python/image-scripts/build-manylinux-cuda-container.sh
+
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span>pip<span class="w"> </span>build<span class="w"> </span>cibuildwheel
+<span class="nv">CIBW_MANYLINUX_X86_64_IMAGE</span><span class="o">=</span>proteus-manylinux-cuda-local:12.4.1<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">LLVM_INSTALL_DIR</span><span class="o">=</span>/opt/llvm-22.1.3<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">CUDA_HOME</span><span class="o">=</span>/usr/local/cuda<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">PATH</span><span class="o">=</span>/opt/llvm-22.1.3/bin:/usr/local/cuda/bin:<span class="nv">$PATH</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>python<span class="w"> </span>-m<span class="w"> </span>cibuildwheel<span class="w"> </span>packaging/python/backend-cuda<span class="w"> </span>--output-dir<span class="w"> </span>wheelhouse
+</code></pre></div>
+<h3 id="rocm-backend-wheel-on-linux">ROCm Backend Wheel on Linux</h3>
+<div class="highlight"><pre><span></span><code><span class="nv">ROCM_VERSION</span><span class="o">=</span><span class="m">7</span>.2.1<span class="w"> </span><span class="se">\</span>
+<span class="nv">ROCM_EL_VERSION</span><span class="o">=</span><span class="m">8</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>bash<span class="w"> </span>packaging/python/image-scripts/build-manylinux-rocm-container.sh
+
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span>pip<span class="w"> </span>build<span class="w"> </span>cibuildwheel
+<span class="nv">CIBW_MANYLINUX_X86_64_IMAGE</span><span class="o">=</span>proteus-manylinux-rocm-local:7.2.1<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">LLVM_INSTALL_DIR</span><span class="o">=</span>/opt/rocm/llvm<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">ROCM_PATH</span><span class="o">=</span>/opt/rocm<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">PATH</span><span class="o">=</span>/opt/rocm/llvm/bin:/opt/rocm/bin:<span class="nv">$PATH</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>python<span class="w"> </span>-m<span class="w"> </span>cibuildwheel<span class="w"> </span>packaging/python/backend-rocm<span class="w"> </span>--output-dir<span class="w"> </span>wheelhouse
+</code></pre></div>
+<h2 id="linux-container-images">Linux Container Images</h2>
+<p>The Linux wheel workflows use one maintained base image and build GPU-specific
+images locally inside CI.</p>
+<p>Host backend image inputs:</p>
+<ul>
+<li><code>packaging/python/image-scripts/manylinux-llvm.Dockerfile</code></li>
+<li><code>packaging/python/image-scripts/build-llvm-manylinux.sh</code></li>
+<li><code>packaging/python/image-scripts/build-manylinux-llvm-container.sh</code></li>
+</ul>
+<p>CUDA backend image inputs:</p>
+<ul>
+<li><code>packaging/python/image-scripts/manylinux-cuda.Dockerfile</code></li>
+<li><code>packaging/python/image-scripts/build-manylinux-cuda-container.sh</code></li>
+</ul>
+<p>ROCm backend image inputs:</p>
+<ul>
+<li><code>packaging/python/image-scripts/manylinux-rocm.Dockerfile</code></li>
+<li><code>packaging/python/image-scripts/build-manylinux-rocm-container.sh</code></li>
+</ul>
+<p>Current CI image strategy:</p>
+<ul>
+<li>maintain <code>ghcr.io/olympus-hpc/proteus-manylinux-llvm:&lt;llvm-version&gt;</code></li>
+<li>derive the CUDA image locally per CI run by adding the requested CUDA toolkit</li>
+<li>derive the ROCm image locally per CI run by installing the requested ROCm
+  HIP development toolchain into stock <code>manylinux_2_28</code></li>
+</ul>
+<h2 id="installed-wheel-verification">Installed-Wheel Verification</h2>
+<p>Do not treat build-tree imports as sufficient. Install from built wheels into a
+clean environment.</p>
+<h3 id="published-install-commands">Published Install Commands</h3>
+<p>Stable shim install from PyPI:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>proteus-python
+</code></pre></div>
+<p>Stable backend installs from the GitHub Pages simple index:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--index-url<span class="w"> </span>https://olympus-hpc.github.io/proteus/wheels/simple/<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>proteus-python-backend-host-llvm22
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--index-url<span class="w"> </span>https://olympus-hpc.github.io/proteus/wheels/simple/<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>proteus-python-backend-cuda12-llvm22
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--index-url<span class="w"> </span>https://olympus-hpc.github.io/proteus/wheels/simple/<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>proteus-python-backend-rocm72
+</code></pre></div>
+<p>Prerelease shim install from TestPyPI:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span>--index-url<span class="w"> </span>https://test.pypi.org/simple/<span class="w"> </span>proteus-python
+</code></pre></div>
+<p>Prerelease backend installs from the prerelease simple index:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--index-url<span class="w"> </span>https://olympus-hpc.github.io/proteus/wheels/test/<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>proteus-python-backend-host-llvm22
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--index-url<span class="w"> </span>https://olympus-hpc.github.io/proteus/wheels/test/<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>proteus-python-backend-cuda12-llvm22
+python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--index-url<span class="w"> </span>https://olympus-hpc.github.io/proteus/wheels/test/<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>proteus-python-backend-rocm72
+</code></pre></div>
+<h3 id="default-host-install">Default Host Install</h3>
+<div class="highlight"><pre><span></span><code>/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--no-index<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--find-links<span class="w"> </span>dist<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--find-links<span class="w"> </span>wheelhouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>dist/proteus_python-*.whl<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>proteus-python-backend-host-llvm22
+
+<span class="nb">export</span><span class="w"> </span><span class="nv">PROTEUS_CLANGXX_BIN</span><span class="o">=</span>/path/to/clang++-22
+
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_backend_loader.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_host_cpp_smoke.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_host_cpp_validation.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_invalid_clang_override.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_wheel_layout.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_backend_selection.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_wildcard_import.py
+</code></pre></div>
+<h3 id="shim-only-install">Shim-Only Install</h3>
+<div class="highlight"><pre><span></span><code>/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>dist/proteus_python-*.whl
+</code></pre></div>
+<p>Validate that backend discovery reports no installed native backend:</p>
+<div class="highlight"><pre><span></span><code>/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_backend_loader_zero_backends.py
+</code></pre></div>
+<h3 id="cuda-backend-install">CUDA Backend Install</h3>
+<p>Install the shim first, then the CUDA backend wheel from the local wheelhouse:</p>
+<div class="highlight"><pre><span></span><code>/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--no-index<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--find-links<span class="w"> </span>dist<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--find-links<span class="w"> </span>wheelhouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>dist/proteus_python-*.whl<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>proteus-python-backend-cuda12-llvm22<span class="o">==</span>&lt;version&gt;
+</code></pre></div>
+<p>On CPU-only machines, validate the host path:</p>
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">PROTEUS_CLANGXX_BIN</span><span class="o">=</span>/path/to/clang++-22
+
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_backend_loader.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_host_cpp_smoke.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_host_cpp_validation.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_invalid_clang_override.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_wheel_layout.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_backend_selection.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_wildcard_import.py
+</code></pre></div>
+<p>On Linux systems with an NVIDIA GPU and driver, additionally validate:</p>
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">CUDA_HOME</span><span class="o">=</span>/usr/local/cuda
+
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_gpu_cpp_smoke.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_gpu_cpp_launch_validation.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_gpu_cpp_pointer_validation.py
+</code></pre></div>
+<h3 id="rocm-backend-install">ROCm Backend Install</h3>
+<div class="highlight"><pre><span></span><code>/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--no-index<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--find-links<span class="w"> </span>dist<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--find-links<span class="w"> </span>wheelhouse<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>dist/proteus_python-*.whl<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>proteus-python-backend-rocm72<span class="o">==</span>&lt;version&gt;
+</code></pre></div>
+<p>Validate the installed-wheel path:</p>
+<div class="highlight"><pre><span></span><code>/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_backend_loader.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_host_cpp_smoke.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_host_cpp_validation.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_invalid_clang_override.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_wheel_layout.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_backend_selection.py
+/tmp/proteus-wheel-venv/bin/python<span class="w"> </span>bindings/python/tests/test_wildcard_import.py
+</code></pre></div>
+<h2 id="runtime-contract">Runtime Contract</h2>
+<h3 id="host-backend">Host Backend</h3>
+<ul>
+<li>ships Proteus and the LLVM/Clang runtime libraries it links against</li>
+<li>does not ship a host C++ compiler toolchain</li>
+<li>still requires a host <code>clang++</code> whose major version matches the bundled
+  LLVM/Clang runtime for <code>frontend="cpp", target="host"</code></li>
+<li>for the current wheel line, use <code>clang++-22</code> or equivalent and set
+  <code>PROTEUS_CLANGXX_BIN</code> when it is not the default <code>clang++</code> on <code>PATH</code></li>
+<li>a mismatched <code>clang++</code> may fail while resolving builtin/system headers during
+  the in-process frontend compile</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Install</th>
+<th>Backend</th>
+<th>Target</th>
+<th>Required compiler/toolchain</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>pip install proteus-python</code></td>
+<td>shim only</td>
+<td>Python API only</td>
+<td>none</td>
+</tr>
+<tr>
+<td><code>pip install --index-url https://olympus-hpc.github.io/proteus/wheels/simple/ proteus-python-backend-host-llvm22</code></td>
+<td><code>proteus-python-backend-host-llvm22</code></td>
+<td>Host CPU</td>
+<td>LLVM/Clang 22.x</td>
+</tr>
+<tr>
+<td><code>pip install --index-url https://olympus-hpc.github.io/proteus/wheels/simple/ proteus-python-backend-cuda12-llvm22</code></td>
+<td><code>proteus-python-backend-cuda12-llvm22</code></td>
+<td>Host CPU + NVIDIA CUDA GPU</td>
+<td>LLVM/Clang 22.x, plus CUDA 12.x</td>
+</tr>
+<tr>
+<td><code>pip install --index-url https://olympus-hpc.github.io/proteus/wheels/simple/ proteus-python-backend-rocm72</code></td>
+<td><code>proteus-python-backend-rocm72</code></td>
+<td>Host CPU + AMD ROCm GPU</td>
+<td>ROCm 7.2.x</td>
+</tr>
+</tbody>
+</table>
+<h3 id="backend-selection">Backend Selection</h3>
+<ul>
+<li>backend kinds are <code>host</code>, <code>cuda</code>, and <code>rocm</code></li>
+<li>each installed backend wheel reports exactly one built variant id through
+  <code>proteus.active_backend_variant</code></li>
+<li>the current CI wheel line reports:</li>
+<li><code>host_llvm22</code></li>
+<li><code>cuda12_llvm22</code></li>
+<li><code>rocm72</code></li>
+<li>use <code>PROTEUS_BACKEND_KIND</code> to force the backend kind when multiple backend
+  wheels are installed</li>
+<li>use <code>PROTEUS_BACKEND_VARIANT</code> to require a specific installed variant id</li>
+<li>once a native backend is loaded, Proteus locks selection for the process and
+  rejects attempts to switch to a different backend kind or variant</li>
+</ul>
+<h3 id="cuda-backend">CUDA Backend</h3>
+<ul>
+<li>is a superset backend: host functionality remains available</li>
+<li>does not vendor <code>libcuda.so</code>, <code>libcudart</code>, or the CUDA Toolkit</li>
+<li>requires an installed NVIDIA driver for CUDA functionality</li>
+<li>requires a matching CUDA 12 toolkit root for runtime compilation</li>
+<li>for <code>frontend="cpp", target="cuda", compiler="nvcc"</code>, also requires an
+  <code>nvcc</code> executable</li>
+</ul>
+<p>CUDA toolkit resolution remains:</p>
+<ol>
+<li><code>PROTEUS_CUDA_HOME</code></li>
+<li><code>CUDA_HOME</code></li>
+<li><code>CUDA_PATH</code></li>
+</ol>
+<p>NVCC discovery for <code>compiler="nvcc"</code> remains:</p>
+<ol>
+<li><code>PROTEUS_NVCC_BIN</code></li>
+<li><code>PATH</code></li>
+</ol>
+<p>For wheel-targeted CUDA builds on Linux, Proteus now resolves <code>libcuda.so.1</code>
+with <code>dlopen()</code> at runtime instead of linking the wheel directly against the
+CUDA driver shared library. This keeps the wheel compatible with manylinux
+repair and lets host-only functionality work on machines without an NVIDIA
+driver.</p>
+<h3 id="rocm-backend">ROCm Backend</h3>
+<ul>
+<li>is a superset backend: host functionality remains available</li>
+<li>does not vendor the kernel driver</li>
+<li>requires a matching ROCm installation for HIP functionality</li>
+</ul>
+<p>ROCm toolkit resolution remains:</p>
+<ol>
+<li><code>PROTEUS_ROCM_PATH</code></li>
+<li><code>ROCM_PATH</code></li>
+<li><code>/opt/rocm</code></li>
+</ol>
+<h2 id="ci-workflow">CI Workflow</h2>
+<p>The wheel workflow is defined in <code>.github/workflows/ci-wheels.yml</code>.</p>
+<p>It runs on:</p>
+<ul>
+<li>pull requests and pushes for wheel CI</li>
+<li><code>workflow_dispatch</code> for manual runs</li>
+<li>GitHub releases for publishable builds</li>
+</ul>
+<p>It produces six artifact groups:</p>
+<ul>
+<li><code>wheels-shim</code></li>
+<li><code>sdist-shim</code></li>
+<li><code>wheels-host-linux</code></li>
+<li><code>wheels-host-macos</code></li>
+<li><code>wheels-cuda-linux</code></li>
+<li><code>wheels-rocm-linux</code></li>
+</ul>
+<p>Current target matrix:</p>
+<ul>
+<li>shim: pure Python</li>
+<li>host backend:</li>
+<li><code>macOS arm64</code></li>
+<li><code>manylinux_2_28 x86_64</code></li>
+<li>CUDA backend:</li>
+<li><code>manylinux_2_28 x86_64</code></li>
+<li>ROCm backend:</li>
+<li><code>manylinux_2_28 x86_64</code></li>
+</ul>
+<p>The workflow builds all backend wheels with <code>cibuildwheel</code>, then performs
+explicit installed-wheel validation using the newly built shim and backend
+wheels from the local artifact directories.</p>
+<p>On GitHub prereleases, the workflow publishes only the <code>proteus-python</code> shim
+artifacts to TestPyPI. On full GitHub releases, it publishes only the
+<code>proteus-python</code> shim artifacts to PyPI.</p>
+<p>Backend wheels are uploaded as GitHub Release assets and exposed through the
+GitHub Pages simple indexes:</p>
+<ul>
+<li>release channel: <code>https://olympus-hpc.github.io/proteus/wheels/simple/</code></li>
+<li>prerelease channel: <code>https://olympus-hpc.github.io/proteus/wheels/test/</code></li>
+</ul>
+<p>The Pages publishing model is split by ownership:</p>
+<ul>
+<li><code>.github/workflows/gh-pages-docs.yml</code></li>
+<li>updates only the <code>main</code> docs version on the machine-owned <code>gh-pages</code> branch</li>
+<li>does not regenerate <code>/wheels/*</code></li>
+<li><code>.github/workflows/ci-wheels.yml</code></li>
+<li>on release or prerelease, publishes the released tag docs and retains all
+    prior stable and prerelease tags on <code>gh-pages</code></li>
+<li>updates the <code>latest</code> or <code>prerelease</code> alias for the new tag</li>
+<li>regenerates <code>/wheels/simple/</code> and <code>/wheels/test/</code></li>
+<li>pushes normal additive commits to <code>gh-pages</code></li>
+</ul>
+<p>The remote <code>gh-pages</code> branch must exist before either Pages publishing workflow
+can update docs. Create it manually once before enabling the workflows.</p>
+<p>Trusted Publishing must be configured on both PyPI and TestPyPI for:</p>
+<ul>
+<li><code>proteus-python</code></li>
+</ul>
+<p>Each publisher must trust:</p>
+<ul>
+<li>repository: <code>Olympus-HPC/proteus</code></li>
+<li>workflow: <code>.github/workflows/ci-wheels.yml</code></li>
+<li>environment: <code>testpypi</code> or <code>pypi</code></li>
+</ul>
+<p>Publishable releases must come from tags that resolve to public PEP 440
+versions under <code>setuptools_scm</code>, for example:</p>
+<ul>
+<li><code>v2026.03.1</code></li>
+<li><code>v2026.03.1rc1</code></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024 - 2026 Lawrence Livermore National Security, LLC and Proteus project contributors.
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["toc.integrate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
