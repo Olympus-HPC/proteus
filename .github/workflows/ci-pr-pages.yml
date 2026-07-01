@@ -152,5 +152,5 @@ jobs:
           test -f "${wheel_dir}/simple/proteus-python-backend-rocm72/index.html"
           test -f "${wheel_dir}/test/proteus-python-backend-host-llvm22/index.html"
 
-          rg -n "proteus_python_backend_host_llvm22-0.2.0" "${wheel_dir}/simple/proteus-python-backend-host-llvm22/index.html"
-          rg -n "proteus_python_backend_host_llvm22-0.3.0rc1" "${wheel_dir}/test/proteus-python-backend-host-llvm22/index.html"
+          grep -n "proteus_python_backend_host_llvm22-0.2.0" "${wheel_dir}/simple/proteus-python-backend-host-llvm22/index.html"
+          grep -n "proteus_python_backend_host_llvm22-0.3.0rc1" "${wheel_dir}/test/proteus-python-backend-host-llvm22/index.html"
