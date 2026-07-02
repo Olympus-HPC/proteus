@@ -192,8 +192,6 @@ public:
 class LambdaInstUseVisitor : public InstVisitor<LambdaInstUseVisitor> {
 private:
   DominatorTree DTree;
-  Value *PtrBegin;
-  Value *SeenUse;
   CallerFrame ArgBeforeCB;
   int64_t Offset = 0;
   LambdaPtrUseAnalysis Result;
@@ -208,7 +206,7 @@ public:
   // need to track where the calling LambdaArgVisitor came in from, so that our
   // analysis does not
   LambdaInstUseVisitor(Value *PtrBegin_, Value *SeenUse_, const DataLayout &_DL)
-      : PtrBegin(PtrBegin_), SeenUse(SeenUse_), DL(_DL) {
+      : DL(_DL) {
     WorkList.push_back(PtrBegin_);
     Seen.insert(SeenUse_);
   }
