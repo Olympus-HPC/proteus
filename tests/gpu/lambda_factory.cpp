@@ -66,7 +66,7 @@ template <typename T> void run(T &&LB) {
   LambdaT Body = std::forward<T>(LB);
   auto func = reinterpret_cast<const void *>(&kernel<LambdaT>);
   void *args[] = {&Body};
-  gpuErrCheck(hipLaunchKernel(func, dim3(1), dim3(1), args, 0, 0));
+  gpuErrCheck(gpuLaunchKernel(func, dim3(1), dim3(1), args, 0, 0));
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
