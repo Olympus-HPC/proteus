@@ -1,9 +1,0 @@
-<map id="proteus::Var&lt; T, std::enable_if_t&lt; is_pointer_unref_v&lt; T &gt; &gt; &gt;" name="proteus::Var&lt; T, std::enable_if_t&lt; is_pointer_unref_v&lt; T &gt; &gt; &gt;">
-<area shape="rect" id="Node000001" title=" " alt="" coords="162,108,343,163"/>
-<area shape="rect" id="Node000002" href="$classproteus_1_1CodeBuilder.html" title=" " alt="" coords="5,5,164,31"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="114,36,216,106,213,110,111,41"/>
-<area shape="rect" id="Node000003" href="$classproteus_1_1IRValue.html" title=" " alt="" coords="189,5,317,31"/>
-<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="255,45,255,108,250,108,250,45"/>
-<area shape="rect" id="Node000004" href="$structproteus_1_1IRType.html" title=" " alt="" coords="341,5,463,31"/>
-<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="378,41,289,110,285,105,375,37"/>
-</map>

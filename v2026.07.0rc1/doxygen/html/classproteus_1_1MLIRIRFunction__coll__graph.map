@@ -1,7 +1,0 @@
-<map id="proteus::MLIRIRFunction" name="proteus::MLIRIRFunction">
-<area shape="rect" id="Node000001" title=" " alt="" coords="68,93,247,119"/>
-<area shape="rect" id="Node000002" href="$classproteus_1_1IRFunction.html" title=" " alt="" coords="5,5,152,31"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="100,39,148,91,144,95,96,43"/>
-<area shape="rect" id="Node000003" href="$structproteus_1_1IRType.html" title=" " alt="" coords="177,5,298,31"/>
-<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="219,43,170,95,167,91,215,39"/>
-</map>

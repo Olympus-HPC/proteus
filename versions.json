@@ -10,17 +10,5 @@
     "aliases": [
       "latest"
     ]
-  },
-  {
-    "version": "v2026.07.0rc2",
-    "title": "v2026.07.0rc2",
-    "aliases": [
-      "prerelease"
-    ]
-  },
-  {
-    "version": "v2026.07.0rc1",
-    "title": "v2026.07.0rc1",
-    "aliases": []
   }
 ]

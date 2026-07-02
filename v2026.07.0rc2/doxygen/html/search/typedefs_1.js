@@ -1,5 +1,0 @@
-var searchData=
-[
-  ['deviceerror_5ft_0',['deviceerror_t',['../classproteus_1_1JitEngineDevice.html#a1f02cecb46e4de0e20c7d4092b3a3ba6',1,'proteus::JitEngineDevice::DeviceError_t'],['../structproteus_1_1DeviceTraits_3_01JitEngineDeviceCUDA_01_4.html#abc2d3230c5ed6e4e953ef5836e229531',1,'proteus::DeviceTraits&lt; JitEngineDeviceCUDA &gt;::DeviceError_t'],['../structproteus_1_1DeviceTraits_3_01JitEngineDeviceHIP_01_4.html#a9efa64e96a8cf724084ec2bee3fd85ef',1,'proteus::DeviceTraits&lt; JitEngineDeviceHIP &gt;::DeviceError_t']]],
-  ['devicestream_5ft_1',['devicestream_t',['../classproteus_1_1JitEngineDevice.html#a5962bc884867ec347ba7e0e5cda18649',1,'proteus::JitEngineDevice::DeviceStream_t'],['../structproteus_1_1DeviceTraits_3_01JitEngineDeviceCUDA_01_4.html#a4f0915eb6d39e5d7f7d0342ef91710e0',1,'proteus::DeviceTraits&lt; JitEngineDeviceCUDA &gt;::DeviceStream_t'],['../structproteus_1_1DeviceTraits_3_01JitEngineDeviceHIP_01_4.html#ad8a0d7032b16703bf6c51c50ad1c29a3',1,'proteus::DeviceTraits&lt; JitEngineDeviceHIP &gt;::DeviceStream_t']]]
-];

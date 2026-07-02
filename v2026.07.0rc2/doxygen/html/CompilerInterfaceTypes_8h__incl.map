@@ -1,9 +1,0 @@
-<map id="include/proteus/CompilerInterfaceTypes.h" name="include/proteus/CompilerInterfaceTypes.h">
-<area shape="rect" id="Node000001" title=" " alt="" coords="37,5,222,45"/>
-<area shape="rect" id="Node000002" title=" " alt="" coords="5,93,72,119"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="109,48,64,86,61,82,106,44"/>
-<area shape="rect" id="Node000003" title=" " alt="" coords="96,93,163,119"/>
-<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="132,46,132,79,127,79,127,46"/>
-<area shape="rect" id="Node000004" title=" " alt="" coords="187,93,264,119"/>
-<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="154,43,202,82,199,87,151,48"/>
-</map>

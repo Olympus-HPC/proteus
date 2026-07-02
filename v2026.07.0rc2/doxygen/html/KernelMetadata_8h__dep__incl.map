@@ -1,7 +1,0 @@
-<map id="include/proteus/KernelMetadata.h" name="include/proteus/KernelMetadata.h">
-<area shape="rect" id="Node000001" title=" " alt="" coords="117,5,359,31"/>
-<area shape="rect" id="Node000002" href="$CompilerInterfaceDevice_8cpp.html" title=" " alt="" coords="5,79,223,119"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="209,41,145,81,142,76,206,36"/>
-<area shape="rect" id="Node000003" href="$KernelMetadata_8cpp.html" title=" " alt="" coords="247,86,477,111"/>
-<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="269,36,345,84,342,88,266,40"/>
-</map>

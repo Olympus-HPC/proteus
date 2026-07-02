@@ -1,7 +1,0 @@
-<map id="proteus::FuncBase" name="proteus::FuncBase">
-<area shape="rect" id="Node000001" title=" " alt="" coords="103,5,245,31"/>
-<area shape="rect" id="Node000002" href="$classproteus_1_1Func.html" title=" " alt="" coords="5,79,161,119"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="152,42,107,81,103,76,149,38"/>
-<area shape="rect" id="Node000003" href="$classproteus_1_1Func.html" title=" " alt="" coords="185,79,344,119"/>
-<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="199,38,245,76,241,81,196,42"/>
-</map>
