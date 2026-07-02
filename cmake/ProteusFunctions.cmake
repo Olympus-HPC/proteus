@@ -87,6 +87,9 @@ AutoRegisterProteusJITPassPlugin AutoRegisterProteusJITPassPluginInstance;
         # This generated TU only registers the JIT pass plugin and does not
         # represent product code. Exclude it from gcov instrumentation so
         # gcovr does not try to resolve a synthetic build-tree-only source.
+        # Relies on coverage being enabled with the explicit
+        # -fprofile-arcs/-ftest-coverage flags (see CMakeLists.txt), not the
+        # --coverage alias, which these -fno- flags cannot cancel.
         set_source_files_properties("${_proteus_jit_pass_source}" PROPERTIES
             COMPILE_OPTIONS "-fno-profile-arcs;-fno-test-coverage")
     endif()

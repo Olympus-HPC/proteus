@@ -67,8 +67,11 @@ if(ENABLE_COVERAGE)
     add_compile_options(
       "$<$<COMPILE_LANGUAGE:C>:-g>"
       "$<$<COMPILE_LANGUAGE:CXX>:-g>"
-      "$<$<COMPILE_LANGUAGE:C>:--coverage>"
-      "$<$<COMPILE_LANGUAGE:CXX>:--coverage>"
+      # Explicit form, not the --coverage alias: only these let a later
+      # per-source -fno-profile-arcs cancel instrumentation (see
+      # proteus_register_jit_pass_plugin in cmake/ProteusFunctions.cmake).
+      "$<$<COMPILE_LANGUAGE:C>:SHELL:-fprofile-arcs -ftest-coverage>"
+      "$<$<COMPILE_LANGUAGE:CXX>:SHELL:-fprofile-arcs -ftest-coverage>"
       "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xarch_host -g>"
       "$<$<COMPILE_LANGUAGE:CUDA>:SHELL:-Xarch_host --coverage>"
       "$<$<COMPILE_LANGUAGE:HIP>:SHELL:-Xarch_host -g>"
