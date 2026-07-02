@@ -29,7 +29,7 @@ auto declareLambda(int rc1, int rc2) {
 
 __attribute__((noinline)) gpuError_t
 launchIndirect(const void *Func, dim3 Grid, dim3 Block, void **Args) {
-  return hipLaunchKernel(Func, Grid, Block, Args, 0, 0);
+  return gpuLaunchKernel(Func, Grid, Block, Args, 0, 0);
 }
 
 template <typename T> void run(T &&LB) {
