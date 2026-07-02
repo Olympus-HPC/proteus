@@ -557,7 +557,11 @@ private:
         "Error in Proteus JitInterface API.  Please report this bug at "
         "https://github.com/Olympus-HPC/proteus.";
     findAnnotatedFunctions(M, "proteus.register_call", RegisterFunctions);
+    if (RegisterFunctions.empty())
+      DEBUG(Logger::logs("lambda-pass") << "No register func CBs found\n");
     for (auto *RegisterFunc : RegisterFunctions) {
+      DEBUG(Logger::logs("lambda-pass")
+            << "Analyzing register_func " << *RegisterFunc << "\n");
       StructType *AnonClassType = nullptr;
       StructType *FunctorType = nullptr;
       std::optional<uint64_t> FunctorID;

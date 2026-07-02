@@ -51,13 +51,11 @@ collectCurrentLambdaJitValues(std::optional<uint64_t> FunctorID) {
   if (!FunctorID)
     return EmptyMap;
 
-  auto VariantsOpt = LambdaRegistry::instance().getHostJitVariants(*FunctorID);
-  if (!VariantsOpt || VariantsOpt->empty())
+  auto VariantOpt = LambdaRegistry::instance().getHostJitVariant(*FunctorID);
+  if (!VariantOpt || VariantOpt->empty())
     return EmptyMap;
-  llvm::ArrayRef<llvm::DenseMap<int, proteus::RuntimeConstant>> Variants =
-      VariantsOpt.value();
 
-  return Variants[0];
+  return *VariantOpt;
 }
 
 } // namespace

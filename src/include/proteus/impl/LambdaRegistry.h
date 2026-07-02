@@ -14,6 +14,7 @@
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Demangle/Demangle.h>
+#include <mutex>
 #include <optional>
 
 namespace proteus {
@@ -41,143 +42,130 @@ public:
     LambdaCallsiteRuntimeConstantsMap CallsiteRuntimeConstants;
   };
 
-  std::optional<ArrayRef<JitVariantMap>>
-  getHostJitVariants(uint64_t FunctorID) const {
-    if (HostJitVariableVariants.empty())
+  std::optional<JitVariantMap> getHostJitVariant(uint64_t FunctorID) const {
+    const auto &CurrentVariants = currentHostJitVariables();
+    if (CurrentVariants.empty())
       return std::nullopt;
 
-    auto It = HostJitVariableVariants.find(FunctorID);
-    if (It == HostJitVariableVariants.end())
+    auto It = CurrentVariants.find(FunctorID);
+    if (It == CurrentVariants.end() || It->second.empty())
       return std::nullopt;
 
-    return ArrayRef<JitVariantMap>{It->second};
+    return It->second;
   }
 
   void appendHostJitVariable(uint64_t FunctorID, const RuntimeConstant &RC) {
-    PendingHostJitVariables[FunctorID][RC.Pos] = RC;
+    pendingHostJitVariables()[FunctorID][RC.Pos] = RC;
   }
 
   void commitHostJitVariables(uint64_t FunctorID) {
-    auto PendingIt = PendingHostJitVariables.find(FunctorID);
-    if (PendingIt == PendingHostJitVariables.end())
+    auto &PendingVariants = pendingHostJitVariables();
+    auto PendingIt = PendingVariants.find(FunctorID);
+    if (PendingIt == PendingVariants.end())
       return;
     if (PendingIt->second.empty())
       return;
 
-    JitVariantMap &Pending = PendingIt->second;
-    JitVariantVec &Variants = HostJitVariableVariants[FunctorID];
-
-    auto RuntimeConstantEqual = [](const RuntimeConstant &A,
-                                   const RuntimeConstant &B) -> bool {
-      if (A.Type != B.Type)
-        return false;
-      if (A.Pos != B.Pos)
-        return false;
-      if (A.Offset != B.Offset)
-        return false;
-      // Today we only register scalar jit_variable captures via
-      // __proteus_register_lambda_runtime_constant.
-      return std::memcmp(&A.Value, &B.Value, sizeof(A.Value)) == 0;
-    };
-
-    auto VariantEqual = [&](const JitVariantMap &A,
-                            const JitVariantMap &B) -> bool {
-      if (A.size() != B.size())
-        return false;
-      for (const auto &KV : A) {
-        auto It = B.find(KV.first);
-        if (It == B.end())
-          return false;
-        if (!RuntimeConstantEqual(KV.second, It->second))
-          return false;
-      }
-      return true;
-    };
-
-    bool AlreadyPresent = false;
-    for (const auto &V : Variants) {
-      if (VariantEqual(Pending, V)) {
-        AlreadyPresent = true;
-        break;
-      }
-    }
-
-    if (!AlreadyPresent) {
-      Variants.push_back(Pending);
-    }
-
-    Pending.clear();
+    currentHostJitVariables()[FunctorID] = std::move(PendingIt->second);
+    PendingVariants.erase(PendingIt);
   }
 
   void eraseHostJitVariables(uint64_t FunctorID) {
-    if (HostJitVariableVariants.contains(FunctorID))
-      HostJitVariableVariants.erase(FunctorID);
+    currentHostJitVariables().erase(FunctorID);
   }
 
-  bool emptyHost() const { return HostJitVariableVariants.empty(); }
+  bool emptyHost() const { return currentHostJitVariables().empty(); }
 
   void beginDeviceLaunch() {
-    PendingDeviceLaunchInfo.LambdaCalleeInfo.clear();
-    PendingDeviceLaunchInfo.CallsiteRuntimeConstants.clear();
-    CurrentDeviceLaunchInfo.LambdaCalleeInfo.clear();
-    CurrentDeviceLaunchInfo.CallsiteRuntimeConstants.clear();
+    auto &PendingLaunchInfo = pendingDeviceLaunchInfo();
+    auto &CurrentLaunchInfo = currentDeviceLaunchInfo();
+    PendingLaunchInfo.LambdaCalleeInfo.clear();
+    PendingLaunchInfo.CallsiteRuntimeConstants.clear();
+    CurrentLaunchInfo.LambdaCalleeInfo.clear();
+    CurrentLaunchInfo.CallsiteRuntimeConstants.clear();
   }
 
   void appendDeviceCallsiteRuntimeConstant(uint64_t LambdaID,
                                            uint32_t CallsiteIndex,
                                            const RuntimeConstant &RC) {
-    auto &RCVec =
-        PendingDeviceLaunchInfo.CallsiteRuntimeConstants[CallsiteIndex];
+    auto &PendingLaunchInfo = pendingDeviceLaunchInfo();
+    auto &RCVec = PendingLaunchInfo.CallsiteRuntimeConstants[CallsiteIndex];
     RCVec.push_back(RC);
-    if (llvm::find(PendingDeviceLaunchInfo.LambdaCalleeInfo, LambdaID) ==
-        PendingDeviceLaunchInfo.LambdaCalleeInfo.end()) {
-      PendingDeviceLaunchInfo.LambdaCalleeInfo.push_back(LambdaID);
+    if (llvm::find(PendingLaunchInfo.LambdaCalleeInfo, LambdaID) ==
+        PendingLaunchInfo.LambdaCalleeInfo.end()) {
+      PendingLaunchInfo.LambdaCalleeInfo.push_back(LambdaID);
     }
   }
 
   void finalizeDeviceLaunch() {
-    for (auto &KV : PendingDeviceLaunchInfo.CallsiteRuntimeConstants) {
+    auto &PendingLaunchInfo = pendingDeviceLaunchInfo();
+    auto &CurrentLaunchInfo = currentDeviceLaunchInfo();
+    for (auto &KV : PendingLaunchInfo.CallsiteRuntimeConstants) {
       llvm::sort(KV.second,
                  [](const RuntimeConstant &L, const RuntimeConstant &R) {
                    return L.Pos < R.Pos;
                  });
     }
-    CurrentDeviceLaunchInfo = std::move(PendingDeviceLaunchInfo);
-    PendingDeviceLaunchInfo.LambdaCalleeInfo.clear();
-    PendingDeviceLaunchInfo.CallsiteRuntimeConstants.clear();
+    CurrentLaunchInfo = std::move(PendingLaunchInfo);
+    PendingLaunchInfo.LambdaCalleeInfo.clear();
+    PendingLaunchInfo.CallsiteRuntimeConstants.clear();
   }
 
   DeviceLaunchInfo takeDeviceLaunchInfo() {
-    DeviceLaunchInfo LaunchInfo = std::move(CurrentDeviceLaunchInfo);
-    CurrentDeviceLaunchInfo.LambdaCalleeInfo.clear();
-    CurrentDeviceLaunchInfo.CallsiteRuntimeConstants.clear();
+    auto &CurrentLaunchInfo = currentDeviceLaunchInfo();
+    DeviceLaunchInfo LaunchInfo = std::move(CurrentLaunchInfo);
+    CurrentLaunchInfo.LambdaCalleeInfo.clear();
+    CurrentLaunchInfo.CallsiteRuntimeConstants.clear();
     return LaunchInfo;
   }
 
   void populateLambdaRegistrationCodeCache(void *Kernel,
                                            void *RegistrationFunc) {
+    std::lock_guard<std::mutex> Lock(DeviceRegistrationMutex);
     KernelToLambdaRegistration[Kernel] = RegistrationFunc;
   }
 
   void invokeRegisterLambdaConstants(void *Kernel, void **Args) {
-    if (!KernelToLambdaRegistration.contains(Kernel)) {
+    void *RegistrationFunc = nullptr;
+    {
+      std::lock_guard<std::mutex> Lock(DeviceRegistrationMutex);
+      auto It = KernelToLambdaRegistration.find(Kernel);
+      if (It != KernelToLambdaRegistration.end())
+        RegistrationFunc = It->second;
+    }
+    if (!RegistrationFunc) {
       beginDeviceLaunch();
       return;
     }
-    auto RegisterFunc =
-        reinterpret_cast<void (*)(void **)>(KernelToLambdaRegistration[Kernel]);
-    // Hopefully this is safe!
+    auto RegisterFunc = reinterpret_cast<void (*)(void **)>(RegistrationFunc);
     RegisterFunc(Args);
   }
 
 private:
   explicit LambdaRegistry() = default;
 
-  DenseMap<uint64_t, JitVariantVec> HostJitVariableVariants;
-  DenseMap<uint64_t, JitVariantMap> PendingHostJitVariables;
+  static DenseMap<uint64_t, JitVariantMap> &pendingHostJitVariables() {
+    static thread_local DenseMap<uint64_t, JitVariantMap> PendingHostJitVars;
+    return PendingHostJitVars;
+  }
+
+  static DenseMap<uint64_t, JitVariantMap> &currentHostJitVariables() {
+    static thread_local DenseMap<uint64_t, JitVariantMap> CurrentHostJitVars;
+    return CurrentHostJitVars;
+  }
+
+  static DeviceLaunchInfo &pendingDeviceLaunchInfo() {
+    static thread_local DeviceLaunchInfo PendingLaunchInfo;
+    return PendingLaunchInfo;
+  }
+
+  static DeviceLaunchInfo &currentDeviceLaunchInfo() {
+    static thread_local DeviceLaunchInfo CurrentLaunchInfo;
+    return CurrentLaunchInfo;
+  }
+
+  mutable std::mutex DeviceRegistrationMutex;
   DenseMap<void *, void *> KernelToLambdaRegistration;
-  DeviceLaunchInfo PendingDeviceLaunchInfo;
-  DeviceLaunchInfo CurrentDeviceLaunchInfo;
 };
 
 } // namespace proteus

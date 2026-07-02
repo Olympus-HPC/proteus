@@ -35,7 +35,7 @@
 namespace proteus {
 using namespace llvm;
 
-std::optional<ReturnInst*> getRetInst(Function& F) {
+std::optional<ReturnInst *> getRetInst(Function &F) {
   for (auto &BB : F) {
     if (auto *TermInst = dyn_cast<ReturnInst>(BB.getTerminator()))
       return TermInst;
@@ -61,8 +61,8 @@ getAggregateIndicesOffset(const DataLayout &DL, Type *AggTy,
     if (auto *AT = dyn_cast<ArrayType>(CurTy)) {
       if (Idx >= AT->getNumElements())
         return std::nullopt;
-      Offset += static_cast<int64_t>(DL.getTypeAllocSize(AT->getElementType())) *
-                Idx;
+      Offset +=
+          static_cast<int64_t>(DL.getTypeAllocSize(AT->getElementType())) * Idx;
       CurTy = AT->getElementType();
       continue;
     }
@@ -184,19 +184,20 @@ private:
     return Visitor.getKernelArgInfo();
   }
 
-  inline std::optional<FunctionAnalysis>
-  analyzeFunction(CallBase &CB,
-                  int64_t StartOffset) {
+  inline std::optional<FunctionAnalysis> analyzeFunction(CallBase &CB,
+                                                         int64_t StartOffset) {
     FunctionAnalysis Result;
     auto &F = *CB.getCalledFunction();
     auto RetInstOpt = getRetInst(F);
     if (!RetInstOpt)
-        return std::nullopt;
-    LambdaArgVisitor Visitor(RetInstOpt.value()->getReturnValue(), MemoryAnalysisPtrUse, StartOffset, DL);
+      return std::nullopt;
+    LambdaArgVisitor Visitor(RetInstOpt.value()->getReturnValue(),
+                             MemoryAnalysisPtrUse, StartOffset, DL);
     while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {
       auto [V, AccessedFrom] = Visitor.back();
       DEBUG(Logger::logs("proteus-pass")
-          << "Function analysis visiting " << *V << " with offset " << Visitor.getOffset() << "\n");
+            << "Function analysis visiting " << *V << " with offset "
+            << Visitor.getOffset() << "\n");
       Visitor.MemoryAnalysisPtrUse = AccessedFrom;
       Visitor.popBack();
       // Prevent loops/infinite recursion
@@ -212,7 +213,9 @@ private:
           Result.Offset = Visitor.Offset;
           Result.ArgIndex = A->getArgNo();
           DEBUG(Logger::logs("proteus-pass")
-            << "Function analysis found termination case " << *Result.PtrArgToCB << " with offset " << Visitor.getOffset() << "\n");
+                << "Function analysis found termination case "
+                << *Result.PtrArgToCB << " with offset " << Visitor.getOffset()
+                << "\n");
           return Result;
         }
         Visitor.visitArgument(*A);
@@ -343,9 +346,8 @@ public:
   }
 
   void visitExtractValueInst(ExtractValueInst &EVI) {
-    auto EVIOffset =
-        getAggregateIndicesOffset(DL, EVI.getAggregateOperand()->getType(),
-                                  EVI.getIndices());
+    auto EVIOffset = getAggregateIndicesOffset(
+        DL, EVI.getAggregateOperand()->getType(), EVI.getIndices());
     if (!EVIOffset) {
       AnalysisFailed = true;
       AnalysisSuccess = false;
@@ -368,9 +370,10 @@ public:
 
     int64_t IVIOffset = 0;
     auto *BaseLoad = dyn_cast<LoadInst>(IVI.getInsertedValueOperand());
-    Value *BasePtrToCheck =
-        BaseLoad ? BaseLoad->getPointerOperand() : IVI.getInsertedValueOperand();
-    auto *InsertedValueBase = GetPointerBaseWithConstantOffset(BasePtrToCheck, IVIOffset, DL);
+    Value *BasePtrToCheck = BaseLoad ? BaseLoad->getPointerOperand()
+                                     : IVI.getInsertedValueOperand();
+    auto *InsertedValueBase =
+        GetPointerBaseWithConstantOffset(BasePtrToCheck, IVIOffset, DL);
     if (!InsertedValueBase || IVIOffset != *IVIAggOffset) {
       AnalysisFailed = true;
       AnalysisSuccess = false;
@@ -379,8 +382,8 @@ public:
 
     auto *IVINext = dyn_cast<InsertValueInst>(IVI.getAggregateOperand());
     while (IVINext) {
-      auto NextAggOffset =
-          getAggregateIndicesOffset(DL, IVINext->getType(), IVINext->getIndices());
+      auto NextAggOffset = getAggregateIndicesOffset(DL, IVINext->getType(),
+                                                     IVINext->getIndices());
       if (!NextAggOffset) {
         AnalysisFailed = true;
         AnalysisSuccess = false;
@@ -391,7 +394,8 @@ public:
       auto *Load = dyn_cast<LoadInst>(IVINext->getInsertedValueOperand());
       Value *PtrToCheck =
           Load ? Load->getPointerOperand() : IVINext->getInsertedValueOperand();
-      auto *NextAggregateBase = GetPointerBaseWithConstantOffset(PtrToCheck, NextOff, DL);
+      auto *NextAggregateBase =
+          GetPointerBaseWithConstantOffset(PtrToCheck, NextOff, DL);
       if (NextAggregateBase != InsertedValueBase || NextOff != *NextAggOffset) {
         // todo: are there IR examples where this actually matters?
         AnalysisFailed = true;
@@ -403,8 +407,8 @@ public:
     }
 
     DEBUG(Logger::logs("proteus-pass")
-    << "Insert value analysis found common base ptr : \n"
-    << *InsertedValueBase << "\n");
+          << "Insert value analysis found common base ptr : \n"
+          << *InsertedValueBase << "\n");
 
     WorkList.push_back({InsertedValueBase, IVI.getInsertedValueOperand()});
   }

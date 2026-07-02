@@ -72,7 +72,8 @@ getTrackedPointerLocation(const DataLayout &DL, Value *Ptr) {
   if (!PointeeTy || !PointeeTy->isSized())
     return MemoryLocation::getBeforeOrAfter(Ptr);
 
-  return MemoryLocation(Ptr, LocationSize::precise(DL.getTypeStoreSize(PointeeTy)));
+  return MemoryLocation(Ptr,
+                        LocationSize::precise(DL.getTypeStoreSize(PointeeTy)));
 }
 
 class FunctionMemorySSAResolver {
@@ -95,22 +96,21 @@ private:
     if (Inserted) {
       It->second.TLII = std::make_unique<TargetLibraryInfoImpl>(
           Triple(F.getParent()->getTargetTriple()));
-      It->second.TLI =
-          std::make_unique<TargetLibraryInfo>(*It->second.TLII);
+      It->second.TLI = std::make_unique<TargetLibraryInfo>(*It->second.TLII);
       It->second.AC = std::make_unique<AssumptionCache>(F);
       It->second.DT = std::make_unique<DominatorTree>(F);
       It->second.AA = std::make_unique<AAResults>(*It->second.TLI);
       It->second.BAA = std::make_unique<BasicAAResult>(
           DL, F, *It->second.TLI, *It->second.AC, It->second.DT.get());
       It->second.AA->addAAResult(*It->second.BAA);
-      It->second.MSSA = std::make_unique<MemorySSA>(
-          F, It->second.AA.get(), It->second.DT.get());
+      It->second.MSSA = std::make_unique<MemorySSA>(F, It->second.AA.get(),
+                                                    It->second.DT.get());
     }
     return It->second;
   }
 
-  std::optional<LambdaPtrUseAnalysis>
-  resolveMemoryAccess(MemoryAccess *MA, int64_t Offset) {
+  std::optional<LambdaPtrUseAnalysis> resolveMemoryAccess(MemoryAccess *MA,
+                                                          int64_t Offset) {
     if (!MA)
       return std::nullopt;
 
