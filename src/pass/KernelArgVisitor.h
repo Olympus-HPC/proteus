@@ -43,6 +43,35 @@ std::optional<ReturnInst*> getRetInst(Function& F) {
   return std::nullopt;
 }
 
+inline std::optional<int64_t>
+getAggregateIndicesOffset(const DataLayout &DL, Type *AggTy,
+                          ArrayRef<unsigned> Indices) {
+  int64_t Offset = 0;
+  Type *CurTy = AggTy;
+  for (unsigned Idx : Indices) {
+    if (auto *ST = dyn_cast<StructType>(CurTy)) {
+      if (Idx >= ST->getNumElements())
+        return std::nullopt;
+      const StructLayout *SL = DL.getStructLayout(ST);
+      Offset += static_cast<int64_t>(SL->getElementOffset(Idx));
+      CurTy = ST->getElementType(Idx);
+      continue;
+    }
+
+    if (auto *AT = dyn_cast<ArrayType>(CurTy)) {
+      if (Idx >= AT->getNumElements())
+        return std::nullopt;
+      Offset += static_cast<int64_t>(DL.getTypeAllocSize(AT->getElementType())) *
+                Idx;
+      CurTy = AT->getElementType();
+      continue;
+    }
+
+    return std::nullopt;
+  }
+  return Offset;
+}
+
 struct LambdaKernelArgAnalysis {
   Function *KernelFunction = nullptr;
   uint32_t KernelArgIndex = 0;
@@ -314,27 +343,56 @@ public:
   }
 
   void visitExtractValueInst(ExtractValueInst &EVI) {
-    int64_t EVIOffset = 0;
-    GetPointerBaseWithConstantOffset(&EVI, EVIOffset, DL);
-    Offset += EVIOffset;
+    auto EVIOffset =
+        getAggregateIndicesOffset(DL, EVI.getAggregateOperand()->getType(),
+                                  EVI.getIndices());
+    if (!EVIOffset) {
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
+      return;
+    }
+    Offset += *EVIOffset;
     WorkList.push_back({EVI.getAggregateOperand(), &EVI});
   }
 
   void visitInsertValueInst(InsertValueInst &IVI) {
-    // Check if all inserted values derive from the same base ptr.
+    // Check if all inserted values derive from the same base ptr and match the
+    // aggregate field offsets they reconstruct.
+    auto IVIAggOffset =
+        getAggregateIndicesOffset(DL, IVI.getType(), IVI.getIndices());
+    if (!IVIAggOffset) {
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
+      return;
+    }
+
     int64_t IVIOffset = 0;
     auto *BaseLoad = dyn_cast<LoadInst>(IVI.getInsertedValueOperand());
-      // auto *GEP = dyn_cast<GetElementPtrInst>(IVINext->getInsertedValueOperand());
-    Value *BasePtrToCheck = BaseLoad ? BaseLoad->getPointerOperand() : IVI.getInsertedValueOperand();
+    Value *BasePtrToCheck =
+        BaseLoad ? BaseLoad->getPointerOperand() : IVI.getInsertedValueOperand();
     auto *InsertedValueBase = GetPointerBaseWithConstantOffset(BasePtrToCheck, IVIOffset, DL);
+    if (!InsertedValueBase || IVIOffset != *IVIAggOffset) {
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
+      return;
+    }
+
     auto *IVINext = dyn_cast<InsertValueInst>(IVI.getAggregateOperand());
     while (IVINext) {
+      auto NextAggOffset =
+          getAggregateIndicesOffset(DL, IVINext->getType(), IVINext->getIndices());
+      if (!NextAggOffset) {
+        AnalysisFailed = true;
+        AnalysisSuccess = false;
+        return;
+      }
+
       int64_t NextOff = 0;
       auto *Load = dyn_cast<LoadInst>(IVINext->getInsertedValueOperand());
-      // auto *GEP = dyn_cast<GetElementPtrInst>(IVINext->getInsertedValueOperand());
-      Value *PtrToCheck = Load ? Load->getPointerOperand() : IVINext->getInsertedValueOperand();
+      Value *PtrToCheck =
+          Load ? Load->getPointerOperand() : IVINext->getInsertedValueOperand();
       auto *NextAggregateBase = GetPointerBaseWithConstantOffset(PtrToCheck, NextOff, DL);
-      if (NextAggregateBase != InsertedValueBase) {
+      if (NextAggregateBase != InsertedValueBase || NextOff != *NextAggOffset) {
         // todo: are there IR examples where this actually matters?
         AnalysisFailed = true;
         AnalysisSuccess = false;
@@ -348,7 +406,6 @@ public:
     << "Insert value analysis found common base ptr : \n"
     << *InsertedValueBase << "\n");
 
-    Offset += IVIOffset;
     WorkList.push_back({InsertedValueBase, IVI.getInsertedValueOperand()});
   }
 
