@@ -1,0 +1,20 @@
+<map id="src/runtime/HIPRuntimeAPI.cpp" name="src/runtime/HIPRuntimeAPI.cpp">
+<area shape="rect" id="Node000001" title=" " alt="" coords="422,5,647,31"/>
+<area shape="rect" id="Node000002" href="$HIPRuntimeAPI_8h.html" title=" " alt="" coords="137,79,356,104"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="489,33,307,78,306,73,488,28"/>
+<area shape="rect" id="Node000006" href="$Error_8h.html" title=" " alt="" coords="380,79,497,104"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="521,33,467,72,464,68,518,29"/>
+<area shape="rect" id="Node000007" title=" " alt="" coords="489,152,548,177"/>
+<area shape="poly" id="edge9_Node000001_Node000007" title=" " alt="" coords="536,31,524,139,519,138,531,31"/>
+<area shape="rect" id="Node000008" title=" " alt="" coords="572,79,639,104"/>
+<area shape="poly" id="edge7_Node000001_Node000008" title=" " alt="" coords="548,29,586,67,582,71,544,33"/>
+<area shape="rect" id="Node000009" title=" " alt="" coords="663,79,727,104"/>
+<area shape="poly" id="edge8_Node000001_Node000009" title=" " alt="" coords="561,28,657,71,655,75,559,33"/>
+<area shape="rect" id="Node000003" title=" " alt="" coords="5,152,141,177"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="220,106,115,149,113,144,218,102"/>
+<area shape="rect" id="Node000004" title=" " alt="" coords="165,152,328,177"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="249,104,249,138,244,138,244,104"/>
+<area shape="rect" id="Node000005" title=" " alt="" coords="353,152,447,177"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="272,102,364,144,362,149,270,106"/>
+<area shape="poly" id="edge6_Node000006_Node000007" title=" " alt="" coords="453,102,497,141,494,145,450,106"/>
+</map>
