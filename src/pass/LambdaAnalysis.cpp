@@ -22,6 +22,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "LambdaAnalysis.h"
 #include "AnnotationHandler.h"
 #include "Helpers.h"
 
@@ -865,105 +866,9 @@ private:
   }
 };
 
-// New PM implementation.
-struct LambdaPass : PassInfoMixin<LambdaPass> {
-  LambdaPass(bool IsLTO) : IsLTO(IsLTO) {}
-  bool IsLTO;
-
-  PreservedAnalyses run(Module &M, ModuleAnalysisManager & /*AM*/) {
-    LambdaPassImpl PPI{M};
-
-    bool Changed = PPI.run(M, IsLTO);
-    if (Changed)
-      return PreservedAnalyses::none();
-
-    return PreservedAnalyses::all();
-  }
-
-  // Without isRequired returning true, this pass will be skipped for functions
-  // decorated with the optnone LLVM attribute. Note that clang -O0 decorates
-  // all functions with optnone.
-  static bool isRequired() { return true; }
-};
-
-// Legacy PM implementation.
-struct LegacyLambdaPass : public ModulePass {
-  static char ID;
-  LegacyLambdaPass() : ModulePass(ID) {}
-  bool runOnModule(Module &M) override {
-    LambdaPassImpl PPI{M};
-    bool Changed = PPI.run(M, false);
-    return Changed;
-  }
-};
 } // namespace
 
-//-----------------------------------------------------------------------------
-// New PM Registration
-//-----------------------------------------------------------------------------
-llvm::PassPluginLibraryInfo getLambdaPassPluginInfo() {
-  const auto Callback = [](PassBuilder &PB) {
-  // TODO: decide where to insert it in the pipeline. Early avoids
-  // inlining jit function (which disables jit'ing) but may require more
-  // optimization, hence overhead, at runtime. We choose after early
-  // simplifications which should avoid inlining and present a reasonably
-  // analyzable IR module.
-
-  // NOTE: For device jitting it should be possible to register the pass late
-  // to reduce compilation time and does lose the kernel due to inlining.
-  // However, there are linking errors, working assumption is that the hiprtc
-  // linker cannot re-link already linked device libraries and aborts.
-
-#if LLVM_VERSION_MAJOR >= 20
-    PB.registerPipelineStartEPCallback(
-        [&](ModulePassManager &MPM, OptimizationLevel) {
-          MPM.addPass(LambdaPass{false});
-        });
-#else
-    PB.registerPipelineStartEPCallback(
-        [&](ModulePassManager &MPM, OptimizationLevel) {
-          MPM.addPass(LambdaPass{false});
-          return true;
-        });
-#endif
-
-#if LLVM_VERSION_MAJOR >= 20
-    PB.registerFullLinkTimeOptimizationEarlyEPCallback(
-        [&](ModulePassManager &MPM, OptimizationLevel) {
-          MPM.addPass(LambdaPass{true});
-        });
-#else
-    PB.registerFullLinkTimeOptimizationEarlyEPCallback(
-        [&](ModulePassManager &MPM, auto) {
-          MPM.addPass(LambdaPass{true});
-          return true;
-        });
-#endif
-  };
-
-  return {LLVM_PLUGIN_API_VERSION, "LambdaPass", LLVM_VERSION_STRING, Callback};
+bool proteus::runLambdaAnalysis(Module &M, bool IsLTO) {
+  LambdaPassImpl PPI{M};
+  return PPI.run(M, IsLTO);
 }
-
-// This is the core interface for pass plugins. It guarantees that 'opt' will
-// be able to recognize LambdaPass when added to the pass pipeline on the
-// command line, i.e. via '-passes=lambda-pass'
-extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo
-llvmGetPassPluginInfo() {
-  return getLambdaPassPluginInfo();
-}
-
-//-----------------------------------------------------------------------------
-// Legacy PM Registration
-//-----------------------------------------------------------------------------
-// The address of this variable is used to uniquely identify the pass. The
-// actual value doesn't matter.
-char LegacyLambdaPass::ID = 0;
-
-// This is the core interface for pass plugins. It guarantees that 'opt' will
-// recognize LegacyLambdaPass when added to the pass pipeline on the command
-// line, i.e.  via '--legacy-lambda-pass'
-static RegisterPass<LegacyLambdaPass>
-    X("legacy-lambda-pass", "Lambda Pass",
-      false, // This pass doesn't modify the CFG => false
-      false  // This pass is not a pure analysis pass => false
-    );
