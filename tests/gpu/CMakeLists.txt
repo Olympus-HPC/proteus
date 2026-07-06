@@ -156,7 +156,6 @@ function(CREATE_GPU_TEST_FORCE exe check_source)
         ${exe}.${lang}
         PUBLIC
             "-fplugin=$<TARGET_FILE:ProteusPass>"
-            "-fplugin=$<TARGET_FILE:LambdaPass>"
             "SHELL:-Xclang -mllvm -Xclang -force-proteus-jit-annotate-all"
     )
 endfunction()
@@ -168,7 +167,6 @@ function(CREATE_GPU_TEST_RDC_FORCE exe check_source)
         ${exe}.${lang}.rdc
         PUBLIC
             "-fplugin=$<TARGET_FILE:ProteusPass>"
-            "-fplugin=$<TARGET_FILE:LambdaPass>"
             "SHELL:-Xclang -mllvm -Xclang -force-proteus-jit-annotate-all"
     )
 endfunction()

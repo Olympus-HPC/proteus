@@ -27,8 +27,8 @@
 
 #include "AnnotationHandler.h"
 #include "Helpers.h"
-
 #include "KernelArgVisitor.h"
+#include "LambdaAnalysis.h"
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Error.h"
 #include "proteus/Frontend/IRFunction.h"
@@ -1837,13 +1837,32 @@ private:
 
 // New PM implementation.
 struct ProteusPass : PassInfoMixin<ProteusPass> {
-  ProteusPass(bool IsLTO) : IsLTO(IsLTO) {}
-  bool IsLTO;
+  enum class InsertionPoint {
+    PipelineStart,
+    EarlySimplification,
+    FullLTOEarly,
+  };
+
+  ProteusPass(InsertionPoint InsertPt) : InsertPt(InsertPt) {}
+  InsertionPoint InsertPt;
 
   PreservedAnalyses run(Module &M, ModuleAnalysisManager & /*AM*/) {
-    ProteusPassImpl PPI{M};
-
-    bool Changed = PPI.run(M, IsLTO);
+    bool Changed = false;
+    switch (InsertPt) {
+    case InsertionPoint::PipelineStart:
+      Changed = runLambdaAnalysis(M, false);
+      break;
+    case InsertionPoint::EarlySimplification: {
+      ProteusPassImpl PPI{M};
+      Changed = PPI.run(M, false);
+      break;
+    }
+    case InsertionPoint::FullLTOEarly: {
+      ProteusPassImpl PPI{M};
+      Changed = PPI.run(M, true);
+      break;
+    }
+    }
     if (Changed)
       // TODO: is anything preserved?
       return PreservedAnalyses::none();
@@ -1874,20 +1893,21 @@ struct LegacyProteusPass : public ModulePass {
 //-----------------------------------------------------------------------------
 llvm::PassPluginLibraryInfo getProteusPassPluginInfo() {
   const auto Callback = [](PassBuilder &PB) {
-  // TODO: decide where to insert it in the pipeline. Early avoids
-  // inlining jit function (which disables jit'ing) but may require more
-  // optimization, hence overhead, at runtime. We choose after early
-  // simplifications which should avoid inlining and present a reasonably
-  // analyzable IR module.
+  // Run lambda analysis before inlining obscures register/jit_variable IR.
+  // Keep the full Proteus rewrite at the existing later pipeline hooks.
+#if LLVM_VERSION_MAJOR >= 20
+    PB.registerPipelineStartEPCallback(
+        [&](ModulePassManager &MPM, OptimizationLevel) {
+          MPM.addPass(ProteusPass{ProteusPass::InsertionPoint::PipelineStart});
+        });
+#else
+    PB.registerPipelineStartEPCallback(
+        [&](ModulePassManager &MPM, OptimizationLevel) {
+          MPM.addPass(ProteusPass{ProteusPass::InsertionPoint::PipelineStart});
+          return true;
+        });
+#endif
 
-  // NOTE: For device jitting it should be possible to register the pass late
-  // to reduce compilation time and does lose the kernel due to inlining.
-  // However, there are linking errors, working assumption is that the hiprtc
-  // linker cannot re-link already linked device libraries and aborts.
-
-  // PB.registerPipelineStartEPCallback(
-  // PB.registerOptimizerLastEPCallback(
-  // PM.registerPipelineEarlySimplificationEPCallback
 #if LLVM_VERSION_MAJOR >= 20
     PB.registerPipelineEarlySimplificationEPCallback(
         [&](ModulePassManager &MPM, OptimizationLevel,
@@ -1899,13 +1919,14 @@ llvm::PassPluginLibraryInfo getProteusPassPluginInfo() {
     PB.registerPipelineEarlySimplificationEPCallback(
         [&](ModulePassManager &MPM, OptimizationLevel) {
 #endif
-          MPM.addPass(ProteusPass{false});
+          MPM.addPass(
+              ProteusPass{ProteusPass::InsertionPoint::EarlySimplification});
           return true;
         });
 
     PB.registerFullLinkTimeOptimizationEarlyEPCallback(
         [&](ModulePassManager &MPM, auto) {
-          MPM.addPass(ProteusPass{true});
+          MPM.addPass(ProteusPass{ProteusPass::InsertionPoint::FullLTOEarly});
           return true;
         });
   };
