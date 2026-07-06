@@ -9,6 +9,7 @@ all:
 		-Wl,-rpath,${PROTEUS_INSTALL_DIR}/lib64 \
 		-l:libproteus.so \
 		-l:libproteus_cudart_builtins.a \
+		-L${CUDA_HOME}/lib64/stubs \
 		-L${CUDA_HOME}/lib64 \
 		-lcuda \
 		-lcudart
