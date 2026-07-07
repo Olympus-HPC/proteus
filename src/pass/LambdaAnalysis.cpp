@@ -21,7 +21,7 @@
 //
 //
 //===----------------------------------------------------------------------===//
-
+// clang-format off
 #include "LambdaAnalysis.h"
 #include "AnnotationHandler.h"
 #include "Helpers.h"
@@ -94,8 +94,8 @@
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
 #include <limits>
-#include <queue>
 #include <string>
+// clang-format on
 
 using namespace llvm;
 using namespace proteus;
