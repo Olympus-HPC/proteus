@@ -50,13 +50,6 @@ class Proteus(CMakePackage, CudaPackage, ROCmPackage):
         "+cuda +rocm",
         msg="Proteus cannot be built with both +cuda and +rocm simultaneously",
     )
-    # Disallow building proteus as shared library with CUDA due to issue with
-    # JIT compilation and device globals.
-    conflicts(
-        "+shared +cuda",
-        msg="Proteus cannot be built as a shared library with +cuda enabled "
-        "due to JIT compilation issues with device globals",
-    )
     # Require the Clang compiler since tests use the Proteus LLVM plugin.
     requires("%clang@18:20", when="+tests")
 
