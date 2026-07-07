@@ -26,6 +26,7 @@ class Proteus(CMakePackage, CudaPackage, ROCmPackage):
     version("main", branch="main")
     version("2026.01.0", tag="v2026.01.0")
     version("2026.05.0", tag="v2026.05.0")
+    version("2026.07.0", tag="v2026.07.0")
 
     # Variants to control build options.
     variant(
