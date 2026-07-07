@@ -23,7 +23,32 @@ run_mpi() {
     fi
 }
 
-# Build proteus with MPI enabled.
+# Build proteus with MPI enabled. Conda's linker does not follow the default
+# Matrix MVAPICH transitive library search paths during CMake's MPI link probe,
+# so make those paths explicit without changing the MPI selected by the module.
+MPI_RPATH_LINK_DIRS=()
+if [[ -n "${CONDA_PREFIX}" ]]; then
+    MPI_RPATH_LINK_DIRS+=(
+        "${CONDA_PREFIX}/lib"
+        "${CONDA_PREFIX}/x86_64-conda-linux-gnu/lib"
+    )
+fi
+MPI_RPATH_LINK_DIRS+=(
+    /lib64
+    /usr/tce/backend/installations/linux-rhel8-x86_64/gcc-10.3.1/intel-oneapi-compilers-2022.1.0-43xp3r52jx2q2rkf3ctzvskqu572xbky/compiler/2022.1.0/linux/compiler/lib/intel64_lin
+    /usr/tce/backend/installations/linux-rhel8-x86_64/intel-2021.6.0/mvapich2-2.3.7-2575ifqlr5fbj34wdlj2fo2tmqdrehia/lib
+    /usr/tce/backend/installations/linux-rhel8-x86_64/gcc-8.5.0/zlib-1.2.13-pwvjwcyuqiscffdc2x2lr7ti355xwohq/lib
+)
+MPI_RPATH_LINK_FLAGS=""
+for dir in "${MPI_RPATH_LINK_DIRS[@]}"; do
+    if [[ -d "${dir}" ]]; then
+        MPI_RPATH_LINK_FLAGS+="${MPI_RPATH_LINK_FLAGS:+ }-Wl,-rpath-link,${dir}"
+    fi
+done
+MPI_CMAKE_ARGS=(
+    -DCMAKE_EXE_LINKER_FLAGS="${MPI_RPATH_LINK_FLAGS}"
+)
+
 cmake -S ${CI_PROJECT_DIR} -B build-proteus \
     -DLLVM_INSTALL_DIR="${LLVM_INSTALL_DIR}" \
     -DCMAKE_C_COMPILER="${LLVM_INSTALL_DIR}/bin/clang" \
@@ -32,7 +57,8 @@ cmake -S ${CI_PROJECT_DIR} -B build-proteus \
     -DPROTEUS_ENABLE_CUDA=on \
     -DPROTEUS_ENABLE_MPI=on \
     -DENABLE_TESTS=off \
-    -DBUILD_SHARED=off
+    -DBUILD_SHARED=off \
+    "${MPI_CMAKE_ARGS[@]}"
 
 pushd build-proteus
 make -j install
@@ -44,7 +70,8 @@ cmake -S ${TEST_DIR} -B build \
     -DCMAKE_CXX_COMPILER="${LLVM_INSTALL_DIR}/bin/clang++" \
     -DCMAKE_CUDA_COMPILER="${LLVM_INSTALL_DIR}/bin/clang++" \
     -DCMAKE_CUDA_ARCHITECTURES=90 \
-    -Dproteus_DIR="${PWD}/install-proteus"
+    -Dproteus_DIR="${PWD}/install-proteus" \
+    "${MPI_CMAKE_ARGS[@]}"
 pushd build
 make -j
 popd

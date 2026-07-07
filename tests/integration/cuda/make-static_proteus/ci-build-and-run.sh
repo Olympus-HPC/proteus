@@ -19,7 +19,7 @@ LLVM_LIBS+=" "$(${LLVM_INSTALL_DIR}/bin/llvm-config --system-libs)
 
 cp -r ${TEST_DIR}/* .
 export PROTEUS_INSTALL_DIR=${PWD}/install-proteus
-export LLVM_LIBFLAGS="-L ${LLVM_LIBDIR} ${LLVM_LIBS} -llldCommon -llldELF"
+export LLVM_LIBFLAGS="-L ${LLVM_LIBDIR} ${LLVM_LIBS}"
 echo "LLVM_LIBFLAGS ${LLVM_LIBFLAGS}"
 make -j
 ./main

@@ -10,6 +10,7 @@ all:
 		-l:libproteus.a \
 		-l:libproteus_cudart_builtins.a \
 		${LLVM_LIBFLAGS} \
+		-L${CUDA_HOME}/lib64/stubs \
 		-L${CUDA_HOME}/lib64 \
 		-lcuda \
 		-lcudart \
