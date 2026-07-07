@@ -17,6 +17,7 @@ class Proteus(CMakePackage, CudaPackage, ROCmPackage):
     """
 
     homepage = "https://github.com/Olympus-HPC/proteus"
+    url = "https://github.com/Olympus-HPC/proteus/archive/refs/tags/v2026.07.0.tar.gz"
     git = "https://github.com/Olympus-HPC/proteus.git"
 
     maintainers("ggeorgakoudis")
@@ -24,9 +25,22 @@ class Proteus(CMakePackage, CudaPackage, ROCmPackage):
     license("Apache-2.0 WITH LLVM-exception")
 
     version("main", branch="main")
-    version("2026.01.0", tag="v2026.01.0")
-    version("2026.05.0", tag="v2026.05.0")
-    version("2026.07.0", tag="v2026.07.0")
+    version(
+        "2026.07.0",
+        sha256="4131ed4fc932784d3a5a978fd48475a92c2acc439cb3511eccd7d799016650f2",
+    )
+    version(
+        "2026.05.0",
+        sha256="ddccebbdda332a05ff259976ebad54822f4e412e293629035fdfea023d57246f",
+    )
+    version(
+        "2026.03.0",
+        sha256="4268c210883de1ca8afaa985cd1429505bbe130fc6cbdbb16bce16598063aa8c",
+    )
+    version(
+        "2026.01.0",
+        sha256="3045ecec79ae46bc73a9cc5c01e1f4545b5ad25dbf0c9b67cce6890a8f93bc46",
+    )
 
     # Variants to control build options.
     variant(
