@@ -8,7 +8,6 @@
 #include "proteus/impl/LambdaCallsite.h"
 #include "proteus/impl/Logger.h"
 
-#include <cstring>
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/ADT/SmallVector.h>

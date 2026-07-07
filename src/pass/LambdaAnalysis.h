@@ -3,7 +3,7 @@
 
 namespace llvm {
 class Module;
-}
+} // namespace llvm
 
 namespace proteus {
 

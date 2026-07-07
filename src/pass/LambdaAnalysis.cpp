@@ -32,7 +32,6 @@
 #include "proteus/impl/LambdaCallsite.h"
 #include "proteus/impl/Logger.h"
 
-#include <cstddef>
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/DenseSet.h>
 #include <llvm/ADT/SmallPtrSet.h>
@@ -65,6 +64,7 @@
 #include <llvm/Linker/Linker.h>
 #include <llvm/Object/ELF.h>
 #include <llvm/Passes/PassBuilder.h>
+#include <cstddef>
 // Upstream LLVM 22.1.0 moved PassPlugin.h from llvm/Passes to llvm/Plugins,
 // while ROCm-packaged LLVM still uses the older include path.
 #if __has_include(<llvm/Plugins/PassPlugin.h>)
@@ -373,7 +373,7 @@ private:
         LambdaOperator->getName() + "_clone_" + std::to_string(Suffix),
         LambdaOperator->getParent());
 
-    auto NewArgIt = NewFunc->arg_begin();
+    auto *NewArgIt = NewFunc->arg_begin();
     for (auto &OldArg : LambdaOperator->args()) {
       NewArgIt->setName(OldArg.getName());
       VMap[&OldArg] = &(*NewArgIt++);
@@ -414,10 +414,10 @@ private:
           std::string CalledFunctionName = Callee->getName().str();
           std::string DemangledCalledFunctionName =
               demangle(CalledFunctionName);
-          bool isCallOp = DemangledCalledFunctionName.find("operator()") !=
+          bool IsCallOp = DemangledCalledFunctionName.find("operator()") !=
                           std::string::npos;
 
-          bool looksLikeLambda =
+          bool LooksLikeLambda =
               DemangledCalledFunctionName.find("{lambda") !=
                   std::string::npos || // common demangle form
               DemangledCalledFunctionName.find("::$_") !=
@@ -427,7 +427,7 @@ private:
               llvm::StringRef(CalledFunctionName)
                   .starts_with("_ZZ"); // local-scope Itanium
 
-          if (!isCallOp || !looksLikeLambda)
+          if (!IsCallOp || !LooksLikeLambda)
             continue;
 
           LambdaCallToFunctor[Callee].emplace_back(CB, FunctorId);
@@ -708,8 +708,8 @@ private:
       }
       // These two integers need to be equivalent--we track down each callsite
       // to an offset in the struct.
-      uint16_t numJitVars = WorkList.size();
-      uint16_t numSlotsFound = 0;
+      uint16_t NumJitVars = WorkList.size();
+      uint16_t NumSlotsFound = 0;
 
       while (!WorkList.empty()) {
         Value *CurVal = WorkList.back();
@@ -729,7 +729,7 @@ private:
           if (!PossibleLamType ||
               !RegisteredLambdaStorageClasses.contains(PossibleLamType))
             continue;
-          ++numSlotsFound;
+          ++NumSlotsFound;
           JitIndices[PossibleLamType].emplace_back(
               LambdaJitVariableInfo{Slot, Slot, LoadType});
           if (!LoadType)
@@ -758,11 +758,11 @@ private:
 
           JitIndices[PossibleLamType].emplace_back(
               LambdaJitVariableInfo{Slot, OffsetCI, LoadType});
-          ++numSlotsFound;
+          ++NumSlotsFound;
         }
       }
 
-      if (numJitVars != numSlotsFound) {
+      if (NumJitVars != NumSlotsFound) {
         DEBUG(Logger::logs("lambda-pass").flush());
         reportFatalError(
             "Analysis found jit_variable callsite outside lambda capture list");

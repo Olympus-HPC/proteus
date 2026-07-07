@@ -6,8 +6,6 @@
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/impl/Logger.h"
 #include "proteus/impl/RuntimeConstantTypeHelpers.h"
-#include <alloca.h>
-#include <cstdint>
 #include <llvm/Analysis/PtrUseVisitor.h>
 #include <llvm/Analysis/ValueTracking.h>
 
@@ -113,8 +111,8 @@ private:
 
   // Constructor used for cloning and merging branches of phi node analysis
   LambdaArgVisitor(Value *Start, Value *LastSeen, int64_t Off,
-                   const DataLayout &_DL)
-      : DL(_DL), Offset(Off) {
+                   const DataLayout &Dl)
+      : DL(Dl), Offset(Off) {
     WorkList.push_back({Start, LastSeen});
   }
 
@@ -228,8 +226,8 @@ private:
   }
 
 public:
-  LambdaArgVisitor(CallBase *LambdaCB_, Module &M)
-      : LambdaCB(LambdaCB_), DL(M.getDataLayout()), Offset(0) {
+  LambdaArgVisitor(CallBase *LambdaCb, Module &M)
+      : LambdaCB(LambdaCb), DL(M.getDataLayout()), Offset(0) {
     auto *ClosurePtr = LambdaCB->getArgOperand(0);
     WorkList.push_back({ClosurePtr, LambdaCB});
   }

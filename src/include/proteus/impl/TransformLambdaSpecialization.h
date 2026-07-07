@@ -215,7 +215,7 @@ private:
     NewFunc->copyAttributesFrom(&F);
     NewFunc->setCallingConv(F.getCallingConv());
 
-    auto NewArgIt = NewFunc->arg_begin();
+    auto *NewArgIt = NewFunc->arg_begin();
     for (auto &OldArg : F.args()) {
       NewArgIt->setName(OldArg.getName());
       VMap[&OldArg] = &(*NewArgIt++);
@@ -302,16 +302,16 @@ private:
     if (LambdaStorageBasePointerOffset < 0)
       reportFatalError("Negative KernelByteOffset");
 
-    auto *base = static_cast<const unsigned char *>(KernelArgs[KernelArgIndex]);
-    if (!base)
+    auto *Base = static_cast<const unsigned char *>(KernelArgs[KernelArgIndex]);
+    if (!Base)
       reportFatalError("KernelArgs[KernelArgIndex] is null");
 
     const unsigned char *StorageBase = nullptr;
     if (StorageType == RuntimeConstantType::NONE) {
-      StorageBase = base + static_cast<size_t>(LambdaStorageBasePointerOffset);
+      StorageBase = Base + static_cast<size_t>(LambdaStorageBasePointerOffset);
     } else {
       const unsigned char *IndirectStoragePtr =
-          base + static_cast<size_t>(LambdaStorageBasePointerOffset);
+          Base + static_cast<size_t>(LambdaStorageBasePointerOffset);
       uintptr_t StorageAddr = 0;
       switch (StorageType) {
       case RuntimeConstantType::INT64: {
@@ -334,34 +334,34 @@ private:
         reportFatalError("Null indirect kernel lambda storage pointer");
     }
 
-    const unsigned char *ptr = StorageBase + static_cast<size_t>(RCOffset);
+    const unsigned char *Ptr = StorageBase + static_cast<size_t>(RCOffset);
 
     RuntimeConstant RC{Type, Pos, RCOffset};
 
     switch (Type) {
     case RuntimeConstantType::BOOL:
-      std::memcpy(&RC.Value.BoolVal, ptr, sizeof(RC.Value.BoolVal));
+      std::memcpy(&RC.Value.BoolVal, Ptr, sizeof(RC.Value.BoolVal));
       break;
     case RuntimeConstantType::INT8:
-      std::memcpy(&RC.Value.Int8Val, ptr, sizeof(RC.Value.Int8Val));
+      std::memcpy(&RC.Value.Int8Val, Ptr, sizeof(RC.Value.Int8Val));
       break;
     case RuntimeConstantType::INT32:
-      std::memcpy(&RC.Value.Int32Val, ptr, sizeof(RC.Value.Int32Val));
+      std::memcpy(&RC.Value.Int32Val, Ptr, sizeof(RC.Value.Int32Val));
       break;
     case RuntimeConstantType::INT64:
-      std::memcpy(&RC.Value.Int64Val, ptr, sizeof(RC.Value.Int64Val));
+      std::memcpy(&RC.Value.Int64Val, Ptr, sizeof(RC.Value.Int64Val));
       break;
     case RuntimeConstantType::FLOAT:
-      std::memcpy(&RC.Value.FloatVal, ptr, sizeof(RC.Value.FloatVal));
+      std::memcpy(&RC.Value.FloatVal, Ptr, sizeof(RC.Value.FloatVal));
       break;
     case RuntimeConstantType::DOUBLE:
-      std::memcpy(&RC.Value.DoubleVal, ptr, sizeof(RC.Value.DoubleVal));
+      std::memcpy(&RC.Value.DoubleVal, Ptr, sizeof(RC.Value.DoubleVal));
       break;
     case RuntimeConstantType::LONG_DOUBLE:
-      std::memcpy(&RC.Value.LongDoubleVal, ptr, sizeof(RC.Value.LongDoubleVal));
+      std::memcpy(&RC.Value.LongDoubleVal, Ptr, sizeof(RC.Value.LongDoubleVal));
       break;
     case RuntimeConstantType::PTR:
-      std::memcpy(&RC.Value.PtrVal, ptr, sizeof(RC.Value.PtrVal));
+      std::memcpy(&RC.Value.PtrVal, Ptr, sizeof(RC.Value.PtrVal));
       break;
     default:
       reportFatalError("Unsupported RuntimeConstantType in kernel-arg reader");
@@ -379,36 +379,36 @@ private:
     if (RCOffset < 0)
       reportFatalError("Negative runtime constant offset");
 
-    const unsigned char *base =
+    const unsigned char *Base =
         static_cast<const unsigned char *>(StorageBasePtr);
-    const unsigned char *ptr = base + static_cast<size_t>(RCOffset);
+    const unsigned char *Ptr = Base + static_cast<size_t>(RCOffset);
 
     RuntimeConstant RC{Type, Pos, RCOffset};
 
     switch (Type) {
     case RuntimeConstantType::BOOL:
-      std::memcpy(&RC.Value.BoolVal, ptr, sizeof(RC.Value.BoolVal));
+      std::memcpy(&RC.Value.BoolVal, Ptr, sizeof(RC.Value.BoolVal));
       break;
     case RuntimeConstantType::INT8:
-      std::memcpy(&RC.Value.Int8Val, ptr, sizeof(RC.Value.Int8Val));
+      std::memcpy(&RC.Value.Int8Val, Ptr, sizeof(RC.Value.Int8Val));
       break;
     case RuntimeConstantType::INT32:
-      std::memcpy(&RC.Value.Int32Val, ptr, sizeof(RC.Value.Int32Val));
+      std::memcpy(&RC.Value.Int32Val, Ptr, sizeof(RC.Value.Int32Val));
       break;
     case RuntimeConstantType::INT64:
-      std::memcpy(&RC.Value.Int64Val, ptr, sizeof(RC.Value.Int64Val));
+      std::memcpy(&RC.Value.Int64Val, Ptr, sizeof(RC.Value.Int64Val));
       break;
     case RuntimeConstantType::FLOAT:
-      std::memcpy(&RC.Value.FloatVal, ptr, sizeof(RC.Value.FloatVal));
+      std::memcpy(&RC.Value.FloatVal, Ptr, sizeof(RC.Value.FloatVal));
       break;
     case RuntimeConstantType::DOUBLE:
-      std::memcpy(&RC.Value.DoubleVal, ptr, sizeof(RC.Value.DoubleVal));
+      std::memcpy(&RC.Value.DoubleVal, Ptr, sizeof(RC.Value.DoubleVal));
       break;
     case RuntimeConstantType::LONG_DOUBLE:
-      std::memcpy(&RC.Value.LongDoubleVal, ptr, sizeof(RC.Value.LongDoubleVal));
+      std::memcpy(&RC.Value.LongDoubleVal, Ptr, sizeof(RC.Value.LongDoubleVal));
       break;
     case RuntimeConstantType::PTR:
-      std::memcpy(&RC.Value.PtrVal, ptr, sizeof(RC.Value.PtrVal));
+      std::memcpy(&RC.Value.PtrVal, Ptr, sizeof(RC.Value.PtrVal));
       break;
     default:
       reportFatalError(
