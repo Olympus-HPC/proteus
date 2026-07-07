@@ -1891,7 +1891,7 @@ struct LegacyProteusPass : public ModulePass {
 //-----------------------------------------------------------------------------
 // New PM Registration
 //-----------------------------------------------------------------------------
-llvm::PassPluginLibraryInfo getProteusPassPluginInfo() {
+static llvm::PassPluginLibraryInfo getProteusPassPluginInfo() {
   const auto Callback = [](PassBuilder &PB) {
   // Run lambda analysis before inlining obscures register/jit_variable IR.
   // Keep the full Proteus rewrite at the existing later pipeline hooks.

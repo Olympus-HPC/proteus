@@ -622,7 +622,7 @@ JitEngineDevice<ImplT>::compileAndRun(
         relinkGlobalsObject(CompiledLib->ObjectModule->getMemBufferRef(),
                             BinInfo.getVarNameToGlobalInfo());
 
-      auto KernelFunc = proteus::getKernelFunctionFromImage(
+      auto *KernelFunc = proteus::getKernelFunctionFromImage(
           KernelMangled, CompiledLib->ObjectModule->getBufferStart(),
           Config::get().ProteusRelinkGlobalsByCopy,
           BinInfo.getVarNameToGlobalInfo());

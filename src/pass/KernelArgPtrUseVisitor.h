@@ -5,8 +5,6 @@
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/impl/Logger.h"
 #include "proteus/impl/RuntimeConstantTypeHelpers.h"
-#include <alloca.h>
-#include <cstdint>
 #include <llvm/Analysis/PtrUseVisitor.h>
 #include <llvm/Analysis/ValueTracking.h>
 
@@ -167,7 +165,7 @@ private:
   }
 
 public:
-  explicit FunctionMemorySSAResolver(const DataLayout &DL_) : DL(DL_) {}
+  explicit FunctionMemorySSAResolver(const DataLayout &Dl) : DL(Dl) {}
 
   std::optional<LambdaPtrUseAnalysis> resolve(Value *TrackedPtr,
                                               Instruction *UseI) {
@@ -205,10 +203,10 @@ public:
   // Constructor used whenever a NeedsDefUseAnalysis Value is encountered. We
   // need to track where the calling LambdaArgVisitor came in from, so that our
   // analysis does not
-  LambdaInstUseVisitor(Value *PtrBegin_, Value *SeenUse_, const DataLayout &_DL)
-      : DL(_DL) {
-    WorkList.push_back(PtrBegin_);
-    Seen.insert(SeenUse_);
+  LambdaInstUseVisitor(Value *PtrBegin, Value *SeenUse, const DataLayout &Dl)
+      : DL(Dl) {
+    WorkList.push_back(PtrBegin);
+    Seen.insert(SeenUse);
   }
   auto back() { return WorkList.back(); }
   void popBack() { WorkList.pop_back(); }
