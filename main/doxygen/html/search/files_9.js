@@ -14,5 +14,7 @@ var searchData=
   ['jitfrontend_2eh_11',['JitFrontend.h',['../JitFrontend_8h.html',1,'']]],
   ['jitfuncattribute_2ecpp_12',['JitFuncAttribute.cpp',['../JitFuncAttribute_8cpp.html',1,'']]],
   ['jitfuncattribute_2eh_13',['jitfuncattribute.h',['../include_2proteus_2JitFuncAttribute_8h.html',1,'(Global Namespace)'],['../src_2include_2proteus_2impl_2Frontend_2JitFuncAttribute_8h.html',1,'(Global Namespace)']]],
-  ['jitinterface_2eh_14',['JitInterface.h',['../JitInterface_8h.html',1,'']]]
+  ['jitinterface_2eh_14',['JitInterface.h',['../JitInterface_8h.html',1,'']]],
+  ['jitpasspluginregistry_2ecpp_15',['JITPassPluginRegistry.cpp',['../JITPassPluginRegistry_8cpp.html',1,'']]],
+  ['jitpasspluginregistry_2eh_16',['JITPassPluginRegistry.h',['../JITPassPluginRegistry_8h.html',1,'']]]
 ];

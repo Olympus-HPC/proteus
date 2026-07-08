@@ -105,8 +105,14 @@ var searchBox = new SearchBox("searchBox", "search/",'.html');
 Functions</h2></td></tr>
 <tr class="memitem:a644d2b3017a421c39ff67ff227886426" id="r_a644d2b3017a421c39ff67ff227886426"><td class="memItemLeft" align="right" valign="top">Expected&lt; std::unique_ptr&lt; TargetMachine &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus_1_1detail.html#a644d2b3017a421c39ff67ff227886426">createTargetMachine</a> (Module &amp;M, StringRef Arch, unsigned OptLevel=3)</td></tr>
 <tr class="separator:a644d2b3017a421c39ff67ff227886426"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0d4863f171aa1f3561918623b06771bf" id="r_a0d4863f171aa1f3561918623b06771bf"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus_1_1detail.html#a0d4863f171aa1f3561918623b06771bf">runOptimizationPassPipeline</a> (Module &amp;M, StringRef Arch, const std::string &amp;PassPipeline, unsigned CodegenOptLevel=3)</td></tr>
-<tr class="separator:a0d4863f171aa1f3561918623b06771bf"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:acc922ea649eaaccdbd36ab0bcd080fc4" id="r_acc922ea649eaaccdbd36ab0bcd080fc4"><td class="memItemLeft" align="right" valign="top">std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus_1_1detail.html#acc922ea649eaaccdbd36ab0bcd080fc4">getDefaultOptimizationPipeline</a> (char OptLevel)</td></tr>
+<tr class="separator:acc922ea649eaaccdbd36ab0bcd080fc4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a34bca743c954c10f1a25d50e4fa2ddb7" id="r_a34bca743c954c10f1a25d50e4fa2ddb7"><td class="memItemLeft" align="right" valign="top">std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus_1_1detail.html#a34bca743c954c10f1a25d50e4fa2ddb7">composeOptimizationPassPipeline</a> (std::optional&lt; std::string &gt; PassPipeline, char OptLevel, const std::vector&lt; <a class="el" href="structproteus_1_1JITPassPluginConfig.html">JITPassPluginConfig</a> &gt; &amp;Plugins)</td></tr>
+<tr class="separator:a34bca743c954c10f1a25d50e4fa2ddb7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1efd5f8a66f9638d7eb47e148eecd8b8" id="r_a1efd5f8a66f9638d7eb47e148eecd8b8"><td class="memItemLeft" align="right" valign="top">std::vector&lt; PassPlugin &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus_1_1detail.html#a1efd5f8a66f9638d7eb47e148eecd8b8">loadJITPassPlugins</a> (const std::vector&lt; <a class="el" href="structproteus_1_1JITPassPluginConfig.html">JITPassPluginConfig</a> &gt; &amp;Plugins)</td></tr>
+<tr class="separator:a1efd5f8a66f9638d7eb47e148eecd8b8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac7f6bf80ced96fbbfeae2b5262a17bf3" id="r_ac7f6bf80ced96fbbfeae2b5262a17bf3"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus_1_1detail.html#ac7f6bf80ced96fbbfeae2b5262a17bf3">runOptimizationPassPipeline</a> (Module &amp;M, StringRef Arch, const std::string &amp;PassPipeline, unsigned CodegenOptLevel, const std::vector&lt; <a class="el" href="structproteus_1_1JITPassPluginConfig.html">JITPassPluginConfig</a> &gt; &amp;Plugins={})</td></tr>
+<tr class="separator:ac7f6bf80ced96fbbfeae2b5262a17bf3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adf864d892f23251950246651949ca0d4" id="r_adf864d892f23251950246651949ca0d4"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus_1_1detail.html#adf864d892f23251950246651949ca0d4">runOptimizationPassPipeline</a> (Module &amp;M, StringRef Arch, char OptLevel='3', unsigned CodegenOptLevel=3)</td></tr>
 <tr class="separator:adf864d892f23251950246651949ca0d4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3fd96061cb43c74ef6633ccb6b38049d" id="r_a3fd96061cb43c74ef6633ccb6b38049d"><td class="memItemLeft" align="right" valign="top">const SmallVector&lt; StringRef &gt; &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus_1_1detail.html#a3fd96061cb43c74ef6633ccb6b38049d">gridDimXFnName</a> ()</td></tr>
@@ -328,6 +334,48 @@ Functions</h2></td></tr>
 
 </div>
 </div>
+<a id="a34bca743c954c10f1a25d50e4fa2ddb7" name="a34bca743c954c10f1a25d50e4fa2ddb7"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a34bca743c954c10f1a25d50e4fa2ddb7">&#9670;&#160;</a></span>composeOptimizationPassPipeline()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::string proteus::detail::composeOptimizationPassPipeline </td>
+          <td>(</td>
+          <td class="paramtype">std::optional&lt; std::string &gt;&#160;</td>
+          <td class="paramname"><em>PassPipeline</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">char&#160;</td>
+          <td class="paramname"><em>OptLevel</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const std::vector&lt; <a class="el" href="structproteus_1_1JITPassPluginConfig.html">JITPassPluginConfig</a> &gt; &amp;&#160;</td>
+          <td class="paramname"><em>Plugins</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
 <a id="a5dc7d6f89313358cee2abf06f3d64e05" name="a5dc7d6f89313358cee2abf06f3d64e05"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a5dc7d6f89313358cee2abf06f3d64e05">&#9670;&#160;</a></span>convert()</h2>
 
@@ -436,6 +484,32 @@ template&lt;typename FromT , typename ToT &gt; </div>
 
 </div>
 </div>
+<a id="acc922ea649eaaccdbd36ab0bcd080fc4" name="acc922ea649eaaccdbd36ab0bcd080fc4"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#acc922ea649eaaccdbd36ab0bcd080fc4">&#9670;&#160;</a></span>getDefaultOptimizationPipeline()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::string proteus::detail::getDefaultOptimizationPipeline </td>
+          <td>(</td>
+          <td class="paramtype">char&#160;</td>
+          <td class="paramname"><em>OptLevel</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
 <a id="a3fd96061cb43c74ef6633ccb6b38049d" name="a3fd96061cb43c74ef6633ccb6b38049d"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a3fd96061cb43c74ef6633ccb6b38049d">&#9670;&#160;</a></span>gridDimXFnName()</h2>
 
@@ -511,6 +585,32 @@ template&lt;typename FromT , typename ToT &gt; </div>
 
 </div>
 </div>
+<a id="a1efd5f8a66f9638d7eb47e148eecd8b8" name="a1efd5f8a66f9638d7eb47e148eecd8b8"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1efd5f8a66f9638d7eb47e148eecd8b8">&#9670;&#160;</a></span>loadJITPassPlugins()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::vector&lt; PassPlugin &gt; proteus::detail::loadJITPassPlugins </td>
+          <td>(</td>
+          <td class="paramtype">const std::vector&lt; <a class="el" href="structproteus_1_1JITPassPluginConfig.html">JITPassPluginConfig</a> &gt; &amp;&#160;</td>
+          <td class="paramname"><em>Plugins</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
 <a id="adf864d892f23251950246651949ca0d4" name="adf864d892f23251950246651949ca0d4"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#adf864d892f23251950246651949ca0d4">&#9670;&#160;</a></span>runOptimizationPassPipeline() <span class="overload">[1/2]</span></h2>
 
@@ -559,8 +659,8 @@ template&lt;typename FromT , typename ToT &gt; </div>
 
 </div>
 </div>
-<a id="a0d4863f171aa1f3561918623b06771bf" name="a0d4863f171aa1f3561918623b06771bf"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a0d4863f171aa1f3561918623b06771bf">&#9670;&#160;</a></span>runOptimizationPassPipeline() <span class="overload">[2/2]</span></h2>
+<a id="ac7f6bf80ced96fbbfeae2b5262a17bf3" name="ac7f6bf80ced96fbbfeae2b5262a17bf3"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac7f6bf80ced96fbbfeae2b5262a17bf3">&#9670;&#160;</a></span>runOptimizationPassPipeline() <span class="overload">[2/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -590,7 +690,13 @@ template&lt;typename FromT , typename ToT &gt; </div>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">unsigned&#160;</td>
-          <td class="paramname"><em>CodegenOptLevel</em> = <code>3</code>&#160;</td>
+          <td class="paramname"><em>CodegenOptLevel</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const std::vector&lt; <a class="el" href="structproteus_1_1JITPassPluginConfig.html">JITPassPluginConfig</a> &gt; &amp;&#160;</td>
+          <td class="paramname"><em>Plugins</em> = <code>{}</code>&#160;</td>
         </tr>
         <tr>
           <td></td>

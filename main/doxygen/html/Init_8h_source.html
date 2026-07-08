@@ -114,24 +114,32 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00009" name="l00009"></a><span class="lineno">    9</span><span class="preprocessor">#ifndef PROTEUS_INIT_H</span></div>
 <div class="line"><a id="l00010" name="l00010"></a><span class="lineno">   10</span><span class="preprocessor">#define PROTEUS_INIT_H</span></div>
 <div class="line"><a id="l00011" name="l00011"></a><span class="lineno">   11</span> </div>
-<div class="line"><a id="l00012" name="l00012"></a><span class="lineno">   12</span><span class="keyword">namespace </span><a class="code hl_namespace" href="namespaceproteus.html">proteus</a> {</div>
+<div class="line"><a id="l00012" name="l00012"></a><span class="lineno">   12</span><span class="preprocessor">#include &lt;string&gt;</span></div>
 <div class="line"><a id="l00013" name="l00013"></a><span class="lineno">   13</span> </div>
-<div class="line"><a id="l00014" name="l00014"></a><span class="lineno">   14</span>[[deprecated(<span class="stringliteral">&quot;it is a no-op and will be removed in a future version.&quot;</span>)]]</div>
-<div class="line"><a id="l00015" name="l00015"></a><span class="lineno">   15</span><span class="keywordtype">void</span> <a class="code hl_function" href="namespaceproteus.html#a2ebff56bbe969b2b571de2ff2f1dbed7">init</a>();</div>
+<div class="line"><a id="l00014" name="l00014"></a><span class="lineno">   14</span><span class="keyword">namespace </span><a class="code hl_namespace" href="namespaceproteus.html">proteus</a> {</div>
+<div class="line"><a id="l00015" name="l00015"></a><span class="lineno">   15</span> </div>
 <div class="line"><a id="l00016" name="l00016"></a><span class="lineno">   16</span>[[deprecated(<span class="stringliteral">&quot;it is a no-op and will be removed in a future version.&quot;</span>)]]</div>
-<div class="line"><a id="l00017" name="l00017"></a><span class="lineno">   17</span><span class="keywordtype">void</span> <a class="code hl_function" href="namespaceproteus.html#ae5096d21d15b3f3a33823c3009efeb4e">finalize</a>();</div>
-<div class="line"><a id="l00018" name="l00018"></a><span class="lineno">   18</span> </div>
-<div class="line"><a id="l00019" name="l00019"></a><span class="lineno">   19</span><span class="keywordtype">void</span> <a class="code hl_function" href="namespaceproteus.html#aa1d4ca1602a02f58f264c8269c8cb9c9">enable</a>();</div>
-<div class="line"><a id="l00020" name="l00020"></a><span class="lineno">   20</span><span class="keywordtype">void</span> <a class="code hl_function" href="namespaceproteus.html#a8bb39f5810f6d04eda164df11f1ebe6a">disable</a>();</div>
-<div class="line"><a id="l00021" name="l00021"></a><span class="lineno">   21</span> </div>
-<div class="line"><a id="l00022" name="l00022"></a><span class="lineno">   22</span>} <span class="comment">// namespace proteus</span></div>
-<div class="line"><a id="l00023" name="l00023"></a><span class="lineno">   23</span> </div>
-<div class="line"><a id="l00024" name="l00024"></a><span class="lineno">   24</span><span class="preprocessor">#endif</span></div>
+<div class="line"><a id="l00017" name="l00017"></a><span class="lineno">   17</span><span class="keywordtype">void</span> <a class="code hl_function" href="namespaceproteus.html#a2ebff56bbe969b2b571de2ff2f1dbed7">init</a>();</div>
+<div class="line"><a id="l00018" name="l00018"></a><span class="lineno">   18</span>[[deprecated(<span class="stringliteral">&quot;it is a no-op and will be removed in a future version.&quot;</span>)]]</div>
+<div class="line"><a id="l00019" name="l00019"></a><span class="lineno">   19</span><span class="keywordtype">void</span> <a class="code hl_function" href="namespaceproteus.html#ae5096d21d15b3f3a33823c3009efeb4e">finalize</a>();</div>
+<div class="line"><a id="l00020" name="l00020"></a><span class="lineno">   20</span> </div>
+<div class="line"><a id="l00021" name="l00021"></a><span class="lineno">   21</span><span class="keywordtype">void</span> <a class="code hl_function" href="namespaceproteus.html#a3bf5c169a8b8d4f6370aa6dd0d5f8acd">registerJITPassPlugin</a>(<span class="keyword">const</span> std::string &amp;PluginPath,</div>
+<div class="line"><a id="l00022" name="l00022"></a><span class="lineno">   22</span>                           <span class="keyword">const</span> std::string &amp;PassPipeline);</div>
+<div class="line"><a id="l00023" name="l00023"></a><span class="lineno">   23</span><span class="keywordtype">void</span> <a class="code hl_function" href="namespaceproteus.html#abb1baa987a9086836c02359f5e3ba82e">clearJITPassPlugins</a>();</div>
+<div class="line"><a id="l00024" name="l00024"></a><span class="lineno">   24</span> </div>
+<div class="line"><a id="l00025" name="l00025"></a><span class="lineno">   25</span><span class="keywordtype">void</span> <a class="code hl_function" href="namespaceproteus.html#aa1d4ca1602a02f58f264c8269c8cb9c9">enable</a>();</div>
+<div class="line"><a id="l00026" name="l00026"></a><span class="lineno">   26</span><span class="keywordtype">void</span> <a class="code hl_function" href="namespaceproteus.html#a8bb39f5810f6d04eda164df11f1ebe6a">disable</a>();</div>
+<div class="line"><a id="l00027" name="l00027"></a><span class="lineno">   27</span> </div>
+<div class="line"><a id="l00028" name="l00028"></a><span class="lineno">   28</span>} <span class="comment">// namespace proteus</span></div>
+<div class="line"><a id="l00029" name="l00029"></a><span class="lineno">   29</span> </div>
+<div class="line"><a id="l00030" name="l00030"></a><span class="lineno">   30</span><span class="preprocessor">#endif</span></div>
 <div class="ttc" id="anamespaceproteus_html"><div class="ttname"><a href="namespaceproteus.html">proteus</a></div><div class="ttdef"><b>Definition</b> MemoryCache.h:27</div></div>
-<div class="ttc" id="anamespaceproteus_html_a2ebff56bbe969b2b571de2ff2f1dbed7"><div class="ttname"><a href="namespaceproteus.html#a2ebff56bbe969b2b571de2ff2f1dbed7">proteus::init</a></div><div class="ttdeci">void init()</div><div class="ttdef"><b>Definition</b> Init.cpp:20</div></div>
-<div class="ttc" id="anamespaceproteus_html_a8bb39f5810f6d04eda164df11f1ebe6a"><div class="ttname"><a href="namespaceproteus.html#a8bb39f5810f6d04eda164df11f1ebe6a">proteus::disable</a></div><div class="ttdeci">void disable()</div><div class="ttdef"><b>Definition</b> Init.cpp:30</div></div>
-<div class="ttc" id="anamespaceproteus_html_aa1d4ca1602a02f58f264c8269c8cb9c9"><div class="ttname"><a href="namespaceproteus.html#aa1d4ca1602a02f58f264c8269c8cb9c9">proteus::enable</a></div><div class="ttdeci">void enable()</div><div class="ttdef"><b>Definition</b> Init.cpp:23</div></div>
-<div class="ttc" id="anamespaceproteus_html_ae5096d21d15b3f3a33823c3009efeb4e"><div class="ttname"><a href="namespaceproteus.html#ae5096d21d15b3f3a33823c3009efeb4e">proteus::finalize</a></div><div class="ttdeci">void finalize()</div><div class="ttdef"><b>Definition</b> Init.cpp:21</div></div>
+<div class="ttc" id="anamespaceproteus_html_a2ebff56bbe969b2b571de2ff2f1dbed7"><div class="ttname"><a href="namespaceproteus.html#a2ebff56bbe969b2b571de2ff2f1dbed7">proteus::init</a></div><div class="ttdeci">void init()</div><div class="ttdef"><b>Definition</b> Init.cpp:21</div></div>
+<div class="ttc" id="anamespaceproteus_html_a3bf5c169a8b8d4f6370aa6dd0d5f8acd"><div class="ttname"><a href="namespaceproteus.html#a3bf5c169a8b8d4f6370aa6dd0d5f8acd">proteus::registerJITPassPlugin</a></div><div class="ttdeci">void registerJITPassPlugin(const std::string &amp;PluginPath, const std::string &amp;PassPipeline)</div><div class="ttdef"><b>Definition</b> Init.cpp:24</div></div>
+<div class="ttc" id="anamespaceproteus_html_a8bb39f5810f6d04eda164df11f1ebe6a"><div class="ttname"><a href="namespaceproteus.html#a8bb39f5810f6d04eda164df11f1ebe6a">proteus::disable</a></div><div class="ttdeci">void disable()</div><div class="ttdef"><b>Definition</b> Init.cpp:38</div></div>
+<div class="ttc" id="anamespaceproteus_html_aa1d4ca1602a02f58f264c8269c8cb9c9"><div class="ttname"><a href="namespaceproteus.html#aa1d4ca1602a02f58f264c8269c8cb9c9">proteus::enable</a></div><div class="ttdeci">void enable()</div><div class="ttdef"><b>Definition</b> Init.cpp:31</div></div>
+<div class="ttc" id="anamespaceproteus_html_abb1baa987a9086836c02359f5e3ba82e"><div class="ttname"><a href="namespaceproteus.html#abb1baa987a9086836c02359f5e3ba82e">proteus::clearJITPassPlugins</a></div><div class="ttdeci">void clearJITPassPlugins()</div><div class="ttdef"><b>Definition</b> Init.cpp:29</div></div>
+<div class="ttc" id="anamespaceproteus_html_ae5096d21d15b3f3a33823c3009efeb4e"><div class="ttname"><a href="namespaceproteus.html#ae5096d21d15b3f3a33823c3009efeb4e">proteus::finalize</a></div><div class="ttdeci">void finalize()</div><div class="ttdef"><b>Definition</b> Init.cpp:22</div></div>
 </div><!-- fragment --></div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>

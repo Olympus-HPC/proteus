@@ -102,14 +102,22 @@ var searchBox = new SearchBox("searchBox", "search/",'.html');
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><code>#include &quot;<a class="el" href="Init_8h_source.html">proteus/Init.h</a>&quot;</code><br />
+<code>#include &quot;<a class="el" href="JITPassPluginRegistry_8h_source.html">proteus/impl/JITPassPluginRegistry.h</a>&quot;</code><br />
 </div><div class="textblock"><div class="dynheader">
 Include dependency graph for Init.cpp:</div>
 <div class="dyncontent">
 <div class="center"><img src="Init_8cpp__incl.png" border="0" usemap="#asrc_2runtime_2Init_8cpp" alt=""/></div>
 <map name="asrc_2runtime_2Init_8cpp" id="asrc_2runtime_2Init_8cpp">
-<area shape="rect" title=" " alt="" coords="5,5,153,31"/>
-<area shape="rect" href="Init_8h.html" title=" " alt="" coords="25,79,133,104"/>
-<area shape="poly" title=" " alt="" coords="82,31,82,65,77,65,77,31"/>
+<area shape="rect" title=" " alt="" coords="72,5,220,31"/>
+<area shape="rect" href="Init_8h.html" title=" " alt="" coords="5,86,113,111"/>
+<area shape="poly" title=" " alt="" coords="135,33,84,78,81,75,131,29"/>
+<area shape="rect" href="JITPassPluginRegistry_8h.html" title=" " alt="" coords="137,79,331,119"/>
+<area shape="poly" title=" " alt="" coords="161,29,205,68,201,72,157,33"/>
+<area shape="rect" title=" " alt="" coords="75,167,134,192"/>
+<area shape="poly" title=" " alt="" coords="68,110,93,153,89,156,64,113"/>
+<area shape="poly" title=" " alt="" coords="204,121,137,162,134,157,201,117"/>
+<area shape="rect" title=" " alt="" coords="203,167,265,192"/>
+<area shape="poly" title=" " alt="" coords="237,119,237,153,231,153,231,119"/>
 </map>
 </div>
 </div><table class="memberdecls">
@@ -132,6 +140,10 @@ Functions</h2></td></tr>
 <tr class="separator:a2ebff56bbe969b2b571de2ff2f1dbed7"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae5096d21d15b3f3a33823c3009efeb4e" id="r_ae5096d21d15b3f3a33823c3009efeb4e"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#ae5096d21d15b3f3a33823c3009efeb4e">proteus::finalize</a> ()</td></tr>
 <tr class="separator:ae5096d21d15b3f3a33823c3009efeb4e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3bf5c169a8b8d4f6370aa6dd0d5f8acd" id="r_a3bf5c169a8b8d4f6370aa6dd0d5f8acd"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a3bf5c169a8b8d4f6370aa6dd0d5f8acd">proteus::registerJITPassPlugin</a> (const std::string &amp;PluginPath, const std::string &amp;PassPipeline)</td></tr>
+<tr class="separator:a3bf5c169a8b8d4f6370aa6dd0d5f8acd"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abb1baa987a9086836c02359f5e3ba82e" id="r_abb1baa987a9086836c02359f5e3ba82e"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#abb1baa987a9086836c02359f5e3ba82e">proteus::clearJITPassPlugins</a> ()</td></tr>
+<tr class="separator:abb1baa987a9086836c02359f5e3ba82e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa1d4ca1602a02f58f264c8269c8cb9c9" id="r_aa1d4ca1602a02f58f264c8269c8cb9c9"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#aa1d4ca1602a02f58f264c8269c8cb9c9">proteus::enable</a> ()</td></tr>
 <tr class="separator:aa1d4ca1602a02f58f264c8269c8cb9c9"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a8bb39f5810f6d04eda164df11f1ebe6a" id="r_a8bb39f5810f6d04eda164df11f1ebe6a"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a8bb39f5810f6d04eda164df11f1ebe6a">proteus::disable</a> ()</td></tr>
