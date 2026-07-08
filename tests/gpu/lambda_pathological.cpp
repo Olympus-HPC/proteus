@@ -10,7 +10,8 @@
 // Several cases are expected to fail under the current analysis and are meant
 // to motivate a redesign of the interprocedural visitor.
 //
-// Each case is set up so that, if lambda specialization works, it should print its own integer.
+// Each case is set up so that, if lambda specialization works, it should print
+// its own integer, either 11, 22, 33, 44, or 55.
 
 #include <cstdint>
 #include <cstdio>
@@ -57,9 +58,7 @@ template <typename F> struct Box {
   F *Fn;
 };
 
-template <typename F> __device__ void helper_multi_caller(F *Fn) {
-  invoke(Fn);
-}
+template <typename F> __device__ void helper_multi_caller(F *Fn) { invoke(Fn); }
 
 template <typename F> __device__ void helper_slot(F *Fn, bool Cond) {
   F *Slot = nullptr;
@@ -82,14 +81,15 @@ template <typename F> __device__ void helper_box(F *Fn) {
 }
 
 // Case 1: same helper, multiple caller contexts.
-// Current visitArgument() walks all users of the callee and can merge callsites.
+// Current visitArgument() walks all users of the callee and can merge
+// callsites.
 static void case1() {
   int A = 11;
   int B = 22;
-  auto LA = [=, X = proteus::jit_variable(A)]__host__ __device__ {
+  auto LA = [=, X = proteus::jit_variable(A)] __host__ __device__ {
     printf("case1 A %d\n", X);
   };
-  auto LB = [=, X = proteus::jit_variable(B)]__host__ __device__ {
+  auto LB = [=, X = proteus::jit_variable(B)] __host__ __device__ {
     printf("case1 B %d\n", X);
   };
 
@@ -170,6 +170,7 @@ int main() {
   return 0;
 }
 
+// clang-format off
 // CHECK-FIRST-DAG: [LambdaSpec] Replacing slot 0 with i32 22
 // CHECK-FIRST-DAG: [LambdaSpec] Replacing slot 0 with i32 11
 // CHECK: case1 A 11
@@ -187,3 +188,4 @@ int main() {
 // CHECK: [proteus][JitEngineDevice] ObjectCacheChain rank 0 with 1 level(s):
 // CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 5
 // CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 5 accesses 5
+// clang-format on

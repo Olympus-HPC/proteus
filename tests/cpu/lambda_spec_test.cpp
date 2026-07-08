@@ -19,17 +19,14 @@ public:
 
 static void printInt(int I) { printf("Integer = %d\n", I); }
 
-template <typename T>
-static void run(T &&LB) {
+template <typename T> static void run(T &&LB) {
   Abstraction<T> Abs(LB);
   run_internal(Abs);
 }
 
-template <typename T>
-static void run_internal(T &&LB) { LB(); }
+template <typename T> static void run_internal(T &&LB) { LB(); }
 
-template<typename Lambda>
-static void registerRun(Lambda&& Lam) {
+template <typename Lambda> static void registerRun(Lambda &&Lam) {
   run(proteus::register_lambda(Lam));
 }
 
@@ -66,3 +63,4 @@ int main() {
 // CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: [proteus][JitEngineHost] StorageCache rank 0 hits 0 accesses 3
 // CHECK-SECOND: [proteus][JitEngineHost] StorageCache rank 0 hits 3 accesses 3
+// clang-format on

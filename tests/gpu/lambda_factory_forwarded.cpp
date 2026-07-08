@@ -19,16 +19,15 @@ __global__ __attribute__((annotate("jit"))) void kernel(T LB) {
 
 auto declareLambda(int rc1, int rc2) {
   return proteus::register_lambda(
-      [=, C = proteus::jit_variable(rc1),
-       C2 = proteus::jit_variable(rc2)]()
+      [=, C = proteus::jit_variable(rc1), C2 = proteus::jit_variable(rc2)]()
           __attribute__((annotate("jit"))) {
             printInt(C);
             printInt(C2);
           });
 }
 
-__attribute__((noinline)) gpuError_t
-launchIndirect(const void *Func, dim3 Grid, dim3 Block, void **Args) {
+__attribute__((noinline)) gpuError_t launchIndirect(const void *Func, dim3 Grid,
+                                                    dim3 Block, void **Args) {
   return gpuLaunchKernel(Func, Grid, Block, Args, 0, 0);
 }
 

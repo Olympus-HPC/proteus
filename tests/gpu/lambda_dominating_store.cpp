@@ -13,8 +13,8 @@
 #include <proteus/JitInterface.h>
 
 template <typename Lambda>
-__global__ __attribute__((annotate("jit"))) void kernel_store(
-    Lambda Body, Lambda Body2, Lambda Body3, bool UseSecond) {
+__global__ __attribute__((annotate("jit"))) void
+kernel_store(Lambda Body, Lambda Body2, Lambda Body3, bool UseSecond) {
   helper(&Body, &Body2, &Body3, UseSecond);
 }
 
@@ -39,20 +39,17 @@ __device__ void helper(F *Opt1, F *Opt2, F *Opt3, bool UseSecond) {
 }
 
 auto getTestLambda(int V) {
-  return  proteus::register_lambda([=, X = proteus::jit_variable(V)] __host__ __device__ {
-    printf("case phi %d\n", X);
-  });
+  return proteus::register_lambda(
+      [=, X = proteus::jit_variable(V)] __host__ __device__ {
+        printf("case phi %d\n", X);
+      });
 }
 
 static void store_case(int V1, int V2, bool UseSecond) {
-  kernel_store<<<1, 1>>>(
-    getTestLambda(V1),
-    getTestLambda(V2),
-    getTestLambda(44),
-    UseSecond);
+  kernel_store<<<1, 1>>>(getTestLambda(V1), getTestLambda(V2),
+                         getTestLambda(44), UseSecond);
   gpuErrCheck(gpuDeviceSynchronize());
 }
-
 
 int main() {
   int V1 = 55;
@@ -68,7 +65,6 @@ int main() {
 
   return 0;
 }
-
 
 // clang-format off
 // CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 55

@@ -19,16 +19,17 @@ struct LaunchContext {
 };
 
 template <typename T>
-__host__ __device__ __attribute__((noinline)) T &&forward_ref(
-    std::remove_reference_t<T> &Value) {
+__host__ __device__ __attribute__((noinline)) T &&
+forward_ref(std::remove_reference_t<T> &Value) {
   return static_cast<T &&>(Value);
 }
 
 template <typename F> struct Privatizer {
   F Fn;
 
-  __host__ __device__ __attribute__((noinline))
-  explicit Privatizer(const F &Fn_) : Fn(Fn_) {}
+  __host__ __device__
+      __attribute__((noinline)) explicit Privatizer(const F &Fn_)
+      : Fn(Fn_) {}
 
   __host__ __device__ __attribute__((noinline)) static Privatizer
   thread_privatize(const F &Fn_) {
@@ -39,8 +40,8 @@ template <typename F> struct Privatizer {
 };
 
 template <typename Params, typename F, typename Ctx>
-__host__ __device__ __attribute__((noinline)) void
-invoke_body(Params &&, F &Fn, Ctx &CtxValue) {
+__host__ __device__ __attribute__((noinline)) void invoke_body(Params &&, F &Fn,
+                                                               Ctx &CtxValue) {
   Fn(forward_ref<Ctx &>(CtxValue));
 }
 
@@ -54,14 +55,14 @@ kernel_thread_privatizer(F Fn, ParamPack Params) {
 }
 
 auto makeLambda(int X, int Y, bool UseAdd, int *Out) {
-  return proteus::register_lambda(
-      [X = proteus::jit_variable(X), Y = proteus::jit_variable(Y),
-       UseAdd = proteus::jit_variable(UseAdd), Out] __host__ __device__(
-          LaunchContext Ctx) {
-        int Result = UseAdd ? (X + Y) : (X - Y);
-        *Out = Result + Ctx.Bias;
-        printf("thread privatizer %d %d %d -> %d\n", X, Y, int(UseAdd), *Out);
-      });
+  return proteus::register_lambda([X = proteus::jit_variable(X),
+                                   Y = proteus::jit_variable(Y),
+                                   UseAdd = proteus::jit_variable(UseAdd),
+                                   Out] __host__ __device__(LaunchContext Ctx) {
+    int Result = UseAdd ? (X + Y) : (X - Y);
+    *Out = Result + Ctx.Bias;
+    printf("thread privatizer %d %d %d -> %d\n", X, Y, int(UseAdd), *Out);
+  });
 }
 
 static void runCase(int X, int Y, bool UseAdd, int Expected) {

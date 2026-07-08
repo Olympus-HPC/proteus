@@ -12,14 +12,12 @@
 
 #include "gpu_common.h"
 #include "proteus/JitInterface.h"
-template<typename T>
-struct Functor {
+template <typename T> struct Functor {
 
-__attribute__((noinline))
-__host__ __device__
-void operator()(T&& Lam, const int I) {
-  Lam(I);
-}
+  __attribute__((noinline)) __host__ __device__ void operator()(T &&Lam,
+                                                                const int I) {
+    Lam(I);
+  }
 };
 
 template <typename T>
@@ -42,16 +40,18 @@ int main() {
   X[0] = -1;
   int A = 4;
 
-  launch(32, [=, A = proteus::jit_variable(A)] __device__ __attribute__((annotate("jit"))) (int I) {
-    // The warning is triggered by LDS/shared-memory globals defined in the
-    // registered lambda body being used through the non-kernel Proteus wrapper.
-     __shared__ int Smem[32];
-    Smem[threadIdx.x] = I;
-    __syncthreads();
-    if (threadIdx.x == 0) {
-      X[0] = Smem[0] + A;
-    }
-  });
+  launch(32, [=, A = proteus::jit_variable(A)] __device__
+         __attribute__((annotate("jit"))) (int I) {
+           // The warning is triggered by LDS/shared-memory globals defined in
+           // the registered lambda body being used through the non-kernel
+           // Proteus wrapper.
+           __shared__ int Smem[32];
+           Smem[threadIdx.x] = I;
+           __syncthreads();
+           if (threadIdx.x == 0) {
+             X[0] = Smem[0] + A;
+           }
+         });
 
   std::cout << "x[0] = " << X[0] << "\n";
   gpuErrCheck(gpuFree(X));
@@ -61,7 +61,8 @@ int main() {
 // CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 4
 // CHECK: x[0] = 4
 // CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 1
-// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
-// CHECK-FIRST: [proteus][JitEngineDevice] ObjectCacheChain rank 0 with 1 level(s):
-// CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 1
-// CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 1 accesses 1
+// CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}}
+// NumExecs 1 NumHits 0 CHECK-FIRST: [proteus][JitEngineDevice] ObjectCacheChain
+// rank 0 with 1 level(s): CHECK-FIRST: [proteus][JitEngineDevice] StorageCache
+// rank 0 hits 0 accesses 1 CHECK-SECOND: [proteus][JitEngineDevice]
+// StorageCache rank 0 hits 1 accesses 1
