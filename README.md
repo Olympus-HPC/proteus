@@ -68,7 +68,7 @@ environment, you can add the spack repo by cloning Proteus and then install it
 by running:
 ```bash
 git clone https://github.com/Olympus-HPC/proteus.git
-spack repo add proteus/packaging/spack
+spack repo add proteus/packaging/spack/spack_repo/proteus
 spack install proteus
 ```
 

@@ -36,7 +36,7 @@ spack external find
 spack external find cuda
 
 # Add repo and package.
-spack repo add ${CI_PROJECT_DIR}/packaging/spack
+spack repo add ${CI_PROJECT_DIR}/packaging/spack/spack_repo/proteus
 spack add proteus@git.${CI_COMMIT_SHA} +cuda cuda_arch=${PROTEUS_CI_CUDA_ARCH} ^cuda@${PROTEUS_CI_CUDA_VERSION} ^llvm@${PROTEUS_CI_LLVM_VERSION}
 
 # Concretize and install.
