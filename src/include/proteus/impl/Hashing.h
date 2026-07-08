@@ -4,6 +4,7 @@
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/TimeTracing.h"
 #include "proteus/impl/Config.h"
+#include "proteus/impl/JITPassPluginRegistry.h"
 #include "proteus/impl/RuntimeConstantTypeHelpers.h"
 
 #include <llvm/ADT/ArrayRef.h>
@@ -145,6 +146,11 @@ inline HashT hashCodeGenConfig(const CodeGenerationConfig &CGConfig) {
   H = hashCombine(H, hashValue(CGConfig.codeGenOptLevel()));
   if (auto Pipeline = CGConfig.optPipeline())
     H = hashCombine(H, hashValue(Pipeline.value()));
+  for (const auto &Plugin : getJITPassPluginConfigs()) {
+    H = hashCombine(H, hashValue(Plugin.Path));
+    H = hashCombine(H, hashValue(Plugin.Pipeline));
+    H = hashCombine(H, hashValue(Plugin.Fingerprint));
+  }
   return H;
 }
 

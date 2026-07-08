@@ -8,6 +8,7 @@ static_assert(__cplusplus >= 201703L,
 #include "proteus/TimeTracing.h"
 #include "proteus/impl/Config.h"
 #include "proteus/impl/Debug.h"
+#include "proteus/impl/JITPassPluginRegistry.h"
 #include "proteus/impl/Logger.h"
 
 #include <llvm/CodeGen/CommandFlags.h>
@@ -17,6 +18,13 @@ static_assert(__cplusplus >= 201703L,
 #include <llvm/Linker/Linker.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Passes/PassBuilder.h>
+#if __has_include(<llvm/Plugins/PassPlugin.h>)
+#include <llvm/Plugins/PassPlugin.h>
+#elif __has_include(<llvm/Passes/PassPlugin.h>)
+#include <llvm/Passes/PassPlugin.h>
+#else
+#error "Cannot find LLVM PassPlugin.h"
+#endif
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/Transforms/IPO/MergeFunctions.h>
@@ -47,6 +55,7 @@ static_assert(__cplusplus >= 201703L,
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace proteus {
 using namespace llvm;
@@ -88,9 +97,57 @@ createTargetMachine(Module &M, StringRef Arch, unsigned OptLevel = 3) {
   return TM;
 }
 
-inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
-                                        const std::string &PassPipeline,
-                                        unsigned CodegenOptLevel = 3) {
+inline std::string getDefaultOptimizationPipeline(char OptLevel) {
+  switch (OptLevel) {
+  case '0':
+    return "default<O0>";
+  case '1':
+    return "default<O1>";
+  case '2':
+    return "default<O2>";
+  case '3':
+    return "default<O3>";
+  case 's':
+    return "default<Os>";
+  case 'z':
+    return "default<Oz>";
+  default:
+    reportFatalError(std::string("Unsupported optimization level ") + OptLevel);
+  }
+  return "";
+}
+
+inline std::string composeOptimizationPassPipeline(
+    std::optional<std::string> PassPipeline, char OptLevel,
+    const std::vector<JITPassPluginConfig> &Plugins) {
+  std::string Pipeline = PassPipeline
+                             ? std::move(PassPipeline.value())
+                             : getDefaultOptimizationPipeline(OptLevel);
+  for (const auto &Plugin : Plugins) {
+    Pipeline += ",";
+    Pipeline += Plugin.Pipeline;
+  }
+  return Pipeline;
+}
+
+inline std::vector<PassPlugin>
+loadJITPassPlugins(const std::vector<JITPassPluginConfig> &Plugins) {
+  std::vector<PassPlugin> LoadedPlugins;
+  LoadedPlugins.reserve(Plugins.size());
+  for (const auto &Plugin : Plugins) {
+    auto LoadedPlugin = PassPlugin::Load(Plugin.Path);
+    if (!LoadedPlugin)
+      reportFatalError("Failed to load JIT pass plugin '" + Plugin.Path +
+                       "': " + toString(LoadedPlugin.takeError()));
+    LoadedPlugins.push_back(std::move(*LoadedPlugin));
+  }
+  return LoadedPlugins;
+}
+
+inline void runOptimizationPassPipeline(
+    Module &M, StringRef Arch, const std::string &PassPipeline,
+    unsigned CodegenOptLevel,
+    const std::vector<JITPassPluginConfig> &Plugins = {}) {
   PipelineTuningOptions PTO;
 
   std::optional<PGOOptions> PGOOpt;
@@ -99,7 +156,10 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
     report_fatal_error(std::move(Err));
   TargetLibraryInfoImpl TLII(Triple(M.getTargetTriple()));
 
+  auto LoadedPlugins = loadJITPassPlugins(Plugins);
   PassBuilder PB(TM->get(), PTO, PGOOpt, nullptr);
+  for (const auto &Plugin : LoadedPlugins)
+    Plugin.registerPassBuilderCallbacks(PB);
   LoopAnalysisManager LAM;
   FunctionAnalysisManager FAM;
   CGSCCAnalysisManager CGAM;
@@ -207,7 +267,15 @@ inline void optimizeIR(Module &M, StringRef Arch,
   TIMESCOPE("proteus::optimizeIR");
   Timer T(Config::get().ProteusEnableTimers);
 
-  if (OptConfig.PassPipeline) {
+  const auto Plugins = getJITPassPluginConfigs();
+  const bool UseTextualPipeline = OptConfig.PassPipeline || !Plugins.empty();
+  const std::string FinalPipeline =
+      UseTextualPipeline
+          ? detail::composeOptimizationPassPipeline(OptConfig.PassPipeline,
+                                                    OptConfig.OptLevel, Plugins)
+          : std::string();
+
+  if (UseTextualPipeline) {
     auto TraceOut = [](const std::string &PassPipeline) {
       SmallString<128> S;
       raw_svector_ostream OS(S);
@@ -216,10 +284,10 @@ inline void optimizeIR(Module &M, StringRef Arch,
     };
 
     if (Config::get().traceSpecializations())
-      Logger::trace(TraceOut(OptConfig.PassPipeline.value()));
+      Logger::trace(TraceOut(FinalPipeline));
 
-    detail::runOptimizationPassPipeline(M, Arch, OptConfig.PassPipeline.value(),
-                                        OptConfig.CodegenOptLevel);
+    detail::runOptimizationPassPipeline(M, Arch, FinalPipeline,
+                                        OptConfig.CodegenOptLevel, Plugins);
   } else {
     detail::runOptimizationPassPipeline(M, Arch, OptConfig.OptLevel,
                                         OptConfig.CodegenOptLevel);
@@ -227,8 +295,8 @@ inline void optimizeIR(Module &M, StringRef Arch,
 
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")
                        << "optimizeIR optlevel "
-                       << (OptConfig.PassPipeline
-                               ? StringRef(OptConfig.PassPipeline.value())
+                       << (UseTextualPipeline
+                               ? StringRef(FinalPipeline)
                                : StringRef(&OptConfig.OptLevel, 1))
                        << " codegenopt " << OptConfig.CodegenOptLevel << " "
                        << T.elapsed() << " ms\n");

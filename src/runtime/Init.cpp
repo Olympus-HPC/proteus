@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------===//
 
 #include "proteus/Init.h"
+#include "proteus/impl/JITPassPluginRegistry.h"
 
 // NOLINTBEGIN(readability-identifier-naming)
 extern "C" void __proteus_enable_host();
@@ -19,6 +20,13 @@ namespace proteus {
 
 void init() {}
 void finalize() {}
+
+void registerJITPassPlugin(const std::string &PluginPath,
+                           const std::string &PassPipeline) {
+  registerJITPassPluginImpl(PluginPath, PassPipeline);
+}
+
+void clearJITPassPlugins() { clearJITPassPluginsImpl(); }
 
 void enable() {
   __proteus_enable_host();

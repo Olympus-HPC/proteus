@@ -5,6 +5,7 @@ set(SOURCES
   Error.cpp
   KernelMetadata.cpp
   JitEngine.cpp
+  JITPassPluginRegistry.cpp
   JitEngineHost.cpp
   Init.cpp
   TimeTracing.cpp

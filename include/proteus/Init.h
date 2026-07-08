@@ -9,12 +9,18 @@
 #ifndef PROTEUS_INIT_H
 #define PROTEUS_INIT_H
 
+#include <string>
+
 namespace proteus {
 
 [[deprecated("it is a no-op and will be removed in a future version.")]]
 void init();
 [[deprecated("it is a no-op and will be removed in a future version.")]]
 void finalize();
+
+void registerJITPassPlugin(const std::string &PluginPath,
+                           const std::string &PassPipeline);
+void clearJITPassPlugins();
 
 void enable();
 void disable();
