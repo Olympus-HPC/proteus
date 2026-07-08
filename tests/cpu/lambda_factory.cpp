@@ -14,13 +14,13 @@
 void printInt(int I) { printf("Integer = %d\n", I); }
 
 auto declareLambda(int rc1, int rc2) {
-  return proteus::register_lambda(
-      [=, C = proteus::jit_variable(rc1), D = 5,
-       C2 = proteus::jit_variable(rc2)]() __attribute__((annotate("jit"))) {
-        printInt(C);
-        printInt(C2);
-        printInt(D);
-      });
+  return proteus::register_lambda([=, C = proteus::jit_variable(rc1), D = 5,
+                                   C2 = proteus::jit_variable(rc2)]()
+                                      __attribute__((annotate("jit"))) {
+                                        printInt(C);
+                                        printInt(C2);
+                                        printInt(D);
+                                      });
 }
 
 template <typename L> struct Abstraction {
@@ -29,7 +29,8 @@ template <typename L> struct Abstraction {
   L lambda_3;
 
   Abstraction(L &&l1, L &&l2, L &&l3)
-      : lambda_1(std::move(l1)), lambda_2(std::move(l2)), lambda_3(std::move(l3)) {}
+      : lambda_1(std::move(l1)), lambda_2(std::move(l2)),
+        lambda_3(std::move(l3)) {}
 
   auto operator()() {
     lambda_1();
@@ -42,11 +43,11 @@ auto declareLambdaThree(int rc1, int rc2, int rc3) {
   return [=, C = proteus::jit_variable(rc1), D = 4,
           C2 = proteus::jit_variable(rc2), rc3 = proteus::jit_variable(rc3)]()
              __attribute__((annotate("jit"))) {
-    printInt(C);
-    printInt(C2);
-    printInt(rc3);
-    printInt(D);
-  };
+               printInt(C);
+               printInt(C2);
+               printInt(rc3);
+               printInt(D);
+             };
 }
 
 auto forwardLambda(int rc1, int, int rc3) {

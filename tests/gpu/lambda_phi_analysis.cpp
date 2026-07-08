@@ -13,27 +13,28 @@
 #include <proteus/JitInterface.h>
 
 template <typename Lambda>
-__global__ __attribute__((annotate("jit"))) void kernel_phi(Lambda Body, Lambda, bool CollapseToKernelArgTwo) {
+__global__ __attribute__((annotate("jit"))) void
+kernel_phi(Lambda Body, Lambda, bool CollapseToKernelArgTwo) {
   helper_slot(&Body, &Body, true, CollapseToKernelArgTwo);
 }
 
 template <typename F> __device__ void invoke(F *Fn) { (*Fn)(); }
 
-
 template <typename F> struct Box {
   F *Fn;
 };
 
-template <typename F> __device__ void helper_slot(F *Opt1, F * Opt2, bool Cond, bool IndexTwo) {
+template <typename F>
+__device__ void helper_slot(F *Opt1, F *Opt2, bool Cond, bool IndexTwo) {
   F *Slot = nullptr;
   if (!IndexTwo) {
-    Box<F> B {Opt2};
+    Box<F> B{Opt2};
     if (Cond)
       Slot = Opt1;
     else
       Slot = B.Fn;
   } else {
-    Box<F> B {Opt1};
+    Box<F> B{Opt1};
     if (Cond)
       Slot = Opt2;
     else
@@ -48,9 +49,10 @@ template <typename F> __device__ void helper_box(F *Fn) {
 }
 
 auto getTestLambda(int V) {
-  return  proteus::register_lambda([=, X = proteus::jit_variable(V)] __host__ __device__ {
-    printf("case phi %d\n", X);
-  });
+  return proteus::register_lambda(
+      [=, X = proteus::jit_variable(V)] __host__ __device__ {
+        printf("case phi %d\n", X);
+      });
 }
 
 // Case 3: multiple stores to the same temporary slot, only one dominating the
@@ -59,19 +61,14 @@ auto getTestLambda(int V) {
 static void phi_case(int V1, int V2, bool CollapseToKernelArgTwo) {
   // branch should always resovle to 55
   if (CollapseToKernelArgTwo)
-  kernel_phi<<<1, 1>>>(
-    getTestLambda(V1),
-    getTestLambda(V2),
-    CollapseToKernelArgTwo);
+    kernel_phi<<<1, 1>>>(getTestLambda(V1), getTestLambda(V2),
+                         CollapseToKernelArgTwo);
   // branch should always resolve to 77
   else
-  kernel_phi<<<1, 1>>>(
-    getTestLambda(V2),
-    getTestLambda(V1),
-    CollapseToKernelArgTwo);
+    kernel_phi<<<1, 1>>>(getTestLambda(V2), getTestLambda(V1),
+                         CollapseToKernelArgTwo);
   gpuErrCheck(gpuDeviceSynchronize());
 }
-
 
 int main() {
   int V1 = 55;
@@ -88,7 +85,6 @@ int main() {
 
   return 0;
 }
-
 
 // clang-format off
 // CHECK-FIRST: [LambdaSpec] Replacing slot 0 with i32 77

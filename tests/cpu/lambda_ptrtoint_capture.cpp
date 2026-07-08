@@ -11,16 +11,15 @@
 
 #include <proteus/JitInterface.h>
 
-template <typename F> void run(F &&Func) {
-  proteus::register_lambda(Func)();
-}
+template <typename F> void run(F &&Func) { proteus::register_lambda(Func)(); }
 
 int main() {
   int Value = 0;
   int *Ptr = &Value;
 
-  run([=, Bits = reinterpret_cast<int *>(proteus::jit_variable(reinterpret_cast<std::uintptr_t>(Ptr)))]
-          () __attribute__((annotate("jit"))) {
+  run([=, Bits = reinterpret_cast<int *>(
+              proteus::jit_variable(reinterpret_cast<std::uintptr_t>(Ptr)))]()
+          __attribute__((annotate("jit"))) {
             std::cout << *Bits << "\n";
             *Bits = 123;
             std::cout << *Bits << "\n";

@@ -20,12 +20,12 @@ __global__ __attribute__((annotate("jit"))) void kernel(T LB) {
   LB();
 }
 
-template<typename L1, typename L2, typename L3>
-struct Abstraction {
+template <typename L1, typename L2, typename L3> struct Abstraction {
   L1 lambda_1;
   L2 lambda_2;
   L3 lambda_3;
-  Abstraction(L1&& l1, L2&& l2, L3&& l3) : lambda_1(l1), lambda_2(l2), lambda_3(l3){};
+  Abstraction(L1 &&l1, L2 &&l2, L3 &&l3)
+      : lambda_1(l1), lambda_2(l2), lambda_3(l3) {};
 
   __host__ __device__ auto operator()() {
     lambda_1();
@@ -34,15 +34,17 @@ struct Abstraction {
   }
 };
 
-// Macro can be invoked function style, either within a Function where the arguments passed
-// to jit_variable are function parameters, or Constants as below
+// Macro can be invoked function style, either within a Function where the
+// arguments passed to jit_variable are function parameters, or Constants as
+// below
 auto declareLambda(int rc1, int rc2) {
   return proteus::register_lambda([=, C = proteus::jit_variable(rc1), D = 5,
-          C2 = proteus::jit_variable(rc2)]() __attribute__((annotate("jit"))) {
-    printInt(C);
-    printInt(C2);
-    printInt(D);
-  });
+                                   C2 = proteus::jit_variable(rc2)]()
+                                      __attribute__((annotate("jit"))) {
+                                        printInt(C);
+                                        printInt(C2);
+                                        printInt(D);
+                                      });
 }
 
 auto declareLambdaThree(int rc1, int rc2, int rc3) {
@@ -77,8 +79,7 @@ void forDeclareLambda() {
   }
 }
 
-#define REGISTER_LAMBDA(Lambda) \
-return Functor<__COUNTER__>(Lambda);
+#define REGISTER_LAMBDA(Lambda) return Functor<__COUNTER__>(Lambda);
 
 int main() {
   int Zero = 0;
@@ -95,7 +96,8 @@ int main() {
 
   auto ForLam = proteus::register_lambda(forwardLambda(Zero, One, Two));
 
-  Abstraction A (std::move(ZeroLambda), std::move(OneLambda), std::move(TwoLambda));
+  Abstraction A(std::move(ZeroLambda), std::move(OneLambda),
+                std::move(TwoLambda));
 
   run(A);
   run(BigLam);
@@ -136,3 +138,4 @@ int main() {
 // CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: [proteus][JitEngineDevice] StorageCache rank 0 hits 0 accesses 2
 // CHECK-SECOND: [proteus][JitEngineDevice] StorageCache rank 0 hits 2 accesses 2
+// clang-format on
