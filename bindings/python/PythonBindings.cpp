@@ -31,7 +31,8 @@ struct ArgStorage {
 };
 
 std::string readSource(py::object Source) {
-  // Accept either inline source text or a path-like object naming a file.
+  // Read from a file when Source's string representation names one; otherwise,
+  // treat the string itself as inline source text.
   py::object PathLike = Source;
   if (py::hasattr(Source, "__fspath__"))
     PathLike = Source.attr("__fspath__")();
