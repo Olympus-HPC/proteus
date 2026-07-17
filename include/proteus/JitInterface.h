@@ -17,16 +17,27 @@
 #include "proteus/Init.h"
 
 #include <cassert>
+#include <cstdint>
 #include <cstring>
 #include <type_traits>
 #include <utility>
 
-extern "C" void __proteus_register_variable(proteus::RuntimeConstant RC,
-                                            const char *AssociatedLambda);
-extern "C" void __proteus_register_lambda(const char *Symbol);
+extern "C" __attribute__((used)) void
+__proteus_register_lambda_runtime_constant(int32_t Type, int32_t Pos,
+                                           int32_t Offset, const void *ValuePtr,
+                                           uint64_t functor_id);
+
 extern "C" void __proteus_take_address(void const *) noexcept;
+extern "C" __attribute__((used)) void
+__proteus_finalize_register(uint64_t Tag) noexcept;
 
 namespace proteus {
+
+#if defined(__CUDACC__) || defined(__HIP__)
+#define PROTEUS_HOST_DEVICE __host__ __device__
+#else
+#define PROTEUS_HOST_DEVICE
+#endif
 
 template <typename T> __attribute__((noinline)) void jit_arg(T V) noexcept;
 #if defined(__CUDACC__) || defined(__HIP__)
@@ -75,51 +86,77 @@ __attribute__((noinline)) __device__ std::enable_if_t<
 jit_object(T &V, size_t Size = sizeof(T)) noexcept;
 #endif
 
-template <typename T> inline static RuntimeConstantType convertCTypeToRCType() {
-  if constexpr (std::is_same_v<T, bool>) {
-    return RuntimeConstantType::BOOL;
-  } else if constexpr (std::is_integral_v<T> && sizeof(T) == sizeof(int8_t)) {
-    return RuntimeConstantType::INT8;
-  } else if constexpr (std::is_integral_v<T> && sizeof(T) == sizeof(int32_t)) {
-    return RuntimeConstantType::INT32;
-  } else if constexpr (std::is_integral_v<T> && sizeof(T) == sizeof(int64_t)) {
-    return RuntimeConstantType::INT64;
-  } else if constexpr (std::is_same_v<T, float>) {
-    return RuntimeConstantType::FLOAT;
-  } else if constexpr (std::is_same_v<T, double>) {
-    return RuntimeConstantType::DOUBLE;
-  } else if constexpr (std::is_same_v<T, long double>) {
-    return RuntimeConstantType::LONG_DOUBLE;
-  } else if constexpr (std::is_pointer_v<T>) {
-    return RuntimeConstantType::PTR;
-  } else {
-    return RuntimeConstantType::NONE;
+namespace detail {
+// todo: use LLVM hashing?
+constexpr std::uint64_t fnv1a64(const char *s) {
+  std::uint64_t h = 14695981039346656037ull;
+  for (; *s; ++s) {
+    h ^= (unsigned char)(*s);
+    h *= 1099511628211ull;
   }
+  return h;
 }
 
-template <typename T>
-static __attribute__((noinline)) T
-jit_variable(T V, int Pos = -1, int Offset = -1,
-             const char *AssociatedLambda = "") noexcept {
-  RuntimeConstant RC{convertCTypeToRCType<T>(), Pos, Offset};
-  std::memcpy(static_cast<void *>(&RC), &V, sizeof(T));
-  __proteus_register_variable(RC, AssociatedLambda);
-
-  return V;
+// todo: make a test with lambda factory in a header, two separate cpp files
+template <class Lambda> constexpr std::uint64_t functor_id() {
+  return fnv1a64(__PRETTY_FUNCTION__); // includes Lambda + Ctr in the text
 }
 
-template <typename T>
-static __attribute__((noinline)) T &&
-register_lambda(T &&t, const char *Symbol = "") noexcept {
-  assert(Symbol && "Expected non-null Symbol");
-  __proteus_register_lambda(Symbol);
+template <uint64_t FunctorID, typename Lambda> struct LambdaFunctorWrapper {
+  using LambdaType = Lambda;
+  static constexpr std::uint64_t functor_id = FunctorID;
+  LambdaType lambda;
+
+  template <typename... Args>
+  PROTEUS_HOST_DEVICE __attribute__((annotate("jit")))
+  __attribute__((annotate("proteus.wrapper_call", functor_id))) decltype(auto)
+  operator()(Args &&...args) const noexcept {
+    return lambda(std::forward<Args>(args)...);
+  }
+};
+
+template <typename... T> struct is_lambda_functor_wrapper : std::false_type {};
+
+template <uint64_t FunctorID, typename Lambda>
+struct is_lambda_functor_wrapper<LambdaFunctorWrapper<FunctorID, Lambda>>
+    : std::true_type {};
+
+template <std::uint64_t FunctorId, typename L>
+PROTEUS_HOST_DEVICE inline auto tag_functor(L &&lambda) {
+  return LambdaFunctorWrapper<FunctorId, std::decay_t<L>>{
+      std::forward<L>(lambda)};
+}
+
+template <uint64_t ID, typename T>
+[[nodiscard]] static __attribute__((noinline))
+__attribute__((annotate("proteus.register_call_impl", ID))) auto
+__register_lambda_impl(T &&t) noexcept {
+  static_assert(!detail::is_lambda_functor_wrapper<std::decay_t<T>>::value);
   // Force LLVM to generate an AllocaInst of the underlying Clang--generated
   // anonymous class for T.  We remove this after recording the demangled
   // lambda name.
   using LambdaType = std::decay_t<T>;
   LambdaType local = t;
   __proteus_take_address(&local);
-  return std::forward<T>(t);
+  auto result = tag_functor<ID>(std::forward<T>(t));
+  return result;
+}
+
+} // namespace detail
+
+template <class L>
+[[nodiscard]] inline auto __attribute__((annotate("proteus.register_call")))
+register_lambda(L &&lambda) noexcept {
+  auto registered_lambda = ::proteus::detail::__register_lambda_impl<
+      ::proteus::detail::functor_id<std::decay_t<L>>()>(
+      std::forward<L>(lambda));
+  __proteus_take_address(&registered_lambda);
+  return registered_lambda;
+}
+
+template <typename T>
+static __attribute__((noinline)) T jit_variable(T V) noexcept {
+  return V;
 }
 
 #if defined(__CUDACC__) || defined(__HIP__)

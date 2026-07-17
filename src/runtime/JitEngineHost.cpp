@@ -17,6 +17,7 @@
 #include "proteus/impl/LambdaRegistry.h"
 #include "proteus/impl/TransformArgumentSpecialization.h"
 #include "proteus/impl/TransformLambdaSpecialization.h"
+#include <optional>
 #if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
 #include "proteus/impl/CompilerInterfaceDevice.h"
 #endif
@@ -34,11 +35,30 @@
 #include <llvm/Object/SymbolSize.h>
 #include <llvm/TargetParser/Host.h>
 
+#include <cstring>
 #include <memory>
 
 using namespace proteus;
 using namespace llvm;
 using namespace llvm::orc;
+
+namespace {
+
+DenseMap<int, proteus::RuntimeConstant>
+collectCurrentLambdaJitValues(std::optional<uint64_t> FunctorID) {
+  DenseMap<int, proteus::RuntimeConstant> EmptyMap{};
+
+  if (!FunctorID)
+    return EmptyMap;
+
+  auto VariantOpt = LambdaRegistry::instance().getHostJitVariant(*FunctorID);
+  if (!VariantOpt || VariantOpt->empty())
+    return EmptyMap;
+
+  return *VariantOpt;
+}
+
+} // namespace
 
 JitEngineHost &JitEngineHost::instance() {
   static JitEngineHost Jit;
@@ -154,15 +174,15 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
     int ArgNo = ConstInt->getZExtValue();
     ArgPos.push_back(ArgNo);
   }
-
   TransformArgumentSpecialization::transform(M, *F, RCArray);
 
-  if (!LambdaRegistry::instance().empty()) {
-    if (auto OptionalMapIt =
-            LambdaRegistry::instance().matchJitVariableMap(F->getName())) {
-      auto &RCVec = OptionalMapIt.value()->getSecond();
-      TransformLambdaSpecialization::transform(M, *F, RCVec);
-    }
+  auto FunctorID = getFunctionU64Metadata(*F, "proteus.registered_lambda");
+  auto LambdaJitValuesMap = collectCurrentLambdaJitValues(FunctorID);
+
+  if (!LambdaJitValuesMap.empty()) {
+    TransformLambdaSpecialization::transformHostFunction(M, *F,
+                                                         LambdaJitValuesMap);
+    LambdaRegistry::instance().eraseHostJitVariables(*FunctorID);
   }
 
   F->setName(FnName + Suffix);
@@ -175,31 +195,10 @@ void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
   }
 }
 
-void getLambdaJitValues(StringRef FnName,
-                        SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
-  TIMESCOPE("proteus::getLambdaJitValues");
-  LambdaRegistry &LR = LambdaRegistry::instance();
-  if (LR.empty())
-    return;
-
-  PROTEUS_DBG(Logger::logs("proteus") << "=== Host LAMBDA MATCHING\n"
-                                      << "Caller trigger " << FnName << " -> "
-                                      << demangle(FnName.str()) << "\n");
-
-  SmallVector<StringRef> LambdaCalleeInfo;
-  PROTEUS_DBG(Logger::logs("proteus")
-              << " Trying F " << demangle(FnName.str()) << "\n ");
-  auto OptionalMapIt = LR.matchJitVariableMap(FnName);
-  if (!OptionalMapIt)
-    return;
-
-  LambdaJitValuesVec = OptionalMapIt.value()->getSecond();
-}
-
-void *
-JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
-                              void **Args,
-                              ArrayRef<RuntimeConstantInfo *> RCInfoArray) {
+void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
+                                    void **Args,
+                                    ArrayRef<RuntimeConstantInfo *> RCInfoArray,
+                                    uint64_t *FunctorIDPtr) {
   TIMESCOPE(JitEngineHost, compileAndLink);
 
   StringRef StrIR(IR, IRSize);
@@ -207,20 +206,15 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 
   Timer T(Config::get().ProteusEnableTimers);
   SMDiagnostic Diag;
-  auto M = parseIR(MemoryBufferRef(StrIR, "JitModule"), Diag, *Ctx);
-  if (!M)
-    reportFatalError("Error parsing IR: " + Diag.getMessage());
-
-  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus") << "Parse IR " << FnName << " "
-                                               << T.elapsed() << " ms\n");
-
   SmallVector<RuntimeConstant> RCVec =
       getRuntimeConstantValues(Args, RCInfoArray);
-  SmallVector<RuntimeConstant> LambdaJitValuesVec;
-  getLambdaJitValues(FnName, LambdaJitValuesVec);
+  std::optional<uint64_t> FunctorID =
+      FunctorIDPtr ? std::optional<uint64_t>{*FunctorIDPtr} : std::nullopt;
+  DenseMap<int, proteus::RuntimeConstant> LambdaJitValuesMap =
+      collectCurrentLambdaJitValues(FunctorID);
 
   const auto &CGConfig = Config::get().getCGConfig();
-  HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesVec,
+  HashT HashValue = hash(StrIR, FnName, RCVec, LambdaJitValuesMap,
                          hashCodeGenConfig(CGConfig),
                          hashRuntimeSpecializationConfig(CGConfig));
   if (Config::get().ProteusDebugOutput) {
@@ -228,16 +222,26 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
         << "Hashing: " << " FnName " << FnName << " RCVec [ ";
     for (const auto &RC : RCVec)
       Logger::logs("proteus") << RC.Value.Int64Val << ",";
-    Logger::logs("proteus") << " ] LambdaVec [ ";
-    for (auto &RC : LambdaJitValuesVec)
-      Logger::logs("proteus") << RC.Value.Int64Val << ",";
+    Logger::logs("proteus") << " ] LambdaMap [ ";
+    for (auto &KV : LambdaJitValuesMap)
+      Logger::logs("proteus")
+          << KV.first << ":" << KV.second.Value.Int32Val << ",";
     Logger::logs("proteus") << " ] -> Hash " << HashValue.getValue() << "\n";
   }
-
   // Lookup the function pointer in the code cache.
   void *JitFnPtr = CodeCache.lookup(HashValue);
-  if (JitFnPtr)
+  if (JitFnPtr) {
+    if (FunctorID)
+      LambdaRegistry::instance().eraseHostJitVariables(*FunctorID);
     return JitFnPtr;
+  }
+
+  auto M = parseIR(MemoryBufferRef(StrIR, "JitModule"), Diag, *Ctx);
+  if (!M)
+    reportFatalError("Error parsing IR: " + Diag.getMessage());
+
+  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus") << "Parse IR " << FnName << " "
+                                               << T.elapsed() << " ms\n");
 
   std::string Suffix = HashValue.toMangledSuffix();
   std::string MangledFnName = FnName.str() + Suffix;
@@ -277,6 +281,8 @@ JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
               << "=== JIT compile: " << FnName << " Mangled " << MangledFnName
               << " RC HashValue " << HashValue.toString() << " Addr "
               << JitFnPtr << "\n");
+  if (FunctorID)
+    LambdaRegistry::instance().eraseHostJitVariables(*FunctorID);
   return JitFnPtr;
 }
 

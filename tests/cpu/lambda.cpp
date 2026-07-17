@@ -10,10 +10,7 @@
 
 #include <proteus/JitInterface.h>
 
-template <typename F> void run(F &&Func) {
-  proteus::register_lambda(Func);
-  Func();
-}
+template <typename F> void run(F &&Func) { proteus::register_lambda(Func)(); }
 
 int main() {
   size_t N = 1024;
@@ -55,3 +52,4 @@ int main() {
 // CHECK: [proteus][JitEngineHost] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: [proteus][JitEngineHost] StorageCache rank 0 hits 0 accesses 1
 // CHECK-SECOND: [proteus][JitEngineHost] StorageCache rank 0 hits 1 accesses 1
+// clang-format on

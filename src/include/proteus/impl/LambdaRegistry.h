@@ -5,11 +5,17 @@
 #include "proteus/Error.h"
 #include "proteus/impl/Config.h"
 #include "proteus/impl/Debug.h"
+#include "proteus/impl/LambdaCallsite.h"
 #include "proteus/impl/Logger.h"
 
 #include <llvm/ADT/DenseMap.h>
+#include <llvm/ADT/STLExtras.h>
+#include <llvm/ADT/SmallVector.h>
 #include <llvm/ADT/StringRef.h>
 #include <llvm/Demangle/Demangle.h>
+#include <mutex>
+#include <optional>
+
 namespace proteus {
 
 using namespace llvm;
@@ -28,83 +34,137 @@ public:
   LambdaRegistry(LambdaRegistry &&) = delete;
   LambdaRegistry &operator=(LambdaRegistry &&) = delete;
 
-  std::optional<DenseMap<StringRef, SmallVector<RuntimeConstant>>::iterator>
-  matchJitVariableMap(StringRef FnName) {
-    std::string Operator = llvm::demangle(FnName.str());
-    std::size_t Sep = Operator.rfind("::operator()");
-    if (Sep == std::string::npos) {
-      PROTEUS_DBG(Logger::logs("proteus")
-                  << "... SKIP ::operator() not found\n");
-      return std::nullopt;
-    }
+  using JitVariantMap = DenseMap<int32_t, RuntimeConstant>;
+  using JitVariantVec = SmallVector<JitVariantMap, 4>;
+  struct DeviceLaunchInfo {
+    SmallVector<uint64_t, 4> LambdaCalleeInfo;
+    LambdaCallsiteRuntimeConstantsMap CallsiteRuntimeConstants;
+  };
 
-    StringRef LambdaType = StringRef{Operator}.slice(0, Sep);
-    if (Config::get().ProteusDebugOutput) {
-      Logger::logs("proteus")
-          << "Operator " << Operator << "\n=> LambdaType to match "
-          << LambdaType << "\n";
-      Logger::logs("proteus") << "Available Keys\n";
-      for (auto &[Key, Val] : JitVariableMap) {
-        Logger::logs("proteus") << "\tKey: " << Key << "\n";
-      }
-      Logger::logs("proteus") << "===\n";
-    }
-
-    const auto It = JitVariableMap.find(LambdaType);
-    if (It == JitVariableMap.end())
+  std::optional<JitVariantMap> getHostJitVariant(uint64_t FunctorID) const {
+    const auto &CurrentVariants = currentHostJitVariables();
+    if (CurrentVariants.empty())
       return std::nullopt;
 
-    return It;
+    auto It = CurrentVariants.find(FunctorID);
+    if (It == CurrentVariants.end() || It->second.empty())
+      return std::nullopt;
+
+    return It->second;
   }
 
-  void dump() {
-    Logger::logs("proteus") << "Dumping pending registry \n";
-    for (const auto &[Key, Value] : PendingJitVariableMap) {
-      Logger::logs("proteus") << Key << " : " << "\n";
-      for (const auto &V : Value) {
-        Logger::logs("proteus") << ", " << V.Value.DoubleVal;
-      }
-      Logger::logs("proteus") << "\n";
+  void appendHostJitVariable(uint64_t FunctorID, const RuntimeConstant &RC) {
+    pendingHostJitVariables()[FunctorID][RC.Pos] = RC;
+  }
+
+  void commitHostJitVariables(uint64_t FunctorID) {
+    auto &PendingVariants = pendingHostJitVariables();
+    auto PendingIt = PendingVariants.find(FunctorID);
+    if (PendingIt == PendingVariants.end())
+      return;
+    if (PendingIt->second.empty())
+      return;
+
+    currentHostJitVariables()[FunctorID] = std::move(PendingIt->second);
+    PendingVariants.erase(PendingIt);
+  }
+
+  void eraseHostJitVariables(uint64_t FunctorID) {
+    currentHostJitVariables().erase(FunctorID);
+  }
+
+  bool emptyHost() const { return currentHostJitVariables().empty(); }
+
+  void beginDeviceLaunch() {
+    auto &PendingLaunchInfo = pendingDeviceLaunchInfo();
+    auto &CurrentLaunchInfo = currentDeviceLaunchInfo();
+    PendingLaunchInfo.LambdaCalleeInfo.clear();
+    PendingLaunchInfo.CallsiteRuntimeConstants.clear();
+    CurrentLaunchInfo.LambdaCalleeInfo.clear();
+    CurrentLaunchInfo.CallsiteRuntimeConstants.clear();
+  }
+
+  void appendDeviceCallsiteRuntimeConstant(uint64_t LambdaID,
+                                           uint32_t CallsiteIndex,
+                                           const RuntimeConstant &RC) {
+    auto &PendingLaunchInfo = pendingDeviceLaunchInfo();
+    auto &RCVec = PendingLaunchInfo.CallsiteRuntimeConstants[CallsiteIndex];
+    RCVec.push_back(RC);
+    if (llvm::find(PendingLaunchInfo.LambdaCalleeInfo, LambdaID) ==
+        PendingLaunchInfo.LambdaCalleeInfo.end()) {
+      PendingLaunchInfo.LambdaCalleeInfo.push_back(LambdaID);
     }
-    Logger::logs("proteus") << "Dumping finalized registry \n";
-    for (const auto &[Key, Value] : JitVariableMap) {
-      Logger::logs("proteus") << Key << " : " << "\n";
-      for (const auto &V : Value) {
-        Logger::logs("proteus") << ", " << V.Value.DoubleVal;
-      }
-      Logger::logs("proteus") << "\n";
+  }
+
+  void finalizeDeviceLaunch() {
+    auto &PendingLaunchInfo = pendingDeviceLaunchInfo();
+    auto &CurrentLaunchInfo = currentDeviceLaunchInfo();
+    for (auto &KV : PendingLaunchInfo.CallsiteRuntimeConstants) {
+      llvm::sort(KV.second,
+                 [](const RuntimeConstant &L, const RuntimeConstant &R) {
+                   return L.Pos < R.Pos;
+                 });
     }
+    CurrentLaunchInfo = std::move(PendingLaunchInfo);
+    PendingLaunchInfo.LambdaCalleeInfo.clear();
+    PendingLaunchInfo.CallsiteRuntimeConstants.clear();
   }
 
-  void setJitVariable(const char *LambdaType, RuntimeConstant &RC) {
-    assert(PendingJitVariableMap.contains(LambdaType) &&
-           "Lambda must be registered prior to register JIT variable!");
-    PendingJitVariableMap[LambdaType].emplace_back(RC);
+  DeviceLaunchInfo takeDeviceLaunchInfo() {
+    auto &CurrentLaunchInfo = currentDeviceLaunchInfo();
+    DeviceLaunchInfo LaunchInfo = std::move(CurrentLaunchInfo);
+    CurrentLaunchInfo.LambdaCalleeInfo.clear();
+    CurrentLaunchInfo.CallsiteRuntimeConstants.clear();
+    return LaunchInfo;
   }
 
-  inline void registerLambda(const char *LambdaType) {
-    const StringRef LambdaTypeRef{LambdaType};
-    PROTEUS_DBG(Logger::logs("proteus")
-                << "=> RegisterLambda " << LambdaTypeRef << "\n");
-    // Copy PendingJitVariables if there were changed, otherwise the runtime
-    // values for the lambda definition have not changed.
-    PROTEUS_DBG(dump());
-    if (!PendingJitVariableMap[LambdaTypeRef].empty()) {
-      JitVariableMap[LambdaTypeRef] = PendingJitVariableMap[LambdaTypeRef];
-      PendingJitVariableMap[LambdaTypeRef].clear();
+  void populateLambdaRegistrationCodeCache(void *Kernel,
+                                           void *RegistrationFunc) {
+    std::lock_guard<std::mutex> Lock(DeviceRegistrationMutex);
+    KernelToLambdaRegistration[Kernel] = RegistrationFunc;
+  }
+
+  void invokeRegisterLambdaConstants(void *Kernel, void **Args) {
+    void *RegistrationFunc = nullptr;
+    {
+      std::lock_guard<std::mutex> Lock(DeviceRegistrationMutex);
+      auto It = KernelToLambdaRegistration.find(Kernel);
+      if (It != KernelToLambdaRegistration.end())
+        RegistrationFunc = It->second;
     }
+    if (!RegistrationFunc) {
+      beginDeviceLaunch();
+      return;
+    }
+    auto RegisterFunc = reinterpret_cast<void (*)(void **)>(RegistrationFunc);
+    RegisterFunc(Args);
   }
-
-  const SmallVector<RuntimeConstant> &getJitVariables(StringRef LambdaTypeRef) {
-    return JitVariableMap[LambdaTypeRef];
-  }
-
-  bool empty() { return JitVariableMap.empty(); }
 
 private:
   explicit LambdaRegistry() = default;
-  DenseMap<StringRef, SmallVector<RuntimeConstant>> JitVariableMap;
-  DenseMap<StringRef, SmallVector<RuntimeConstant>> PendingJitVariableMap;
+
+  static DenseMap<uint64_t, JitVariantMap> &pendingHostJitVariables() {
+    static thread_local DenseMap<uint64_t, JitVariantMap> PendingHostJitVars;
+    return PendingHostJitVars;
+  }
+
+  static DenseMap<uint64_t, JitVariantMap> &currentHostJitVariables() {
+    static thread_local DenseMap<uint64_t, JitVariantMap> CurrentHostJitVars;
+    return CurrentHostJitVars;
+  }
+
+  static DeviceLaunchInfo &pendingDeviceLaunchInfo() {
+    static thread_local DeviceLaunchInfo PendingLaunchInfo;
+    return PendingLaunchInfo;
+  }
+
+  static DeviceLaunchInfo &currentDeviceLaunchInfo() {
+    static thread_local DeviceLaunchInfo CurrentLaunchInfo;
+    return CurrentLaunchInfo;
+  }
+
+  mutable std::mutex DeviceRegistrationMutex;
+  DenseMap<void *, void *> KernelToLambdaRegistration;
 };
 
 } // namespace proteus
