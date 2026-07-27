@@ -126,9 +126,12 @@ entry:
 """
 
 mod = proteus.compile(source, frontend="llvmir", target="host")
-plus1 = mod.get_function("plus1", restype=proteus.i32, argtypes=[proteus.i32])
+plus1 = mod.get_function("plus1", signature=proteus.i32(proteus.i32))
 assert plus1(41) == 42
 ```
 
 In the current Python API, LLVM IR input is provided as text through a string
 or a path to a `.ll` file.
+See [Python Bindings](python-bindings.md) for native signature descriptors,
+GPU kernel lookup,
+and ABI matching requirements.

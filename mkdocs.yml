@@ -9,6 +9,7 @@ nav:
       - User Interface:
           - Overview: user/interface.md
           - Code Annotations: user/annotations.md
+          - Python Bindings: user/python-bindings.md
           - C++ Frontend API: user/cpp-frontend.md
           - LLVM IR Frontend API: user/llvmir-frontend.md
           - MLIR Frontend API: user/mlir-frontend.md

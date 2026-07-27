@@ -20,6 +20,8 @@ def main():
     native_module.__file__ = "/tmp/fake_proteus_backend.so"
     native_module.compile = lambda *args, **kwargs: None
     native_module.i32 = object()
+    native_module.void = object()
+    native_module.Signature = type("Signature", (), {})
     native_module.has_cuda = False
     native_module.has_hip = False
 
@@ -44,6 +46,10 @@ def main():
     assert namespace["active_backend_variant"] == "host_llvm22"
     assert "compile" in namespace
     assert "i32" in namespace
+    assert "void" in namespace
+    assert "Signature" in namespace
+    assert exported.void is native_module.void
+    assert exported.Signature is native_module.Signature
     assert exported.__doc__ == "fake native module"
     assert exported.__file__ == "/tmp/fake_proteus_backend.so"
 

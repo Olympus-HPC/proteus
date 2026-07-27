@@ -13,19 +13,28 @@ def main():
     device_value = runtime.malloc_i32()
 
     mod = proteus.compile(source, frontend="cpp", target=target)
-    kernel = mod.get_kernel("write_int", [proteus.ptr, proteus.i32])
+    kernel = mod.get_kernel(
+        "write_int", signature=proteus.void(proteus.ptr, proteus.i32)
+    )
 
+    expect_raises(
+        TypeError,
+        lambda: mod.get_kernel(
+            "write_int", signature=proteus.i32(proteus.ptr, proteus.i32)
+        ),
+        "kernel signatures must return proteus.void",
+    )
     expect_raises(
         ValueError,
         lambda: mod.get_function(
-            "write_int", restype=None, argtypes=[proteus.ptr, proteus.i32]
+            "write_int", signature=proteus.void(proteus.ptr, proteus.i32)
         ),
         "Target is a GPU model, cannot directly run functions, use launch()",
     )
     expect_raises(
         TypeError,
         lambda: kernel.launch(grid=1, block=1, args=[device_value]),
-        "kernel argument count does not match argtypes",
+        "kernel argument count does not match signature",
     )
     expect_raises(
         TypeError,

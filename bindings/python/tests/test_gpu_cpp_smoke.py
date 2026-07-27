@@ -14,8 +14,13 @@ def main():
     runtime.copy_h2d_i32(device_value, 0)
 
     mod = proteus.compile(source, frontend="cpp", target=target)
-    kernel = mod.get_kernel("write_int", [proteus.ptr, proteus.i32])
-    assert repr(kernel) == "<proteus.Kernel name='write_int' restype=None argtypes=[proteus.ptr, proteus.i32]>"
+    kernel = mod.get_kernel(
+        "write_int", signature=proteus.void(proteus.ptr, proteus.i32)
+    )
+    assert (
+        repr(kernel)
+        == "<proteus.Kernel name='write_int' signature=proteus.void(proteus.ptr, proteus.i32)>"
+    )
     kernel.launch(grid=1, block=(1, 1, 1), args=[device_value, 7])
     runtime.sync()
     assert runtime.copy_d2h_i32(device_value) == 7

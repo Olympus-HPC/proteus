@@ -20,8 +20,11 @@ entry:
 
     mod = proteus.compile(source, frontend="llvmir", target="host")
     assert mod.get_function_address("forty_two") != 0
-    plus1 = mod.get_function("plus1", restype=proteus.i32, argtypes=[proteus.i32])
-    assert repr(plus1) == "<proteus.Function name='plus1' restype=proteus.i32 argtypes=[proteus.i32]>"
+    plus1 = mod.get_function("plus1", signature=proteus.i32(proteus.i32))
+    assert (
+        repr(plus1)
+        == "<proteus.Function name='plus1' signature=proteus.i32(proteus.i32)>"
+    )
     assert plus1(41) == 42
     assert proteus.compile(source, frontend="llvmir").get_function_address("forty_two") != 0
 
@@ -30,7 +33,9 @@ entry:
         path.write_text(source)
         mod = proteus.compile(path, frontend="llvmir", target="host")
         assert mod.get_function_address("forty_two") != 0
-        assert mod.get_function("plus1", restype=proteus.i32, argtypes=[proteus.i32])(41) == 42
+        assert mod.get_function(
+            "plus1", signature=proteus.i32(proteus.i32)
+        )(41) == 42
 
     print("python_host_llvmir_smoke: ok")
 
