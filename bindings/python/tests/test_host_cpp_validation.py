@@ -29,26 +29,26 @@ def main():
     for descriptor in (proteus.void, *arg_descriptors):
         assert isinstance(descriptor, proteus.Type)
         assert isinstance(descriptor(), proteus.Signature)
+        assert descriptor == descriptor
+    assert proteus.i32 != proteus.i64
+    assert proteus.i32 != object()
 
     signature = proteus.f64(proteus.f64, proteus.f64)
-    assert repr(signature.restype) == "proteus.f64"
-    assert tuple(map(repr, signature.argtypes)) == (
-        "proteus.f64",
-        "proteus.f64",
-    )
+    assert signature.restype == proteus.f64
+    assert signature.argtypes == (proteus.f64, proteus.f64)
+    assert hash(signature.restype) == hash(proteus.f64)
+    assert len({signature.restype, proteus.f64}) == 1
     assert isinstance(signature.argtypes, tuple)
     assert repr(signature) == "proteus.f64(proteus.f64, proteus.f64)"
 
     zero_arg_signature = proteus.i32()
-    assert repr(zero_arg_signature.restype) == "proteus.i32"
+    assert zero_arg_signature.restype == proteus.i32
     assert zero_arg_signature.argtypes == ()
     assert repr(zero_arg_signature) == "proteus.i32()"
 
     all_arg_signature = proteus.void(*arg_descriptors)
-    assert repr(all_arg_signature.restype) == "proteus.void"
-    assert tuple(map(repr, all_arg_signature.argtypes)) == tuple(
-        map(repr, arg_descriptors)
-    )
+    assert all_arg_signature.restype == proteus.void
+    assert all_arg_signature.argtypes == arg_descriptors
 
     expect_raises(TypeError, lambda: proteus.Signature())
     expect_raises(

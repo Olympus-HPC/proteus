@@ -437,7 +437,17 @@ PYBIND11_MODULE(_proteus, M) {
   // Expose the builtin scalar/pointer descriptors as module-level singletons.
   py::class_<Type>(M, "Type")
       .def("__call__", &makeSignature)
-      .def("__repr__", &typeRepr);
+      .def("__repr__", &typeRepr)
+      .def(
+          "__eq__",
+          [](const Type &LHS, const Type &RHS) { return LHS.Kind == RHS.Kind; },
+          py::is_operator())
+      .def(
+          "__ne__",
+          [](const Type &LHS, const Type &RHS) { return LHS.Kind != RHS.Kind; },
+          py::is_operator())
+      .def("__hash__",
+           [](const Type &T) { return static_cast<py::ssize_t>(T.Kind); });
 
   py::class_<Signature>(M, "Signature")
       .def_property_readonly("restype",
