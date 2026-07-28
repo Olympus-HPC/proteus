@@ -13,7 +13,7 @@ import proteus
 source = {source!r}
 target = {target!r}
 mod = proteus.compile(source, frontend="mlir", target=target, verify=True)
-mod.get_kernel("missing_kernel", [proteus.ptr])
+mod.get_kernel("missing_kernel", signature=proteus.void(proteus.ptr))
 """
     )
     assert missing_kernel.returncode != 0

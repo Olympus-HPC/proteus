@@ -5,6 +5,8 @@ def main():
     assert namespace["active_backend_variant"], namespace
     assert callable(namespace["compile"]), namespace.keys()
     assert "i32" in namespace, namespace.keys()
+    assert "void" in namespace, namespace.keys()
+    assert "Signature" in namespace, namespace.keys()
     print("test_wildcard_import: ok")
 
 

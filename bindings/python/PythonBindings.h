@@ -11,12 +11,18 @@
 
 namespace proteus_python {
 
-// Scalar and pointer element kinds exposed through the Python bindings.
-enum class PyType { I8, I32, I64, U32, U64, F32, F64, Ptr };
+// Return, scalar, and pointer kinds exposed through the Python bindings.
+enum class PyType { Void, I8, I32, I64, U32, U64, F32, F64, Ptr };
 
-// Lightweight type descriptor used when marshalling Python-side values.
+// Lightweight type descriptor used in signatures and argument marshalling.
 struct Type {
   PyType Kind;
+};
+
+// Exact native function signature assembled from the builtin descriptors.
+struct Signature {
+  Type RetType;
+  std::vector<Type> ArgTypes;
 };
 
 // Common execution interface implemented by the C++ and MLIR-backed modules.

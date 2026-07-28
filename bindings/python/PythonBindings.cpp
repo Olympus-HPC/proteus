@@ -147,6 +147,9 @@ ArgStorage convertArg(Type Ty, py::object Value, bool DevicePointers) {
   // addresses.
   ArgStorage Storage;
   switch (Ty.Kind) {
+  case PyType::Void:
+    throw py::type_error(
+        "proteus.void is only valid as a signature return type");
   case PyType::I8:
     Storage.set<int8_t>(Value.cast<int8_t>());
     break;
@@ -179,14 +182,70 @@ ArgStorage convertArg(Type Ty, py::object Value, bool DevicePointers) {
 class Module;
 class Function;
 
-py::object typeToCType(py::handle ctypes, py::object Ty) {
-  if (Ty.is_none())
-    return py::none();
+std::string typeRepr(Type Ty) {
+  switch (Ty.Kind) {
+  case PyType::Void:
+    return "proteus.void";
+  case PyType::I8:
+    return "proteus.i8";
+  case PyType::I32:
+    return "proteus.i32";
+  case PyType::I64:
+    return "proteus.i64";
+  case PyType::U32:
+    return "proteus.u32";
+  case PyType::U64:
+    return "proteus.u64";
+  case PyType::F32:
+    return "proteus.f32";
+  case PyType::F64:
+    return "proteus.f64";
+  case PyType::Ptr:
+    return "proteus.ptr";
+  }
+  throw py::type_error("unsupported Proteus type descriptor");
+}
 
+std::string signatureRepr(const Signature &Sig) {
+  std::string Repr = typeRepr(Sig.RetType) + "(";
+  for (std::size_t I = 0; I < Sig.ArgTypes.size(); ++I) {
+    if (I != 0)
+      Repr += ", ";
+    Repr += typeRepr(Sig.ArgTypes[I]);
+  }
+  Repr += ")";
+  return Repr;
+}
+
+void validateSignature(const Signature &Sig) {
+  for (Type ArgType : Sig.ArgTypes)
+    if (ArgType.Kind == PyType::Void)
+      throw py::type_error(
+          "proteus.void is only valid as a signature return type");
+}
+
+Signature makeSignature(Type RetType, py::args Args) {
+  std::vector<Type> ArgTypes;
+  ArgTypes.reserve(Args.size());
+  for (py::handle Arg : Args) {
+    if (!py::isinstance<Type>(Arg))
+      throw py::type_error(
+          "signature arguments must be Proteus type descriptors");
+    Type ArgType = py::cast<Type>(Arg);
+    if (ArgType.Kind == PyType::Void)
+      throw py::type_error(
+          "proteus.void is only valid as a signature return type");
+    ArgTypes.push_back(ArgType);
+  }
+  return Signature{RetType, std::move(ArgTypes)};
+}
+
+py::object typeToCType(py::handle ctypes, Type Ty) {
   // Build the ctypes signature from the lightweight descriptors exported by
   // this module.
-  Type T = Ty.cast<Type>();
-  switch (T.Kind) {
+  switch (Ty.Kind) {
+  case PyType::Void:
+    return py::none();
   case PyType::I8:
     return ctypes.attr("c_int8");
   case PyType::I32:
@@ -210,26 +269,26 @@ py::object typeToCType(py::handle ctypes, py::object Ty) {
 class Kernel {
   std::shared_ptr<ModuleBase> Mod;
   void *KernelFunc = nullptr;
-  std::vector<Type> ArgTypes;
+  Signature Sig;
   std::string Name;
 
 public:
-  Kernel(std::shared_ptr<ModuleBase> Mod, void *KernelFunc,
-         std::vector<Type> ArgTypes, std::string Name)
-      : Mod(std::move(Mod)), KernelFunc(KernelFunc),
-        ArgTypes(std::move(ArgTypes)), Name(std::move(Name)) {}
+  Kernel(std::shared_ptr<ModuleBase> Mod, void *KernelFunc, Signature Sig,
+         std::string Name)
+      : Mod(std::move(Mod)), KernelFunc(KernelFunc), Sig(std::move(Sig)),
+        Name(std::move(Name)) {}
 
   void launch(py::object Grid, py::object Block, py::sequence Args,
               uint64_t Shmem, py::object Stream) {
-    if (Args.size() != ArgTypes.size())
-      throw py::type_error("kernel argument count does not match argtypes");
+    if (Args.size() != Sig.ArgTypes.size())
+      throw py::type_error("kernel argument count does not match signature");
 
     // Keep the converted values alive for the duration of the kernel launch.
     std::vector<ArgStorage> Storage;
-    Storage.reserve(ArgTypes.size());
-    for (std::size_t I = 0; I < ArgTypes.size(); ++I)
+    Storage.reserve(Sig.ArgTypes.size());
+    for (std::size_t I = 0; I < Sig.ArgTypes.size(); ++I)
       Storage.push_back(convertArg(
-          ArgTypes[I], py::reinterpret_borrow<py::object>(Args[I]), true));
+          Sig.ArgTypes[I], py::reinterpret_borrow<py::object>(Args[I]), true));
 
     std::vector<void *> RawArgs;
     RawArgs.reserve(Storage.size());
@@ -252,15 +311,8 @@ public:
   }
 
   std::string repr() const {
-    std::string Repr =
-        "<proteus.Kernel name='" + Name + "' restype=None argtypes=[";
-    for (std::size_t I = 0; I < ArgTypes.size(); ++I) {
-      if (I != 0)
-        Repr += ", ";
-      Repr += py::str(py::repr(py::cast(ArgTypes[I]))).cast<std::string>();
-    }
-    Repr += "]>";
-    return Repr;
+    return "<proteus.Kernel name='" + Name +
+           "' signature=" + signatureRepr(Sig) + ">";
   }
 };
 
@@ -268,25 +320,23 @@ class Function {
   std::shared_ptr<ModuleBase> Mod;
   py::object Callable;
   std::string Name;
-  py::object RetType;
-  std::vector<Type> ArgTypes;
+  Signature Sig;
 
 public:
   Function(std::shared_ptr<ModuleBase> Mod, py::object Callable,
-           std::string Name, py::object RetType, std::vector<Type> ArgTypes)
+           std::string Name, Signature Sig)
       : Mod(std::move(Mod)), Callable(std::move(Callable)),
-        Name(std::move(Name)), RetType(std::move(RetType)),
-        ArgTypes(std::move(ArgTypes)) {}
+        Name(std::move(Name)), Sig(std::move(Sig)) {}
 
   py::object call(py::args Args) const {
-    if (Args.size() != ArgTypes.size())
-      throw py::type_error("function argument count does not match argtypes");
+    if (Args.size() != Sig.ArgTypes.size())
+      throw py::type_error("function argument count does not match signature");
 
     py::tuple CoercedArgs(Args.size());
     py::module_ ctypes = py::module_::import("ctypes");
-    for (std::size_t I = 0; I < ArgTypes.size(); ++I) {
+    for (std::size_t I = 0; I < Sig.ArgTypes.size(); ++I) {
       py::object Arg = py::reinterpret_borrow<py::object>(Args[I]);
-      if (ArgTypes[I].Kind == PyType::Ptr)
+      if (Sig.ArgTypes[I].Kind == PyType::Ptr)
         // Force pointer-typed arguments through `c_void_p` so ctypes does not
         // reinterpret Python integers as narrower scalar values.
         CoercedArgs[I] =
@@ -298,16 +348,8 @@ public:
   }
 
   std::string repr() const {
-    std::string Repr = "<proteus.Function name='" + Name + "' restype=" +
-                       py::str(py::repr(RetType)).cast<std::string>() +
-                       " argtypes=[";
-    for (std::size_t I = 0; I < ArgTypes.size(); ++I) {
-      if (I != 0)
-        Repr += ", ";
-      Repr += py::str(py::repr(py::cast(ArgTypes[I]))).cast<std::string>();
-    }
-    Repr += "]>";
-    return Repr;
+    return "<proteus.Function name='" + Name +
+           "' signature=" + signatureRepr(Sig) + ">";
   }
 };
 
@@ -317,13 +359,15 @@ class Module {
 public:
   explicit Module(std::shared_ptr<ModuleBase> Impl) : Impl(std::move(Impl)) {}
 
-  Kernel getKernel(const std::string &Name, std::vector<Type> ArgTypes) {
-    return Kernel(Impl, Impl->getKernelAddress(Name), std::move(ArgTypes),
-                  Name);
+  Kernel getKernel(const std::string &Name, Signature Sig) {
+    validateSignature(Sig);
+    if (Sig.RetType.Kind != PyType::Void)
+      throw py::type_error("kernel signatures must return proteus.void");
+    return Kernel(Impl, Impl->getKernelAddress(Name), std::move(Sig), Name);
   }
 
-  Function getFunction(const std::string &Name, py::object RetType,
-                       std::vector<Type> ArgTypes) {
+  Function getFunction(const std::string &Name, Signature Sig) {
+    validateSignature(Sig);
     if (!proteus::isHostTargetModel(Impl->getTargetModel()))
       throw py::value_error(
           "Target is a GPU model, cannot directly run functions, use launch()");
@@ -331,18 +375,17 @@ public:
     py::module_ ctypes = py::module_::import("ctypes");
     // CFUNCTYPE expects the return type first, then the positional argument
     // types.
-    py::tuple CTypeArgs(ArgTypes.size() + 1);
-    CTypeArgs[0] = typeToCType(ctypes, RetType);
-    for (std::size_t I = 0; I < ArgTypes.size(); ++I)
-      CTypeArgs[I + 1] = typeToCType(ctypes, py::cast(ArgTypes[I]));
+    py::tuple CTypeArgs(Sig.ArgTypes.size() + 1);
+    CTypeArgs[0] = typeToCType(ctypes, Sig.RetType);
+    for (std::size_t I = 0; I < Sig.ArgTypes.size(); ++I)
+      CTypeArgs[I + 1] = typeToCType(ctypes, Sig.ArgTypes[I]);
 
     py::object FuncType = ctypes.attr("CFUNCTYPE")(*CTypeArgs);
     // Wrap the JIT symbol address in a Python callable with the requested
     // signature.
     py::object Callable = FuncType(
         py::int_(reinterpret_cast<uintptr_t>(Impl->getFunctionAddress(Name))));
-    return Function(Impl, std::move(Callable), Name, std::move(RetType),
-                    std::move(ArgTypes));
+    return Function(Impl, std::move(Callable), Name, std::move(Sig));
   }
 
   uintptr_t getFunctionAddress(const std::string &Name) {
@@ -392,28 +435,34 @@ PYBIND11_MODULE(_proteus, M) {
   M.doc() = "Thin Python bindings for Proteus JIT frontends";
 
   // Expose the builtin scalar/pointer descriptors as module-level singletons.
-  py::class_<Type>(M, "Type").def("__repr__", [](const Type &T) {
-    switch (T.Kind) {
-    case PyType::I8:
-      return "proteus.i8";
-    case PyType::I32:
-      return "proteus.i32";
-    case PyType::I64:
-      return "proteus.i64";
-    case PyType::U32:
-      return "proteus.u32";
-    case PyType::U64:
-      return "proteus.u64";
-    case PyType::F32:
-      return "proteus.f32";
-    case PyType::F64:
-      return "proteus.f64";
-    case PyType::Ptr:
-      return "proteus.ptr";
-    }
-    return "proteus.Type";
-  });
+  py::class_<Type>(M, "Type")
+      .def("__call__", &makeSignature)
+      .def("__repr__", &typeRepr)
+      .def(
+          "__eq__",
+          [](const Type &LHS, const Type &RHS) { return LHS.Kind == RHS.Kind; },
+          py::is_operator())
+      .def(
+          "__ne__",
+          [](const Type &LHS, const Type &RHS) { return LHS.Kind != RHS.Kind; },
+          py::is_operator())
+      .def("__hash__",
+           [](const Type &T) { return static_cast<py::ssize_t>(T.Kind); });
 
+  py::class_<Signature>(M, "Signature")
+      .def_property_readonly("restype",
+                             [](const Signature &Sig) { return Sig.RetType; })
+      .def_property_readonly("argtypes",
+                             [](const Signature &Sig) {
+                               py::tuple Result(Sig.ArgTypes.size());
+                               for (std::size_t I = 0; I < Sig.ArgTypes.size();
+                                    ++I)
+                                 Result[I] = py::cast(Sig.ArgTypes[I]);
+                               return Result;
+                             })
+      .def("__repr__", &signatureRepr);
+
+  M.attr("void") = Type{PyType::Void};
   M.attr("i8") = Type{PyType::I8};
   M.attr("i32") = Type{PyType::I32};
   M.attr("i64") = Type{PyType::I64};
@@ -425,10 +474,10 @@ PYBIND11_MODULE(_proteus, M) {
 
   // Modules own compiled code; kernels capture both the code and arg schema.
   py::class_<Module>(M, "Module")
-      .def("get_kernel", &Module::getKernel, py::arg("name"),
-           py::arg("argtypes"))
-      .def("get_function", &Module::getFunction, py::arg("name"),
-           py::arg("restype"), py::arg("argtypes"))
+      .def("get_kernel", &Module::getKernel, py::arg("name"), py::kw_only(),
+           py::arg("signature"))
+      .def("get_function", &Module::getFunction, py::arg("name"), py::kw_only(),
+           py::arg("signature"))
       .def("get_function_address", &Module::getFunctionAddress,
            py::arg("name"));
 

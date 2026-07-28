@@ -30,12 +30,18 @@ def main():
     runtime = create_runtime()
     device_value = runtime.malloc_i32()
     mod = proteus.compile(source, frontend="mlir", target=target, verify=True)
-    kernel = mod.get_kernel("write42", [proteus.ptr])
+    kernel = mod.get_kernel("write42", signature=proteus.void(proteus.ptr))
+
+    expect_raises(
+        TypeError,
+        lambda: mod.get_kernel("write42", signature=proteus.i32(proteus.ptr)),
+        "kernel signatures must return proteus.void",
+    )
 
     expect_raises(
         TypeError,
         lambda: kernel.launch(grid=1, block=1, args=[]),
-        "kernel argument count does not match argtypes",
+        "kernel argument count does not match signature",
     )
     expect_raises(
         TypeError,

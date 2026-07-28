@@ -19,7 +19,7 @@ def main():
 
     mod = proteus.compile(source, frontend="mlir", target=target, verify=True)
     assert mod.get_function_address("write42") != 0
-    kernel = mod.get_kernel("write42", [proteus.ptr])
+    kernel = mod.get_kernel("write42", signature=proteus.void(proteus.ptr))
     kernel.launch(grid=1, block=1, args=[device_value])
     runtime.sync()
     assert runtime.copy_d2h_i32(device_value) == 42
@@ -28,7 +28,9 @@ def main():
         path = pathlib.Path(tmpdir) / "kernel.mlir"
         path.write_text(source)
         file_mod = proteus.compile(path, frontend="mlir", target=target, verify=True)
-        file_kernel = file_mod.get_kernel("write42", [proteus.ptr])
+        file_kernel = file_mod.get_kernel(
+            "write42", signature=proteus.void(proteus.ptr)
+        )
         runtime.copy_h2d_i32(device_value, 0)
         file_kernel.launch(grid=[1], block=(1, 1, 1), args=[int(device_value)])
         runtime.sync()

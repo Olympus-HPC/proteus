@@ -20,7 +20,9 @@ def main():
     runtime.copy_h2d_i32(device_value, 0)
 
     mod = proteus.compile(source, frontend="cpp", target=target)
-    kernel = mod.get_kernel("write_int", [proteus.ptr, proteus.i32])
+    kernel = mod.get_kernel(
+        "write_int", signature=proteus.void(proteus.ptr, proteus.i32)
+    )
 
     kernel.launch(grid=(1, 1, 1), block=1, args=[DataPtr(device_value), 8])
     runtime.sync()
