@@ -8,25 +8,31 @@
       
       
       
+        <link rel="canonical" href="https://olympus-hpc.github.io/proteus/latest/user/python-bindings/">
       
+      
+        <link rel="prev" href="../annotations/">
+      
+      
+        <link rel="next" href="../cpp-frontend/">
       
       
         
       
       
-      <link rel="icon" href="/proteus/latest/assets/proteus-logo.png">
+      <link rel="icon" href="../../assets/proteus-logo.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Proteus</title>
+        <title>Python Bindings - Proteus</title>
       
     
     
-      <link rel="stylesheet" href="/proteus/latest/assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="/proteus/latest/assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -45,9 +51,9 @@
       
     
     
-      <link rel="stylesheet" href="/proteus/latest/stylesheets/extra.css">
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
-    <script>__md_scope=new URL("/proteus/latest",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -69,6 +75,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#python-bindings" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -85,9 +96,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="/proteus/latest/." title="Proteus" class="md-header__button md-logo" aria-label="Proteus" data-md-component="logo">
+    <a href="../.." title="Proteus" class="md-header__button md-logo" aria-label="Proteus" data-md-component="logo">
       
-  <img src="/proteus/latest/assets/proteus-logo.png" alt="logo">
+  <img src="../../assets/proteus-logo.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -104,7 +115,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              
+              Python Bindings
             
           </span>
         </div>
@@ -196,9 +207,9 @@
 
 <nav class="md-nav md-nav--primary md-nav--integrated" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="/proteus/latest/." title="Proteus" class="md-nav__button md-logo" aria-label="Proteus" data-md-component="logo">
+    <a href="../.." title="Proteus" class="md-nav__button md-logo" aria-label="Proteus" data-md-component="logo">
       
-  <img src="/proteus/latest/assets/proteus-logo.png" alt="logo">
+  <img src="../../assets/proteus-logo.png" alt="logo">
 
     </a>
     Proteus
@@ -225,7 +236,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/proteus/latest/." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -249,18 +260,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
@@ -281,7 +294,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -299,7 +312,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/proteus/latest/user/install/" class="md-nav__link">
+      <a href="../install/" class="md-nav__link">
         
   
   
@@ -327,7 +340,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/proteus/latest/user/integration/" class="md-nav__link">
+      <a href="../integration/" class="md-nav__link">
         
   
   
@@ -352,18 +365,20 @@
                 
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" checked>
         
           
           <label class="md-nav__link" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
@@ -384,7 +399,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -402,7 +417,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/proteus/latest/user/interface/" class="md-nav__link">
+      <a href="../interface/" class="md-nav__link">
         
   
   
@@ -430,7 +445,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/proteus/latest/user/annotations/" class="md-nav__link">
+      <a href="../annotations/" class="md-nav__link">
         
   
   
@@ -455,10 +470,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="/proteus/latest/user/python-bindings/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Bindings
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -474,6 +516,59 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#host-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Host Functions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gpu-kernels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU Kernels
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-abi-descriptors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported ABI Descriptors
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -486,7 +581,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/proteus/latest/user/cpp-frontend/" class="md-nav__link">
+      <a href="../cpp-frontend/" class="md-nav__link">
         
   
   
@@ -514,7 +609,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/proteus/latest/user/llvmir-frontend/" class="md-nav__link">
+      <a href="../llvmir-frontend/" class="md-nav__link">
         
   
   
@@ -542,7 +637,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/proteus/latest/user/mlir-frontend/" class="md-nav__link">
+      <a href="../mlir-frontend/" class="md-nav__link">
         
   
   
@@ -570,7 +665,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/proteus/latest/user/dsl/" class="md-nav__link">
+      <a href="../dsl/" class="md-nav__link">
         
   
   
@@ -606,7 +701,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/proteus/latest/user/config/" class="md-nav__link">
+      <a href="../config/" class="md-nav__link">
         
   
   
@@ -634,7 +729,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/proteus/latest/user/resources/" class="md-nav__link">
+      <a href="../resources/" class="md-nav__link">
         
   
   
@@ -716,7 +811,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/proteus/latest/dev/concepts/" class="md-nav__link">
+      <a href="../../dev/concepts/" class="md-nav__link">
         
   
   
@@ -791,7 +886,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/proteus/latest/dev/proteus-internals/" class="md-nav__link">
+      <a href="../../dev/proteus-internals/" class="md-nav__link">
         
   
   
@@ -819,7 +914,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/proteus/latest/dev/optimization-pipeline/" class="md-nav__link">
+      <a href="../../dev/optimization-pipeline/" class="md-nav__link">
         
   
   
@@ -855,7 +950,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/proteus/latest/dev/python-wheel/" class="md-nav__link">
+      <a href="../../dev/python-wheel/" class="md-nav__link">
         
   
   
@@ -883,7 +978,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/proteus/latest/dev/runtime-cuda-toolchain/" class="md-nav__link">
+      <a href="../../dev/runtime-cuda-toolchain/" class="md-nav__link">
         
   
   
@@ -911,7 +1006,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/proteus/latest/dev/runtime-hip-toolchain/" class="md-nav__link">
+      <a href="../../dev/runtime-hip-toolchain/" class="md-nav__link">
         
   
   
@@ -939,7 +1034,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/proteus/latest/dev/pr/" class="md-nav__link">
+      <a href="../../dev/pr/" class="md-nav__link">
         
   
   
@@ -967,7 +1062,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/proteus/latest/dev/api/" class="md-nav__link">
+      <a href="../../dev/api/" class="md-nav__link">
         
   
   
@@ -1008,8 +1103,141 @@
               
               <article class="md-content__inner md-typeset">
                 
-  <h1>404 - Not found</h1>
+                  
 
+
+  
+  
+
+
+<h1 id="python-bindings">Python Bindings</h1>
+<p>The Python API compiles C++, LLVM IR, or MLIR source with <code>proteus.compile()</code>.
+After compilation,
+retrieve a native entry point by supplying its exact ABI signature.</p>
+<h2 id="host-functions">Host Functions</h2>
+<p>Build a signature by calling the return-type descriptor with the argument-type
+descriptors:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">proteus</span>
+
+<span class="n">source</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">extern &quot;C&quot; int plus1(int x) {</span>
+<span class="s1">  return x + 1;</span>
+<span class="s1">}</span>
+<span class="s1">&#39;&#39;&#39;</span>
+
+<span class="n">mod</span> <span class="o">=</span> <span class="n">proteus</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">frontend</span><span class="o">=</span><span class="s2">&quot;cpp&quot;</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="s2">&quot;host&quot;</span><span class="p">)</span>
+<span class="n">plus1</span> <span class="o">=</span> <span class="n">mod</span><span class="o">.</span><span class="n">get_function</span><span class="p">(</span>
+    <span class="s2">&quot;plus1&quot;</span><span class="p">,</span>
+    <span class="n">signature</span><span class="o">=</span><span class="n">proteus</span><span class="o">.</span><span class="n">i32</span><span class="p">(</span><span class="n">proteus</span><span class="o">.</span><span class="n">i32</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="k">assert</span> <span class="n">plus1</span><span class="p">(</span><span class="mi">41</span><span class="p">)</span> <span class="o">==</span> <span class="mi">42</span>
+</code></pre></div>
+<p>The <code>signature</code> parameter is keyword-only.
+A function with no arguments uses an empty descriptor call,
+such as <code>proteus.i32()</code>.
+Host functions may return any supported scalar or pointer descriptor,
+or <code>proteus.void</code>.</p>
+<h2 id="gpu-kernels">GPU Kernels</h2>
+<p>CUDA and HIP kernel signatures must return <code>proteus.void</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="n">kernel</span> <span class="o">=</span> <span class="n">mod</span><span class="o">.</span><span class="n">get_kernel</span><span class="p">(</span>
+    <span class="s2">&quot;write_int&quot;</span><span class="p">,</span>
+    <span class="n">signature</span><span class="o">=</span><span class="n">proteus</span><span class="o">.</span><span class="n">void</span><span class="p">(</span><span class="n">proteus</span><span class="o">.</span><span class="n">ptr</span><span class="p">,</span> <span class="n">proteus</span><span class="o">.</span><span class="n">i32</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="n">kernel</span><span class="o">.</span><span class="n">launch</span><span class="p">(</span>
+    <span class="n">grid</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">block</span><span class="o">=</span><span class="mi">256</span><span class="p">,</span>
+    <span class="n">args</span><span class="o">=</span><span class="p">[</span><span class="n">device_output</span><span class="p">,</span> <span class="mi">42</span><span class="p">],</span>
+<span class="p">)</span>
+</code></pre></div>
+<p><code>proteus.void</code> is valid only as a return descriptor.
+It cannot appear in the argument list.</p>
+<h2 id="supported-abi-descriptors">Supported ABI Descriptors</h2>
+<p>Signatures preserve the exact width and signedness of every descriptor:</p>
+<table>
+<thead>
+<tr>
+<th>Descriptor</th>
+<th>Native ABI type</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>proteus.i8</code></td>
+<td>signed 8-bit integer</td>
+</tr>
+<tr>
+<td><code>proteus.i32</code></td>
+<td>signed 32-bit integer</td>
+</tr>
+<tr>
+<td><code>proteus.i64</code></td>
+<td>signed 64-bit integer</td>
+</tr>
+<tr>
+<td><code>proteus.u32</code></td>
+<td>unsigned 32-bit integer</td>
+</tr>
+<tr>
+<td><code>proteus.u64</code></td>
+<td>unsigned 64-bit integer</td>
+</tr>
+<tr>
+<td><code>proteus.f32</code></td>
+<td>32-bit floating point</td>
+</tr>
+<tr>
+<td><code>proteus.f64</code></td>
+<td>64-bit floating point</td>
+</tr>
+<tr>
+<td><code>proteus.ptr</code></td>
+<td>opaque pointer</td>
+</tr>
+<tr>
+<td><code>proteus.void</code></td>
+<td>return only; no value</td>
+</tr>
+</tbody>
+</table>
+<p>A constructed <code>proteus.Signature</code> exposes read-only <code>restype</code> and <code>argtypes</code>
+properties.
+<code>argtypes</code> is always a tuple.
+For example,
+<code>repr(proteus.f64(proteus.f64, proteus.f64))</code> is
+<code>proteus.f64(proteus.f64, proteus.f64)</code>.</p>
+<p>Proteus does not infer native types from Python builtins,
+function annotations,
+decorators,
+or runtime argument values.
+Python types such as <code>int</code> and <code>float</code>,
+and <code>ctypes</code> types,
+are not valid signature descriptors.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Proteus cannot verify that a supplied signature matches the compiled
+native symbol.
+A mismatch in return type,
+argument order,
+width,
+signedness,
+or pointer position can cross the native ABI incorrectly and cause
+corrupted results or a process failure.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
               </article>
             </div>
           
@@ -1050,10 +1278,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "/proteus/latest", "features": ["toc.integrate"], "search": "/proteus/latest/assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["toc.integrate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
     
     
-      <script src="/proteus/latest/assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
