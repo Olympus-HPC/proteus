@@ -41,21 +41,21 @@ int main(int argc, char **argv) {
   return 0;
 }
 
-// LEGACY: [JITTestPluginInfo]
-// LEGACY: [JITTestPass] jit-test-pass
-// LEGACY: [CustomPipeline] default<O3>,jit-test-pass
+// LEGACY-DAG: [JITTestPluginInfo]
+// LEGACY-DAG: [JITTestPass] jit-test-pass
+// LEGACY-DAG: [CustomPipeline] default<O3>,jit-test-pass
 
-// PREPEND: [JITTestPluginInfo]
-// PREPEND: [JITTestPass] jit-test-pass
-// PREPEND: [CustomPipeline] jit-test-pass,default<O3>
+// PREPEND-DAG: [JITTestPluginInfo]
+// PREPEND-DAG: [JITTestPass] jit-test-pass
+// PREPEND-DAG: [CustomPipeline] jit-test-pass,default<O3>
 
-// LOAD-ONLY: [JITTestPluginInfo]
-// LOAD-ONLY: [JITTestPass] jit-test-pass
+// LOAD-ONLY-DAG: [JITTestPluginInfo]
+// LOAD-ONLY-DAG: [JITTestPass] jit-test-pass
+// LOAD-ONLY-DAG: [CustomPipeline] default<O3>,jit-test-pass
+
+// PARALLEL-DAG: [JITTestPluginInfo]
+// PARALLEL-DAG: [JITTestPass] jit-test-pass
+
+// CHECK-DAG: KernelPassPlugin
 // LOAD-ONLY-NOT: [JITTestPass] jit-test-pass
-// LOAD-ONLY: [CustomPipeline] default<O3>,jit-test-pass
-
-// PARALLEL: [JITTestPluginInfo]
-// PARALLEL: [JITTestPass] jit-test-pass
-
-// CHECK: KernelPassPlugin
 // CHECK: [proteus][JitEngineDevice] MemoryCache rank 0 hits 0 accesses 1

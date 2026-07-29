@@ -81,7 +81,6 @@ function(proteus_register_jit_pass_plugin target)
         else()
             set(_proteus_jit_pass_position "Append")
         endif()
-        set(_proteus_jit_pass_mode "insert")
         set(_proteus_jit_pass_registration
 "    proteus::registerJITPassPlugin(
         R\"(${_proteus_jit_pass_plugin_path})\",
@@ -89,14 +88,13 @@ function(proteus_register_jit_pass_plugin target)
         proteus::JITPassPluginPosition::${_proteus_jit_pass_position});")
     else()
         set(_proteus_jit_pass_position "LoadOnly")
-        set(_proteus_jit_pass_mode "load-only")
         set(_proteus_jit_pass_registration
 "    proteus::registerJITPassPlugin(
         R\"(${_proteus_jit_pass_plugin_path})\");")
     endif()
 
     string(MD5 _proteus_jit_pass_key
-        "${target};${_proteus_jit_pass_plugin_path};${_proteus_jit_pass_mode};${_proteus_jit_pass_position};${PROTEUS_JIT_PASS_PIPELINE}")
+        "${target};${_proteus_jit_pass_plugin_path};${_proteus_jit_pass_position};${PROTEUS_JIT_PASS_PIPELINE}")
     set(_proteus_jit_pass_source
         "${CMAKE_CURRENT_BINARY_DIR}/${target}.proteus_jit_pass_${_proteus_jit_pass_key}.cpp")
 
