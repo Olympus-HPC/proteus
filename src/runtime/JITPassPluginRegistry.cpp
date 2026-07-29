@@ -10,6 +10,8 @@
 #include <algorithm>
 #include <atomic>
 #include <mutex>
+#include <optional>
+#include <utility>
 
 namespace proteus {
 namespace {
@@ -22,20 +24,24 @@ public:
   }
 
   void registerPlugin(const std::string &PluginPath,
-                      const std::string &PassPipeline) {
+                      std::optional<std::string> PassPipeline,
+                      JITPassPluginPosition Position) {
     if (PluginPath.empty())
       reportFatalError("JIT pass plugin path must be non-empty");
-    if (PassPipeline.empty())
+    if (PassPipeline && PassPipeline->empty())
       reportFatalError("JIT pass plugin pipeline must be non-empty");
 
-    JITPassPluginConfig Config{normalizePath(PluginPath), PassPipeline, {}};
+    JITPassPluginConfig Config{
+        normalizePath(PluginPath), std::move(PassPipeline), Position, {}};
     Config.Fingerprint = computeFingerprint(Config);
 
     std::lock_guard<std::mutex> Lock(Mutex);
-    auto It = std::find_if(
-        Plugins.begin(), Plugins.end(), [&](const JITPassPluginConfig &Entry) {
-          return Entry.Path == Config.Path && Entry.Pipeline == Config.Pipeline;
-        });
+    auto It = std::find_if(Plugins.begin(), Plugins.end(),
+                           [&](const JITPassPluginConfig &Entry) {
+                             return Entry.Path == Config.Path &&
+                                    Entry.Pipeline == Config.Pipeline &&
+                                    Entry.Position == Config.Position;
+                           });
     if (It != Plugins.end()) {
       It->Fingerprint = std::move(Config.Fingerprint);
       return;
@@ -72,8 +78,12 @@ private:
 
   static std::string computeFingerprint(const JITPassPluginConfig &Config) {
     auto BufOrErr = llvm::MemoryBuffer::getFile(Config.Path);
-    if (!BufOrErr)
-      return Config.Path + "|" + Config.Pipeline;
+    if (!BufOrErr) {
+      std::string Fingerprint = Config.Path + "|";
+      if (Config.Pipeline)
+        Fingerprint += *Config.Pipeline;
+      return Fingerprint;
+    }
 
     return hashValue(BufOrErr.get()->getBuffer()).toString();
   }
@@ -86,8 +96,10 @@ private:
 } // namespace
 
 void registerJITPassPluginImpl(const std::string &PluginPath,
-                               const std::string &PassPipeline) {
-  JITPassPluginRegistry::instance().registerPlugin(PluginPath, PassPipeline);
+                               std::optional<std::string> PassPipeline,
+                               JITPassPluginPosition Position) {
+  JITPassPluginRegistry::instance().registerPlugin(
+      PluginPath, std::move(PassPipeline), Position);
 }
 
 void clearJITPassPluginsImpl() { JITPassPluginRegistry::instance().clear(); }

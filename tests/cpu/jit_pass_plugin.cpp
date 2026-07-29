@@ -21,7 +21,10 @@ int main() {
   return 0;
 }
 
-// CHECK: [JITTestPass]
+// CHECK: [JITTestPluginInfo]
+// CHECK-NOT: [JITTestPluginInfo]
+// CHECK: [JITTestPass] jit-test-pass
+// CHECK-NOT: [JITTestPass] jit-test-pass
 // CHECK: [CustomPipeline] default<O3>,jit-test-pass
 // CHECK: 5
 // CHECK: [proteus][JitEngineHost] MemoryCache rank 0 hits 0 accesses 1

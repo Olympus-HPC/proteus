@@ -21,9 +21,21 @@ namespace proteus {
 void init() {}
 void finalize() {}
 
+void registerJITPassPlugin(const std::string &PluginPath) {
+  registerJITPassPluginImpl(PluginPath, std::nullopt,
+                            JITPassPluginPosition::Append);
+}
+
 void registerJITPassPlugin(const std::string &PluginPath,
                            const std::string &PassPipeline) {
-  registerJITPassPluginImpl(PluginPath, PassPipeline);
+  registerJITPassPlugin(PluginPath, PassPipeline,
+                        JITPassPluginPosition::Append);
+}
+
+void registerJITPassPlugin(const std::string &PluginPath,
+                           const std::string &PassPipeline,
+                           JITPassPluginPosition Position) {
+  registerJITPassPluginImpl(PluginPath, PassPipeline, Position);
 }
 
 void clearJITPassPlugins() { clearJITPassPluginsImpl(); }

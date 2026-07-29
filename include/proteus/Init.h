@@ -18,8 +18,14 @@ void init();
 [[deprecated("it is a no-op and will be removed in a future version.")]]
 void finalize();
 
+enum class JITPassPluginPosition { Prepend, Append };
+
+void registerJITPassPlugin(const std::string &PluginPath);
 void registerJITPassPlugin(const std::string &PluginPath,
                            const std::string &PassPipeline);
+void registerJITPassPlugin(const std::string &PluginPath,
+                           const std::string &PassPipeline,
+                           JITPassPluginPosition Position);
 void clearJITPassPlugins();
 
 void enable();

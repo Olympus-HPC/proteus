@@ -69,10 +69,20 @@ CREATE_CPU_TEST(jit_pass_plugin jit_pass_plugin.cpp)
 target_compile_definitions(jit_pass_plugin PRIVATE
     PROTEUS_TEST_JIT_PASS_PLUGIN_PATH="$<TARGET_FILE:JITTestPass>")
 add_dependencies(jit_pass_plugin JITTestPass)
+CREATE_CPU_TEST(jit_pass_plugin_position jit_pass_plugin_position.cpp)
+target_compile_definitions(jit_pass_plugin_position PRIVATE
+    PROTEUS_TEST_JIT_PASS_PLUGIN_PATH="$<TARGET_FILE:JITTestPass>")
+add_dependencies(jit_pass_plugin_position JITTestPass)
 CREATE_CPU_TEST(jit_pass_plugin_cmake jit_pass_plugin_cmake.cpp)
 proteus_register_jit_pass_plugin(
     jit_pass_plugin_cmake
     PLUGIN_TARGET JITTestPass
-    PIPELINE jit-test-pass)
+    PIPELINE jit-test-pass
+    POSITION PREPEND)
+CREATE_CPU_TEST(jit_pass_plugin_cmake_load_only
+    jit_pass_plugin_cmake_load_only.cpp)
+proteus_register_jit_pass_plugin(
+    jit_pass_plugin_cmake_load_only
+    PLUGIN_TARGET JITTestPass)
 CREATE_CPU_TEST(modify_gvar modify_gvar.cpp)
 CREATE_CPU_TEST(jit_eh jit_eh.cpp)

@@ -148,7 +148,10 @@ inline HashT hashCodeGenConfig(const CodeGenerationConfig &CGConfig) {
     H = hashCombine(H, hashValue(Pipeline.value()));
   for (const auto &Plugin : getJITPassPluginConfigs()) {
     H = hashCombine(H, hashValue(Plugin.Path));
-    H = hashCombine(H, hashValue(Plugin.Pipeline));
+    H = hashCombine(H, hashValue(Plugin.Pipeline.has_value()));
+    if (Plugin.Pipeline)
+      H = hashCombine(H, hashValue(*Plugin.Pipeline));
+    H = hashCombine(H, hashValue(static_cast<int>(Plugin.Position)));
     H = hashCombine(H, hashValue(Plugin.Fingerprint));
   }
   return H;

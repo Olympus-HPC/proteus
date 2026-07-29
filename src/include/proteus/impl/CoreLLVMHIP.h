@@ -252,11 +252,13 @@ codegenParallel(Module &M, StringRef DeviceArch,
   const auto Plugins = getJITPassPluginConfigs();
   // Parallel codegen lets LTO own optimization, so custom textual pipelines
   // must be forwarded to the LTO configuration instead of run beforehand.
-  if (OptConfig.PassPipeline || !Plugins.empty())
+  if (OptConfig.PassPipeline ||
+      proteus::detail::hasJITPassPluginPipeline(Plugins))
     Conf.OptPipeline = proteus::detail::composeOptimizationPassPipeline(
         OptConfig.PassPipeline, OptConfig.OptLevel, Plugins);
-  for (const auto &Plugin : Plugins)
-    Conf.PassPlugins.push_back(Plugin.Path);
+  for (const auto &PluginPath :
+       proteus::detail::getUniqueJITPassPluginPaths(Plugins))
+    Conf.PassPlugins.push_back(PluginPath);
   Conf.CGOptLevel = static_cast<CodeGenOptLevel>(OptConfig.CodegenOptLevel);
 
   unsigned ParallelCodeGenParallelismLevel =
