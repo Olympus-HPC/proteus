@@ -377,7 +377,7 @@ JitEngineHost::JitEngineHost() {
   // By dumpSymbolInfo() the debug sections are not populated. Why?
   LLJITPtr = ExitOnErr(
       LLJITBuilder()
-#if LLVM_VERSION_MAJOR >= 22
+#if LLVM_VERSION_MAJOR >= 21
           .setObjectLinkingLayerCreator([&](ExecutionSession &ES) {
             auto GetMemMgr = [](const MemoryBuffer &) {
               return std::make_unique<SectionMemoryManager>();

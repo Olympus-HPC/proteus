@@ -107,7 +107,7 @@ static std::string computeTargetDataLayout(llvm::StringRef TargetTriple,
   std::optional<llvm::CodeModel::Model> CodeModel;
 
   std::unique_ptr<llvm::TargetMachine> TM(T->createTargetMachine(
-#if LLVM_VERSION_MAJOR >= 22
+#if LLVM_VERSION_MAJOR >= 21
       llvm::Triple{TargetTriple},
 #else
       TargetTriple,
@@ -203,7 +203,7 @@ static void addGenericToLLVMConversion(mlir::PassManager &PM) {
 static void addHostLoweringPipeline(mlir::PassManager &PM) {
   // HOST path: input is host-side structured IR (func/scf/arith/math/
   // memref); output is host-targeted LLVM dialect before translation.
-#if LLVM_VERSION_MAJOR >= 22
+#if LLVM_VERSION_MAJOR >= 21
   PM.addPass(mlir::createSCFToControlFlowPass());
 #else
   PM.addPass(mlir::createConvertSCFToCFPass());
@@ -226,7 +226,7 @@ static void addHostLoweringPipeline(mlir::PassManager &PM) {
 
 #if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
 static void addCommonGpuLoweringPrelude(mlir::PassManager &PM) {
-#if LLVM_VERSION_MAJOR >= 22
+#if LLVM_VERSION_MAJOR >= 21
   PM.addPass(mlir::createSCFToControlFlowPass());
 #else
   PM.addPass(mlir::createConvertSCFToCFPass());
@@ -518,7 +518,7 @@ static void setFinalLLVMTargetAttrs(llvm::Module &Mod, TargetModelType TM,
                                     llvm::StringRef Features,
                                     llvm::StringRef Prefix) {
   if (!TargetTriple.empty()) {
-#if LLVM_VERSION_MAJOR >= 22
+#if LLVM_VERSION_MAJOR >= 21
     Mod.setTargetTriple(llvm::Triple{TargetTriple});
 #else
     Mod.setTargetTriple(TargetTriple);

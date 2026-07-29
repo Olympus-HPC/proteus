@@ -72,8 +72,8 @@ IRValue *emitCudaBuiltin(LLVMCodeBuilder &CB, const std::string &Name,
   if (Name == "gridDim.z")
     return CB.createCall("llvm.nvvm.read.ptx.sreg.nctaid.z", RetTy);
   if (Name == "syncThreads") {
-#if LLVM_VERSION_MAJOR >= 22
-    // LLVM 22 replaced the legacy zero-arg barrier0 intrinsic with CTA barrier
+#if LLVM_VERSION_MAJOR >= 21
+    // LLVM 21 replaced the legacy zero-arg barrier0 intrinsic with CTA barrier
     // variants; __syncthreads maps to barrier.cta.sync.aligned.all(0).
     Value *BarrierId = ConstantInt::get(Type::getInt32Ty(CB.getContext()), 0);
     emitVoidIntrinsicCall(CB, Intrinsic::nvvm_barrier_cta_sync_aligned_all,
@@ -223,7 +223,7 @@ LLVMCodeBuilder::LLVMCodeBuilder(std::unique_ptr<LLVMContext> Ctx,
                                  TargetModelType TM)
     : PImpl{std::make_unique<Impl>(std::move(Ctx), std::move(Mod))}, F(nullptr),
       TargetModel(TM) {
-#if LLVM_VERSION_MAJOR >= 22
+#if LLVM_VERSION_MAJOR >= 21
   getModule().setTargetTriple(Triple{getTargetTriple(TM)});
 #else
   getModule().setTargetTriple(getTargetTriple(TM));
