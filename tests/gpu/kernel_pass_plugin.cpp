@@ -1,6 +1,6 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT="specialization;cache-stats" %build/kernel_pass_plugin.%ext legacy | %FILECHECK %s --check-prefixes=CHECK,LEGACY
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT="specialization;cache-stats" %build/kernel_pass_plugin.%ext append | %FILECHECK %s --check-prefixes=CHECK,APPEND
 // RUN: rm -rf "%t.$$.proteus"
 // RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_CODEGEN=serial PROTEUS_TRACE_OUTPUT="specialization;cache-stats" %build/kernel_pass_plugin.%ext prepend | %FILECHECK %s --check-prefixes=CHECK,PREPEND
 // RUN: rm -rf "%t.$$.proteus"
@@ -23,7 +23,7 @@ __global__ __attribute__((annotate("jit"))) void kernel_pass_plugin() {
 
 int main(int argc, char **argv) {
   const std::string Mode = argc > 1 ? argv[1] : "";
-  if (Mode == "legacy") {
+  if (Mode == "append") {
     proteus::registerJITPassPlugin(PROTEUS_TEST_JIT_PASS_PLUGIN_PATH,
                                    "jit-test-pass");
   } else if (Mode == "prepend") {
@@ -41,9 +41,9 @@ int main(int argc, char **argv) {
   return 0;
 }
 
-// LEGACY-DAG: [JITTestPluginInfo]
-// LEGACY-DAG: [JITTestPass] jit-test-pass
-// LEGACY-DAG: [CustomPipeline] default<O3>,jit-test-pass
+// APPEND-DAG: [JITTestPluginInfo]
+// APPEND-DAG: [JITTestPass] jit-test-pass
+// APPEND-DAG: [CustomPipeline] default<O3>,jit-test-pass
 
 // PREPEND-DAG: [JITTestPluginInfo]
 // PREPEND-DAG: [JITTestPass] jit-test-pass

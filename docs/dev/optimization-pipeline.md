@@ -41,7 +41,7 @@ before Proteus builds or parses the optimization pipeline.
 The C++ API supports three registration modes:
 
 ```cpp
-// Load callbacks and append a pipeline fragment (legacy behavior).
+// Load callbacks and append a pipeline fragment (the default).
 proteus::registerJITPassPlugin(path, "my-pass");
 
 // Load callbacks and explicitly place a pipeline fragment.
@@ -77,7 +77,7 @@ and registration order contribute to JIT cache identity.
 The CMake helper exposes the same modes:
 
 ```cmake
-# Legacy-compatible append.
+# Append by default.
 proteus_register_jit_pass_plugin(
     app PLUGIN_TARGET MyPassPlugin PIPELINE my-pass)
 
@@ -93,7 +93,7 @@ proteus_register_jit_pass_plugin(
 `POSITION` accepts `PREPEND` or `APPEND`.
 It requires a nonempty `PIPELINE`;
 when `PIPELINE` is present without `POSITION`,
-the helper retains the legacy append behavior.
+the helper appends the pipeline fragment by default.
 `PLUGIN_PATH` can be used instead of `PLUGIN_TARGET` in all three modes.
 
 ## Support Matrix
