@@ -37,6 +37,14 @@ set_property(TEST python_host_llvmir_validation PROPERTY ENVIRONMENT ${PROTEUS_P
 set_property(TEST python_host_llvmir_validation PROPERTY LABELS "python")
 
 add_test(
+  NAME python_llvm_module
+  COMMAND ${Python3_EXECUTABLE}
+          ${CMAKE_CURRENT_SOURCE_DIR}/test_llvm_module.py
+)
+set_property(TEST python_llvm_module PROPERTY ENVIRONMENT ${PROTEUS_PYTHON_TEST_ENV})
+set_property(TEST python_llvm_module PROPERTY LABELS "python")
+
+add_test(
   NAME python_backend_selection
   COMMAND ${Python3_EXECUTABLE}
           ${CMAKE_CURRENT_SOURCE_DIR}/test_backend_selection.py
@@ -53,6 +61,14 @@ set_property(TEST python_proteus_init_exports PROPERTY ENVIRONMENT ${PROTEUS_PYT
 set_property(TEST python_proteus_init_exports PROPERTY LABELS "python")
 
 if(PROTEUS_ENABLE_CUDA OR PROTEUS_ENABLE_HIP)
+  add_test(
+    NAME python_gpu_llvm_module
+    COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/test_gpu_llvm_module.py
+  )
+  set_property(TEST python_gpu_llvm_module PROPERTY ENVIRONMENT ${PROTEUS_PYTHON_TEST_ENV})
+  set_property(TEST python_gpu_llvm_module PROPERTY LABELS "python;frontend-gpu")
+
   # GPU C++ frontend coverage only makes sense when a device backend is enabled.
   add_test(
     NAME python_gpu_cpp_smoke

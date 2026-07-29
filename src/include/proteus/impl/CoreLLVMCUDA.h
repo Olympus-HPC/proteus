@@ -129,7 +129,8 @@ inline void setLaunchBoundsForKernel(Function &F, int MaxThreadsPerSM,
 }
 
 inline void codegenPTX(Module &M, StringRef DeviceArch,
-                       SmallVectorImpl<char> &PTXStr) {
+                       SmallVectorImpl<char> &PTXStr,
+                       unsigned CodegenOptLevel = 3) {
   TIMESCOPE("proteus::codegenPTX");
   // TODO: It is possbile to use PTX directly through the CUDA PTX JIT
   // interface. Maybe useful if we can re-link globals using the CUDA API.
@@ -139,7 +140,8 @@ inline void codegenPTX(Module &M, StringRef DeviceArch,
   // CUDA_CACHE_PATH, CUDA_FORCE_PTX_JIT.
 
   Timer T(Config::get().ProteusEnableTimers);
-  auto TMExpected = proteus::detail::createTargetMachine(M, DeviceArch);
+  auto TMExpected =
+      proteus::detail::createTargetMachine(M, DeviceArch, CodegenOptLevel);
   if (!TMExpected)
     reportFatalError(toString(TMExpected.takeError()));
 
@@ -175,14 +177,16 @@ inline void codegenPTX(Module &M, StringRef DeviceArch,
 inline std::unique_ptr<MemoryBuffer>
 codegenObject(Module &M, StringRef DeviceArch,
               SmallPtrSetImpl<void *> &GlobalLinkedBinaries,
-              CodegenOption CGOption = CodegenOption::RTC) {
+              CodegenOption CGOption = CodegenOption::RTC,
+              const OptimizationPipelineConfig &OptConfig =
+                  OptimizationPipelineConfig(std::nullopt, '3', 3)) {
   TIMESCOPE("proteus::codegenObjectCUDA");
   if (CGOption != CodegenOption::RTC)
     reportFatalError("Only RTC compilation is supported for CUDA");
   SmallVector<char, 4096> PTXStr;
   size_t BinSize;
 
-  codegenPTX(M, DeviceArch, PTXStr);
+  codegenPTX(M, DeviceArch, PTXStr, OptConfig.CodegenOptLevel);
   PTXStr.push_back('\0');
 
   Timer T(Config::get().ProteusEnableTimers);

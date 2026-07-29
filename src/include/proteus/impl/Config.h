@@ -263,6 +263,8 @@ public:
   bool specializeLaunchBounds() const { return ProteusSpecializeLaunchBounds; }
   char optLevel() const { return ProteusOptLevel; }
   int codeGenOptLevel() const { return ProteusCodeGenOptLevel; }
+  int tunedMaxThreads() const { return TunedMaxThreads; }
+  int configuredMinBlocksPerSM() const { return MinBlocksPerSM; }
   std::optional<const std::string> optPipeline() const {
     return ProteusOptPipeline;
   }

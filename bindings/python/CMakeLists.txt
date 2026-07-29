@@ -7,6 +7,7 @@ set(PROTEUS_PYTHON_SOURCES
   PythonBindings.cpp
   CppBindings.cpp
   LLVMIRBindings.cpp
+  LLVMModuleBindings.cpp
 )
 set(PROTEUS_PYTHON_BUILD_PACKAGE_DIR
   "${CMAKE_BINARY_DIR}/python/${PROTEUS_PYTHON_PACKAGE_DIR}")

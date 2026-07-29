@@ -1,4 +1,5 @@
 #include "PythonBindings.h"
+#include "LLVMModuleBindings.h"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -495,6 +496,8 @@ PYBIND11_MODULE(_proteus, M) {
         py::arg("target") = "host",
         py::arg("extra_args") = std::vector<std::string>{},
         py::arg("compiler") = "clang", py::arg("verify") = false);
+
+  bindLLVMModule(M);
 
   M.attr("has_cuda") =
 #if PROTEUS_ENABLE_CUDA

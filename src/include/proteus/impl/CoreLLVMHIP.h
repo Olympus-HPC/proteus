@@ -473,7 +473,8 @@ codegenObject(Module &M, StringRef DeviceArch,
   }
 #if LLVM_VERSION_MAJOR >= 18
   case CodegenOption::Serial:
-    ObjectFiles = detail::codegenSerial(M, DeviceArch);
+    ObjectFiles = detail::codegenSerial(M, DeviceArch, OptConfig.OptLevel,
+                                        OptConfig.CodegenOptLevel);
     break;
   case CodegenOption::Parallel:
     ObjectFiles = detail::codegenParallel(M, DeviceArch, OptConfig);

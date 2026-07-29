@@ -8,6 +8,7 @@ set(SOURCES
   JITPassPluginRegistry.cpp
   JitEngineHost.cpp
   Init.cpp
+  LLVMModule.cpp
   TimeTracing.cpp
   Caching/ObjectCacheChain.cpp
   Caching/StorageCache.cpp
