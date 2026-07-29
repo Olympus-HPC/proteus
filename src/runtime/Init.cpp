@@ -22,8 +22,7 @@ void init() {}
 void finalize() {}
 
 void registerJITPassPlugin(const std::string &PluginPath) {
-  registerJITPassPluginImpl(PluginPath, std::nullopt,
-                            JITPassPluginPosition::Append);
+  registerJITPassPluginImpl(PluginPath, std::nullopt);
 }
 
 void registerJITPassPlugin(const std::string &PluginPath,
@@ -35,7 +34,8 @@ void registerJITPassPlugin(const std::string &PluginPath,
 void registerJITPassPlugin(const std::string &PluginPath,
                            const std::string &PassPipeline,
                            JITPassPluginPosition Position) {
-  registerJITPassPluginImpl(PluginPath, PassPipeline, Position);
+  registerJITPassPluginImpl(
+      PluginPath, JITPassPluginInsertion{std::string(PassPipeline), Position});
 }
 
 void clearJITPassPlugins() { clearJITPassPluginsImpl(); }

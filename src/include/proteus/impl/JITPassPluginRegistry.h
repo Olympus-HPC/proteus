@@ -9,16 +9,23 @@
 
 namespace proteus {
 
+struct JITPassPluginInsertion {
+  std::string Pipeline;
+  JITPassPluginPosition Position;
+
+  bool operator==(const JITPassPluginInsertion &Other) const {
+    return Pipeline == Other.Pipeline && Position == Other.Position;
+  }
+};
+
 struct JITPassPluginConfig {
   std::string Path;
-  std::optional<std::string> Pipeline;
-  JITPassPluginPosition Position;
+  std::optional<JITPassPluginInsertion> Insertion;
   std::string Fingerprint;
 };
 
 void registerJITPassPluginImpl(const std::string &PluginPath,
-                               std::optional<std::string> PassPipeline,
-                               JITPassPluginPosition Position);
+                               std::optional<JITPassPluginInsertion> Insertion);
 void clearJITPassPluginsImpl();
 std::vector<JITPassPluginConfig> getJITPassPluginConfigs();
 

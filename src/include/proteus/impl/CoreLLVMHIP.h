@@ -253,7 +253,7 @@ codegenParallel(Module &M, StringRef DeviceArch,
   // Parallel codegen lets LTO own optimization, so custom textual pipelines
   // must be forwarded to the LTO configuration instead of run beforehand.
   if (OptConfig.PassPipeline ||
-      proteus::detail::hasJITPassPluginPipeline(Plugins))
+      proteus::detail::hasJITPassPluginInsertion(Plugins))
     Conf.OptPipeline = proteus::detail::composeOptimizationPassPipeline(
         OptConfig.PassPipeline, OptConfig.OptLevel, Plugins);
   for (const auto &PluginPath :

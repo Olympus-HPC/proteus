@@ -125,11 +125,12 @@ inline std::string composeOptimizationPassPipeline(
     const std::vector<JITPassPluginConfig> &Plugins) {
   std::string Pipeline;
   for (const auto &Plugin : Plugins) {
-    if (!Plugin.Pipeline || Plugin.Position != JITPassPluginPosition::Prepend)
+    if (!Plugin.Insertion ||
+        Plugin.Insertion->Position != JITPassPluginPosition::Prepend)
       continue;
     if (!Pipeline.empty())
       Pipeline += ",";
-    Pipeline += *Plugin.Pipeline;
+    Pipeline += Plugin.Insertion->Pipeline;
   }
 
   if (!Pipeline.empty())
@@ -138,20 +139,21 @@ inline std::string composeOptimizationPassPipeline(
                            : getDefaultOptimizationPipeline(OptLevel);
 
   for (const auto &Plugin : Plugins) {
-    if (!Plugin.Pipeline || Plugin.Position != JITPassPluginPosition::Append)
+    if (!Plugin.Insertion ||
+        Plugin.Insertion->Position != JITPassPluginPosition::Append)
       continue;
     Pipeline += ",";
-    Pipeline += *Plugin.Pipeline;
+    Pipeline += Plugin.Insertion->Pipeline;
   }
 
   return Pipeline;
 }
 
 inline bool
-hasJITPassPluginPipeline(const std::vector<JITPassPluginConfig> &Plugins) {
+hasJITPassPluginInsertion(const std::vector<JITPassPluginConfig> &Plugins) {
   return std::any_of(Plugins.begin(), Plugins.end(),
                      [](const JITPassPluginConfig &Plugin) {
-                       return Plugin.Pipeline.has_value();
+                       return Plugin.Insertion.has_value();
                      });
 }
 
@@ -311,7 +313,7 @@ inline void optimizeIR(Module &M, StringRef Arch,
 
   const auto Plugins = getJITPassPluginConfigs();
   const bool UseTextualPipeline =
-      OptConfig.PassPipeline || detail::hasJITPassPluginPipeline(Plugins);
+      OptConfig.PassPipeline || detail::hasJITPassPluginInsertion(Plugins);
   const std::string FinalPipeline =
       UseTextualPipeline
           ? detail::composeOptimizationPassPipeline(OptConfig.PassPipeline,

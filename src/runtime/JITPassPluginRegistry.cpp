@@ -24,23 +24,21 @@ public:
   }
 
   void registerPlugin(const std::string &PluginPath,
-                      std::optional<std::string> PassPipeline,
-                      JITPassPluginPosition Position) {
+                      std::optional<JITPassPluginInsertion> Insertion) {
     if (PluginPath.empty())
       reportFatalError("JIT pass plugin path must be non-empty");
-    if (PassPipeline && PassPipeline->empty())
+    if (Insertion && Insertion->Pipeline.empty())
       reportFatalError("JIT pass plugin pipeline must be non-empty");
 
     JITPassPluginConfig Config{
-        normalizePath(PluginPath), std::move(PassPipeline), Position, {}};
+        normalizePath(PluginPath), std::move(Insertion), {}};
     Config.Fingerprint = computeFingerprint(Config);
 
     std::lock_guard<std::mutex> Lock(Mutex);
     auto It = std::find_if(Plugins.begin(), Plugins.end(),
                            [&](const JITPassPluginConfig &Entry) {
                              return Entry.Path == Config.Path &&
-                                    Entry.Pipeline == Config.Pipeline &&
-                                    Entry.Position == Config.Position;
+                                    Entry.Insertion == Config.Insertion;
                            });
     if (It != Plugins.end()) {
       It->Fingerprint = std::move(Config.Fingerprint);
@@ -80,8 +78,8 @@ private:
     auto BufOrErr = llvm::MemoryBuffer::getFile(Config.Path);
     if (!BufOrErr) {
       std::string Fingerprint = Config.Path + "|";
-      if (Config.Pipeline)
-        Fingerprint += *Config.Pipeline;
+      if (Config.Insertion)
+        Fingerprint += Config.Insertion->Pipeline;
       return Fingerprint;
     }
 
@@ -95,11 +93,11 @@ private:
 
 } // namespace
 
-void registerJITPassPluginImpl(const std::string &PluginPath,
-                               std::optional<std::string> PassPipeline,
-                               JITPassPluginPosition Position) {
-  JITPassPluginRegistry::instance().registerPlugin(
-      PluginPath, std::move(PassPipeline), Position);
+void registerJITPassPluginImpl(
+    const std::string &PluginPath,
+    std::optional<JITPassPluginInsertion> Insertion) {
+  JITPassPluginRegistry::instance().registerPlugin(PluginPath,
+                                                   std::move(Insertion));
 }
 
 void clearJITPassPluginsImpl() { JITPassPluginRegistry::instance().clear(); }
