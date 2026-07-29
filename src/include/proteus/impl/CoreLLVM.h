@@ -11,6 +11,8 @@ static_assert(__cplusplus >= 201703L,
 #include "proteus/impl/JITPassPluginRegistry.h"
 #include "proteus/impl/Logger.h"
 
+#include <llvm/ADT/DenseSet.h>
+#include <llvm/ADT/StringRef.h>
 #include <llvm/CodeGen/CommandFlags.h>
 #include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/Module.h>
@@ -157,8 +159,9 @@ inline std::vector<std::string>
 getUniqueJITPassPluginPaths(const std::vector<JITPassPluginConfig> &Plugins) {
   std::vector<std::string> Paths;
   Paths.reserve(Plugins.size());
+  SmallDenseSet<StringRef, 8> SeenPaths;
   for (const auto &Plugin : Plugins) {
-    if (std::find(Paths.begin(), Paths.end(), Plugin.Path) == Paths.end())
+    if (SeenPaths.insert(Plugin.Path).second)
       Paths.push_back(Plugin.Path);
   }
   return Paths;
