@@ -221,7 +221,7 @@ private:
     auto Invocation = createCompilerInvocation(Clangxx, ArgStorage,
                                                TempCompiler, "Clang IR build");
 
-#if LLVM_VERSION_MAJOR >= 22
+#if LLVM_VERSION_MAJOR >= 21
     CompilerInstance Compiler(Invocation);
 #else
     CompilerInstance Compiler;

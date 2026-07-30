@@ -133,6 +133,7 @@ meta-only:
       - PROTEUS_CI_LLVM_VERSION: "19.1.7"
       - PROTEUS_CI_LLVM_VERSION: "20.1.8"
         PROTEUS_CODECOV_VERSION_SELECTED: "1"
+      - PROTEUS_CI_LLVM_VERSION: "21.1.8"
       - PROTEUS_CI_LLVM_VERSION: "22.1.0"
   trigger:
     include:

@@ -98,7 +98,7 @@ void LLVMIRJitModule::compile(bool Verify) {
     reportFatalError("LLVMIRJitModule: expected non-null parsed LLVM module");
 
   if (Module->getTargetTriple().empty())
-#if LLVM_VERSION_MAJOR >= 22
+#if LLVM_VERSION_MAJOR >= 21
     Module->setTargetTriple(llvm::Triple(getTargetTriple(TargetModel)));
 #else
     Module->setTargetTriple(getTargetTriple(TargetModel));

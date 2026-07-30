@@ -358,7 +358,7 @@ private:
     LinkedModule->setDataLayout(LTOModule.getDataLayout());
     LinkedModule->setTargetTriple(LTOModule.getTargetTriple());
     LinkedModule->setModuleInlineAsm(LTOModule.getModuleInlineAsm());
-#if LLVM_VERSION_MAJOR >= 18 && LLVM_VERSION_MAJOR < 22
+#if LLVM_VERSION_MAJOR >= 18 && LLVM_VERSION_MAJOR < 21
     LinkedModule->IsNewDbgInfoFormat = LTOModule.IsNewDbgInfoFormat;
 #endif
 
