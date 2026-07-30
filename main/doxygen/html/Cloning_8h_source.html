@@ -129,7 +129,7 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00023" name="l00023"></a><span class="lineno">   23</span>  KernelModuleTmp-&gt;setDataLayout(M.getDataLayout());</div>
 <div class="line"><a id="l00024" name="l00024"></a><span class="lineno">   24</span>  KernelModuleTmp-&gt;setTargetTriple(M.getTargetTriple());</div>
 <div class="line"><a id="l00025" name="l00025"></a><span class="lineno">   25</span>  KernelModuleTmp-&gt;setModuleInlineAsm(M.getModuleInlineAsm());</div>
-<div class="line"><a id="l00026" name="l00026"></a><span class="lineno">   26</span><span class="preprocessor">#if LLVM_VERSION_MAJOR &gt;= 18 &amp;&amp; LLVM_VERSION_MAJOR &lt; 22</span></div>
+<div class="line"><a id="l00026" name="l00026"></a><span class="lineno">   26</span><span class="preprocessor">#if LLVM_VERSION_MAJOR &gt;= 18 &amp;&amp; LLVM_VERSION_MAJOR &lt; 21</span></div>
 <div class="line"><a id="l00027" name="l00027"></a><span class="lineno">   27</span>  KernelModuleTmp-&gt;IsNewDbgInfoFormat = M.IsNewDbgInfoFormat;</div>
 <div class="line"><a id="l00028" name="l00028"></a><span class="lineno">   28</span><span class="preprocessor">#endif</span></div>
 <div class="line"><a id="l00029" name="l00029"></a><span class="lineno">   29</span> </div>
@@ -488,7 +488,7 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00365" name="l00365"></a><span class="lineno">  365</span>    ModuleOut-&gt;setDataLayout(M.getDataLayout());</div>
 <div class="line"><a id="l00366" name="l00366"></a><span class="lineno">  366</span>    ModuleOut-&gt;setTargetTriple(M.getTargetTriple());</div>
 <div class="line"><a id="l00367" name="l00367"></a><span class="lineno">  367</span>    ModuleOut-&gt;setModuleInlineAsm(M.getModuleInlineAsm());</div>
-<div class="line"><a id="l00368" name="l00368"></a><span class="lineno">  368</span><span class="preprocessor">#if LLVM_VERSION_MAJOR &gt;= 18 &amp;&amp; LLVM_VERSION_MAJOR &lt; 22</span></div>
+<div class="line"><a id="l00368" name="l00368"></a><span class="lineno">  368</span><span class="preprocessor">#if LLVM_VERSION_MAJOR &gt;= 18 &amp;&amp; LLVM_VERSION_MAJOR &lt; 21</span></div>
 <div class="line"><a id="l00369" name="l00369"></a><span class="lineno">  369</span>    ModuleOut-&gt;IsNewDbgInfoFormat = M.IsNewDbgInfoFormat;</div>
 <div class="line"><a id="l00370" name="l00370"></a><span class="lineno">  370</span><span class="preprocessor">#endif</span></div>
 <div class="line"><a id="l00371" name="l00371"></a><span class="lineno">  371</span> </div>
