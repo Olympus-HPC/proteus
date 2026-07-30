@@ -236,6 +236,8 @@ static void addCommonGpuLoweringPrelude(mlir::PassManager &PM) {
     Opts.indexBitwidth = mlir::kDeriveIndexBitwidthFromDataLayout;
     PM.addPass(mlir::createConvertControlFlowToLLVMPass(Opts));
   }
+  // Lower internal device helpers before target-specific GPU conversion.
+  PM.addPass(mlir::createConvertFuncToLLVMPass());
   PM.addPass(mlir::createReconcileUnrealizedCastsPass());
 }
 
