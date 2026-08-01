@@ -52,6 +52,7 @@ static_assert(__cplusplus >= 201703L,
 #include <llvm/Transforms/IPO/StripSymbols.h>
 #include <llvm/Transforms/Utils/ModuleUtils.h>
 
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <utility>
@@ -120,24 +121,60 @@ inline std::string getDefaultOptimizationPipeline(char OptLevel) {
 inline std::string composeOptimizationPassPipeline(
     std::optional<std::string> PassPipeline, char OptLevel,
     const std::vector<JITPassPluginConfig> &Plugins) {
-  std::string Pipeline = PassPipeline
-                             ? std::move(PassPipeline.value())
-                             : getDefaultOptimizationPipeline(OptLevel);
+  std::string Pipeline;
   for (const auto &Plugin : Plugins) {
-    Pipeline += ",";
-    Pipeline += Plugin.Pipeline;
+    if (!Plugin.Insertion ||
+        Plugin.Insertion->Position != JITPassPluginPosition::Prepend)
+      continue;
+    if (!Pipeline.empty())
+      Pipeline += ",";
+    Pipeline += Plugin.Insertion->Pipeline;
   }
+
+  if (!Pipeline.empty())
+    Pipeline += ",";
+  Pipeline += PassPipeline ? std::move(*PassPipeline)
+                           : getDefaultOptimizationPipeline(OptLevel);
+
+  for (const auto &Plugin : Plugins) {
+    if (!Plugin.Insertion ||
+        Plugin.Insertion->Position != JITPassPluginPosition::Append)
+      continue;
+    Pipeline += ",";
+    Pipeline += Plugin.Insertion->Pipeline;
+  }
+
   return Pipeline;
+}
+
+inline bool
+hasJITPassPluginInsertion(const std::vector<JITPassPluginConfig> &Plugins) {
+  return std::any_of(Plugins.begin(), Plugins.end(),
+                     [](const JITPassPluginConfig &Plugin) {
+                       return Plugin.Insertion.has_value();
+                     });
+}
+
+inline std::vector<std::string>
+getUniqueJITPassPluginPaths(const std::vector<JITPassPluginConfig> &Plugins) {
+  std::vector<std::string> Paths;
+  Paths.reserve(Plugins.size());
+  for (const auto &Plugin : Plugins) {
+    if (std::find(Paths.begin(), Paths.end(), Plugin.Path) == Paths.end())
+      Paths.push_back(Plugin.Path);
+  }
+  return Paths;
 }
 
 inline std::vector<PassPlugin>
 loadJITPassPlugins(const std::vector<JITPassPluginConfig> &Plugins) {
   std::vector<PassPlugin> LoadedPlugins;
-  LoadedPlugins.reserve(Plugins.size());
-  for (const auto &Plugin : Plugins) {
-    auto LoadedPlugin = PassPlugin::Load(Plugin.Path);
+  const auto PluginPaths = getUniqueJITPassPluginPaths(Plugins);
+  LoadedPlugins.reserve(PluginPaths.size());
+  for (const auto &PluginPath : PluginPaths) {
+    auto LoadedPlugin = PassPlugin::Load(PluginPath);
     if (!LoadedPlugin)
-      reportFatalError("Failed to load JIT pass plugin '" + Plugin.Path +
+      reportFatalError("Failed to load JIT pass plugin '" + PluginPath +
                        "': " + toString(LoadedPlugin.takeError()));
     LoadedPlugins.push_back(std::move(*LoadedPlugin));
   }
@@ -179,9 +216,10 @@ inline void runOptimizationPassPipeline(
   Passes.run(M, MAM);
 }
 
-inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
-                                        char OptLevel = '3',
-                                        unsigned CodegenOptLevel = 3) {
+inline void runOptimizationPassPipeline(
+    Module &M, StringRef Arch, char OptLevel = '3',
+    unsigned CodegenOptLevel = 3,
+    const std::vector<JITPassPluginConfig> &Plugins = {}) {
   PipelineTuningOptions PTO;
 
   std::optional<PGOOptions> PGOOpt;
@@ -190,7 +228,10 @@ inline void runOptimizationPassPipeline(Module &M, StringRef Arch,
     report_fatal_error(std::move(Err));
   TargetLibraryInfoImpl TLII(Triple(M.getTargetTriple()));
 
+  auto LoadedPlugins = loadJITPassPlugins(Plugins);
   PassBuilder PB(TM->get(), PTO, PGOOpt, nullptr);
+  for (const auto &Plugin : LoadedPlugins)
+    Plugin.registerPassBuilderCallbacks(PB);
   LoopAnalysisManager LAM;
   FunctionAnalysisManager FAM;
   CGSCCAnalysisManager CGAM;
@@ -268,7 +309,8 @@ inline void optimizeIR(Module &M, StringRef Arch,
   Timer T(Config::get().ProteusEnableTimers);
 
   const auto Plugins = getJITPassPluginConfigs();
-  const bool UseTextualPipeline = OptConfig.PassPipeline || !Plugins.empty();
+  const bool UseTextualPipeline =
+      OptConfig.PassPipeline || detail::hasJITPassPluginInsertion(Plugins);
   const std::string FinalPipeline =
       UseTextualPipeline
           ? detail::composeOptimizationPassPipeline(OptConfig.PassPipeline,
@@ -290,7 +332,7 @@ inline void optimizeIR(Module &M, StringRef Arch,
                                         OptConfig.CodegenOptLevel, Plugins);
   } else {
     detail::runOptimizationPassPipeline(M, Arch, OptConfig.OptLevel,
-                                        OptConfig.CodegenOptLevel);
+                                        OptConfig.CodegenOptLevel, Plugins);
   }
 
   PROTEUS_TIMER_OUTPUT(Logger::outs("proteus")

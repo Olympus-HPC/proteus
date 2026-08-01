@@ -33,6 +33,69 @@ Config::get().getCGConfig()
 so per-kernel JSON `"Pipeline"` does not naturally apply to DSL, MLIR, or C++
 frontend modules.
 
+## JIT Pass Plugins
+
+Registering a JIT pass plugin always loads its normalized library path
+and registers its PassBuilder callbacks
+before Proteus builds or parses the optimization pipeline.
+The C++ API supports three registration modes:
+
+```cpp
+// Load callbacks and append a pipeline fragment (the default).
+proteus::registerJITPassPlugin(path, "my-pass");
+
+// Load callbacks and explicitly place a pipeline fragment.
+proteus::registerJITPassPlugin(
+    path, "my-pass", proteus::JITPassPluginPosition::Prepend);
+proteus::registerJITPassPlugin(
+    path, "my-pass", proteus::JITPassPluginPosition::Append);
+
+// Load callbacks without automatically inserting a fragment.
+proteus::registerJITPassPlugin(path);
+```
+
+For automatic insertion,
+Proteus composes the effective textual pipeline in this order:
+
+1. Prepended fragments in registration order.
+2. The configured `PROTEUS_OPT_PIPELINE` or default optimization pipeline.
+3. Appended fragments in registration order.
+
+Load-only registrations do not add text to the pipeline.
+They can still make pass names available
+to a user-authored `PROTEUS_OPT_PIPELINE`,
+and their callbacks can affect default pipelines through LLVM extension points.
+If every registration is load-only and no custom pipeline is configured,
+Proteus builds the normal LLVM default pipeline.
+
+Multiple registrations can use the same plugin library.
+Proteus preserves every distinct registration for ordering and cache identity,
+while loading each normalized library path only once per compilation.
+The registration mode, position, pipeline fragment, plugin fingerprint,
+and registration order contribute to JIT cache identity.
+
+The CMake helper exposes the same modes:
+
+```cmake
+# Append by default.
+proteus_register_jit_pass_plugin(
+    app PLUGIN_TARGET MyPassPlugin PIPELINE my-pass)
+
+# Explicit placement.
+proteus_register_jit_pass_plugin(
+    app PLUGIN_TARGET MyPassPlugin PIPELINE my-pass POSITION PREPEND)
+
+# Load only.
+proteus_register_jit_pass_plugin(
+    app PLUGIN_TARGET MyPassPlugin)
+```
+
+`POSITION` accepts `PREPEND` or `APPEND`.
+It requires a nonempty `PIPELINE`;
+when `PIPELINE` is present without `POSITION`,
+the helper appends the pipeline fragment by default.
+`PLUGIN_PATH` can be used instead of `PLUGIN_TARGET` in all three modes.
+
 ## Support Matrix
 
 | Frontend / API path | Target type | Main compile path | Uses `PROTEUS_OPT_PIPELINE`? | Notes |
@@ -75,6 +138,8 @@ This includes:
 - `PROTEUS_OPT_LEVEL`
 - `PROTEUS_CODEGEN_OPT_LEVEL`
 - `PROTEUS_OPT_PIPELINE`
+- Ordered JIT pass-plugin registrations,
+  including load-only versus inserted mode and prepend versus append position
 
 Runtime annotated JIT cache keys also include runtime specialization policy:
 
@@ -101,6 +166,7 @@ way annotated runtime JIT paths do.
 interface accepts some compiler options, but it does not expose a documented
 LLVM textual pass pipeline interface equivalent to `opt`/PassBuilder or LLVM
 LTO's `OptPipeline`.
+JIT pass-plugin registration does not change this exclusion.
 
 ### CppJit Host+CUDA / Host+HIP
 
@@ -108,9 +174,11 @@ The Clang backend currently compiles mixed host/device C++ offload source
 directly into a shared library for `HOST_CUDA` and `HOST_HIP`. Proteus receives
 the final `.so`, so it cannot run its LLVM pass pipeline over the host and
 device modules.
+JIT pass-plugin registration does not change this exclusion.
 
 ### NVCC Backend
 
 The NVCC backend is an external compiler path. Proteus does not own LLVM IR
 optimization there, so `PROTEUS_OPT_PIPELINE` does not apply and is not included
 in NVCC CppJit cache keys.
+JIT pass-plugin registration does not change this exclusion.
