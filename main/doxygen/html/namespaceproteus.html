@@ -220,6 +220,8 @@ Classes</h2></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1JITPassPluginConfig.html">JITPassPluginConfig</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1JITPassPluginInsertion.html">JITPassPluginInsertion</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html">LambdaRegistry</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1LinkingCloner.html">LinkingCloner</a></td></tr>
@@ -509,6 +511,10 @@ Enumerations</h2></td></tr>
 <br />
  }</td></tr>
 <tr class="separator:a08485a05eb684e821e1004eefb75362f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab68201e3b56d22b47b53a1ddd00fe403" id="r_ab68201e3b56d22b47b53a1ddd00fe403"><td class="memItemLeft" align="right" valign="top">enum class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#ab68201e3b56d22b47b53a1ddd00fe403">JITPassPluginPosition</a> { <a class="el" href="namespaceproteus.html#ab68201e3b56d22b47b53a1ddd00fe403ac8bc2f88eeb64f1a0c9ec31ec452432c">Prepend</a>
+, <a class="el" href="namespaceproteus.html#ab68201e3b56d22b47b53a1ddd00fe403a3ac4692f3935a49a0b243eecf529faa9">Append</a>
+ }</td></tr>
+<tr class="separator:ab68201e3b56d22b47b53a1ddd00fe403"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a010089148bcc2c6de5d9dd65cab2833f" id="r_a010089148bcc2c6de5d9dd65cab2833f"><td class="memItemLeft" align="right" valign="top">enum class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a010089148bcc2c6de5d9dd65cab2833f">JitFuncAttribute</a> { <a class="el" href="namespaceproteus.html#a010089148bcc2c6de5d9dd65cab2833fade24e426a0792b746cc233d30e36c55e">MaxDynamicSharedMemorySize</a>
  }</td></tr>
 <tr class="separator:a010089148bcc2c6de5d9dd65cab2833f"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -644,8 +650,8 @@ Functions</h2></td></tr>
 <tr class="memitem:a7b58468726c221ffc391e3d8dbea262e" id="r_a7b58468726c221ffc391e3d8dbea262e"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
 <tr class="memitem:a7b58468726c221ffc391e3d8dbea262e"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="classproteus_1_1HashT.html">HashT</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a7b58468726c221ffc391e3d8dbea262e">hash</a> (T &amp;&amp;Data)</td></tr>
 <tr class="separator:a7b58468726c221ffc391e3d8dbea262e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a301d5cc23497e0efbe4fcd1b7ce50308" id="r_a301d5cc23497e0efbe4fcd1b7ce50308"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a301d5cc23497e0efbe4fcd1b7ce50308">registerJITPassPluginImpl</a> (const std::string &amp;PluginPath, const std::string &amp;PassPipeline)</td></tr>
-<tr class="separator:a301d5cc23497e0efbe4fcd1b7ce50308"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aeed8b6ca11dd4afb580f6406e6339ba0" id="r_aeed8b6ca11dd4afb580f6406e6339ba0"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#aeed8b6ca11dd4afb580f6406e6339ba0">registerJITPassPluginImpl</a> (const std::string &amp;PluginPath, std::optional&lt; <a class="el" href="structproteus_1_1JITPassPluginInsertion.html">JITPassPluginInsertion</a> &gt; Insertion)</td></tr>
+<tr class="separator:aeed8b6ca11dd4afb580f6406e6339ba0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0ce1a8fe801a000d944f3d5bf5dcfaac" id="r_a0ce1a8fe801a000d944f3d5bf5dcfaac"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a0ce1a8fe801a000d944f3d5bf5dcfaac">clearJITPassPluginsImpl</a> ()</td></tr>
 <tr class="separator:a0ce1a8fe801a000d944f3d5bf5dcfaac"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a1b17eaa2717750d9169f68eac00d808b" id="r_a1b17eaa2717750d9169f68eac00d808b"><td class="memItemLeft" align="right" valign="top">std::vector&lt; <a class="el" href="structproteus_1_1JITPassPluginConfig.html">JITPassPluginConfig</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a1b17eaa2717750d9169f68eac00d808b">getJITPassPluginConfigs</a> ()</td></tr>
@@ -693,8 +699,12 @@ Functions</h2></td></tr>
 <tr class="separator:a2ebff56bbe969b2b571de2ff2f1dbed7"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae5096d21d15b3f3a33823c3009efeb4e" id="r_ae5096d21d15b3f3a33823c3009efeb4e"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#ae5096d21d15b3f3a33823c3009efeb4e">finalize</a> ()</td></tr>
 <tr class="separator:ae5096d21d15b3f3a33823c3009efeb4e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a83181486c2d551268d2fd20e3127b59c" id="r_a83181486c2d551268d2fd20e3127b59c"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a83181486c2d551268d2fd20e3127b59c">registerJITPassPlugin</a> (const std::string &amp;PluginPath)</td></tr>
+<tr class="separator:a83181486c2d551268d2fd20e3127b59c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3bf5c169a8b8d4f6370aa6dd0d5f8acd" id="r_a3bf5c169a8b8d4f6370aa6dd0d5f8acd"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a3bf5c169a8b8d4f6370aa6dd0d5f8acd">registerJITPassPlugin</a> (const std::string &amp;PluginPath, const std::string &amp;PassPipeline)</td></tr>
 <tr class="separator:a3bf5c169a8b8d4f6370aa6dd0d5f8acd"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af8be3f9810aa3073ff2f41e6f0b4d58c" id="r_af8be3f9810aa3073ff2f41e6f0b4d58c"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#af8be3f9810aa3073ff2f41e6f0b4d58c">registerJITPassPlugin</a> (const std::string &amp;PluginPath, const std::string &amp;PassPipeline, <a class="el" href="namespaceproteus.html#ab68201e3b56d22b47b53a1ddd00fe403">JITPassPluginPosition</a> Position)</td></tr>
+<tr class="separator:af8be3f9810aa3073ff2f41e6f0b4d58c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:abb1baa987a9086836c02359f5e3ba82e" id="r_abb1baa987a9086836c02359f5e3ba82e"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#abb1baa987a9086836c02359f5e3ba82e">clearJITPassPlugins</a> ()</td></tr>
 <tr class="separator:abb1baa987a9086836c02359f5e3ba82e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa1d4ca1602a02f58f264c8269c8cb9c9" id="r_aa1d4ca1602a02f58f264c8269c8cb9c9"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#aa1d4ca1602a02f58f264c8269c8cb9c9">enable</a> ()</td></tr>
@@ -1087,6 +1097,32 @@ template&lt;typename T &gt; </div>
 </div><div class="memdoc">
 <table class="fieldtable">
 <tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="a010089148bcc2c6de5d9dd65cab2833fade24e426a0792b746cc233d30e36c55e" name="a010089148bcc2c6de5d9dd65cab2833fade24e426a0792b746cc233d30e36c55e"></a>MaxDynamicSharedMemorySize&#160;</td><td class="fielddoc"></td></tr>
+</table>
+
+</div>
+</div>
+<a id="ab68201e3b56d22b47b53a1ddd00fe403" name="ab68201e3b56d22b47b53a1ddd00fe403"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab68201e3b56d22b47b53a1ddd00fe403">&#9670;&#160;</a></span>JITPassPluginPosition</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">enum class <a class="el" href="namespaceproteus.html#ab68201e3b56d22b47b53a1ddd00fe403">proteus::JITPassPluginPosition</a></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">strong</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<table class="fieldtable">
+<tr><th colspan="2">Enumerator</th></tr><tr><td class="fieldname"><a id="ab68201e3b56d22b47b53a1ddd00fe403ac8bc2f88eeb64f1a0c9ec31ec452432c" name="ab68201e3b56d22b47b53a1ddd00fe403ac8bc2f88eeb64f1a0c9ec31ec452432c"></a>Prepend&#160;</td><td class="fielddoc"></td></tr>
+<tr><td class="fieldname"><a id="ab68201e3b56d22b47b53a1ddd00fe403a3ac4692f3935a49a0b243eecf529faa9" name="ab68201e3b56d22b47b53a1ddd00fe403a3ac4692f3935a49a0b243eecf529faa9"></a>Append&#160;</td><td class="fielddoc"></td></tr>
 </table>
 
 </div>
@@ -3956,8 +3992,26 @@ template&lt;typename T &gt; </div>
 
 </div>
 </div>
+<a id="a83181486c2d551268d2fd20e3127b59c" name="a83181486c2d551268d2fd20e3127b59c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a83181486c2d551268d2fd20e3127b59c">&#9670;&#160;</a></span>registerJITPassPlugin() <span class="overload">[1/3]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void proteus::registerJITPassPlugin </td>
+          <td>(</td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
+          <td class="paramname"><em>PluginPath</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
 <a id="a3bf5c169a8b8d4f6370aa6dd0d5f8acd" name="a3bf5c169a8b8d4f6370aa6dd0d5f8acd"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a3bf5c169a8b8d4f6370aa6dd0d5f8acd">&#9670;&#160;</a></span>registerJITPassPlugin()</h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a3bf5c169a8b8d4f6370aa6dd0d5f8acd">&#9670;&#160;</a></span>registerJITPassPlugin() <span class="overload">[2/3]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -3984,8 +4038,42 @@ template&lt;typename T &gt; </div>
 
 </div>
 </div>
-<a id="a301d5cc23497e0efbe4fcd1b7ce50308" name="a301d5cc23497e0efbe4fcd1b7ce50308"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a301d5cc23497e0efbe4fcd1b7ce50308">&#9670;&#160;</a></span>registerJITPassPluginImpl()</h2>
+<a id="af8be3f9810aa3073ff2f41e6f0b4d58c" name="af8be3f9810aa3073ff2f41e6f0b4d58c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af8be3f9810aa3073ff2f41e6f0b4d58c">&#9670;&#160;</a></span>registerJITPassPlugin() <span class="overload">[3/3]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void proteus::registerJITPassPlugin </td>
+          <td>(</td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
+          <td class="paramname"><em>PluginPath</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
+          <td class="paramname"><em>PassPipeline</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="namespaceproteus.html#ab68201e3b56d22b47b53a1ddd00fe403">JITPassPluginPosition</a>&#160;</td>
+          <td class="paramname"><em>Position</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="aeed8b6ca11dd4afb580f6406e6339ba0" name="aeed8b6ca11dd4afb580f6406e6339ba0"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aeed8b6ca11dd4afb580f6406e6339ba0">&#9670;&#160;</a></span>registerJITPassPluginImpl()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -3999,8 +4087,8 @@ template&lt;typename T &gt; </div>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const std::string &amp;&#160;</td>
-          <td class="paramname"><em>PassPipeline</em>&#160;</td>
+          <td class="paramtype">std::optional&lt; <a class="el" href="structproteus_1_1JITPassPluginInsertion.html">JITPassPluginInsertion</a> &gt;&#160;</td>
+          <td class="paramname"><em>Insertion</em>&#160;</td>
         </tr>
         <tr>
           <td></td>

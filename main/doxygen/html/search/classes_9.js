@@ -11,5 +11,6 @@ var searchData=
   ['jitfunctioninfo_8',['JitFunctionInfo',['../structproteus_1_1JitFunctionInfo.html',1,'proteus']]],
   ['jitkernelinfo_9',['JITKernelInfo',['../classproteus_1_1JITKernelInfo.html',1,'proteus']]],
   ['jitmodule_10',['JitModule',['../classproteus_1_1JitModule.html',1,'proteus']]],
-  ['jitpasspluginconfig_11',['JITPassPluginConfig',['../structproteus_1_1JITPassPluginConfig.html',1,'proteus']]]
+  ['jitpasspluginconfig_11',['JITPassPluginConfig',['../structproteus_1_1JITPassPluginConfig.html',1,'proteus']]],
+  ['jitpassplugininsertion_12',['JITPassPluginInsertion',['../structproteus_1_1JITPassPluginInsertion.html',1,'proteus']]]
 ];

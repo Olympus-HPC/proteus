@@ -905,6 +905,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#jit-pass-plugins" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JIT Pass Plugins
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#support-matrix" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1184,6 +1195,59 @@ JIT paths because they call:</p>
 </code></pre></div>
 <p>so per-kernel JSON <code>"Pipeline"</code> does not naturally apply to DSL, MLIR, or C++
 frontend modules.</p>
+<h2 id="jit-pass-plugins">JIT Pass Plugins</h2>
+<p>Registering a JIT pass plugin always loads its normalized library path
+and registers its PassBuilder callbacks
+before Proteus builds or parses the optimization pipeline.
+The C++ API supports three registration modes:</p>
+<div class="highlight"><pre><span></span><code><span class="c1">// Load callbacks and append a pipeline fragment (the default).</span>
+<span class="n">proteus</span><span class="o">::</span><span class="n">registerJITPassPlugin</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;my-pass&quot;</span><span class="p">);</span>
+
+<span class="c1">// Load callbacks and explicitly place a pipeline fragment.</span>
+<span class="n">proteus</span><span class="o">::</span><span class="n">registerJITPassPlugin</span><span class="p">(</span>
+<span class="w">    </span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;my-pass&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">proteus</span><span class="o">::</span><span class="n">JITPassPluginPosition</span><span class="o">::</span><span class="n">Prepend</span><span class="p">);</span>
+<span class="n">proteus</span><span class="o">::</span><span class="n">registerJITPassPlugin</span><span class="p">(</span>
+<span class="w">    </span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;my-pass&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">proteus</span><span class="o">::</span><span class="n">JITPassPluginPosition</span><span class="o">::</span><span class="n">Append</span><span class="p">);</span>
+
+<span class="c1">// Load callbacks without automatically inserting a fragment.</span>
+<span class="n">proteus</span><span class="o">::</span><span class="n">registerJITPassPlugin</span><span class="p">(</span><span class="n">path</span><span class="p">);</span>
+</code></pre></div>
+<p>For automatic insertion,
+Proteus composes the effective textual pipeline in this order:</p>
+<ol>
+<li>Prepended fragments in registration order.</li>
+<li>The configured <code>PROTEUS_OPT_PIPELINE</code> or default optimization pipeline.</li>
+<li>Appended fragments in registration order.</li>
+</ol>
+<p>Load-only registrations do not add text to the pipeline.
+They can still make pass names available
+to a user-authored <code>PROTEUS_OPT_PIPELINE</code>,
+and their callbacks can affect default pipelines through LLVM extension points.
+If every registration is load-only and no custom pipeline is configured,
+Proteus builds the normal LLVM default pipeline.</p>
+<p>Multiple registrations can use the same plugin library.
+Proteus preserves every distinct registration for ordering and cache identity,
+while loading each normalized library path only once per compilation.
+The registration mode, position, pipeline fragment, plugin fingerprint,
+and registration order contribute to JIT cache identity.</p>
+<p>The CMake helper exposes the same modes:</p>
+<div class="highlight"><pre><span></span><code><span class="c"># Append by default.</span>
+<span class="nb">proteus_register_jit_pass_plugin</span><span class="p">(</span>
+<span class="w">    </span><span class="s">app</span><span class="w"> </span><span class="s">PLUGIN_TARGET</span><span class="w"> </span><span class="s">MyPassPlugin</span><span class="w"> </span><span class="s">PIPELINE</span><span class="w"> </span><span class="s">my-pass</span><span class="p">)</span>
+
+<span class="c"># Explicit placement.</span>
+<span class="nb">proteus_register_jit_pass_plugin</span><span class="p">(</span>
+<span class="w">    </span><span class="s">app</span><span class="w"> </span><span class="s">PLUGIN_TARGET</span><span class="w"> </span><span class="s">MyPassPlugin</span><span class="w"> </span><span class="s">PIPELINE</span><span class="w"> </span><span class="s">my-pass</span><span class="w"> </span><span class="s">POSITION</span><span class="w"> </span><span class="s">PREPEND</span><span class="p">)</span>
+
+<span class="c"># Load only.</span>
+<span class="nb">proteus_register_jit_pass_plugin</span><span class="p">(</span>
+<span class="w">    </span><span class="s">app</span><span class="w"> </span><span class="s">PLUGIN_TARGET</span><span class="w"> </span><span class="s">MyPassPlugin</span><span class="p">)</span>
+</code></pre></div>
+<p><code>POSITION</code> accepts <code>PREPEND</code> or <code>APPEND</code>.
+It requires a nonempty <code>PIPELINE</code>;
+when <code>PIPELINE</code> is present without <code>POSITION</code>,
+the helper appends the pipeline fragment by default.
+<code>PLUGIN_PATH</code> can be used instead of <code>PLUGIN_TARGET</code> in all three modes.</p>
 <h2 id="support-matrix">Support Matrix</h2>
 <table>
 <thead>
@@ -1356,6 +1420,8 @@ frontend modules.</p>
 <li><code>PROTEUS_OPT_LEVEL</code></li>
 <li><code>PROTEUS_CODEGEN_OPT_LEVEL</code></li>
 <li><code>PROTEUS_OPT_PIPELINE</code></li>
+<li>Ordered JIT pass-plugin registrations,
+  including load-only versus inserted mode and prepend versus append position</li>
 </ul>
 <p>Runtime annotated JIT cache keys also include runtime specialization policy:</p>
 <div class="highlight"><pre><span></span><code><span class="n">hashRuntimeSpecializationConfig</span><span class="p">(</span><span class="n">CGConfig</span><span class="p">)</span>
@@ -1375,16 +1441,19 @@ way annotated runtime JIT paths do.</p>
 <p><code>PROTEUS_CODEGEN=rtc</code> routes HIP compilation through HIPRTC. The HIPRTC linker
 interface accepts some compiler options, but it does not expose a documented
 LLVM textual pass pipeline interface equivalent to <code>opt</code>/PassBuilder or LLVM
-LTO's <code>OptPipeline</code>.</p>
+LTO's <code>OptPipeline</code>.
+JIT pass-plugin registration does not change this exclusion.</p>
 <h3 id="cppjit-hostcuda-hosthip">CppJit Host+CUDA / Host+HIP</h3>
 <p>The Clang backend currently compiles mixed host/device C++ offload source
 directly into a shared library for <code>HOST_CUDA</code> and <code>HOST_HIP</code>. Proteus receives
 the final <code>.so</code>, so it cannot run its LLVM pass pipeline over the host and
-device modules.</p>
+device modules.
+JIT pass-plugin registration does not change this exclusion.</p>
 <h3 id="nvcc-backend">NVCC Backend</h3>
 <p>The NVCC backend is an external compiler path. Proteus does not own LLVM IR
 optimization there, so <code>PROTEUS_OPT_PIPELINE</code> does not apply and is not included
-in NVCC CppJit cache keys.</p>
+in NVCC CppJit cache keys.
+JIT pass-plugin registration does not change this exclusion.</p>
 
 
 

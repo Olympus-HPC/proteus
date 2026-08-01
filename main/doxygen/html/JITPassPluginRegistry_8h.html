@@ -102,18 +102,25 @@ var searchBox = new SearchBox("searchBox", "search/",'.html');
   <div class="headertitle"><div class="title">JITPassPluginRegistry.h File Reference</div></div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><code>#include &lt;string&gt;</code><br />
+<div class="textblock"><code>#include &quot;<a class="el" href="Init_8h_source.html">proteus/Init.h</a>&quot;</code><br />
+<code>#include &lt;optional&gt;</code><br />
+<code>#include &lt;string&gt;</code><br />
 <code>#include &lt;vector&gt;</code><br />
 </div><div class="textblock"><div class="dynheader">
 Include dependency graph for JITPassPluginRegistry.h:</div>
 <div class="dyncontent">
 <div class="center"><img src="JITPassPluginRegistry_8h__incl.png" border="0" usemap="#asrc_2include_2proteus_2impl_2JITPassPluginRegistry_8h" alt=""/></div>
 <map name="asrc_2include_2proteus_2impl_2JITPassPluginRegistry_8h" id="asrc_2include_2proteus_2impl_2JITPassPluginRegistry_8h">
-<area shape="rect" title=" " alt="" coords="5,5,213,45"/>
-<area shape="rect" title=" " alt="" coords="37,93,96,119"/>
-<area shape="poly" title=" " alt="" coords="101,47,82,83,77,80,97,44"/>
-<area shape="rect" title=" " alt="" coords="121,93,183,119"/>
-<area shape="poly" title=" " alt="" coords="122,44,142,80,137,83,117,47"/>
+<area shape="rect" title=" " alt="" coords="85,5,293,45"/>
+<area shape="rect" href="Init_8h.html" title=" " alt="" coords="5,93,113,119"/>
+<area shape="poly" title=" " alt="" coords="159,48,91,88,89,84,156,43"/>
+<area shape="rect" title=" " alt="" coords="75,167,134,192"/>
+<area shape="poly" title=" " alt="" coords="180,47,120,156,115,153,176,45"/>
+<area shape="rect" title=" " alt="" coords="189,93,263,119"/>
+<area shape="poly" title=" " alt="" coords="200,44,217,80,212,82,195,47"/>
+<area shape="rect" title=" " alt="" coords="288,93,351,119"/>
+<area shape="poly" title=" " alt="" coords="222,43,290,84,287,88,219,48"/>
+<area shape="poly" title=" " alt="" coords="69,118,92,154,88,157,65,120"/>
 </map>
 </div>
 </div><div class="textblock"><div class="dynheader">
@@ -252,6 +259,8 @@ This graph shows which files directly or indirectly include this file:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="nested-classes" name="nested-classes"></a>
 Classes</h2></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1JITPassPluginInsertion.html">proteus::JITPassPluginInsertion</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1JITPassPluginConfig.html">proteus::JITPassPluginConfig</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
@@ -262,8 +271,8 @@ Namespaces</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:a301d5cc23497e0efbe4fcd1b7ce50308" id="r_a301d5cc23497e0efbe4fcd1b7ce50308"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a301d5cc23497e0efbe4fcd1b7ce50308">proteus::registerJITPassPluginImpl</a> (const std::string &amp;PluginPath, const std::string &amp;PassPipeline)</td></tr>
-<tr class="separator:a301d5cc23497e0efbe4fcd1b7ce50308"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aeed8b6ca11dd4afb580f6406e6339ba0" id="r_aeed8b6ca11dd4afb580f6406e6339ba0"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#aeed8b6ca11dd4afb580f6406e6339ba0">proteus::registerJITPassPluginImpl</a> (const std::string &amp;PluginPath, std::optional&lt; <a class="el" href="structproteus_1_1JITPassPluginInsertion.html">JITPassPluginInsertion</a> &gt; Insertion)</td></tr>
+<tr class="separator:aeed8b6ca11dd4afb580f6406e6339ba0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0ce1a8fe801a000d944f3d5bf5dcfaac" id="r_a0ce1a8fe801a000d944f3d5bf5dcfaac"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a0ce1a8fe801a000d944f3d5bf5dcfaac">proteus::clearJITPassPluginsImpl</a> ()</td></tr>
 <tr class="separator:a0ce1a8fe801a000d944f3d5bf5dcfaac"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a1b17eaa2717750d9169f68eac00d808b" id="r_a1b17eaa2717750d9169f68eac00d808b"><td class="memItemLeft" align="right" valign="top">std::vector&lt; <a class="el" href="structproteus_1_1JITPassPluginConfig.html">JITPassPluginConfig</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a1b17eaa2717750d9169f68eac00d808b">proteus::getJITPassPluginConfigs</a> ()</td></tr>
