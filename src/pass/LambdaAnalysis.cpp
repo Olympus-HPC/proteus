@@ -10,91 +10,45 @@
 //    Instrument host lambda callsites to register runtime constants.  Record
 //    and instrument the data layout for user-specified jit_variable calls.
 //
-// USAGE:
-//    1. Legacy PM
-//      opt -enable-new-pm=0 -load libLambdaPass.dylib -legacy-lambda-pass
-//      -disable-output `\`
-//        <input-llvm-file>
-//    2. New PM
-//      opt -load-pass-plugin=libLambdaPass.dylib -passes="lambda-pass" `\`
-//        -disable-output <input-llvm-file>
-//
-//
 //===----------------------------------------------------------------------===//
 // clang-format off
 #include "LambdaAnalysis.h"
-#include "AnnotationHandler.h"
 #include "Helpers.h"
+#include "Types.h"
 
 #include "proteus/CompilerInterfaceTypes.h"
-#include "proteus/Error.h"
 #include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/LambdaCallsite.h"
 #include "proteus/impl/Logger.h"
 
 #include <llvm/ADT/DenseMap.h>
 #include <llvm/ADT/DenseSet.h>
-#include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/ADT/SmallVector.h>
-#include <llvm/ADT/StringMap.h>
 #include <llvm/ADT/StringRef.h>
-#include <llvm/ADT/StringSet.h>
-#include <llvm/Analysis/CallGraph.h>
-#include <llvm/Analysis/ValueTracking.h>
-#include <llvm/Bitcode/BitcodeWriter.h>
 #include <llvm/Demangle/Demangle.h>
-#include <llvm/IR/CallingConv.h>
 #include <llvm/IR/Constant.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
-#include <llvm/IR/DebugInfo.h>
 #include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/Dominators.h>
 #include <llvm/IR/Function.h>
-#include <llvm/IR/GlobalValue.h>
 #include <llvm/IR/GlobalVariable.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Instructions.h>
-#include <llvm/IR/Mangler.h>
 #include <llvm/IR/Metadata.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Verifier.h>
-#include <llvm/IRReader/IRReader.h>
-#include <llvm/Linker/Linker.h>
-#include <llvm/Object/ELF.h>
-#include <llvm/Passes/PassBuilder.h>
-#include <cstddef>
-// Upstream LLVM 22.1.0 moved PassPlugin.h from llvm/Passes to llvm/Plugins,
-// while ROCm-packaged LLVM still uses the older include path.
-#if __has_include(<llvm/Plugins/PassPlugin.h>)
-#include <llvm/Plugins/PassPlugin.h>
-#elif __has_include(<llvm/Passes/PassPlugin.h>)
-#include <llvm/Passes/PassPlugin.h>
-#else
-#error "Cannot find LLVM PassPlugin.h"
-#endif
 #include <llvm/Support/Debug.h>
-#include <llvm/Support/Error.h>
 #include <llvm/Support/ErrorHandling.h>
-#include <llvm/Support/FileSystem.h>
-#include <llvm/Support/FileSystem/UniqueID.h>
-#include <llvm/Support/JSON.h>
-#include <llvm/Support/MemoryBuffer.h>
-#include <llvm/Support/MemoryBufferRef.h>
 #include <llvm/Support/raw_ostream.h>
-#include <llvm/Transforms/IPO.h>
-#include <llvm/Transforms/IPO/AlwaysInliner.h>
-#include <llvm/Transforms/IPO/GlobalDCE.h>
-#include <llvm/Transforms/IPO/GlobalOpt.h>
-#include <llvm/Transforms/IPO/MergeFunctions.h>
-#include <llvm/Transforms/IPO/StripDeadPrototypes.h>
-#include <llvm/Transforms/IPO/StripSymbols.h>
 #include <llvm/Transforms/Utils/Cloning.h>
-#include <llvm/Transforms/Utils/ModuleUtils.h>
 
+#include <cstdint>
 #include <limits>
+#include <optional>
 #include <string>
+#include <utility>
 // clang-format on
 
 using namespace llvm;
@@ -115,34 +69,26 @@ class LambdaPassImpl {
 public:
   LambdaPassImpl(Module &M) : Types(M) {}
 
-  bool run(Module &M, bool) {
+  bool run(Module &M) {
     // Attach Metadata nodes corresponding to llvm.global.annotations to
     // individual function calls.
     addMetadataNodeWithNameFromLLVMGlobal(M, "proteus.wrapper_call");
     addMetadataNodeWithNameFromLLVMGlobal(M, "proteus.register_call");
     addMetadataNodeWithNameFromLLVMGlobal(M, "proteus.register_call_impl");
-    // We need collect any kernel host stubs to pass to parse annotations, used
-    // in forced annotations.
-    const auto StubToKernelMap = getKernelHostStubs(M);
 
-    DenseMap<StructType *, SmallVector<LambdaJitVariableInfo, 16>>
-        LambdaStorageTypeToJitIndices;
-    DenseMap<Type *, GlobalVariable *> LambdaTypeToGlobalName;
-    DenseSet<StructType *> RegisteredLambdaStorageClasses;
-    DenseMap<StructType *, StructType *> FunctorTypeToLambdaTypeMap;
-    DenseMap<uint64_t, StructType *> FunctorIDToLambdaTypeMap;
-    DenseMap<uint64_t, StructType *> FunctorIDToFunctorTypeMap;
     // clang-format off
-    // new pipeline: LambdaAnalysis sees early LLVM IR emitted at StartEPCallback.
-    // proteus::register_lambda emits unique a LambdaFunctorWrapper
-    // template instantiation for every function call.  The goal of this analysis
+    // lambda pipeline: LambdaAnalysis sees early LLVM IR emitted at StartEPCallback.
+    // proteus::register_lambda emits a LambdaFunctorWrapper template instantiation
+    // for every lambda passed to register_lambda.  The goal of this analysis
     // is to determine which slots in a Functor/Lambda's storage will be folded into LLVM
     // IR at runtime and treated as constants. The analysis uses the following steps:
     // For the host module, we emit registration of runtime constants directly into the
     // functor's wrapper operator() method.
     //  (1) make a DenseSet containing anonymous lambda classes (class.anon type)
     //      as registered by __proteus_take_address inside __register_lambda_impl.
-    //      Also track functor type --> corresponding class.anon type
+    //      Also track functor type --> corresponding class.anon type.  This correspondence
+    //      is unique on a per-module level, and the exact class.anon names vary
+    //      between host and device modules!  Type names are only stable within the module.
     //  (2) Find jit_variable calls and associate the calls offset with registered,
     //      class.anon types
     //  (3) Look at register_lambda calls, identify the call operators of the functors
@@ -166,6 +112,12 @@ public:
 
     makeLambdaCallsUniquePerFunctorOperator(M);
     if (!isDeviceCompilation(M)) {
+      DenseMap<StructType *, SmallVector<LambdaJitVariableInfo, 16>>
+          LambdaStorageTypeToJitIndices;
+      DenseSet<StructType *> RegisteredLambdaStorageClasses;
+      DenseMap<StructType *, StructType *> FunctorTypeToLambdaTypeMap;
+      DenseMap<uint64_t, StructType *> FunctorIDToLambdaTypeMap;
+      DenseMap<uint64_t, StructType *> FunctorIDToFunctorTypeMap;
       mapLambdaTypeToFunctorType(
           M, RegisteredLambdaStorageClasses, FunctorTypeToLambdaTypeMap,
           FunctorIDToLambdaTypeMap, FunctorIDToFunctorTypeMap);
@@ -193,28 +145,6 @@ public:
 
 private:
   ProteusTypes Types;
-
-  MapVector<Function *, JitFunctionInfo> JitFunctionInfoMap;
-  SmallPtrSet<Function *, 16> ModuleDeviceKernels;
-
-  Value *getStubGV([[maybe_unused]] Value *Operand) {
-    // NOTE: when called by isDeviceKernelHostStub, Operand may not be a global
-    // variable point to the stub, so we check and return null in that case.
-    Value *V = nullptr;
-#if PROTEUS_ENABLE_HIP
-    // NOTE: Hip creates a global named after the device kernel function that
-    // points to the host kernel stub. Because of this, we need to unpeel this
-    // indirection to use the host kernel stub for finding the device kernel
-    // function name global.
-    GlobalVariable *IndirectGV = dyn_cast<GlobalVariable>(Operand);
-    V = IndirectGV ? IndirectGV->getInitializer() : nullptr;
-#elif PROTEUS_ENABLE_CUDA
-    GlobalValue *DirectGV = dyn_cast<GlobalValue>(Operand);
-    V = DirectGV ? DirectGV : nullptr;
-#endif
-
-    return V;
-  }
 
   static void
   findAnnotatedFunctions(llvm::Module &M, llvm::StringRef Wanted,
@@ -385,6 +315,7 @@ private:
 
     return NewFunc;
   }
+
   // Go through all of the functor operator() methods emitted by the
   // proteus::register_lambda call.  Each operator()
   // has a unique ID, but multiple functor::operator() methods may call the same
@@ -471,39 +402,6 @@ private:
     }
   }
 
-  DenseMap<Value *, GlobalVariable *> getKernelHostStubs(Module &M) {
-    DenseMap<Value *, GlobalVariable *> StubToKernelMap;
-    Function *RegisterFunction = nullptr;
-
-    if (!hasDeviceLaunchKernelCalls(M))
-      return StubToKernelMap;
-
-    if (!RegisterFunctionName) {
-      reportFatalError("getKernelHostStubs only callable with `EnableHIP or "
-                       "EnableCUDA set.");
-      return StubToKernelMap;
-    }
-    RegisterFunction = M.getFunction(RegisterFunctionName);
-
-    if (!RegisterFunction)
-      return StubToKernelMap;
-
-    constexpr int StubOperand = 1;
-    constexpr int KernelOperand = 2;
-    for (User *Usr : RegisterFunction->users())
-      if (CallBase *CB = dyn_cast<CallBase>(Usr)) {
-        GlobalVariable *GV =
-            dyn_cast<GlobalVariable>(CB->getArgOperand(KernelOperand));
-        assert(GV && "Expected global variable as kernel name operand");
-        Value *Key = getStubGV(CB->getArgOperand(StubOperand));
-        assert(Key && "Expected valid kernel stub key");
-        StubToKernelMap[Key->stripPointerCasts()] = GV;
-        DEBUG(Logger::logs("lambda-pass")
-              << "StubToKernelMap Key: " << Key->getName() << " -> " << *GV
-              << "\n");
-      }
-    return StubToKernelMap;
-  }
   StructType *getStructAllocaFromCB(CallBase *CB) {
     auto *Alloca = dyn_cast<AllocaInst>(CB->getArgOperand(0));
     if (!Alloca)
@@ -625,6 +523,8 @@ private:
       return RuntimeConstantType::FLOAT;
     if (Ty->isDoubleTy())
       return RuntimeConstantType::DOUBLE;
+    if (Ty->isFP128Ty() || Ty->isPPC_FP128Ty() || Ty->isX86_FP80Ty())
+      return RuntimeConstantType::LONG_DOUBLE;
     if (Ty->isPointerTy())
       return RuntimeConstantType::PTR;
     return std::nullopt;
@@ -851,24 +751,11 @@ private:
       Builder.CreateCall(FinalizeFn, {Builder.getInt64(ID)});
     }
   }
-
-  bool hasDeviceLaunchKernelCalls(Module &M) {
-    Function *LaunchKernelFn = nullptr;
-    if (!LaunchFunctionName) {
-      return false;
-    }
-    LaunchKernelFn = M.getFunction(LaunchFunctionName);
-
-    if (!LaunchKernelFn)
-      return false;
-
-    return true;
-  }
 };
 
 } // namespace
 
-bool proteus::runLambdaAnalysis(Module &M, bool IsLTO) {
+bool proteus::runLambdaAnalysis(Module &M) {
   LambdaPassImpl PPI{M};
-  return PPI.run(M, IsLTO);
+  return PPI.run(M);
 }

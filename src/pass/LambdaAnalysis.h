@@ -7,7 +7,7 @@ class Module;
 
 namespace proteus {
 
-bool runLambdaAnalysis(llvm::Module &M, bool IsLTO);
+bool runLambdaAnalysis(llvm::Module &M);
 
 } // namespace proteus
 

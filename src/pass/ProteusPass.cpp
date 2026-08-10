@@ -676,6 +676,42 @@ private:
                                      {Builder.getInt64(Schema.Offset)});
   }
 
+  /// clang-format off
+  /// instrumentLambdaLaunchCallsites creates function calls that ultimately
+  /// populate the runtime LambdaRegistry using information from the lambda
+  /// manifests.  However, it does so indirectly in the following way: (1) Look
+  /// at every host stub in the StubToKernelMap.  If the stub's (key in map)
+  /// kernel (value in map)
+  ///     contains lambda calls (as indicated by the lambda manifests) identify
+  ///     the kernel launch site within the IR of the stub
+  /// (2) Begin building IR for a registration function for that GPU kernel.
+  /// This registration function dynamically
+  ///     loads runtime constants from the kernel blob (the void** args passed
+  ///     to the launch function). (a) Inject the
+  ///     __proteus_begin_device_lambda_launch function call, which tells the
+  ///     registry to start
+  ///         receiving constants given a kernel
+  ///     (b) For each manifest record, inject a call to
+  ///     __proteus_push_device_lambda_callsite_constant
+  ///         which uses the pointer offset (deduced from analyzeLambdaUses) and
+  ///         the runtime constant type (deduced in LambdaAnalysis) to memcpy
+  ///         the runtime constant off the kernel blob.  The value pointer
+  ///         (indexed from the void** kernel arg pointer) is deduced by
+  ///         materializeDeviceLambdaValuePtr.
+  ///     (c) Inject __proteus_finalize_device_lambda_launch to finalize
+  /// (3) Populate LambdaRegistrationHelpers with a pointer to the new
+  /// registration function. The LambdaRegistry holds
+  ///     this pointer to the registration function, keyed on the kernel
+  ///     address, and calls it during the runtime before lambda specialization
+  ///     occurs.
+  /// The late propagation of the LambdaRegistry (we populate the registration
+  /// functions first, then call them at runtime) occurs because portability
+  /// layers like RAJA/Kokkos don't directly use call host stub to launch a
+  /// kernel, and instead invoke hipLaunchKernel/cudaLaunchKernel on a
+  /// potentially opaque kernel ptr.  The approach outlined above uses the
+  /// address of the kernel ptr as the source of truth about runtime constants,
+  /// instead of relying on LLVM IR to call the host kernel stub.
+  /// clang-format on
   void instrumentLambdaLaunchCallsites(
       Module &M, const DenseMap<Value *, GlobalVariable *> &StubToKernelMap) {
     auto KernelManifest = parseLambdaManifestFile(M);
@@ -699,6 +735,8 @@ private:
       auto *LaunchCB = getStubLaunchCB(M, StubFn);
 
       auto *RegFuncTy = FunctionType::get(Types.VoidTy, {Types.PtrTy}, false);
+      // Create a new function that will be called with the kernel args at
+      // runtime to populate the LambdaRegistry
       Function *RegFunc = Function::Create(
           RegFuncTy, GlobalValue::InternalLinkage,
           "registerKernel" + demangle(KernelSym) + "LambdaConstants", M);
@@ -718,7 +756,9 @@ private:
         LambdaManifestRecord EffectiveRecord = Record;
         EffectiveRecord.StorageType = KernelArgsStorageType;
         for (const auto &Schema : SchemaIt->second) {
-          Value *ValuePtr = materializeDeviceLambdaValuePtr(
+          // Use the results of the analyzeLambdaUses to deduce the location of
+          // the closure ptr within the void** kernel args
+          Value *ClosurePtr = materializeDeviceLambdaValuePtr(
               Builder, KernelArgs, EffectiveRecord, Schema);
           Builder.CreateCall(
               getPushDeviceLambdaCallsiteConstantFn(M),
@@ -726,7 +766,7 @@ private:
                Builder.getInt32(Record.CallsiteIndex),
                Builder.getInt32(static_cast<int32_t>(Schema.Type)),
                Builder.getInt32(Schema.Pos), Builder.getInt32(Schema.Offset),
-               ValuePtr});
+               ClosurePtr});
         }
       }
       Builder.CreateCall(getFinalizeDeviceLambdaLaunchFn(M), {});
@@ -1850,7 +1890,7 @@ struct ProteusPass : PassInfoMixin<ProteusPass> {
     bool Changed = false;
     switch (InsertPt) {
     case InsertionPoint::PipelineStart:
-      Changed = runLambdaAnalysis(M, false);
+      Changed = runLambdaAnalysis(M);
       break;
     case InsertionPoint::EarlySimplification: {
       ProteusPassImpl PPI{M};
@@ -1877,13 +1917,18 @@ struct ProteusPass : PassInfoMixin<ProteusPass> {
 };
 
 // Legacy PM implementation.
+struct LegacyLambdaAnalysisPass : public ModulePass {
+  static char ID;
+  LegacyLambdaAnalysisPass() : ModulePass(ID) {}
+  bool runOnModule(Module &M) override { return runLambdaAnalysis(M); }
+};
+
 struct LegacyProteusPass : public ModulePass {
   static char ID;
   LegacyProteusPass() : ModulePass(ID) {}
   bool runOnModule(Module &M) override {
     ProteusPassImpl PPI{M};
-    bool Changed = PPI.run(M, false);
-    return Changed;
+    return PPI.run(M, false);
   }
 };
 } // namespace
@@ -1948,13 +1993,24 @@ llvmGetPassPluginInfo() {
 //-----------------------------------------------------------------------------
 // The address of this variable is used to uniquely identify the pass. The
 // actual value doesn't matter.
+char LegacyLambdaAnalysisPass::ID = 0;
 char LegacyProteusPass::ID = 0;
 
 // This is the core interface for pass plugins. It guarantees that 'opt' will
-// recognize LegacyProteusPass when added to the pass pipeline on the command
-// line, i.e.  via '--legacy-proteus-pass'
+// recognize the legacy passes when added to the pass pipeline on the command
+// line, i.e. via '--legacy-proteus-lambda-analysis --legacy-proteus-pass'.
+static RegisterPass<LegacyLambdaAnalysisPass>
+    LambdaX("legacy-proteus-lambda-analysis", "Proteus Lambda Analysis",
+            false, // This pass doesn't modify the CFG => false
+            false  // This pass is not a pure analysis pass => false
+    );
 static RegisterPass<LegacyProteusPass>
-    X("legacy-proteuss-pass", "Proteus Pass",
+    X("legacy-proteus-pass", "Proteus Pass",
       false, // This pass doesn't modify the CFG => false
       false  // This pass is not a pure analysis pass => false
+    );
+static RegisterPass<LegacyProteusPass>
+    XCompat("legacy-proteuss-pass", "Proteus Pass",
+            false, // This pass doesn't modify the CFG => false
+            false  // This pass is not a pure analysis pass => false
     );

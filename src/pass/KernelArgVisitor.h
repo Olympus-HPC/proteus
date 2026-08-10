@@ -575,6 +575,9 @@ public:
       }
     }
     KernelFunction = FirstAnalysis->KernelFunction;
+    Offset = BaseOffset;
+    KernelArg = BaseSlot;
+    ChangedRC = FirstAnalysis->ChangedRCLayout;
     AnalysisSuccess = true;
     AnalysisFailed = false;
   }
