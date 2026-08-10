@@ -96,23 +96,31 @@ var searchBox = new SearchBox("searchBox", "search/",'.html');
 </div><!-- top -->
 <div class="header">
   <div class="summary">
+<a href="#namespaces">Namespaces</a> &#124;
 <a href="#func-members">Functions</a>  </div>
   <div class="headertitle"><div class="title">ProteusPass.cpp File Reference</div></div>
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><code>#include &quot;<a class="el" href="AnnotationHandler_8h_source.html">AnnotationHandler.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="Helpers_8h_source.html">Helpers.h</a>&quot;</code><br />
+<code>#include &quot;<a class="el" href="KernelArgVisitor_8h_source.html">KernelArgVisitor.h</a>&quot;</code><br />
+<code>#include &quot;<a class="el" href="LambdaAnalysis_8h_source.html">LambdaAnalysis.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="CompilerInterfaceTypes_8h_source.html">proteus/CompilerInterfaceTypes.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="Error_8h_source.html">proteus/Error.h</a>&quot;</code><br />
+<code>#include &quot;<a class="el" href="IRFunction_8h_source.html">proteus/Frontend/IRFunction.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="Cloning_8h_source.html">proteus/impl/Cloning.h</a>&quot;</code><br />
+<code>#include &quot;<a class="el" href="CoreLLVM_8h_source.html">proteus/impl/CoreLLVM.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="Hashing_8h_source.html">proteus/impl/Hashing.h</a>&quot;</code><br />
+<code>#include &quot;<a class="el" href="LambdaCallsite_8h_source.html">proteus/impl/LambdaCallsite.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="Logger_8h_source.html">proteus/impl/Logger.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="RuntimeConstantTypeHelpers_8h_source.html">proteus/impl/RuntimeConstantTypeHelpers.h</a>&quot;</code><br />
+<code>#include &lt;llvm/ADT/DenseSet.h&gt;</code><br />
 <code>#include &lt;llvm/ADT/SmallPtrSet.h&gt;</code><br />
 <code>#include &lt;llvm/ADT/StringMap.h&gt;</code><br />
 <code>#include &lt;llvm/ADT/StringRef.h&gt;</code><br />
 <code>#include &lt;llvm/ADT/StringSet.h&gt;</code><br />
 <code>#include &lt;llvm/Analysis/CallGraph.h&gt;</code><br />
+<code>#include &lt;llvm/Analysis/ValueTracking.h&gt;</code><br />
 <code>#include &lt;llvm/Bitcode/BitcodeWriter.h&gt;</code><br />
 <code>#include &lt;llvm/Demangle/Demangle.h&gt;</code><br />
 <code>#include &lt;llvm/IR/CallingConv.h&gt;</code><br />
@@ -121,6 +129,7 @@ var searchBox = new SearchBox("searchBox", "search/",'.html');
 <code>#include &lt;llvm/IR/DataLayout.h&gt;</code><br />
 <code>#include &lt;llvm/IR/DebugInfo.h&gt;</code><br />
 <code>#include &lt;llvm/IR/DerivedTypes.h&gt;</code><br />
+<code>#include &lt;llvm/IR/Dominators.h&gt;</code><br />
 <code>#include &lt;llvm/IR/Function.h&gt;</code><br />
 <code>#include &lt;llvm/IR/GlobalValue.h&gt;</code><br />
 <code>#include &lt;llvm/IR/GlobalVariable.h&gt;</code><br />
@@ -152,34 +161,24 @@ var searchBox = new SearchBox("searchBox", "search/",'.html');
 <code>#include &lt;llvm/Transforms/IPO/StripSymbols.h&gt;</code><br />
 <code>#include &lt;llvm/Transforms/Utils/Cloning.h&gt;</code><br />
 <code>#include &lt;llvm/Transforms/Utils/ModuleUtils.h&gt;</code><br />
+<code>#include &lt;cstdio&gt;</code><br />
+<code>#include &lt;filesystem&gt;</code><br />
 <code>#include &lt;queue&gt;</code><br />
 <code>#include &lt;string&gt;</code><br />
+<code>#include &lt;sys/types.h&gt;</code><br />
+<code>#include &lt;unistd.h&gt;</code><br />
 </div><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="namespaces" name="namespaces"></a>
+Namespaces</h2></td></tr>
+<tr class="memitem:namespacehelpers" id="r_namespacehelpers"><td class="memItemLeft" align="right" valign="top">namespace &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespacehelpers.html">helpers</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:a6933ba1ba985caa0f36d1f82486c3c13" id="r_a6933ba1ba985caa0f36d1f82486c3c13"><td class="memItemLeft" align="right" valign="top">llvm::PassPluginLibraryInfo&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ProteusPass_8cpp.html#a6933ba1ba985caa0f36d1f82486c3c13">getProteusPassPluginInfo</a> ()</td></tr>
-<tr class="separator:a6933ba1ba985caa0f36d1f82486c3c13"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6a38583d4b9115cf1b28be6f952eed6f" id="r_a6a38583d4b9115cf1b28be6f952eed6f"><td class="memItemLeft" align="right" valign="top">LLVM_ATTRIBUTE_WEAK::llvm::PassPluginLibraryInfo&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ProteusPass_8cpp.html#a6a38583d4b9115cf1b28be6f952eed6f">llvmGetPassPluginInfo</a> ()</td></tr>
 <tr class="separator:a6a38583d4b9115cf1b28be6f952eed6f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Function Documentation</h2>
-<a id="a6933ba1ba985caa0f36d1f82486c3c13" name="a6933ba1ba985caa0f36d1f82486c3c13"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a6933ba1ba985caa0f36d1f82486c3c13">&#9670;&#160;</a></span>getProteusPassPluginInfo()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">llvm::PassPluginLibraryInfo getProteusPassPluginInfo </td>
-          <td>(</td>
-          <td class="paramname"></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-</div>
-</div>
 <a id="a6a38583d4b9115cf1b28be6f952eed6f" name="a6a38583d4b9115cf1b28be6f952eed6f"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a6a38583d4b9115cf1b28be6f952eed6f">&#9670;&#160;</a></span>llvmGetPassPluginInfo()</h2>
 

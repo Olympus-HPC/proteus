@@ -98,6 +98,8 @@ var searchBox = new SearchBox("searchBox", "search/",'.html');
 </div><!-- top -->
 <div class="header">
   <div class="summary">
+<a href="#nested-classes">Classes</a> &#124;
+<a href="#pub-types">Public Types</a> &#124;
 <a href="#pub-methods">Public Member Functions</a> &#124;
 <a href="#pub-static-methods">Static Public Member Functions</a> &#124;
 <a href="classproteus_1_1LambdaRegistry-members.html">List of all members</a>  </div>
@@ -107,6 +109,18 @@ var searchBox = new SearchBox("searchBox", "search/",'.html');
 
 <p><code>#include &lt;<a class="el" href="LambdaRegistry_8h_source.html">LambdaRegistry.h</a>&gt;</code></p>
 <table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="nested-classes" name="nested-classes"></a>
+Classes</h2></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1LambdaRegistry_1_1DeviceLaunchInfo.html">DeviceLaunchInfo</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-types" name="pub-types"></a>
+Public Types</h2></td></tr>
+<tr class="memitem:a84e70d3d28ed3143fc627e954eee74b2" id="r_a84e70d3d28ed3143fc627e954eee74b2"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#a84e70d3d28ed3143fc627e954eee74b2">JitVariantMap</a> = DenseMap&lt; int32_t, <a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a> &gt;</td></tr>
+<tr class="separator:a84e70d3d28ed3143fc627e954eee74b2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a676a6f0179ce8e90e4e6ba8081363e74" id="r_a676a6f0179ce8e90e4e6ba8081363e74"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#a676a6f0179ce8e90e4e6ba8081363e74">JitVariantVec</a> = SmallVector&lt; <a class="el" href="classproteus_1_1LambdaRegistry.html#a84e70d3d28ed3143fc627e954eee74b2">JitVariantMap</a>, 4 &gt;</td></tr>
+<tr class="separator:a676a6f0179ce8e90e4e6ba8081363e74"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
 <tr class="memitem:a6790512851894ccd050e7131325e447f" id="r_a6790512851894ccd050e7131325e447f"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#a6790512851894ccd050e7131325e447f">LambdaRegistry</a> (const <a class="el" href="classproteus_1_1LambdaRegistry.html">LambdaRegistry</a> &amp;)=delete</td></tr>
@@ -117,24 +131,63 @@ Public Member Functions</h2></td></tr>
 <tr class="separator:acc94a5c116ca2ce135669bb92b2e3033"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a57f803246fd6e2079e3178bdfedae503" id="r_a57f803246fd6e2079e3178bdfedae503"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classproteus_1_1LambdaRegistry.html">LambdaRegistry</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#a57f803246fd6e2079e3178bdfedae503">operator=</a> (<a class="el" href="classproteus_1_1LambdaRegistry.html">LambdaRegistry</a> &amp;&amp;)=delete</td></tr>
 <tr class="separator:a57f803246fd6e2079e3178bdfedae503"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3d6923bc8f8a4589be78f2962602fffb" id="r_a3d6923bc8f8a4589be78f2962602fffb"><td class="memItemLeft" align="right" valign="top">std::optional&lt; DenseMap&lt; StringRef, SmallVector&lt; <a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a> &gt; &gt;::iterator &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#a3d6923bc8f8a4589be78f2962602fffb">matchJitVariableMap</a> (StringRef FnName)</td></tr>
-<tr class="separator:a3d6923bc8f8a4589be78f2962602fffb"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a46a9d61f10b7f601e96ff000d3c46612" id="r_a46a9d61f10b7f601e96ff000d3c46612"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#a46a9d61f10b7f601e96ff000d3c46612">dump</a> ()</td></tr>
-<tr class="separator:a46a9d61f10b7f601e96ff000d3c46612"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1d353f9708bd45103a1cc27451f30ef4" id="r_a1d353f9708bd45103a1cc27451f30ef4"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#a1d353f9708bd45103a1cc27451f30ef4">setJitVariable</a> (const char *LambdaType, <a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a> &amp;RC)</td></tr>
-<tr class="separator:a1d353f9708bd45103a1cc27451f30ef4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a076da0ac665a6b917fcaae2f1aee2bbb" id="r_a076da0ac665a6b917fcaae2f1aee2bbb"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#a076da0ac665a6b917fcaae2f1aee2bbb">registerLambda</a> (const char *LambdaType)</td></tr>
-<tr class="separator:a076da0ac665a6b917fcaae2f1aee2bbb"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aadb7b5bb027e6b90bb93d6ed88fe0b65" id="r_aadb7b5bb027e6b90bb93d6ed88fe0b65"><td class="memItemLeft" align="right" valign="top">const SmallVector&lt; <a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a> &gt; &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#aadb7b5bb027e6b90bb93d6ed88fe0b65">getJitVariables</a> (StringRef LambdaTypeRef)</td></tr>
-<tr class="separator:aadb7b5bb027e6b90bb93d6ed88fe0b65"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af5c24e9205b68183c6245f952065340e" id="r_af5c24e9205b68183c6245f952065340e"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#af5c24e9205b68183c6245f952065340e">empty</a> ()</td></tr>
-<tr class="separator:af5c24e9205b68183c6245f952065340e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a163cb10d247fcf490ede5656c5ff417b" id="r_a163cb10d247fcf490ede5656c5ff417b"><td class="memItemLeft" align="right" valign="top">std::optional&lt; <a class="el" href="classproteus_1_1LambdaRegistry.html#a84e70d3d28ed3143fc627e954eee74b2">JitVariantMap</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#a163cb10d247fcf490ede5656c5ff417b">getHostJitVariant</a> (uint64_t FunctorID) const</td></tr>
+<tr class="separator:a163cb10d247fcf490ede5656c5ff417b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a75e447e810bc7de841a6cf5d5fd6e2d4" id="r_a75e447e810bc7de841a6cf5d5fd6e2d4"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#a75e447e810bc7de841a6cf5d5fd6e2d4">appendHostJitVariable</a> (uint64_t FunctorID, const <a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a> &amp;RC)</td></tr>
+<tr class="separator:a75e447e810bc7de841a6cf5d5fd6e2d4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a802406ad4dce87a09fb80a09468874bd" id="r_a802406ad4dce87a09fb80a09468874bd"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#a802406ad4dce87a09fb80a09468874bd">commitHostJitVariables</a> (uint64_t FunctorID)</td></tr>
+<tr class="separator:a802406ad4dce87a09fb80a09468874bd"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a904d9eea80f725daf601332fa0a6ae33" id="r_a904d9eea80f725daf601332fa0a6ae33"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#a904d9eea80f725daf601332fa0a6ae33">eraseHostJitVariables</a> (uint64_t FunctorID)</td></tr>
+<tr class="separator:a904d9eea80f725daf601332fa0a6ae33"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af7bc922277e302651fc4dcd24d09e1ca" id="r_af7bc922277e302651fc4dcd24d09e1ca"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#af7bc922277e302651fc4dcd24d09e1ca">emptyHost</a> () const</td></tr>
+<tr class="separator:af7bc922277e302651fc4dcd24d09e1ca"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1732309216ff8282b5438b75efc32798" id="r_a1732309216ff8282b5438b75efc32798"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#a1732309216ff8282b5438b75efc32798">beginDeviceLaunch</a> ()</td></tr>
+<tr class="separator:a1732309216ff8282b5438b75efc32798"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a42cf9702383bd3a9b5e95a2e630c10f3" id="r_a42cf9702383bd3a9b5e95a2e630c10f3"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#a42cf9702383bd3a9b5e95a2e630c10f3">appendDeviceCallsiteRuntimeConstant</a> (uint64_t <a class="el" href="CompilerInterfaceDevice_8cpp.html#a47cd70d25244738dc6068ed25f6272c2">LambdaID</a>, uint32_t <a class="el" href="CompilerInterfaceDevice_8cpp.html#a18204ea9e58ad72ebae0099b0789662a">CallsiteIndex</a>, const <a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a> &amp;RC)</td></tr>
+<tr class="separator:a42cf9702383bd3a9b5e95a2e630c10f3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aef82e2d0907bc56f2ed0fee0f635f3e0" id="r_aef82e2d0907bc56f2ed0fee0f635f3e0"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#aef82e2d0907bc56f2ed0fee0f635f3e0">finalizeDeviceLaunch</a> ()</td></tr>
+<tr class="separator:aef82e2d0907bc56f2ed0fee0f635f3e0"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae98226488a00bb757c8998ee654fe033" id="r_ae98226488a00bb757c8998ee654fe033"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structproteus_1_1LambdaRegistry_1_1DeviceLaunchInfo.html">DeviceLaunchInfo</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#ae98226488a00bb757c8998ee654fe033">takeDeviceLaunchInfo</a> ()</td></tr>
+<tr class="separator:ae98226488a00bb757c8998ee654fe033"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1fe1c816baf24fc5ff306fef51814894" id="r_a1fe1c816baf24fc5ff306fef51814894"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#a1fe1c816baf24fc5ff306fef51814894">populateLambdaRegistrationCodeCache</a> (void *<a class="el" href="CompilerInterfaceDevice_8cpp.html#a85044d213393723d1b4ee267cd7e1d57">Kernel</a>, void *<a class="el" href="CompilerInterfaceDevice_8cpp.html#a09e9ef949da2835999d4be8f52b7449f">RegistrationFunc</a>)</td></tr>
+<tr class="separator:a1fe1c816baf24fc5ff306fef51814894"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9dd8d9fbafbec36b45d27073e3c67d9f" id="r_a9dd8d9fbafbec36b45d27073e3c67d9f"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#a9dd8d9fbafbec36b45d27073e3c67d9f">invokeRegisterLambdaConstants</a> (void *<a class="el" href="CompilerInterfaceDevice_8cpp.html#a85044d213393723d1b4ee267cd7e1d57">Kernel</a>, void **<a class="el" href="CompilerInterfaceHost_8cpp.html#a79deec49595e60116c9539e1d7ea029c">Args</a>)</td></tr>
+<tr class="separator:a9dd8d9fbafbec36b45d27073e3c67d9f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-static-methods" name="pub-static-methods"></a>
 Static Public Member Functions</h2></td></tr>
 <tr class="memitem:ab9f192b66a437f992c63a117fe082b9a" id="r_ab9f192b66a437f992c63a117fe082b9a"><td class="memItemLeft" align="right" valign="top">static <a class="el" href="classproteus_1_1LambdaRegistry.html">LambdaRegistry</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1LambdaRegistry.html#ab9f192b66a437f992c63a117fe082b9a">instance</a> ()</td></tr>
 <tr class="separator:ab9f192b66a437f992c63a117fe082b9a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
+<h2 class="groupheader">Member Typedef Documentation</h2>
+<a id="a84e70d3d28ed3143fc627e954eee74b2" name="a84e70d3d28ed3143fc627e954eee74b2"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a84e70d3d28ed3143fc627e954eee74b2">&#9670;&#160;</a></span>JitVariantMap</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">using <a class="el" href="classproteus_1_1LambdaRegistry.html#a84e70d3d28ed3143fc627e954eee74b2">proteus::LambdaRegistry::JitVariantMap</a> =  DenseMap&lt;int32_t, <a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a>&gt;</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="a676a6f0179ce8e90e4e6ba8081363e74" name="a676a6f0179ce8e90e4e6ba8081363e74"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a676a6f0179ce8e90e4e6ba8081363e74">&#9670;&#160;</a></span>JitVariantVec</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">using <a class="el" href="classproteus_1_1LambdaRegistry.html#a676a6f0179ce8e90e4e6ba8081363e74">proteus::LambdaRegistry::JitVariantVec</a> =  SmallVector&lt;<a class="el" href="classproteus_1_1LambdaRegistry.html#a84e70d3d28ed3143fc627e954eee74b2">JitVariantMap</a>, 4&gt;</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
 <h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
 <a id="a6790512851894ccd050e7131325e447f" name="a6790512851894ccd050e7131325e447f"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a6790512851894ccd050e7131325e447f">&#9670;&#160;</a></span>LambdaRegistry() <span class="overload">[1/2]</span></h2>
@@ -189,8 +242,8 @@ Static Public Member Functions</h2></td></tr>
 </div>
 </div>
 <h2 class="groupheader">Member Function Documentation</h2>
-<a id="a46a9d61f10b7f601e96ff000d3c46612" name="a46a9d61f10b7f601e96ff000d3c46612"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a46a9d61f10b7f601e96ff000d3c46612">&#9670;&#160;</a></span>dump()</h2>
+<a id="a42cf9702383bd3a9b5e95a2e630c10f3" name="a42cf9702383bd3a9b5e95a2e630c10f3"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a42cf9702383bd3a9b5e95a2e630c10f3">&#9670;&#160;</a></span>appendDeviceCallsiteRuntimeConstant()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -199,7 +252,85 @@ Static Public Member Functions</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">void proteus::LambdaRegistry::dump </td>
+          <td class="memname">void proteus::LambdaRegistry::appendDeviceCallsiteRuntimeConstant </td>
+          <td>(</td>
+          <td class="paramtype">uint64_t&#160;</td>
+          <td class="paramname"><em>LambdaID</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint32_t&#160;</td>
+          <td class="paramname"><em>CallsiteIndex</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a> &amp;&#160;</td>
+          <td class="paramname"><em>RC</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="a75e447e810bc7de841a6cf5d5fd6e2d4" name="a75e447e810bc7de841a6cf5d5fd6e2d4"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a75e447e810bc7de841a6cf5d5fd6e2d4">&#9670;&#160;</a></span>appendHostJitVariable()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void proteus::LambdaRegistry::appendHostJitVariable </td>
+          <td>(</td>
+          <td class="paramtype">uint64_t&#160;</td>
+          <td class="paramname"><em>FunctorID</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a> &amp;&#160;</td>
+          <td class="paramname"><em>RC</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="a1732309216ff8282b5438b75efc32798" name="a1732309216ff8282b5438b75efc32798"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1732309216ff8282b5438b75efc32798">&#9670;&#160;</a></span>beginDeviceLaunch()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void proteus::LambdaRegistry::beginDeviceLaunch </td>
           <td>(</td>
           <td class="paramname"></td><td>)</td>
           <td></td>
@@ -214,8 +345,8 @@ Static Public Member Functions</h2></td></tr>
 
 </div>
 </div>
-<a id="af5c24e9205b68183c6245f952065340e" name="af5c24e9205b68183c6245f952065340e"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#af5c24e9205b68183c6245f952065340e">&#9670;&#160;</a></span>empty()</h2>
+<a id="a802406ad4dce87a09fb80a09468874bd" name="a802406ad4dce87a09fb80a09468874bd"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a802406ad4dce87a09fb80a09468874bd">&#9670;&#160;</a></span>commitHostJitVariables()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -224,7 +355,84 @@ Static Public Member Functions</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">bool proteus::LambdaRegistry::empty </td>
+          <td class="memname">void proteus::LambdaRegistry::commitHostJitVariables </td>
+          <td>(</td>
+          <td class="paramtype">uint64_t&#160;</td>
+          <td class="paramname"><em>FunctorID</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="af7bc922277e302651fc4dcd24d09e1ca" name="af7bc922277e302651fc4dcd24d09e1ca"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af7bc922277e302651fc4dcd24d09e1ca">&#9670;&#160;</a></span>emptyHost()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool proteus::LambdaRegistry::emptyHost </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="a904d9eea80f725daf601332fa0a6ae33" name="a904d9eea80f725daf601332fa0a6ae33"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a904d9eea80f725daf601332fa0a6ae33">&#9670;&#160;</a></span>eraseHostJitVariables()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void proteus::LambdaRegistry::eraseHostJitVariables </td>
+          <td>(</td>
+          <td class="paramtype">uint64_t&#160;</td>
+          <td class="paramname"><em>FunctorID</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="aef82e2d0907bc56f2ed0fee0f635f3e0" name="aef82e2d0907bc56f2ed0fee0f635f3e0"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aef82e2d0907bc56f2ed0fee0f635f3e0">&#9670;&#160;</a></span>finalizeDeviceLaunch()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void proteus::LambdaRegistry::finalizeDeviceLaunch </td>
           <td>(</td>
           <td class="paramname"></td><td>)</td>
           <td></td>
@@ -239,8 +447,8 @@ Static Public Member Functions</h2></td></tr>
 
 </div>
 </div>
-<a id="aadb7b5bb027e6b90bb93d6ed88fe0b65" name="aadb7b5bb027e6b90bb93d6ed88fe0b65"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aadb7b5bb027e6b90bb93d6ed88fe0b65">&#9670;&#160;</a></span>getJitVariables()</h2>
+<a id="a163cb10d247fcf490ede5656c5ff417b" name="a163cb10d247fcf490ede5656c5ff417b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a163cb10d247fcf490ede5656c5ff417b">&#9670;&#160;</a></span>getHostJitVariant()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -249,11 +457,11 @@ Static Public Member Functions</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">const SmallVector&lt; <a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a> &gt; &amp; proteus::LambdaRegistry::getJitVariables </td>
+          <td class="memname">std::optional&lt; <a class="el" href="classproteus_1_1LambdaRegistry.html#a84e70d3d28ed3143fc627e954eee74b2">JitVariantMap</a> &gt; proteus::LambdaRegistry::getHostJitVariant </td>
           <td>(</td>
-          <td class="paramtype">StringRef&#160;</td>
-          <td class="paramname"><em>LambdaTypeRef</em></td><td>)</td>
-          <td></td>
+          <td class="paramtype">uint64_t&#160;</td>
+          <td class="paramname"><em>FunctorID</em></td><td>)</td>
+          <td> const</td>
         </tr>
       </table>
   </td>
@@ -290,8 +498,8 @@ Static Public Member Functions</h2></td></tr>
 
 </div>
 </div>
-<a id="a3d6923bc8f8a4589be78f2962602fffb" name="a3d6923bc8f8a4589be78f2962602fffb"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a3d6923bc8f8a4589be78f2962602fffb">&#9670;&#160;</a></span>matchJitVariableMap()</h2>
+<a id="a9dd8d9fbafbec36b45d27073e3c67d9f" name="a9dd8d9fbafbec36b45d27073e3c67d9f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9dd8d9fbafbec36b45d27073e3c67d9f">&#9670;&#160;</a></span>invokeRegisterLambdaConstants()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -300,11 +508,21 @@ Static Public Member Functions</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">std::optional&lt; DenseMap&lt; StringRef, SmallVector&lt; <a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a> &gt; &gt;::iterator &gt; proteus::LambdaRegistry::matchJitVariableMap </td>
+          <td class="memname">void proteus::LambdaRegistry::invokeRegisterLambdaConstants </td>
           <td>(</td>
-          <td class="paramtype">StringRef&#160;</td>
-          <td class="paramname"><em>FnName</em></td><td>)</td>
+          <td class="paramtype">void *&#160;</td>
+          <td class="paramname"><em>Kernel</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
           <td></td>
+          <td class="paramtype">void **&#160;</td>
+          <td class="paramname"><em>Args</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
         </tr>
       </table>
   </td>
@@ -368,8 +586,8 @@ Static Public Member Functions</h2></td></tr>
 
 </div>
 </div>
-<a id="a076da0ac665a6b917fcaae2f1aee2bbb" name="a076da0ac665a6b917fcaae2f1aee2bbb"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a076da0ac665a6b917fcaae2f1aee2bbb">&#9670;&#160;</a></span>registerLambda()</h2>
+<a id="a1fe1c816baf24fc5ff306fef51814894" name="a1fe1c816baf24fc5ff306fef51814894"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1fe1c816baf24fc5ff306fef51814894">&#9670;&#160;</a></span>populateLambdaRegistrationCodeCache()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -378,11 +596,21 @@ Static Public Member Functions</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">void proteus::LambdaRegistry::registerLambda </td>
+          <td class="memname">void proteus::LambdaRegistry::populateLambdaRegistrationCodeCache </td>
           <td>(</td>
-          <td class="paramtype">const char *&#160;</td>
-          <td class="paramname"><em>LambdaType</em></td><td>)</td>
+          <td class="paramtype">void *&#160;</td>
+          <td class="paramname"><em>Kernel</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
           <td></td>
+          <td class="paramtype">void *&#160;</td>
+          <td class="paramname"><em>RegistrationFunc</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
         </tr>
       </table>
   </td>
@@ -394,8 +622,8 @@ Static Public Member Functions</h2></td></tr>
 
 </div>
 </div>
-<a id="a1d353f9708bd45103a1cc27451f30ef4" name="a1d353f9708bd45103a1cc27451f30ef4"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a1d353f9708bd45103a1cc27451f30ef4">&#9670;&#160;</a></span>setJitVariable()</h2>
+<a id="ae98226488a00bb757c8998ee654fe033" name="ae98226488a00bb757c8998ee654fe033"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae98226488a00bb757c8998ee654fe033">&#9670;&#160;</a></span>takeDeviceLaunchInfo()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -404,21 +632,10 @@ Static Public Member Functions</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">void proteus::LambdaRegistry::setJitVariable </td>
+          <td class="memname"><a class="el" href="structproteus_1_1LambdaRegistry_1_1DeviceLaunchInfo.html">DeviceLaunchInfo</a> proteus::LambdaRegistry::takeDeviceLaunchInfo </td>
           <td>(</td>
-          <td class="paramtype">const char *&#160;</td>
-          <td class="paramname"><em>LambdaType</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
+          <td class="paramname"></td><td>)</td>
           <td></td>
-          <td class="paramtype"><a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a> &amp;&#160;</td>
-          <td class="paramname"><em>RC</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
         </tr>
       </table>
   </td>

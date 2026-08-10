@@ -136,8 +136,8 @@ Public Member Functions</h2></td></tr>
 <tr class="separator:a8084556a7cc6da0433f580f7f272700d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a28d48e8cefc3af5f342a6aff3ffc0474" id="r_a28d48e8cefc3af5f342a6aff3ffc0474"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineHost.html#a28d48e8cefc3af5f342a6aff3ffc0474">specializeIR</a> (Module &amp;M, StringRef FnName, StringRef Suffix, ArrayRef&lt; <a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a> &gt; RCArray)</td></tr>
 <tr class="separator:a28d48e8cefc3af5f342a6aff3ffc0474"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae06264c3396d74eea2496974153ed620" id="r_ae06264c3396d74eea2496974153ed620"><td class="memItemLeft" align="right" valign="top">void *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineHost.html#ae06264c3396d74eea2496974153ed620">compileAndLink</a> (StringRef FnName, char *<a class="el" href="CompilerInterfaceHost_8cpp.html#a6cae0f6a75928b59f85f67f1089dba63">IR</a>, int <a class="el" href="CompilerInterfaceHost_8cpp.html#af65e6606290845b468eb03c50980ee74">IRSize</a>, void **<a class="el" href="CompilerInterfaceHost_8cpp.html#a79deec49595e60116c9539e1d7ea029c">Args</a>, ArrayRef&lt; <a class="el" href="structproteus_1_1RuntimeConstantInfo.html">RuntimeConstantInfo</a> * &gt; <a class="el" href="CompilerInterfaceHost_8cpp.html#affef93b0b8904b118d76664511e21c0f">RCInfoArray</a>)</td></tr>
-<tr class="separator:ae06264c3396d74eea2496974153ed620"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af093b6ef2f8861eeddd397f2dd54128a" id="r_af093b6ef2f8861eeddd397f2dd54128a"><td class="memItemLeft" align="right" valign="top">void *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineHost.html#af093b6ef2f8861eeddd397f2dd54128a">compileAndLink</a> (StringRef FnName, char *<a class="el" href="CompilerInterfaceHost_8cpp.html#a6cae0f6a75928b59f85f67f1089dba63">IR</a>, int <a class="el" href="CompilerInterfaceHost_8cpp.html#af65e6606290845b468eb03c50980ee74">IRSize</a>, void **<a class="el" href="CompilerInterfaceHost_8cpp.html#a79deec49595e60116c9539e1d7ea029c">Args</a>, ArrayRef&lt; <a class="el" href="structproteus_1_1RuntimeConstantInfo.html">RuntimeConstantInfo</a> * &gt; RCInfoArray, uint64_t *FunctorIDPtr)</td></tr>
+<tr class="separator:af093b6ef2f8861eeddd397f2dd54128a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a750ec72f6371ec02ac47ff25b055d3bb" id="r_a750ec72f6371ec02ac47ff25b055d3bb"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; MemoryBuffer &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineHost.html#a750ec72f6371ec02ac47ff25b055d3bb">compileOnly</a> (Module &amp;M, bool DisableIROpt=false)</td></tr>
 <tr class="separator:a750ec72f6371ec02ac47ff25b055d3bb"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a8226be298aeea1768d4257d44fd45cc2" id="r_a8226be298aeea1768d4257d44fd45cc2"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineHost.html#a8226be298aeea1768d4257d44fd45cc2">loadCompiledLibrary</a> (<a class="el" href="structproteus_1_1CompiledLibrary.html">CompiledLibrary</a> &amp;Library)</td></tr>
@@ -174,7 +174,7 @@ Public Attributes</h2></td></tr>
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="inherited" name="inherited"></a>
 Additional Inherited Members</h2></td></tr>
 <tr class="inherit_header pro_methods_classproteus_1_1JitEngine"><td colspan="2" onclick="javascript:toggleInherit('pro_methods_classproteus_1_1JitEngine')"><img src="closed.png" alt="-"/>&#160;Protected Member Functions inherited from <a class="el" href="classproteus_1_1JitEngine.html">proteus::JitEngine</a></td></tr>
-<tr class="memitem:a6aa61854e18dd9f06a0a71e9470faf84 inherit pro_methods_classproteus_1_1JitEngine" id="r_a6aa61854e18dd9f06a0a71e9470faf84"><td class="memItemLeft" align="right" valign="top">SmallVector&lt; <a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngine.html#a6aa61854e18dd9f06a0a71e9470faf84">getRuntimeConstantValues</a> (void **KernelArgs, ArrayRef&lt; <a class="el" href="structproteus_1_1RuntimeConstantInfo.html">RuntimeConstantInfo</a> * &gt; <a class="el" href="CompilerInterfaceHost_8cpp.html#affef93b0b8904b118d76664511e21c0f">RCInfoArray</a>)</td></tr>
+<tr class="memitem:a6aa61854e18dd9f06a0a71e9470faf84 inherit pro_methods_classproteus_1_1JitEngine" id="r_a6aa61854e18dd9f06a0a71e9470faf84"><td class="memItemLeft" align="right" valign="top">SmallVector&lt; <a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngine.html#a6aa61854e18dd9f06a0a71e9470faf84">getRuntimeConstantValues</a> (void **KernelArgs, ArrayRef&lt; <a class="el" href="structproteus_1_1RuntimeConstantInfo.html">RuntimeConstantInfo</a> * &gt; RCInfoArray)</td></tr>
 <tr class="separator:a6aa61854e18dd9f06a0a71e9470faf84 inherit pro_methods_classproteus_1_1JitEngine"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a099660d97f27dcf3c05f82f069dcb90a inherit pro_methods_classproteus_1_1JitEngine" id="r_a099660d97f27dcf3c05f82f069dcb90a"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngine.html#a099660d97f27dcf3c05f82f069dcb90a">JitEngine</a> ()</td></tr>
 <tr class="separator:a099660d97f27dcf3c05f82f069dcb90a inherit pro_methods_classproteus_1_1JitEngine"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -198,8 +198,8 @@ Additional Inherited Members</h2></td></tr>
 </div>
 </div>
 <h2 class="groupheader">Member Function Documentation</h2>
-<a id="ae06264c3396d74eea2496974153ed620" name="ae06264c3396d74eea2496974153ed620"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ae06264c3396d74eea2496974153ed620">&#9670;&#160;</a></span>compileAndLink()</h2>
+<a id="af093b6ef2f8861eeddd397f2dd54128a" name="af093b6ef2f8861eeddd397f2dd54128a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af093b6ef2f8861eeddd397f2dd54128a">&#9670;&#160;</a></span>compileAndLink()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -232,7 +232,13 @@ Additional Inherited Members</h2></td></tr>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">ArrayRef&lt; <a class="el" href="structproteus_1_1RuntimeConstantInfo.html">RuntimeConstantInfo</a> * &gt;&#160;</td>
-          <td class="paramname"><em>RCInfoArray</em>&#160;</td>
+          <td class="paramname"><em>RCInfoArray</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint64_t *&#160;</td>
+          <td class="paramname"><em>FunctorIDPtr</em>&#160;</td>
         </tr>
         <tr>
           <td></td>

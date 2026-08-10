@@ -1,4 +1,6 @@
 var searchData=
 [
-  ['valuetype_0',['valuetype',['../structproteus_1_1Var_3_01T_00_01std_1_1enable__if__t_3_01is__scalar__arithmetic__v_3_01T_01_4_01_4_01_4.html#af6d7fc2c7e72715eba95741074d29e5a',1,'proteus::Var&lt; T, std::enable_if_t&lt; is_scalar_arithmetic_v&lt; T &gt; &gt; &gt;::ValueType'],['../structproteus_1_1Var_3_01T_00_01std_1_1enable__if__t_3_01std_1_1is__array__v_3_01T_01_4_01_4_01_4.html#a46941d90e600d027990847d28889d4fb',1,'proteus::Var&lt; T, std::enable_if_t&lt; std::is_array_v&lt; T &gt; &gt; &gt;::ValueType'],['../structproteus_1_1Var_3_01T_00_01std_1_1enable__if__t_3_01is__pointer__unref__v_3_01T_01_4_01_4_01_4.html#a140e92b1990c27ac28ccbcd02cf7f00d',1,'proteus::Var&lt; T, std::enable_if_t&lt; is_pointer_unref_v&lt; T &gt; &gt; &gt;::ValueType']]]
+  ['remove_5fcvref_5ft_0',['remove_cvref_t',['../namespaceproteus.html#a007b7a1373a2a9bdae1cbb02d8931042',1,'proteus']]],
+  ['rett_1',['RetT',['../structproteus_1_1FnSig_3_01RetT___07ArgT_8_8_8_08_4.html#aaa17e26a7cfecc2fe86430f1145f1572',1,'proteus::FnSig&lt; RetT_(ArgT...)&gt;']]],
+  ['return_5ftype_2',['return_type',['../structproteus_1_1sig__traits_3_01R_07Args_8_8_8_08_4.html#a0431730f8631a1205cbc06488160ad27',1,'proteus::sig_traits&lt; R(Args...)&gt;']]]
 ];

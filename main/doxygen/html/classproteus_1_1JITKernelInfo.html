@@ -144,8 +144,16 @@ Public Member Functions</h2></td></tr>
 <tr class="separator:ad75cad075eb02ce92671b4c0f5386b60"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad08fa58a86bdb83f2fd51c2b7577730a" id="r_ad08fa58a86bdb83f2fd51c2b7577730a"><td class="memItemLeft" align="right" valign="top">const auto &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JITKernelInfo.html#ad08fa58a86bdb83f2fd51c2b7577730a">getLambdaCalleeInfo</a> ()</td></tr>
 <tr class="separator:ad08fa58a86bdb83f2fd51c2b7577730a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac92b74694b7f0cdcc883a61c024b5acb" id="r_ac92b74694b7f0cdcc883a61c024b5acb"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JITKernelInfo.html#ac92b74694b7f0cdcc883a61c024b5acb">setLambdaCalleeInfo</a> (SmallVector&lt; std::pair&lt; std::string, StringRef &gt; &gt; &amp;&amp;LambdaInfo)</td></tr>
-<tr class="separator:ac92b74694b7f0cdcc883a61c024b5acb"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa8549e6da001c66387107a20381a9f03" id="r_aa8549e6da001c66387107a20381a9f03"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JITKernelInfo.html#aa8549e6da001c66387107a20381a9f03">setLambdaCalleeInfo</a> (SmallVector&lt; uint64_t &gt; &amp;&amp;LambdaInfo)</td></tr>
+<tr class="separator:aa8549e6da001c66387107a20381a9f03"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2c50aaec27219c19086c7efb56232c0e" id="r_a2c50aaec27219c19086c7efb56232c0e"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JITKernelInfo.html#a2c50aaec27219c19086c7efb56232c0e">hasLambdaCallsiteLocationInfo</a> () const</td></tr>
+<tr class="separator:a2c50aaec27219c19086c7efb56232c0e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aeb8b9edc02a0d2740622d98ccfde3a13" id="r_aeb8b9edc02a0d2740622d98ccfde3a13"><td class="memItemLeft" align="right" valign="top">const auto &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JITKernelInfo.html#aeb8b9edc02a0d2740622d98ccfde3a13">getLambdaCallsiteLocationInfo</a> () const</td></tr>
+<tr class="separator:aeb8b9edc02a0d2740622d98ccfde3a13"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a504dd46a1c70b502ea4f0d6122d87a80" id="r_a504dd46a1c70b502ea4f0d6122d87a80"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JITKernelInfo.html#a504dd46a1c70b502ea4f0d6122d87a80">setLambdaCallsiteLocationInfo</a> (<a class="el" href="namespaceproteus.html#a0b64e1c19189735e97f71c2adbf01096">LambdaCallsiteLocationMap</a> &amp;&amp;Info)</td></tr>
+<tr class="separator:a504dd46a1c70b502ea4f0d6122d87a80"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a591f81cedeaa8e3eb7bdeee4bd369149" id="r_a591f81cedeaa8e3eb7bdeee4bd369149"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JITKernelInfo.html#a591f81cedeaa8e3eb7bdeee4bd369149">addLambdaCallsiteLocation</a> (uint64_t <a class="el" href="CompilerInterfaceDevice_8cpp.html#a47cd70d25244738dc6068ed25f6272c2">LambdaID</a>, uint32_t <a class="el" href="CompilerInterfaceDevice_8cpp.html#a18204ea9e58ad72ebae0099b0789662a">CallsiteIndex</a>, <a class="el" href="structproteus_1_1LambdaKernelArgLocation.html">LambdaKernelArgLocation</a> Location)</td></tr>
+<tr class="separator:a591f81cedeaa8e3eb7bdeee4bd369149"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
 <a id="a62da589990ef51ec6dd2432ebb96d3d3" name="a62da589990ef51ec6dd2432ebb96d3d3"></a>
@@ -222,6 +230,48 @@ Public Member Functions</h2></td></tr>
 </div>
 </div>
 <h2 class="groupheader">Member Function Documentation</h2>
+<a id="a591f81cedeaa8e3eb7bdeee4bd369149" name="a591f81cedeaa8e3eb7bdeee4bd369149"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a591f81cedeaa8e3eb7bdeee4bd369149">&#9670;&#160;</a></span>addLambdaCallsiteLocation()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void proteus::JITKernelInfo::addLambdaCallsiteLocation </td>
+          <td>(</td>
+          <td class="paramtype">uint64_t&#160;</td>
+          <td class="paramname"><em>LambdaID</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint32_t&#160;</td>
+          <td class="paramname"><em>CallsiteIndex</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="structproteus_1_1LambdaKernelArgLocation.html">LambdaKernelArgLocation</a>&#160;</td>
+          <td class="paramname"><em>Location</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
 <a id="a422d4241e3afbe46a66f915f912d494a" name="a422d4241e3afbe46a66f915f912d494a"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a422d4241e3afbe46a66f915f912d494a">&#9670;&#160;</a></span>createStaticHash()</h2>
 
@@ -337,6 +387,31 @@ Public Member Functions</h2></td></tr>
           <td>(</td>
           <td class="paramname"></td><td>)</td>
           <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="aeb8b9edc02a0d2740622d98ccfde3a13" name="aeb8b9edc02a0d2740622d98ccfde3a13"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aeb8b9edc02a0d2740622d98ccfde3a13">&#9670;&#160;</a></span>getLambdaCallsiteLocationInfo()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">const auto &amp; proteus::JITKernelInfo::getLambdaCallsiteLocationInfo </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
         </tr>
       </table>
   </td>
@@ -523,6 +598,31 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
+<a id="a2c50aaec27219c19086c7efb56232c0e" name="a2c50aaec27219c19086c7efb56232c0e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a2c50aaec27219c19086c7efb56232c0e">&#9670;&#160;</a></span>hasLambdaCallsiteLocationInfo()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool proteus::JITKernelInfo::hasLambdaCallsiteLocationInfo </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
 <a id="a8d3f99ff6f645bf2befae0ba1b28e9e5" name="a8d3f99ff6f645bf2befae0ba1b28e9e5"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a8d3f99ff6f645bf2befae0ba1b28e9e5">&#9670;&#160;</a></span>hasModule()</h2>
 
@@ -599,8 +699,8 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
-<a id="ac92b74694b7f0cdcc883a61c024b5acb" name="ac92b74694b7f0cdcc883a61c024b5acb"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ac92b74694b7f0cdcc883a61c024b5acb">&#9670;&#160;</a></span>setLambdaCalleeInfo()</h2>
+<a id="aa8549e6da001c66387107a20381a9f03" name="aa8549e6da001c66387107a20381a9f03"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa8549e6da001c66387107a20381a9f03">&#9670;&#160;</a></span>setLambdaCalleeInfo()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -611,8 +711,34 @@ Public Member Functions</h2></td></tr>
         <tr>
           <td class="memname">void proteus::JITKernelInfo::setLambdaCalleeInfo </td>
           <td>(</td>
-          <td class="paramtype">SmallVector&lt; std::pair&lt; std::string, StringRef &gt; &gt; &amp;&amp;&#160;</td>
+          <td class="paramtype">SmallVector&lt; uint64_t &gt; &amp;&amp;&#160;</td>
           <td class="paramname"><em>LambdaInfo</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="a504dd46a1c70b502ea4f0d6122d87a80" name="a504dd46a1c70b502ea4f0d6122d87a80"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a504dd46a1c70b502ea4f0d6122d87a80">&#9670;&#160;</a></span>setLambdaCallsiteLocationInfo()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void proteus::JITKernelInfo::setLambdaCallsiteLocationInfo </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="namespaceproteus.html#a0b64e1c19189735e97f71c2adbf01096">LambdaCallsiteLocationMap</a> &amp;&amp;&#160;</td>
+          <td class="paramname"><em>Info</em></td><td>)</td>
           <td></td>
         </tr>
       </table>

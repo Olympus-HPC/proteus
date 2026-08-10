@@ -96,11 +96,21 @@ var searchBox = new SearchBox("searchBox", "search/",'.html');
 </div><!-- top -->
 <div class="header">
   <div class="summary">
+<a href="#nested-classes">Classes</a> &#124;
 <a href="#func-members">Functions</a>  </div>
   <div class="headertitle"><div class="title">proteus::detail Namespace Reference</div></div>
 </div><!--header-->
 <div class="contents">
 <table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="nested-classes" name="nested-classes"></a>
+Classes</h2></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1detail_1_1is__lambda__functor__wrapper.html">is_lambda_functor_wrapper</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1detail_1_1is__lambda__functor__wrapper_3_01LambdaFunctorWrapper_3_01FunctorID_00_01Lambda_01_4_01_4.html">is_lambda_functor_wrapper&lt; LambdaFunctorWrapper&lt; FunctorID, Lambda &gt; &gt;</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1detail_1_1LambdaFunctorWrapper.html">LambdaFunctorWrapper</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:a644d2b3017a421c39ff67ff227886426" id="r_a644d2b3017a421c39ff67ff227886426"><td class="memItemLeft" align="right" valign="top">Expected&lt; std::unique_ptr&lt; TargetMachine &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus_1_1detail.html#a644d2b3017a421c39ff67ff227886426">createTargetMachine</a> (Module &amp;M, StringRef Arch, unsigned OptLevel=3)</td></tr>
@@ -150,8 +160,44 @@ Functions</h2></td></tr>
 <tr class="memitem:a5dc7d6f89313358cee2abf06f3d64e05" id="r_a5dc7d6f89313358cee2abf06f3d64e05"><td class="memTemplParams" colspan="2">template&lt;typename FromT , typename ToT &gt; </td></tr>
 <tr class="memitem:a5dc7d6f89313358cee2abf06f3d64e05"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="classproteus_1_1IRValue.html">IRValue</a> *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceproteus_1_1detail.html#a5dc7d6f89313358cee2abf06f3d64e05">convert</a> (<a class="el" href="classproteus_1_1CodeBuilder.html">CodeBuilder</a> &amp;CB, <a class="el" href="classproteus_1_1IRValue.html">IRValue</a> *V)</td></tr>
 <tr class="separator:a5dc7d6f89313358cee2abf06f3d64e05"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4536b03b95f3fee752c4dce1b6f151dd" id="r_a4536b03b95f3fee752c4dce1b6f151dd"><td class="memItemLeft" align="right" valign="top">constexpr std::uint64_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus_1_1detail.html#a4536b03b95f3fee752c4dce1b6f151dd">fnv1a64</a> (const char *s)</td></tr>
+<tr class="separator:a4536b03b95f3fee752c4dce1b6f151dd"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac378e4fc85e7685f97268783f949e2d1" id="r_ac378e4fc85e7685f97268783f949e2d1"><td class="memTemplParams" colspan="2">template&lt;class Lambda &gt; </td></tr>
+<tr class="memitem:ac378e4fc85e7685f97268783f949e2d1"><td class="memTemplItemLeft" align="right" valign="top">constexpr std::uint64_t&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceproteus_1_1detail.html#ac378e4fc85e7685f97268783f949e2d1">functor_id</a> ()</td></tr>
+<tr class="separator:ac378e4fc85e7685f97268783f949e2d1"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a12ffa8f60b67ed9fd0d503df51ef7cf8" id="r_a12ffa8f60b67ed9fd0d503df51ef7cf8"><td class="memTemplParams" colspan="2">template&lt;std::uint64_t FunctorId, typename L &gt; </td></tr>
+<tr class="memitem:a12ffa8f60b67ed9fd0d503df51ef7cf8"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="JitInterface_8h.html#a5c8920f2e9c64e8a13879252c4bdbc65">PROTEUS_HOST_DEVICE</a> auto&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceproteus_1_1detail.html#a12ffa8f60b67ed9fd0d503df51ef7cf8">tag_functor</a> (L &amp;&amp;lambda)</td></tr>
+<tr class="separator:a12ffa8f60b67ed9fd0d503df51ef7cf8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4066494d5a077310c46b963fb540fbec" id="r_a4066494d5a077310c46b963fb540fbec"><td class="memItemLeft" align="right" valign="top">static ID auto&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus_1_1detail.html#a4066494d5a077310c46b963fb540fbec">__register_lambda_impl</a> (T &amp;&amp;t) noexcept</td></tr>
+<tr class="separator:a4066494d5a077310c46b963fb540fbec"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Function Documentation</h2>
+<a id="a4066494d5a077310c46b963fb540fbec" name="a4066494d5a077310c46b963fb540fbec"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4066494d5a077310c46b963fb540fbec">&#9670;&#160;</a></span>__register_lambda_impl()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">static ID auto proteus::detail::__register_lambda_impl </td>
+          <td>(</td>
+          <td class="paramtype">T &amp;&amp;&#160;</td>
+          <td class="paramname"><em>t</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">noexcept</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
 <a id="acdbefbfbedd09228461b8ddb8ebb00b6" name="acdbefbfbedd09228461b8ddb8ebb00b6"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#acdbefbfbedd09228461b8ddb8ebb00b6">&#9670;&#160;</a></span>blockDimXFnName()</h2>
 
@@ -488,6 +534,59 @@ template&lt;typename FromT , typename ToT &gt; </div>
 
 </div>
 </div>
+<a id="a4536b03b95f3fee752c4dce1b6f151dd" name="a4536b03b95f3fee752c4dce1b6f151dd"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4536b03b95f3fee752c4dce1b6f151dd">&#9670;&#160;</a></span>fnv1a64()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">constexpr std::uint64_t proteus::detail::fnv1a64 </td>
+          <td>(</td>
+          <td class="paramtype">const char *&#160;</td>
+          <td class="paramname"><em>s</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">constexpr</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="ac378e4fc85e7685f97268783f949e2d1" name="ac378e4fc85e7685f97268783f949e2d1"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac378e4fc85e7685f97268783f949e2d1">&#9670;&#160;</a></span>functor_id()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;class Lambda &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">constexpr std::uint64_t proteus::detail::functor_id </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">constexpr</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
 <a id="acc922ea649eaaccdbd36ab0bcd080fc4" name="acc922ea649eaaccdbd36ab0bcd080fc4"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#acc922ea649eaaccdbd36ab0bcd080fc4">&#9670;&#160;</a></span>getDefaultOptimizationPipeline()</h2>
 
@@ -764,6 +863,34 @@ template&lt;typename FromT , typename ToT &gt; </div>
           <td></td>
           <td>)</td>
           <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="a12ffa8f60b67ed9fd0d503df51ef7cf8" name="a12ffa8f60b67ed9fd0d503df51ef7cf8"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a12ffa8f60b67ed9fd0d503df51ef7cf8">&#9670;&#160;</a></span>tag_functor()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;std::uint64_t FunctorId, typename L &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="JitInterface_8h.html#a5c8920f2e9c64e8a13879252c4bdbc65">PROTEUS_HOST_DEVICE</a> auto proteus::detail::tag_functor </td>
+          <td>(</td>
+          <td class="paramtype">L &amp;&amp;&#160;</td>
+          <td class="paramname"><em>lambda</em></td><td>)</td>
+          <td></td>
         </tr>
       </table>
   </td>

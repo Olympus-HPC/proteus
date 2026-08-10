@@ -124,14 +124,14 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00018" name="l00018"></a><span class="lineno">   18</span>        <span class="keyword">static_cast&lt;</span>typename JitDeviceImplT::DeviceStream_t<span class="keyword">&gt;</span>(Stream));</div>
 <div class="line"><a id="l00019" name="l00019"></a><span class="lineno">   19</span>  }</div>
 <div class="line"><a id="l00020" name="l00020"></a><span class="lineno">   20</span> </div>
-<div class="line"><a id="l00021" name="l00021"></a><span class="lineno">   21</span>  <span class="keyword">auto</span> &amp;<a class="code hl_variable" href="CompilerInterfaceHost_8cpp.html#a7b0939b3daa7f173ed5ec0ee1e413716">Jit</a> = JitDeviceImplT::instance();</div>
-<div class="line"><a id="l00022" name="l00022"></a><span class="lineno">   22</span>  <span class="keywordflow">if</span> (<a class="code hl_variable" href="CompilerInterfaceHost_8cpp.html#a7b0939b3daa7f173ed5ec0ee1e413716">Jit</a>.isProteusDisabled()) {</div>
+<div class="line"><a id="l00021" name="l00021"></a><span class="lineno">   21</span>  <span class="keyword">auto</span> &amp;Jit = JitDeviceImplT::instance();</div>
+<div class="line"><a id="l00022" name="l00022"></a><span class="lineno">   22</span>  <span class="keywordflow">if</span> (Jit.isProteusDisabled()) {</div>
 <div class="line"><a id="l00023" name="l00023"></a><span class="lineno">   23</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="namespaceproteus.html#a684a52e17b7442bacba0084e229bd695">proteus::launchKernelDirect</a>(</div>
 <div class="line"><a id="l00024" name="l00024"></a><span class="lineno">   24</span>        <a class="code hl_variable" href="CompilerInterfaceDevice_8cpp.html#a85044d213393723d1b4ee267cd7e1d57">Kernel</a>, GridDim, BlockDim, KernelArgs, ShmemSize,</div>
 <div class="line"><a id="l00025" name="l00025"></a><span class="lineno">   25</span>        <span class="keyword">static_cast&lt;</span>typename JitDeviceImplT::DeviceStream_t<span class="keyword">&gt;</span>(Stream));</div>
 <div class="line"><a id="l00026" name="l00026"></a><span class="lineno">   26</span>  }</div>
 <div class="line"><a id="l00027" name="l00027"></a><span class="lineno">   27</span> </div>
-<div class="line"><a id="l00028" name="l00028"></a><span class="lineno">   28</span>  <span class="keyword">auto</span> OptionalKernelInfo = <a class="code hl_variable" href="CompilerInterfaceHost_8cpp.html#a7b0939b3daa7f173ed5ec0ee1e413716">Jit</a>.getJITKernelInfo(<a class="code hl_variable" href="CompilerInterfaceDevice_8cpp.html#a85044d213393723d1b4ee267cd7e1d57">Kernel</a>);</div>
+<div class="line"><a id="l00028" name="l00028"></a><span class="lineno">   28</span>  <span class="keyword">auto</span> OptionalKernelInfo = Jit.getJITKernelInfo(<a class="code hl_variable" href="CompilerInterfaceDevice_8cpp.html#a85044d213393723d1b4ee267cd7e1d57">Kernel</a>);</div>
 <div class="line"><a id="l00029" name="l00029"></a><span class="lineno">   29</span>  <span class="keywordflow">if</span> (!OptionalKernelInfo) {</div>
 <div class="line"><a id="l00030" name="l00030"></a><span class="lineno">   30</span>    <span class="keywordflow">return</span> <a class="code hl_function" href="namespaceproteus.html#a684a52e17b7442bacba0084e229bd695">proteus::launchKernelDirect</a>(</div>
 <div class="line"><a id="l00031" name="l00031"></a><span class="lineno">   31</span>        <a class="code hl_variable" href="CompilerInterfaceDevice_8cpp.html#a85044d213393723d1b4ee267cd7e1d57">Kernel</a>, GridDim, BlockDim, KernelArgs, ShmemSize,</div>
@@ -154,15 +154,14 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00048" name="l00048"></a><span class="lineno">   48</span>    Logger::logs(<span class="stringliteral">&quot;proteus&quot;</span>) &lt;&lt; <span class="stringliteral">&quot;=== End Kernel Info\n&quot;</span>;</div>
 <div class="line"><a id="l00049" name="l00049"></a><span class="lineno">   49</span>  }</div>
 <div class="line"><a id="l00050" name="l00050"></a><span class="lineno">   50</span> </div>
-<div class="line"><a id="l00051" name="l00051"></a><span class="lineno">   51</span>  <span class="keywordflow">return</span> <a class="code hl_variable" href="CompilerInterfaceHost_8cpp.html#a7b0939b3daa7f173ed5ec0ee1e413716">Jit</a>.compileAndRun(</div>
+<div class="line"><a id="l00051" name="l00051"></a><span class="lineno">   51</span>  <span class="keywordflow">return</span> Jit.compileAndRun(</div>
 <div class="line"><a id="l00052" name="l00052"></a><span class="lineno">   52</span>      KernelInfo, GridDim, BlockDim, KernelArgs, ShmemSize,</div>
 <div class="line"><a id="l00053" name="l00053"></a><span class="lineno">   53</span>      <span class="keyword">static_cast&lt;</span>typename JitDeviceImplT::DeviceStream_t<span class="keyword">&gt;</span>(Stream));</div>
 <div class="line"><a id="l00054" name="l00054"></a><span class="lineno">   54</span>}</div>
 </div>
 <div class="ttc" id="aCompilerInterfaceDeviceInternal_8h_html_ae5a482e14e8e05bfa939c37932d73bf5"><div class="ttname"><a href="CompilerInterfaceDeviceInternal_8h.html#ae5a482e14e8e05bfa939c37932d73bf5">__proteus_launch_kernel_internal</a></div><div class="ttdeci">auto __proteus_launch_kernel_internal(void *Kernel, dim3 GridDim, dim3 BlockDim, void **KernelArgs, uint64_t ShmemSize, void *Stream)</div><div class="ttdef"><b>Definition</b> CompilerInterfaceDeviceInternal.h:5</div></div>
-<div class="ttc" id="aCompilerInterfaceDevice_8cpp_html_a85044d213393723d1b4ee267cd7e1d57"><div class="ttname"><a href="CompilerInterfaceDevice_8cpp.html#a85044d213393723d1b4ee267cd7e1d57">Kernel</a></div><div class="ttdeci">void * Kernel</div><div class="ttdef"><b>Definition</b> CompilerInterfaceDevice.cpp:59</div></div>
+<div class="ttc" id="aCompilerInterfaceDevice_8cpp_html_a85044d213393723d1b4ee267cd7e1d57"><div class="ttname"><a href="CompilerInterfaceDevice_8cpp.html#a85044d213393723d1b4ee267cd7e1d57">Kernel</a></div><div class="ttdeci">void * Kernel</div><div class="ttdef"><b>Definition</b> CompilerInterfaceDevice.cpp:62</div></div>
 <div class="ttc" id="aCompilerInterfaceDevice_8h_html"><div class="ttname"><a href="CompilerInterfaceDevice_8h.html">CompilerInterfaceDevice.h</a></div></div>
-<div class="ttc" id="aCompilerInterfaceHost_8cpp_html_a7b0939b3daa7f173ed5ec0ee1e413716"><div class="ttname"><a href="CompilerInterfaceHost_8cpp.html#a7b0939b3daa7f173ed5ec0ee1e413716">Jit</a></div><div class="ttdeci">JitEngineHost &amp; Jit</div><div class="ttdef"><b>Definition</b> CompilerInterfaceHost.cpp:26</div></div>
 <div class="ttc" id="aCoreDevice_8h_html"><div class="ttname"><a href="CoreDevice_8h.html">CoreDevice.h</a></div></div>
 <div class="ttc" id="anamespacellvm_html"><div class="ttname"><a href="namespacellvm.html">llvm</a></div><div class="ttdef"><b>Definition</b> CompiledLibrary.h:7</div></div>
 <div class="ttc" id="anamespaceproteus_html"><div class="ttname"><a href="namespaceproteus.html">proteus</a></div><div class="ttdef"><b>Definition</b> MemoryCache.h:27</div></div>

@@ -108,8 +108,8 @@ var searchBox = new SearchBox("searchBox", "search/",'.html');
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:afff9857833acf3af862358763589df00" id="r_afff9857833acf3af862358763589df00"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1CompilationTask.html#afff9857833acf3af862358763589df00">CompilationTask</a> (MemoryBufferRef Bitcode, <a class="el" href="classproteus_1_1HashT.html">HashT</a> HashValue, const std::string &amp;KernelName, std::string &amp;Suffix, dim3 BlockDim, dim3 GridDim, const SmallVector&lt; <a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a> &gt; &amp;RCVec, const SmallVector&lt; std::pair&lt; std::string, StringRef &gt; &gt; &amp;LambdaCalleeInfo, const std::unordered_map&lt; std::string, <a class="el" href="structproteus_1_1GlobalVarInfo.html">GlobalVarInfo</a> &gt; &amp;VarNameToGlobalInfo, const SmallPtrSet&lt; void *, 8 &gt; &amp;GlobalLinkedBinaries, const std::string &amp;DeviceArch, const <a class="el" href="classproteus_1_1CodeGenerationConfig.html">CodeGenerationConfig</a> &amp;CGConfig, bool DumpIR, bool RelinkGlobalsByCopy)</td></tr>
-<tr class="separator:afff9857833acf3af862358763589df00"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a166e5730aae6ee0b0d831ecb0dc503ba" id="r_a166e5730aae6ee0b0d831ecb0dc503ba"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1CompilationTask.html#a166e5730aae6ee0b0d831ecb0dc503ba">CompilationTask</a> (MemoryBufferRef Bitcode, <a class="el" href="classproteus_1_1HashT.html">HashT</a> HashValue, const std::string &amp;KernelName, std::string &amp;Suffix, dim3 BlockDim, dim3 GridDim, const SmallVector&lt; <a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a> &gt; &amp;RCVec, const SmallVector&lt; uint64_t &gt; &amp;LambdaCalleeInfo, const <a class="el" href="namespaceproteus.html#accc9ef5a2f5a2a91475485e819884dc3">LambdaCallsiteRuntimeConstantsMap</a> &amp;<a class="el" href="namespaceproteus.html#ace5ba074e0d8137431b0e6622e0f6ee3">LambdaCallsiteRuntimeConstants</a>, const std::unordered_map&lt; std::string, <a class="el" href="structproteus_1_1GlobalVarInfo.html">GlobalVarInfo</a> &gt; &amp;VarNameToGlobalInfo, const SmallPtrSet&lt; void *, 8 &gt; &amp;GlobalLinkedBinaries, const std::string &amp;DeviceArch, const <a class="el" href="classproteus_1_1CodeGenerationConfig.html">CodeGenerationConfig</a> &amp;CGConfig, bool DumpIR, bool RelinkGlobalsByCopy)</td></tr>
+<tr class="separator:a166e5730aae6ee0b0d831ecb0dc503ba"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:afceba3832b5cf8b65397f9aa8e665bf6" id="r_afceba3832b5cf8b65397f9aa8e665bf6"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1CompilationTask.html#afceba3832b5cf8b65397f9aa8e665bf6">CompilationTask</a> (const <a class="el" href="classproteus_1_1CompilationTask.html">CompilationTask</a> &amp;)=delete</td></tr>
 <tr class="separator:afceba3832b5cf8b65397f9aa8e665bf6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a11e937189f6484a11c078f959832a13a" id="r_a11e937189f6484a11c078f959832a13a"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classproteus_1_1CompilationTask.html">CompilationTask</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1CompilationTask.html#a11e937189f6484a11c078f959832a13a">operator=</a> (const <a class="el" href="classproteus_1_1CompilationTask.html">CompilationTask</a> &amp;)=delete</td></tr>
@@ -124,8 +124,8 @@ Public Member Functions</h2></td></tr>
 <tr class="separator:affa259816dd3ba7cd412deb72b71e275"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
-<a id="afff9857833acf3af862358763589df00" name="afff9857833acf3af862358763589df00"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#afff9857833acf3af862358763589df00">&#9670;&#160;</a></span>CompilationTask() <span class="overload">[1/3]</span></h2>
+<a id="a166e5730aae6ee0b0d831ecb0dc503ba" name="a166e5730aae6ee0b0d831ecb0dc503ba"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a166e5730aae6ee0b0d831ecb0dc503ba">&#9670;&#160;</a></span>CompilationTask() <span class="overload">[1/3]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -178,8 +178,14 @@ Public Member Functions</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const SmallVector&lt; std::pair&lt; std::string, StringRef &gt; &gt; &amp;&#160;</td>
+          <td class="paramtype">const SmallVector&lt; uint64_t &gt; &amp;&#160;</td>
           <td class="paramname"><em>LambdaCalleeInfo</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="namespaceproteus.html#accc9ef5a2f5a2a91475485e819884dc3">LambdaCallsiteRuntimeConstantsMap</a> &amp;&#160;</td>
+          <td class="paramname"><em>LambdaCallsiteRuntimeConstants</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>

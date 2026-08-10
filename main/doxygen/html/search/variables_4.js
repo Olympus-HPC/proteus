@@ -6,6 +6,7 @@ var searchData=
   ['devicelibdir_3',['DeviceLibDir',['../structproteus_1_1ResolvedHIPToolchain.html#a56ad92a5a0554cec14556df91e8ad456',1,'proteus::ResolvedHIPToolchain']]],
   ['devicemodule_4',['DeviceModule',['../structproteus_1_1MLIRCodeBuilder_1_1Impl.html#a9ee37c2a42d7d8d6e236efb8ad5def0a',1,'proteus::MLIRCodeBuilder::Impl']]],
   ['diagnosticprefix_5',['DiagnosticPrefix',['../structproteus_1_1MLIRLoweringOptions.html#a71e3b6b7333f78a7565e08d1f315a065',1,'proteus::MLIRLoweringOptions']]],
-  ['doubleval_6',['DoubleVal',['../unionproteus_1_1RuntimeConstantValue.html#a0908db799ab8f4bf64de438529feacde',1,'proteus::RuntimeConstantValue']]],
-  ['dynlibpath_7',['DynLibPath',['../structproteus_1_1CompiledLibrary.html#ae35d7e13256d670c1fdcc6345e362f69',1,'proteus::CompiledLibrary']]]
+  ['dominatingwrite_6',['DominatingWrite',['../structproteus_1_1LambdaPtrUseAnalysis.html#a470ee9ff582440f468bb5541b8b16767',1,'proteus::LambdaPtrUseAnalysis']]],
+  ['doubleval_7',['DoubleVal',['../unionproteus_1_1RuntimeConstantValue.html#a0908db799ab8f4bf64de438529feacde',1,'proteus::RuntimeConstantValue']]],
+  ['dynlibpath_8',['DynLibPath',['../structproteus_1_1CompiledLibrary.html#ae35d7e13256d670c1fdcc6345e362f69',1,'proteus::CompiledLibrary']]]
 ];

@@ -108,12 +108,20 @@ var searchBox = new SearchBox("searchBox", "search/",'.html');
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-static-methods" name="pub-static-methods"></a>
 Static Public Member Functions</h2></td></tr>
-<tr class="memitem:a1d637784b7ed659f1ba9c0a159e0259a" id="r_a1d637784b7ed659f1ba9c0a159e0259a"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1TransformLambdaSpecialization.html#a1d637784b7ed659f1ba9c0a159e0259a">transform</a> (Module &amp;M, Function &amp;F, const SmallVector&lt; <a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a> &gt; &amp;RCVec)</td></tr>
-<tr class="separator:a1d637784b7ed659f1ba9c0a159e0259a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a99f0c89ceaf5841b7061e14765d778a9" id="r_a99f0c89ceaf5841b7061e14765d778a9"><td class="memItemLeft" align="right" valign="top">static <a class="el" href="namespaceproteus.html#ace5ba074e0d8137431b0e6622e0f6ee3">LambdaCallsiteRuntimeConstants</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1TransformLambdaSpecialization.html#a99f0c89ceaf5841b7061e14765d778a9">readRuntimeConstantsForCallsite</a> (void *const *KernelArgs, const <a class="el" href="structproteus_1_1LambdaKernelArgLocation.html">LambdaKernelArgLocation</a> &amp;Location, const JitVariantMap &amp;VariantSchema)</td></tr>
+<tr class="separator:a99f0c89ceaf5841b7061e14765d778a9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad911897e709f91cea3cd67ddbef6b7eb" id="r_ad911897e709f91cea3cd67ddbef6b7eb"><td class="memItemLeft" align="right" valign="top">static <a class="el" href="classproteus_1_1LambdaRegistry.html#a676a6f0179ce8e90e4e6ba8081363e74">LambdaRegistry::JitVariantVec</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1TransformLambdaSpecialization.html#ad911897e709f91cea3cd67ddbef6b7eb">readRuntimeVariantsFromKernelArgs</a> (void *const *KernelArgs, ArrayRef&lt; <a class="el" href="structproteus_1_1LambdaKernelArgLocation.html">LambdaKernelArgLocation</a> &gt; KernelArgLocations, ArrayRef&lt; <a class="el" href="classproteus_1_1LambdaRegistry.html#a84e70d3d28ed3143fc627e954eee74b2">LambdaRegistry::JitVariantMap</a> &gt; VariantSchemas)</td></tr>
+<tr class="separator:ad911897e709f91cea3cd67ddbef6b7eb"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3d5611e4ff479538275adb20f0f5fc92" id="r_a3d5611e4ff479538275adb20f0f5fc92"><td class="memItemLeft" align="right" valign="top">static JitVariantMap&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1TransformLambdaSpecialization.html#a3d5611e4ff479538275adb20f0f5fc92">readRuntimeVariantFromStorage</a> (const void *StorageBasePtr, ArrayRef&lt; <a class="el" href="classproteus_1_1LambdaRegistry.html#a84e70d3d28ed3143fc627e954eee74b2">LambdaRegistry::JitVariantMap</a> &gt; VariantSchemas)</td></tr>
+<tr class="separator:a3d5611e4ff479538275adb20f0f5fc92"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:acf3008465ef362d0328278250b454757" id="r_acf3008465ef362d0328278250b454757"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1TransformLambdaSpecialization.html#acf3008465ef362d0328278250b454757">transformHostFunction</a> (Module &amp;M, Function &amp;Lambda, const JitVariantMap &amp;RuntimeVariant)</td></tr>
+<tr class="separator:acf3008465ef362d0328278250b454757"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac9aeeb19350b22074c38884e59ba1102" id="r_ac9aeeb19350b22074c38884e59ba1102"><td class="memItemLeft" align="right" valign="top">static void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1TransformLambdaSpecialization.html#ac9aeeb19350b22074c38884e59ba1102">transformDeviceKernel</a> (Module &amp;M, uint64_t FunctorID, const <a class="el" href="namespaceproteus.html#accc9ef5a2f5a2a91475485e819884dc3">LambdaCallsiteRuntimeConstantsMap</a> &amp;CallsiteRuntimeConstants)</td></tr>
+<tr class="separator:ac9aeeb19350b22074c38884e59ba1102"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Member Function Documentation</h2>
-<a id="a1d637784b7ed659f1ba9c0a159e0259a" name="a1d637784b7ed659f1ba9c0a159e0259a"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a1d637784b7ed659f1ba9c0a159e0259a">&#9670;&#160;</a></span>transform()</h2>
+<a id="a99f0c89ceaf5841b7061e14765d778a9" name="a99f0c89ceaf5841b7061e14765d778a9"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a99f0c89ceaf5841b7061e14765d778a9">&#9670;&#160;</a></span>readRuntimeConstantsForCallsite()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -122,7 +130,169 @@ Static Public Member Functions</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">static void proteus::TransformLambdaSpecialization::transform </td>
+          <td class="memname">static <a class="el" href="namespaceproteus.html#ace5ba074e0d8137431b0e6622e0f6ee3">LambdaCallsiteRuntimeConstants</a> proteus::TransformLambdaSpecialization::readRuntimeConstantsForCallsite </td>
+          <td>(</td>
+          <td class="paramtype">void *const *&#160;</td>
+          <td class="paramname"><em>KernelArgs</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="structproteus_1_1LambdaKernelArgLocation.html">LambdaKernelArgLocation</a> &amp;&#160;</td>
+          <td class="paramname"><em>Location</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const JitVariantMap &amp;&#160;</td>
+          <td class="paramname"><em>VariantSchema</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="a3d5611e4ff479538275adb20f0f5fc92" name="a3d5611e4ff479538275adb20f0f5fc92"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a3d5611e4ff479538275adb20f0f5fc92">&#9670;&#160;</a></span>readRuntimeVariantFromStorage()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">static JitVariantMap proteus::TransformLambdaSpecialization::readRuntimeVariantFromStorage </td>
+          <td>(</td>
+          <td class="paramtype">const void *&#160;</td>
+          <td class="paramname"><em>StorageBasePtr</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">ArrayRef&lt; <a class="el" href="classproteus_1_1LambdaRegistry.html#a84e70d3d28ed3143fc627e954eee74b2">LambdaRegistry::JitVariantMap</a> &gt;&#160;</td>
+          <td class="paramname"><em>VariantSchemas</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="ad911897e709f91cea3cd67ddbef6b7eb" name="ad911897e709f91cea3cd67ddbef6b7eb"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad911897e709f91cea3cd67ddbef6b7eb">&#9670;&#160;</a></span>readRuntimeVariantsFromKernelArgs()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">static <a class="el" href="classproteus_1_1LambdaRegistry.html#a676a6f0179ce8e90e4e6ba8081363e74">LambdaRegistry::JitVariantVec</a> proteus::TransformLambdaSpecialization::readRuntimeVariantsFromKernelArgs </td>
+          <td>(</td>
+          <td class="paramtype">void *const *&#160;</td>
+          <td class="paramname"><em>KernelArgs</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">ArrayRef&lt; <a class="el" href="structproteus_1_1LambdaKernelArgLocation.html">LambdaKernelArgLocation</a> &gt;&#160;</td>
+          <td class="paramname"><em>KernelArgLocations</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">ArrayRef&lt; <a class="el" href="classproteus_1_1LambdaRegistry.html#a84e70d3d28ed3143fc627e954eee74b2">LambdaRegistry::JitVariantMap</a> &gt;&#160;</td>
+          <td class="paramname"><em>VariantSchemas</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="ac9aeeb19350b22074c38884e59ba1102" name="ac9aeeb19350b22074c38884e59ba1102"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac9aeeb19350b22074c38884e59ba1102">&#9670;&#160;</a></span>transformDeviceKernel()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">static void proteus::TransformLambdaSpecialization::transformDeviceKernel </td>
+          <td>(</td>
+          <td class="paramtype">Module &amp;&#160;</td>
+          <td class="paramname"><em>M</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint64_t&#160;</td>
+          <td class="paramname"><em>FunctorID</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="namespaceproteus.html#accc9ef5a2f5a2a91475485e819884dc3">LambdaCallsiteRuntimeConstantsMap</a> &amp;&#160;</td>
+          <td class="paramname"><em>CallsiteRuntimeConstants</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="acf3008465ef362d0328278250b454757" name="acf3008465ef362d0328278250b454757"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#acf3008465ef362d0328278250b454757">&#9670;&#160;</a></span>transformHostFunction()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">static void proteus::TransformLambdaSpecialization::transformHostFunction </td>
           <td>(</td>
           <td class="paramtype">Module &amp;&#160;</td>
           <td class="paramname"><em>M</em>, </td>
@@ -131,13 +301,13 @@ Static Public Member Functions</h2></td></tr>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">Function &amp;&#160;</td>
-          <td class="paramname"><em>F</em>, </td>
+          <td class="paramname"><em>Lambda</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const SmallVector&lt; <a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a> &gt; &amp;&#160;</td>
-          <td class="paramname"><em>RCVec</em>&#160;</td>
+          <td class="paramtype">const JitVariantMap &amp;&#160;</td>
+          <td class="paramname"><em>RuntimeVariant</em>&#160;</td>
         </tr>
         <tr>
           <td></td>

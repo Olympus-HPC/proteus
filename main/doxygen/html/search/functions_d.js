@@ -1,12 +1,12 @@
 var searchData=
 [
-  ['matchjitvariablemap_0',['matchJitVariableMap',['../classproteus_1_1LambdaRegistry.html#a3d6923bc8f8a4589be78f2962602fffb',1,'proteus::LambdaRegistry']]],
+  ['markasseen_0',['markasseen',['../classproteus_1_1LambdaArgVisitor.html#a1cac8797b475c4baeb973a001abfe5e4',1,'proteus::LambdaArgVisitor::markAsSeen()'],['../classproteus_1_1LambdaInstUseVisitor.html#a55c8ba010c54bac777a2db130654326c',1,'proteus::LambdaInstUseVisitor::markAsSeen()']]],
   ['max_1',['max',['../namespaceproteus.html#adc3d0e7dbd9cb23fd2c3ccdedfd9671d',1,'proteus']]],
   ['memcpyhtod_2',['memcpyHtoD',['../namespaceproteus_1_1hipdyn.html#aa391e85d2fdf61eaff445574580136b8',1,'proteus::hipdyn']]],
   ['memorycache_3',['MemoryCache',['../classproteus_1_1MemoryCache.html#adeae68ee4f4027d8441b67755a6e9558',1,'proteus::MemoryCache']]],
   ['min_4',['min',['../namespaceproteus.html#a15715ce8addfcb576dd84860e6c08899',1,'proteus']]],
   ['minblockspersm_5',['minBlocksPerSM',['../classproteus_1_1CodeGenerationConfig.html#a1cdcb5006e1c9ed9923b965fe35dc86b',1,'proteus::CodeGenerationConfig']]],
-  ['mlircodebuilder_6',['mlircodebuilder',['../classproteus_1_1MLIRCodeBuilder.html#a764514d5e03787bf9eb56d88a7fa561f',1,'proteus::MLIRCodeBuilder::MLIRCodeBuilder(const MLIRCodeBuilder &amp;)=delete'],['../classproteus_1_1MLIRCodeBuilder.html#a79d4673614dc365c4efd545a386c4abc',1,'proteus::MLIRCodeBuilder::MLIRCodeBuilder(TargetModelType TM=TargetModelType::HOST)']]],
+  ['mlircodebuilder_6',['mlircodebuilder',['../classproteus_1_1MLIRCodeBuilder.html#a79d4673614dc365c4efd545a386c4abc',1,'proteus::MLIRCodeBuilder::MLIRCodeBuilder(TargetModelType TM=TargetModelType::HOST)'],['../classproteus_1_1MLIRCodeBuilder.html#a764514d5e03787bf9eb56d88a7fa561f',1,'proteus::MLIRCodeBuilder::MLIRCodeBuilder(const MLIRCodeBuilder &amp;)=delete']]],
   ['mlirirfunction_7',['MLIRIRFunction',['../classproteus_1_1MLIRIRFunction.html#a5ef286afc21dae7e5edd9c8cd6f8f80a',1,'proteus::MLIRIRFunction']]],
   ['mlirirvalue_8',['MLIRIRValue',['../classproteus_1_1MLIRIRValue.html#ab0e4dcd858301d253125f5172ba3aa5c',1,'proteus::MLIRIRValue']]],
   ['mlirjitmodule_9',['mlirjitmodule',['../classproteus_1_1MLIRJitModule.html#a5b0e8547008a3a7b892745de995cbf3a',1,'proteus::MLIRJitModule::MLIRJitModule(TargetModelType TargetModel, const std::string &amp;Code)'],['../classproteus_1_1MLIRJitModule.html#a30c1accc443f8a1e1da9ab66abfa6826',1,'proteus::MLIRJitModule::MLIRJitModule(const std::string &amp;Target, const std::string &amp;Code)']]],

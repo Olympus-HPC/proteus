@@ -96,7 +96,9 @@ var searchBox = new SearchBox("searchBox", "search/",'.html');
 </div><!-- top -->
 <div class="header">
   <div class="summary">
+<a href="#nested-classes">Classes</a> &#124;
 <a href="#namespaces">Namespaces</a> &#124;
+<a href="#define-members">Macros</a> &#124;
 <a href="#func-members">Functions</a> &#124;
 <a href="#var-members">Variables</a>  </div>
   <div class="headertitle"><div class="title">JitInterface.h File Reference</div></div>
@@ -105,6 +107,7 @@ var searchBox = new SearchBox("searchBox", "search/",'.html');
 <div class="textblock"><code>#include &quot;<a class="el" href="CompilerInterfaceTypes_8h_source.html">proteus/CompilerInterfaceTypes.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="Init_8h_source.html">proteus/Init.h</a>&quot;</code><br />
 <code>#include &lt;cassert&gt;</code><br />
+<code>#include &lt;cstdint&gt;</code><br />
 <code>#include &lt;cstring&gt;</code><br />
 <code>#include &lt;type_traits&gt;</code><br />
 <code>#include &lt;utility&gt;</code><br />
@@ -113,100 +116,119 @@ Include dependency graph for JitInterface.h:</div>
 <div class="dyncontent">
 <div class="center"><img src="JitInterface_8h__incl.png" border="0" usemap="#ainclude_2proteus_2JitInterface_8h" alt=""/></div>
 <map name="ainclude_2proteus_2JitInterface_8h" id="ainclude_2proteus_2JitInterface_8h">
-<area shape="rect" title=" " alt="" coords="302,5,511,31"/>
-<area shape="rect" href="CompilerInterfaceTypes_8h.html" title=" " alt="" coords="29,79,221,119"/>
-<area shape="poly" title=" " alt="" coords="366,33,207,78,205,72,365,28"/>
-<area shape="rect" title=" " alt="" coords="216,167,283,192"/>
-<area shape="poly" title=" " alt="" coords="366,33,325,52,305,65,287,80,275,97,266,116,256,153,250,152,261,114,271,95,283,77,301,60,322,47,364,28"/>
-<area shape="rect" href="Init_8h.html" title=" " alt="" coords="297,86,405,111"/>
-<area shape="poly" title=" " alt="" coords="401,32,369,76,365,73,396,29"/>
-<area shape="rect" title=" " alt="" coords="429,86,499,111"/>
-<area shape="poly" title=" " alt="" coords="417,29,450,73,445,76,413,32"/>
-<area shape="rect" title=" " alt="" coords="523,86,615,111"/>
-<area shape="poly" title=" " alt="" coords="431,28,535,78,532,83,429,33"/>
-<area shape="rect" title=" " alt="" coords="639,86,699,111"/>
-<area shape="poly" title=" " alt="" coords="459,28,540,48,629,76,634,78,632,83,627,81,538,54,458,33"/>
+<area shape="rect" title=" " alt="" coords="274,5,483,31"/>
+<area shape="rect" href="CompilerInterfaceTypes_8h.html" title=" " alt="" coords="57,79,249,119"/>
+<area shape="poly" title=" " alt="" coords="347,33,221,77,220,72,345,28"/>
 <area shape="rect" title=" " alt="" coords="5,167,72,192"/>
-<area shape="poly" title=" " alt="" coords="106,121,64,159,60,155,103,117"/>
-<area shape="poly" title=" " alt="" coords="157,117,221,157,218,161,154,121"/>
-<area shape="rect" title=" " alt="" coords="96,167,173,192"/>
-<area shape="poly" title=" " alt="" coords="130,119,134,152,129,153,125,119"/>
-<area shape="rect" title=" " alt="" coords="321,167,380,192"/>
-<area shape="poly" title=" " alt="" coords="353,112,353,153,348,153,348,112"/>
+<area shape="poly" title=" " alt="" coords="274,27,206,33,139,44,82,59,62,69,47,80,38,96,34,115,35,153,30,153,28,115,33,95,43,77,59,65,81,54,138,39,206,28,274,22"/>
+<area shape="rect" title=" " alt="" coords="235,167,301,192"/>
+<area shape="poly" title=" " alt="" coords="364,33,340,54,315,80,294,118,279,154,274,152,289,116,311,77,336,50,361,29"/>
+<area shape="rect" href="Init_8h.html" title=" " alt="" coords="325,86,433,111"/>
+<area shape="poly" title=" " alt="" coords="381,31,381,72,376,72,376,31"/>
+<area shape="rect" title=" " alt="" coords="457,86,527,111"/>
+<area shape="poly" title=" " alt="" coords="397,29,466,76,463,80,394,33"/>
+<area shape="rect" title=" " alt="" coords="551,86,643,111"/>
+<area shape="poly" title=" " alt="" coords="411,28,553,79,552,84,410,33"/>
+<area shape="rect" title=" " alt="" coords="667,86,727,111"/>
+<area shape="poly" title=" " alt="" coords="453,28,551,47,657,76,663,78,661,83,655,81,550,53,452,33"/>
+<area shape="poly" title=" " alt="" coords="127,121,68,161,65,157,124,117"/>
+<area shape="poly" title=" " alt="" coords="183,117,241,157,238,161,180,121"/>
+<area shape="rect" title=" " alt="" coords="115,167,192,192"/>
+<area shape="poly" title=" " alt="" coords="156,119,156,153,151,153,151,119"/>
+<area shape="rect" title=" " alt="" coords="349,167,408,192"/>
+<area shape="poly" title=" " alt="" coords="381,112,381,153,376,153,376,112"/>
 </map>
 </div>
 </div>
 <p><a href="JitInterface_8h_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="nested-classes" name="nested-classes"></a>
+Classes</h2></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1detail_1_1LambdaFunctorWrapper.html">proteus::detail::LambdaFunctorWrapper&lt; T &gt;</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1detail_1_1is__lambda__functor__wrapper.html">proteus::detail::is_lambda_functor_wrapper&lt; T &gt;</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1detail_1_1is__lambda__functor__wrapper_3_01LambdaFunctorWrapper_3_01FunctorID_00_01Lambda_01_4_01_4.html">proteus::detail::is_lambda_functor_wrapper&lt; LambdaFunctorWrapper&lt; FunctorID, Lambda &gt; &gt;</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="namespaces" name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceproteus" id="r_namespaceproteus"><td class="memItemLeft" align="right" valign="top">namespace &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html">proteus</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:namespaceproteus_1_1detail" id="r_namespaceproteus_1_1detail"><td class="memItemLeft" align="right" valign="top">namespace &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus_1_1detail.html">proteus::detail</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="define-members" name="define-members"></a>
+Macros</h2></td></tr>
+<tr class="memitem:a5c8920f2e9c64e8a13879252c4bdbc65" id="r_a5c8920f2e9c64e8a13879252c4bdbc65"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="JitInterface_8h.html#a5c8920f2e9c64e8a13879252c4bdbc65">PROTEUS_HOST_DEVICE</a></td></tr>
+<tr class="separator:a5c8920f2e9c64e8a13879252c4bdbc65"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="func-members" name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:a6b38d5a78d9fe73eb7f7e73453cecb8f" id="r_a6b38d5a78d9fe73eb7f7e73453cecb8f"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="JitInterface_8h.html#a6b38d5a78d9fe73eb7f7e73453cecb8f">__proteus_register_variable</a> (<a class="el" href="structproteus_1_1RuntimeConstant.html">proteus::RuntimeConstant</a> RC, const char *AssociatedLambda)</td></tr>
-<tr class="separator:a6b38d5a78d9fe73eb7f7e73453cecb8f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5798656044ac11b2f330ab6a7004fc6d" id="r_a5798656044ac11b2f330ab6a7004fc6d"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="JitInterface_8h.html#a5798656044ac11b2f330ab6a7004fc6d">__proteus_register_lambda</a> (const char *Symbol)</td></tr>
-<tr class="separator:a5798656044ac11b2f330ab6a7004fc6d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a23c15283ae070bf6e49c3cdca6a1329a" id="r_a23c15283ae070bf6e49c3cdca6a1329a"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="JitInterface_8h.html#a23c15283ae070bf6e49c3cdca6a1329a">__attribute__</a> ((used)) void __proteus_register_lambda_runtime_constant(int32_t <a class="el" href="CompilerInterfaceDevice_8cpp.html#a135c078c3e3abc27b76a03c726d28c61">Type</a></td></tr>
+<tr class="separator:a23c15283ae070bf6e49c3cdca6a1329a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adf8ff022cfb30fe5aad8b5b0971a3926" id="r_adf8ff022cfb30fe5aad8b5b0971a3926"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="JitInterface_8h.html#adf8ff022cfb30fe5aad8b5b0971a3926">__proteus_take_address</a> (void const *) noexcept</td></tr>
 <tr class="separator:adf8ff022cfb30fe5aad8b5b0971a3926"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:acf12dca3866431d7b44c79a4e6b5d1b1" id="r_acf12dca3866431d7b44c79a4e6b5d1b1"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
 <tr class="memitem:acf12dca3866431d7b44c79a4e6b5d1b1"><td class="memTemplItemLeft" align="right" valign="top">&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#acf12dca3866431d7b44c79a4e6b5d1b1">proteus::__attribute__</a> ((noinline)) void jit_arg(T V) noexcept</td></tr>
 <tr class="separator:acf12dca3866431d7b44c79a4e6b5d1b1"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4536b03b95f3fee752c4dce1b6f151dd" id="r_a4536b03b95f3fee752c4dce1b6f151dd"><td class="memItemLeft" align="right" valign="top">constexpr std::uint64_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus_1_1detail.html#a4536b03b95f3fee752c4dce1b6f151dd">proteus::detail::fnv1a64</a> (const char *s)</td></tr>
+<tr class="separator:a4536b03b95f3fee752c4dce1b6f151dd"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac378e4fc85e7685f97268783f949e2d1" id="r_ac378e4fc85e7685f97268783f949e2d1"><td class="memTemplParams" colspan="2">template&lt;class Lambda &gt; </td></tr>
+<tr class="memitem:ac378e4fc85e7685f97268783f949e2d1"><td class="memTemplItemLeft" align="right" valign="top">constexpr std::uint64_t&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceproteus_1_1detail.html#ac378e4fc85e7685f97268783f949e2d1">proteus::detail::functor_id</a> ()</td></tr>
+<tr class="separator:ac378e4fc85e7685f97268783f949e2d1"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a12ffa8f60b67ed9fd0d503df51ef7cf8" id="r_a12ffa8f60b67ed9fd0d503df51ef7cf8"><td class="memTemplParams" colspan="2">template&lt;std::uint64_t FunctorId, typename L &gt; </td></tr>
+<tr class="memitem:a12ffa8f60b67ed9fd0d503df51ef7cf8"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="JitInterface_8h.html#a5c8920f2e9c64e8a13879252c4bdbc65">PROTEUS_HOST_DEVICE</a> auto&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceproteus_1_1detail.html#a12ffa8f60b67ed9fd0d503df51ef7cf8">proteus::detail::tag_functor</a> (L &amp;&amp;lambda)</td></tr>
+<tr class="separator:a12ffa8f60b67ed9fd0d503df51ef7cf8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4066494d5a077310c46b963fb540fbec" id="r_a4066494d5a077310c46b963fb540fbec"><td class="memItemLeft" align="right" valign="top">static ID auto&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus_1_1detail.html#a4066494d5a077310c46b963fb540fbec">proteus::detail::__register_lambda_impl</a> (T &amp;&amp;t) noexcept</td></tr>
+<tr class="separator:a4066494d5a077310c46b963fb540fbec"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab213e9bea03d22a14dc139d474e82629" id="r_ab213e9bea03d22a14dc139d474e82629"><td class="memTemplParams" colspan="2">template&lt;class L &gt; </td></tr>
+<tr class="memitem:ab213e9bea03d22a14dc139d474e82629"><td class="memTemplItemLeft" align="right" valign="top">auto&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#ab213e9bea03d22a14dc139d474e82629">proteus::__attribute__</a> ((annotate(&quot;proteus.register_call&quot;))) register_lambda(L &amp;&amp;lambda) noexcept</td></tr>
+<tr class="separator:ab213e9bea03d22a14dc139d474e82629"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="var-members" name="var-members"></a>
 Variables</h2></td></tr>
+<tr class="memitem:afd47502f0ef909c167afbf93c32c7a3d" id="r_afd47502f0ef909c167afbf93c32c7a3d"><td class="memItemLeft" align="right" valign="top">int32_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="JitInterface_8h.html#afd47502f0ef909c167afbf93c32c7a3d">Pos</a></td></tr>
+<tr class="separator:afd47502f0ef909c167afbf93c32c7a3d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a64ef6f455da8778073436d84f0cbbab5" id="r_a64ef6f455da8778073436d84f0cbbab5"><td class="memItemLeft" align="right" valign="top">int32_t int32_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="JitInterface_8h.html#a64ef6f455da8778073436d84f0cbbab5">Offset</a></td></tr>
+<tr class="separator:a64ef6f455da8778073436d84f0cbbab5"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a62d43a138d46297693f3a9eea3905b92" id="r_a62d43a138d46297693f3a9eea3905b92"><td class="memItemLeft" align="right" valign="top">int32_t int32_t const void *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="JitInterface_8h.html#a62d43a138d46297693f3a9eea3905b92">ValuePtr</a></td></tr>
+<tr class="separator:a62d43a138d46297693f3a9eea3905b92"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a861fdccdf79e2fdf0e2ca0349415381e" id="r_a861fdccdf79e2fdf0e2ca0349415381e"><td class="memItemLeft" align="right" valign="top">int32_t int32_t const void uint64_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="JitInterface_8h.html#a861fdccdf79e2fdf0e2ca0349415381e">functor_id</a></td></tr>
+<tr class="separator:a861fdccdf79e2fdf0e2ca0349415381e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a86a341f3051b83d089c0708996de0efe" id="r_a86a341f3051b83d089c0708996de0efe"><td class="memItemLeft" align="right" valign="top">size_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a86a341f3051b83d089c0708996de0efe">proteus::NumElts</a></td></tr>
 <tr class="separator:a86a341f3051b83d089c0708996de0efe"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0f45a5cc4f3fb43de5e962c91dbdd325" id="r_a0f45a5cc4f3fb43de5e962c91dbdd325"><td class="memItemLeft" align="right" valign="top">size_t std::remove_pointer&lt; T &gt;::type&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a0f45a5cc4f3fb43de5e962c91dbdd325">proteus::Velem</a> = 0) noexcept</td></tr>
 <tr class="separator:a0f45a5cc4f3fb43de5e962c91dbdd325"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a24239a46d0148ea0330d3c63c81fe80d" id="r_a24239a46d0148ea0330d3c63c81fe80d"><td class="memItemLeft" align="right" valign="top">static int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a24239a46d0148ea0330d3c63c81fe80d">proteus::Pos</a> = -1</td></tr>
-<tr class="separator:a24239a46d0148ea0330d3c63c81fe80d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a723b5720b9e4e106cae86f15814eba00" id="r_a723b5720b9e4e106cae86f15814eba00"><td class="memItemLeft" align="right" valign="top">static int int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a723b5720b9e4e106cae86f15814eba00">proteus::Offset</a> = -1</td></tr>
-<tr class="separator:a723b5720b9e4e106cae86f15814eba00"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
-<h2 class="groupheader">Function Documentation</h2>
-<a id="a5798656044ac11b2f330ab6a7004fc6d" name="a5798656044ac11b2f330ab6a7004fc6d"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a5798656044ac11b2f330ab6a7004fc6d">&#9670;&#160;</a></span>__proteus_register_lambda()</h2>
+<h2 class="groupheader">Macro Definition Documentation</h2>
+<a id="a5c8920f2e9c64e8a13879252c4bdbc65" name="a5c8920f2e9c64e8a13879252c4bdbc65"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a5c8920f2e9c64e8a13879252c4bdbc65">&#9670;&#160;</a></span>PROTEUS_HOST_DEVICE</h2>
 
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">void __proteus_register_lambda </td>
-          <td>(</td>
-          <td class="paramtype">const char *&#160;</td>
-          <td class="paramname"><em>Symbol</em></td><td>)</td>
-          <td></td>
+          <td class="memname">#define PROTEUS_HOST_DEVICE</td>
         </tr>
       </table>
 </div><div class="memdoc">
 
 </div>
 </div>
-<a id="a6b38d5a78d9fe73eb7f7e73453cecb8f" name="a6b38d5a78d9fe73eb7f7e73453cecb8f"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a6b38d5a78d9fe73eb7f7e73453cecb8f">&#9670;&#160;</a></span>__proteus_register_variable()</h2>
+<h2 class="groupheader">Function Documentation</h2>
+<a id="a23c15283ae070bf6e49c3cdca6a1329a" name="a23c15283ae070bf6e49c3cdca6a1329a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a23c15283ae070bf6e49c3cdca6a1329a">&#9670;&#160;</a></span>__attribute__()</h2>
 
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">void __proteus_register_variable </td>
+          <td class="memname">__attribute__ </td>
           <td>(</td>
-          <td class="paramtype"><a class="el" href="structproteus_1_1RuntimeConstant.html">proteus::RuntimeConstant</a>&#160;</td>
-          <td class="paramname"><em>RC</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">const char *&#160;</td>
-          <td class="paramname"><em>AssociatedLambda</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
+          <td class="paramtype">(used)&#160;</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -235,6 +257,63 @@ Variables</h2></td></tr>
 <span class="mlabels"><span class="mlabel">noexcept</span></span>  </td>
   </tr>
 </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<h2 class="groupheader">Variable Documentation</h2>
+<a id="a861fdccdf79e2fdf0e2ca0349415381e" name="a861fdccdf79e2fdf0e2ca0349415381e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a861fdccdf79e2fdf0e2ca0349415381e">&#9670;&#160;</a></span>functor_id</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int32_t int32_t const void uint64_t functor_id</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="a64ef6f455da8778073436d84f0cbbab5" name="a64ef6f455da8778073436d84f0cbbab5"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a64ef6f455da8778073436d84f0cbbab5">&#9670;&#160;</a></span>Offset</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int32_t int32_t Offset</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="afd47502f0ef909c167afbf93c32c7a3d" name="afd47502f0ef909c167afbf93c32c7a3d"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#afd47502f0ef909c167afbf93c32c7a3d">&#9670;&#160;</a></span>Pos</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int32_t Pos</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="a62d43a138d46297693f3a9eea3905b92" name="a62d43a138d46297693f3a9eea3905b92"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a62d43a138d46297693f3a9eea3905b92">&#9670;&#160;</a></span>ValuePtr</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">int32_t int32_t const void* ValuePtr</td>
+        </tr>
+      </table>
 </div><div class="memdoc">
 
 </div>

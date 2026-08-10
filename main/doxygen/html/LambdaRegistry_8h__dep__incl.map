@@ -1,7 +1,25 @@
 <map id="src/include/proteus/impl/LambdaRegistry.h" name="src/include/proteus/impl/LambdaRegistry.h">
-<area shape="rect" id="Node000001" title=" " alt="" coords="147,5,321,45"/>
-<area shape="rect" id="Node000002" href="$CompilerInterfaceHost_8cpp.html" title=" " alt="" coords="5,93,223,133"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="198,56,142,95,139,91,194,51"/>
-<area shape="rect" id="Node000003" href="$JitEngineHost_8cpp.html" title=" " alt="" coords="247,101,461,126"/>
-<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="273,51,339,98,336,103,270,56"/>
+<area shape="rect" id="Node000001" title=" " alt="" coords="255,5,429,45"/>
+<area shape="rect" id="Node000002" href="$JitEngineDevice_8h.html" title=" " alt="" coords="183,181,357,221"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="244,53,215,71,192,95,186,113,192,132,212,159,237,179,234,183,208,163,188,135,181,113,188,92,212,66,241,48"/>
+<area shape="rect" id="Node000007" href="$CompilerInterfaceDevice_8cpp.html" title=" " alt="" coords="5,269,223,309"/>
+<area shape="poly" id="edge11_Node000001_Node000007" title=" " alt="" coords="248,53,212,70,181,95,165,115,152,138,133,186,123,233,118,269,113,268,117,232,128,185,147,136,161,112,177,91,209,66,245,48"/>
+<area shape="rect" id="Node000008" href="$TransformLambdaSpecialization_8h.html" title=" " alt="" coords="203,93,481,133"/>
+<area shape="poly" id="edge8_Node000001_Node000008" title=" " alt="" coords="345,59,345,93,339,93,339,59"/>
+<area shape="rect" id="Node000009" href="$JitEngineHost_8cpp.html" title=" " alt="" coords="401,189,616,214"/>
+<area shape="poly" id="edge13_Node000001_Node000009" title=" " alt="" coords="438,48,470,66,496,92,509,116,514,143,513,188,508,188,509,144,504,118,492,95,467,71,436,53"/>
+<area shape="rect" id="Node000010" href="$CompilerInterfaceHost_8cpp.html" title=" " alt="" coords="557,93,775,133"/>
+<area shape="poly" id="edge12_Node000001_Node000010" title=" " alt="" coords="427,46,596,91,594,96,425,51"/>
+<area shape="rect" id="Node000003" href="$JitEngineDeviceCUDA_8h.html" title=" " alt="" coords="298,269,509,309"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="312,227,375,267,372,271,310,231"/>
+<area shape="rect" id="Node000004" href="$JitEngineDeviceCUDA_8cpp.html" title=" " alt="" coords="231,357,434,397"/>
+<area shape="poly" id="edge7_Node000002_Node000004" title=" " alt="" coords="274,235,278,271,288,308,302,334,318,355,314,359,297,336,284,310,273,272,268,236"/>
+<area shape="rect" id="Node000005" href="$JitEngineDeviceHIP_8h.html" title=" " alt="" coords="533,269,727,309"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="363,222,552,267,551,272,361,227"/>
+<area shape="poly" id="edge6_Node000002_Node000007" title=" " alt="" coords="225,230,149,272,147,267,222,226"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="381,322,350,359,346,355,377,318"/>
+<area shape="rect" id="Node000006" href="$JitEngineDeviceHIP_8cpp.html" title=" " alt="" coords="529,357,731,397"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="633,323,633,357,627,357,627,323"/>
+<area shape="poly" id="edge9_Node000008_Node000002" title=" " alt="" coords="319,146,288,183,284,179,315,142"/>
+<area shape="poly" id="edge10_Node000008_Node000009" title=" " alt="" coords="392,137,488,186,485,191,389,142"/>
 </map>
