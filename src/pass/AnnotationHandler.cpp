@@ -307,6 +307,12 @@ static bool isLambdaFunction(const Function &F) {
          StringRef{DemangledName}.contains(")::operator()");
 }
 
+static bool isLambdaFunctorWrapperOperator(const Function &F) {
+  std::string DemangledName = demangle(F.getName().str());
+  return StringRef{DemangledName}.contains("LambdaFunctorWrapper") &&
+         StringRef{DemangledName}.contains("::operator()");
+}
+
 AnnotationHandler::AnnotationHandler(Module &M) : M(M), Types(M) {}
 
 void AnnotationHandler::parseAnnotations(
@@ -325,6 +331,7 @@ void AnnotationHandler::parseAnnotations(
   if (ForceJitAnnotateAll) {
     // Remove any pre-existing global annotations.
     removeJitGlobalAnnotations();
+    removeProteusLambdaAnnotations();
 
     // Create jit annotations for all kernel functions.
     for (auto &F : M.getFunctionList()) {
@@ -370,6 +377,7 @@ void AnnotationHandler::parseAnnotations(
   // Lastly, parse global annotations and remove them after parsing.
   parseJitGlobalAnnotations(StubToKernelMap, RCInfoMap);
   removeJitGlobalAnnotations();
+  removeProteusLambdaAnnotations();
 
   // If this is device compilation the pass emits a JSON file that stores this
   // information for the host compilation pass to parse for instrumentation.
@@ -1124,6 +1132,29 @@ static RuntimeConstantInfo parseAttributeJsonRuntimeConstantObject(
   return RuntimeConstantInfo{RCType, ArgNo, Size, PassByValue};
 }
 
+static llvm::StringRef getGlobalString(const llvm::GlobalVariable &GV) {
+  if (!GV.hasInitializer())
+    return {};
+
+  const llvm::Constant *Init = GV.getInitializer();
+
+  if (auto *CDS = llvm::dyn_cast<llvm::ConstantDataSequential>(Init)) {
+    if (CDS->isCString())
+      return CDS->getAsCString(); // drops trailing '\0'
+    if (CDS->isString())
+      return CDS->getAsString(); // may include '\0'
+  }
+
+  if (auto *CDA = llvm::dyn_cast<llvm::ConstantDataArray>(Init)) {
+    if (CDA->isCString())
+      return CDA->getAsCString();
+    if (CDA->isString())
+      return CDA->getAsString();
+  }
+
+  return {};
+}
+
 void AnnotationHandler::parseJitGlobalAnnotations(
     const DenseMap<Value *, GlobalVariable *> &StubToKernelMap,
     MapVector<Function *, SmallSetVector<RuntimeConstantInfo, 16>> &RCInfoMap) {
@@ -1145,13 +1176,16 @@ void AnnotationHandler::parseJitGlobalAnnotations(
     }
 
     auto *Fn = dyn_cast<Function>(Entry->getOperand(0)->stripPointerCasts());
+    auto *AnnotName = dyn_cast<GlobalVariable>(Entry->getOperand(1));
+    auto AnnotStr = getGlobalString(*AnnotName);
 
     assert(Fn && "Expected function in entry operands");
 
-    if (isDeviceCompilation(M)) {
+    if (isDeviceCompilation(M) && AnnotStr.contains("jit")) {
       // Check the annotated function is a kernel function or a device
       // lambda for device compilation.
-      if (!isDeviceKernel(Fn) && !isLambdaFunction(*Fn))
+      if (!isDeviceKernel(Fn) && !isLambdaFunction(*Fn) &&
+          !isLambdaFunctorWrapperOperator(*Fn))
         reportFatalError(
             std::string{} + __FILE__ + ":" + std::to_string(__LINE__) +
             " => Expected the annotated Fn " + Fn->getName() + " (" +
@@ -1304,6 +1338,60 @@ void AnnotationHandler::parseJitGlobalAnnotations(
       }
     }
   }
+}
+
+void AnnotationHandler::removeProteusLambdaAnnotations() {
+  // Remove Proteus JIT global annotations after parsing.
+
+  auto *GlobalAnnotations = M.getNamedGlobal("llvm.global.annotations");
+  if (!GlobalAnnotations)
+    return;
+
+  Constant *Init = GlobalAnnotations->getInitializer();
+  if (!Init)
+    return;
+
+  // Iterate over the annotations and keep only those that are not related to
+  // proteus JIT.
+  SmallVector<Constant *> KeepAnnotations;
+  unsigned N = Init->getNumOperands();
+  for (unsigned I = 0; I != N; ++I) {
+    auto *Entry = dyn_cast<ConstantStruct>(Init->getOperand(I));
+    if (!Entry) {
+      DEBUG(Logger::logs("proteus-pass")
+            << "Expected constant struct in global annotations, skipping null"
+               "entry...\n");
+      continue;
+    }
+
+    auto *Annotation =
+        dyn_cast<ConstantDataArray>(Entry->getOperand(1)->getOperand(0));
+    if (!Annotation)
+      reportFatalError("Expected constant data array as annotation string");
+
+    StringRef AStr = Annotation->getAsCString();
+    if (AStr.contains("proteus.register_lambda_impl") ||
+        AStr.contains("proteus.register_call") ||
+        AStr.contains("proteus.wrapper_call"))
+      continue;
+
+    KeepAnnotations.push_back(cast<Constant>(Init->getOperand(I)));
+  }
+
+  GlobalAnnotations->eraseFromParent();
+
+  if (KeepAnnotations.empty())
+    return;
+
+  // Create new llvm.global.annotations global variable with the remaining
+  // annotations.
+  ArrayType *AT =
+      ArrayType::get(Types.GlobalAnnotationEltTy, KeepAnnotations.size());
+  Constant *NewInit = ConstantArray::get(AT, KeepAnnotations);
+  auto *AnnotationsGV = new GlobalVariable(M, NewInit->getType(), false,
+                                           GlobalValue::AppendingLinkage,
+                                           NewInit, "llvm.global.annotations");
+  AnnotationsGV->setSection("llvm.metadata");
 }
 
 void AnnotationHandler::removeJitGlobalAnnotations() {

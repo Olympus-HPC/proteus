@@ -16,10 +16,7 @@
 // them.
 int GVar = 1;
 
-template <typename F> void run(F &&Func) {
-  proteus::register_lambda(Func);
-  Func();
-}
+template <typename F> void run(F &&Func) { proteus::register_lambda(Func)(); }
 
 __attribute__((annotate("jit"))) void modifyGVar() { GVar += 1; }
 
@@ -47,3 +44,4 @@ int main() {
 // CHECK: [proteus][JitEngineHost] ObjectCacheChain rank 0 with 1 level(s):
 // CHECK-FIRST: [proteus][JitEngineHost] StorageCache rank 0 hits 0 accesses 2
 // CHECK-SECOND: [proteus][JitEngineHost] StorageCache rank 0 hits 2 accesses 2
+// clang-format on

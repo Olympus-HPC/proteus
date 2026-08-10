@@ -95,7 +95,6 @@ private:
       Result = CI->getSExtValue();
       return true;
     }
-
     // Fold an instruction.
     if (Instruction *I = dyn_cast<Instruction>(V)) {
       if (Value *FoldedV = ConstantFoldInstruction(I, DL, nullptr)) {

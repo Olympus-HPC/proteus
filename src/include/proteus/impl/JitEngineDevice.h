@@ -25,6 +25,9 @@
 #include "proteus/impl/Hashing.h"
 #include "proteus/impl/JitEngine.h"
 #include "proteus/impl/JitEngineInfoRegistry.h"
+#include "proteus/impl/LambdaCallsite.h"
+#include "proteus/impl/LambdaRegistry.h"
+#include "proteus/impl/TransformLambdaSpecialization.h"
 #include "proteus/impl/Utils.h"
 
 #include <llvm/ADT/SmallPtrSet.h>
@@ -229,16 +232,18 @@ class JITKernelInfo {
   std::optional<std::unique_ptr<MemoryBuffer>> Bitcode;
   std::optional<std::reference_wrapper<BinaryInfo>> BinInfo;
   std::optional<HashT> StaticHash;
-  std::optional<SmallVector<std::pair<std::string, StringRef>>>
-      LambdaCalleeInfo;
+  // LambdaCalleeInfo optionally contains a vector with all annotated
+  // LambdaFunctorWrapper annotators and thei unique IDs
+  std::optional<SmallVector<uint64_t>> LambdaCalleeInfo;
+  std::optional<LambdaCallsiteLocationMap> LambdaCallsiteLocationInfo;
 
 public:
   JITKernelInfo(void *Kernel, BinaryInfo &BinInfo, char const *Name,
                 ArrayRef<RuntimeConstantInfo *> RCInfoArray)
       : Kernel(Kernel), Ctx(std::make_unique<LLVMContext>()), Name(Name),
         RCInfoArray(RCInfoArray), ExtractedModule(std::nullopt),
-        Bitcode{std::nullopt}, BinInfo(BinInfo),
-        LambdaCalleeInfo(std::nullopt) {}
+        Bitcode{std::nullopt}, BinInfo(BinInfo), LambdaCalleeInfo(std::nullopt),
+        LambdaCallsiteLocationInfo(std::nullopt) {}
 
   JITKernelInfo() = default;
   void *getKernel() const {
@@ -270,9 +275,35 @@ public:
 
   bool hasLambdaCalleeInfo() { return LambdaCalleeInfo.has_value(); }
   const auto &getLambdaCalleeInfo() { return LambdaCalleeInfo.value(); }
-  void setLambdaCalleeInfo(
-      SmallVector<std::pair<std::string, StringRef>> &&LambdaInfo) {
+  void setLambdaCalleeInfo(SmallVector<uint64_t> &&LambdaInfo) {
     LambdaCalleeInfo = std::move(LambdaInfo);
+  }
+
+  bool hasLambdaCallsiteLocationInfo() const {
+    return LambdaCallsiteLocationInfo.has_value();
+  }
+  const auto &getLambdaCallsiteLocationInfo() const {
+    return LambdaCallsiteLocationInfo.value();
+  }
+  void setLambdaCallsiteLocationInfo(LambdaCallsiteLocationMap &&Info) {
+    LambdaCallsiteLocationInfo = std::move(Info);
+  }
+  void addLambdaCallsiteLocation(uint64_t LambdaID, uint32_t CallsiteIndex,
+                                 LambdaKernelArgLocation Location) {
+    if (!LambdaCallsiteLocationInfo)
+      LambdaCallsiteLocationInfo.emplace();
+
+    auto &Callsites = (*LambdaCallsiteLocationInfo)[LambdaID];
+    auto It = Callsites.find(CallsiteIndex);
+    if (It != Callsites.end()) {
+      if (It->second.KernelArgIndex != Location.KernelArgIndex ||
+          It->second.Offset != Location.Offset ||
+          It->second.StorageType != Location.StorageType)
+        reportFatalError("Conflicting lambda callsite location for lambda " +
+                         std::to_string(LambdaID));
+      return;
+    }
+    Callsites[CallsiteIndex] = Location;
   }
 };
 
@@ -414,42 +445,17 @@ public:
     return KernelInfo.getBitcode();
   }
 
-  void getLambdaJitValues(JITKernelInfo &KernelInfo,
-                          SmallVector<RuntimeConstant> &LambdaJitValuesVec) {
+  void
+  getLambdaJitValues(SmallVector<uint64_t> &LambdaCalleeInfo,
+                     LambdaCallsiteRuntimeConstantsMap &LambdaJitValuesMap) {
     TIMESCOPE(JitEngineDevice, getLambdaJitValues);
     LambdaRegistry &LR = LambdaRegistry::instance();
-    if (LR.empty()) {
-      KernelInfo.setLambdaCalleeInfo({});
+    auto LaunchInfo = LR.takeDeviceLaunchInfo();
+    if (LaunchInfo.CallsiteRuntimeConstants.empty()) {
       return;
     }
-
-    if (!KernelInfo.hasLambdaCalleeInfo()) {
-      Module &KernelModule = getModule(KernelInfo);
-      PROTEUS_DBG(Logger::logs("proteus")
-                  << "=== LAMBDA MATCHING\n"
-                  << "Caller trigger " << KernelInfo.getName() << " -> "
-                  << demangle(KernelInfo.getName()) << "\n");
-
-      SmallVector<std::pair<std::string, StringRef>> LambdaCalleeInfo;
-      for (auto &F : KernelModule.getFunctionList()) {
-        PROTEUS_DBG(Logger::logs("proteus")
-                    << " Trying F " << demangle(F.getName().str()) << "\n ");
-        auto OptionalMapIt =
-            LambdaRegistry::instance().matchJitVariableMap(F.getName());
-        if (OptionalMapIt)
-          LambdaCalleeInfo.emplace_back(F.getName(),
-                                        OptionalMapIt.value()->first);
-      }
-
-      KernelInfo.setLambdaCalleeInfo(std::move(LambdaCalleeInfo));
-    }
-
-    for (auto &[FnName, LambdaType] : KernelInfo.getLambdaCalleeInfo()) {
-      const SmallVector<RuntimeConstant> &Values =
-          LR.getJitVariables(LambdaType);
-      LambdaJitValuesVec.insert(LambdaJitValuesVec.end(), Values.begin(),
-                                Values.end());
-    }
+    LambdaCalleeInfo = std::move(LaunchInfo.LambdaCalleeInfo);
+    LambdaJitValuesMap = std::move(LaunchInfo.CallsiteRuntimeConstants);
   }
 
   void registerVar(void *Handle, const char *VarName, const void *HostAddr,
@@ -472,6 +478,10 @@ public:
   void finalizeRegistration();
   void registerFunction(void *Handle, void *Kernel, char *KernelName,
                         ArrayRef<RuntimeConstantInfo *> RCInfoArray);
+  void registerLambdaCallsiteLocation(void *Kernel, uint64_t LambdaID,
+                                      uint32_t CallsiteIndex,
+                                      uint32_t KernelArgIndex, int64_t Offset,
+                                      RuntimeConstantType StorageType);
 
   std::unordered_map<std::string, FatbinWrapperT *> ModuleIdToFatBinary;
   std::unordered_map<const void *, BinaryInfo> HandleToBinaryInfo;
@@ -561,6 +571,8 @@ protected:
   std::string DeviceArch;
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
+  DenseMap<const void *, LambdaCallsiteLocationMap>
+      PendingLambdaCallsiteLocationInfo;
   std::unique_ptr<CompilerAsync> AsyncCompiler;
 };
 
@@ -576,14 +588,15 @@ JitEngineDevice<ImplT>::compileAndRun(
   SmallVector<RuntimeConstant> RCVec =
       getRuntimeConstantValues(KernelArgs, KernelInfo.getRCInfoArray());
 
-  SmallVector<RuntimeConstant> LambdaJitValuesVec;
-  getLambdaJitValues(KernelInfo, LambdaJitValuesVec);
+  SmallVector<uint64_t> LambdaCalleeInfoToSpecialize;
+  LambdaCallsiteRuntimeConstantsMap LambdaJitValuesMap;
+  getLambdaJitValues(LambdaCalleeInfoToSpecialize, LambdaJitValuesMap);
   const auto &CGConfig = Config::get().getCGConfig(KernelInfo.getName());
-  // Include codegen and runtime specialization policy in the cache key. If we
-  // do not specialize IR based on grid dimensions, avoid hashing on grid dims
-  // to eliminate repeated compilation overhead.
+  // Determine the hash based on dimension specialization.  If we do not
+  // specialize IR based on grid dimensions, avoid hashing on those to
+  // eliminate repeated compilation overhead.
   HashT HashValue =
-      hash(getStaticHash(KernelInfo), RCVec, LambdaJitValuesVec, BlockDim.x,
+      hash(getStaticHash(KernelInfo), RCVec, LambdaJitValuesMap, BlockDim.x,
            BlockDim.y, BlockDim.z, hashCodeGenConfig(CGConfig),
            hashRuntimeSpecializationConfig(CGConfig));
   if (CGConfig.specializeDims() || CGConfig.specializeDimsRange())
@@ -609,7 +622,7 @@ JitEngineDevice<ImplT>::compileAndRun(
         relinkGlobalsObject(CompiledLib->ObjectModule->getMemBufferRef(),
                             BinInfo.getVarNameToGlobalInfo());
 
-      auto KernelFunc = proteus::getKernelFunctionFromImage(
+      auto *KernelFunc = proteus::getKernelFunctionFromImage(
           KernelMangled, CompiledLib->ObjectModule->getBufferStart(),
           Config::get().ProteusRelinkGlobalsByCopy,
           BinInfo.getVarNameToGlobalInfo());
@@ -623,6 +636,10 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   MemoryBufferRef KernelBitcode = getBitcode(KernelInfo);
   std::unique_ptr<MemoryBuffer> ObjBuf = nullptr;
+  const LambdaCallsiteRuntimeConstantsMap EmptyLambdaCallsiteRuntimeConstants;
+  const auto &LambdaCallsiteRuntimeConstants =
+      LambdaJitValuesMap.empty() ? EmptyLambdaCallsiteRuntimeConstants
+                                 : LambdaJitValuesMap;
 
   if (Config::get().ProteusAsyncCompilation) {
     //  If there is no compilation pending for the specialization, post the
@@ -633,8 +650,9 @@ JitEngineDevice<ImplT>::compileAndRun(
 
       AsyncCompiler->compile(CompilationTask{
           KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
-          GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(),
-          BinInfo.getVarNameToGlobalInfo(), GlobalLinkedBinaries, DeviceArch,
+          GridDim, RCVec, LambdaCalleeInfoToSpecialize,
+          LambdaCallsiteRuntimeConstants, BinInfo.getVarNameToGlobalInfo(),
+          GlobalLinkedBinaries, DeviceArch,
           /*CodeGenConfig */ CGConfig,
           /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
           /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy});
@@ -653,8 +671,9 @@ JitEngineDevice<ImplT>::compileAndRun(
     // Process through synchronous compilation.
     ObjBuf = CompilerSync::instance().compile(CompilationTask{
         KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
-        GridDim, RCVec, KernelInfo.getLambdaCalleeInfo(),
-        BinInfo.getVarNameToGlobalInfo(), GlobalLinkedBinaries, DeviceArch,
+        GridDim, RCVec, LambdaCalleeInfoToSpecialize,
+        LambdaCallsiteRuntimeConstants, BinInfo.getVarNameToGlobalInfo(),
+        GlobalLinkedBinaries, DeviceArch,
         /*CodeGenConfig */ CGConfig,
         /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
         /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy});
@@ -746,6 +765,27 @@ void JitEngineDevice<ImplT>::registerFunction(
 
   JITKernelInfoMap[Kernel] =
       JITKernelInfo{Kernel, BinInfo, KernelName, RCInfoArray};
+  auto PendingIt = PendingLambdaCallsiteLocationInfo.find(Kernel);
+  if (PendingIt != PendingLambdaCallsiteLocationInfo.end()) {
+    JITKernelInfoMap[Kernel].setLambdaCallsiteLocationInfo(
+        std::move(PendingIt->second));
+    PendingLambdaCallsiteLocationInfo.erase(PendingIt);
+  }
+}
+
+template <typename ImplT>
+void JitEngineDevice<ImplT>::registerLambdaCallsiteLocation(
+    void *Kernel, uint64_t LambdaID, uint32_t CallsiteIndex,
+    uint32_t KernelArgIndex, int64_t Offset, RuntimeConstantType StorageType) {
+  LambdaKernelArgLocation Location{KernelArgIndex, Offset, StorageType};
+  auto It = JITKernelInfoMap.find(Kernel);
+  if (It == JITKernelInfoMap.end()) {
+    PendingLambdaCallsiteLocationInfo[Kernel][LambdaID][CallsiteIndex] =
+        Location;
+    return;
+  }
+
+  It->second.addLambdaCallsiteLocation(LambdaID, CallsiteIndex, Location);
 }
 
 template <typename ImplT>

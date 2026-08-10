@@ -2,6 +2,7 @@
 # dependencies for building tests.
 set(PROTEUS_PASS_SOURCES
   ${PROJECT_SOURCE_DIR}/src/pass/AnnotationHandler.cpp
+  ${PROJECT_SOURCE_DIR}/src/pass/LambdaAnalysis.cpp
   ${PROJECT_SOURCE_DIR}/src/pass/ProteusPass.cpp
   ${PROJECT_SOURCE_DIR}/src/runtime/Error.cpp
 )
@@ -9,6 +10,7 @@ set(PROTEUS_PASS_SOURCES
 add_library(ProteusPassObjects OBJECT
   ${PROTEUS_PASS_SOURCES}
 )
+
 
 llvm_map_components_to_libnames(
   proteus_pass_offload_llvm_libs
@@ -66,6 +68,7 @@ target_compile_options(
 target_link_options(
   ProteusPass
   INTERFACE
+
   "SHELL:$<$<LINK_LANGUAGE:HIP>:-Xoffload-linker --load-pass-plugin=$<TARGET_FILE:ProteusPassOffload>>"
 )
 
