@@ -42,7 +42,7 @@ jobs:
       # Build the toolchain env once per LLVM version, then hand it to build jobs.
       - name: Create environment
         run: |
-          conda create -y -n llvm-env -c conda-forge \
+          conda create -y -n llvm-env --override-channels -c conda-forge \
             conda-pack \
             python=3.12 \
             pybind11 \
