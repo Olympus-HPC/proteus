@@ -41,33 +41,14 @@ std::optional<ReturnInst *> getRetInst(Function &F) {
   return std::nullopt;
 }
 
-inline std::optional<int64_t>
-getAggregateIndicesOffset(const DataLayout &DL, Type *AggTy,
-                          ArrayRef<unsigned> Indices) {
-  int64_t Offset = 0;
-  Type *CurTy = AggTy;
-  for (unsigned Idx : Indices) {
-    if (auto *ST = dyn_cast<StructType>(CurTy)) {
-      if (Idx >= ST->getNumElements())
-        return std::nullopt;
-      const StructLayout *SL = DL.getStructLayout(ST);
-      Offset += static_cast<int64_t>(SL->getElementOffset(Idx));
-      CurTy = ST->getElementType(Idx);
-      continue;
-    }
-
-    if (auto *AT = dyn_cast<ArrayType>(CurTy)) {
-      if (Idx >= AT->getNumElements())
-        return std::nullopt;
-      Offset +=
-          static_cast<int64_t>(DL.getTypeAllocSize(AT->getElementType())) * Idx;
-      CurTy = AT->getElementType();
-      continue;
-    }
-
-    return std::nullopt;
-  }
-  return Offset;
+inline int64_t getValueIndicesOffset(const DataLayout &DL, Type *AggTy,
+                                     ArrayRef<unsigned> Indices) {
+  LLVMContext &Ctx = AggTy->getContext();
+  SmallVector<Value *, 8> GEPIndices;
+  GEPIndices.push_back(ConstantInt::get(Type::getInt32Ty(Ctx), 0));
+  for (unsigned Idx : Indices)
+    GEPIndices.push_back(ConstantInt::get(Type::getInt32Ty(Ctx), Idx));
+  return DL.getIndexedOffsetInType(AggTy, GEPIndices);
 }
 
 struct LambdaKernelArgAnalysis {
@@ -278,74 +259,35 @@ public:
   }
 
   void visitExtractValueInst(ExtractValueInst &EVI) {
-    auto EVIOffset = getAggregateIndicesOffset(
+    int64_t EVIOffset = getValueIndicesOffset(
         DL, EVI.getAggregateOperand()->getType(), EVI.getIndices());
-    if (!EVIOffset) {
-      AnalysisFailed = true;
-      AnalysisSuccess = false;
-      return;
-    }
-    Offset += *EVIOffset;
+    Offset += EVIOffset;
     WorkList.push_back({EVI.getAggregateOperand(), &EVI});
   }
 
-  // Check if all inserted values derive from the same base ptr and match the
-  // aggregate field offsets they reconstruct.
+  // The analysis always encounters IVI chains in a backwards direction, meaning
+  // we always see the final IVI in a chain of writes. We assert this shape in
+  // our analysis, stopping at the location within the aggregate where we know
+  // our closure ptr lives
   void visitInsertValueInst(InsertValueInst &IVI) {
-    auto IVIAggOffset =
-        getAggregateIndicesOffset(DL, IVI.getType(), IVI.getIndices());
-    if (!IVIAggOffset) {
-      AnalysisFailed = true;
-      AnalysisSuccess = false;
-      return;
-    }
+    auto *AggregateOperand = IVI.getAggregateOperand();
+    auto *Cur = &IVI;
 
-    int64_t IVIOffset = 0;
-    auto *BaseLoad = dyn_cast<LoadInst>(IVI.getInsertedValueOperand());
-    Value *BasePtrToCheck = BaseLoad ? BaseLoad->getPointerOperand()
-                                     : IVI.getInsertedValueOperand();
-    auto *InsertedValueBase =
-        GetPointerBaseWithConstantOffset(BasePtrToCheck, IVIOffset, DL);
-    if (!InsertedValueBase || IVIOffset != *IVIAggOffset) {
+    while (Cur && AggregateOperand) {
+      int64_t CurOffset = getValueIndicesOffset(
+          DL, Cur->getAggregateOperand()->getType(), Cur->getIndices());
       DEBUG(Logger::logs("proteus-pass")
-            << "Insert value analysis failed due to " << *IVIAggOffset
-            << " not equal to " << IVIOffset << "\n");
-      AnalysisFailed = true;
-      AnalysisSuccess = false;
-      return;
-    }
-
-    auto *IVINext = dyn_cast<InsertValueInst>(IVI.getAggregateOperand());
-    while (IVINext) {
-      auto NextAggOffset = getAggregateIndicesOffset(DL, IVINext->getType(),
-                                                     IVINext->getIndices());
-      if (!NextAggOffset) {
-        AnalysisFailed = true;
-        AnalysisSuccess = false;
+            << "Curr offset " << CurOffset << "\nOffset " << Offset << "\n");
+      if (CurOffset == Offset) {
+        WorkList.push_back({Cur->getInsertedValueOperand(), &IVI});
         return;
       }
-
-      int64_t NextOff = 0;
-      auto *Load = dyn_cast<LoadInst>(IVINext->getInsertedValueOperand());
-      Value *PtrToCheck =
-          Load ? Load->getPointerOperand() : IVINext->getInsertedValueOperand();
-      auto *NextAggregateBase =
-          GetPointerBaseWithConstantOffset(PtrToCheck, NextOff, DL);
-      if (NextAggregateBase != InsertedValueBase || NextOff != *NextAggOffset) {
-        // todo: are there IR examples where this actually matters?
-        AnalysisFailed = true;
-        AnalysisSuccess = false;
-        return;
-      }
-      // Go up the chain
-      IVINext = dyn_cast<InsertValueInst>(IVINext->getAggregateOperand());
+      Cur = dyn_cast<InsertValueInst>(AggregateOperand);
+      if (Cur)
+        AggregateOperand = Cur->getAggregateOperand();
     }
-
-    DEBUG(Logger::logs("proteus-pass")
-          << "Insert value analysis found common base ptr : \n"
-          << *InsertedValueBase << "\n");
-
-    WorkList.push_back({InsertedValueBase, IVI.getInsertedValueOperand()});
+    AnalysisFailed = true;
+    AnalysisSuccess = false;
   }
 
   // todo: these three methods need to be changed to find a dominating store
@@ -356,7 +298,7 @@ public:
 
     WorkList.push_back({Res->DominatingWrite, &Alloca});
     // Default is zero so we can safely add it
-    Offset += Res->Offset;
+    Offset -= Res->Offset;
   }
 
   void visitBitCastInst(BitCastInst &BC) {
@@ -365,7 +307,7 @@ public:
       return;
     WorkList.push_back({Res->DominatingWrite, &BC});
     // Default is zero so we can safely add it
-    Offset += Res->Offset;
+    Offset -= Res->Offset;
   }
 
   void visitAddrSpaceCastInst(AddrSpaceCastInst &ASC) {
@@ -376,7 +318,7 @@ public:
 
     WorkList.push_back({Res->DominatingWrite, &ASC});
     // Default is zero so we can safely add it
-    Offset += Res->Offset;
+    Offset -= Res->Offset;
   }
 
   void visitIntToPtr(IntToPtrInst &ITP) {
