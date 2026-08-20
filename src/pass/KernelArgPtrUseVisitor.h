@@ -278,7 +278,7 @@ public:
     AnalysisFailed = false;
     AnalysisSuccess = true;
     Result = {.DominatingWrite = SI.getValueOperand(),
-              .Offset = ValueOffsetMap[StoreBase],
+              .Offset = Offset,
               .ChangedRCLayout = std::nullopt};
   }
 
@@ -328,7 +328,7 @@ public:
 
     int64_t GEPOffset = StepOffset.getSExtValue();
     DEBUG(Logger::logs("proteus-pass")
-          << "    " << "Computed offset " << GEPOffset << "\n");
+          << "    " << "Computed GEP offset " << GEPOffset << "\n");
     Value *GEPBase = GEP.getPointerOperand();
     if (!GEPBase ||
         GEPBase->stripPointerCasts() != TrackedBase->stripPointerCasts())
@@ -353,6 +353,7 @@ public:
     // We found a GEP, now we need to track the GEP itself, so the TargetOffset
     // is now zero again
     ValueOffsetMap[&GEP] = ValueOffsetMap[GEPBase] - GEPOffset;
+    Offset += GEPOffset;
     DEBUG(Logger::logs("proteus-pass")
           << "    " << "Setting map K " << GEP << " : " << ValueOffsetMap[&GEP]
           << "\n");
