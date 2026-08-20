@@ -44,6 +44,19 @@ bool needsDefUseAnalysis(Value *Val) {
          isa<BitCastInst>(Val) || isa<IntToPtrInst>(Val);
 }
 
+inline bool offsetCoveredByRange(int64_t TargetOffset, int64_t RangeOffset,
+                                 uint64_t RangeSize) {
+  return TargetOffset >= RangeOffset &&
+         static_cast<uint64_t>(TargetOffset - RangeOffset) < RangeSize;
+}
+
+inline std::optional<uint64_t> getTypeStoreSize(const DataLayout &DL,
+                                                Type *Ty) {
+  if (!Ty || !Ty->isSized())
+    return std::nullopt;
+  return static_cast<uint64_t>(DL.getTypeStoreSize(Ty));
+}
+
 struct LambdaPtrUseAnalysis {
   Value *DominatingWrite = nullptr;
   int64_t Offset = 0;
@@ -192,6 +205,15 @@ private:
   DominatorTree DTree;
   CallerFrame ArgBeforeCB;
   int64_t Offset = 0;
+  // The ValueOffsetMap contains the "live range" of the ptr we're analyzing.
+  // For example, let's say that LambdaInstUseVisitor is handed ptr %0 = alloca
+  // ptr, and LambdaArgVisitor has already identified that the closure starts at
+  // byte
+  // 8.  In this case, ValueOffsetMap[%0] = 8.  If we encounter a store like
+  // store ptr %2, ptr%0, align 8, we don't care, because its written outside
+  // of the range of the closure.
+  DenseMap<Value *, int> ValueOffsetMap;
+  Value *TrackedBase = nullptr;
   LambdaPtrUseAnalysis Result;
   DataLayout DL;
   SmallVector<Value *> WorkList;
@@ -203,10 +225,12 @@ public:
   // Constructor used whenever a NeedsDefUseAnalysis Value is encountered. We
   // need to track where the calling LambdaArgVisitor came in from, so that our
   // analysis does not
-  LambdaInstUseVisitor(Value *PtrBegin, Value *SeenUse, const DataLayout &Dl)
-      : DL(Dl) {
+  LambdaInstUseVisitor(Value *PtrBegin, Value *SeenUse, const DataLayout &Dl,
+                       int64_t TargetOff)
+      : TrackedBase(PtrBegin), DL(Dl) {
     WorkList.push_back(PtrBegin);
     Seen.insert(SeenUse);
+    ValueOffsetMap[PtrBegin] = TargetOff;
   }
   auto back() { return WorkList.back(); }
   void popBack() { WorkList.pop_back(); }
@@ -230,13 +254,32 @@ public:
   }
 
   void visitStoreInst(StoreInst &SI) {
+    // todo: uncomment
+    // Value *Stored = SI.getValueOperand();
+    // if (!Stored->getType()->isPointerTy())
+    //   return;
+    Value *StoreBase = SI.getPointerOperand();
+    auto StoreSize = getTypeStoreSize(DL, SI.getValueOperand()->getType());
+    if (!ValueOffsetMap.contains(StoreBase)) {
+      DEBUG(Logger::logs("proteus-pass")
+            << "    Analysis failed due to absence of " << *StoreBase
+            << " in offset tracking map, this is an internal compiler bug\n");
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
+      return;
+    }
+
+    if (!StoreSize ||
+        !offsetCoveredByRange(ValueOffsetMap[StoreBase], 0, *StoreSize))
+      return;
+    DEBUG(Logger::logs("proteus-pass")
+          << "    Found PTRstore applicable to offset " << ValueOffsetMap[&SI]
+          << " Store size = " << *StoreSize << " ; " << SI << "\n");
     AnalysisFailed = false;
     AnalysisSuccess = true;
     Result = {.DominatingWrite = SI.getValueOperand(),
-              .Offset = 0,
+              .Offset = ValueOffsetMap[StoreBase],
               .ChangedRCLayout = std::nullopt};
-    // if (SI.getType()->isPointerTy())
-    // pushBack(SI.getPointerOperand(), &SI);
   }
 
   void visitLoadInst(LoadInst &LI) {
@@ -270,13 +313,56 @@ public:
   }
 
   void visitGetElementPtrInst(GetElementPtrInst &GEP) {
-    int64_t GEPOffset = 0;
-    GetPointerBaseWithConstantOffset(&GEP, GEPOffset, DL);
-    Offset += GEPOffset;
-    pushBack(GEP.getPointerOperand(), &GEP);
+    // We don't want to use GetPointerBaseWithConstantOffset here.
+    // We actually don't want the true "pointer base" here.  I.E. if we are
+    // analyzing the dominating store to %4 = addrspacecast ptr addrspace(5) %3
+    // to ptr where %3 = alloca %class.anon.1, align 8, addrspace(5)
+    // GetPointerBaseWithConstantOffset gets us 3, which we (a) don't know about
+    // and (b) don't care about, we just care about the SSA to %4.
+    APInt StepOffset(DL.getIndexTypeSizeInBits(GEP.getType()), 0);
+    if (!GEP.accumulateConstantOffset(DL, StepOffset)) {
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
+      return;
+    }
+
+    int64_t GEPOffset = StepOffset.getSExtValue();
+    DEBUG(Logger::logs("proteus-pass")
+          << "    " << "Computed offset " << GEPOffset << "\n");
+    Value *GEPBase = GEP.getPointerOperand();
+    if (!GEPBase ||
+        GEPBase->stripPointerCasts() != TrackedBase->stripPointerCasts())
+      return;
+
+    if (!ValueOffsetMap.contains(GEPBase)) {
+      DEBUG(Logger::logs("proteus-pass")
+            << "  [PTR use analysis]: " << "GEPBase not found in map "
+            << *GEPBase << "\n");
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
+      return;
+    }
+
+    auto ResultSize = getTypeStoreSize(DL, GEP.getResultElementType());
+    if (ResultSize &&
+        !offsetCoveredByRange(ValueOffsetMap[GEPBase], GEPOffset, *ResultSize))
+      return;
+    DEBUG(Logger::logs("proteus-pass")
+          << "    Found GEP applicable to offset=" << ValueOffsetMap[GEPBase]
+          << " ; " << GEP << "\n");
+    // We found a GEP, now we need to track the GEP itself, so the TargetOffset
+    // is now zero again
+    ValueOffsetMap[&GEP] = ValueOffsetMap[GEPBase] - GEPOffset;
+    DEBUG(Logger::logs("proteus-pass")
+          << "    " << "Setting map K " << GEP << " : " << ValueOffsetMap[&GEP]
+          << "\n");
+    for (auto *User : GEP.users())
+      if (!Seen.contains(User))
+        pushBack(User, &GEP);
   }
 
-  // todo: these three methods need to be changed to find a dominating store
+  // todo: these three methods may need to be changed to find a dominating store
+  // particularly for the case of mutable lambdas.
   void visitAllocaInst(AllocaInst &Alloca) {
     for (auto *User : Alloca.users())
       if (!Seen.contains(User))
@@ -290,13 +376,10 @@ public:
   }
 
   void visitAddrSpaceCastInst(AddrSpaceCastInst &ASC) {
-    // todo: I don't think the below is necessary, useful, or correct
-    // WorkList.push_back(ASC.getPointerOperand());
     DEBUG(Logger::logs("proteus-pass") << ASC << "\n");
     for (auto *User : ASC.users())
       if (!Seen.contains(User)) {
-        DEBUG(Logger::logs("proteus-pass") << "  Next up : " << *User << "\n");
-        pushBack(User, &ASC); //&ASC);
+        pushBack(User, &ASC);
       }
   }
 
@@ -354,20 +437,20 @@ public:
 
 inline std::optional<LambdaPtrUseAnalysis>
 getDominatingUse(const DataLayout &DL, Value *ValueNeedingAnalysis,
-                 Value *SeenUse) {
+                 Value *SeenUse, int64_t TargetOffset) {
   DEBUG(Logger::logs("proteus-pass") << "Beginning PtrUse analysis " << "\n");
 
-  if (auto *I = dyn_cast<Instruction>(SeenUse)) {
-    FunctionMemorySSAResolver Resolver(DL);
-    if (auto Res = Resolver.resolve(ValueNeedingAnalysis, I)) {
-      DEBUG(Logger::logs("proteus-pass")
-            << "  [PTR use analysis]: MemorySSA resolved "
-            << *ValueNeedingAnalysis << " at use " << *SeenUse << "\n");
-      return Res;
-    }
-  }
+  // if (auto *I = dyn_cast<Instruction>(SeenUse)) {
+  //   FunctionMemorySSAResolver Resolver(DL);
+  //   if (auto Res = Resolver.resolve(ValueNeedingAnalysis, I)) {
+  //     DEBUG(Logger::logs("proteus-pass")
+  //           << "  [PTR use analysis]: MemorySSA resolved "
+  //           << *ValueNeedingAnalysis << " at use " << *SeenUse << "\n");
+  //     return Res;
+  //   }
+  // }
 
-  LambdaInstUseVisitor Visitor(ValueNeedingAnalysis, SeenUse, DL);
+  LambdaInstUseVisitor Visitor(ValueNeedingAnalysis, SeenUse, DL, TargetOffset);
   // Analysis loop
   while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {
     auto *V = Visitor.back();

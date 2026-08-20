@@ -253,87 +253,21 @@ public:
   }
 
   void visitLoadInst(LoadInst &LI) {
-    // TODO: Delete this?  We shouldn't reach this from a use-def
-    if (!LI.getType()->isPointerTy()) {
-      AnalysisFailed = true;
-      return;
-    }
+    DEBUG(Logger::logs("proteus-pass") << "Load inst analysis \n")
+    // int64_t LoadOff = 0;
+    // Value *LoadBase =
+    //     GetPointerBaseWithConstantOffset(LI.getPointerOperand(), LoadOff,
+    //     DL);
+    // if (!LoadBase) {
+    //   AnalysisFailed = true;
+    //   return;
+    // }
+    // LoadBase = LoadBase->stripPointerCasts();
+    // auto Res = getDominatingUse(DL, LoadBase, MemoryAnalysisPtrUse);
+    // if (!Res)
+    //   return;
 
-    int64_t LoadOff = 0;
-    Value *LoadBase =
-        GetPointerBaseWithConstantOffset(LI.getPointerOperand(), LoadOff, DL);
-    if (!LoadBase) {
-      AnalysisFailed = true;
-      return;
-    }
-    LoadBase = LoadBase->stripPointerCasts();
-
-    SmallVector<Value *, 8> PtrWorkList;
-    SmallPtrSet<Value *, 16> LocalSeen;
-    PtrWorkList.push_back(LoadBase);
-
-    Value *CommonStoredVal = nullptr;
-    bool FoundStore = false;
-
-    while (!PtrWorkList.empty()) {
-      Value *Cur = PtrWorkList.pop_back_val();
-      if (!LocalSeen.insert(Cur).second)
-        continue;
-
-      for (User *U : Cur->users()) {
-        if (auto *SI = dyn_cast<StoreInst>(U)) {
-          int64_t StoreOff = 0;
-          Value *StoreBase = GetPointerBaseWithConstantOffset(
-              SI->getPointerOperand(), StoreOff, DL);
-          if (!StoreBase)
-            continue;
-          StoreBase = StoreBase->stripPointerCasts();
-
-          if (StoreBase != LoadBase || StoreOff != LoadOff)
-            continue;
-
-          Value *V = SI->getValueOperand();
-          if (!V->getType()->isPointerTy())
-            continue;
-
-          V = V->stripPointerCasts();
-          if (!FoundStore) {
-            CommonStoredVal = V;
-            FoundStore = true;
-          } else if (CommonStoredVal != V) {
-            AnalysisFailed = true;
-            return;
-          }
-          continue;
-        }
-
-        if (isa<GetElementPtrInst>(U) || isa<BitCastInst>(U) ||
-            isa<AddrSpaceCastInst>(U) || isa<PHINode>(U) ||
-            isa<SelectInst>(U)) {
-          PtrWorkList.push_back(cast<Value>(U));
-          continue;
-        }
-
-        if (auto *II = dyn_cast<IntrinsicInst>(U)) {
-          switch (II->getIntrinsicID()) {
-          case Intrinsic::dbg_declare:
-          case Intrinsic::dbg_value:
-          case Intrinsic::lifetime_start:
-          case Intrinsic::lifetime_end:
-            continue;
-          default:
-            break;
-          }
-        }
-      }
-    }
-
-    if (!FoundStore) {
-      AnalysisFailed = true;
-      return;
-    }
-
-    WorkList.push_back({CommonStoredVal, &LI});
+    WorkList.push_back({LI.getPointerOperand(), &LI});
   }
 
   void visitGetElementPtrInst(GetElementPtrInst &GEP) {
@@ -355,9 +289,9 @@ public:
     WorkList.push_back({EVI.getAggregateOperand(), &EVI});
   }
 
+  // Check if all inserted values derive from the same base ptr and match the
+  // aggregate field offsets they reconstruct.
   void visitInsertValueInst(InsertValueInst &IVI) {
-    // Check if all inserted values derive from the same base ptr and match the
-    // aggregate field offsets they reconstruct.
     auto IVIAggOffset =
         getAggregateIndicesOffset(DL, IVI.getType(), IVI.getIndices());
     if (!IVIAggOffset) {
@@ -373,6 +307,9 @@ public:
     auto *InsertedValueBase =
         GetPointerBaseWithConstantOffset(BasePtrToCheck, IVIOffset, DL);
     if (!InsertedValueBase || IVIOffset != *IVIAggOffset) {
+      DEBUG(Logger::logs("proteus-pass")
+            << "Insert value analysis failed due to " << *IVIAggOffset
+            << " not equal to " << IVIOffset << "\n");
       AnalysisFailed = true;
       AnalysisSuccess = false;
       return;
@@ -413,30 +350,19 @@ public:
 
   // todo: these three methods need to be changed to find a dominating store
   void visitAllocaInst(AllocaInst &Alloca) {
-    auto Res = getDominatingUse(DL, &Alloca, MemoryAnalysisPtrUse);
-    if (!Res) {
+    auto Res = getDominatingUse(DL, &Alloca, MemoryAnalysisPtrUse, Offset);
+    if (!Res)
       return;
-      // AnalysisFailed = true;
-      // AnalysisSuccess = false;
-      // DEBUG(Logger::logs("proteus-pass")
-      //     << "Analysis failed at = \n"
-      //     << Alloca << "\n");
-    }
+
     WorkList.push_back({Res->DominatingWrite, &Alloca});
     // Default is zero so we can safely add it
     Offset += Res->Offset;
   }
 
   void visitBitCastInst(BitCastInst &BC) {
-    auto Res = getDominatingUse(DL, &BC, MemoryAnalysisPtrUse);
-    if (!Res) {
+    auto Res = getDominatingUse(DL, &BC, MemoryAnalysisPtrUse, Offset);
+    if (!Res)
       return;
-      // AnalysisFailed = true;
-      // AnalysisSuccess = false;
-      // DEBUG(Logger::logs("proteus-pass")
-      //     << "Analysis failed at = \n"
-      //     << BC << "\n");
-    }
     WorkList.push_back({Res->DominatingWrite, &BC});
     // Default is zero so we can safely add it
     Offset += Res->Offset;
@@ -444,15 +370,10 @@ public:
 
   void visitAddrSpaceCastInst(AddrSpaceCastInst &ASC) {
     WorkList.push_back({ASC.getPointerOperand(), &ASC});
-    auto Res = getDominatingUse(DL, &ASC, MemoryAnalysisPtrUse);
-    if (!Res) {
+    auto Res = getDominatingUse(DL, &ASC, MemoryAnalysisPtrUse, Offset);
+    if (!Res)
       return;
-      // AnalysisFailed = true;
-      // AnalysisSuccess = false;
-      // DEBUG(Logger::logs("proteus-pass")
-      //     << "Analysis failed at = \n"
-      //     << ASC << "\n");
-    }
+
     WorkList.push_back({Res->DominatingWrite, &ASC});
     // Default is zero so we can safely add it
     Offset += Res->Offset;
