@@ -58,6 +58,7 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalValue.h>
 #include <llvm/IR/GlobalVariable.h>
+#include <llvm/IR/InstIterator.h>
 #include <llvm/IR/InstrTypes.h>
 #include <llvm/IR/Instruction.h>
 #include <llvm/IR/Instructions.h>
@@ -228,15 +229,17 @@ public:
       JitWorkList.push_back(&JFI);
     }
 
-    // IMPORTANT: Build all per-function JIT modules before rewriting any of the
-    // original functions into stubs. Otherwise, later JIT module extraction can
-    // accidentally clone the already-rewritten stub (and its mutable globals),
-    // producing invalid JIT IR (e.g. external globals with InternalLinkage).
-    // See unit test lambda_def_register_once, which tests this ordering.
-    for (auto *JFI : JitWorkList)
+    // IMPORTANT: A JIT function is rewritten into its dispatch stub before the
+    // module of any JIT function that contains it is extracted, so the
+    // enclosing module carries the nested dispatch and the inner region
+    // specializes on its own runtime constants. Ordering innermost-first is
+    // what makes that happen; the stub's mutable bookkeeping globals are
+    // cloned by definition (see emitJitModuleHost) so the cloned IR stays
+    // valid. See unit tests lambda_def_register_once and lambda_nested.
+    for (auto *JFI : sortJitWorkListInnermostFirst(JitWorkList)) {
       emitJitModuleHost(M, *JFI);
-    for (auto *JFI : JitWorkList)
       emitJitEntryCall(M, *JFI);
+    }
 
     DEBUG(Logger::logs("proteus-pass")
           << "=== Post Original Host Module\n"
@@ -776,6 +779,81 @@ private:
     }
   }
 
+  using JitWorkListEntry = decltype(JitFunctionInfoMap)::value_type;
+
+  // JIT functions reachable from F's body, looking through ordinary calls but
+  // stopping at another JIT function -- those are the regions nested in F.
+  static SmallPtrSet<Function *, 8>
+  findNestedJitFunctions(Function &F,
+                         const SmallPtrSetImpl<Function *> &JitFunctions) {
+    SmallPtrSet<Function *, 8> Nested;
+    SmallPtrSet<Function *, 16> Visited;
+    SmallVector<Function *, 16> Worklist{&F};
+
+    while (!Worklist.empty()) {
+      Function *Current = Worklist.pop_back_val();
+      if (!Visited.insert(Current).second)
+        continue;
+
+      for (Instruction &I : instructions(*Current)) {
+        auto *CB = dyn_cast<CallBase>(&I);
+        if (!CB)
+          continue;
+
+        Function *Callee = CB->getCalledFunction();
+        if (!Callee || Callee->isDeclaration() || Callee == &F)
+          continue;
+
+        if (JitFunctions.contains(Callee)) {
+          Nested.insert(Callee);
+          continue;
+        }
+
+        Worklist.push_back(Callee);
+      }
+    }
+
+    return Nested;
+  }
+
+  // Post-order over the nesting relation, so an inner JIT function is always
+  // processed before the ones containing it. Recursion through JIT functions
+  // has no innermost region, so a cycle keeps its original relative order.
+  SmallVector<JitWorkListEntry *, 16> sortJitWorkListInnermostFirst(
+      const SmallVectorImpl<JitWorkListEntry *> &JitWorkList) {
+    SmallPtrSet<Function *, 16> JitFunctions;
+    DenseMap<Function *, JitWorkListEntry *> FnToEntry;
+    for (auto *JFI : JitWorkList) {
+      JitFunctions.insert(JFI->first);
+      FnToEntry[JFI->first] = JFI;
+    }
+
+    DenseMap<Function *, SmallPtrSet<Function *, 8>> Nested;
+    for (auto *JFI : JitWorkList)
+      Nested[JFI->first] = findNestedJitFunctions(*JFI->first, JitFunctions);
+
+    SmallVector<JitWorkListEntry *, 16> Ordered;
+    SmallPtrSet<Function *, 16> Done;
+    SmallPtrSet<Function *, 16> OnStack;
+
+    std::function<void(Function *)> Visit = [&](Function *F) {
+      if (Done.contains(F) || !OnStack.insert(F).second)
+        return;
+
+      for (Function *Inner : Nested[F])
+        Visit(Inner);
+
+      OnStack.erase(F);
+      if (Done.insert(F).second)
+        Ordered.push_back(FnToEntry[F]);
+    };
+
+    for (auto *JFI : JitWorkList)
+      Visit(JFI->first);
+
+    return Ordered;
+  }
+
   void emitJitModuleHost(Module &M,
                          std::pair<Function *, JitFunctionInfo> &JITInfo) {
     Function *JITFn = JITInfo.first;
@@ -786,9 +864,17 @@ private:
           if (isCoverageGlobal(*GV))
             return true;
 
-          if (const GlobalVariable *G = dyn_cast<GlobalVariable>(GV))
+          if (const GlobalVariable *G = dyn_cast<GlobalVariable>(GV)) {
+            // Bookkeeping globals of a nested dispatch stub are per-callsite
+            // state, so the enclosing JIT module gets its own definitions. They
+            // are mutable and internal, so cloning them as declarations would
+            // produce invalid IR.
+            if (G->getName().starts_with(".proteus."))
+              return true;
+
             if (!G->isConstant())
               return false;
+          }
 
           return true;
         });
