@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "proteus/LLVMModule.h"
+#include "proteus/impl/LLVMModule.h"
 
 #include "proteus/impl/Config.h"
 #include "proteus/impl/CoreLLVM.h"
