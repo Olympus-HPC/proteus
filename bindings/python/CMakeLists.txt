@@ -54,6 +54,10 @@ endif()
 pybind11_add_module(proteus_python MODULE ${PROTEUS_PYTHON_SOURCES})
 target_link_libraries(proteus_python PRIVATE proteusFrontend)
 
+# The bindings use implementation headers (for example proteus/impl/LLVMModule.h)
+# that are not part of the installed public API surface.
+target_include_directories(proteus_python PRIVATE ${PROJECT_SOURCE_DIR}/src/include)
+
 # Mirror the selected backend features into the binding compilation unit.
 target_compile_definitions(proteus_python PRIVATE
   $<$<BOOL:${PROTEUS_ENABLE_MLIR}>:PROTEUS_ENABLE_MLIR>

@@ -1,6 +1,6 @@
 #include "LLVMModuleBindings.h"
 
-#include "proteus/LLVMModule.h"
+#include "proteus/impl/LLVMModule.h"
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
