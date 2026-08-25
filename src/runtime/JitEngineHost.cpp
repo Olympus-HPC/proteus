@@ -95,8 +95,12 @@ void JitEngineHost::addStaticLibrarySymbols() {
   }
 #endif
 
-#if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
+#if PROTEUS_ENABLE_CUDA
   if (__proteus_get_device_launch_config_symbols) {
+#elif PROTEUS_ENABLE_HIP
+  {
+#endif
+#if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
     const char *PushName = nullptr;
     uintptr_t PushCallConfiguration = 0;
     const char *PopName = nullptr;
