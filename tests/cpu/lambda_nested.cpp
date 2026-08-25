@@ -15,9 +15,8 @@ template <typename F> void run(F &&Func) { proteus::register_lambda(Func)(); }
 
 void nested(int V, int W) {
   run([=, V = proteus::jit_variable(V)]() __attribute__((annotate("jit"))) {
-    run([=, W = proteus::jit_variable(W)]() __attribute__((annotate("jit"))) {
-      printf("V %d W %d\n", V, W);
-    });
+    run([=, W = proteus::jit_variable(W)]()
+            __attribute__((annotate("jit"))) { printf("V %d W %d\n", V, W); });
   });
 }
 
