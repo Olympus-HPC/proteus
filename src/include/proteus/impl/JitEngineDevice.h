@@ -499,6 +499,15 @@ public:
     return JITKernelInfoMap[Func];
   }
 
+  std::optional<std::reference_wrapper<JITKernelInfo>>
+  getJITKernelInfo(StringRef FuncName) {
+    auto It = KernelNameToKernel.find(FuncName.str());
+    if (It == KernelNameToKernel.end())
+      return std::nullopt;
+
+    return getJITKernelInfo(It->second);
+  }
+
   HashT getStaticHash(JITKernelInfo &KernelInfo) {
     if (KernelInfo.hasStaticHash())
       return KernelInfo.getStaticHash();
@@ -571,6 +580,7 @@ protected:
   std::string DeviceArch;
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
+  std::unordered_map<std::string, const void *> KernelNameToKernel;
   DenseMap<const void *, LambdaCallsiteLocationMap>
       PendingLambdaCallsiteLocationInfo;
   std::unique_ptr<CompilerAsync> AsyncCompiler;
@@ -754,6 +764,8 @@ void JitEngineDevice<ImplT>::registerFunction(
                 << "\n");
     return;
   }
+
+  KernelNameToKernel.try_emplace(KernelName, Kernel);
 
   if (!HandleToBinaryInfo.count(Handle))
     reportFatalError("Expected Handle in map");

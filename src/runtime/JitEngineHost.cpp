@@ -82,6 +82,18 @@ void JitEngineHost::addStaticLibrarySymbols() {
                                    __proteus_cudaLaunchKernel_ptr)},
                                JITSymbolFlags::Exported);
   }
+  if (__proteus_cudaPushCallConfiguration_ptr) {
+    SymbolMap[LLJITPtr->mangleAndIntern("__cudaPushCallConfiguration")] =
+        orc::ExecutorSymbolDef(orc::ExecutorAddr{reinterpret_cast<uintptr_t>(
+                                   __proteus_cudaPushCallConfiguration_ptr)},
+                               JITSymbolFlags::Exported);
+  }
+  if (__proteus_cudaPopCallConfiguration_ptr) {
+    SymbolMap[LLJITPtr->mangleAndIntern("__cudaPopCallConfiguration")] =
+        orc::ExecutorSymbolDef(orc::ExecutorAddr{reinterpret_cast<uintptr_t>(
+                                   __proteus_cudaPopCallConfiguration_ptr)},
+                               JITSymbolFlags::Exported);
+  }
 
 #endif
 
@@ -90,6 +102,10 @@ void JitEngineHost::addStaticLibrarySymbols() {
   SymbolMap[LLJITPtr->mangleAndIntern("__proteus_launch_kernel")] =
       orc::ExecutorSymbolDef(orc::ExecutorAddr{reinterpret_cast<uintptr_t>(
                                  __proteus_launch_kernel)},
+                             JITSymbolFlags::Exported);
+  SymbolMap[LLJITPtr->mangleAndIntern("__proteus_launch_kernel_by_name")] =
+      orc::ExecutorSymbolDef(orc::ExecutorAddr{reinterpret_cast<uintptr_t>(
+                                 __proteus_launch_kernel_by_name)},
                              JITSymbolFlags::Exported);
 
 #endif
