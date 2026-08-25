@@ -33,7 +33,7 @@ __proteus_launch_kernel(void *Kernel, dim3 GridDim, dim3 BlockDim,
                         void **KernelArgs, uint64_t ShmemSize, void *Stream);
 
 extern "C" proteus::DeviceTraits<JitDeviceImplT>::DeviceError_t
-__proteus_launch_kernel_by_name(const char *KernelName, dim3 GridDim,
+__proteus_launch_kernel_by_name(const char *KernelLookupKey, dim3 GridDim,
                                 dim3 BlockDim, void **KernelArgs,
                                 uint64_t ShmemSize, void *Stream);
 
