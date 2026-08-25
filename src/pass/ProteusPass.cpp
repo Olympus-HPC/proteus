@@ -206,7 +206,7 @@ public:
 
     if (hasDeviceLaunchKernelCalls(M)) {
       instrumentLambdaLaunchCallsites(M, StubToKernelMap);
-      emitJitLaunchKernelCall(M);
+      emitJitLaunchKernelCall(M, StubToKernelMap);
     }
 
     instrumentRegisterFunction(M);
@@ -1594,7 +1594,7 @@ private:
     return true;
   }
 
-  FunctionCallee getJitLaunchKernelFn(Module &M) {
+  FunctionCallee getJitLaunchKernelFn(Module &M, bool LookupByName) {
     FunctionType *JitLaunchKernelFnTy = nullptr;
 
     assert(LaunchFunctionName && "Expected valid launch function name");
@@ -1612,14 +1612,18 @@ private:
           "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags "
           "for ProteusPass");
 
+    StringRef EntryName = LookupByName ? "__proteus_launch_kernel_by_name"
+                                       : "__proteus_launch_kernel";
     FunctionCallee JitLaunchKernelFn =
-        M.getOrInsertFunction("__proteus_launch_kernel", JitLaunchKernelFnTy);
+        M.getOrInsertFunction(EntryName, JitLaunchKernelFnTy);
 
     return JitLaunchKernelFn;
   }
 
-  void replaceWithJitLaunchKernel(Module &M, CallBase *LaunchKernelCB) {
-    FunctionCallee JitLaunchKernelFn = getJitLaunchKernelFn(M);
+  void replaceWithJitLaunchKernel(Module &M, CallBase *LaunchKernelCB,
+                                  GlobalVariable *KernelName) {
+    FunctionCallee JitLaunchKernelFn =
+        getJitLaunchKernelFn(M, KernelName != nullptr);
 
     // Insert before the launch kernel call instruction.
     IRBuilder<> Builder(LaunchKernelCB);
@@ -1627,6 +1631,8 @@ private:
 
     SmallVector<Value *> Args = {LaunchKernelCB->arg_begin(),
                                  LaunchKernelCB->arg_end()};
+    if (KernelName)
+      Args[0] = KernelName;
 
     if (isa<CallInst>(LaunchKernelCB)) {
       CallOrInvoke = Builder.CreateCall(JitLaunchKernelFn, Args);
@@ -1646,7 +1652,8 @@ private:
     LaunchKernelCB->eraseFromParent();
   }
 
-  void emitJitLaunchKernelCall(Module &M) {
+  void emitJitLaunchKernelCall(
+      Module &M, const DenseMap<Value *, GlobalVariable *> &StubToKernelMap) {
     Function *LaunchKernelFn = nullptr;
     if (!LaunchFunctionName) {
       reportFatalError(
@@ -1675,8 +1682,17 @@ private:
         ToBeReplaced.push_back(CB);
       }
 
-    for (CallBase *CB : ToBeReplaced)
-      replaceWithJitLaunchKernel(M, CB);
+    for (CallBase *CB : ToBeReplaced) {
+      GlobalVariable *KernelName = nullptr;
+      Value *Stub = getStubGV(CB->getArgOperand(0));
+      auto *StubFn = dyn_cast_or_null<Function>(Stub);
+      auto It = StubToKernelMap.find(Stub);
+      if (StubFn && It != StubToKernelMap.end() &&
+          JitFunctionInfoMap.contains(StubFn))
+        KernelName = It->second;
+
+      replaceWithJitLaunchKernel(M, CB, KernelName);
+    }
   }
 
   FunctionCallee getJitRegisterFatBinaryFn(Module &M) {
