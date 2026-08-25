@@ -32,10 +32,15 @@ extern cudaError_t (*__proteus_cudaGetSymbolAddress_ptr)(void **, const void *);
 extern cudaError_t (*__proteus_cudaLaunchKernel_ptr)(const void *, dim3, dim3,
                                                      void **, size_t,
                                                      cudaStream_t);
-extern unsigned (*__proteus_cudaPushCallConfiguration_ptr)(dim3, dim3, size_t,
-                                                           void *);
-extern cudaError_t (*__proteus_cudaPopCallConfiguration_ptr)(dim3 *, dim3 *,
-                                                             size_t *, void *);
+}
+
+extern "C" void __proteus_get_device_launch_config_symbols(
+    const char **PushName, uintptr_t *PushAddress, const char **PopName,
+    uintptr_t *PopAddress) {
+  *PushName = "__cudaPushCallConfiguration";
+  *PushAddress = reinterpret_cast<uintptr_t>(&__cudaPushCallConfiguration);
+  *PopName = "__cudaPopCallConfiguration";
+  *PopAddress = reinterpret_cast<uintptr_t>(&__cudaPopCallConfiguration);
 }
 
 // Initialization function to set the function pointers for the CUDA runtime
@@ -44,8 +49,6 @@ extern cudaError_t (*__proteus_cudaPopCallConfiguration_ptr)(dim3 *, dim3 *,
 extern "C" void __proteus_cudart_builtins_init() {
   __proteus_cudaGetSymbolAddress_ptr = checkCudaGetSymbolAddress;
   __proteus_cudaLaunchKernel_ptr = cudaLaunchKernel;
-  __proteus_cudaPushCallConfiguration_ptr = __cudaPushCallConfiguration;
-  __proteus_cudaPopCallConfiguration_ptr = __cudaPopCallConfiguration;
 }
 
 // NOLINTEND(readability-identifier-naming)

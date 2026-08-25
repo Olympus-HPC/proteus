@@ -20,11 +20,6 @@ inline cudaError_t (*__proteus_cudaGetSymbolAddress_ptr)(
 inline cudaError_t (*__proteus_cudaLaunchKernel_ptr)(const void *, dim3, dim3,
                                                      void **, size_t,
                                                      cudaStream_t) = nullptr;
-inline unsigned (*__proteus_cudaPushCallConfiguration_ptr)(dim3, dim3, size_t,
-                                                           void *) = nullptr;
-inline cudaError_t (*__proteus_cudaPopCallConfiguration_ptr)(dim3 *, dim3 *,
-                                                             size_t *,
-                                                             void *) = nullptr;
 }
 // NOLINTEND(readability-identifier-naming)
 

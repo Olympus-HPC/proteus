@@ -17,9 +17,6 @@
 #include "proteus/impl/LambdaRegistry.h"
 #include "proteus/impl/TransformArgumentSpecialization.h"
 #include "proteus/impl/TransformLambdaSpecialization.h"
-#if PROTEUS_ENABLE_HIP
-#include "proteus/impl/HIPRuntimeAPI.h"
-#endif
 #include <optional>
 #if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
 #include "proteus/impl/CompilerInterfaceDevice.h"
@@ -44,6 +41,17 @@
 using namespace proteus;
 using namespace llvm;
 using namespace llvm::orc;
+
+#if PROTEUS_ENABLE_CUDA
+extern "C" LLVM_ATTRIBUTE_WEAK void
+__proteus_get_device_launch_config_symbols(const char **, uintptr_t *,
+                                           const char **, uintptr_t *);
+#elif PROTEUS_ENABLE_HIP
+extern "C" void __proteus_get_device_launch_config_symbols(const char **,
+                                                           uintptr_t *,
+                                                           const char **,
+                                                           uintptr_t *);
+#endif
 
 namespace {
 
@@ -85,30 +93,22 @@ void JitEngineHost::addStaticLibrarySymbols() {
                                    __proteus_cudaLaunchKernel_ptr)},
                                JITSymbolFlags::Exported);
   }
-  if (__proteus_cudaPushCallConfiguration_ptr) {
-    SymbolMap[LLJITPtr->mangleAndIntern("__cudaPushCallConfiguration")] =
-        orc::ExecutorSymbolDef(orc::ExecutorAddr{reinterpret_cast<uintptr_t>(
-                                   __proteus_cudaPushCallConfiguration_ptr)},
-                               JITSymbolFlags::Exported);
-  }
-  if (__proteus_cudaPopCallConfiguration_ptr) {
-    SymbolMap[LLJITPtr->mangleAndIntern("__cudaPopCallConfiguration")] =
-        orc::ExecutorSymbolDef(orc::ExecutorAddr{reinterpret_cast<uintptr_t>(
-                                   __proteus_cudaPopCallConfiguration_ptr)},
-                               JITSymbolFlags::Exported);
-  }
-
 #endif
 
-#if PROTEUS_ENABLE_HIP
-  SymbolMap[LLJITPtr->mangleAndIntern("__hipPushCallConfiguration")] =
-      orc::ExecutorSymbolDef(orc::ExecutorAddr{reinterpret_cast<uintptr_t>(
-                                 &proteus::hipdyn::pushCallConfiguration)},
-                             JITSymbolFlags::Exported);
-  SymbolMap[LLJITPtr->mangleAndIntern("__hipPopCallConfiguration")] =
-      orc::ExecutorSymbolDef(orc::ExecutorAddr{reinterpret_cast<uintptr_t>(
-                                 &proteus::hipdyn::popCallConfiguration)},
-                             JITSymbolFlags::Exported);
+#if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
+  if (__proteus_get_device_launch_config_symbols) {
+    const char *PushName = nullptr;
+    uintptr_t PushCallConfiguration = 0;
+    const char *PopName = nullptr;
+    uintptr_t PopCallConfiguration = 0;
+    __proteus_get_device_launch_config_symbols(
+        &PushName, &PushCallConfiguration, &PopName, &PopCallConfiguration);
+
+    SymbolMap[LLJITPtr->mangleAndIntern(PushName)] = orc::ExecutorSymbolDef(
+        orc::ExecutorAddr{PushCallConfiguration}, JITSymbolFlags::Exported);
+    SymbolMap[LLJITPtr->mangleAndIntern(PopName)] = orc::ExecutorSymbolDef(
+        orc::ExecutorAddr{PopCallConfiguration}, JITSymbolFlags::Exported);
+  }
 #endif
 
 #if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
