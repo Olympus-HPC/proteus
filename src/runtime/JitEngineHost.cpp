@@ -17,6 +17,9 @@
 #include "proteus/impl/LambdaRegistry.h"
 #include "proteus/impl/TransformArgumentSpecialization.h"
 #include "proteus/impl/TransformLambdaSpecialization.h"
+#if PROTEUS_ENABLE_HIP
+#include "proteus/impl/HIPRuntimeAPI.h"
+#endif
 #include <optional>
 #if PROTEUS_ENABLE_HIP || PROTEUS_ENABLE_CUDA
 #include "proteus/impl/CompilerInterfaceDevice.h"
@@ -95,6 +98,17 @@ void JitEngineHost::addStaticLibrarySymbols() {
                                JITSymbolFlags::Exported);
   }
 
+#endif
+
+#if PROTEUS_ENABLE_HIP
+  SymbolMap[LLJITPtr->mangleAndIntern("__hipPushCallConfiguration")] =
+      orc::ExecutorSymbolDef(orc::ExecutorAddr{reinterpret_cast<uintptr_t>(
+                                 &proteus::hipdyn::pushCallConfiguration)},
+                             JITSymbolFlags::Exported);
+  SymbolMap[LLJITPtr->mangleAndIntern("__hipPopCallConfiguration")] =
+      orc::ExecutorSymbolDef(orc::ExecutorAddr{reinterpret_cast<uintptr_t>(
+                                 &proteus::hipdyn::popCallConfiguration)},
+                             JITSymbolFlags::Exported);
 #endif
 
 #if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP

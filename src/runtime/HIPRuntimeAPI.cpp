@@ -175,6 +175,20 @@ hipError_t launchKernel(const void *FunctionAddress, dim3 NumBlocks,
               Stream);
 }
 
+hipError_t pushCallConfiguration(dim3 GridDim, dim3 BlockDim, size_t SharedMem,
+                                 hipStream_t Stream) {
+  using Fn = decltype(&::__hipPushCallConfiguration);
+  static Fn Func = resolveHIPRuntimeSymbol<Fn>("__hipPushCallConfiguration");
+  return Func(GridDim, BlockDim, SharedMem, Stream);
+}
+
+hipError_t popCallConfiguration(dim3 *GridDim, dim3 *BlockDim,
+                                size_t *SharedMem, hipStream_t *Stream) {
+  using Fn = decltype(&::__hipPopCallConfiguration);
+  static Fn Func = resolveHIPRuntimeSymbol<Fn>("__hipPopCallConfiguration");
+  return Func(GridDim, BlockDim, SharedMem, Stream);
+}
+
 hipError_t funcSetAttribute(const void *Function, hipFuncAttribute Attribute,
                             int Value) {
   using Fn = hipError_t (*)(const void *, hipFuncAttribute, int);

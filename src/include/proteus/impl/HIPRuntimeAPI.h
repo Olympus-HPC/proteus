@@ -25,6 +25,10 @@ hipError_t moduleLaunchKernel(hipFunction_t Function, unsigned int GridDimX,
 hipError_t launchKernel(const void *FunctionAddress, dim3 NumBlocks,
                         dim3 DimBlocks, void **Args, size_t SharedMemBytes,
                         hipStream_t Stream);
+hipError_t pushCallConfiguration(dim3 GridDim, dim3 BlockDim, size_t SharedMem,
+                                 hipStream_t Stream);
+hipError_t popCallConfiguration(dim3 *GridDim, dim3 *BlockDim,
+                                size_t *SharedMem, hipStream_t *Stream);
 hipError_t funcSetAttribute(const void *Function, hipFuncAttribute Attribute,
                             int Value);
 
