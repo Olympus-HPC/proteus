@@ -477,6 +477,7 @@ public:
                          const char *ModuleId);
   void finalizeRegistration();
   void registerFunction(void *Handle, void *Kernel, char *KernelName,
+                        const char *KernelLookupKey,
                         ArrayRef<RuntimeConstantInfo *> RCInfoArray);
   void registerLambdaCallsiteLocation(void *Kernel, uint64_t LambdaID,
                                       uint32_t CallsiteIndex,
@@ -500,9 +501,9 @@ public:
   }
 
   std::optional<std::reference_wrapper<JITKernelInfo>>
-  getJITKernelInfo(StringRef FuncName) {
-    auto It = KernelNameToKernel.find(FuncName.str());
-    if (It == KernelNameToKernel.end())
+  getJITKernelInfo(StringRef KernelLookupKey) {
+    auto It = KernelLookupKeyToKernel.find(KernelLookupKey.str());
+    if (It == KernelLookupKeyToKernel.end())
       return std::nullopt;
 
     return getJITKernelInfo(It->second);
@@ -545,7 +546,7 @@ protected:
 
       for (auto &Func : FatbinInfo.Functions)
         registerFunction(Handle, Func.Kernel, Func.KernelName,
-                         Func.RCInfoArray);
+                         Func.KernelLookupKey, Func.RCInfoArray);
 
       for (auto &Var : FatbinInfo.Vars)
         registerVar(Var.Handle, Var.VarName, Var.HostAddr, Var.VarSize);
@@ -580,7 +581,7 @@ protected:
   std::string DeviceArch;
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
-  std::unordered_map<std::string, const void *> KernelNameToKernel;
+  std::unordered_map<std::string, const void *> KernelLookupKeyToKernel;
   DenseMap<const void *, LambdaCallsiteLocationMap>
       PendingLambdaCallsiteLocationInfo;
   std::unique_ptr<CompilerAsync> AsyncCompiler;
@@ -749,10 +750,12 @@ template <typename ImplT> void JitEngineDevice<ImplT>::finalizeRegistration() {
 
 template <typename ImplT>
 void JitEngineDevice<ImplT>::registerFunction(
-    void *Handle, void *Kernel, char *KernelName,
+    void *Handle, void *Kernel, char *KernelName, const char *KernelLookupKey,
     ArrayRef<RuntimeConstantInfo *> RCInfoArray) {
   PROTEUS_DBG(Logger::logs("proteus") << "Register function " << Kernel
                                       << " To Handle " << Handle << "\n");
+  KernelLookupKeyToKernel.try_emplace(KernelLookupKey, Kernel);
+
   // NOTE: HIP RDC might call multiple times the registerFunction for the same
   // kernel, which has weak linkage, when it comes from different translation
   // units. Either the first or the second call can prevail and should be
@@ -764,8 +767,6 @@ void JitEngineDevice<ImplT>::registerFunction(
                 << "\n");
     return;
   }
-
-  KernelNameToKernel.try_emplace(KernelName, Kernel);
 
   if (!HandleToBinaryInfo.count(Handle))
     reportFatalError("Expected Handle in map");

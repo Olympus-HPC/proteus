@@ -58,14 +58,14 @@ __proteus_register_linked_binary(void *FatbinWrapper, const char *ModuleId) {
   JitEngineInfo.registerLinkedBinary(FatbinWrapper, ModuleId);
 }
 
-extern "C" __attribute((used)) void
-__proteus_register_function(void *Handle, void *Kernel, char *KernelName,
-                            RuntimeConstantInfo **RCInfoArrayPtr,
-                            int32_t NumRCs) {
+extern "C" __attribute((used)) void __proteus_register_function(
+    void *Handle, void *Kernel, char *KernelName, const char *KernelLookupKey,
+    RuntimeConstantInfo **RCInfoArrayPtr, int32_t NumRCs) {
   ArrayRef<RuntimeConstantInfo *> RCInfoArray{RCInfoArrayPtr,
                                               static_cast<size_t>(NumRCs)};
   auto &JitEngineInfo = JitEngineInfoRegistry::instance();
-  JitEngineInfo.registerFunction(Handle, Kernel, KernelName, RCInfoArray);
+  JitEngineInfo.registerFunction(Handle, Kernel, KernelName, KernelLookupKey,
+                                 RCInfoArray);
 }
 
 extern "C" __attribute__((used)) void
@@ -147,14 +147,14 @@ __proteus_launch_kernel(void *Kernel, dim3 GridDim, dim3 BlockDim,
 }
 
 extern "C" proteus::DeviceTraits<JitDeviceImplT>::DeviceError_t
-__proteus_launch_kernel_by_name(const char *KernelName, dim3 GridDim,
+__proteus_launch_kernel_by_name(const char *KernelLookupKey, dim3 GridDim,
                                 dim3 BlockDim, void **KernelArgs,
                                 uint64_t ShmemSize, void *Stream) {
   TIMESCOPE("__proteus_launch_kernel_by_name");
   auto &Jit = JitDeviceImplT::instance();
-  auto OptionalKernelInfo = Jit.getJITKernelInfo(StringRef{KernelName});
+  auto OptionalKernelInfo = Jit.getJITKernelInfo(StringRef{KernelLookupKey});
   if (!OptionalKernelInfo)
-    reportFatalError("Missing registered GPU kernel " + Twine(KernelName));
+    reportFatalError("Missing registered GPU kernel " + Twine(KernelLookupKey));
 
   void *Kernel = OptionalKernelInfo->get().getKernel();
   auto &LR = LambdaRegistry::instance();
