@@ -66,8 +66,6 @@ public:
 
   void registerDynamicLibrary(const HashT &HashValue,
                               const std::string &Path) override {
-    if (!ObjectCache)
-      return;
     auto Buf = MemoryBuffer::getFileAsStream(Path);
     if (!Buf)
       reportFatalError("Failed to read dynamic library: " + Path);
