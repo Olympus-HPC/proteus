@@ -155,12 +155,11 @@ public:
   virtual void *lookupFunction(const KernelName &Name,
                                const HashT &ModuleHash) = 0;
 
-  virtual void *loadFunctionAddress(const KernelName &Name,
-                                    const HashT &ModuleHash,
-                                    CompiledLibrary &Library) = 0;
+  virtual void *insertFunction(const KernelName &Name, const HashT &ModuleHash,
+                               CompiledLibrary &Library) = 0;
 
-  void *getFunctionAddress(const KernelName &Name, const HashT &ModuleHash,
-                           CompiledLibrary &Library);
+  void *getOrInsertFunction(const KernelName &Name, const HashT &ModuleHash,
+                            CompiledLibrary &Library);
 
   virtual void registerDynamicLibrary(const HashT &HashValue,
                                       const std::string &Path) = 0;
