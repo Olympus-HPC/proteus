@@ -14,6 +14,7 @@
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/impl/CompilerInterfaceRuntimeConstantInfo.h"
 #include "proteus/impl/CoreLLVM.h"
+#include "proteus/impl/Frontend/DispatcherHost.h"
 #include "proteus/impl/LambdaRegistry.h"
 #include "proteus/impl/TransformArgumentSpecialization.h"
 #include "proteus/impl/TransformLambdaSpecialization.h"
@@ -145,12 +146,12 @@ void JitEngineHost::notifyLoaded(MaterializationResponsibility & /*R*/,
   dumpSymbolInfo(Obj, LOI);
 }
 
-JitEngineHost::~JitEngineHost() {
-  if (Config::get().traceCacheStats())
-    CodeCache.printStats();
-  CodeCache.printKernelTrace();
-  if (Config::get().traceCacheStats() && CacheChain)
-    CacheChain->printStats();
+JitEngineHost::~JitEngineHost() = default;
+
+DispatcherHost &JitEngineHost::getDispatcher() {
+  if (!Dispatch)
+    reportFatalError("Dispatcher has not been created by the engine");
+  return *Dispatch;
 }
 
 void JitEngineHost::specializeIR(Module &M, StringRef FnName, StringRef Suffix,
@@ -202,10 +203,7 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   TIMESCOPE(JitEngineHost, compileAndLink);
 
   StringRef StrIR(IR, IRSize);
-  auto Ctx = std::make_unique<LLVMContext>();
 
-  Timer T(Config::get().ProteusEnableTimers);
-  SMDiagnostic Diag;
   SmallVector<RuntimeConstant> RCVec =
       getRuntimeConstantValues(Args, RCInfoArray);
   std::optional<uint64_t> FunctorID =
@@ -228,49 +226,45 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
           << KV.first << ":" << KV.second.Value.Int32Val << ",";
     Logger::logs("proteus") << " ] -> Hash " << HashValue.getValue() << "\n";
   }
+
+  std::string Suffix = HashValue.toMangledSuffix();
+  std::string MangledFnName = FnName.str() + Suffix;
+  DispatcherHost &Dispatch = getDispatcher();
+
   // Lookup the function pointer in the code cache.
-  void *JitFnPtr = CodeCache.lookup(HashValue);
+  void *JitFnPtr = Dispatch.lookupFunction(MangledFnName, HashValue);
   if (JitFnPtr) {
     if (FunctorID)
       LambdaRegistry::instance().eraseHostJitVariables(*FunctorID);
     return JitFnPtr;
   }
 
-  auto M = parseIR(MemoryBufferRef(StrIR, "JitModule"), Diag, *Ctx);
-  if (!M)
-    reportFatalError("Error parsing IR: " + Diag.getMessage());
+  std::unique_ptr<CompiledLibrary> Library =
+      Dispatch.lookupCompiledLibrary(HashValue);
+  if (!Library) {
+    Timer T(Config::get().ProteusEnableTimers);
+    auto Ctx = std::make_unique<LLVMContext>();
+    SMDiagnostic Diag;
+    auto M = parseIR(MemoryBufferRef(StrIR, "JitModule"), Diag, *Ctx);
+    if (!M)
+      reportFatalError("Error parsing IR: " + Diag.getMessage());
 
-  PROTEUS_TIMER_OUTPUT(Logger::outs("proteus") << "Parse IR " << FnName << " "
-                                               << T.elapsed() << " ms\n");
+    PROTEUS_TIMER_OUTPUT(Logger::outs("proteus") << "Parse IR " << FnName << " "
+                                                 << T.elapsed() << " ms\n");
 
-  std::string Suffix = HashValue.toMangledSuffix();
-  std::string MangledFnName = FnName.str() + Suffix;
-  std::unique_ptr<CompiledLibrary> Library;
-
-  // Lookup the code library in the object cache chain to load without
-  // compiling, if found.
-  if (CacheChain && (Library = CacheChain->lookup(HashValue))) {
-    loadCompiledLibrary(*Library);
-  } else {
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".input.ll", *M));
     // Specialize the module using runtime values.
     specializeIR(*M, FnName, Suffix, RCVec);
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".specialized.ll", *M));
-    // Compile the object.
-    auto ObjectModule = compileOnly(*M);
 
-    if (CacheChain)
-      CacheChain->store(
-          HashValue, CacheEntry::staticObject(ObjectModule->getMemBufferRef()));
-
-    // Create the compiled library and load it.
-    Library = std::make_unique<CompiledLibrary>(std::move(ObjectModule));
-    loadCompiledLibrary(*Library);
+    CompileOptions Opts;
+    Opts.CGConfig = &CGConfig;
+    Library = std::make_unique<CompiledLibrary>(
+        Dispatch.compile(std::move(Ctx), std::move(M), HashValue, Opts));
   }
 
-  // Retrieve the function address and store it in the code cache.
-  JitFnPtr = getFunctionAddress(MangledFnName, *Library);
-  CodeCache.insert(HashValue, JitFnPtr, FnName);
+  JitFnPtr = Dispatch.loadFunctionAddress(MangledFnName, HashValue, *Library,
+                                          FnName.str());
 
   PROTEUS_DBG(Logger::logs("proteus")
               << "===\n"
@@ -286,8 +280,9 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   return JitFnPtr;
 }
 
-std::unique_ptr<MemoryBuffer> JitEngineHost::compileOnly(Module &M,
-                                                         bool DisableIROpt) {
+std::unique_ptr<MemoryBuffer>
+JitEngineHost::compileOnly(Module &M, const CodeGenerationConfig &CGConfig,
+                           bool DisableIROpt) {
   TIMESCOPE(JitEngineHost, compileOnly);
   // Create the target machine using JITTargetMachineBuilder to match ORC JIT
   // loading.
@@ -305,7 +300,6 @@ std::unique_ptr<MemoryBuffer> JitEngineHost::compileOnly(Module &M,
   legacy::PassManager PM;
   // Add optimization passes.
   if (!DisableIROpt) {
-    const auto &CGConfig = Config::get().getCGConfig();
     optimizeIR(M, sys::getHostCPUName(), OptimizationPipelineConfig(CGConfig));
   } else {
     if (Config::get().traceSpecializations())
@@ -440,6 +434,7 @@ JitEngineHost::JitEngineHost() {
   // Add static library functions to the main JIT dynamic library.
   addStaticLibrarySymbols();
 
-  if (Config::get().ProteusUseStoredCache)
-    CacheChain.emplace("JitEngineHost");
+  // Create the dispatcher eagerly so cache statistics are always reported,
+  // even when no function is ever JIT-compiled.
+  Dispatch = std::make_unique<DispatcherHost>("JitEngineHost", *this);
 }

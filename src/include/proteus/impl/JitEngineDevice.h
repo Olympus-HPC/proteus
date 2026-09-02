@@ -12,11 +12,11 @@
 #define PROTEUS_JITENGINEDEVICE_H
 
 #include "proteus/CompilerInterfaceTypes.h"
+#include "proteus/Frontend/Dispatcher.h"
 #include "proteus/Init.h"
 #include "proteus/TimeTracing.h"
-#include "proteus/impl/Caching/MemoryCache.h"
-#include "proteus/impl/Caching/ObjectCacheChain.h"
 #include "proteus/impl/Cloning.h"
+#include "proteus/impl/CompiledLibrary.h"
 #include "proteus/impl/CompilerAsync.h"
 #include "proteus/impl/CompilerSync.h"
 #include "proteus/impl/CoreDevice.h"
@@ -544,9 +544,6 @@ protected:
 
     finalizeRegistration();
 
-    if (Config::get().ProteusUseStoredCache)
-      CacheChain.emplace("JitEngineDevice");
-
     if (Config::get().ProteusAsyncCompilation)
       AsyncCompiler =
           std::make_unique<CompilerAsync>(Config::get().ProteusAsyncThreads);
@@ -558,16 +555,18 @@ protected:
     // joinAllThreads() is idempotent.
     if (AsyncCompiler)
       AsyncCompiler->joinAllThreads();
-
-    if (Config::get().traceCacheStats())
-      CodeCache.printStats();
-    CodeCache.printKernelTrace();
-    if (Config::get().traceCacheStats() && CacheChain)
-      CacheChain->printStats();
   }
 
-  MemoryCache<KernelFunction_t> CodeCache{"JitEngineDevice"};
-  std::optional<ObjectCacheChain> CacheChain;
+  // The derived engine constructs the dispatcher at the end of its
+  // constructor, since the dispatcher references the constructed engine.
+  // Constructing it eagerly keeps cache statistics reported even when the
+  // program never JIT-compiles a kernel.
+  Dispatcher &getDispatcher() {
+    if (!Dispatch)
+      reportFatalError("Dispatcher has not been created by the engine");
+    return *Dispatch;
+  }
+  std::unique_ptr<Dispatcher> Dispatch;
   std::string DeviceArch;
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
@@ -602,11 +601,7 @@ JitEngineDevice<ImplT>::compileAndRun(
   if (CGConfig.specializeDims() || CGConfig.specializeDimsRange())
     HashValue = hash(HashValue, GridDim.x, GridDim.y, GridDim.z);
 
-  typename DeviceTraits<ImplT>::KernelFunction_t KernelFunc =
-      CodeCache.lookup(HashValue);
-  if (KernelFunc)
-    return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
-                                ShmemSize, Stream);
+  Dispatcher &Dispatch = getDispatcher();
 
   // NOTE: we don't need a suffix to differentiate kernels, each
   // specialization will be in its own module uniquely identify by HashValue.
@@ -615,24 +610,26 @@ JitEngineDevice<ImplT>::compileAndRun(
   std::string Suffix = HashValue.toMangledSuffix();
   std::string KernelMangled = (KernelInfo.getName() + Suffix);
 
-  if (CacheChain) {
-    auto CompiledLib = CacheChain->lookup(HashValue);
-    if (CompiledLib) {
-      if (!Config::get().ProteusRelinkGlobalsByCopy)
-        relinkGlobalsObject(CompiledLib->ObjectModule->getMemBufferRef(),
-                            BinInfo.getVarNameToGlobalInfo());
+  auto Launch = [&](void *KernelFunc) {
+    return static_cast<DeviceError_t>(Dispatch
+                                          .launch(KernelFunc, GridDim, BlockDim,
+                                                  KernelArgs, ShmemSize,
+                                                  static_cast<void *>(Stream))
+                                          .Ret);
+  };
 
-      auto *KernelFunc = proteus::getKernelFunctionFromImage(
-          KernelMangled, CompiledLib->ObjectModule->getBufferStart(),
-          Config::get().ProteusRelinkGlobalsByCopy,
-          BinInfo.getVarNameToGlobalInfo());
+  auto LoadKernel = [&](CompiledLibrary &Library) {
+    Library.VarNameToGlobalInfo = &BinInfo.getVarNameToGlobalInfo();
+    Library.RelinkGlobalsByCopy = Config::get().ProteusRelinkGlobalsByCopy;
+    return Dispatch.loadFunctionAddress(KernelMangled, HashValue, Library,
+                                        KernelInfo.getName());
+  };
 
-      CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
+  if (void *KernelFunc = Dispatch.lookupFunction(KernelMangled, HashValue))
+    return Launch(KernelFunc);
 
-      return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
-                                  ShmemSize, Stream);
-    }
-  }
+  if (auto CompiledLib = Dispatch.lookupCompiledLibrary(HashValue))
+    return Launch(LoadKernel(*CompiledLib));
 
   MemoryBufferRef KernelBitcode = getBitcode(KernelInfo);
   std::unique_ptr<MemoryBuffer> ObjBuf = nullptr;
@@ -641,6 +638,25 @@ JitEngineDevice<ImplT>::compileAndRun(
       LambdaJitValuesMap.empty() ? EmptyLambdaCallsiteRuntimeConstants
                                  : LambdaJitValuesMap;
 
+  auto CreateTask = [&]() {
+    return CompilationTask{
+        Dispatch,
+        KernelBitcode,
+        HashValue,
+        KernelInfo.getName(),
+        Suffix,
+        BlockDim,
+        GridDim,
+        RCVec,
+        LambdaCalleeInfoToSpecialize,
+        LambdaCallsiteRuntimeConstants,
+        BinInfo.getVarNameToGlobalInfo(),
+        GlobalLinkedBinaries,
+        /*CodeGenConfig */ CGConfig,
+        /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
+        /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy};
+  };
+
   if (Config::get().ProteusAsyncCompilation) {
     //  If there is no compilation pending for the specialization, post the
     //  compilation task to the compiler.
@@ -648,14 +664,7 @@ JitEngineDevice<ImplT>::compileAndRun(
       PROTEUS_DBG(Logger::logs("proteus") << "Compile async for HashValue "
                                           << HashValue.toString() << "\n");
 
-      AsyncCompiler->compile(CompilationTask{
-          KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
-          GridDim, RCVec, LambdaCalleeInfoToSpecialize,
-          LambdaCallsiteRuntimeConstants, BinInfo.getVarNameToGlobalInfo(),
-          GlobalLinkedBinaries, DeviceArch,
-          /*CodeGenConfig */ CGConfig,
-          /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
-          /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy});
+      AsyncCompiler->compile(CreateTask());
     }
 
     // Compilation is pending, try to get the compilation result buffer. If
@@ -669,31 +678,19 @@ JitEngineDevice<ImplT>::compileAndRun(
     }
   } else {
     // Process through synchronous compilation.
-    ObjBuf = CompilerSync::instance().compile(CompilationTask{
-        KernelBitcode, HashValue, KernelInfo.getName(), Suffix, BlockDim,
-        GridDim, RCVec, LambdaCalleeInfoToSpecialize,
-        LambdaCallsiteRuntimeConstants, BinInfo.getVarNameToGlobalInfo(),
-        GlobalLinkedBinaries, DeviceArch,
-        /*CodeGenConfig */ CGConfig,
-        /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
-        /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy});
+    ObjBuf = CompilerSync::instance().compile(CreateTask());
   }
 
   if (!ObjBuf)
     reportFatalError("Expected non-null object");
 
-  KernelFunc = proteus::getKernelFunctionFromImage(
-      KernelMangled, ObjBuf->getBufferStart(),
-      Config::get().ProteusRelinkGlobalsByCopy,
-      BinInfo.getVarNameToGlobalInfo());
+  Dispatch.registerObject(HashValue, ObjBuf->getMemBufferRef());
 
-  CodeCache.insert(HashValue, KernelFunc, KernelInfo.getName());
-  if (CacheChain)
-    CacheChain->store(HashValue,
-                      CacheEntry::staticObject(ObjBuf->getMemBufferRef()));
+  CompiledLibrary Library{std::move(ObjBuf)};
+  // The dispatcher relinked the globals as part of compilation.
+  Library.GlobalsRelinked = true;
 
-  return launchKernelFunction(KernelFunc, GridDim, BlockDim, KernelArgs,
-                              ShmemSize, Stream);
+  return Launch(LoadKernel(Library));
 }
 
 template <typename ImplT>

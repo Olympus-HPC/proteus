@@ -13,6 +13,7 @@
 #include "proteus/impl/CoreDevice.h"
 #include "proteus/impl/CoreLLVM.h"
 #include "proteus/impl/CoreLLVMHIP.h"
+#include "proteus/impl/Frontend/DispatcherHIP.h"
 
 #if LLVM_VERSION_MAJOR == 18
 #include <lld/Common/Driver.h>
@@ -370,21 +371,20 @@ JitEngineDeviceHIP::JitEngineDeviceHIP() {
 
   DeviceArch = DevProp.gcnArchName;
   DeviceArch = DeviceArch.substr(0, DeviceArch.find_first_of(":"));
+
+  Dispatch = createDispatcher();
 }
 
 std::unique_ptr<MemoryBuffer>
-JitEngineDeviceHIP::compileOnly(Module &M, bool DisableIROpt) {
-  TIMESCOPE(JitEngineDeviceHIP, compileOnly);
-  if (!DisableIROpt) {
-    const auto &CGConfig = Config::get().getCGConfig();
-    proteus::optimizeIR(M, DeviceArch, OptimizationPipelineConfig(CGConfig));
-  } else {
-    if (Config::get().traceSpecializations())
-      Logger::trace("[SkipOpt] Skipping JitEngine IR optimization\n");
-  }
-  const auto &CGConfig = Config::get().getCGConfig();
-  auto DeviceObject = proteus::codegenObject(
-      M, DeviceArch, GlobalLinkedBinaries, CGConfig.codeGenOption(),
-      OptimizationPipelineConfig(CGConfig));
-  return DeviceObject;
+JitEngineDeviceHIP::codegenObject(Module &M,
+                                  SmallPtrSetImpl<void *> &GlobalLinkedBinaries,
+                                  const CodeGenerationConfig &CGConfig) {
+  TIMESCOPE(JitEngineDeviceHIP, codegenObject);
+  return proteus::codegenObject(M, DeviceArch, GlobalLinkedBinaries,
+                                CGConfig.codeGenOption(),
+                                OptimizationPipelineConfig(CGConfig));
+}
+
+std::unique_ptr<Dispatcher> JitEngineDeviceHIP::createDispatcher() {
+  return std::make_unique<DispatcherHIP>("JitEngineDevice", *this);
 }
