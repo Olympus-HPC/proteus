@@ -80,17 +80,16 @@ public:
 
   StringRef getDeviceArch() const override { return Jit.getDeviceArch(); }
 
-  void *lookupFunction(const std::string &KernelName,
+  void *lookupFunction(const KernelName &Name,
                        const HashT &ModuleHash) override {
-    HashT HashValue = hash(KernelName, ModuleHash);
+    HashT HashValue = hash(Name.mangled(), ModuleHash);
     return CodeCache.lookup(HashValue);
   }
 
-  void *loadFunctionAddress(const std::string &KernelName,
-                            const HashT &ModuleHash, CompiledLibrary &Library,
-                            const std::string &TraceName = "") override {
+  void *loadFunctionAddress(const KernelName &Name, const HashT &ModuleHash,
+                            CompiledLibrary &Library) override {
     TIMESCOPE(DispatcherDevice, loadFunctionAddress);
-    HashT HashValue = hash(KernelName, ModuleHash);
+    HashT HashValue = hash(Name.mangled(), ModuleHash);
 
     static const std::unordered_map<std::string, GlobalVarInfo> NoGlobals;
     const auto &VarNameToGlobalInfo =
@@ -106,12 +105,11 @@ public:
     }
 
     auto KernelFunc = proteus::getKernelFunctionFromImage(
-        KernelName, Library.ObjectModule->getBufferStart(),
+        Name.mangled(), Library.ObjectModule->getBufferStart(),
         Library.RelinkGlobalsByCopy, VarNameToGlobalInfo);
     Library.IsLoaded = true;
 
-    CodeCache.insert(HashValue, KernelFunc,
-                     TraceName.empty() ? KernelName : TraceName);
+    CodeCache.insert(HashValue, KernelFunc, Name.base());
 
     return KernelFunc;
   }

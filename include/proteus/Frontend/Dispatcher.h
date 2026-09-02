@@ -2,6 +2,7 @@
 #define PROTEUS_FRONTEND_DISPATCHER_H
 
 #include "proteus/Error.h"
+#include "proteus/Frontend/KernelName.h"
 #include "proteus/Frontend/TargetModel.h"
 
 #if PROTEUS_ENABLE_HIP && __HIP__
@@ -151,18 +152,15 @@ public:
       return Fn(std::forward<ArgT>(Args)...);
   }
 
-  virtual void *lookupFunction(const std::string &FunctionName,
+  virtual void *lookupFunction(const KernelName &Name,
                                const HashT &ModuleHash) = 0;
 
-  // A non-empty TraceName replaces FunctionName in the kernel trace.
-  virtual void *loadFunctionAddress(const std::string &FunctionName,
+  virtual void *loadFunctionAddress(const KernelName &Name,
                                     const HashT &ModuleHash,
-                                    CompiledLibrary &Library,
-                                    const std::string &TraceName = "") = 0;
+                                    CompiledLibrary &Library) = 0;
 
-  void *getFunctionAddress(const std::string &FunctionName,
-                           const HashT &ModuleHash, CompiledLibrary &Library,
-                           const std::string &TraceName = "");
+  void *getFunctionAddress(const KernelName &Name, const HashT &ModuleHash,
+                           CompiledLibrary &Library);
 
   virtual void registerDynamicLibrary(const HashT &HashValue,
                                       const std::string &Path) = 0;

@@ -607,8 +607,7 @@ JitEngineDevice<ImplT>::compileAndRun(
   // specialization will be in its own module uniquely identify by HashValue.
   // It exists only for debugging purposes to verify that the jitted kernel
   // executes.
-  std::string Suffix = HashValue.toMangledSuffix();
-  std::string KernelMangled = (KernelInfo.getName() + Suffix);
+  KernelName Name{KernelInfo.getName(), HashValue};
 
   auto Launch = [&](void *KernelFunc) {
     return static_cast<DeviceError_t>(Dispatch
@@ -621,11 +620,10 @@ JitEngineDevice<ImplT>::compileAndRun(
   auto LoadKernel = [&](CompiledLibrary &Library) {
     Library.VarNameToGlobalInfo = &BinInfo.getVarNameToGlobalInfo();
     Library.RelinkGlobalsByCopy = Config::get().ProteusRelinkGlobalsByCopy;
-    return Dispatch.loadFunctionAddress(KernelMangled, HashValue, Library,
-                                        KernelInfo.getName());
+    return Dispatch.loadFunctionAddress(Name, HashValue, Library);
   };
 
-  if (void *KernelFunc = Dispatch.lookupFunction(KernelMangled, HashValue))
+  if (void *KernelFunc = Dispatch.lookupFunction(Name, HashValue))
     return Launch(KernelFunc);
 
   if (auto CompiledLib = Dispatch.lookupCompiledLibrary(HashValue))
@@ -643,8 +641,7 @@ JitEngineDevice<ImplT>::compileAndRun(
         Dispatch,
         KernelBitcode,
         HashValue,
-        KernelInfo.getName(),
-        Suffix,
+        Name,
         BlockDim,
         GridDim,
         RCVec,
