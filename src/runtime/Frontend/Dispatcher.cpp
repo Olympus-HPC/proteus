@@ -75,14 +75,13 @@ Dispatcher &Dispatcher::getDispatcher(TargetModelType TargetModel) {
 
 Dispatcher::Dispatcher(const std::string &Name, TargetModelType TM)
     : TargetModel(TM), Label(Name) {
-  if (Config::get().ProteusUseStoredCache)
-    ObjectCache = std::make_unique<ObjectCacheChain>(Name);
+  ObjectCache = std::make_unique<ObjectCacheChain>(Name);
 }
 
 Dispatcher::~Dispatcher() = default;
 
 void Dispatcher::printObjectCacheStats() {
-  if (Config::get().traceCacheStats() && ObjectCache)
+  if (Config::get().traceCacheStats())
     ObjectCache->printStats();
 }
 
@@ -107,8 +106,6 @@ Dispatcher::compile(std::unique_ptr<llvm::LLVMContext> Ctx,
 
 std::unique_ptr<CompiledLibrary>
 Dispatcher::lookupCompiledLibrary(const HashT &ModuleHash) {
-  if (!ObjectCache)
-    return nullptr;
   return ObjectCache->lookup(ModuleHash);
 }
 
@@ -127,8 +124,6 @@ void *Dispatcher::getOrInsertFunction(const KernelName &Name,
 
 void Dispatcher::registerObject(const HashT &HashValue,
                                 const llvm::MemoryBufferRef &Obj) {
-  if (!ObjectCache)
-    return;
   ObjectCache->store(HashValue, CacheEntry::staticObject(Obj));
 }
 

@@ -105,7 +105,6 @@ class Dispatcher {
 protected:
   TargetModelType TargetModel;
   const std::string Label;
-  // This is null when the stored object cache is disabled.
   std::unique_ptr<ObjectCacheChain> ObjectCache;
 
   Dispatcher(const std::string &Name, TargetModelType TM);
