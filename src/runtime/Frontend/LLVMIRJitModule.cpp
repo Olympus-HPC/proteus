@@ -131,7 +131,7 @@ void *LLVMIRJitModule::getFunctionAddress(const std::string &Name) {
   TIMESCOPE(LLVMIRJitModule, getFunctionAddress);
   if (!ModuleHash)
     reportFatalError("LLVMIRJitModule: expected module hash after compilation");
-  return Dispatch.getFunctionAddress(Name, *ModuleHash, getLibrary());
+  return Dispatch.getOrInsertFunction(Name, *ModuleHash, getLibrary());
 }
 
 DispatchResult LLVMIRJitModule::launch(void *KernelFunc, LaunchDims GridDim,

@@ -620,7 +620,7 @@ JitEngineDevice<ImplT>::compileAndRun(
   auto LoadKernel = [&](CompiledLibrary &Library) {
     Library.VarNameToGlobalInfo = &BinInfo.getVarNameToGlobalInfo();
     Library.RelinkGlobalsByCopy = Config::get().ProteusRelinkGlobalsByCopy;
-    return Dispatch.loadFunctionAddress(Name, HashValue, Library);
+    return Dispatch.insertFunction(Name, HashValue, Library);
   };
 
   if (void *KernelFunc = Dispatch.lookupFunction(Name, HashValue))

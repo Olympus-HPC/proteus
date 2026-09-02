@@ -44,9 +44,9 @@ public:
     return CodeCache.lookup(FuncHash);
   }
 
-  void *loadFunctionAddress(const KernelName &Name, const HashT &ModuleHash,
-                            CompiledLibrary &Library) override {
-    TIMESCOPE(DispatcherHost, loadFunctionAddress);
+  void *insertFunction(const KernelName &Name, const HashT &ModuleHash,
+                       CompiledLibrary &Library) override {
+    TIMESCOPE(DispatcherHost, insertFunction);
     const std::string MangledName = Name.mangled();
     HashT FuncHash = hash(MangledName, ModuleHash);
 
