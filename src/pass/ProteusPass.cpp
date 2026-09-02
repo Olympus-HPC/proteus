@@ -1072,6 +1072,7 @@ private:
       };
       auto EmitM = CloneModule(M, VMap, ShouldClone);
       runCleanupPassPipeline(*EmitM);
+      EmitM->setSourceFileName(getCanonicalSourceFileName(M));
 
       emitModuleDevice(M, *EmitM, "tu", true);
     }
