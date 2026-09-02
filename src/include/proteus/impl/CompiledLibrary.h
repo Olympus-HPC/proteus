@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 namespace llvm {
 class MemoryBuffer;
@@ -15,6 +16,8 @@ namespace proteus {
 
 using namespace llvm;
 
+struct GlobalVarInfo;
+
 struct CompiledLibrary {
   // Compiled library holds a relocatable object or a dynamic library, indicated
   // by IsDynLib.
@@ -25,6 +28,12 @@ struct CompiledLibrary {
   // JitDyLib holds a pointer to the ORC JIT dynamic library context for the
   // host JIT engine.
   llvm::orc::JITDylib *JitDyLib = nullptr;
+  // The caller owns this information, which relinks a loaded device object.
+  const std::unordered_map<std::string, GlobalVarInfo> *VarNameToGlobalInfo =
+      nullptr;
+  bool RelinkGlobalsByCopy = false;
+  // Proteus sets this once it patches the object with global addresses.
+  bool GlobalsRelinked = false;
 
   CompiledLibrary(std::unique_ptr<MemoryBuffer> ObjectModule);
 

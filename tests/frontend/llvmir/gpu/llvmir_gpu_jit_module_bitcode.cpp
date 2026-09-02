@@ -1,9 +1,9 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
 // RUN: %llvm_as %S/llvmir_gpu_jit_module_bitcode_input.%ext.ll -o %t.module.bc
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/llvmir_gpu_jit_module_bitcode.%ext %t.module.bc | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="cache-stats" %build/llvmir_gpu_jit_module_bitcode.%ext %t.module.bc | %FILECHECK %s --check-prefixes=CHECK,CHECK-FIRST
 // Second run uses the object cache.
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" %build/llvmir_gpu_jit_module_bitcode.%ext %t.module.bc | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
+// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="cache-stats" %build/llvmir_gpu_jit_module_bitcode.%ext %t.module.bc | %FILECHECK %s --check-prefixes=CHECK,CHECK-SECOND
 // RUN: rm -rf "%t.$$.proteus"
 // clang-format on
 

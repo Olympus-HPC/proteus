@@ -9,14 +9,19 @@
 #endif
 
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <string>
 #include <type_traits>
+#include <unordered_map>
 
 namespace llvm {
 class LLVMContext;
 class Module;
 class MemoryBuffer;
 class MemoryBufferRef;
+class StringRef;
+template <typename T> class SmallPtrSetImpl;
 } // namespace llvm
 
 struct LaunchDims {
@@ -42,6 +47,8 @@ namespace proteus {
 class ObjectCacheChain;
 struct CompiledLibrary;
 class HashT;
+class CodeGenerationConfig;
+struct GlobalVarInfo;
 
 template <typename T> struct sig_traits;
 
@@ -72,24 +79,60 @@ struct DispatchResult {
 
 struct DispatchResult;
 
+// CompileOptions controls how a Dispatcher turns a module into an object. The
+// defaults match the frontend JIT modules and the annotation runtime overrides
+// them.
+struct CompileOptions {
+  bool DisableIROpt = false;
+  // Host dispatchers ignore this option.
+  bool LinkDeviceLibraries = true;
+  // A null configuration selects Config::get().getCGConfig().
+  const CodeGenerationConfig *CGConfig = nullptr;
+  // These are prelinked fat binaries, which CUDA produces for RDC.
+  llvm::SmallPtrSetImpl<void *> *GlobalLinkedBinaries = nullptr;
+  // These globals relink the object against the ones the host program uses.
+  const std::unordered_map<std::string, GlobalVarInfo> *VarNameToGlobalInfo =
+      nullptr;
+  // Setting this relinks globals when loading the image rather than by
+  // patching the object.
+  bool RelinkGlobalsByCopy = false;
+  // Proteus invokes this after IR optimization and before codegen.
+  std::function<void(llvm::Module &)> OnOptimized;
+};
+
 class Dispatcher {
 protected:
   TargetModelType TargetModel;
+  const std::string Label;
+  // This is null when the stored object cache is disabled.
   std::unique_ptr<ObjectCacheChain> ObjectCache;
 
   Dispatcher(const std::string &Name, TargetModelType TM);
 
+  void printObjectCacheStats();
+
 public:
   static Dispatcher &getDispatcher(TargetModelType TargetModel);
-  virtual ~Dispatcher() = default;
+  virtual ~Dispatcher();
 
+  const std::string &getLabel() const { return Label; }
+
+  // compileModule touches no cache, so it is safe on a worker thread.
   virtual std::unique_ptr<llvm::MemoryBuffer>
+  compileModule(llvm::Module &M, const CompileOptions &Opts) = 0;
+
+  std::unique_ptr<llvm::MemoryBuffer>
   compile(std::unique_ptr<llvm::LLVMContext> Ctx,
           std::unique_ptr<llvm::Module> M, const HashT &ModuleHash,
-          bool DisableIROpt = false) = 0;
+          const CompileOptions &Opts = CompileOptions{});
 
-  virtual std::unique_ptr<CompiledLibrary>
-  lookupCompiledLibrary(const HashT &ModuleHash) = 0;
+  std::unique_ptr<llvm::MemoryBuffer>
+  compile(std::unique_ptr<llvm::LLVMContext> Ctx,
+          std::unique_ptr<llvm::Module> M, const HashT &ModuleHash,
+          bool DisableIROpt);
+
+  std::unique_ptr<CompiledLibrary>
+  lookupCompiledLibrary(const HashT &ModuleHash);
 
   virtual DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
                                 LaunchDims BlockDim, void *KernelArgs[],
@@ -113,15 +156,23 @@ public:
       return Fn(std::forward<ArgT>(Args)...);
   }
 
-  virtual void *getFunctionAddress(const std::string &FunctionName,
-                                   const HashT &ModuleHash,
-                                   CompiledLibrary &Library) = 0;
+  virtual void *lookupFunction(const std::string &FunctionName,
+                               const HashT &ModuleHash) = 0;
+
+  // A non-empty TraceName replaces FunctionName in the kernel trace.
+  virtual void *loadFunctionAddress(const std::string &FunctionName,
+                                    const HashT &ModuleHash,
+                                    CompiledLibrary &Library,
+                                    const std::string &TraceName = "") = 0;
+
+  void *getFunctionAddress(const std::string &FunctionName,
+                           const HashT &ModuleHash, CompiledLibrary &Library,
+                           const std::string &TraceName = "");
 
   virtual void registerDynamicLibrary(const HashT &HashValue,
                                       const std::string &Path) = 0;
 
-  virtual void registerObject(const HashT &HashValue,
-                              const llvm::MemoryBufferRef &Obj) = 0;
+  void registerObject(const HashT &HashValue, const llvm::MemoryBufferRef &Obj);
 };
 
 } // namespace proteus

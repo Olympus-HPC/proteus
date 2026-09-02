@@ -4,10 +4,8 @@
 #if PROTEUS_ENABLE_CUDA
 
 #include "proteus/Error.h"
-#include "proteus/Frontend/Dispatcher.h"
-#include "proteus/TimeTracing.h"
-#include "proteus/impl/Caching/ObjectCacheChain.h"
 #include "proteus/impl/Frontend/CUDAToolchain.h"
+#include "proteus/impl/Frontend/DispatcherDevice.h"
 #include "proteus/impl/JitEngineDeviceCUDA.h"
 
 #include <llvm/Bitcode/BitcodeReader.h>
@@ -16,23 +14,19 @@
 
 namespace proteus {
 
-class DispatcherCUDA : public Dispatcher {
+class DispatcherCUDA : public DispatcherDevice<JitEngineDeviceCUDA> {
 public:
   static DispatcherCUDA &instance() {
-    static DispatcherCUDA D;
+    static DispatcherCUDA D{"DispatcherCUDA", JitEngineDeviceCUDA::instance()};
     return D;
   }
 
-  std::unique_ptr<MemoryBuffer> compile(std::unique_ptr<LLVMContext> Ctx,
-                                        std::unique_ptr<Module> Mod,
-                                        const HashT &ModuleHash,
-                                        bool DisableIROpt = false) override {
-    TIMESCOPE(DispatcherCUDA, compile);
-    // This is necessary to ensure Ctx outlives M. Setting [[maybe_unused]] can
-    // trigger a lifetime bug.
-    auto CtxOwner = std::move(Ctx);
-    auto ModOwner = std::move(Mod);
+  DispatcherCUDA(const std::string &Label, JitEngineDeviceCUDA &Jit)
+      : DispatcherDevice(Label, TargetModelType::CUDA, Jit) {}
 
+protected:
+  void linkDeviceLibraries(Module &M) override {
+    TIMESCOPE(DispatcherCUDA, linkDeviceLibraries);
     const auto &Toolchain = resolveCUDAToolchain();
     auto LibDeviceBuffer = llvm::MemoryBuffer::getFile(Toolchain.LibDevicePath);
     if (!LibDeviceBuffer || !LibDeviceBuffer.get())
@@ -40,92 +34,15 @@ public:
                        Toolchain.LibDevicePath + " (" + Toolchain.Origin + ")");
 
     auto LibDeviceModule = llvm::parseBitcodeFile(
-        LibDeviceBuffer->get()->getMemBufferRef(), ModOwner->getContext());
+        LibDeviceBuffer->get()->getMemBufferRef(), M.getContext());
     if (!LibDeviceModule)
       reportFatalError("DispatchCUDA: failed to parse libdevice from " +
                        Toolchain.LibDevicePath + " (" + Toolchain.Origin + ")");
 
-    llvm::Linker linker(*ModOwner);
-    linker.linkInModule(std::move(LibDeviceModule.get()),
+    llvm::Linker Linker(M);
+    Linker.linkInModule(std::move(LibDeviceModule.get()),
                         llvm::Linker::Flags::LinkOnlyNeeded);
-
-    std::unique_ptr<MemoryBuffer> ObjectModule =
-        Jit.compileOnly(*ModOwner, DisableIROpt);
-    if (!ObjectModule)
-      reportFatalError("Expected non-null object library");
-
-    ObjectCache->store(
-        ModuleHash, CacheEntry::staticObject(ObjectModule->getMemBufferRef()));
-
-    return ObjectModule;
   }
-
-  std::unique_ptr<CompiledLibrary>
-  lookupCompiledLibrary(const HashT &ModuleHash) override {
-    return ObjectCache->lookup(ModuleHash);
-  }
-
-  DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
-                        LaunchDims BlockDim, void *KernelArgs[],
-                        uint64_t ShmemSize, void *Stream) override {
-    TIMESCOPE(DispatcherCUDA, launch);
-    dim3 CudaGridDim = {GridDim.X, GridDim.Y, GridDim.Z};
-    dim3 CudaBlockDim = {BlockDim.X, BlockDim.Y, BlockDim.Z};
-    cudaStream_t CudaStream = reinterpret_cast<cudaStream_t>(Stream);
-
-    return proteus::launchKernelFunction(
-        reinterpret_cast<cudaFunction_t>(KernelFunc), CudaGridDim, CudaBlockDim,
-        KernelArgs, ShmemSize, CudaStream);
-  }
-
-  StringRef getDeviceArch() const override { return Jit.getDeviceArch(); }
-
-  void *getFunctionAddress(const std::string &KernelName,
-                           const HashT &ModuleHash,
-                           CompiledLibrary &Library) override {
-    TIMESCOPE(DispatcherCUDA, getFunctionAddress);
-    auto GetKernelFunc = [&]() {
-      // Hash the kernel name to get a unique id.
-      HashT HashValue = hash(KernelName, ModuleHash);
-
-      if (auto KernelFunc = CodeCache.lookup(HashValue))
-        return KernelFunc;
-
-      auto KernelFunc = proteus::getKernelFunctionFromImage(
-          KernelName, Library.ObjectModule->getBufferStart(),
-          /*RelinkGlobalsByCopy*/ false,
-          /* VarNameToGlobalInfo */ {});
-
-      CodeCache.insert(HashValue, KernelFunc, KernelName);
-
-      return KernelFunc;
-    };
-
-    auto KernelFunc = GetKernelFunc();
-    return KernelFunc;
-  }
-
-  void registerDynamicLibrary(const HashT &, const std::string &) override {
-    reportFatalError("Dispatch CUDA does not support registerDynamicLibrary");
-  }
-
-  void registerObject(const HashT &HashValue,
-                      const llvm::MemoryBufferRef &Obj) override {
-    ObjectCache->store(HashValue, CacheEntry::staticObject(Obj));
-  }
-
-  ~DispatcherCUDA() {
-    CodeCache.printStats();
-    CodeCache.printKernelTrace();
-    ObjectCache->printStats();
-  }
-
-private:
-  JitEngineDeviceCUDA &Jit;
-  DispatcherCUDA()
-      : Dispatcher("DispatcherCUDA", TargetModelType::CUDA),
-        Jit(JitEngineDeviceCUDA::instance()) {}
-  MemoryCache<CUfunction> CodeCache{"DispatcherCUDA"};
 };
 
 } // namespace proteus

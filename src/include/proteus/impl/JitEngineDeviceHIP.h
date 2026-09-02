@@ -100,8 +100,17 @@ public:
 
   HashT getModuleHash(BinaryInfo &BinInfo);
 
-  std::unique_ptr<MemoryBuffer> compileOnly(Module &M,
-                                            bool DisableIROpt = false);
+  // Parallel codegen forwards the pipeline and pass plugins to LTO, so
+  // optimizing beforehand would run it twice.
+  static bool optimizesBeforeCodegen(CodegenOption CGOption) {
+    return CGOption != CodegenOption::Parallel;
+  }
+
+  std::unique_ptr<MemoryBuffer>
+  codegenObject(Module &M, SmallPtrSetImpl<void *> &GlobalLinkedBinaries,
+                const CodeGenerationConfig &CGConfig);
+
+  std::unique_ptr<Dispatcher> createDispatcher();
 
 private:
   JitEngineDeviceHIP();

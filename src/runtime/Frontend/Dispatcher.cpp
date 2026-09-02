@@ -1,6 +1,7 @@
 #include "proteus/Frontend/Dispatcher.h"
 #include "proteus/Error.h"
 #include "proteus/impl/Caching/ObjectCacheChain.h"
+#include "proteus/impl/Config.h"
 #include "proteus/impl/Frontend/DispatcherHost.h"
 #if PROTEUS_ENABLE_HIP
 #include "proteus/impl/Frontend/DispatcherHIP.h"
@@ -10,6 +11,10 @@
 #include "proteus/impl/Frontend/DispatcherCUDA.h"
 #include "proteus/impl/Frontend/DispatcherHostCUDA.h"
 #endif
+
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/Support/MemoryBuffer.h>
 
 namespace proteus {
 
@@ -68,8 +73,67 @@ Dispatcher &Dispatcher::getDispatcher(TargetModelType TargetModel) {
 }
 
 Dispatcher::Dispatcher(const std::string &Name, TargetModelType TM)
-    : TargetModel(TM) {
-  ObjectCache = std::make_unique<ObjectCacheChain>(Name);
+    : TargetModel(TM), Label(Name) {
+  if (Config::get().ProteusUseStoredCache)
+    ObjectCache = std::make_unique<ObjectCacheChain>(Name);
+}
+
+Dispatcher::~Dispatcher() = default;
+
+void Dispatcher::printObjectCacheStats() {
+  if (Config::get().traceCacheStats() && ObjectCache)
+    ObjectCache->printStats();
+}
+
+std::unique_ptr<llvm::MemoryBuffer>
+Dispatcher::compile(std::unique_ptr<llvm::LLVMContext> Ctx,
+                    std::unique_ptr<llvm::Module> M, const HashT &ModuleHash,
+                    const CompileOptions &Opts) {
+  // Keep the context alive for as long as the module. Setting [[maybe_unused]]
+  // can trigger a lifetime bug.
+  auto CtxOwner = std::move(Ctx);
+  auto ModOwner = std::move(M);
+
+  std::unique_ptr<llvm::MemoryBuffer> ObjectModule =
+      compileModule(*ModOwner, Opts);
+  if (!ObjectModule)
+    reportFatalError("Expected non-null object library");
+
+  registerObject(ModuleHash, ObjectModule->getMemBufferRef());
+
+  return ObjectModule;
+}
+
+std::unique_ptr<llvm::MemoryBuffer>
+Dispatcher::compile(std::unique_ptr<llvm::LLVMContext> Ctx,
+                    std::unique_ptr<llvm::Module> M, const HashT &ModuleHash,
+                    bool DisableIROpt) {
+  CompileOptions Opts;
+  Opts.DisableIROpt = DisableIROpt;
+  return compile(std::move(Ctx), std::move(M), ModuleHash, Opts);
+}
+
+std::unique_ptr<CompiledLibrary>
+Dispatcher::lookupCompiledLibrary(const HashT &ModuleHash) {
+  if (!ObjectCache)
+    return nullptr;
+  return ObjectCache->lookup(ModuleHash);
+}
+
+void *Dispatcher::getFunctionAddress(const std::string &FunctionName,
+                                     const HashT &ModuleHash,
+                                     CompiledLibrary &Library,
+                                     const std::string &TraceName) {
+  if (void *FuncPtr = lookupFunction(FunctionName, ModuleHash))
+    return FuncPtr;
+  return loadFunctionAddress(FunctionName, ModuleHash, Library, TraceName);
+}
+
+void Dispatcher::registerObject(const HashT &HashValue,
+                                const llvm::MemoryBufferRef &Obj) {
+  if (!ObjectCache)
+    return;
+  ObjectCache->store(HashValue, CacheEntry::staticObject(Obj));
 }
 
 } // namespace proteus
