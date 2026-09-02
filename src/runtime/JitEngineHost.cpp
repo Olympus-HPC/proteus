@@ -227,12 +227,13 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
     Logger::logs("proteus") << " ] -> Hash " << HashValue.getValue() << "\n";
   }
 
-  std::string Suffix = HashValue.toMangledSuffix();
-  std::string MangledFnName = FnName.str() + Suffix;
+  KernelName Name{FnName.str(), HashValue};
+  std::string Suffix = Name.suffix();
+  std::string MangledFnName = Name.mangled();
   DispatcherHost &Dispatch = getDispatcher();
 
   // Lookup the function pointer in the code cache.
-  void *JitFnPtr = Dispatch.lookupFunction(MangledFnName, HashValue);
+  void *JitFnPtr = Dispatch.lookupFunction(Name, HashValue);
   if (JitFnPtr) {
     if (FunctorID)
       LambdaRegistry::instance().eraseHostJitVariables(*FunctorID);
@@ -263,8 +264,7 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
         Dispatch.compile(std::move(Ctx), std::move(M), HashValue, Opts));
   }
 
-  JitFnPtr = Dispatch.loadFunctionAddress(MangledFnName, HashValue, *Library,
-                                          FnName.str());
+  JitFnPtr = Dispatch.loadFunctionAddress(Name, HashValue, *Library);
 
   PROTEUS_DBG(Logger::logs("proteus")
               << "===\n"

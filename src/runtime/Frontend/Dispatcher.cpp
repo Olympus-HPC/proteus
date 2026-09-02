@@ -3,6 +3,7 @@
 #include "proteus/impl/Caching/ObjectCacheChain.h"
 #include "proteus/impl/Config.h"
 #include "proteus/impl/Frontend/DispatcherHost.h"
+#include "proteus/impl/Hashing.h"
 #if PROTEUS_ENABLE_HIP
 #include "proteus/impl/Frontend/DispatcherHIP.h"
 #include "proteus/impl/Frontend/DispatcherHostHIP.h"
@@ -111,13 +112,17 @@ Dispatcher::lookupCompiledLibrary(const HashT &ModuleHash) {
   return ObjectCache->lookup(ModuleHash);
 }
 
-void *Dispatcher::getFunctionAddress(const std::string &FunctionName,
+KernelName::KernelName(const StringRef &Base) : Base(Base.str()) {}
+
+KernelName::KernelName(std::string Base, const HashT &Specialization)
+    : Base(std::move(Base)), Specialization(Specialization.toMangledSuffix()) {}
+
+void *Dispatcher::getFunctionAddress(const KernelName &Name,
                                      const HashT &ModuleHash,
-                                     CompiledLibrary &Library,
-                                     const std::string &TraceName) {
-  if (void *FuncPtr = lookupFunction(FunctionName, ModuleHash))
+                                     CompiledLibrary &Library) {
+  if (void *FuncPtr = lookupFunction(Name, ModuleHash))
     return FuncPtr;
-  return loadFunctionAddress(FunctionName, ModuleHash, Library, TraceName);
+  return loadFunctionAddress(Name, ModuleHash, Library);
 }
 
 void Dispatcher::registerObject(const HashT &HashValue,

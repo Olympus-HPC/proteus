@@ -38,29 +38,28 @@ public:
     reportFatalError("Host dispatcher does not implement getDeviceArch");
   }
 
-  void *lookupFunction(const std::string &FnName,
+  void *lookupFunction(const KernelName &Name,
                        const HashT &ModuleHash) override {
-    HashT FuncHash = hash(FnName, ModuleHash);
+    HashT FuncHash = hash(Name.mangled(), ModuleHash);
     return CodeCache.lookup(FuncHash);
   }
 
-  void *loadFunctionAddress(const std::string &FnName, const HashT &ModuleHash,
-                            CompiledLibrary &Library,
-                            const std::string &TraceName = "") override {
+  void *loadFunctionAddress(const KernelName &Name, const HashT &ModuleHash,
+                            CompiledLibrary &Library) override {
     TIMESCOPE(DispatcherHost, loadFunctionAddress);
-    HashT FuncHash = hash(FnName, ModuleHash);
+    const std::string MangledName = Name.mangled();
+    HashT FuncHash = hash(MangledName, ModuleHash);
 
     if (!Library.IsLoaded) {
       Jit.loadCompiledLibrary(Library);
       Library.IsLoaded = true;
     }
 
-    void *FuncAddr = Jit.getFunctionAddress(FnName, Library);
+    void *FuncAddr = Jit.getFunctionAddress(MangledName, Library);
     if (!FuncAddr)
-      reportFatalError("Failed to find address for function " + FnName);
+      reportFatalError("Failed to find address for function " + MangledName);
 
-    CodeCache.insert(FuncHash, FuncAddr,
-                     TraceName.empty() ? FnName : TraceName);
+    CodeCache.insert(FuncHash, FuncAddr, Name.base());
 
     return FuncAddr;
   }
