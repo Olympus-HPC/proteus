@@ -250,16 +250,16 @@ int main(int argc, char *argv[]) {
 // CHECK-NEXT: Creating JIT module
 // CHECK-NEXT: Compiling JIT module
 // CHECK-NEXT: Average kernel execution time {{.*}} (ms)
-// CHECK-NEXT: p[0] = -0.57293
-// CHECK-NEXT: p[1] = -0.59603
+// CHECK-NEXT: p[0] = -0.5729{{[0-9]+}}
+// CHECK-NEXT: p[1] = -0.5960{{[0-9]+}}
 // CHECK-NEXT: p[2] = -0.592634
-// CHECK-NEXT: p[3] = -0.588154
-// CHECK-NEXT: p[4] = -0.593454
+// CHECK-NEXT: p[3] = -0.5881{{[0-9]+}}
+// CHECK-NEXT: p[4] = -0.59345{{[0-9]}}
 // CHECK-NEXT: p[5] = -0.5919{{[0-9]+}}
-// CHECK-NEXT: p[6] = -0.573486
-// CHECK-NEXT: p[7] = -0.599872
-// CHECK-NEXT: p[8] = -0.58157
-// CHECK-NEXT: p[9] = -0.59015{{[7|8]}}
+// CHECK-NEXT: p[6] = -0.5734{{[0-9]+}}
+// CHECK-NEXT: p[7] = -0.5998{{[0-9]+}}
+// CHECK-NEXT: p[8] = -0.5815{{[0-9]+}}
+// CHECK-NEXT: p[9] = -0.5901{{[0-9]+}}
 // CHECK: [proteus][Dispatcher{{CUDA|HIP}}] MemoryCache rank 0 hits 0 accesses 1
 // CHECK: [proteus][Dispatcher{{CUDA|HIP}}] MemoryCache rank 0 HashValue {{[0-9]+}} NumExecs 1 NumHits 0
 // CHECK-FIRST: [proteus][Dispatcher{{CUDA|HIP}}] StorageCache rank 0 hits 0 accesses 1

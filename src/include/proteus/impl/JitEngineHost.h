@@ -21,8 +21,6 @@
 #include "proteus/CompilerInterfaceTypes.h"
 #include "proteus/Error.h"
 #include "proteus/Init.h"
-#include "proteus/impl/Caching/MemoryCache.h"
-#include "proteus/impl/Caching/ObjectCacheChain.h"
 #include "proteus/impl/CompiledLibrary.h"
 #include "proteus/impl/Config.h"
 #include "proteus/impl/JitEngine.h"
@@ -30,6 +28,8 @@
 namespace proteus {
 
 using namespace llvm;
+
+class DispatcherHost;
 
 class JitEngineHost : public JitEngine {
 public:
@@ -52,8 +52,9 @@ public:
                        ArrayRef<RuntimeConstantInfo *> RCInfoArray,
                        uint64_t *FunctorIDPtr);
 
-  std::unique_ptr<MemoryBuffer> compileOnly(Module &M,
-                                            bool DisableIROpt = false);
+  std::unique_ptr<MemoryBuffer>
+  compileOnly(Module &M, const CodeGenerationConfig &CGConfig,
+              bool DisableIROpt = false);
 
   void loadCompiledLibrary(CompiledLibrary &Library);
 
@@ -62,8 +63,9 @@ public:
 private:
   JitEngineHost();
   void addStaticLibrarySymbols();
-  MemoryCache<void *> CodeCache{"JitEngineHost"};
-  std::optional<ObjectCacheChain> CacheChain;
+  // Proteus creates the dispatcher lazily because it references this engine.
+  DispatcherHost &getDispatcher();
+  std::unique_ptr<DispatcherHost> Dispatch;
 };
 
 } // namespace proteus
