@@ -387,7 +387,9 @@ inline void runCleanupPassPipeline(Module &M) {
 
   Passes.run(M, MAM);
 
-  StripDebugInfo(M);
+  // Keep line-table debug info so that recorded device modules retain the
+  // kernel's source file and line information.
+  stripNonLineTableDebugInfo(M);
 }
 
 inline void findFunctionsWithU64Metadata(

@@ -276,7 +276,9 @@ private:
 
     Passes.run(M, MAM);
 
-    StripDebugInfo(M);
+    // Keep line-table debug info so that recorded device modules retain the
+    // kernel's source file and line information.
+    stripNonLineTableDebugInfo(M);
   }
 
   void runOptimizationPassPipeline(Module &M) {
@@ -989,7 +991,9 @@ private:
         if (G.hasInternalLinkage())
           G.setLinkage(GlobalValue::ExternalLinkage);
 
-      StripDebugInfo(*PrunedLTOModule);
+      // Keep line-table debug info so that recorded device modules retain the
+      // kernel's source file and line information.
+      stripNonLineTableDebugInfo(*PrunedLTOModule);
 
       if (verifyModule(*PrunedLTOModule, &errs()))
         reportFatalError(
