@@ -104,15 +104,6 @@ Dispatcher::compile(std::unique_ptr<llvm::LLVMContext> Ctx,
   return ObjectModule;
 }
 
-std::unique_ptr<llvm::MemoryBuffer>
-Dispatcher::compile(std::unique_ptr<llvm::LLVMContext> Ctx,
-                    std::unique_ptr<llvm::Module> M, const HashT &ModuleHash,
-                    bool DisableIROpt) {
-  CompileOptions Opts;
-  Opts.DisableIROpt = DisableIROpt;
-  return compile(std::move(Ctx), std::move(M), ModuleHash, Opts);
-}
-
 std::unique_ptr<CompiledLibrary>
 Dispatcher::lookupCompiledLibrary(const HashT &ModuleHash) {
   if (!ObjectCache)

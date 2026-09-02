@@ -126,11 +126,6 @@ public:
           std::unique_ptr<llvm::Module> M, const HashT &ModuleHash,
           const CompileOptions &Opts = CompileOptions{});
 
-  std::unique_ptr<llvm::MemoryBuffer>
-  compile(std::unique_ptr<llvm::LLVMContext> Ctx,
-          std::unique_ptr<llvm::Module> M, const HashT &ModuleHash,
-          bool DisableIROpt);
-
   std::unique_ptr<CompiledLibrary>
   lookupCompiledLibrary(const HashT &ModuleHash);
 
