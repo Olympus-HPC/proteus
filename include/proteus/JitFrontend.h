@@ -94,8 +94,8 @@ private:
         // Func object to avoid cache lookups.
         // TODO: Re-think caching and dispatchers.
         auto KernelFunc = reinterpret_cast<decltype(F.getCompiledFunc())>(
-            M.Dispatch.getFunctionAddress(F.getName(), M.getModuleHash(),
-                                          M.getLibrary()));
+            M.Dispatch.getOrInsertFunction(F.getName(), M.getModuleHash(),
+                                           M.getLibrary()));
 
         F.setCompiledFunc(KernelFunc);
 
@@ -181,8 +181,8 @@ RetT Func<RetT, ArgT...>::operator()(ArgT... Args) {
 
   if (!CompiledFunc) {
     CompiledFunc = reinterpret_cast<decltype(CompiledFunc)>(
-        J.getDispatcher().getFunctionAddress(getName(), J.getModuleHash(),
-                                             J.getLibrary()));
+        J.getDispatcher().getOrInsertFunction(getName(), J.getModuleHash(),
+                                              J.getLibrary()));
   }
 
   if (J.getTargetModel() != TargetModelType::HOST)

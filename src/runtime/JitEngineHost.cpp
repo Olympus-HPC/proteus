@@ -264,7 +264,7 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
         Dispatch.compile(std::move(Ctx), std::move(M), HashValue, Opts));
   }
 
-  JitFnPtr = Dispatch.loadFunctionAddress(Name, HashValue, *Library);
+  JitFnPtr = Dispatch.insertFunction(Name, HashValue, *Library);
 
   PROTEUS_DBG(Logger::logs("proteus")
               << "===\n"

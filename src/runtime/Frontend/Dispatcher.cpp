@@ -117,12 +117,12 @@ KernelName::KernelName(const StringRef &Base) : Base(Base.str()) {}
 KernelName::KernelName(std::string Base, const HashT &Specialization)
     : Base(std::move(Base)), Specialization(Specialization.toMangledSuffix()) {}
 
-void *Dispatcher::getFunctionAddress(const KernelName &Name,
-                                     const HashT &ModuleHash,
-                                     CompiledLibrary &Library) {
+void *Dispatcher::getOrInsertFunction(const KernelName &Name,
+                                      const HashT &ModuleHash,
+                                      CompiledLibrary &Library) {
   if (void *FuncPtr = lookupFunction(Name, ModuleHash))
     return FuncPtr;
-  return loadFunctionAddress(Name, ModuleHash, Library);
+  return insertFunction(Name, ModuleHash, Library);
 }
 
 void Dispatcher::registerObject(const HashT &HashValue,

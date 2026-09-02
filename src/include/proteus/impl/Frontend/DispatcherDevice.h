@@ -86,9 +86,9 @@ public:
     return CodeCache.lookup(HashValue);
   }
 
-  void *loadFunctionAddress(const KernelName &Name, const HashT &ModuleHash,
-                            CompiledLibrary &Library) override {
-    TIMESCOPE(DispatcherDevice, loadFunctionAddress);
+  void *insertFunction(const KernelName &Name, const HashT &ModuleHash,
+                       CompiledLibrary &Library) override {
+    TIMESCOPE(DispatcherDevice, insertFunction);
     HashT HashValue = hash(Name.mangled(), ModuleHash);
 
     static const std::unordered_map<std::string, GlobalVarInfo> NoGlobals;

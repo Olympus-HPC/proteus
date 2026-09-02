@@ -80,7 +80,7 @@ void *MLIRJitModule::getFunctionAddress(const std::string &Name) {
   TIMESCOPE(MLIRJitModule, getFunctionAddress);
   if (!ModuleHash)
     reportFatalError("MLIRJitModule: expected module hash after compilation");
-  return Dispatch.getFunctionAddress(Name, *ModuleHash, getLibrary());
+  return Dispatch.getOrInsertFunction(Name, *ModuleHash, getLibrary());
 }
 
 DispatchResult MLIRJitModule::launch(void *KernelFunc, LaunchDims GridDim,
