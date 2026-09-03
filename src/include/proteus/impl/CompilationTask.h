@@ -61,7 +61,7 @@ private:
     // Parallel codegen forwards custom pipelines to LTO; HIP RTC invokes
     // optimization internally.
     // TODO: Move optimizeIR inside the codegen routines?
-    if (CGOption == CodegenOption::Serial)
+    if (CGOption != CodegenOption::Parallel)
       optimizeIR(M, DeviceArch, OptConfig);
 #else
 #error "JitEngineDevice requires PROTEUS_ENABLE_CUDA or PROTEUS_ENABLE_HIP"

@@ -371,6 +371,10 @@ public:
     return;
   }
 
+  void visitTruncInst(TruncInst &TI) {
+    WorkList.push_back({TI.getOperand(0), &TI});
+  }
+
   void visitArgument(Argument &A) {
     Function *F = A.getParent();
     DEBUG(Logger::logs("proteus-pass")
