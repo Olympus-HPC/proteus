@@ -27,6 +27,8 @@
 #include <llvm/Support/WithColor.h>
 #include <llvm/Target/TargetMachine.h>
 
+#include <cstdlib>
+#include <cstring>
 #include <optional>
 
 #if LLVM_VERSION_MAJOR >= 18
@@ -261,8 +263,15 @@ codegenParallel(Module &M, StringRef DeviceArch,
     Conf.PassPlugins.push_back(PluginPath);
   Conf.CGOptLevel = static_cast<CodeGenOptLevel>(OptConfig.CodegenOptLevel);
 
+  int RequestedParallelism =
+      getEnvOrDefaultInt("PROTEUS_HIP_LTO_PARALLELISM", 3);
+  if (RequestedParallelism <= 0)
+    reportFatalError("PROTEUS_HIP_LTO_PARALLELISM must be positive");
   unsigned ParallelCodeGenParallelismLevel =
-      std::max(1u, std::thread::hardware_concurrency());
+      static_cast<unsigned>(RequestedParallelism);
+  PROTEUS_DBG(Logger::logs("proteus")
+              << "HIP LTO codegen parallelism "
+              << ParallelCodeGenParallelismLevel << "\n");
   lto::LTO L(std::move(Conf), {}, ParallelCodeGenParallelismLevel);
 
   // Ensure module has the correct DataLayout prior to emitting bitcode.
@@ -402,16 +411,40 @@ inline std::unique_ptr<MemoryBuffer> codegenRTC(Module &M,
   // NOTE: Unrolling can have a dramatic (time-consuming) effect on JIT
   // compilation time and on the resulting optimization, better or worse
   // depending on code specifics.
-  std::string MArchOpt = ("-march=" + DeviceArch).str();
+  SmallVector<std::string, 8> OwnedOptArgs;
+  OwnedOptArgs.push_back(("-march=" + DeviceArch).str());
+
+  if (const char *ExtraOptions =
+          std::getenv("PROTEUS_HIP_RTC_IR_TO_ISA_OPTIONS")) {
+    Logger::outs("proteus")
+        << "PROTEUS_HIP_RTC_IR_TO_ISA_OPTIONS=\"" << ExtraOptions << "\"\n";
+
+    SmallVector<StringRef, 8> ExtraOptionRefs;
+    StringRef(ExtraOptions)
+        .split(ExtraOptionRefs, ' ', /*MaxSplit=*/-1, /*KeepEmpty=*/false);
+    for (StringRef Opt : ExtraOptionRefs)
+      OwnedOptArgs.push_back(Opt.str());
+  }
+
+  SmallVector<const char *, 8> OptArgs;
+  for (const std::string &Opt : OwnedOptArgs)
+    OptArgs.push_back(Opt.c_str());
+
+  PROTEUS_DBG({
+    Logger::logs("proteus") << "HIPRTC IR-to-ISA options:";
+    for (const char *Opt : OptArgs)
+      Logger::logs("proteus") << " " << Opt;
+    Logger::logs("proteus") << "\n";
+  });
 
   // NOTE: We used to pass these options as well. "-mllvm",
   // "-unroll-threshold=1000",
   //  We removed them cause we saw on bezier they cause slowdowns
-  const char *OptArgs[] = {MArchOpt.c_str()};
   std::vector<hiprtcJIT_option> JITOptions = {
       HIPRTC_JIT_IR_TO_ISA_OPT_EXT, HIPRTC_JIT_IR_TO_ISA_OPT_COUNT_EXT};
-  size_t OptArgsSize = 1;
-  const void *JITOptionsValues[] = {(void *)OptArgs, (void *)(OptArgsSize)};
+  size_t OptArgsSize = OptArgs.size();
+  const void *JITOptionsValues[] = {(void *)OptArgs.data(),
+                                    (void *)(OptArgsSize)};
   proteusHiprtcErrCheck(proteus::hipdyn::rtcLinkCreate(
       JITOptions.size(), JITOptions.data(), (void **)JITOptionsValues,
       &HipLinkStatePtr));
@@ -430,13 +463,21 @@ inline std::unique_ptr<MemoryBuffer> codegenRTC(Module &M,
 
 } // namespace detail
 
-inline void setLaunchBoundsForKernel(Function &F, int MaxNumWorkGroups,
+inline void setLaunchBoundsForKernel(Function &F, int MaxThreadsPerBlock,
                                      int MinBlocksPerSM = 0) {
   // TODO: fix calculation of launch bounds.
   // TODO: find maximum (hardcoded 1024) from device info.
   // TODO: Setting as 1, BlockSize to replicate launch bounds settings
+  const char *ForceAOTBound =
+      std::getenv("PROTEUS_HIP_FORCE_AOT_WORKGROUP_BOUND");
+  const bool UseAOTBound =
+      ForceAOTBound && std::strcmp(ForceAOTBound, "1") == 0;
+  const int MaxFlatWorkGroupSize =
+      UseAOTBound ? 1024 : std::min(1024, MaxThreadsPerBlock);
+  // F.addFnAttr("amdgpu-flat-work-group-size",
+  //             "1," + std::to_string(MaxFlatWorkGroupSize));
   F.addFnAttr("amdgpu-flat-work-group-size",
-              "1," + std::to_string(std::min(1024, MaxNumWorkGroups)));
+              "1," + std::to_string(std::min(1024, MaxFlatWorkGroupSize)));
   // F->addFnAttr("amdgpu-waves-per-eu", std::to_string(WavesPerEU));
   if (MinBlocksPerSM != 0) {
     // NOTE: We are missing a heuristic to define the `WavesPerEU`, as such we
@@ -449,7 +490,9 @@ inline void setLaunchBoundsForKernel(Function &F, int MaxNumWorkGroups,
   }
 
   PROTEUS_DBG(Logger::logs("proteus")
-              << " => Set Workgroup size " << MaxNumWorkGroups
+              << " => Set Workgroup size " << MaxThreadsPerBlock
+              << " => KEYWORD "
+              // << " MaxFlatWorkGroupSize " << MaxFlatWorkGroupSize
               << " WavesPerEU (unused) " << MinBlocksPerSM << "\n");
 }
 
@@ -473,7 +516,8 @@ codegenObject(Module &M, StringRef DeviceArch,
   }
 #if LLVM_VERSION_MAJOR >= 18
   case CodegenOption::Serial:
-    ObjectFiles = detail::codegenSerial(M, DeviceArch);
+    ObjectFiles = detail::codegenSerial(M, DeviceArch, OptConfig.OptLevel,
+                                        OptConfig.CodegenOptLevel);
     break;
   case CodegenOption::Parallel:
     ObjectFiles = detail::codegenParallel(M, DeviceArch, OptConfig);
