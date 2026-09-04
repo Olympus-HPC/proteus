@@ -157,11 +157,6 @@ jobs:
           CIBW_BUILD: "cp310-* cp311-* cp312-* cp313-* cp314-*"
           CIBW_SKIP: "*-musllinux_* cp31?t-*"
           CIBW_MANYLINUX_X86_64_IMAGE: ${{ format('{0}:{1}', env.PROTEUS_MANYLINUX_LLVM_IMAGE_REPO, env.PROTEUS_LLVM_VERSION) }}
-          # Pin the versioned Homebrew keg. Once Homebrew's unversioned llvm
-          # formula moves past PROTEUS_LLVM_VERSION's major, llvm@<major>
-          # becomes its own keg under /opt/homebrew/opt/llvm@<major> and
-          # /opt/homebrew/opt/llvm no longer exists (or points at a newer
-          # LLVM), so never reference the unversioned path here.
           CIBW_BEFORE_ALL_MACOS: brew install llvm@${{ env.PROTEUS_LLVM_MAJOR }}
           CIBW_BEFORE_BUILD_MACOS: python -m pip install delocate
           CIBW_BUILD_VERBOSITY: 1
