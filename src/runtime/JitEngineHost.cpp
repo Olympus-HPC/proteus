@@ -42,6 +42,17 @@ using namespace proteus;
 using namespace llvm;
 using namespace llvm::orc;
 
+#if PROTEUS_ENABLE_CUDA
+extern "C" LLVM_ATTRIBUTE_WEAK void
+__proteus_get_device_launch_config_symbols(const char **, uintptr_t *,
+                                           const char **, uintptr_t *);
+#elif PROTEUS_ENABLE_HIP
+extern "C" void __proteus_get_device_launch_config_symbols(const char **,
+                                                           uintptr_t *,
+                                                           const char **,
+                                                           uintptr_t *);
+#endif
+
 namespace {
 
 DenseMap<int, proteus::RuntimeConstant>
@@ -82,7 +93,26 @@ void JitEngineHost::addStaticLibrarySymbols() {
                                    __proteus_cudaLaunchKernel_ptr)},
                                JITSymbolFlags::Exported);
   }
+#endif
 
+#if PROTEUS_ENABLE_CUDA
+  if (__proteus_get_device_launch_config_symbols) {
+#elif PROTEUS_ENABLE_HIP
+  {
+#endif
+#if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
+    const char *PushName = nullptr;
+    uintptr_t PushCallConfiguration = 0;
+    const char *PopName = nullptr;
+    uintptr_t PopCallConfiguration = 0;
+    __proteus_get_device_launch_config_symbols(
+        &PushName, &PushCallConfiguration, &PopName, &PopCallConfiguration);
+
+    SymbolMap[LLJITPtr->mangleAndIntern(PushName)] = orc::ExecutorSymbolDef(
+        orc::ExecutorAddr{PushCallConfiguration}, JITSymbolFlags::Exported);
+    SymbolMap[LLJITPtr->mangleAndIntern(PopName)] = orc::ExecutorSymbolDef(
+        orc::ExecutorAddr{PopCallConfiguration}, JITSymbolFlags::Exported);
+  }
 #endif
 
 #if PROTEUS_ENABLE_CUDA || PROTEUS_ENABLE_HIP
@@ -90,6 +120,10 @@ void JitEngineHost::addStaticLibrarySymbols() {
   SymbolMap[LLJITPtr->mangleAndIntern("__proteus_launch_kernel")] =
       orc::ExecutorSymbolDef(orc::ExecutorAddr{reinterpret_cast<uintptr_t>(
                                  __proteus_launch_kernel)},
+                             JITSymbolFlags::Exported);
+  SymbolMap[LLJITPtr->mangleAndIntern("__proteus_launch_kernel_by_name")] =
+      orc::ExecutorSymbolDef(orc::ExecutorAddr{reinterpret_cast<uintptr_t>(
+                                 __proteus_launch_kernel_by_name)},
                              JITSymbolFlags::Exported);
 
 #endif
