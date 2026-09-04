@@ -366,6 +366,35 @@ linkModules(LLVMContext &Ctx,
   return LinkedModule;
 }
 
+inline void pruneDanglingNVVMAnnotations(Module &M) {
+  NamedMDNode *Annotations = M.getNamedMetadata("nvvm.annotations");
+  if (!Annotations)
+    return;
+
+  SmallVector<MDNode *> LiveEntries;
+  for (MDNode *Entry : Annotations->operands()) {
+    // Global DCE nulls out the entry of a function it removes and stripping
+    // debug info rewrites such a node to an empty tuple, !{}.
+    // LLVM's nvvm.annotations which LLVM's later UpgradeNVVMAnnotations
+    // pass reads unconditionally, so we need to prune out such entries.
+    // Otherwise, UpgradeNVVMAnnotations runs out of bounds!
+    if (!Entry || Entry->getNumOperands() == 0)
+      continue;
+
+    if (!mdconst::dyn_extract_or_null<GlobalValue>(Entry->getOperand(0)))
+      continue;
+
+    LiveEntries.push_back(Entry);
+  }
+
+  if (LiveEntries.size() == Annotations->getNumOperands())
+    return;
+
+  Annotations->clearOperands();
+  for (MDNode *Entry : LiveEntries)
+    Annotations->addOperand(Entry);
+}
+
 inline void runCleanupPassPipeline(Module &M) {
   TIMESCOPE("proteus::runCleanupPassPipeline");
   PassBuilder PB;
@@ -386,6 +415,8 @@ inline void runCleanupPassPipeline(Module &M) {
   Passes.addPass(StripDeadPrototypesPass());
 
   Passes.run(M, MAM);
+
+  pruneDanglingNVVMAnnotations(M);
 
   // Keep line-table debug info so that recorded device modules retain the
   // kernel's source file and line information.

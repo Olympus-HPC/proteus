@@ -276,6 +276,8 @@ private:
 
     Passes.run(M, MAM);
 
+    proteus::pruneDanglingNVVMAnnotations(M);
+
     // Keep line-table debug info so that recorded device modules retain the
     // kernel's source file and line information.
     stripNonLineTableDebugInfo(M);
@@ -990,6 +992,8 @@ private:
       for (auto &G : PrunedLTOModule->global_values())
         if (G.hasInternalLinkage())
           G.setLinkage(GlobalValue::ExternalLinkage);
+
+      proteus::pruneDanglingNVVMAnnotations(*PrunedLTOModule);
 
       // Keep line-table debug info so that recorded device modules retain the
       // kernel's source file and line information.
