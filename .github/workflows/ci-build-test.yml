@@ -137,9 +137,6 @@ jobs:
       - name: Install LLVM
         run: |
           brew install llvm@${{ matrix.llvm }}
-      - name: Install lit
-        run: |
-          brew install lit
       - name: Install Python bindings dependencies
         run: |
           brew install python pybind11
@@ -155,6 +152,16 @@ jobs:
           echo "CXX=$LLVM_PREFIX/bin/clang++" >> "$GITHUB_ENV"
           echo "$LLVM_PREFIX/bin" >> "$GITHUB_PATH"
           echo "$PYTHON_PREFIX/bin" >> "$GITHUB_PATH"
+      - name: Install lit
+        run: |
+          # Pin below lit 23, which made ShTest(execute_external=True) a hard
+          # error; the lit.cfg.py files generated under tests/ still rely on
+          # lit's external shell. Homebrew's unpinned lit formula picks up the
+          # new major automatically, so install into a venv instead. Remove the
+          # upper bound once the suites move to lit's internal shell.
+          python3 -m venv "$RUNNER_TEMP/lit-venv"
+          "$RUNNER_TEMP/lit-venv/bin/pip" install --quiet 'lit<23'
+          echo "$RUNNER_TEMP/lit-venv/bin" >> "$GITHUB_PATH"
       - name: Build build_shared=${{ matrix.build_shared }}
         run: |
           mkdir -p build
