@@ -1119,15 +1119,15 @@ retrieve a native entry point by supplying its exact ABI signature.</p>
 descriptors:</p>
 <div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">proteus</span>
 
-<span class="n">source</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">&#39;&#39;&#39;</span>
-<span class="s1">extern &quot;C&quot; int plus1(int x) {</span>
+<span class="n">source</span> <span class="o">=</span> <span class="sa">r</span><span class="s1">'''</span>
+<span class="s1">extern "C" int plus1(int x) {</span>
 <span class="s1">  return x + 1;</span>
 <span class="s1">}</span>
-<span class="s1">&#39;&#39;&#39;</span>
+<span class="s1">'''</span>
 
-<span class="n">mod</span> <span class="o">=</span> <span class="n">proteus</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">frontend</span><span class="o">=</span><span class="s2">&quot;cpp&quot;</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="s2">&quot;host&quot;</span><span class="p">)</span>
+<span class="n">mod</span> <span class="o">=</span> <span class="n">proteus</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">frontend</span><span class="o">=</span><span class="s2">"cpp"</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="s2">"host"</span><span class="p">)</span>
 <span class="n">plus1</span> <span class="o">=</span> <span class="n">mod</span><span class="o">.</span><span class="n">get_function</span><span class="p">(</span>
-    <span class="s2">&quot;plus1&quot;</span><span class="p">,</span>
+    <span class="s2">"plus1"</span><span class="p">,</span>
     <span class="n">signature</span><span class="o">=</span><span class="n">proteus</span><span class="o">.</span><span class="n">i32</span><span class="p">(</span><span class="n">proteus</span><span class="o">.</span><span class="n">i32</span><span class="p">),</span>
 <span class="p">)</span>
 
@@ -1141,7 +1141,7 @@ or <code>proteus.void</code>.</p>
 <h2 id="gpu-kernels">GPU Kernels</h2>
 <p>CUDA and HIP kernel signatures must return <code>proteus.void</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="n">kernel</span> <span class="o">=</span> <span class="n">mod</span><span class="o">.</span><span class="n">get_kernel</span><span class="p">(</span>
-    <span class="s2">&quot;write_int&quot;</span><span class="p">,</span>
+    <span class="s2">"write_int"</span><span class="p">,</span>
     <span class="n">signature</span><span class="o">=</span><span class="n">proteus</span><span class="o">.</span><span class="n">void</span><span class="p">(</span><span class="n">proteus</span><span class="o">.</span><span class="n">ptr</span><span class="p">,</span> <span class="n">proteus</span><span class="o">.</span><span class="n">i32</span><span class="p">),</span>
 <span class="p">)</span>
 

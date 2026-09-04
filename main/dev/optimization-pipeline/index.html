@@ -1201,13 +1201,13 @@ and registers its PassBuilder callbacks
 before Proteus builds or parses the optimization pipeline.
 The C++ API supports three registration modes:</p>
 <div class="highlight"><pre><span></span><code><span class="c1">// Load callbacks and append a pipeline fragment (the default).</span>
-<span class="n">proteus</span><span class="o">::</span><span class="n">registerJITPassPlugin</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;my-pass&quot;</span><span class="p">);</span>
+<span class="n">proteus</span><span class="o">::</span><span class="n">registerJITPassPlugin</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="s">"my-pass"</span><span class="p">);</span>
 
 <span class="c1">// Load callbacks and explicitly place a pipeline fragment.</span>
 <span class="n">proteus</span><span class="o">::</span><span class="n">registerJITPassPlugin</span><span class="p">(</span>
-<span class="w">    </span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;my-pass&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">proteus</span><span class="o">::</span><span class="n">JITPassPluginPosition</span><span class="o">::</span><span class="n">Prepend</span><span class="p">);</span>
+<span class="w">    </span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="s">"my-pass"</span><span class="p">,</span><span class="w"> </span><span class="n">proteus</span><span class="o">::</span><span class="n">JITPassPluginPosition</span><span class="o">::</span><span class="n">Prepend</span><span class="p">);</span>
 <span class="n">proteus</span><span class="o">::</span><span class="n">registerJITPassPlugin</span><span class="p">(</span>
-<span class="w">    </span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;my-pass&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">proteus</span><span class="o">::</span><span class="n">JITPassPluginPosition</span><span class="o">::</span><span class="n">Append</span><span class="p">);</span>
+<span class="w">    </span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="s">"my-pass"</span><span class="p">,</span><span class="w"> </span><span class="n">proteus</span><span class="o">::</span><span class="n">JITPassPluginPosition</span><span class="o">::</span><span class="n">Append</span><span class="p">);</span>
 
 <span class="c1">// Load callbacks without automatically inserting a fragment.</span>
 <span class="n">proteus</span><span class="o">::</span><span class="n">registerJITPassPlugin</span><span class="p">(</span><span class="n">path</span><span class="p">);</span>

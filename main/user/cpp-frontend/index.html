@@ -1185,8 +1185,8 @@ strings, see the <a href="../dsl/">DSL API</a>.</p>
 <span class="kt">double</span><span class="w"> </span><span class="n">A</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span>
 <span class="kt">size_t</span><span class="w"> </span><span class="n">N</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span>
 
-<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">Code</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">format</span><span class="p">(</span><span class="sa">R</span><span class="s">&quot;</span><span class="dl">cpp(</span>
-<span class="s">  extern &quot;C&quot;</span>
+<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">Code</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">format</span><span class="p">(</span><span class="sa">R</span><span class="s">"</span><span class="dl">cpp(</span>
+<span class="s">  extern "C"</span>
 <span class="s">  __global__</span>
 <span class="s">  void daxpy(double *X, double *Y)</span>
 <span class="s">  {{</span>
@@ -1194,10 +1194,10 @@ strings, see the <a href="../dsl/">DSL API</a>.</p>
 <span class="s">    int Stride = blockDim.x * gridDim.x;</span>
 <span class="s">    for (int I = Tid; I &lt; {0}; I += Stride)</span>
 <span class="s">      X[I] = {1} * X[I] + Y[I];</span>
-<span class="s">  }}</span><span class="dl">)cpp</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">N</span><span class="p">,</span><span class="w"> </span><span class="n">A</span><span class="p">);</span>
+<span class="s">  }}</span><span class="dl">)cpp</span><span class="s">"</span><span class="p">,</span><span class="w"> </span><span class="n">N</span><span class="p">,</span><span class="w"> </span><span class="n">A</span><span class="p">);</span>
 
-<span class="n">CppJitModule</span><span class="w"> </span><span class="n">Module</span><span class="p">{</span><span class="s">&quot;cuda&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">Code</span><span class="p">};</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">Kernel</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Module</span><span class="p">.</span><span class="n">getKernel</span><span class="o">&lt;</span><span class="kt">void</span><span class="p">(</span><span class="kt">double</span><span class="w"> </span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;daxpy&quot;</span><span class="p">);</span>
+<span class="n">CppJitModule</span><span class="w"> </span><span class="n">Module</span><span class="p">{</span><span class="s">"cuda"</span><span class="p">,</span><span class="w"> </span><span class="n">Code</span><span class="p">};</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">Kernel</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Module</span><span class="p">.</span><span class="n">getKernel</span><span class="o">&lt;</span><span class="kt">void</span><span class="p">(</span><span class="kt">double</span><span class="w"> </span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="o">&gt;</span><span class="p">(</span><span class="s">"daxpy"</span><span class="p">);</span>
 <span class="n">Kernel</span><span class="p">.</span><span class="n">launch</span><span class="p">(</span>
 <span class="w">  </span><span class="cm">/* GridDim */</span><span class="w"> </span><span class="p">{</span><span class="n">NumBlocks</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">},</span>
 <span class="w">  </span><span class="cm">/* BlockDim */</span><span class="w"> </span><span class="p">{</span><span class="n">ThreadsPerBlock</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">},</span>
@@ -1214,16 +1214,16 @@ retrieved by name.</p>
 <p>The same pattern for targeting the CPU is very similar:
 instead of <code>getKernel()</code> use <code>getFunction()</code>, and execute the JIT-compiled code
 with <code>run()</code> instead of <code>launch()</code>.</p>
-<div class="highlight"><pre><span></span><code><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">Code</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">format</span><span class="p">(</span><span class="sa">R</span><span class="s">&quot;</span><span class="dl">cpp(</span>
-<span class="s">  extern &quot;C&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">Code</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">format</span><span class="p">(</span><span class="sa">R</span><span class="s">"</span><span class="dl">cpp(</span>
+<span class="s">  extern "C"</span>
 <span class="s">  void daxpy(double *X, double *Y)</span>
 <span class="s">  {{</span>
 <span class="s">    for (int I = 0; I &lt; {0}; ++I)</span>
 <span class="s">      X[I] = {1} * X[I] + Y[I];</span>
-<span class="s">  }}</span><span class="dl">)cpp</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">N</span><span class="p">,</span><span class="w"> </span><span class="n">A</span><span class="p">);</span>
+<span class="s">  }}</span><span class="dl">)cpp</span><span class="s">"</span><span class="p">,</span><span class="w"> </span><span class="n">N</span><span class="p">,</span><span class="w"> </span><span class="n">A</span><span class="p">);</span>
 
-<span class="n">CppJitModule</span><span class="w"> </span><span class="n">Module</span><span class="p">{</span><span class="s">&quot;host&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">Code</span><span class="p">};</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">Func</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Module</span><span class="p">.</span><span class="n">getFunction</span><span class="o">&lt;</span><span class="kt">void</span><span class="p">(</span><span class="kt">double</span><span class="w"> </span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;daxpy&quot;</span><span class="p">);</span>
+<span class="n">CppJitModule</span><span class="w"> </span><span class="n">Module</span><span class="p">{</span><span class="s">"host"</span><span class="p">,</span><span class="w"> </span><span class="n">Code</span><span class="p">};</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">Func</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Module</span><span class="p">.</span><span class="n">getFunction</span><span class="o">&lt;</span><span class="kt">void</span><span class="p">(</span><span class="kt">double</span><span class="w"> </span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="kt">double</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="o">&gt;</span><span class="p">(</span><span class="s">"daxpy"</span><span class="p">);</span>
 <span class="n">Func</span><span class="p">.</span><span class="n">run</span><span class="p">(</span><span class="n">X</span><span class="p">,</span><span class="w"> </span><span class="n">Y</span><span class="p">);</span>
 </code></pre></div>
 <h2 id="gpu-example">GPU Example</h2>
@@ -1234,7 +1234,7 @@ shared memory size, stream, and kernel arguments.</p>
 <h2 id="template-instantiation">Template Instantiation</h2>
 <p>The C++ frontend API also supports runtime instantiation of C++ templates.
 Here is a simple example:</p>
-<div class="highlight"><pre><span></span><code><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">Code</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="sa">R</span><span class="s">&quot;</span><span class="dl">cpp(</span>
+<div class="highlight"><pre><span></span><code><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">Code</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="sa">R</span><span class="s">"</span><span class="dl">cpp(</span>
 <span class="s">  template&lt;int V&gt;</span>
 <span class="s">  __global__ void foo(int *Ret) {</span>
 <span class="s">    *Ret = V;</span>
@@ -1244,14 +1244,14 @@ Here is a simple example:</p>
 <span class="s">  __global__ void bar(T *Ret) {</span>
 <span class="s">    *Ret = 42;</span>
 <span class="s">  }</span>
-<span class="dl">)cpp</span><span class="s">&quot;</span><span class="p">;</span>
+<span class="dl">)cpp</span><span class="s">"</span><span class="p">;</span>
 
 <span class="kt">int</span><span class="w"> </span><span class="o">*</span><span class="n">RetFoo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span>
 <span class="kt">double</span><span class="w"> </span><span class="o">*</span><span class="n">RetBar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span>
 
-<span class="n">CppJitModule</span><span class="w"> </span><span class="n">Module</span><span class="p">{</span><span class="s">&quot;cuda&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">Code</span><span class="p">};</span>
-<span class="k">auto</span><span class="w"> </span><span class="o">&amp;</span><span class="n">InstanceFoo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Module</span><span class="p">.</span><span class="n">instantiate</span><span class="p">(</span><span class="s">&quot;foo&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;3&quot;</span><span class="p">);</span>
-<span class="k">auto</span><span class="w"> </span><span class="o">&amp;</span><span class="n">InstanceBar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Module</span><span class="p">.</span><span class="n">instantiate</span><span class="p">(</span><span class="s">&quot;bar&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;double&quot;</span><span class="p">);</span>
+<span class="n">CppJitModule</span><span class="w"> </span><span class="n">Module</span><span class="p">{</span><span class="s">"cuda"</span><span class="p">,</span><span class="w"> </span><span class="n">Code</span><span class="p">};</span>
+<span class="k">auto</span><span class="w"> </span><span class="o">&amp;</span><span class="n">InstanceFoo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Module</span><span class="p">.</span><span class="n">instantiate</span><span class="p">(</span><span class="s">"foo"</span><span class="p">,</span><span class="w"> </span><span class="s">"3"</span><span class="p">);</span>
+<span class="k">auto</span><span class="w"> </span><span class="o">&amp;</span><span class="n">InstanceBar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Module</span><span class="p">.</span><span class="n">instantiate</span><span class="p">(</span><span class="s">"bar"</span><span class="p">,</span><span class="w"> </span><span class="s">"double"</span><span class="p">);</span>
 
 <span class="n">InstanceFoo</span><span class="p">.</span><span class="n">launch</span><span class="p">(</span>
 <span class="w">  </span><span class="cm">/* GridDim */</span><span class="w"> </span><span class="p">{</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">},</span>
@@ -1280,8 +1280,8 @@ module.</p>
 before.</p>
 <h2 id="optional-compile-args-and-backend-selection">Optional Compile Args and Backend Selection</h2>
 <p>You can pass extra compile arguments or select the backend explicitly:</p>
-<div class="highlight"><pre><span></span><code><span class="n">CppJitModule</span><span class="w"> </span><span class="n">HostModule</span><span class="p">{</span><span class="s">&quot;host&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">Code</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;-DMY_OFFSET=10&quot;</span><span class="p">}};</span>
-<span class="n">CppJitModule</span><span class="w"> </span><span class="n">DeviceModule</span><span class="p">{</span><span class="s">&quot;cuda&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">Code</span><span class="p">,</span><span class="w"> </span><span class="p">{},</span><span class="w"> </span><span class="n">CppJitCompilerBackend</span><span class="o">::</span><span class="n">Nvcc</span><span class="p">};</span>
+<div class="highlight"><pre><span></span><code><span class="n">CppJitModule</span><span class="w"> </span><span class="n">HostModule</span><span class="p">{</span><span class="s">"host"</span><span class="p">,</span><span class="w"> </span><span class="n">Code</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="s">"-DMY_OFFSET=10"</span><span class="p">}};</span>
+<span class="n">CppJitModule</span><span class="w"> </span><span class="n">DeviceModule</span><span class="p">{</span><span class="s">"cuda"</span><span class="p">,</span><span class="w"> </span><span class="n">Code</span><span class="p">,</span><span class="w"> </span><span class="p">{},</span><span class="w"> </span><span class="n">CppJitCompilerBackend</span><span class="o">::</span><span class="n">Nvcc</span><span class="p">};</span>
 </code></pre></div>
 <p><code>CppJitCompilerBackend::Clang</code> is the default backend.
 For CUDA modules, <code>CppJitCompilerBackend::Nvcc</code> is also available when you want
@@ -1291,7 +1291,7 @@ to compile through the NVCC toolchain instead.</p>
 attributes before launching.
 For example, Proteus exposes
 <code>JitFuncAttribute::MaxDynamicSharedMemorySize</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="k">auto</span><span class="w"> </span><span class="n">Kernel</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Module</span><span class="p">.</span><span class="n">getKernel</span><span class="o">&lt;</span><span class="kt">void</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;shmem_plain&quot;</span><span class="p">);</span>
+<div class="highlight"><pre><span></span><code><span class="k">auto</span><span class="w"> </span><span class="n">Kernel</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Module</span><span class="p">.</span><span class="n">getKernel</span><span class="o">&lt;</span><span class="kt">void</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="o">&gt;</span><span class="p">(</span><span class="s">"shmem_plain"</span><span class="p">);</span>
 <span class="n">Kernel</span><span class="p">.</span><span class="n">setFuncAttribute</span><span class="p">(</span><span class="n">JitFuncAttribute</span><span class="o">::</span><span class="n">MaxDynamicSharedMemorySize</span><span class="p">,</span>
 <span class="w">                        </span><span class="mi">49</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">1024</span><span class="p">);</span>
 <span class="n">Kernel</span><span class="p">.</span><span class="n">launch</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">},</span><span class="w"> </span><span class="mi">49</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">1024</span><span class="p">,</span><span class="w"> </span><span class="nb">nullptr</span><span class="p">,</span><span class="w"> </span><span class="n">Out</span><span class="p">);</span>
