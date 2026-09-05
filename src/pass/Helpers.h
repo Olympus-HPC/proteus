@@ -81,6 +81,16 @@ inline std::string getUniqueFileID(Module &M) {
   return std::string(Out);
 }
 
+// Resolve the module source path so consumers of the embedded bitcode can
+// locate the translation unit independently of the compile working directory.
+inline std::string getCanonicalSourceFileName(Module &M) {
+  SmallString<256> RealPath;
+  if (llvm::sys::fs::real_path(M.getSourceFileName(), RealPath))
+    return M.getSourceFileName();
+
+  return std::string(RealPath);
+}
+
 inline bool isDeviceKernel(const Function *F) {
   if (!F)
     reportFatalError("Expected non-null function");

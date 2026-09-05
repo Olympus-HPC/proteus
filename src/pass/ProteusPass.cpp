@@ -276,7 +276,11 @@ private:
 
     Passes.run(M, MAM);
 
-    StripDebugInfo(M);
+    proteus::pruneDanglingNVVMAnnotations(M);
+
+    // Keep line-table debug info so that recorded device modules retain the
+    // kernel's source file and line information.
+    stripNonLineTableDebugInfo(M);
   }
 
   void runOptimizationPassPipeline(Module &M) {
@@ -989,7 +993,11 @@ private:
         if (G.hasInternalLinkage())
           G.setLinkage(GlobalValue::ExternalLinkage);
 
-      StripDebugInfo(*PrunedLTOModule);
+      proteus::pruneDanglingNVVMAnnotations(*PrunedLTOModule);
+
+      // Keep line-table debug info so that recorded device modules retain the
+      // kernel's source file and line information.
+      stripNonLineTableDebugInfo(*PrunedLTOModule);
 
       if (verifyModule(*PrunedLTOModule, &errs()))
         reportFatalError(
@@ -1072,6 +1080,7 @@ private:
       };
       auto EmitM = CloneModule(M, VMap, ShouldClone);
       runCleanupPassPipeline(*EmitM);
+      EmitM->setSourceFileName(getCanonicalSourceFileName(M));
 
       emitModuleDevice(M, *EmitM, "tu", true);
     }
