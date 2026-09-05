@@ -18,7 +18,7 @@ var searchData=
   ['int128ty_15',['Int128Ty',['../structproteus_1_1ProteusTypes.html#a89f95c718530db50288d32fa8b1037e5',1,'proteus::ProteusTypes']]],
   ['int16_16',['Int16',['../namespaceproteus.html#ad44857f031a4f66111485d3db4210016a39bc2ae44b184207f560ff8619823208',1,'proteus']]],
   ['int1ty_17',['Int1Ty',['../structproteus_1_1ProteusTypes.html#a3578fb268f1d9db344081266bbd13df2',1,'proteus::ProteusTypes']]],
-  ['int32_18',['int32',['../namespaceproteus.html#a321b5206e698d88e9dbf55b4c1c69ee1a25c714ac46f6f8e2f1cabfc9066cc272',1,'proteus::INT32'],['../namespaceproteus.html#ad44857f031a4f66111485d3db4210016ac06129f6e6e15c09328365e553f1dc31',1,'proteus::Int32']]],
+  ['int32_18',['int32',['../namespaceproteus.html#ad44857f031a4f66111485d3db4210016ac06129f6e6e15c09328365e553f1dc31',1,'proteus::Int32'],['../namespaceproteus.html#a321b5206e698d88e9dbf55b4c1c69ee1a25c714ac46f6f8e2f1cabfc9066cc272',1,'proteus::INT32']]],
   ['int32ty_19',['Int32Ty',['../structproteus_1_1ProteusTypes.html#a9e301b40f036ad2db1bbdf20187c2061',1,'proteus::ProteusTypes']]],
   ['int32val_20',['Int32Val',['../unionproteus_1_1RuntimeConstantValue.html#aacb7a8cd4c1b8b411af7405f2d042cfe',1,'proteus::RuntimeConstantValue']]],
   ['int64_21',['int64',['../namespaceproteus.html#ad44857f031a4f66111485d3db4210016afbde23b11d7e59af7828e81144c8b487',1,'proteus::Int64'],['../namespaceproteus.html#a321b5206e698d88e9dbf55b4c1c69ee1a3c0d554d7f99f18d88898c2929f7d55a',1,'proteus::INT64']]],

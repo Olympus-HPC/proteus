@@ -610,6 +610,8 @@ Functions</h2></td></tr>
 <tr class="separator:a148a49d668e7ad949b42639f696af2b0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:afd9cd9c5596410363d4e1534f7329799" id="r_afd9cd9c5596410363d4e1534f7329799"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; Module &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#afd9cd9c5596410363d4e1534f7329799">linkModules</a> (LLVMContext &amp;Ctx, SmallVector&lt; std::unique_ptr&lt; Module &gt; &gt; LinkedModules)</td></tr>
 <tr class="separator:afd9cd9c5596410363d4e1534f7329799"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac1aee2db7054dab22ca0bb915ddb4b0b" id="r_ac1aee2db7054dab22ca0bb915ddb4b0b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#ac1aee2db7054dab22ca0bb915ddb4b0b">pruneDanglingNVVMAnnotations</a> (Module &amp;M)</td></tr>
+<tr class="separator:ac1aee2db7054dab22ca0bb915ddb4b0b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af07e54a445654e28c7a589dab63edc0f" id="r_af07e54a445654e28c7a589dab63edc0f"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#af07e54a445654e28c7a589dab63edc0f">runCleanupPassPipeline</a> (Module &amp;M)</td></tr>
 <tr class="separator:af07e54a445654e28c7a589dab63edc0f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a25440d2db365849cd9f0537fff22026b" id="r_a25440d2db365849cd9f0537fff22026b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a25440d2db365849cd9f0537fff22026b">findFunctionsWithU64Metadata</a> (llvm::Module &amp;M, llvm::StringRef Key, llvm::SmallVectorImpl&lt; std::pair&lt; llvm::Function *, std::uint64_t &gt; &gt; &amp;Out)</td></tr>
@@ -735,6 +737,8 @@ Functions</h2></td></tr>
 <tr class="separator:ad192d3c624c2f89b9f8f3773debc4730"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7a5d04a863a17546e68d3f9d53aa5c05" id="r_a7a5d04a863a17546e68d3f9d53aa5c05"><td class="memItemLeft" align="right" valign="top">std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a7a5d04a863a17546e68d3f9d53aa5c05">getUniqueFileID</a> (Module &amp;M)</td></tr>
 <tr class="separator:a7a5d04a863a17546e68d3f9d53aa5c05"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5438380988808f63bea4d1a6e5032486" id="r_a5438380988808f63bea4d1a6e5032486"><td class="memItemLeft" align="right" valign="top">std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a5438380988808f63bea4d1a6e5032486">getCanonicalSourceFileName</a> (Module &amp;M)</td></tr>
+<tr class="separator:a5438380988808f63bea4d1a6e5032486"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a37fee433b41b26fb71cc7314983da196" id="r_a37fee433b41b26fb71cc7314983da196"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a37fee433b41b26fb71cc7314983da196">isDeviceKernel</a> (const Function *F)</td></tr>
 <tr class="separator:a37fee433b41b26fb71cc7314983da196"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a393ddb296d5fcabc2edade89b2a96f65" id="r_a393ddb296d5fcabc2edade89b2a96f65"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a393ddb296d5fcabc2edade89b2a96f65">needsDefUseAnalysis</a> (Value *Val)</td></tr>
@@ -2423,6 +2427,32 @@ template&lt;typename T &gt; </div>
           <td></td>
           <td>)</td>
           <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="a5438380988808f63bea4d1a6e5032486" name="a5438380988808f63bea4d1a6e5032486"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a5438380988808f63bea4d1a6e5032486">&#9670;&#160;</a></span>getCanonicalSourceFileName()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::string proteus::getCanonicalSourceFileName </td>
+          <td>(</td>
+          <td class="paramtype">Module &amp;&#160;</td>
+          <td class="paramname"><em>M</em></td><td>)</td>
+          <td></td>
         </tr>
       </table>
   </td>
@@ -4705,6 +4735,32 @@ template&lt;typename T &gt; </div>
           <td></td><td></td>
         </tr>
       </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="ac1aee2db7054dab22ca0bb915ddb4b0b" name="ac1aee2db7054dab22ca0bb915ddb4b0b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac1aee2db7054dab22ca0bb915ddb4b0b">&#9670;&#160;</a></span>pruneDanglingNVVMAnnotations()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void proteus::pruneDanglingNVVMAnnotations </td>
+          <td>(</td>
+          <td class="paramtype">Module &amp;&#160;</td>
+          <td class="paramname"><em>M</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
 </div><div class="memdoc">
 
 </div>

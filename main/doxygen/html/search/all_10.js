@@ -72,11 +72,12 @@ var searchData=
   ['proteustraceconfig_69',['ProteusTraceConfig',['../classproteus_1_1Config.html#a0e94b86bd05060f128f4d4cc57f2e587',1,'proteus::Config']]],
   ['proteustypes_70',['proteustypes',['../structproteus_1_1ProteusTypes.html',1,'proteus::ProteusTypes'],['../structproteus_1_1ProteusTypes.html#a15880d4b165fbf99b25d237bc4362ba3',1,'proteus::ProteusTypes::ProteusTypes()']]],
   ['proteususestoredcache_71',['ProteusUseStoredCache',['../classproteus_1_1Config.html#a8b8b068e45e47dce98084a3d0ab25aa6',1,'proteus::Config']]],
-  ['pruneir_72',['pruneIR',['../namespaceproteus.html#a9920b35bfda33f3a1cbd00e1a930483f',1,'proteus']]],
-  ['ptr_73',['PTR',['../namespaceproteus.html#a321b5206e698d88e9dbf55b4c1c69ee1af3bea4c3f6d74b2b5fb96ae2c938219e',1,'proteus']]],
-  ['ptrargtocb_74',['PtrArgToCB',['../structproteus_1_1FunctionAnalysis.html#a5f6c533882b69dfb9c248ca8a6de189b',1,'proteus::FunctionAnalysis']]],
-  ['ptrty_75',['PtrTy',['../structproteus_1_1ProteusTypes.html#ac2854a36c97cef336066857a8476f903',1,'proteus::ProteusTypes']]],
-  ['ptrval_76',['PtrVal',['../unionproteus_1_1RuntimeConstantValue.html#a3e1059682f397e06c33ee292f115f8e4',1,'proteus::RuntimeConstantValue']]],
-  ['pushback_77',['pushBack',['../classproteus_1_1LambdaInstUseVisitor.html#aa55fbb1426eabf2924bc4c099fc9a239',1,'proteus::LambdaInstUseVisitor']]],
-  ['pushscope_78',['pushScope',['../classproteus_1_1LLVMCodeBuilder.html#acf27449d90740e4429f5955c0c1536c6',1,'proteus::LLVMCodeBuilder']]]
+  ['prunedanglingnvvmannotations_72',['pruneDanglingNVVMAnnotations',['../namespaceproteus.html#ac1aee2db7054dab22ca0bb915ddb4b0b',1,'proteus']]],
+  ['pruneir_73',['pruneIR',['../namespaceproteus.html#a9920b35bfda33f3a1cbd00e1a930483f',1,'proteus']]],
+  ['ptr_74',['PTR',['../namespaceproteus.html#a321b5206e698d88e9dbf55b4c1c69ee1af3bea4c3f6d74b2b5fb96ae2c938219e',1,'proteus']]],
+  ['ptrargtocb_75',['PtrArgToCB',['../structproteus_1_1FunctionAnalysis.html#a5f6c533882b69dfb9c248ca8a6de189b',1,'proteus::FunctionAnalysis']]],
+  ['ptrty_76',['PtrTy',['../structproteus_1_1ProteusTypes.html#ac2854a36c97cef336066857a8476f903',1,'proteus::ProteusTypes']]],
+  ['ptrval_77',['PtrVal',['../unionproteus_1_1RuntimeConstantValue.html#a3e1059682f397e06c33ee292f115f8e4',1,'proteus::RuntimeConstantValue']]],
+  ['pushback_78',['pushBack',['../classproteus_1_1LambdaInstUseVisitor.html#aa55fbb1426eabf2924bc4c099fc9a239',1,'proteus::LambdaInstUseVisitor']]],
+  ['pushscope_79',['pushScope',['../classproteus_1_1LLVMCodeBuilder.html#acf27449d90740e4429f5955c0c1536c6',1,'proteus::LLVMCodeBuilder']]]
 ];

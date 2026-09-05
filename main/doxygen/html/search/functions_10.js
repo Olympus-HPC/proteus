@@ -13,7 +13,8 @@ var searchData=
   ['printllvmir_10',['printllvmir',['../classproteus_1_1MLIRCodeBuilder.html#a09a495149b2a453e5962446e2fcab26b',1,'proteus::MLIRCodeBuilder::printLLVMIR()'],['../classproteus_1_1JitModule.html#a1dafd818cf84e618fade7459c18b7c8e',1,'proteus::JitModule::printLLVMIR()']]],
   ['printstats_11',['printstats',['../classproteus_1_1ObjectCacheChain.html#a3984db85ead37a55250eaf041cf852bb',1,'proteus::ObjectCacheChain::printStats()'],['../classproteus_1_1StorageCache.html#a326e10ce21cef666746ab52e5c21d9bb',1,'proteus::StorageCache::printStats()'],['../classproteus_1_1ObjectCache.html#a533f74e25addce88ee2da9e2955cefd4',1,'proteus::ObjectCache::printStats()'],['../classproteus_1_1MPIStorageCache.html#ac3e5fc46f16331c4a35a310849495a28',1,'proteus::MPIStorageCache::printStats()'],['../classproteus_1_1MemoryCache.html#a03351c9f47ef33cd0ec494f2867e6ed5',1,'proteus::MemoryCache::printStats()']]],
   ['proteustypes_12',['ProteusTypes',['../structproteus_1_1ProteusTypes.html#a15880d4b165fbf99b25d237bc4362ba3',1,'proteus::ProteusTypes']]],
-  ['pruneir_13',['pruneIR',['../namespaceproteus.html#a9920b35bfda33f3a1cbd00e1a930483f',1,'proteus']]],
-  ['pushback_14',['pushBack',['../classproteus_1_1LambdaInstUseVisitor.html#aa55fbb1426eabf2924bc4c099fc9a239',1,'proteus::LambdaInstUseVisitor']]],
-  ['pushscope_15',['pushScope',['../classproteus_1_1LLVMCodeBuilder.html#acf27449d90740e4429f5955c0c1536c6',1,'proteus::LLVMCodeBuilder']]]
+  ['prunedanglingnvvmannotations_13',['pruneDanglingNVVMAnnotations',['../namespaceproteus.html#ac1aee2db7054dab22ca0bb915ddb4b0b',1,'proteus']]],
+  ['pruneir_14',['pruneIR',['../namespaceproteus.html#a9920b35bfda33f3a1cbd00e1a930483f',1,'proteus']]],
+  ['pushback_15',['pushBack',['../classproteus_1_1LambdaInstUseVisitor.html#aa55fbb1426eabf2924bc4c099fc9a239',1,'proteus::LambdaInstUseVisitor']]],
+  ['pushscope_16',['pushScope',['../classproteus_1_1LLVMCodeBuilder.html#acf27449d90740e4429f5955c0c1536c6',1,'proteus::LLVMCodeBuilder']]]
 ];
