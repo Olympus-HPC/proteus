@@ -22,7 +22,6 @@ class Module;
 class MemoryBuffer;
 class MemoryBufferRef;
 class StringRef;
-template <typename T> class SmallPtrSetImpl;
 } // namespace llvm
 
 struct LaunchDims {
@@ -89,8 +88,6 @@ struct CompileOptions {
   bool LinkDeviceLibraries = true;
   // A null configuration selects Config::get().getCGConfig().
   const CodeGenerationConfig *CGConfig = nullptr;
-  // These are prelinked fat binaries, which CUDA produces for RDC.
-  llvm::SmallPtrSetImpl<void *> *GlobalLinkedBinaries = nullptr;
   // These globals relink the object against the ones the host program uses.
   const std::unordered_map<std::string, GlobalVarInfo> *VarNameToGlobalInfo =
       nullptr;
