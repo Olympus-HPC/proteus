@@ -34,27 +34,33 @@ public:
     const CodeGenerationConfig &CGConfig =
         Opts.CGConfig ? *Opts.CGConfig : Config::get().getCGConfig();
 
-    if (Opts.LinkDeviceLibraries)
-      linkDeviceLibraries(M);
+    linkDeviceLibraries(M);
+    optimizeModule(M, CGConfig, Opts.DisableIROpt);
+    return codegenModule(M, CGConfig);
+  }
 
-    if (Opts.DisableIROpt) {
+  void optimizeModule(Module &M, const CodeGenerationConfig &CGConfig,
+                      bool DisableIROpt) override {
+    TIMESCOPE(DispatcherDevice, optimizeModule);
+
+    if (DisableIROpt) {
       if (Config::get().traceSpecializations())
         Logger::trace("[SkipOpt] Skipping JitEngine IR optimization\n");
-    } else if (JitT::optimizesBeforeCodegen(CGConfig.codeGenOption())) {
-      proteus::optimizeIR(M, Jit.getDeviceArch(),
-                          OptimizationPipelineConfig(CGConfig));
+      return;
     }
 
-    if (Opts.OnOptimized)
-      Opts.OnOptimized(M);
+    if (JitT::optimizesBeforeCodegen(CGConfig.codeGenOption()))
+      proteus::optimizeIR(M, Jit.getDeviceArch(),
+                          OptimizationPipelineConfig(CGConfig));
+  }
+
+  std::unique_ptr<MemoryBuffer>
+  codegenModule(Module &M, const CodeGenerationConfig &CGConfig) override {
+    TIMESCOPE(DispatcherDevice, codegenModule);
 
     auto ObjBuf = Jit.codegenObject(M, Jit.GlobalLinkedBinaries, CGConfig);
     if (!ObjBuf)
       reportFatalError("Expected non-null object library");
-
-    if (Opts.VarNameToGlobalInfo && !Opts.RelinkGlobalsByCopy)
-      proteus::relinkGlobalsObject(ObjBuf->getMemBufferRef(),
-                                   *Opts.VarNameToGlobalInfo);
 
     return ObjBuf;
   }

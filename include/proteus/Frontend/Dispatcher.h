@@ -10,11 +10,9 @@
 #endif
 
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <string>
 #include <type_traits>
-#include <unordered_map>
 
 namespace llvm {
 class LLVMContext;
@@ -48,7 +46,6 @@ class ObjectCacheChain;
 struct CompiledLibrary;
 class HashT;
 class CodeGenerationConfig;
-struct GlobalVarInfo;
 
 template <typename T> struct sig_traits;
 
@@ -84,18 +81,8 @@ struct DispatchResult;
 // them.
 struct CompileOptions {
   bool DisableIROpt = false;
-  // Host dispatchers ignore this option.
-  bool LinkDeviceLibraries = true;
   // A null configuration selects Config::get().getCGConfig().
   const CodeGenerationConfig *CGConfig = nullptr;
-  // These globals relink the object against the ones the host program uses.
-  const std::unordered_map<std::string, GlobalVarInfo> *VarNameToGlobalInfo =
-      nullptr;
-  // Setting this relinks globals when loading the image rather than by
-  // patching the object.
-  bool RelinkGlobalsByCopy = false;
-  // Proteus invokes this after IR optimization and before codegen.
-  std::function<void(llvm::Module &)> OnOptimized;
 };
 
 class Dispatcher {
@@ -114,9 +101,15 @@ public:
 
   const std::string &getLabel() const { return Label; }
 
-  // compileModule touches no cache, so it is safe on a worker thread.
   virtual std::unique_ptr<llvm::MemoryBuffer>
   compileModule(llvm::Module &M, const CompileOptions &Opts) = 0;
+
+  virtual void optimizeModule(llvm::Module &M,
+                              const CodeGenerationConfig &CGConfig,
+                              bool DisableIROpt = false);
+
+  virtual std::unique_ptr<llvm::MemoryBuffer>
+  codegenModule(llvm::Module &M, const CodeGenerationConfig &CGConfig);
 
   std::unique_ptr<llvm::MemoryBuffer>
   compile(std::unique_ptr<llvm::LLVMContext> Ctx,

@@ -85,6 +85,16 @@ void Dispatcher::printObjectCacheStats() {
     ObjectCache->printStats();
 }
 
+void Dispatcher::optimizeModule(llvm::Module &, const CodeGenerationConfig &,
+                                bool) {
+  reportFatalError(Label + " does not support optimizeModule");
+}
+
+std::unique_ptr<llvm::MemoryBuffer>
+Dispatcher::codegenModule(llvm::Module &, const CodeGenerationConfig &) {
+  reportFatalError(Label + " does not support codegenModule");
+}
+
 std::unique_ptr<llvm::MemoryBuffer>
 Dispatcher::compile(std::unique_ptr<llvm::LLVMContext> Ctx,
                     std::unique_ptr<llvm::Module> M, const HashT &ModuleHash,
