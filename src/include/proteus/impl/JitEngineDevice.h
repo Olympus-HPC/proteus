@@ -683,7 +683,6 @@ JitEngineDevice<ImplT>::compileAndRun(
   Dispatch.registerObject(HashValue, ObjBuf->getMemBufferRef());
 
   CompiledLibrary Library{std::move(ObjBuf)};
-  // The dispatcher relinked the globals as part of compilation.
   Library.GlobalsRelinked = true;
 
   return Launch(LoadKernel(Library));

@@ -153,14 +153,15 @@ public:
     replaceGlobalVariablesWithPointers(*M, VarNameToGlobalInfo);
 
     // The AOT bitcode is already linked with the device libraries.
-    CompileOptions Opts;
-    Opts.LinkDeviceLibraries = false;
-    Opts.CGConfig = CGConfig;
-    Opts.VarNameToGlobalInfo = &VarNameToGlobalInfo;
-    Opts.RelinkGlobalsByCopy = RelinkGlobalsByCopy;
-    Opts.OnOptimized = [this](Module &M) { dumpOptimizedIR(M); };
+    Dispatch->optimizeModule(*M, *CGConfig);
+    dumpOptimizedIR(*M);
 
-    return Dispatch->compileModule(*M, Opts);
+    auto ObjBuf = Dispatch->codegenModule(*M, *CGConfig);
+    if (!RelinkGlobalsByCopy)
+      proteus::relinkGlobalsObject(ObjBuf->getMemBufferRef(),
+                                   VarNameToGlobalInfo);
+
+    return ObjBuf;
   }
 };
 
