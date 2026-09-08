@@ -17,6 +17,8 @@
 
 #include <llvm/Support/MemoryBuffer.h>
 
+#include <mutex>
+
 namespace proteus {
 
 template <typename JitT> class DispatcherDevice : public Dispatcher {
@@ -36,9 +38,14 @@ public:
                       const CodeGenerationConfig &CGConfig) override {
     TIMESCOPE(DispatcherDevice, optimizeModule);
 
-    if (JitT::optimizesBeforeCodegen(CGConfig.codeGenOption()))
+    if (JitT::optimizesBeforeCodegen(CGConfig.codeGenOption())) {
       proteus::optimizeIR(M, Jit.getDeviceArch(),
                           OptimizationPipelineConfig(CGConfig));
+      return;
+    }
+
+    if (CGConfig.codeGenOption() == CodegenOption::RTC)
+      warnOptimizationConfigIgnoredByRTC(CGConfig);
   }
 
   std::unique_ptr<MemoryBuffer>
@@ -122,6 +129,30 @@ protected:
   JitT &Jit;
 
 private:
+  // Skipping optimization on the RTC path leaves the runtime compiler in charge
+  // of it, which silently drops every user-configured optimization setting.
+  // Warn once per process so the setting does not appear to take effect.
+  static void
+  warnOptimizationConfigIgnoredByRTC(const CodeGenerationConfig &CGConfig) {
+    // '3' and 3 are the PROTEUS_OPT_LEVEL and PROTEUS_CODEGEN_OPT_LEVEL
+    // defaults set by CodeGenerationConfig.
+    const bool UsesDefaults =
+        !CGConfig.optPipeline() && CGConfig.optLevel() == '3' &&
+        CGConfig.codeGenOptLevel() == 3 && getJITPassPluginConfigs().empty();
+    if (UsesDefaults)
+      return;
+
+    static std::once_flag WarnOnce;
+    std::call_once(WarnOnce, [] {
+      Logger::outs("proteus")
+          << "Warning: RTC codegen optimizes internally, so Proteus ignores "
+             "PROTEUS_OPT_PIPELINE, PROTEUS_OPT_LEVEL, "
+             "PROTEUS_CODEGEN_OPT_LEVEL and JIT pass plugins, use "
+             "PROTEUS_CODEGEN=serial or PROTEUS_CODEGEN=parallel to apply "
+             "them\n";
+    });
+  }
+
   MemoryCache<KernelFunction_t> CodeCache;
 };
 
