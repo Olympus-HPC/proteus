@@ -648,7 +648,6 @@ JitEngineDevice<ImplT>::compileAndRun(
         LambdaCalleeInfoToSpecialize,
         LambdaCallsiteRuntimeConstants,
         BinInfo.getVarNameToGlobalInfo(),
-        GlobalLinkedBinaries,
         /*CodeGenConfig */ CGConfig,
         /*DumpIR*/ Config::get().ProteusDumpLLVMIR,
         /*RelinkGlobalsByCopy*/ Config::get().ProteusRelinkGlobalsByCopy};

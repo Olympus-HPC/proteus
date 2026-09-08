@@ -48,12 +48,7 @@ public:
     if (Opts.OnOptimized)
       Opts.OnOptimized(M);
 
-    SmallPtrSet<void *, 8> NoLinkedBinaries;
-    SmallPtrSetImpl<void *> &GlobalLinkedBinaries =
-        Opts.GlobalLinkedBinaries ? *Opts.GlobalLinkedBinaries
-                                  : NoLinkedBinaries;
-
-    auto ObjBuf = Jit.codegenObject(M, GlobalLinkedBinaries, CGConfig);
+    auto ObjBuf = Jit.codegenObject(M, Jit.GlobalLinkedBinaries, CGConfig);
     if (!ObjBuf)
       reportFatalError("Expected non-null object library");
 

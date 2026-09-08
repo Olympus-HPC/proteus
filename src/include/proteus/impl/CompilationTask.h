@@ -33,7 +33,6 @@ private:
   SmallVector<uint64_t> LambdaCalleeInfo;
   LambdaCallsiteRuntimeConstantsMap LambdaCallsiteRuntimeConstants;
   std::unordered_map<std::string, GlobalVarInfo> VarNameToGlobalInfo;
-  SmallPtrSet<void *, 8> GlobalLinkedBinaries;
   const CodeGenerationConfig *CGConfig;
   bool DumpIR;
   bool RelinkGlobalsByCopy;
@@ -79,15 +78,13 @@ public:
       const SmallVector<uint64_t> &LambdaCalleeInfo,
       const LambdaCallsiteRuntimeConstantsMap &LambdaCallsiteRuntimeConstants,
       const std::unordered_map<std::string, GlobalVarInfo> &VarNameToGlobalInfo,
-      const SmallPtrSet<void *, 8> &GlobalLinkedBinaries,
       const CodeGenerationConfig &CGConfig, bool DumpIR,
       bool RelinkGlobalsByCopy)
       : Dispatch(&Dispatch), Bitcode(Bitcode), HashValue(HashValue),
         Name(std::move(Name)), BlockDim(BlockDim), GridDim(GridDim),
         RCVec(RCVec), LambdaCalleeInfo(LambdaCalleeInfo),
         LambdaCallsiteRuntimeConstants(LambdaCallsiteRuntimeConstants),
-        VarNameToGlobalInfo(VarNameToGlobalInfo),
-        GlobalLinkedBinaries(GlobalLinkedBinaries), CGConfig(&CGConfig),
+        VarNameToGlobalInfo(VarNameToGlobalInfo), CGConfig(&CGConfig),
         DumpIR(DumpIR), RelinkGlobalsByCopy(RelinkGlobalsByCopy),
         MinBlocksPerSM(
             CGConfig.minBlocksPerSM(BlockDim.x * BlockDim.y * BlockDim.z)),
@@ -159,7 +156,6 @@ public:
     CompileOptions Opts;
     Opts.LinkDeviceLibraries = false;
     Opts.CGConfig = CGConfig;
-    Opts.GlobalLinkedBinaries = &GlobalLinkedBinaries;
     Opts.VarNameToGlobalInfo = &VarNameToGlobalInfo;
     Opts.RelinkGlobalsByCopy = RelinkGlobalsByCopy;
     Opts.OnOptimized = [this](Module &M) { dumpOptimizedIR(M); };
