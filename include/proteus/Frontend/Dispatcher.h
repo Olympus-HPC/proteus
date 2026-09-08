@@ -76,15 +76,6 @@ struct DispatchResult {
 
 struct DispatchResult;
 
-// CompileOptions controls how a Dispatcher turns a module into an object. The
-// defaults match the frontend JIT modules and the annotation runtime overrides
-// them.
-struct CompileOptions {
-  bool DisableIROpt = false;
-  // A null configuration selects Config::get().getCGConfig().
-  const CodeGenerationConfig *CGConfig = nullptr;
-};
-
 class Dispatcher {
 protected:
   TargetModelType TargetModel;
@@ -102,7 +93,8 @@ public:
   const std::string &getLabel() const { return Label; }
 
   virtual std::unique_ptr<llvm::MemoryBuffer>
-  compileModule(llvm::Module &M, const CompileOptions &Opts) = 0;
+  compileModule(llvm::Module &M, const CodeGenerationConfig &CGConfig,
+                bool DisableIROpt = false) = 0;
 
   virtual void optimizeModule(llvm::Module &M,
                               const CodeGenerationConfig &CGConfig,
@@ -114,7 +106,11 @@ public:
   std::unique_ptr<llvm::MemoryBuffer>
   compile(std::unique_ptr<llvm::LLVMContext> Ctx,
           std::unique_ptr<llvm::Module> M, const HashT &ModuleHash,
-          const CompileOptions &Opts = CompileOptions{});
+          const CodeGenerationConfig &CGConfig, bool DisableIROpt = false);
+
+  std::unique_ptr<llvm::MemoryBuffer>
+  compile(std::unique_ptr<llvm::LLVMContext> Ctx,
+          std::unique_ptr<llvm::Module> M, const HashT &ModuleHash);
 
   std::unique_ptr<CompiledLibrary>
   lookupCompiledLibrary(const HashT &ModuleHash);

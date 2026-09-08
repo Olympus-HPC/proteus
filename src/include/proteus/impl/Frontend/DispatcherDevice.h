@@ -28,14 +28,12 @@ public:
   using KernelFunction_t = typename DeviceTraits<JitT>::KernelFunction_t;
 
   std::unique_ptr<MemoryBuffer>
-  compileModule(Module &M, const CompileOptions &Opts) override {
+  compileModule(Module &M, const CodeGenerationConfig &CGConfig,
+                bool DisableIROpt) override {
     TIMESCOPE(DispatcherDevice, compileModule);
 
-    const CodeGenerationConfig &CGConfig =
-        Opts.CGConfig ? *Opts.CGConfig : Config::get().getCGConfig();
-
     linkDeviceLibraries(M);
-    optimizeModule(M, CGConfig, Opts.DisableIROpt);
+    optimizeModule(M, CGConfig, DisableIROpt);
     return codegenModule(M, CGConfig);
   }
 

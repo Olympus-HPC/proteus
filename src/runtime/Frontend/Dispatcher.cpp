@@ -97,15 +97,22 @@ Dispatcher::codegenModule(llvm::Module &, const CodeGenerationConfig &) {
 
 std::unique_ptr<llvm::MemoryBuffer>
 Dispatcher::compile(std::unique_ptr<llvm::LLVMContext> Ctx,
+                    std::unique_ptr<llvm::Module> M, const HashT &ModuleHash) {
+  return compile(std::move(Ctx), std::move(M), ModuleHash,
+                 Config::get().getCGConfig());
+}
+
+std::unique_ptr<llvm::MemoryBuffer>
+Dispatcher::compile(std::unique_ptr<llvm::LLVMContext> Ctx,
                     std::unique_ptr<llvm::Module> M, const HashT &ModuleHash,
-                    const CompileOptions &Opts) {
+                    const CodeGenerationConfig &CGConfig, bool DisableIROpt) {
   // Keep the context alive for as long as the module. Setting [[maybe_unused]]
   // can trigger a lifetime bug.
   auto CtxOwner = std::move(Ctx);
   auto ModOwner = std::move(M);
 
   std::unique_ptr<llvm::MemoryBuffer> ObjectModule =
-      compileModule(*ModOwner, Opts);
+      compileModule(*ModOwner, CGConfig, DisableIROpt);
   if (!ObjectModule)
     reportFatalError("Expected non-null object library");
 
