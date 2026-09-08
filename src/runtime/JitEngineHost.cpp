@@ -258,10 +258,8 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
     specializeIR(*M, FnName, Suffix, RCVec);
     PROTEUS_DBG(Logger::logfile(HashValue.toString() + ".specialized.ll", *M));
 
-    CompileOptions Opts;
-    Opts.CGConfig = &CGConfig;
     Library = std::make_unique<CompiledLibrary>(
-        Dispatch.compile(std::move(Ctx), std::move(M), HashValue, Opts));
+        Dispatch.compile(std::move(Ctx), std::move(M), HashValue, CGConfig));
   }
 
   JitFnPtr = Dispatch.insertFunction(Name, HashValue, *Library);
