@@ -100,10 +100,12 @@ public:
 
   HashT getModuleHash(BinaryInfo &BinInfo);
 
-  // Parallel codegen forwards the pipeline and pass plugins to LTO, so
-  // optimizing beforehand would run it twice.
+  // Proteus optimizes beforehand only when it owns the pipeline. Parallel
+  // codegen forwards the pipeline and pass plugins to LTO, and RTC hands
+  // bitcode to hiprtc which optimizes it internally, so pre-optimizing on
+  // either path would run a full pipeline twice.
   static bool optimizesBeforeCodegen(CodegenOption CGOption) {
-    return CGOption != CodegenOption::Parallel;
+    return CGOption == CodegenOption::Serial;
   }
 
   std::unique_ptr<MemoryBuffer>
