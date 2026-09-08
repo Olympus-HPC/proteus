@@ -127,8 +127,8 @@ Dispatcher::lookupCompiledLibrary(const HashT &ModuleHash) {
 
 KernelName::KernelName(const StringRef &Base) : Base(Base.str()) {}
 
-KernelName::KernelName(std::string Base, const HashT &Specialization)
-    : Base(std::move(Base)), Specialization(Specialization.toMangledSuffix()) {}
+KernelName::KernelName(std::string Base, const HashT &Hash)
+    : Base(std::move(Base)), HashSuffix(Hash.toMangledSuffix()) {}
 
 void *Dispatcher::getOrInsertFunction(const KernelName &Name,
                                       const HashT &ModuleHash,
