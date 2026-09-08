@@ -85,8 +85,7 @@ void Dispatcher::printObjectCacheStats() {
     ObjectCache->printStats();
 }
 
-void Dispatcher::optimizeModule(llvm::Module &, const CodeGenerationConfig &,
-                                bool) {
+void Dispatcher::optimizeModule(llvm::Module &, const CodeGenerationConfig &) {
   reportFatalError(Label + " does not support optimizeModule");
 }
 
@@ -105,14 +104,14 @@ Dispatcher::compile(std::unique_ptr<llvm::LLVMContext> Ctx,
 std::unique_ptr<llvm::MemoryBuffer>
 Dispatcher::compile(std::unique_ptr<llvm::LLVMContext> Ctx,
                     std::unique_ptr<llvm::Module> M, const HashT &ModuleHash,
-                    const CodeGenerationConfig &CGConfig, bool DisableIROpt) {
+                    const CodeGenerationConfig &CGConfig) {
   // Keep the context alive for as long as the module. Setting [[maybe_unused]]
   // can trigger a lifetime bug.
   auto CtxOwner = std::move(Ctx);
   auto ModOwner = std::move(M);
 
   std::unique_ptr<llvm::MemoryBuffer> ObjectModule =
-      compileModule(*ModOwner, CGConfig, DisableIROpt);
+      compileModule(*ModOwner, CGConfig);
   if (!ObjectModule)
     reportFatalError("Expected non-null object library");
 

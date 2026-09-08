@@ -15,7 +15,6 @@
 #include "proteus/impl/CoreLLVMDevice.h"
 #include "proteus/impl/JitEngineDevice.h"
 
-#include <llvm/ADT/SmallPtrSet.h>
 #include <llvm/Support/MemoryBuffer.h>
 
 namespace proteus {
@@ -28,24 +27,17 @@ public:
   using KernelFunction_t = typename DeviceTraits<JitT>::KernelFunction_t;
 
   std::unique_ptr<MemoryBuffer>
-  compileModule(Module &M, const CodeGenerationConfig &CGConfig,
-                bool DisableIROpt) override {
+  compileModule(Module &M, const CodeGenerationConfig &CGConfig) override {
     TIMESCOPE(DispatcherDevice, compileModule);
 
     linkDeviceLibraries(M);
-    optimizeModule(M, CGConfig, DisableIROpt);
+    optimizeModule(M, CGConfig);
     return codegenModule(M, CGConfig);
   }
 
-  void optimizeModule(Module &M, const CodeGenerationConfig &CGConfig,
-                      bool DisableIROpt) override {
+  void optimizeModule(Module &M,
+                      const CodeGenerationConfig &CGConfig) override {
     TIMESCOPE(DispatcherDevice, optimizeModule);
-
-    if (DisableIROpt) {
-      if (Config::get().traceSpecializations())
-        Logger::trace("[SkipOpt] Skipping JitEngine IR optimization\n");
-      return;
-    }
 
     if (JitT::optimizesBeforeCodegen(CGConfig.codeGenOption()))
       proteus::optimizeIR(M, Jit.getDeviceArch(),

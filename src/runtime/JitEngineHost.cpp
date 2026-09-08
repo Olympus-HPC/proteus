@@ -279,8 +279,7 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
 }
 
 std::unique_ptr<MemoryBuffer>
-JitEngineHost::compileOnly(Module &M, const CodeGenerationConfig &CGConfig,
-                           bool DisableIROpt) {
+JitEngineHost::compileOnly(Module &M, const CodeGenerationConfig &CGConfig) {
   TIMESCOPE(JitEngineHost, compileOnly);
   // Create the target machine using JITTargetMachineBuilder to match ORC JIT
   // loading.
@@ -297,12 +296,7 @@ JitEngineHost::compileOnly(Module &M, const CodeGenerationConfig &CGConfig,
   // Set up the pass manager.
   legacy::PassManager PM;
   // Add optimization passes.
-  if (!DisableIROpt) {
-    optimizeIR(M, sys::getHostCPUName(), OptimizationPipelineConfig(CGConfig));
-  } else {
-    if (Config::get().traceSpecializations())
-      Logger::trace("[SkipOpt] Skipping JitEngine IR optimization\n");
-  }
+  optimizeIR(M, sys::getHostCPUName(), OptimizationPipelineConfig(CGConfig));
 
   // Add the target passes to emit object code.
   if (TM->addPassesToEmitFile(PM, ObjStream, nullptr,

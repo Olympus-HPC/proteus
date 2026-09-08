@@ -22,10 +22,9 @@ public:
       : Dispatcher(Label, TargetModelType::HOST), Jit(Jit), CodeCache(Label) {}
 
   std::unique_ptr<MemoryBuffer>
-  compileModule(Module &M, const CodeGenerationConfig &CGConfig,
-                bool DisableIROpt) override {
+  compileModule(Module &M, const CodeGenerationConfig &CGConfig) override {
     TIMESCOPE(DispatcherHost, compileModule);
-    return Jit.compileOnly(M, CGConfig, DisableIROpt);
+    return Jit.compileOnly(M, CGConfig);
   }
 
   DispatchResult launch(void *, LaunchDims, LaunchDims, void *[], uint64_t,
