@@ -62,7 +62,6 @@ public:
 private:
   JitEngineHost();
   void addStaticLibrarySymbols();
-  // Proteus creates the dispatcher lazily because it references this engine.
   DispatcherHost &getDispatcher();
   std::unique_ptr<DispatcherHost> Dispatch;
 };

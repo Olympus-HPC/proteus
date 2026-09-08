@@ -19,9 +19,6 @@
 
 namespace proteus {
 
-// DispatcherDevice is the shared implementation of the device dispatchers,
-// where JitT is the device JIT engine. Subclasses supply the device library
-// linking and the singleton.
 template <typename JitT> class DispatcherDevice : public Dispatcher {
 public:
   using KernelFunction_t = typename DeviceTraits<JitT>::KernelFunction_t;
