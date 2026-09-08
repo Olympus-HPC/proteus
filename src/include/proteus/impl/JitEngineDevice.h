@@ -557,10 +557,6 @@ protected:
       AsyncCompiler->joinAllThreads();
   }
 
-  // The derived engine constructs the dispatcher at the end of its
-  // constructor, since the dispatcher references the constructed engine.
-  // Constructing it eagerly keeps cache statistics reported even when the
-  // program never JIT-compiles a kernel.
   Dispatcher &getDispatcher() {
     if (!Dispatch)
       reportFatalError("Dispatcher has not been created by the engine");

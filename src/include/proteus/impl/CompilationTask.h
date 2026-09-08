@@ -18,9 +18,6 @@ namespace proteus {
 
 using namespace llvm;
 
-// A CompilationTask specializes an extracted kernel module against runtime
-// values and hands it to the Dispatcher. It touches no cache, so it can run on
-// a compilation worker thread.
 class CompilationTask {
 private:
   Dispatcher *Dispatch;
@@ -152,7 +149,6 @@ public:
 
     replaceGlobalVariablesWithPointers(*M, VarNameToGlobalInfo);
 
-    // The AOT bitcode is already linked with the device libraries.
     Dispatch->optimizeModule(*M, *CGConfig);
     dumpOptimizedIR(*M);
 
