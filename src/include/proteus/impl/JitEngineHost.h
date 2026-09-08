@@ -53,8 +53,7 @@ public:
                        uint64_t *FunctorIDPtr);
 
   std::unique_ptr<MemoryBuffer>
-  compileOnly(Module &M, const CodeGenerationConfig &CGConfig,
-              bool DisableIROpt = false);
+  compileOnly(Module &M, const CodeGenerationConfig &CGConfig);
 
   void loadCompiledLibrary(CompiledLibrary &Library);
 

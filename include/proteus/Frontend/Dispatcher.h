@@ -93,12 +93,10 @@ public:
   const std::string &getLabel() const { return Label; }
 
   virtual std::unique_ptr<llvm::MemoryBuffer>
-  compileModule(llvm::Module &M, const CodeGenerationConfig &CGConfig,
-                bool DisableIROpt = false) = 0;
+  compileModule(llvm::Module &M, const CodeGenerationConfig &CGConfig) = 0;
 
   virtual void optimizeModule(llvm::Module &M,
-                              const CodeGenerationConfig &CGConfig,
-                              bool DisableIROpt = false);
+                              const CodeGenerationConfig &CGConfig);
 
   virtual std::unique_ptr<llvm::MemoryBuffer>
   codegenModule(llvm::Module &M, const CodeGenerationConfig &CGConfig);
@@ -106,7 +104,7 @@ public:
   std::unique_ptr<llvm::MemoryBuffer>
   compile(std::unique_ptr<llvm::LLVMContext> Ctx,
           std::unique_ptr<llvm::Module> M, const HashT &ModuleHash,
-          const CodeGenerationConfig &CGConfig, bool DisableIROpt = false);
+          const CodeGenerationConfig &CGConfig);
 
   std::unique_ptr<llvm::MemoryBuffer>
   compile(std::unique_ptr<llvm::LLVMContext> Ctx,
