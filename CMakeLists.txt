@@ -59,7 +59,7 @@ endif()
 message(STATUS "Using LLVM installation: ${LLVM_INSTALL_DIR}")
 
 if (ENABLE_DEVELOPER_COMPILER_FLAGS)
-  add_compile_options(-Wall -Wextra -Werror "-Wno-error=\#warnings" -Wno-error=unknown-cuda-version)
+  add_compile_options(-Wall -Wextra -Werror "-Wno-error=\#warnings" -Wno-error=unknown-cuda-version -Wno-error=invalid-feature-combination)
 endif()
 
 if(ENABLE_COVERAGE)
