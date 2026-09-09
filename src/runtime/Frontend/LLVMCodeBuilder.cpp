@@ -230,13 +230,12 @@ LLVMCodeBuilder::LLVMCodeBuilder(std::unique_ptr<LLVMContext> Ctx,
 #endif
   // TODO: Create a TargetArch abstraction to encapsulate this kind of logic for
   // both host and device targets.
-  if (isHostTargetModel(TM)) {
-    auto TMExpected =
-        detail::createTargetMachine(getModule(), sys::getHostCPUName());
-    if (!TMExpected)
-      reportFatalError("LLVMCodeBuilder: failed to create host target machine");
-    getModule().setDataLayout((*TMExpected)->createDataLayout());
-  }
+  auto TMExpected = detail::createTargetMachine(
+      getModule(), isHostTargetModel(TM) ? sys::getHostCPUName() : "");
+  if (!TMExpected)
+    reportFatalError("LLVMCodeBuilder: failed to create target machine for " +
+                     getTargetTriple(TM));
+  getModule().setDataLayout((*TMExpected)->createDataLayout());
 }
 
 LLVMCodeBuilder::~LLVMCodeBuilder() = default;
@@ -1156,15 +1155,21 @@ IRValue *LLVMCodeBuilder::emitBuiltin(const std::string &Name, IRType RetTy,
 // Alloca/array emission.
 IRValue *LLVMCodeBuilder::emitAlloca(Type *Ty, const std::string &Name,
                                      AddressSpace AS) {
+  const unsigned AllocaAS = getModule().getDataLayout().getAllocaAddrSpace();
   auto SaveIP = PImpl->IRB.saveIP();
   auto AllocaIP = IRBuilderBase::InsertPoint(&F->getEntryBlock(),
                                              F->getEntryBlock().begin());
   PImpl->IRB.restoreIP(AllocaIP);
-  auto *Alloca =
-      PImpl->IRB.CreateAlloca(Ty, static_cast<unsigned>(AS), nullptr, Name);
+  Value *Slot = PImpl->IRB.CreateAlloca(Ty, AllocaAS, nullptr, Name);
+  // Targets such as AMDGPU require allocas in a dedicated address space, so
+  // reach the requested one through a cast, the same way Clang does.
+  if (static_cast<unsigned>(AS) != AllocaAS)
+    Slot = PImpl->IRB.CreateAddrSpaceCast(
+        Slot, PointerType::get(getContext(), static_cast<unsigned>(AS)),
+        Name + ".ascast");
 
   PImpl->IRB.restoreIP(SaveIP);
-  return PImpl->wrap(Alloca);
+  return PImpl->wrap(Slot);
 }
 
 IRValue *LLVMCodeBuilder::emitArrayCreate(Type *Ty, AddressSpace AT,
