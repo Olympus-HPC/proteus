@@ -22,9 +22,9 @@ variables:
 # Note: can be set to "OFF" to prevent allocation sharing.
   MATRIX_SHARED_ALLOC: "OFF"
 # Arguments for job level allocation
-  MATRIX_JOB_ALLOC: "--job-name=${SLURM_JOB_NAME} --gpus=1 --nodes=1 --time=60 --partition=pdebug"
+  MATRIX_JOB_ALLOC: "--job-name=${SLURM_JOB_NAME} --account=asccasc --gpus=1 --nodes=1 --time=60 --partition=pdebug"
 # Arguments for performance job allocation (dedicated allocation with no overlapping).
-  MATRIX_PERF_ALLOC: "--exclusive --time=60 --nodes=1"
+  MATRIX_PERF_ALLOC: "--account=asccasc --exclusive --time=60 --nodes=1"
 # Add variables that should apply to all the jobs on a machine:
 #  MATRIX_MY_VAR: "..."
 
