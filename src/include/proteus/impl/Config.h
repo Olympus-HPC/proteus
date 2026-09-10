@@ -213,6 +213,8 @@ public:
         getEnvOrDefaultBool("PROTEUS_SPECIALIZE_ARGS", true),
         getEnvOrDefaultBool("PROTEUS_SPECIALIZE_LAUNCH_BOUNDS", true),
         getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS", true),
+        // SpecializeDimsRange is disabled by default due to observed
+        // regressions for HIP and CUDA code generation
         getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS_RANGE", false),
         getEnvOrDefaultChar("PROTEUS_OPT_LEVEL", '3'),
         getEnvOrDefaultInt("PROTEUS_CODEGEN_OPT_LEVEL", 3));

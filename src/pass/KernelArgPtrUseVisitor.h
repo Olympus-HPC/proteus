@@ -368,11 +368,6 @@ public:
               .Offset = Offset,
               .ChangedRCLayout = std::nullopt};
   }
-
-  // void visitIntrinsicInst(IntrinsicInst &) {
-  //   AnalysisFailed = true;
-  //   return;
-  // }
 };
 
 inline std::optional<LambdaPtrUseAnalysis>
