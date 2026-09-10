@@ -6,7 +6,10 @@
 #include "proteus/impl/UtilsCUDA.h"
 
 #include <llvm/ADT/StringRef.h>
+#include <llvm/ADT/Twine.h>
 
+#include <cstdint>
+#include <string>
 #include <unordered_map>
 
 namespace proteus {
@@ -104,14 +107,36 @@ inline cudaError_t launchKernelFunction(CUfunction KernelFunc, dim3 GridDim,
       return cudaErrorUnknown;
     }
   };
-  // TODO: Use attributes to find the actual shared memory size supported by the
-  // device architecture.
-  constexpr size_t DefaultShmemSize = 48 * 1024;
-  // Allow kernels to use more than the default 48KB of dynamic shared memory.
-  if (ShmemSize >= DefaultShmemSize) {
+  // Opt in to more dynamic shared memory only when the request exceeds the
+  // function's current limit.
+  int MaxDynamicShmem = 0;
+  proteusCuErrCheck(cuFuncGetAttribute(
+      &MaxDynamicShmem, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
+      KernelFunc));
+
+  if (ShmemSize > static_cast<uint64_t>(MaxDynamicShmem)) {
+    // The device opt-in limit covers static plus dynamic shared memory.
+    int StaticShmem = 0;
+    proteusCuErrCheck(cuFuncGetAttribute(
+        &StaticShmem, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, KernelFunc));
+
+    CUdevice Device;
+    proteusCuErrCheck(cuCtxGetDevice(&Device));
+
+    int OptinMaxShmem = 0;
+    proteusCuErrCheck(cuDeviceGetAttribute(
+        &OptinMaxShmem, CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK_OPTIN,
+        Device));
+
+    if (ShmemSize + static_cast<uint64_t>(StaticShmem) >
+        static_cast<uint64_t>(OptinMaxShmem))
+      reportFatalError("Shared memory request exceeds device limit: dynamic " +
+                       Twine(ShmemSize) + " + static " + Twine(StaticShmem) +
+                       " > " + Twine(OptinMaxShmem) + " bytes");
+
     proteusCuErrCheck(cuFuncSetAttribute(
         KernelFunc, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
-        ShmemSize));
+        static_cast<int>(ShmemSize)));
   }
 
   CUresult Res = cuLaunchKernel(KernelFunc, GridDim.x, GridDim.y, GridDim.z,
