@@ -11,7 +11,6 @@
 #include "proteus/JitInterface.h"
 
 #include "gpu_common.h"
-#include "raja_style_launch.h"
 #include <proteus/JitInterface.h>
 
 __device__ void printInt(int I) { printf("Integer = %d\n", I); }

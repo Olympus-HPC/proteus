@@ -31,6 +31,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/PassManager.h>
 #include <llvm/IR/Type.h>
+#include <llvm/IR/Value.h>
 #include <llvm/TargetParser/Triple.h>
 #include <memory>
 #include <optional>
@@ -42,6 +43,25 @@ using namespace llvm;
 bool needsDefUseAnalysis(Value *Val) {
   return isa<AddrSpaceCastInst>(Val) || isa<AllocaInst>(Val) ||
          isa<BitCastInst>(Val) || isa<IntToPtrInst>(Val);
+}
+
+inline bool offsetCoveredByRange(int64_t TargetOffset, int64_t RangeOffset,
+                                 uint64_t RangeSize) {
+  DEBUG(Logger::logs("proteus-pass")
+        << "    [PTR use analysis]: Target Offset = " << TargetOffset << "\n");
+  DEBUG(Logger::logs("proteus-pass")
+        << "    [PTR use analysis]: Range Offset = " << RangeOffset << "\n");
+  DEBUG(Logger::logs("proteus-pass")
+        << "    [PTR use analysis]: Range Size = " << RangeSize << "\n");
+  return TargetOffset >= RangeOffset &&
+         static_cast<uint64_t>(TargetOffset - RangeOffset) < RangeSize;
+}
+
+inline std::optional<uint64_t> getTypeStoreSize(const DataLayout &DL,
+                                                Type *Ty) {
+  if (!Ty || !Ty->isSized())
+    return std::nullopt;
+  return static_cast<uint64_t>(DL.getTypeStoreSize(Ty));
 }
 
 struct LambdaPtrUseAnalysis {
@@ -56,6 +76,12 @@ struct CallerFrame {
   Value *ValEnteringCallBase;
   CallBase *CallerCB;
   Function *Callee;
+};
+
+// We track use-edges in our analysis.
+struct UseEdge {
+  Value *CurVal;
+  Value *LastVal;
 };
 
 inline std::optional<MemoryLocation>
@@ -74,127 +100,28 @@ getTrackedPointerLocation(const DataLayout &DL, Value *Ptr) {
                         LocationSize::precise(DL.getTypeStoreSize(PointeeTy)));
 }
 
-class FunctionMemorySSAResolver {
-private:
-  struct FunctionAnalyses {
-    std::unique_ptr<TargetLibraryInfoImpl> TLII;
-    std::unique_ptr<TargetLibraryInfo> TLI;
-    std::unique_ptr<AssumptionCache> AC;
-    std::unique_ptr<DominatorTree> DT;
-    std::unique_ptr<AAResults> AA;
-    std::unique_ptr<BasicAAResult> BAA;
-    std::unique_ptr<MemorySSA> MSSA;
-  };
-
-  DenseMap<Function *, FunctionAnalyses> Cache;
-  const DataLayout &DL;
-
-  FunctionAnalyses &getAnalyses(Function &F) {
-    auto [It, Inserted] = Cache.try_emplace(&F);
-    if (Inserted) {
-      It->second.TLII = std::make_unique<TargetLibraryInfoImpl>(
-          Triple(F.getParent()->getTargetTriple()));
-      It->second.TLI = std::make_unique<TargetLibraryInfo>(*It->second.TLII);
-      It->second.AC = std::make_unique<AssumptionCache>(F);
-      It->second.DT = std::make_unique<DominatorTree>(F);
-      It->second.AA = std::make_unique<AAResults>(*It->second.TLI);
-      It->second.BAA = std::make_unique<BasicAAResult>(
-          DL, F, *It->second.TLI, *It->second.AC, It->second.DT.get());
-      It->second.AA->addAAResult(*It->second.BAA);
-      It->second.MSSA = std::make_unique<MemorySSA>(F, It->second.AA.get(),
-                                                    It->second.DT.get());
-    }
-    return It->second;
-  }
-
-  std::optional<LambdaPtrUseAnalysis> resolveMemoryAccess(MemoryAccess *MA,
-                                                          int64_t Offset) {
-    if (!MA)
-      return std::nullopt;
-
-    if (auto *MP = dyn_cast<MemoryPhi>(MA)) {
-      std::optional<LambdaPtrUseAnalysis> Common;
-      for (Use &Incoming : MP->incoming_values()) {
-        auto *IncomingMA = dyn_cast<MemoryAccess>(Incoming.get());
-        if (!IncomingMA)
-          return std::nullopt;
-        auto Res = resolveMemoryAccess(IncomingMA, Offset);
-        if (!Res)
-          return std::nullopt;
-        if (!Common) {
-          Common = Res;
-          continue;
-        }
-        if (Common->DominatingWrite != Res->DominatingWrite ||
-            Common->Offset != Res->Offset ||
-            Common->ChangedRCLayout != Res->ChangedRCLayout)
-          return std::nullopt;
-      }
-      return Common;
-    }
-
-    auto *MD = dyn_cast<MemoryDef>(MA);
-    if (!MD)
-      return std::nullopt;
-
-    auto *MemI = dyn_cast_or_null<Instruction>(MD->getMemoryInst());
-    if (!MemI)
-      return std::nullopt;
-
-    if (auto *SI = dyn_cast<StoreInst>(MemI)) {
-      Value *Stored = SI->getValueOperand();
-      if (!Stored->getType()->isPointerTy())
-        return std::nullopt;
-      return LambdaPtrUseAnalysis{Stored, Offset, std::nullopt};
-    }
-
-    auto *MT = dyn_cast<MemTransferInst>(MemI);
-    if (!MT)
-      return std::nullopt;
-
-    int64_t DstOff = 0, SrcOff = 0;
-    Value *DstBase =
-        GetPointerBaseWithConstantOffset(MT->getRawDest(), DstOff, DL);
-    Value *SrcBase =
-        GetPointerBaseWithConstantOffset(MT->getRawSource(), SrcOff, DL);
-    if (!DstBase || !SrcBase)
-      return std::nullopt;
-
-    return LambdaPtrUseAnalysis{SrcBase, Offset - DstOff + SrcOff,
-                                std::nullopt};
-  }
-
-public:
-  explicit FunctionMemorySSAResolver(const DataLayout &Dl) : DL(Dl) {}
-
-  std::optional<LambdaPtrUseAnalysis> resolve(Value *TrackedPtr,
-                                              Instruction *UseI) {
-    auto Loc = getTrackedPointerLocation(DL, TrackedPtr);
-    if (!Loc)
-      return std::nullopt;
-
-    Function &F = *UseI->getFunction();
-    auto &Analyses = getAnalyses(F);
-    auto *MA = Analyses.MSSA->getMemoryAccess(UseI);
-    if (!MA)
-      return std::nullopt;
-
-    auto *Walker = Analyses.MSSA->getWalker();
-    auto *Clobber = Walker->getClobberingMemoryAccess(MA, *Loc);
-    return resolveMemoryAccess(Clobber, /*Offset=*/0);
-  }
-};
-
 // Given a newly allocated ptr encountered in def-use analysis beginning at a
 // Lambda callsite, we need to determine which definition dominates that ptr.
 class LambdaInstUseVisitor : public InstVisitor<LambdaInstUseVisitor> {
 private:
   DominatorTree DTree;
-  CallerFrame ArgBeforeCB;
   int64_t Offset = 0;
+  // The ValueOffsetMap contains the "live range" of the ptr we're analyzing.
+  // For example, let's say that LambdaInstUseVisitor is handed ptr %0 = alloca
+  // ptr, and LambdaArgVisitor has already identified that the closure starts at
+  // byte
+  // 8.  In this case, ValueOffsetMap[%0] = 8.  If we encounter a store like
+  // store ptr %2, ptr%0, align 8, we don't care, because its written outside
+  // of the range of the closure.
+  DenseMap<Value *, int> ValueOffsetMap;
+  Value *TrackedBase = nullptr;
   LambdaPtrUseAnalysis Result;
   DataLayout DL;
-  SmallVector<Value *> WorkList;
+  SmallVector<UseEdge> WorkList;
+  // The visitor pattern is always setting LastUse to the back of the
+  // edge at the front of the worklist (the def that brought us to the
+  // current use).
+  Value *Def = nullptr;
   SmallDenseSet<Value *> Seen;
   bool AnalysisSuccess = false;
   bool AnalysisFailed = false;
@@ -203,13 +130,21 @@ public:
   // Constructor used whenever a NeedsDefUseAnalysis Value is encountered. We
   // need to track where the calling LambdaArgVisitor came in from, so that our
   // analysis does not
-  LambdaInstUseVisitor(Value *PtrBegin, Value *SeenUse, const DataLayout &Dl)
-      : DL(Dl) {
-    WorkList.push_back(PtrBegin);
+  LambdaInstUseVisitor(Value *PtrBegin, Value *SeenUse, const DataLayout &Dl,
+                       int64_t TargetOff)
+      : TrackedBase(PtrBegin), DL(Dl) {
+    WorkList.push_back({PtrBegin, nullptr});
     Seen.insert(SeenUse);
+    ValueOffsetMap[PtrBegin] = TargetOff;
   }
   auto back() { return WorkList.back(); }
-  void popBack() { WorkList.pop_back(); }
+  auto popBack() {
+    auto Result = WorkList.back();
+    Def = Result.LastVal;
+    WorkList.pop_back();
+    return Result;
+  }
+  auto getLastDef() { return Def; }
   bool seen(Value *Val) { return Seen.contains(Val); }
   void markAsSeen(Value *Val) { Seen.insert(Val); }
   bool empty() { return WorkList.empty(); }
@@ -220,23 +155,54 @@ public:
 
   // Keep track of Function frame
   void pushBack(Value *NextVal, Value *CurVal) {
-    WorkList.push_back(NextVal);
-    if (auto *CB = dyn_cast<CallBase>(NextVal)) {
-      // todo: do we need current caller CB
-      ArgBeforeCB = CallerFrame{.ValEnteringCallBase = CurVal,
-                                .CallerCB = CB,
-                                .Callee = CB->getParent()->getParent()};
-    }
+    WorkList.push_back(UseEdge{NextVal, CurVal});
+  }
+
+  void offsetValueMapFailure(Value *V) {
+    AnalysisFailed = true;
+    AnalysisSuccess = false;
+    DEBUG(Logger::logs("proteus-pass")
+          << "    [PTR use analysis]: Analysis failed due to absence of " << *V
+          << " in offset tracking map, this is an internal compiler bug\n");
   }
 
   void visitStoreInst(StoreInst &SI) {
+    Value *Stored = SI.getValueOperand();
+    Value *StoreBase = SI.getPointerOperand();
+
+    // A pointer argument is commonly spilled in an unoptimized or optnone
+    // callee before it is used.  Follow the slot's loads as carrying the same
+    // pointee-relative offset instead of interpreting this as a write to the
+    // tracked pointee.
+    if (Stored == Def && Stored->getType()->isPointerTy()) {
+      if (!ValueOffsetMap.contains(Stored)) {
+        offsetValueMapFailure(Stored);
+        return;
+      }
+      ValueOffsetMap[StoreBase] = ValueOffsetMap[Stored];
+      for (User *Usr : StoreBase->users())
+        if (Usr != &SI && !Seen.contains(Usr))
+          pushBack(Usr, StoreBase);
+      return;
+    }
+
+    auto StoreSize = getTypeStoreSize(DL, SI.getValueOperand()->getType());
+    if (!ValueOffsetMap.contains(StoreBase)) {
+      offsetValueMapFailure(StoreBase);
+      return;
+    }
+
+    if (!StoreSize ||
+        !offsetCoveredByRange(ValueOffsetMap[StoreBase], 0, *StoreSize))
+      return;
+    DEBUG(Logger::logs("proteus-pass")
+          << "    Found PTRstore applicable to offset " << ValueOffsetMap[&SI]
+          << " Store size = " << *StoreSize << " ; " << SI << "\n");
     AnalysisFailed = false;
     AnalysisSuccess = true;
     Result = {.DominatingWrite = SI.getValueOperand(),
-              .Offset = 0,
+              .Offset = Offset,
               .ChangedRCLayout = std::nullopt};
-    // if (SI.getType()->isPointerTy())
-    // pushBack(SI.getPointerOperand(), &SI);
   }
 
   void visitLoadInst(LoadInst &LI) {
@@ -245,58 +211,159 @@ public:
       AnalysisSuccess = false;
       return;
     }
+    if (!ValueOffsetMap.contains(LI.getPointerOperand())) {
+      offsetValueMapFailure(LI.getPointerOperand());
+      return;
+    }
+    ValueOffsetMap[&LI] = ValueOffsetMap[LI.getPointerOperand()];
     for (User *Usr : LI.users()) {
       pushBack(Usr, &LI);
     }
   }
 
   void visitCallBase(CallBase &CB) {
-    auto OldFrame = ArgBeforeCB;
-    DEBUG(Logger::logs("proteus-pass")
-          << "    OLD VAL " << *OldFrame.ValEnteringCallBase << "\n");
+    // Lifetime markers describe the validity of an allocation, not a write to
+    // its contents.  Following their declaration as if it were an ordinary
+    // callee makes an otherwise valid search fail before reaching a store.
+    if (auto *II = dyn_cast<IntrinsicInst>(&CB)) {
+      if (II->getIntrinsicID() == Intrinsic::lifetime_start ||
+          II->getIntrinsicID() == Intrinsic::lifetime_end)
+        return;
+    }
+
     Function *F = CB.getCalledFunction();
-    Value *ArgToTrack = nullptr;
+    if (!F || F->isDeclaration()) {
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
+      return;
+    }
+
+    Value *DefBeforeCB = getLastDef();
+    if (!DefBeforeCB || !ValueOffsetMap.contains(DefBeforeCB)) {
+      offsetValueMapFailure(DefBeforeCB ? DefBeforeCB : TrackedBase);
+      return;
+    }
+
+    bool FoundArg = false;
     for (size_t ArgI = 0; ArgI < F->arg_size(); ++ArgI) {
       DEBUG(Logger::logs("proteus-pass") << "    ARG " << ArgI << " VAL "
                                          << *CB.getArgOperand(ArgI) << "\n");
-      if (CB.getArgOperand(ArgI) == ArgBeforeCB.ValEnteringCallBase)
-        ArgToTrack = F->getArg(ArgI);
-    }
-    DEBUG(Logger::logs("proteus-pass") << "    Beginning analysis within "
-                                       << *CB.getCalledFunction() << "\n");
+      if (CB.getArgOperand(ArgI) != DefBeforeCB)
+        continue;
 
-    for (User *Usr : ArgToTrack->users())
-      pushBack(Usr, ArgToTrack);
+      FoundArg = true;
+      Argument *ArgToTrack = F->getArg(ArgI);
+      ValueOffsetMap[ArgToTrack] = ValueOffsetMap[DefBeforeCB];
+      DEBUG(Logger::logs("proteus-pass")
+            << "    Looking at uses of " << *ArgToTrack << "\n");
+      for (User *Usr : ArgToTrack->users())
+        pushBack(Usr, ArgToTrack);
+    }
+    DEBUG(Logger::logs("proteus-pass")
+          << "    Beginning analysis within " << *F << "\n");
+    if (!FoundArg) {
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
+    }
   }
 
   void visitGetElementPtrInst(GetElementPtrInst &GEP) {
-    int64_t GEPOffset = 0;
-    GetPointerBaseWithConstantOffset(&GEP, GEPOffset, DL);
+    // We don't want to use GetPointerBaseWithConstantOffset here.
+    // We actually don't want the true "pointer base" here.  I.E. if we are
+    // analyzing the dominating store to %4 = addrspacecast ptr addrspace(5) %3
+    // to ptr where %3 = alloca %class.anon.1, align 8, addrspace(5)
+    // GetPointerBaseWithConstantOffset gets us 3, which we (a) don't know about
+    // and (b) don't care about, we just care about the SSA to %4.
+    APInt StepOffset(DL.getIndexTypeSizeInBits(GEP.getType()), 0);
+    if (!GEP.accumulateConstantOffset(DL, StepOffset)) {
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
+      return;
+    }
+
+    int64_t GEPOffset = StepOffset.getSExtValue();
+    DEBUG(Logger::logs("proteus-pass")
+          << "    " << "Computed GEP offset " << GEPOffset << "\n");
+    Value *GEPBase = GEP.getPointerOperand();
+    if (!GEPBase)
+      return;
+
+    if (!ValueOffsetMap.contains(GEPBase)) {
+      offsetValueMapFailure(GEPBase);
+      return;
+    }
+
+    auto ResultSize = getTypeStoreSize(DL, GEP.getResultElementType());
+    DEBUG(if (ResultSize) Logger::logs("proteus-pass")
+              << "    GEP size = " << *ResultSize << "\n";)
+    if (ResultSize &&
+        !offsetCoveredByRange(ValueOffsetMap[GEPBase], GEPOffset, *ResultSize))
+      return;
+    DEBUG(Logger::logs("proteus-pass")
+          << "    Found GEP applicable to offset=" << ValueOffsetMap[GEPBase]
+          << " ; " << GEP << "\n");
+    // We found a GEP, now we need to track the GEP itself, so the TargetOffset
+    // is now zero again
+    ValueOffsetMap[&GEP] = ValueOffsetMap[GEPBase] - GEPOffset;
     Offset += GEPOffset;
-    pushBack(GEP.getPointerOperand(), &GEP);
+    DEBUG(Logger::logs("proteus-pass")
+          << "    " << "Setting map K " << GEP << " : " << ValueOffsetMap[&GEP]
+          << "\n");
+    for (auto *User : GEP.users())
+      if (!Seen.contains(User))
+        pushBack(User, &GEP);
   }
 
-  // todo: these three methods need to be changed to find a dominating store
+  // todo: these three methods may need to be changed to find a dominating store
+  // particularly for the case of mutable lambdas.
   void visitAllocaInst(AllocaInst &Alloca) {
+    if (Def) {
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
+      DEBUG(Logger::logs("proteus-pass")
+            << "    Dominating use analysis somehow reached AllocaInst from "
+               "non-null def\n");
+      return;
+    }
+
+    ValueOffsetMap[&Alloca] = Offset;
     for (auto *User : Alloca.users())
       if (!Seen.contains(User))
         pushBack(User, &Alloca);
   }
 
+  // TODO(bowen) come up with a unit test for an analysis starting with
+  // a BC
   void visitBitCastInst(BitCastInst &BC) {
+    // If the last Def is nullptr, we have just begun the use analysis.
+    // In this case, respect the constructor's offset for the pointer operand.
+    if (!Def)
+      ValueOffsetMap[BC.getOperand(0)] = Offset;
+    // AddrSpaceCast does not change the offset we track.
+    ValueOffsetMap[&BC] = ValueOffsetMap[BC.getOperand(0)];
     for (auto *User : BC.users())
       if (!Seen.contains(User))
         pushBack(User, &BC);
   }
 
   void visitAddrSpaceCastInst(AddrSpaceCastInst &ASC) {
-    // todo: I don't think the below is necessary, useful, or correct
-    // WorkList.push_back(ASC.getPointerOperand());
-    DEBUG(Logger::logs("proteus-pass") << ASC << "\n");
+    // The constructor automatically populates the map with ASC's offset
+    // if its not present we need to rely on the pointer operand's offset
+    if (!ValueOffsetMap.contains(&ASC)) {
+      if (!ValueOffsetMap.contains(ASC.getPointerOperand())) {
+        offsetValueMapFailure(ASC.getPointerOperand());
+        return;
+      }
+      // AddrSpaceCast does not change the offset we track.
+      ValueOffsetMap[&ASC] = ValueOffsetMap[ASC.getPointerOperand()];
+    }
+    DEBUG(Logger::logs("proteus-pass")
+          << "    [PTR use analysis]: Setting offset " << ASC << " = "
+          << ValueOffsetMap[&ASC]);
+
     for (auto *User : ASC.users())
       if (!Seen.contains(User)) {
-        DEBUG(Logger::logs("proteus-pass") << "  Next up : " << *User << "\n");
-        pushBack(User, &ASC); //&ASC);
+        pushBack(User, &ASC);
       }
   }
 
@@ -307,6 +374,27 @@ public:
       AnalysisFailed = true;
       return;
     }
+
+    // A transfer defines the tracked memory only when the use edge reached it
+    // through the destination operand.  Reaching the same intrinsic through
+    // its source is merely a read.
+    if (Def != MT->getRawDest())
+      return;
+
+    if (!ValueOffsetMap.contains(Def)) {
+      offsetValueMapFailure(Def);
+      return;
+    }
+
+    auto *Len = dyn_cast<ConstantInt>(MT->getLength());
+    if (!Len) {
+      // We cannot prove that a dynamic-sized transfer defines the tracked byte.
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
+      return;
+    }
+    if (!offsetCoveredByRange(ValueOffsetMap[Def], 0, Len->getZExtValue()))
+      return;
 
     int64_t DstOff = 0, SrcOff = 0;
     Value *DstBase =
@@ -320,17 +408,6 @@ public:
       return;
     }
 
-    // Optional safety: only valid if the tracked byte lies within the copied
-    // region.
-    // if (auto *LenC = dyn_cast<ConstantInt>(MT->getLength())) {
-    //   uint64_t Len = LenC->getZExtValue();
-    //   if (Offset < DstOff || uint64_t(Offset - DstOff) >= Len) {
-    //     DEBUG(Logger::logs("proteus-pass") << "  [PTR use analysis]: Failure
-    //     due to bytesize" << "\n");
-    //     // AnalysisFailed = true;
-    //     // return;
-    //   }
-    // }
     DEBUG(Logger::logs("proteus-pass")
           << "  [PTR use analysis]: Completed instrinsic analysis " << "\n");
     Offset = Offset - DstOff + SrcOff;
@@ -340,38 +417,18 @@ public:
               .Offset = Offset,
               .ChangedRCLayout = std::nullopt};
   }
-
-  // void visitIntrinsicInst(IntrinsicInst &) {
-  //   AnalysisFailed = true;
-  //   return;
-  // }
-
-  // void visitInstruction(Instruction &) {
-  //   AnalysisFailed = true;
-  //   return;
-  // }
 };
 
 inline std::optional<LambdaPtrUseAnalysis>
 getDominatingUse(const DataLayout &DL, Value *ValueNeedingAnalysis,
-                 Value *SeenUse) {
-  DEBUG(Logger::logs("proteus-pass") << "Beginning PtrUse analysis " << "\n");
+                 Value *SeenUse, int64_t TargetOffset) {
+  DEBUG(Logger::logs("proteus-pass")
+        << "Beginning PtrUse analysis with offset = " << TargetOffset << "\n");
 
-  if (auto *I = dyn_cast<Instruction>(SeenUse)) {
-    FunctionMemorySSAResolver Resolver(DL);
-    if (auto Res = Resolver.resolve(ValueNeedingAnalysis, I)) {
-      DEBUG(Logger::logs("proteus-pass")
-            << "  [PTR use analysis]: MemorySSA resolved "
-            << *ValueNeedingAnalysis << " at use " << *SeenUse << "\n");
-      return Res;
-    }
-  }
-
-  LambdaInstUseVisitor Visitor(ValueNeedingAnalysis, SeenUse, DL);
+  LambdaInstUseVisitor Visitor(ValueNeedingAnalysis, SeenUse, DL, TargetOffset);
   // Analysis loop
   while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {
-    auto *V = Visitor.back();
-    Visitor.popBack();
+    auto *V = Visitor.popBack().CurVal;
     // Prevent loops/infinite recursion
     if (Visitor.seen(V))
       continue;
