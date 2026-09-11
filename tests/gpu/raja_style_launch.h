@@ -1,6 +1,7 @@
 // NOLINTBEGIN
 #include "gpu_common.h"
 
+namespace MockRajaInterface {
 template <typename T> struct Privatizer {
   using value_type = T;
   using reference_type = value_type &;
@@ -29,18 +30,26 @@ __global__ __attribute__((annotate("jit", 2))) void globalWrapper(Lambda lam,
   }
 }
 
-template <typename Lambda, typename... Args>
+template <typename Lambda, typename... Args, bool DeviceLaunch = true>
 void forall(size_t N, Lambda &&lam, Args &&...) {
   const std::size_t GridSize = (((N) + (256) - 1) / (256));
+  if constexpr (DeviceLaunch)
+  {
 #if PROTEUS_ENABLE_HIP
-  hipLaunchKernelGGL((globalWrapper<Lambda>), dim3(GridSize), dim3(256), 0, 0,
-                     lam, N);
+    hipLaunchKernelGGL((globalWrapper<Lambda>), dim3(GridSize), dim3(256), 0, 0,
+                      lam, N);
 #elif PROTEUS_ENABLE_CUDA
-  auto func = reinterpret_cast<const void *>(&globalWrapper<Lambda>);
-  void *AArgs[] = {&lam, &N};
-  cudaLaunchKernel(func, dim3(GridSize), dim3(256), AArgs, 0, 0);
+    auto func = reinterpret_cast<const void *>(&globalWrapper<Lambda>);
+    void *AArgs[] = {&lam, &N};
+    cudaLaunchKernel(func, dim3(GridSize), dim3(256), AArgs, 0, 0);
 #else
-#error Must provide PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA
+  #error Must provide PROTEUS_ENABLE_HIP or PROTEUS_ENABLE_CUDA
 #endif
+  }
+  else
+  {
+    globalWrapper(lam, N);
+  }
+}
 }
 // NOLINTEND

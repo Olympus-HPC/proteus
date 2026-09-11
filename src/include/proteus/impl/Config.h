@@ -237,7 +237,7 @@ public:
         getDefaultValueFromOptional(Config.getBoolean("LaunchBounds"), true),
         getDefaultValueFromOptional(Config.getBoolean("SpecializeDims"), true),
         getDefaultValueFromOptional(Config.getBoolean("SpecializeDimsRange"),
-                                    DefaultSpecializeDimsRange),
+                                    false),
         getDefaultValueFromOptional(Config.getString("OptLevel"),
                                     llvm::StringRef("3"))[0],
         getDefaultValueFromOptional(Config.getInteger("CodeGenOptLevel"),

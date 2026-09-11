@@ -27,19 +27,19 @@ int main() {
 
   std::cout << Y[10] << std::endl;
   double A = 6.2;
-  forall(N, [=] __host__ __device__(int I) { Y[I] += X[I] * A; });
+  MockRajaInterface::forall(N, [=] __host__ __device__(int I) { Y[I] += X[I] * A; });
   gpuErrCheck(gpuDeviceSynchronize());
   std::cout << Y[10] << std::endl;
 
-  forall(N, [=] __host__ __device__(int I) { Y[I] += 2 * X[I] * A; });
+  MockRajaInterface::forall(N, [=] __host__ __device__(int I) { Y[I] += 2 * X[I] * A; });
   gpuErrCheck(gpuDeviceSynchronize());
   std::cout << Y[10] << std::endl;
 
-  forall(N, [=] __host__ __device__(int I) { Y[I] += 3 * X[I] * A; });
+  MockRajaInterface::forall(N, [=] __host__ __device__(int I) { Y[I] += 3 * X[I] * A; });
   gpuErrCheck(gpuDeviceSynchronize());
   std::cout << Y[10] << std::endl;
 
-  forall(N, [=] __host__ __device__(int I) { Y[I] -= 6 * X[I] * A; });
+  MockRajaInterface::forall(N, [=] __host__ __device__(int I) { Y[I] -= 6 * X[I] * A; });
   gpuErrCheck(gpuDeviceSynchronize());
   std::cout << Y[10] << std::endl;
 
