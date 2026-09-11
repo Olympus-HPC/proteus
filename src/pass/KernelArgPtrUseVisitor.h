@@ -105,7 +105,6 @@ getTrackedPointerLocation(const DataLayout &DL, Value *Ptr) {
 class LambdaInstUseVisitor : public InstVisitor<LambdaInstUseVisitor> {
 private:
   DominatorTree DTree;
-  CallerFrame ArgBeforeCB;
   int64_t Offset = 0;
   // The ValueOffsetMap contains the "live range" of the ptr we're analyzing.
   // For example, let's say that LambdaInstUseVisitor is handed ptr %0 = alloca
@@ -157,12 +156,6 @@ public:
   // Keep track of Function frame
   void pushBack(Value *NextVal, Value *CurVal) {
     WorkList.push_back(UseEdge{NextVal, CurVal});
-    if (auto *CB = dyn_cast<CallBase>(NextVal)) {
-      // todo: do we need current caller CB
-      ArgBeforeCB = CallerFrame{.ValEnteringCallBase = CurVal,
-                                .CallerCB = CB,
-                                .Callee = CB->getParent()->getParent()};
-    }
   }
 
   void offsetValueMapFailure(Value *V) {
@@ -174,11 +167,25 @@ public:
   }
 
   void visitStoreInst(StoreInst &SI) {
-    // todo: uncomment
-    // Value *Stored = SI.getValueOperand();
-    // if (!Stored->getType()->isPointerTy())
-    //   return;
+    Value *Stored = SI.getValueOperand();
     Value *StoreBase = SI.getPointerOperand();
+
+    // A pointer argument is commonly spilled in an unoptimized or optnone
+    // callee before it is used.  Follow the slot's loads as carrying the same
+    // pointee-relative offset instead of interpreting this as a write to the
+    // tracked pointee.
+    if (Stored == Def && Stored->getType()->isPointerTy()) {
+      if (!ValueOffsetMap.contains(Stored)) {
+        offsetValueMapFailure(Stored);
+        return;
+      }
+      ValueOffsetMap[StoreBase] = ValueOffsetMap[Stored];
+      for (User *Usr : StoreBase->users())
+        if (Usr != &SI && !Seen.contains(Usr))
+          pushBack(Usr, StoreBase);
+      return;
+    }
+
     auto StoreSize = getTypeStoreSize(DL, SI.getValueOperand()->getType());
     if (!ValueOffsetMap.contains(StoreBase)) {
       offsetValueMapFailure(StoreBase);
@@ -204,38 +211,59 @@ public:
       AnalysisSuccess = false;
       return;
     }
+    if (!ValueOffsetMap.contains(LI.getPointerOperand())) {
+      offsetValueMapFailure(LI.getPointerOperand());
+      return;
+    }
+    ValueOffsetMap[&LI] = ValueOffsetMap[LI.getPointerOperand()];
     for (User *Usr : LI.users()) {
       pushBack(Usr, &LI);
     }
   }
 
   void visitCallBase(CallBase &CB) {
-    auto OldFrame = ArgBeforeCB;
-    DEBUG(Logger::logs("proteus-pass")
-          << "    OLD VAL " << *OldFrame.ValEnteringCallBase << "\n");
+    // Lifetime markers describe the validity of an allocation, not a write to
+    // its contents.  Following their declaration as if it were an ordinary
+    // callee makes an otherwise valid search fail before reaching a store.
+    if (auto *II = dyn_cast<IntrinsicInst>(&CB)) {
+      if (II->getIntrinsicID() == Intrinsic::lifetime_start ||
+          II->getIntrinsicID() == Intrinsic::lifetime_end)
+        return;
+    }
+
     Function *F = CB.getCalledFunction();
-    Value *ArgToTrack = nullptr;
+    if (!F || F->isDeclaration()) {
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
+      return;
+    }
+
+    Value *DefBeforeCB = getLastDef();
+    if (!DefBeforeCB || !ValueOffsetMap.contains(DefBeforeCB)) {
+      offsetValueMapFailure(DefBeforeCB ? DefBeforeCB : TrackedBase);
+      return;
+    }
+
+    bool FoundArg = false;
     for (size_t ArgI = 0; ArgI < F->arg_size(); ++ArgI) {
       DEBUG(Logger::logs("proteus-pass") << "    ARG " << ArgI << " VAL "
                                          << *CB.getArgOperand(ArgI) << "\n");
-      if (CB.getArgOperand(ArgI) == ArgBeforeCB.ValEnteringCallBase)
-        ArgToTrack = F->getArg(ArgI);
+      if (CB.getArgOperand(ArgI) != DefBeforeCB)
+        continue;
+
+      FoundArg = true;
+      Argument *ArgToTrack = F->getArg(ArgI);
+      ValueOffsetMap[ArgToTrack] = ValueOffsetMap[DefBeforeCB];
+      DEBUG(Logger::logs("proteus-pass")
+            << "    Looking at uses of " << *ArgToTrack << "\n");
+      for (User *Usr : ArgToTrack->users())
+        pushBack(Usr, ArgToTrack);
     }
-    DEBUG(Logger::logs("proteus-pass") << "    Beginning analysis within "
-                                       << *CB.getCalledFunction() << "\n");
-    // Propagate the offset across the call boundary.
-    auto *DefBeforeCB = getLastDef();
-    if (!ValueOffsetMap.contains(DefBeforeCB)) {
-      offsetValueMapFailure(DefBeforeCB);
-      return;
-    }
-    ValueOffsetMap[ArgToTrack] = ValueOffsetMap[DefBeforeCB];
     DEBUG(Logger::logs("proteus-pass")
-          << "    Looking at uses of " << *ArgToTrack << "\n");
-    // Check all uses across the call boundary
-    for (User *Usr : ArgToTrack->users()) {
-      // todo add check if its a ptr, continue if not.
-      pushBack(Usr, ArgToTrack);
+          << "    Beginning analysis within " << *F << "\n");
+    if (!FoundArg) {
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
     }
   }
 
@@ -266,8 +294,8 @@ public:
     }
 
     auto ResultSize = getTypeStoreSize(DL, GEP.getResultElementType());
-    DEBUG(Logger::logs("proteus-pass")
-          << "    GEP size = " << *ResultSize << "\n");
+    DEBUG(if (ResultSize) Logger::logs("proteus-pass")
+              << "    GEP size = " << *ResultSize << "\n";)
     if (ResultSize &&
         !offsetCoveredByRange(ValueOffsetMap[GEPBase], GEPOffset, *ResultSize))
       return;
@@ -346,6 +374,27 @@ public:
       AnalysisFailed = true;
       return;
     }
+
+    // A transfer defines the tracked memory only when the use edge reached it
+    // through the destination operand.  Reaching the same intrinsic through
+    // its source is merely a read.
+    if (Def != MT->getRawDest())
+      return;
+
+    if (!ValueOffsetMap.contains(Def)) {
+      offsetValueMapFailure(Def);
+      return;
+    }
+
+    auto *Len = dyn_cast<ConstantInt>(MT->getLength());
+    if (!Len) {
+      // We cannot prove that a dynamic-sized transfer defines the tracked byte.
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
+      return;
+    }
+    if (!offsetCoveredByRange(ValueOffsetMap[Def], 0, Len->getZExtValue()))
+      return;
 
     int64_t DstOff = 0, SrcOff = 0;
     Value *DstBase =

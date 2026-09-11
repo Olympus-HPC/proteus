@@ -235,6 +235,19 @@ public:
 
   void visitLoadInst(LoadInst &LI) {
     DEBUG(Logger::logs("proteus-pass") << "Load inst analysis \n")
+    // Loading a pointer from a spill slot does not change the offset within
+    // the pointee.  Resolve the pointer-sized store at offset zero in the slot,
+    // then continue with the original pointee-relative Offset.
+    if (LI.getType()->isPointerTy()) {
+      auto Res = getDominatingUse(DL, LI.getPointerOperand(), &LI, 0);
+      if (!Res) {
+        AnalysisFailed = true;
+        AnalysisSuccess = false;
+        return;
+      }
+      WorkList.push_back({Res->DominatingWrite, &LI});
+      return;
+    }
     // int64_t LoadOff = 0;
     // Value *LoadBase =
     //     GetPointerBaseWithConstantOffset(LI.getPointerOperand(), LoadOff,
@@ -252,9 +265,13 @@ public:
   }
 
   void visitGetElementPtrInst(GetElementPtrInst &GEP) {
-    int64_t GEPOffset = 0;
-    GetPointerBaseWithConstantOffset(&GEP, GEPOffset, DL);
-    Offset += GEPOffset;
+    APInt StepOffset(DL.getIndexTypeSizeInBits(GEP.getType()), 0);
+    if (!GEP.accumulateConstantOffset(DL, StepOffset)) {
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
+      return;
+    }
+    Offset += StepOffset.getSExtValue();
     WorkList.push_back({GEP.getPointerOperand(), &GEP});
   }
 
@@ -276,9 +293,18 @@ public:
     while (Cur && AggregateOperand) {
       int64_t CurOffset = getValueIndicesOffset(
           DL, Cur->getAggregateOperand()->getType(), Cur->getIndices());
+      TypeSize InsertedSize =
+          DL.getTypeAllocSize(Cur->getInsertedValueOperand()->getType());
       DEBUG(Logger::logs("proteus-pass")
             << "Curr offset " << CurOffset << "\nOffset " << Offset << "\n");
-      if (CurOffset == Offset) {
+      if (!InsertedSize.isScalable() && Offset >= CurOffset &&
+          static_cast<uint64_t>(Offset - CurOffset) <
+              InsertedSize.getFixedValue()) {
+        // We are now following the value inserted into this aggregate field,
+        // so make the tracked offset relative to that value.  Leaving the
+        // aggregate-field offset in place causes it to be counted again when
+        // the inserted value came from a GEP into another aggregate.
+        Offset -= CurOffset;
         WorkList.push_back({Cur->getInsertedValueOperand(), &IVI});
         return;
       }
