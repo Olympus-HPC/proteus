@@ -149,6 +149,14 @@ CUresult CUDAAPI cuMemcpyDtoH(void *DstHost, CUdeviceptr SrcDevice,
   return Func(DstHost, SrcDevice, ByteCount);
 }
 
+CUresult CUDAAPI cuFuncGetAttribute(int *Pi, CUfunction_attribute Attrib,
+                                    CUfunction Hfunc) {
+  using Fn = decltype(&cuFuncGetAttribute);
+  static Fn Func =
+      resolveCUDADriverSymbol<Fn>(PROTEUS_CUDA_STRINGIZE(cuFuncGetAttribute));
+  return Func(Pi, Attrib, Hfunc);
+}
+
 CUresult CUDAAPI cuFuncSetAttribute(CUfunction Hfunc,
                                     CUfunction_attribute Attrib, int Value) {
   using Fn = decltype(&cuFuncSetAttribute);
