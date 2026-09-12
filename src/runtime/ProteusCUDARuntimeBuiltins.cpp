@@ -6,6 +6,12 @@
 
 // NOLINTBEGIN(readability-identifier-naming)
 
+extern "C" unsigned __cudaPushCallConfiguration(dim3 GridDim, dim3 BlockDim,
+                                                size_t SharedMem, void *Stream);
+extern "C" cudaError_t __cudaPopCallConfiguration(dim3 *GridDim, dim3 *BlockDim,
+                                                  size_t *SharedMem,
+                                                  void *Stream);
+
 // Resolve at runtime CUDA runtime symbols to avoid a dependency on the CUDA
 // runtime library for the proteus runtime library, and allow users to link with
 // either the static or dynamic CUDA runtime library.
@@ -26,6 +32,15 @@ extern cudaError_t (*__proteus_cudaGetSymbolAddress_ptr)(void **, const void *);
 extern cudaError_t (*__proteus_cudaLaunchKernel_ptr)(const void *, dim3, dim3,
                                                      void **, size_t,
                                                      cudaStream_t);
+}
+
+extern "C" void __proteus_get_device_launch_config_symbols(
+    const char **PushName, uintptr_t *PushAddress, const char **PopName,
+    uintptr_t *PopAddress) {
+  *PushName = "__cudaPushCallConfiguration";
+  *PushAddress = reinterpret_cast<uintptr_t>(&__cudaPushCallConfiguration);
+  *PopName = "__cudaPopCallConfiguration";
+  *PopAddress = reinterpret_cast<uintptr_t>(&__cudaPopCallConfiguration);
 }
 
 // Initialization function to set the function pointers for the CUDA runtime

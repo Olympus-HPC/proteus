@@ -37,6 +37,7 @@ struct RegisterFunctionInfo {
   void *Handle;
   void *Kernel;
   char *KernelName;
+  const char *KernelLookupKey;
   ArrayRef<RuntimeConstantInfo *> RCInfoArray;
 };
 
@@ -75,9 +76,11 @@ public:
   }
 
   void registerFunction(void *Handle, void *Kernel, char *KernelName,
+                        const char *KernelLookupKey,
                         ArrayRef<RuntimeConstantInfo *> RCInfoArray) {
     auto &FatbinInfo = FatbinaryMap.at(Handle);
-    FatbinInfo.Functions.push_back({Handle, Kernel, KernelName, RCInfoArray});
+    FatbinInfo.Functions.push_back(
+        {Handle, Kernel, KernelName, KernelLookupKey, RCInfoArray});
   }
 
   void registerVar(void *Handle, const void *HostAddr, const char *VarName,

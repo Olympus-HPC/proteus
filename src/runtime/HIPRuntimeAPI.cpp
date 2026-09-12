@@ -104,7 +104,30 @@ template <typename Fn> Fn resolveHIPRTCSymbol(const char *Name) {
   return resolveSymbol<Fn>(getHIPRTCHandle(), Name, "libhiprtc");
 }
 
+hipError_t pushCallConfiguration(dim3 GridDim, dim3 BlockDim, size_t SharedMem,
+                                 hipStream_t Stream) {
+  using Fn = decltype(&::__hipPushCallConfiguration);
+  static Fn Func = resolveHIPRuntimeSymbol<Fn>("__hipPushCallConfiguration");
+  return Func(GridDim, BlockDim, SharedMem, Stream);
+}
+
+hipError_t popCallConfiguration(dim3 *GridDim, dim3 *BlockDim,
+                                size_t *SharedMem, hipStream_t *Stream) {
+  using Fn = decltype(&::__hipPopCallConfiguration);
+  static Fn Func = resolveHIPRuntimeSymbol<Fn>("__hipPopCallConfiguration");
+  return Func(GridDim, BlockDim, SharedMem, Stream);
+}
+
 } // namespace
+
+extern "C" void __proteus_get_device_launch_config_symbols(
+    const char **PushName, uintptr_t *PushAddress, const char **PopName,
+    uintptr_t *PopAddress) {
+  *PushName = "__hipPushCallConfiguration";
+  *PushAddress = reinterpret_cast<uintptr_t>(&pushCallConfiguration);
+  *PopName = "__hipPopCallConfiguration";
+  *PopAddress = reinterpret_cast<uintptr_t>(&popCallConfiguration);
+}
 
 namespace proteus::hipdyn {
 

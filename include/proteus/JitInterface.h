@@ -65,9 +65,9 @@ jit_object(T *V, size_t Size = sizeof(std::remove_pointer_t<T>)) noexcept;
 
 #if defined(__CUDACC__) || defined(__HIP__)
 template <typename T>
-__attribute__((noinline)) __device__ std::enable_if_t<
-    std::is_trivially_copyable_v<std::remove_pointer_t<T>>, void>
-jit_object(T *V, size_t Size = sizeof(T)) noexcept;
+__attribute__((noinline)) __device__
+    std::enable_if_t<std::is_trivially_copyable_v<std::remove_pointer_t<T>>,
+                     void> jit_object(T *V, size_t Size = sizeof(T)) noexcept;
 #endif
 
 template <typename T>
@@ -82,8 +82,7 @@ template <typename T>
 __attribute__((noinline)) __device__ std::enable_if_t<
     !std::is_pointer_v<T> &&
         std::is_trivially_copyable_v<std::remove_reference_t<T>>,
-    void>
-jit_object(T &V, size_t Size = sizeof(T)) noexcept;
+    void> jit_object(T &V, size_t Size = sizeof(T)) noexcept;
 #endif
 
 namespace detail {
