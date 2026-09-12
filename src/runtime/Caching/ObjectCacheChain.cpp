@@ -30,7 +30,8 @@ namespace proteus {
 
 ObjectCacheChain::ObjectCacheChain(const std::string &Label)
     : Label(Label), DistributedRank(getDistributedRank()) {
-  buildFromConfig(Config::get().ProteusObjectCacheChain);
+  if (Config::get().ProteusUseStoredCache)
+    buildFromConfig(Config::get().ProteusObjectCacheChain);
 }
 
 void ObjectCacheChain::buildFromConfig(const std::string &ConfigStr) {
@@ -155,6 +156,9 @@ void ObjectCacheChain::store(const HashT &HashValue, const CacheEntry &Entry) {
 }
 
 void ObjectCacheChain::printStats() {
+  if (Caches.empty())
+    return;
+
   printf("[proteus][%s] ObjectCacheChain rank %s with %zu level(s):\n",
          Label.c_str(), DistributedRank.c_str(), Caches.size());
   for (auto &Cache : Caches) {

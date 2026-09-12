@@ -1,7 +1,9 @@
 #include "proteus/Frontend/Dispatcher.h"
 #include "proteus/Error.h"
 #include "proteus/impl/Caching/ObjectCacheChain.h"
+#include "proteus/impl/Config.h"
 #include "proteus/impl/Frontend/DispatcherHost.h"
+#include "proteus/impl/Hashing.h"
 #if PROTEUS_ENABLE_HIP
 #include "proteus/impl/Frontend/DispatcherHIP.h"
 #include "proteus/impl/Frontend/DispatcherHostHIP.h"
@@ -10,6 +12,10 @@
 #include "proteus/impl/Frontend/DispatcherCUDA.h"
 #include "proteus/impl/Frontend/DispatcherHostCUDA.h"
 #endif
+
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Module.h>
+#include <llvm/Support/MemoryBuffer.h>
 
 namespace proteus {
 
@@ -68,8 +74,73 @@ Dispatcher &Dispatcher::getDispatcher(TargetModelType TargetModel) {
 }
 
 Dispatcher::Dispatcher(const std::string &Name, TargetModelType TM)
-    : TargetModel(TM) {
+    : TargetModel(TM), Label(Name) {
   ObjectCache = std::make_unique<ObjectCacheChain>(Name);
+}
+
+Dispatcher::~Dispatcher() = default;
+
+void Dispatcher::printObjectCacheStats() {
+  if (Config::get().traceCacheStats())
+    ObjectCache->printStats();
+}
+
+void Dispatcher::optimizeModule(llvm::Module &, const CodeGenerationConfig &) {
+  reportFatalError(Label + " does not support optimizeModule");
+}
+
+std::unique_ptr<llvm::MemoryBuffer>
+Dispatcher::codegenModule(llvm::Module &, const CodeGenerationConfig &) {
+  reportFatalError(Label + " does not support codegenModule");
+}
+
+std::unique_ptr<llvm::MemoryBuffer>
+Dispatcher::compile(std::unique_ptr<llvm::LLVMContext> Ctx,
+                    std::unique_ptr<llvm::Module> M, const HashT &ModuleHash) {
+  return compile(std::move(Ctx), std::move(M), ModuleHash,
+                 Config::get().getCGConfig());
+}
+
+std::unique_ptr<llvm::MemoryBuffer>
+Dispatcher::compile(std::unique_ptr<llvm::LLVMContext> Ctx,
+                    std::unique_ptr<llvm::Module> M, const HashT &ModuleHash,
+                    const CodeGenerationConfig &CGConfig) {
+  // Keep the context alive for as long as the module. Setting [[maybe_unused]]
+  // can trigger a lifetime bug.
+  auto CtxOwner = std::move(Ctx);
+  auto ModOwner = std::move(M);
+
+  std::unique_ptr<llvm::MemoryBuffer> ObjectModule =
+      compileModule(*ModOwner, CGConfig);
+  if (!ObjectModule)
+    reportFatalError("Expected non-null object library");
+
+  registerObject(ModuleHash, ObjectModule->getMemBufferRef());
+
+  return ObjectModule;
+}
+
+std::unique_ptr<CompiledLibrary>
+Dispatcher::lookupCompiledLibrary(const HashT &ModuleHash) {
+  return ObjectCache->lookup(ModuleHash);
+}
+
+KernelName::KernelName(const StringRef &Base) : Base(Base.str()) {}
+
+KernelName::KernelName(std::string Base, const HashT &Hash)
+    : Base(std::move(Base)), HashSuffix(Hash.toMangledSuffix()) {}
+
+void *Dispatcher::getOrInsertFunction(const KernelName &Name,
+                                      const HashT &ModuleHash,
+                                      CompiledLibrary &Library) {
+  if (void *FuncPtr = lookupFunction(Name, ModuleHash))
+    return FuncPtr;
+  return insertFunction(Name, ModuleHash, Library);
+}
+
+void Dispatcher::registerObject(const HashT &HashValue,
+                                const llvm::MemoryBufferRef &Obj) {
+  ObjectCache->store(HashValue, CacheEntry::staticObject(Obj));
 }
 
 } // namespace proteus

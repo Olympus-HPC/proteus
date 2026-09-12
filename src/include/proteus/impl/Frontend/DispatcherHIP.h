@@ -4,9 +4,7 @@
 #if PROTEUS_ENABLE_HIP
 
 #include "proteus/Error.h"
-#include "proteus/Frontend/Dispatcher.h"
-#include "proteus/TimeTracing.h"
-#include "proteus/impl/Caching/ObjectCacheChain.h"
+#include "proteus/impl/Frontend/DispatcherDevice.h"
 #include "proteus/impl/Frontend/HIPToolchain.h"
 #include "proteus/impl/JitEngineDeviceHIP.h"
 
@@ -17,22 +15,21 @@
 
 namespace proteus {
 
-class DispatcherHIP : public Dispatcher {
+class DispatcherHIP : public DispatcherDevice<JitEngineDeviceHIP> {
 public:
   static DispatcherHIP &instance() {
-    static DispatcherHIP D;
+    static DispatcherHIP D{"DispatcherHIP", JitEngineDeviceHIP::instance()};
     return D;
   }
 
-  std::unique_ptr<MemoryBuffer> compile(std::unique_ptr<LLVMContext> Ctx,
-                                        std::unique_ptr<Module> Mod,
-                                        const HashT &ModuleHash,
-                                        bool DisableIROpt = false) override {
-    TIMESCOPE(DispatcherHIP, compile);
-    // This is necessary to ensure Ctx outlives M. Setting [[maybe_unused]] can
-    // trigger a lifetime bug.
-    auto CtxOwner = std::move(Ctx);
-    auto ModOwner = std::move(Mod);
+  DispatcherHIP(const std::string &Label, JitEngineDeviceHIP &Jit)
+      : DispatcherDevice(Label, TargetModelType::HIP, Jit) {}
+
+protected:
+  // Link ROCm device libraries (ocml/ockl + oclc config) so HIPRTC can
+  // resolve __ocml_* calls produced by math lowering.
+  void linkDeviceLibraries(Module &M) override {
+    TIMESCOPE(DispatcherHIP, linkDeviceLibraries);
     const auto &Toolchain = resolveHIPToolchain();
 
     auto LoadBitcode = [&](const llvm::SmallString<256> &Path) {
@@ -41,7 +38,7 @@ public:
         reportFatalError("DispatchHIP: failed to read ROCm bitcode file: " +
                          Path.str().str() + " (" + Toolchain.Origin + ")");
       auto Parsed = llvm::parseBitcodeFile(
-          BufferOrErr->get()->getMemBufferRef(), ModOwner->getContext());
+          BufferOrErr->get()->getMemBufferRef(), M.getContext());
       if (!Parsed)
         reportFatalError("DispatchHIP: failed to parse ROCm bitcode file: " +
                          Path.str().str() + " (" + Toolchain.Origin + ")");
@@ -72,8 +69,6 @@ public:
       return {};
     };
 
-    // Link ROCm device libraries (ocml/ockl + oclc config) so HIPRTC can
-    // resolve __ocml_* calls produced by math lowering.
     llvm::SmallVector<llvm::SmallString<256>, 8> LibsToLink;
     AppendBitcodePath(LibsToLink, "ocml.bc");
     AppendBitcodePath(LibsToLink, "ockl.bc");
@@ -117,90 +112,13 @@ public:
     AppendBitcodePath(LibsToLink, IsWave32 ? "oclc_wavefrontsize64_off.bc"
                                            : "oclc_wavefrontsize64_on.bc");
 
-    llvm::Linker Linker{*ModOwner};
+    llvm::Linker Linker{M};
     for (const auto &Path : LibsToLink) {
       auto LibMod = LoadBitcode(Path);
       Linker.linkInModule(std::move(LibMod),
                           llvm::Linker::Flags::LinkOnlyNeeded);
     }
-
-    std::unique_ptr<MemoryBuffer> ObjectModule =
-        Jit.compileOnly(*ModOwner, DisableIROpt);
-    if (!ObjectModule)
-      reportFatalError("Expected non-null object library");
-
-    ObjectCache->store(
-        ModuleHash, CacheEntry::staticObject(ObjectModule->getMemBufferRef()));
-
-    return ObjectModule;
   }
-
-  std::unique_ptr<CompiledLibrary>
-  lookupCompiledLibrary(const HashT &ModuleHash) override {
-    return ObjectCache->lookup(ModuleHash);
-  }
-
-  DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
-                        LaunchDims BlockDim, void *KernelArgs[],
-                        uint64_t ShmemSize, void *Stream) override {
-    TIMESCOPE(DispatcherHIP, launch);
-    dim3 HipGridDim = {GridDim.X, GridDim.Y, GridDim.Z};
-    dim3 HipBlockDim = {BlockDim.X, BlockDim.Y, BlockDim.Z};
-    hipStream_t HipStream = reinterpret_cast<hipStream_t>(Stream);
-
-    return proteus::launchKernelFunction(
-        reinterpret_cast<hipFunction_t>(KernelFunc), HipGridDim, HipBlockDim,
-        KernelArgs, ShmemSize, HipStream);
-  }
-
-  StringRef getDeviceArch() const override { return Jit.getDeviceArch(); }
-
-  ~DispatcherHIP() {
-    CodeCache.printStats();
-    CodeCache.printKernelTrace();
-    ObjectCache->printStats();
-  }
-
-  void *getFunctionAddress(const std::string &KernelName,
-                           const HashT &ModuleHash,
-                           CompiledLibrary &Library) override {
-    TIMESCOPE(DispatcherHIP, getFunctionAddress);
-    auto GetKernelFunc = [&]() {
-      // Hash the kernel name to get a unique id.
-      HashT HashValue = hash(KernelName, ModuleHash);
-
-      if (auto KernelFunc = CodeCache.lookup(HashValue))
-        return KernelFunc;
-
-      auto KernelFunc = proteus::getKernelFunctionFromImage(
-          KernelName, Library.ObjectModule->getBufferStart(),
-          /*RelinkGlobalsByCopy*/ false,
-          /* VarNameToGlobalInfo */ {});
-
-      CodeCache.insert(HashValue, KernelFunc, KernelName);
-
-      return KernelFunc;
-    };
-
-    auto KernelFunc = GetKernelFunc();
-    return KernelFunc;
-  }
-
-  void registerDynamicLibrary(const HashT &, const std::string &) override {
-    reportFatalError("Dispatch HIP does not support registerDynamicLibrary");
-  }
-
-  void registerObject(const HashT &HashValue,
-                      const llvm::MemoryBufferRef &Obj) override {
-    ObjectCache->store(HashValue, CacheEntry::staticObject(Obj));
-  }
-
-private:
-  JitEngineDeviceHIP &Jit;
-  DispatcherHIP()
-      : Dispatcher("DispatcherHIP", TargetModelType::HIP),
-        Jit(JitEngineDeviceHIP::instance()) {}
-  MemoryCache<hipFunction_t> CodeCache{"DispatcherHIP"};
 };
 
 } // namespace proteus

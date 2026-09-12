@@ -3,8 +3,10 @@
 
 #include "proteus/Frontend/Dispatcher.h"
 #include "proteus/TimeTracing.h"
+#include "proteus/impl/Caching/MemoryCache.h"
 #include "proteus/impl/Caching/ObjectCacheChain.h"
 #include "proteus/impl/CompiledLibrary.h"
+#include "proteus/impl/Config.h"
 #include "proteus/impl/JitEngineHost.h"
 
 namespace proteus {
@@ -12,33 +14,17 @@ namespace proteus {
 class DispatcherHost : public Dispatcher {
 public:
   static DispatcherHost &instance() {
-    static DispatcherHost D;
+    static DispatcherHost D{"DispatcherHost", JitEngineHost::instance()};
     return D;
   }
 
-  std::unique_ptr<MemoryBuffer> compile(std::unique_ptr<LLVMContext> Ctx,
-                                        std::unique_ptr<Module> Mod,
-                                        const HashT &ModuleHash,
-                                        bool DisableIROpt = false) override {
-    TIMESCOPE(DispatcherHost, compile);
-    // This is necessary to ensure Ctx outlives M. Setting [[maybe_unused]] can
-    // trigger a lifetime bug.
-    auto CtxOwner = std::move(Ctx);
-    auto ModOwner = std::move(Mod);
-    std::unique_ptr<MemoryBuffer> ObjectModule =
-        Jit.compileOnly(*ModOwner, DisableIROpt);
-    if (!ObjectModule)
-      reportFatalError("Expected non-null object library");
+  DispatcherHost(const std::string &Label, JitEngineHost &Jit)
+      : Dispatcher(Label, TargetModelType::HOST), Jit(Jit), CodeCache(Label) {}
 
-    ObjectCache->store(
-        ModuleHash, CacheEntry::staticObject(ObjectModule->getMemBufferRef()));
-
-    return ObjectModule;
-  }
-
-  std::unique_ptr<CompiledLibrary>
-  lookupCompiledLibrary(const HashT &ModuleHash) override {
-    return ObjectCache->lookup(ModuleHash);
+  std::unique_ptr<MemoryBuffer>
+  compileModule(Module &M, const CodeGenerationConfig &CGConfig) override {
+    TIMESCOPE(DispatcherHost, compileModule);
+    return Jit.compileOnly(M, CGConfig);
   }
 
   DispatchResult launch(void *, LaunchDims, LaunchDims, void *[], uint64_t,
@@ -50,24 +36,28 @@ public:
     reportFatalError("Host dispatcher does not implement getDeviceArch");
   }
 
-  void *getFunctionAddress(const std::string &FnName, const HashT &ModuleHash,
-                           CompiledLibrary &Library) override {
-    TIMESCOPE(DispatcherHost, getFunctionAddress);
-    HashT FuncHash = hash(FnName, ModuleHash);
+  void *lookupFunction(const KernelName &Name,
+                       const HashT &ModuleHash) override {
+    HashT FuncHash = hash(Name.mangled(), ModuleHash);
+    return CodeCache.lookup(FuncHash);
+  }
 
-    if (void *FuncPtr = CodeCache.lookup(FuncHash))
-      return FuncPtr;
+  void *insertFunction(const KernelName &Name, const HashT &ModuleHash,
+                       CompiledLibrary &Library) override {
+    TIMESCOPE(DispatcherHost, insertFunction);
+    const std::string MangledName = Name.mangled();
+    HashT FuncHash = hash(MangledName, ModuleHash);
 
     if (!Library.IsLoaded) {
       Jit.loadCompiledLibrary(Library);
       Library.IsLoaded = true;
     }
 
-    void *FuncAddr = Jit.getFunctionAddress(FnName, Library);
+    void *FuncAddr = Jit.getFunctionAddress(MangledName, Library);
     if (!FuncAddr)
-      reportFatalError("Failed to find address for function " + FnName);
+      reportFatalError("Failed to find address for function " + MangledName);
 
-    CodeCache.insert(FuncHash, FuncAddr, FnName);
+    CodeCache.insert(FuncHash, FuncAddr, Name.base());
 
     return FuncAddr;
   }
@@ -81,21 +71,17 @@ public:
                        CacheEntry::sharedObject((*Buf)->getMemBufferRef()));
   }
 
-  void registerObject(const HashT &HashValue,
-                      const llvm::MemoryBufferRef &Obj) override {
-    ObjectCache->store(HashValue, CacheEntry::staticObject(Obj));
+  ~DispatcherHost() {
+    if (Config::get().traceCacheStats())
+      CodeCache.printStats();
+    CodeCache.printKernelTrace();
+    printObjectCacheStats();
   }
 
 protected:
-  explicit DispatcherHost(const std::string &Label = "DispatcherHost")
-      : Dispatcher(Label, TargetModelType::HOST),
-        Jit(JitEngineHost::instance()), CodeCache(Label) {}
-
-  ~DispatcherHost() {
-    CodeCache.printStats();
-    CodeCache.printKernelTrace();
-    ObjectCache->printStats();
-  }
+  explicit DispatcherHost(const std::string &Label, JitEngineHost &Jit,
+                          TargetModelType TM)
+      : Dispatcher(Label, TM), Jit(Jit), CodeCache(Label) {}
 
 private:
   JitEngineHost &Jit;

@@ -2,6 +2,7 @@
 #define PROTEUS_FRONTEND_DISPATCHER_H
 
 #include "proteus/Error.h"
+#include "proteus/Frontend/KernelName.h"
 #include "proteus/Frontend/TargetModel.h"
 
 #if PROTEUS_ENABLE_HIP && __HIP__
@@ -10,6 +11,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <type_traits>
 
 namespace llvm {
@@ -17,6 +19,7 @@ class LLVMContext;
 class Module;
 class MemoryBuffer;
 class MemoryBufferRef;
+class StringRef;
 } // namespace llvm
 
 struct LaunchDims {
@@ -42,6 +45,7 @@ namespace proteus {
 class ObjectCacheChain;
 struct CompiledLibrary;
 class HashT;
+class CodeGenerationConfig;
 
 template <typename T> struct sig_traits;
 
@@ -75,21 +79,39 @@ struct DispatchResult;
 class Dispatcher {
 protected:
   TargetModelType TargetModel;
+  const std::string Label;
   std::unique_ptr<ObjectCacheChain> ObjectCache;
 
   Dispatcher(const std::string &Name, TargetModelType TM);
 
+  void printObjectCacheStats();
+
 public:
   static Dispatcher &getDispatcher(TargetModelType TargetModel);
-  virtual ~Dispatcher() = default;
+  virtual ~Dispatcher();
+
+  const std::string &getLabel() const { return Label; }
 
   virtual std::unique_ptr<llvm::MemoryBuffer>
+  compileModule(llvm::Module &M, const CodeGenerationConfig &CGConfig) = 0;
+
+  virtual void optimizeModule(llvm::Module &M,
+                              const CodeGenerationConfig &CGConfig);
+
+  virtual std::unique_ptr<llvm::MemoryBuffer>
+  codegenModule(llvm::Module &M, const CodeGenerationConfig &CGConfig);
+
+  std::unique_ptr<llvm::MemoryBuffer>
   compile(std::unique_ptr<llvm::LLVMContext> Ctx,
           std::unique_ptr<llvm::Module> M, const HashT &ModuleHash,
-          bool DisableIROpt = false) = 0;
+          const CodeGenerationConfig &CGConfig);
 
-  virtual std::unique_ptr<CompiledLibrary>
-  lookupCompiledLibrary(const HashT &ModuleHash) = 0;
+  std::unique_ptr<llvm::MemoryBuffer>
+  compile(std::unique_ptr<llvm::LLVMContext> Ctx,
+          std::unique_ptr<llvm::Module> M, const HashT &ModuleHash);
+
+  std::unique_ptr<CompiledLibrary>
+  lookupCompiledLibrary(const HashT &ModuleHash);
 
   virtual DispatchResult launch(void *KernelFunc, LaunchDims GridDim,
                                 LaunchDims BlockDim, void *KernelArgs[],
@@ -113,15 +135,19 @@ public:
       return Fn(std::forward<ArgT>(Args)...);
   }
 
-  virtual void *getFunctionAddress(const std::string &FunctionName,
-                                   const HashT &ModuleHash,
-                                   CompiledLibrary &Library) = 0;
+  virtual void *lookupFunction(const KernelName &Name,
+                               const HashT &ModuleHash) = 0;
+
+  virtual void *insertFunction(const KernelName &Name, const HashT &ModuleHash,
+                               CompiledLibrary &Library) = 0;
+
+  void *getOrInsertFunction(const KernelName &Name, const HashT &ModuleHash,
+                            CompiledLibrary &Library);
 
   virtual void registerDynamicLibrary(const HashT &HashValue,
                                       const std::string &Path) = 0;
 
-  virtual void registerObject(const HashT &HashValue,
-                              const llvm::MemoryBufferRef &Obj) = 0;
+  void registerObject(const HashT &HashValue, const llvm::MemoryBufferRef &Obj);
 };
 
 } // namespace proteus

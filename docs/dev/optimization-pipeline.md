@@ -107,16 +107,16 @@ the helper appends the pipeline fragment by default.
 | Annotated HIP kernel JIT | HIP, `PROTEUS_CODEGEN=rtc` | `CompilationTask` -> HIPRTC link/compile | No | HIPRTC accepts some compiler options, but does not expose a documented textual LLVM pass pipeline equivalent. |
 | DSL `JitModule`, LLVM backend | Host CPU | DSL -> LLVM IR -> host dispatcher | Yes | Host dispatcher reaches `JitEngineHost::compileOnly()`. Module hash includes codegen config. |
 | DSL `JitModule`, LLVM backend | CUDA device | DSL -> LLVM IR -> CUDA dispatcher | Yes | CUDA dispatcher reaches `JitEngineDeviceCUDA::compileOnly()`. Module hash includes codegen config. |
-| DSL `JitModule`, LLVM backend | HIP device | DSL -> LLVM IR -> HIP dispatcher | Yes | HIP dispatcher reaches `JitEngineDeviceHIP::compileOnly()`. Module hash includes codegen config. |
+| DSL `JitModule`, LLVM backend | HIP device | DSL -> LLVM IR -> HIP dispatcher | Serial and parallel only | HIP dispatcher optimizes before serial codegen or forwards the pipeline to LTO for parallel codegen. Under `PROTEUS_CODEGEN=rtc` HIPRTC optimizes instead, see HIP RTC below. Module hash includes codegen config. |
 | DSL `JitModule`, MLIR backend | Host CPU | MLIR -> LLVM IR -> host dispatcher | Yes | Same dispatcher path as LLVM backend. Module hash includes codegen config. |
 | DSL `JitModule`, MLIR backend | CUDA device | MLIR -> LLVM IR -> CUDA dispatcher | Yes | Same CUDA dispatcher path. Module hash includes codegen config. |
-| DSL `JitModule`, MLIR backend | HIP device | MLIR -> LLVM IR -> HIP dispatcher | Yes | Same HIP dispatcher path. Module hash includes codegen config. |
+| DSL `JitModule`, MLIR backend | HIP device | MLIR -> LLVM IR -> HIP dispatcher | Serial and parallel only | Same HIP dispatcher path. Module hash includes codegen config. |
 | Direct `MLIRJitModule` | Host CPU | MLIR source -> LLVM IR -> host dispatcher | Yes | Uses dispatcher compile path. Module hash includes codegen config. |
 | Direct `MLIRJitModule` | CUDA device | MLIR source -> LLVM IR -> CUDA dispatcher | Yes | Uses dispatcher compile path. Module hash includes codegen config. |
-| Direct `MLIRJitModule` | HIP device | MLIR source -> LLVM IR -> HIP dispatcher | Yes | Uses dispatcher compile path. Module hash includes codegen config. |
+| Direct `MLIRJitModule` | HIP device | MLIR source -> LLVM IR -> HIP dispatcher | Serial and parallel only | Same HIP dispatcher path. Module hash includes codegen config. |
 | `CppJitModule`, Clang backend | Host CPU | Clang emits LLVM IR -> host dispatcher | Yes | Clang emits optimized-mode IR with `-O3 -Xclang -disable-llvm-passes`; Proteus runs the configured pipeline. |
 | `CppJitModule`, Clang backend | CUDA device-only | Clang emits device LLVM IR -> CUDA dispatcher | Yes | Proteus optimizes the emitted LLVM IR. Module hash includes codegen config. |
-| `CppJitModule`, Clang backend | HIP device-only | Clang emits device LLVM IR -> HIP dispatcher | Yes | Proteus optimizes the emitted LLVM IR. Module hash includes codegen config. |
+| `CppJitModule`, Clang backend | HIP device-only | Clang emits device LLVM IR -> HIP dispatcher | Serial and parallel only | Same HIP dispatcher path. Module hash includes codegen config. |
 | `CppJitModule`, Clang backend | Host+CUDA | Clang compiles mixed offload translation unit directly to shared library | No | Proteus receives a final `.so`, not host/device LLVM IR. |
 | `CppJitModule`, Clang backend | Host+HIP | Clang compiles mixed offload translation unit directly to shared library | No | Same reason as Host+CUDA. |
 | `CppJitModule`, NVCC backend | CUDA device-only | NVCC emits cubin | No | NVCC owns optimization and codegen. Cache key intentionally does not include Proteus codegen config. |
@@ -167,6 +167,15 @@ interface accepts some compiler options, but it does not expose a documented
 LLVM textual pass pipeline interface equivalent to `opt`/PassBuilder or LLVM
 LTO's `OptPipeline`.
 JIT pass-plugin registration does not change this exclusion.
+
+This applies to every HIP path, including the DSL and `CppJitModule` HIP
+dispatcher paths. HIPRTC runs its own full optimization pipeline on the
+bitcode it receives, so Proteus skips `optimizeIR()` before RTC codegen
+rather than optimizing the module twice. Since `rtc` is the default HIP
+codegen mode, `PROTEUS_OPT_PIPELINE`, `PROTEUS_OPT_LEVEL`,
+`PROTEUS_CODEGEN_OPT_LEVEL`, and JIT pass plugins are ignored on HIP unless
+`PROTEUS_CODEGEN=serial` or `PROTEUS_CODEGEN=parallel` is set. Proteus prints a
+one-time warning when any of these is configured under `rtc`.
 
 ### CppJit Host+CUDA / Host+HIP
 
