@@ -163,6 +163,8 @@ Functions</h2></td></tr>
 <tr class="separator:a53c70e902459055e86c380d352936881"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a8783aeef4d027f23d3b1ed5669f22bae" id="r_a8783aeef4d027f23d3b1ed5669f22bae"><td class="memItemLeft" align="right" valign="top">CUresult CUDAAPI&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="CUDADriverAPI_8cpp.html#a8783aeef4d027f23d3b1ed5669f22bae">cuMemcpyDtoH</a> (void *DstHost, CUdeviceptr SrcDevice, size_t ByteCount)</td></tr>
 <tr class="separator:a8783aeef4d027f23d3b1ed5669f22bae"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac6807fb51c3900ae5503a22cc88d1269" id="r_ac6807fb51c3900ae5503a22cc88d1269"><td class="memItemLeft" align="right" valign="top">CUresult CUDAAPI&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="CUDADriverAPI_8cpp.html#ac6807fb51c3900ae5503a22cc88d1269">cuFuncGetAttribute</a> (int *Pi, CUfunction_attribute Attrib, CUfunction Hfunc)</td></tr>
+<tr class="separator:ac6807fb51c3900ae5503a22cc88d1269"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac36e7ebe3a6803d5203c497bb7927a7c" id="r_ac36e7ebe3a6803d5203c497bb7927a7c"><td class="memItemLeft" align="right" valign="top">CUresult CUDAAPI&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="CUDADriverAPI_8cpp.html#ac36e7ebe3a6803d5203c497bb7927a7c">cuFuncSetAttribute</a> (CUfunction Hfunc, CUfunction_attribute Attrib, int Value)</td></tr>
 <tr class="separator:ac36e7ebe3a6803d5203c497bb7927a7c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac894ee07e4601018c70c036df29e529a" id="r_ac894ee07e4601018c70c036df29e529a"><td class="memItemLeft" align="right" valign="top">CUresult CUDAAPI&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="CUDADriverAPI_8cpp.html#ac894ee07e4601018c70c036df29e529a">cuLaunchKernel</a> (CUfunction F, unsigned int GridDimX, unsigned int GridDimY, unsigned int GridDimZ, unsigned int BlockDimX, unsigned int BlockDimY, unsigned int BlockDimZ, unsigned int SharedMemBytes, CUstream HStream, void **KernelParams, void **Extra)</td></tr>
@@ -345,6 +347,40 @@ Functions</h2></td></tr>
           <td></td>
           <td class="paramtype">CUdevice&#160;</td>
           <td class="paramname"><em>Dev</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="ac6807fb51c3900ae5503a22cc88d1269" name="ac6807fb51c3900ae5503a22cc88d1269"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac6807fb51c3900ae5503a22cc88d1269">&#9670;&#160;</a></span>cuFuncGetAttribute()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">CUresult CUDAAPI cuFuncGetAttribute </td>
+          <td>(</td>
+          <td class="paramtype">int *&#160;</td>
+          <td class="paramname"><em>Pi</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">CUfunction_attribute&#160;</td>
+          <td class="paramname"><em>Attrib</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">CUfunction&#160;</td>
+          <td class="paramname"><em>Hfunc</em>&#160;</td>
         </tr>
         <tr>
           <td></td>
