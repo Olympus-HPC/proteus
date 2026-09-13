@@ -477,7 +477,6 @@ public:
                          const char *ModuleId);
   void finalizeRegistration();
   void registerFunction(void *Handle, void *Kernel, char *KernelName,
-                        const char *KernelLookupKey,
                         ArrayRef<RuntimeConstantInfo *> RCInfoArray);
   void registerLambdaCallsiteLocation(void *Kernel, uint64_t LambdaID,
                                       uint32_t CallsiteIndex,
@@ -498,15 +497,6 @@ public:
       return std::nullopt;
     }
     return JITKernelInfoMap[Func];
-  }
-
-  std::optional<std::reference_wrapper<JITKernelInfo>>
-  getJITKernelInfo(StringRef KernelLookupKey) {
-    auto It = KernelLookupKeyToKernel.find(KernelLookupKey.str());
-    if (It == KernelLookupKeyToKernel.end())
-      return std::nullopt;
-
-    return getJITKernelInfo(It->second);
   }
 
   HashT getStaticHash(JITKernelInfo &KernelInfo) {
@@ -546,7 +536,7 @@ protected:
 
       for (auto &Func : FatbinInfo.Functions)
         registerFunction(Handle, Func.Kernel, Func.KernelName,
-                         Func.KernelLookupKey, Func.RCInfoArray);
+                         Func.RCInfoArray);
 
       for (auto &Var : FatbinInfo.Vars)
         registerVar(Var.Handle, Var.VarName, Var.HostAddr, Var.VarSize);
@@ -576,7 +566,6 @@ protected:
   std::string DeviceArch;
 
   DenseMap<const void *, JITKernelInfo> JITKernelInfoMap;
-  std::unordered_map<std::string, const void *> KernelLookupKeyToKernel;
   DenseMap<const void *, LambdaCallsiteLocationMap>
       PendingLambdaCallsiteLocationInfo;
   std::unique_ptr<CompilerAsync> AsyncCompiler;
@@ -742,12 +731,10 @@ template <typename ImplT> void JitEngineDevice<ImplT>::finalizeRegistration() {
 
 template <typename ImplT>
 void JitEngineDevice<ImplT>::registerFunction(
-    void *Handle, void *Kernel, char *KernelName, const char *KernelLookupKey,
+    void *Handle, void *Kernel, char *KernelName,
     ArrayRef<RuntimeConstantInfo *> RCInfoArray) {
   PROTEUS_DBG(Logger::logs("proteus") << "Register function " << Kernel
                                       << " To Handle " << Handle << "\n");
-  KernelLookupKeyToKernel.try_emplace(KernelLookupKey, Kernel);
-
   // NOTE: HIP RDC might call multiple times the registerFunction for the same
   // kernel, which has weak linkage, when it comes from different translation
   // units. Either the first or the second call can prevail and should be

@@ -206,7 +206,7 @@ public:
 
     if (hasDeviceLaunchKernelCalls(M)) {
       instrumentLambdaLaunchCallsites(M, StubToKernelMap);
-      emitJitLaunchKernelCall(M, StubToKernelMap);
+      emitJitLaunchKernelCall(M);
     }
 
     instrumentRegisterFunction(M);
@@ -1594,7 +1594,7 @@ private:
     return true;
   }
 
-  FunctionCallee getJitLaunchKernelFn(Module &M, bool LookupByName) {
+  FunctionCallee getJitLaunchKernelFn(Module &M) {
     FunctionType *JitLaunchKernelFnTy = nullptr;
 
     assert(LaunchFunctionName && "Expected valid launch function name");
@@ -1612,22 +1612,14 @@ private:
           "PROTEUS_ENABLE_CUDA|PROTEUS_ENABLE_HIP compilation flags "
           "for ProteusPass");
 
-    StringRef EntryName = LookupByName ? "__proteus_launch_kernel_by_name"
-                                       : "__proteus_launch_kernel";
     FunctionCallee JitLaunchKernelFn =
-        M.getOrInsertFunction(EntryName, JitLaunchKernelFnTy);
+        M.getOrInsertFunction("__proteus_launch_kernel", JitLaunchKernelFnTy);
 
     return JitLaunchKernelFn;
   }
 
-  std::string getKernelLookupKey(Module &M, const Function &KernelStub) {
-    return getUniqueFileID(M) + ":" + KernelStub.getName().str();
-  }
-
-  void replaceWithJitLaunchKernel(Module &M, CallBase *LaunchKernelCB,
-                                  Function *KernelStub) {
-    FunctionCallee JitLaunchKernelFn =
-        getJitLaunchKernelFn(M, KernelStub != nullptr);
+  void replaceWithJitLaunchKernel(Module &M, CallBase *LaunchKernelCB) {
+    FunctionCallee JitLaunchKernelFn = getJitLaunchKernelFn(M);
 
     // Insert before the launch kernel call instruction.
     IRBuilder<> Builder(LaunchKernelCB);
@@ -1635,9 +1627,6 @@ private:
 
     SmallVector<Value *> Args = {LaunchKernelCB->arg_begin(),
                                  LaunchKernelCB->arg_end()};
-    if (KernelStub)
-      Args[0] = Builder.CreateGlobalString(getKernelLookupKey(M, *KernelStub),
-                                           ".proteus.kernel.lookup");
 
     if (isa<CallInst>(LaunchKernelCB)) {
       CallOrInvoke = Builder.CreateCall(JitLaunchKernelFn, Args);
@@ -1657,8 +1646,7 @@ private:
     LaunchKernelCB->eraseFromParent();
   }
 
-  void emitJitLaunchKernelCall(
-      Module &M, const DenseMap<Value *, GlobalVariable *> &StubToKernelMap) {
+  void emitJitLaunchKernelCall(Module &M) {
     Function *LaunchKernelFn = nullptr;
     if (!LaunchFunctionName) {
       reportFatalError(
@@ -1687,17 +1675,8 @@ private:
         ToBeReplaced.push_back(CB);
       }
 
-    for (CallBase *CB : ToBeReplaced) {
-      Function *KernelStub = nullptr;
-      Value *Stub = getStubGV(CB->getArgOperand(0));
-      auto *StubFn = dyn_cast_or_null<Function>(Stub);
-      auto It = StubToKernelMap.find(Stub);
-      if (StubFn && It != StubToKernelMap.end() &&
-          JitFunctionInfoMap.contains(StubFn))
-        KernelStub = StubFn;
-
-      replaceWithJitLaunchKernel(M, CB, KernelStub);
-    }
+    for (CallBase *CB : ToBeReplaced)
+      replaceWithJitLaunchKernel(M, CB);
   }
 
   FunctionCallee getJitRegisterFatBinaryFn(Module &M) {
@@ -1863,14 +1842,12 @@ private:
     // __proteus_register_function(void *Handle,
     //                             void *Kernel,
     //                             char const *KernelName,
-    //                             char const *KernelLookupKey,
     //                             RuntimeConstantInfo **RCInfoArrayPtr,
     //                             int32_t NumRCs)
-    FunctionType *JitRegisterFunctionFnTy =
-        FunctionType::get(Types.VoidTy,
-                          {Types.PtrTy, Types.PtrTy, Types.PtrTy, Types.PtrTy,
-                           Types.PtrTy, Types.Int32Ty},
-                          /* isVarArg=*/false);
+    FunctionType *JitRegisterFunctionFnTy = FunctionType::get(
+        Types.VoidTy,
+        {Types.PtrTy, Types.PtrTy, Types.PtrTy, Types.PtrTy, Types.Int32Ty},
+        /* isVarArg=*/false);
     FunctionCallee JitRegisterKernelFn = M.getOrInsertFunction(
         "__proteus_register_function", JitRegisterFunctionFnTy);
 
@@ -1941,13 +1918,11 @@ private:
           ConstantInt::get(Builder.getInt32Ty(), NumRuntimeConstants);
 
       FunctionCallee JitRegisterFunction = getJitRegisterFunctionFn(M);
-      auto *KernelLookupKey = Builder.CreateGlobalString(
-          getKernelLookupKey(M, *FunctionToRegister), ".proteus.kernel.lookup");
 
       Builder.CreateCall(JitRegisterFunction,
                          {RegisterCB->getArgOperand(0),
                           RegisterCB->getArgOperand(1),
-                          RegisterCB->getArgOperand(2), KernelLookupKey,
+                          RegisterCB->getArgOperand(2),
                           RuntimeConstantInfoPtrArray, NumRCsValue});
 
       auto HelperIt =
