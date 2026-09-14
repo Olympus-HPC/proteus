@@ -100,6 +100,70 @@ getTrackedPointerLocation(const DataLayout &DL, Value *Ptr) {
                         LocationSize::precise(DL.getTypeStoreSize(PointeeTy)));
 }
 
+// Find the closest preceding same-block store whose written range covers the
+// tracked byte. This preserves execution order where Value::users() does not:
+// a later overwrite must win over an earlier initializer. Calls that might
+// clobber the storage force the general analysis instead. See the latest-store
+// and capture-overwrite cases in tests/gpu/lambda_store_order.cpp.
+inline std::optional<LambdaPtrUseAnalysis>
+getPreviousCoveringStore(const DataLayout &DL, Value *Ptr, Value *UseBoundary,
+                         int64_t TargetOffset) {
+  auto *PtrI = dyn_cast<Instruction>(Ptr);
+  auto *BoundaryI = dyn_cast<Instruction>(UseBoundary);
+  if (!PtrI || !BoundaryI || PtrI->getFunction() != BoundaryI->getFunction() ||
+      PtrI->getParent() != BoundaryI->getParent())
+    return std::nullopt;
+
+  int64_t RootOffset = 0;
+  Value *RootBase = GetPointerBaseWithConstantOffset(Ptr, RootOffset, DL);
+  if (!RootBase)
+    return std::nullopt;
+  int64_t AbsoluteTarget = RootOffset + TargetOffset;
+
+  // A backwards provenance edge commonly ends at the GEP that computes the
+  // lambda field, while a modifying call follows that GEP before the field is
+  // read.  Do not select an older initializer across such a call: the regular
+  // def-use visitor must inspect the call (and, for a dynamic memcpy, decline
+  // specialization).  For a non-escaping local, a call can only clobber this
+  // storage if one of its pointer arguments aliases the same base.
+  for (Instruction *I = BoundaryI->getNextNode(); I; I = I->getNextNode()) {
+    auto *CB = dyn_cast<CallBase>(I);
+    if (!CB || isa<DbgInfoIntrinsic>(CB) || CB->onlyReadsMemory())
+      continue;
+    for (Value *Arg : CB->args()) {
+      if (!Arg->getType()->isPointerTy())
+        continue;
+      int64_t ArgOffset = 0;
+      Value *ArgBase = GetPointerBaseWithConstantOffset(Arg, ArgOffset, DL);
+      if (ArgBase == RootBase)
+        return std::nullopt;
+    }
+  }
+
+  for (Instruction *I = BoundaryI->getPrevNode(); I; I = I->getPrevNode()) {
+    if (auto *SI = dyn_cast<StoreInst>(I)) {
+      int64_t StoreOffset = 0;
+      Value *StoreBase = GetPointerBaseWithConstantOffset(
+          SI->getPointerOperand(), StoreOffset, DL);
+      auto StoreSize = getTypeStoreSize(DL, SI->getValueOperand()->getType());
+      if (StoreBase == RootBase && StoreSize &&
+          offsetCoveredByRange(AbsoluteTarget, StoreOffset, *StoreSize))
+        return LambdaPtrUseAnalysis{.DominatingWrite = SI->getValueOperand(),
+                                    .Offset = StoreOffset - RootOffset,
+                                    .ChangedRCLayout = std::nullopt};
+      continue;
+    }
+
+    // A call that may write memory could clobber Ptr.  Leave such cases to the
+    // interprocedural visitor, which understands memcpy and pointer arguments.
+    if (auto *CB = dyn_cast<CallBase>(I)) {
+      if (!isa<DbgInfoIntrinsic>(CB) && !CB->onlyReadsMemory())
+        return std::nullopt;
+    }
+  }
+  return std::nullopt;
+}
+
 // Given a newly allocated ptr encountered in def-use analysis beginning at a
 // Lambda callsite, we need to determine which definition dominates that ptr.
 class LambdaInstUseVisitor : public InstVisitor<LambdaInstUseVisitor> {
@@ -130,11 +194,17 @@ public:
   // Constructor used whenever a NeedsDefUseAnalysis Value is encountered. We
   // need to track where the calling LambdaArgVisitor came in from, so that our
   // analysis does not
-  LambdaInstUseVisitor(Value *PtrBegin, Value *SeenUse, const DataLayout &Dl,
-                       int64_t TargetOff)
+  LambdaInstUseVisitor(Value *PtrBegin, Value *SeenUse, CallBase *LambdaCB,
+                       const DataLayout &Dl, int64_t TargetOff)
       : TrackedBase(PtrBegin), DL(Dl) {
     WorkList.push_back({PtrBegin, nullptr});
-    Seen.insert(SeenUse);
+    // A pointer-transform on the backwards provenance path may also have an
+    // earlier store as a user.  Visit that transform so those writes remain
+    // visible, but stop before re-entering the lambda invocation itself.
+    if (!isa<GetElementPtrInst, BitCastInst, AddrSpaceCastInst>(SeenUse))
+      Seen.insert(SeenUse);
+    if (LambdaCB)
+      Seen.insert(LambdaCB);
     ValueOffsetMap[PtrBegin] = TargetOff;
   }
   auto back() { return WorkList.back(); }
@@ -164,6 +234,26 @@ public:
     DEBUG(Logger::logs("proteus-pass")
           << "    [PTR use analysis]: Analysis failed due to absence of " << *V
           << " in offset tracking map, this is an internal compiler bug\n");
+  }
+
+  // WorkList is LIFO.  Enqueue possible writers last so they are inspected
+  // before an older store reached through a GEP.  Otherwise a memcpy/memmove
+  // call can be skipped merely because the initializer happens to appear
+  // earlier in Value::users().
+  void pushPointerUsers(Value *V) {
+    SmallVector<User *, 4> PossibleWriters;
+    for (User *Usr : V->users()) {
+      if (Seen.contains(Usr))
+        continue;
+      auto *CB = dyn_cast<CallBase>(Usr);
+      if (CB && !isa<DbgInfoIntrinsic>(CB) && !CB->onlyReadsMemory()) {
+        PossibleWriters.push_back(Usr);
+        continue;
+      }
+      pushBack(Usr, V);
+    }
+    for (User *Usr : PossibleWriters)
+      pushBack(Usr, V);
   }
 
   void visitStoreInst(StoreInst &SI) {
@@ -207,6 +297,9 @@ public:
 
   void visitLoadInst(LoadInst &LI) {
     if (!LI.getType()->isPointerTy()) {
+      DEBUG(Logger::logs("proteus-pass")
+            << "    [PTR use analysis]: Expected a pointer load, got " << LI
+            << "\n");
       AnalysisFailed = true;
       AnalysisSuccess = false;
       return;
@@ -216,9 +309,7 @@ public:
       return;
     }
     ValueOffsetMap[&LI] = ValueOffsetMap[LI.getPointerOperand()];
-    for (User *Usr : LI.users()) {
-      pushBack(Usr, &LI);
-    }
+    pushPointerUsers(&LI);
   }
 
   void visitCallBase(CallBase &CB) {
@@ -233,6 +324,10 @@ public:
 
     Function *F = CB.getCalledFunction();
     if (!F || F->isDeclaration()) {
+      DEBUG(Logger::logs("proteus-pass")
+            << "    [PTR use analysis]: Cannot trace indirect or declaration "
+               "call "
+            << CB << "\n");
       AnalysisFailed = true;
       AnalysisSuccess = false;
       return;
@@ -262,6 +357,10 @@ public:
     DEBUG(Logger::logs("proteus-pass")
           << "    Beginning analysis within " << *F << "\n");
     if (!FoundArg) {
+      DEBUG(Logger::logs("proteus-pass")
+            << "    [PTR use analysis]: Call does not pass the tracked "
+               "pointer on any callee argument: "
+            << CB << "\n");
       AnalysisFailed = true;
       AnalysisSuccess = false;
     }
@@ -309,9 +408,7 @@ public:
     DEBUG(Logger::logs("proteus-pass")
           << "    " << "Setting map K " << GEP << " : " << ValueOffsetMap[&GEP]
           << "\n");
-    for (auto *User : GEP.users())
-      if (!Seen.contains(User))
-        pushBack(User, &GEP);
+    pushPointerUsers(&GEP);
   }
 
   // todo: these three methods may need to be changed to find a dominating store
@@ -327,9 +424,7 @@ public:
     }
 
     ValueOffsetMap[&Alloca] = Offset;
-    for (auto *User : Alloca.users())
-      if (!Seen.contains(User))
-        pushBack(User, &Alloca);
+    pushPointerUsers(&Alloca);
   }
 
   // TODO(bowen) come up with a unit test for an analysis starting with
@@ -341,9 +436,7 @@ public:
       ValueOffsetMap[BC.getOperand(0)] = Offset;
     // AddrSpaceCast does not change the offset we track.
     ValueOffsetMap[&BC] = ValueOffsetMap[BC.getOperand(0)];
-    for (auto *User : BC.users())
-      if (!Seen.contains(User))
-        pushBack(User, &BC);
+    pushPointerUsers(&BC);
   }
 
   void visitAddrSpaceCastInst(AddrSpaceCastInst &ASC) {
@@ -361,19 +454,33 @@ public:
           << "    [PTR use analysis]: Setting offset " << ASC << " = "
           << ValueOffsetMap[&ASC]);
 
-    for (auto *User : ASC.users())
-      if (!Seen.contains(User)) {
-        pushBack(User, &ASC);
-      }
+    pushPointerUsers(&ASC);
   }
 
   void visitMemIntrinsic(MemIntrinsic &I) {
-    auto *MT = dyn_cast<MemTransferInst>(&I); // memcpy/memmove
-    if (!MT) {
-      // memset doesn't preserve any src->dst relationship we can use
+    if (auto *MS = dyn_cast<MemSetInst>(&I)) {
+      if (Def != MS->getRawDest())
+        return;
+      if (!ValueOffsetMap.contains(Def)) {
+        offsetValueMapFailure(Def);
+        return;
+      }
+      auto *Len = dyn_cast<ConstantInt>(MS->getLength());
+      if (Len &&
+          !offsetCoveredByRange(ValueOffsetMap[Def], 0, Len->getZExtValue()))
+        return;
+      // A covering memset destroys the tracked provenance, and a dynamic
+      // length cannot be proven not to cover it.
+      DEBUG(Logger::logs("proteus-pass")
+            << "    [PTR use analysis]: Memset may overwrite the tracked "
+               "byte: "
+            << I << "\n");
       AnalysisFailed = true;
+      AnalysisSuccess = false;
       return;
     }
+
+    auto *MT = cast<MemTransferInst>(&I); // memcpy/memmove
 
     // A transfer defines the tracked memory only when the use edge reached it
     // through the destination operand.  Reaching the same intrinsic through
@@ -389,6 +496,10 @@ public:
     auto *Len = dyn_cast<ConstantInt>(MT->getLength());
     if (!Len) {
       // We cannot prove that a dynamic-sized transfer defines the tracked byte.
+      DEBUG(Logger::logs("proteus-pass")
+            << "    [PTR use analysis]: Dynamic-length transfer cannot prove "
+               "provenance for the tracked byte: "
+            << I << "\n");
       AnalysisFailed = true;
       AnalysisSuccess = false;
       return;
@@ -410,22 +521,42 @@ public:
 
     DEBUG(Logger::logs("proteus-pass")
           << "  [PTR use analysis]: Completed instrinsic analysis " << "\n");
-    Offset = Offset - DstOff + SrcOff;
+    // LambdaArgVisitor applies Result.Offset by subtracting it from its
+    // current, destination-relative offset.  The value carried across a
+    // transfer is therefore the difference between the destination and
+    // source bases, rather than the source's absolute offset.  For example,
+    // copying a field at byte 8 into a field at byte 24 needs a correction of
+    // 16, so the caller turns 24 into 8.
+    int64_t OffsetCorrection = DstOff - SrcOff;
     AnalysisSuccess = true;
     AnalysisFailed = false;
     Result = {.DominatingWrite = SrcBase,
-              .Offset = Offset,
+              .Offset = OffsetCorrection,
               .ChangedRCLayout = std::nullopt};
+  }
+
+  void visitInstruction(Instruction &I) {
+    DEBUG(Logger::logs("proteus-pass")
+          << "    [PTR use analysis]: Unhandled instruction "
+          << I.getOpcodeName() << ": " << I << "\n");
+    AnalysisFailed = true;
+    AnalysisSuccess = false;
   }
 };
 
 inline std::optional<LambdaPtrUseAnalysis>
 getDominatingUse(const DataLayout &DL, Value *ValueNeedingAnalysis,
-                 Value *SeenUse, int64_t TargetOffset) {
+                 Value *SeenUse, int64_t TargetOffset,
+                 CallBase *LambdaCB = nullptr) {
   DEBUG(Logger::logs("proteus-pass")
         << "Beginning PtrUse analysis with offset = " << TargetOffset << "\n");
 
-  LambdaInstUseVisitor Visitor(ValueNeedingAnalysis, SeenUse, DL, TargetOffset);
+  if (auto Store = getPreviousCoveringStore(DL, ValueNeedingAnalysis, SeenUse,
+                                            TargetOffset))
+    return Store;
+
+  LambdaInstUseVisitor Visitor(ValueNeedingAnalysis, SeenUse, LambdaCB, DL,
+                               TargetOffset);
   // Analysis loop
   while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {
     auto *V = Visitor.popBack().CurVal;
