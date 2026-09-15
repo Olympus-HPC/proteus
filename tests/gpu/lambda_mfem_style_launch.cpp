@@ -9,8 +9,8 @@
 #include "lambda_mfem_style_kernel.h"
 
 int main() {
-  auto Kernel23 = IntegralKernel<2, 3>;
-  auto Kernel34 = IntegralKernel<3, 4>;
+  auto Kernel23 = integralKernel<2, 3>;
+  auto Kernel34 = integralKernel<3, 4>;
   Kernel23(1.0, 4, 5);
   gpuErrCheck(gpuDeviceSynchronize());
   Kernel34(-1.0, 6, 7);
