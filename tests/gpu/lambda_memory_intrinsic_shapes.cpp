@@ -99,7 +99,7 @@ int main() {
   auto DynamicDestination = makeDynamicBody(199);
   auto DynamicSource = makeDynamicBody(211);
   kernelDynamicMemcpy<<<1, 1>>>(DynamicDestination, DynamicSource,
-                                  sizeof(std::uint64_t));
+                                sizeof(std::uint64_t));
   gpuErrCheck(gpuDeviceSynchronize());
 
   auto MoveDestinationBody = makeMoveBody(223);

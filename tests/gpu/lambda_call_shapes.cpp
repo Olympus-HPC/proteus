@@ -75,7 +75,8 @@ kernelSelectDifferent(F First, F Second, bool UseSecond) {
 }
 
 template <typename F>
-__device__ __attribute__((noinline, optnone)) static void invokeIndirect(F *Body) {
+__device__ __attribute__((noinline, optnone)) static void
+invokeIndirect(F *Body) {
   using Forwarder = F *(*)(F *);
   volatile Forwarder Forward = &identityBody<F>;
   (*Forward(Body))();
@@ -84,7 +85,8 @@ __device__ __attribute__((noinline, optnone)) static void invokeIndirect(F *Body
 // getCalledFunction() is null for an indirect call.  The provenance analysis
 // must decline this shape instead of dereferencing the null callee.
 template <typename F>
-__global__ __attribute__((annotate("jit"))) static void kernelIndirectCall(F Body) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelIndirectCall(F Body) {
   invokeIndirect(&Body);
 }
 

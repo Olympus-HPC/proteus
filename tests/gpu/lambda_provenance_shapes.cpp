@@ -60,7 +60,8 @@ copyBody(CopyDestination<F> *Destination, const CopySource<F> *Source) {
 }
 
 template <typename F>
-__global__ __attribute__((annotate("jit"))) static void kernelOffsetMemcpy(F Body) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelOffsetMemcpy(F Body) {
   static_assert(offsetof(CopySource<F>, Body) == 8);
   static_assert(offsetof(CopyDestination<F>, Body) == 16);
   CopySource<F> Source{0x1111111111111111ULL, Body};
@@ -102,8 +103,8 @@ kernelPartialMemcpy(F DestinationBody, F SourceBody) {
 template <typename F>
 __global__ __attribute__((annotate("jit"))) static void
 kernelMemcpySource(F SourceBody, F DestinationBody) {
-  PartialCopyValue<F> Source{
-      {0x5555555555555555ULL, 0x6666666666666666ULL}, SourceBody};
+  PartialCopyValue<F> Source{{0x5555555555555555ULL, 0x6666666666666666ULL},
+                             SourceBody};
   PartialCopyValue<F> Destination{
       {0x7777777777777777ULL, 0x8888888888888888ULL}, DestinationBody};
   copyPrefixOnly(&Destination, &Source);
@@ -116,7 +117,8 @@ template <typename F> struct NestedBody {
 };
 
 template <typename F>
-__device__ __attribute__((noinline)) static F *getNestedBody(NestedBody<F> *Nested) {
+__device__ __attribute__((noinline)) static F *
+getNestedBody(NestedBody<F> *Nested) {
   return &Nested->Body;
 }
 
@@ -130,8 +132,8 @@ template <typename F>
 __device__ __attribute__((noinline, optnone)) static F *
 roundTripInteriorPointer(F *Body) {
   auto *Bytes = reinterpret_cast<char *>(Body);
-  auto *Nested = reinterpret_cast<NestedBody<F> *>(
-      Bytes - offsetof(NestedBody<F>, Body));
+  auto *Nested =
+      reinterpret_cast<NestedBody<F> *>(Bytes - offsetof(NestedBody<F>, Body));
   return &Nested->Body;
 }
 
@@ -160,7 +162,7 @@ static void runArrayMember() {
         printf("inserted array member %d\n", X);
       });
   kernelArrayMember<<<1, 1>>>(Body, 0x1111111111111111ULL,
-                                0x2222222222222222ULL);
+                              0x2222222222222222ULL);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 

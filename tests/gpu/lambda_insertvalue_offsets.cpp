@@ -45,7 +45,8 @@ __global__ __attribute__((annotate("jit"))) static void kernelShift(F Body) {
 // Applying the same transformation twice catches visitors that repair one
 // aggregate boundary but retain stale state at the next one.
 template <typename F>
-__global__ __attribute__((annotate("jit"))) static void kernelDoubleShift(F Body) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelDoubleShift(F Body) {
   static_assert(offsetof(ShiftedEnvelope<F>, Body) == 8);
   auto First = makeShiftedEnvelope(Body, 0x2222222222222222ULL);
   auto Second = makeShiftedEnvelope(First.Body, 0x3333333333333333ULL);
