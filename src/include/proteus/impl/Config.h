@@ -162,15 +162,6 @@ inline KernelCloneOption getEnvOrDefaultKC(const char *VarName,
 }
 
 class CodeGenerationConfig {
-  static constexpr bool DefaultSpecializeDimsRange =
-#if PROTEUS_ENABLE_CUDA
-      // Disable SpecializeDimsRange on CUDA builds: empirically causes worse
-      // optimization, so default to false.
-      false;
-#else
-      true;
-#endif
-
   static CodegenOption getCodeGen(CodegenOption ProteusCodegen) {
     constexpr bool SupportOnlyRTC =
 #if defined(PROTEUS_ENABLE_CUDA)
@@ -222,8 +213,9 @@ public:
         getEnvOrDefaultBool("PROTEUS_SPECIALIZE_ARGS", true),
         getEnvOrDefaultBool("PROTEUS_SPECIALIZE_LAUNCH_BOUNDS", true),
         getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS", true),
-        getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS_RANGE",
-                            DefaultSpecializeDimsRange),
+        // SpecializeDimsRange is disabled by default due to observed
+        // regressions for HIP and CUDA code generation
+        getEnvOrDefaultBool("PROTEUS_SPECIALIZE_DIMS_RANGE", false),
         getEnvOrDefaultChar("PROTEUS_OPT_LEVEL", '3'),
         getEnvOrDefaultInt("PROTEUS_CODEGEN_OPT_LEVEL", 3));
   }
@@ -245,7 +237,7 @@ public:
         getDefaultValueFromOptional(Config.getBoolean("LaunchBounds"), true),
         getDefaultValueFromOptional(Config.getBoolean("SpecializeDims"), true),
         getDefaultValueFromOptional(Config.getBoolean("SpecializeDimsRange"),
-                                    DefaultSpecializeDimsRange),
+                                    false),
         getDefaultValueFromOptional(Config.getString("OptLevel"),
                                     llvm::StringRef("3"))[0],
         getDefaultValueFromOptional(Config.getInteger("CodeGenOptLevel"),
