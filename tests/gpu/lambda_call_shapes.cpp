@@ -144,18 +144,18 @@ int main() {
 }
 
 // clang-format off
-// CHECK: [KernelConfig] ID:_Z23kernel_multiple_returns
+// CHECK: [KernelConfig] ID:{{.*}}kernelMultipleReturns
 // CHECK-NOT: [LambdaSpec]
 // CHECK: multiple returns 163
 // CHECK: [LambdaSpec] Replacing slot 0 with i32 173
 // CHECK: same returns 173
-// CHECK: [KernelConfig] ID:_Z20kernel_indirect_call
+// CHECK: [KernelConfig] ID:{{.*}}kernelIndirectCall
 // CHECK-NOT: [LambdaSpec]
 // CHECK: indirect call 167
-// CHECK: [KernelConfig] ID:_Z18kernel_select_same
+// CHECK: [KernelConfig] ID:{{.*}}kernelSelectSame
 // CHECK-NOT: [LambdaSpec]
 // CHECK: select same 179
-// CHECK: [KernelConfig] ID:_Z23kernel_select_different
+// CHECK: [KernelConfig] ID:{{.*}}kernelSelectDifferent
 // CHECK-NOT: [LambdaSpec]
 // CHECK: multiple returns 191
 // clang-format on

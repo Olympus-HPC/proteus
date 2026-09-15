@@ -112,7 +112,7 @@ int main() {
 // clang-format off
 // CHECK: [LambdaSpec] Replacing slot 0 with i32 197
 // CHECK: nonoverlap memset 197
-// CHECK: [KernelConfig] ID:_Z21kernel_dynamic_memcpy
+// CHECK: [KernelConfig] ID:{{.*}}kernelDynamicMemcpy
 // CHECK-NOT: [LambdaSpec]
 // CHECK: dynamic memcpy 199
 // CHECK: [LambdaSpec] Replacing slot 0 with i32 227

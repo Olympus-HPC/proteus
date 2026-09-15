@@ -138,10 +138,10 @@ int main() {
 // CHECK: store order 127
 // CHECK: [LambdaSpec] Replacing slot 0 with i32 139
 // CHECK: store order 139
-// CHECK: [KernelConfig] ID:_Z19kernel_branch_store
+// CHECK: [KernelConfig] ID:{{.*}}kernelBranchStore
 // CHECK-NOT: [LambdaSpec]
 // CHECK: branch store 151
-// CHECK: [KernelConfig] ID:_Z22kernel_mutated_capture
+// CHECK: [KernelConfig] ID:{{.*}}kernelMutatedCapture
 // CHECK-NOT: [LambdaSpec]
 // CHECK: mutated capture 181
 // CHECK: [LambdaSpec] Replacing slot 0 with i32 193
