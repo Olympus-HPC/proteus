@@ -27,7 +27,7 @@ template <typename F> struct ShiftedEnvelope {
 };
 
 template <typename F>
-__host__ __device__ __attribute__((noinline)) ShiftedEnvelope<F>
+__host__ __device__ __attribute__((noinline)) static ShiftedEnvelope<F>
 makeShiftedEnvelope(F Body, std::uint64_t Prefix) {
   return {Prefix, Body};
 }
@@ -36,7 +36,7 @@ makeShiftedEnvelope(F Body, std::uint64_t Prefix) {
 // offset eight in the returned aggregate.  Crossing the matching insertvalue
 // must therefore rebase the tracked offset from eight to zero.
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void kernel_shift(F Body) {
+__global__ __attribute__((annotate("jit"))) static void kernelShift(F Body) {
   static_assert(offsetof(ShiftedEnvelope<F>, Body) == 8);
   auto Envelope = makeShiftedEnvelope(Body, 0x1111111111111111ULL);
   Envelope();
@@ -45,7 +45,7 @@ __global__ __attribute__((annotate("jit"))) void kernel_shift(F Body) {
 // Applying the same transformation twice catches visitors that repair one
 // aggregate boundary but retain stale state at the next one.
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void kernel_double_shift(F Body) {
+__global__ __attribute__((annotate("jit"))) static void kernelDoubleShift(F Body) {
   static_assert(offsetof(ShiftedEnvelope<F>, Body) == 8);
   auto First = makeShiftedEnvelope(Body, 0x2222222222222222ULL);
   auto Second = makeShiftedEnvelope(First.Body, 0x3333333333333333ULL);
@@ -63,7 +63,7 @@ template <typename F> struct PaddedEnvelope {
 };
 
 template <typename F>
-__host__ __device__ __attribute__((noinline)) PaddedEnvelope<F>
+__host__ __device__ __attribute__((noinline)) static PaddedEnvelope<F>
 makePaddedEnvelope(F Body, std::uint64_t Suffix) {
   return {0x44, Body, Suffix};
 }
@@ -72,8 +72,8 @@ makePaddedEnvelope(F Body, std::uint64_t Suffix) {
 // Body.  The analysis has to skip the suffix insert and use the DataLayout
 // offset of Body rather than assuming tightly packed fields.
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void
-kernel_padded(F Body, std::uint64_t Suffix) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelPadded(F Body, std::uint64_t Suffix) {
   static_assert(offsetof(PaddedEnvelope<F>, Body) == 16);
   auto Envelope = makePaddedEnvelope(Body, Suffix);
   Envelope();
@@ -84,7 +84,7 @@ static void runShift() {
       [X = proteus::jit_variable(31)] __host__ __device__ {
         printf("single insertvalue rebase %d\n", X);
       });
-  kernel_shift<<<1, 1>>>(Body);
+  kernelShift<<<1, 1>>>(Body);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
@@ -93,7 +93,7 @@ static void runDoubleShift() {
       [X = proteus::jit_variable(47)] __host__ __device__ {
         printf("double insertvalue rebase %d\n", X);
       });
-  kernel_double_shift<<<1, 1>>>(Body);
+  kernelDoubleShift<<<1, 1>>>(Body);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
@@ -102,7 +102,7 @@ static void runPadded() {
       [X = proteus::jit_variable(59)] __host__ __device__(int Suffix) {
         printf("padded insertvalue rebase %d suffix %d\n", X, Suffix);
       });
-  kernel_padded<<<1, 1>>>(Body, 0x5555555555555555ULL);
+  kernelPadded<<<1, 1>>>(Body, 0x5555555555555555ULL);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 

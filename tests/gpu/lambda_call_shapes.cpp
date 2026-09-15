@@ -10,7 +10,7 @@
 #include <proteus/JitInterface.h>
 
 template <typename F>
-__device__ __attribute__((noinline, optnone)) F *
+__device__ __attribute__((noinline, optnone)) static F *
 chooseBody(F *First, F *Second, bool UseSecond) {
   if (UseSecond)
     return Second;
@@ -18,7 +18,7 @@ chooseBody(F *First, F *Second, bool UseSecond) {
 }
 
 template <typename F>
-__device__ __attribute__((noinline, optnone)) F *
+__device__ __attribute__((noinline, optnone)) static F *
 chooseSameBody(F *Body, bool FirstPath) {
   if (FirstPath)
     return Body;
@@ -28,27 +28,27 @@ chooseSameBody(F *Body, bool FirstPath) {
 // Different return paths carry different kernel arguments.  Picking the first
 // ReturnInst (or first reaching store to a lowered return slot) is unsound.
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void
-kernel_multiple_returns(F First, F Second, bool UseSecond) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelMultipleReturns(F First, F Second, bool UseSecond) {
   (*chooseBody(&First, &Second, UseSecond))();
 }
 
 // Distinct CFG paths and SSA loads still have one semantic pointer source.
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void
-kernel_same_returns(F Body, bool FirstPath) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelSameReturns(F Body, bool FirstPath) {
   (*chooseSameBody(&Body, FirstPath))();
 }
 
 template <typename F>
-__device__ __attribute__((noinline)) F *identityBody(F *Body) {
+__device__ __attribute__((noinline)) static F *identityBody(F *Body) {
   return Body;
 }
 
 // With optimization, this ternary is a pointer select rather than a branch
 // spill.  The arms are distinct call results with the same provenance.
 template <typename F>
-__device__ __attribute__((always_inline)) F *
+__device__ __attribute__((always_inline)) static F *
 selectSameBody(F *Body, bool AlternatePath) {
   auto *First = identityBody(Body);
   auto *Second = identityBody(Body);
@@ -57,25 +57,25 @@ selectSameBody(F *Body, bool AlternatePath) {
 
 // Different select arms must not be collapsed to the first operand.
 template <typename F>
-__device__ __attribute__((always_inline)) F *
+__device__ __attribute__((always_inline)) static F *
 selectDifferentBody(F *First, F *Second, bool UseSecond) {
   return UseSecond ? Second : First;
 }
 
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void
-kernel_select_same(F Body, bool AlternatePath) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelSelectSame(F Body, bool AlternatePath) {
   (*selectSameBody(&Body, AlternatePath))();
 }
 
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void
-kernel_select_different(F First, F Second, bool UseSecond) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelSelectDifferent(F First, F Second, bool UseSecond) {
   (*selectDifferentBody(&First, &Second, UseSecond))();
 }
 
 template <typename F>
-__device__ __attribute__((noinline, optnone)) void invokeIndirect(F *Body) {
+__device__ __attribute__((noinline, optnone)) static void invokeIndirect(F *Body) {
   using Forwarder = F *(*)(F *);
   volatile Forwarder Forward = &identityBody<F>;
   (*Forward(Body))();
@@ -84,7 +84,7 @@ __device__ __attribute__((noinline, optnone)) void invokeIndirect(F *Body) {
 // getCalledFunction() is null for an indirect call.  The provenance analysis
 // must decline this shape instead of dereferencing the null callee.
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void kernel_indirect_call(F Body) {
+__global__ __attribute__((annotate("jit"))) static void kernelIndirectCall(F Body) {
   invokeIndirect(&Body);
 }
 
@@ -119,24 +119,24 @@ static auto makeSelectSameBody(int Value) {
 int main() {
   auto First = makeReturnBody(157);
   auto Second = makeReturnBody(163);
-  kernel_multiple_returns<<<1, 1>>>(First, Second, true);
+  kernelMultipleReturns<<<1, 1>>>(First, Second, true);
   gpuErrCheck(gpuDeviceSynchronize());
 
   auto Same = makeSameReturnBody(173);
-  kernel_same_returns<<<1, 1>>>(Same, false);
+  kernelSameReturns<<<1, 1>>>(Same, false);
   gpuErrCheck(gpuDeviceSynchronize());
 
   auto Indirect = makeIndirectBody(167);
-  kernel_indirect_call<<<1, 1>>>(Indirect);
+  kernelIndirectCall<<<1, 1>>>(Indirect);
   gpuErrCheck(gpuDeviceSynchronize());
 
   auto SelectSame = makeSelectSameBody(179);
-  kernel_select_same<<<1, 1>>>(SelectSame, true);
+  kernelSelectSame<<<1, 1>>>(SelectSame, true);
   gpuErrCheck(gpuDeviceSynchronize());
 
   auto SelectFirst = makeReturnBody(181);
   auto SelectSecond = makeReturnBody(191);
-  kernel_select_different<<<1, 1>>>(SelectFirst, SelectSecond, true);
+  kernelSelectDifferent<<<1, 1>>>(SelectFirst, SelectSecond, true);
   gpuErrCheck(gpuDeviceSynchronize());
   return 0;
 }

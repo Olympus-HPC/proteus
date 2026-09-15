@@ -10,22 +10,22 @@
 #include <proteus/JitInterface.h>
 
 template <typename F>
-__host__ __device__ __attribute__((noinline)) void invoke_inner(F Inner) {
+__host__ __device__ __attribute__((noinline)) static void invokeInner(F Inner) {
   Inner();
 }
 
 template <typename F>
-__host__ __device__ __attribute__((noinline)) void
-invoke_with_index_first_slot(F Body, int I) {
+__host__ __device__ __attribute__((noinline)) static void
+invokeWithIndexFirstSlot(F Body, int I) {
   int LocalIndex = I;
   int *IndexPtr = &LocalIndex;
 
   auto Inner = [IndexPtr, Body] __host__ __device__() { Body(*IndexPtr); };
-  invoke_inner(Inner);
+  invokeInner(Inner);
 }
 
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void kernel(F Wrapped) {
+__global__ __attribute__((annotate("jit"))) static void kernel(F Wrapped) {
   if (threadIdx.x == 0)
     Wrapped(5);
 }
@@ -38,7 +38,7 @@ static auto makeWrapped(int X, int *Out) {
       });
 
   return [Registered] __host__ __device__(int I) {
-    invoke_with_index_first_slot(Registered, I);
+    invokeWithIndexFirstSlot(Registered, I);
   };
 }
 

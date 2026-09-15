@@ -22,7 +22,7 @@ template <typename F> struct PointerFieldContext {
 };
 
 template <typename F>
-__device__ __attribute__((noinline, optnone)) void
+__device__ __attribute__((noinline, optnone)) static void
 invokeThroughPointerField(PointerFieldContext<F> *Context, int Offset) {
   int Index = *Context->First * *Context->Second + Offset;
   if (Index < *Context->Limit)
@@ -30,8 +30,8 @@ invokeThroughPointerField(PointerFieldContext<F> *Context, int Offset) {
 }
 
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void
-kernel_pointer_field_load(F Body) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelPointerFieldLoad(F Body) {
   int First = 2;
   int Second = 3;
   int Limit = 7;
@@ -44,7 +44,7 @@ int main() {
       [X = proteus::jit_variable(211)] __host__ __device__(int Index) {
         printf("pointer field load %d %d\n", X, Index);
       });
-  kernel_pointer_field_load<<<1, 1>>>(Body);
+  kernelPointerFieldLoad<<<1, 1>>>(Body);
   gpuErrCheck(gpuDeviceSynchronize());
   return 0;
 }

@@ -177,7 +177,7 @@ private:
   // 8.  In this case, ValueOffsetMap[%0] = 8.  If we encounter a store like
   // store ptr %2, ptr%0, align 8, we don't care, because its written outside
   // of the range of the closure.
-  DenseMap<Value *, int> ValueOffsetMap;
+  DenseMap<Value *, int64_t> ValueOffsetMap;
   Value *TrackedBase = nullptr;
   LambdaPtrUseAnalysis Result;
   DataLayout DL;

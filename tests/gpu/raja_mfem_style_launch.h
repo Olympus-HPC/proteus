@@ -4,25 +4,25 @@
 
 namespace MockMfemInterface {
 template <typename DBODY>
-void RajaWrap(const int N, DBODY &&d_body)
+void rajaWrap(const int N, DBODY &&DBody)
 {
-  MockRajaInterface::forall(N, std::forward<DBODY>(d_body));
+  MockRajaInterface::forall(N, std::forward<DBODY>(DBody));
 }
 
 template <typename d_lambda>
-inline void ForallWrap(const int N, d_lambda &&d_body)
+inline void forallWrap(const int N, d_lambda &&DBody)
 {
-  return RajaWrap(N, std::forward<d_lambda>(d_body));
+  return RajaWrap(N, std::forward<d_lambda>(DBody));
 }
 
 template<typename lambda>
-__attribute__((noinline)) void forall(int N, lambda &&body)
+__attribute__((noinline)) void forall(int N, lambda &&Body)
 {
-  ForallWrap(N, std::forward<lambda>(body));
+  ForallWrap(N, std::forward<lambda>(Body));
 }
 
 template<typename lambda>
-__attribute__((noinline)) void forall(int Nx, int Ny, lambda &&body)
+__attribute__((noinline)) void forall(int Nx, int Ny, lambda &&Body)
 {
   MockMfemInterface::forall(Nx * Ny, [=] PROTEUS_HOST_DEVICE (int idx)
   {
@@ -31,4 +31,4 @@ __attribute__((noinline)) void forall(int Nx, int Ny, lambda &&body)
       body(i, j);
   });
 }
-}
+} // namespace MockMfemInterface

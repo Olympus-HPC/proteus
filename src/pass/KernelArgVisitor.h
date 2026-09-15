@@ -461,7 +461,10 @@ public:
       return;
 
     WorkList.push_back({Res->DominatingWrite, &Alloca});
-    // Default is zero so we can safely add it
+    // Res->Offset converts the current allocation-relative byte offset into
+    // the coordinate system of DominatingWrite. For a field store it removes
+    // the field displacement; for a memory transfer it translates destination
+    // displacement into the corresponding source displacement.
     Offset -= Res->Offset;
   }
 
@@ -471,7 +474,8 @@ public:
     if (!Res)
       return;
     WorkList.push_back({Res->DominatingWrite, &BC});
-    // Default is zero so we can safely add it
+    // Res->Offset converts the current cast-relative byte offset into the
+    // coordinate system of DominatingWrite.
     Offset -= Res->Offset;
   }
 
@@ -483,7 +487,8 @@ public:
       return;
 
     WorkList.push_back({Res->DominatingWrite, &ASC});
-    // Default is zero so we can safely add it
+    // Res->Offset converts the current cast-relative byte offset into the
+    // coordinate system of DominatingWrite.
     Offset -= Res->Offset;
   }
 

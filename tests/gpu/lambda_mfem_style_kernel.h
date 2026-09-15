@@ -2,11 +2,11 @@
 #include "raja_mfem_style_launch.h"
 
 
-__attribute__((noinline)) PROTEUS_HOST_DEVICE void PrintD1D(int D1D) { printf("D1D = %d\n", D1D); }
-__attribute__((noinline)) PROTEUS_HOST_DEVICE void PrintQ1D(int Q1D) { printf("Q1D = %d\n", Q1D); }
+__attribute__((noinline)) PROTEUS_HOST_DEVICE void printD1D(int D1D) { printf("D1D = %d\n", D1D); }
+__attribute__((noinline)) PROTEUS_HOST_DEVICE void printQ1D(int Q1D) { printf("Q1D = %d\n", Q1D); }
 
 template<int T_D1D = 0, int T_Q1D = 0>
-inline void IntegralKernel(double FloatConst, int PD1D, int PQ1D)
+inline void integralKernel(double FloatConst, int PD1D, int PQ1D)
 {
    const int D1D = T_D1D ? T_D1D : PD1D;
    const int Q1D = T_Q1D ? T_Q1D : PQ1D;
@@ -23,9 +23,9 @@ inline void IntegralKernel(double FloatConst, int PD1D, int PQ1D)
         for (int D = 0; D < D1D; ++D)
         {
           if (FloatConst > 0.0)
-            PrintD1D(D1D);
+            printD1D(D1D);
           else
-            PrintQ1D(Q1D);
+            printQ1D(Q1D);
         }
       }
    }));

@@ -17,29 +17,29 @@ template <typename F> struct MemoryBox {
 };
 
 template <typename F>
-__device__ __attribute__((noinline, optnone)) void
+__device__ __attribute__((noinline, optnone)) static void
 clearPrefix(MemoryBox<F> *Box) {
   __builtin_memset(Box, 0, sizeof(std::uint64_t));
 }
 
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void
-kernel_nonoverlap_memset(F Body) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelNonoverlapMemset(F Body) {
   MemoryBox<F> Box{{1, 2}, Body};
   clearPrefix(&Box);
   Box.Body();
 }
 
 template <typename F>
-__device__ __attribute__((noinline, optnone)) void
+__device__ __attribute__((noinline, optnone)) static void
 copyDynamic(MemoryBox<F> *Destination, const MemoryBox<F> *Source,
             std::size_t Bytes) {
   __builtin_memcpy(Destination, Source, Bytes);
 }
 
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void
-kernel_dynamic_memcpy(F DestinationBody, F SourceBody, std::size_t Bytes) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelDynamicMemcpy(F DestinationBody, F SourceBody, std::size_t Bytes) {
   MemoryBox<F> Destination{{3, 4}, DestinationBody};
   MemoryBox<F> Source{{5, 6}, SourceBody};
   copyDynamic(&Destination, &Source, Bytes);
@@ -57,14 +57,14 @@ template <typename F> struct MoveDestination {
 };
 
 template <typename F>
-__device__ __attribute__((noinline, optnone)) void
+__device__ __attribute__((noinline, optnone)) static void
 moveBody(MoveDestination<F> *Destination, const MoveSource<F> *Source) {
   __builtin_memmove(&Destination->Body, &Source->Body, sizeof(F));
 }
 
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void
-kernel_offset_memmove(F DestinationBody, F SourceBody) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelOffsetMemmove(F DestinationBody, F SourceBody) {
   MoveDestination<F> Destination{{7, 8, 9}, DestinationBody};
   MoveSource<F> Source{10, SourceBody};
   moveBody(&Destination, &Source);
@@ -93,18 +93,18 @@ static auto makeMoveBody(int Value) {
 }
 
 int main() {
-  kernel_nonoverlap_memset<<<1, 1>>>(makeMemsetBody(197));
+  kernelNonoverlapMemset<<<1, 1>>>(makeMemsetBody(197));
   gpuErrCheck(gpuDeviceSynchronize());
 
   auto DynamicDestination = makeDynamicBody(199);
   auto DynamicSource = makeDynamicBody(211);
-  kernel_dynamic_memcpy<<<1, 1>>>(DynamicDestination, DynamicSource,
+  kernelDynamicMemcpy<<<1, 1>>>(DynamicDestination, DynamicSource,
                                   sizeof(std::uint64_t));
   gpuErrCheck(gpuDeviceSynchronize());
 
   auto MoveDestinationBody = makeMoveBody(223);
   auto MoveSourceBody = makeMoveBody(227);
-  kernel_offset_memmove<<<1, 1>>>(MoveDestinationBody, MoveSourceBody);
+  kernelOffsetMemmove<<<1, 1>>>(MoveDestinationBody, MoveSourceBody);
   gpuErrCheck(gpuDeviceSynchronize());
   return 0;
 }

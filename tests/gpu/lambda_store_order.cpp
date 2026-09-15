@@ -10,7 +10,7 @@
 #include <proteus/JitInterface.h>
 
 template <typename F>
-__device__ __attribute__((noinline, optnone)) void
+__device__ __attribute__((noinline, optnone)) static void
 invokeThenOverwrite(F Initial, F Later) {
   F *volatile Slot = &Initial;
   (*Slot)();
@@ -18,7 +18,7 @@ invokeThenOverwrite(F Initial, F Later) {
 }
 
 template <typename F>
-__device__ __attribute__((noinline, optnone)) void
+__device__ __attribute__((noinline, optnone)) static void
 overwriteThenInvoke(F Initial, F Replacement) {
   F *volatile Slot = &Initial;
   Slot = &Replacement;
@@ -26,7 +26,7 @@ overwriteThenInvoke(F Initial, F Replacement) {
 }
 
 template <typename F>
-__device__ __attribute__((noinline, optnone)) void
+__device__ __attribute__((noinline, optnone)) static void
 branchThenInvoke(F First, F Second, bool UseSecond) {
   F *volatile Slot;
   if (UseSecond)
@@ -37,26 +37,26 @@ branchThenInvoke(F First, F Second, bool UseSecond) {
 }
 
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void
-kernel_store_order(F Initial, F Other) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelStoreOrder(F Initial, F Other) {
   invokeThenOverwrite(Initial, Other);
 }
 
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void
-kernel_latest_store(F Initial, F Replacement) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelLatestStore(F Initial, F Replacement) {
   overwriteThenInvoke(Initial, Replacement);
 }
 
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void
-kernel_branch_store(F First, F Second, bool UseSecond) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelBranchStore(F First, F Second, bool UseSecond) {
   branchThenInvoke(First, Second, UseSecond);
 }
 
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void
-kernel_mutated_capture(F Body) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelMutatedCapture(F Body) {
   // Force a second write to the captured integer itself.  Specializing from
   // the parameter initializer instead of this nearest write miscompiles the
   // call even though no pointer spill is involved.
@@ -65,15 +65,15 @@ kernel_mutated_capture(F Body) {
 }
 
 template <typename F>
-__device__ __attribute__((noinline, optnone)) void
+__device__ __attribute__((noinline, optnone)) static void
 replaceCaptureThenInvoke(F Body, int Replacement) {
   *reinterpret_cast<volatile int *>(&Body) = Replacement;
   Body();
 }
 
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void
-kernel_capture_from_arg(F Body, int Replacement) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelCaptureFromArg(F Body, int Replacement) {
   replaceCaptureThenInvoke(Body, Replacement);
 }
 
@@ -110,25 +110,25 @@ static auto makeReplacedBody(int Value) {
 int main() {
   auto Before = makeBody(127);
   auto After = makeBody(131);
-  kernel_store_order<<<1, 1>>>(Before, After);
+  kernelStoreOrder<<<1, 1>>>(Before, After);
   gpuErrCheck(gpuDeviceSynchronize());
 
   auto Initial = makeBody(137);
   auto Replacement = makeBody(139);
-  kernel_latest_store<<<1, 1>>>(Initial, Replacement);
+  kernelLatestStore<<<1, 1>>>(Initial, Replacement);
   gpuErrCheck(gpuDeviceSynchronize());
 
   auto BranchFirst = makeAmbiguousBody(149);
   auto BranchSecond = makeAmbiguousBody(151);
-  kernel_branch_store<<<1, 1>>>(BranchFirst, BranchSecond, true);
+  kernelBranchStore<<<1, 1>>>(BranchFirst, BranchSecond, true);
   gpuErrCheck(gpuDeviceSynchronize());
 
   auto Mutated = makeMutatedBody(179);
-  kernel_mutated_capture<<<1, 1>>>(Mutated);
+  kernelMutatedCapture<<<1, 1>>>(Mutated);
   gpuErrCheck(gpuDeviceSynchronize());
 
   auto Replaced = makeReplacedBody(191);
-  kernel_capture_from_arg<<<1, 1>>>(Replaced, 193);
+  kernelCaptureFromArg<<<1, 1>>>(Replaced, 193);
   gpuErrCheck(gpuDeviceSynchronize());
   return 0;
 }

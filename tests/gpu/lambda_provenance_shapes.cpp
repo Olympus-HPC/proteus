@@ -24,7 +24,7 @@ template <typename F> struct SlotArray {
 };
 
 template <typename F>
-__host__ __device__ __attribute__((noinline)) SlotArray<F>
+__host__ __device__ __attribute__((noinline)) static SlotArray<F>
 makeSlotArray(F Body, std::uint64_t Prefix, std::uint64_t Suffix) {
   return {Prefix, {Body, Body}, Suffix};
 }
@@ -33,8 +33,8 @@ makeSlotArray(F Body, std::uint64_t Prefix, std::uint64_t Suffix) {
 // inserted aggregate at byte 12.  The outer insertion contains the tracked
 // byte but does not begin at the tracked byte.
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void
-kernel_array_member(F Body, std::uint64_t Prefix, std::uint64_t Suffix) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelArrayMember(F Body, std::uint64_t Prefix, std::uint64_t Suffix) {
   static_assert(offsetof(SlotArray<F>, Bodies) == 8);
   static_assert(offsetof(SlotArray<F>, Bodies) + sizeof(F) == 12);
   auto Slots = makeSlotArray(Body, Prefix, Suffix);
@@ -54,13 +54,13 @@ template <typename F> struct CopyDestination {
 // Keep the memory transfer visible so LambdaInstUseVisitor must translate the
 // tracked byte from destination offset 16 to source offset 8.
 template <typename F>
-__device__ __attribute__((noinline, optnone)) void
+__device__ __attribute__((noinline, optnone)) static void
 copyBody(CopyDestination<F> *Destination, const CopySource<F> *Source) {
   __builtin_memcpy(&Destination->Body, &Source->Body, sizeof(F));
 }
 
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void kernel_offset_memcpy(F Body) {
+__global__ __attribute__((annotate("jit"))) static void kernelOffsetMemcpy(F Body) {
   static_assert(offsetof(CopySource<F>, Body) == 8);
   static_assert(offsetof(CopyDestination<F>, Body) == 16);
   CopySource<F> Source{0x1111111111111111ULL, Body};
@@ -76,7 +76,7 @@ template <typename F> struct PartialCopyValue {
 };
 
 template <typename F>
-__device__ __attribute__((noinline, optnone)) void
+__device__ __attribute__((noinline, optnone)) static void
 copyPrefixOnly(PartialCopyValue<F> *Destination,
                const PartialCopyValue<F> *Source) {
   __builtin_memcpy(Destination, Source, sizeof(std::uint64_t));
@@ -86,8 +86,8 @@ copyPrefixOnly(PartialCopyValue<F> *Destination,
 // Treating every memcpy as a reaching definition incorrectly attributes the
 // invocation to Source.Body.
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void
-kernel_partial_memcpy(F DestinationBody, F SourceBody) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelPartialMemcpy(F DestinationBody, F SourceBody) {
   static_assert(offsetof(PartialCopyValue<F>, Body) == 16);
   PartialCopyValue<F> Destination{
       {0x1111111111111111ULL, 0x2222222222222222ULL}, DestinationBody};
@@ -100,8 +100,8 @@ kernel_partial_memcpy(F DestinationBody, F SourceBody) {
 // Reaching memcpy through its source operand is a read, not a definition of
 // Source.Body.  The source's initializer must remain its provenance.
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void
-kernel_memcpy_source(F SourceBody, F DestinationBody) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelMemcpySource(F SourceBody, F DestinationBody) {
   PartialCopyValue<F> Source{
       {0x5555555555555555ULL, 0x6666666666666666ULL}, SourceBody};
   PartialCopyValue<F> Destination{
@@ -116,18 +116,18 @@ template <typename F> struct NestedBody {
 };
 
 template <typename F>
-__device__ __attribute__((noinline)) F *getNestedBody(NestedBody<F> *Nested) {
+__device__ __attribute__((noinline)) static F *getNestedBody(NestedBody<F> *Nested) {
   return &Nested->Body;
 }
 
 template <typename F>
-__device__ __attribute__((noinline)) F *
+__device__ __attribute__((noinline)) static F *
 forwardNestedBody(NestedBody<F> *Nested) {
   return getNestedBody(Nested);
 }
 
 template <typename F>
-__device__ __attribute__((noinline, optnone)) F *
+__device__ __attribute__((noinline, optnone)) static F *
 roundTripInteriorPointer(F *Body) {
   auto *Bytes = reinterpret_cast<char *>(Body);
   auto *Nested = reinterpret_cast<NestedBody<F> *>(
@@ -138,8 +138,8 @@ roundTripInteriorPointer(F *Body) {
 // The pointer returned by each call is interior to the argument.  This checks
 // that analyzeFunction composes the GEP offset across two call boundaries.
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void
-kernel_returned_interior_pointer(F Body) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelReturnedInteriorPointer(F Body) {
   static_assert(offsetof(NestedBody<F>, Body) == 8);
   NestedBody<F> Nested{0x4444444444444444ULL, Body};
   (*forwardNestedBody(&Nested))();
@@ -148,8 +148,8 @@ kernel_returned_interior_pointer(F Body) {
 // The backwards walk sees +offsetof(Body), then the helper's negative GEP,
 // then +offsetof(Body) at the caller.  Offsets must compose per instruction.
 template <typename F>
-__global__ __attribute__((annotate("jit"))) void
-kernel_negative_gep(F Body) {
+__global__ __attribute__((annotate("jit"))) static void
+kernelNegativeGep(F Body) {
   NestedBody<F> Nested{0x9999999999999999ULL, Body};
   (*roundTripInteriorPointer(&Nested.Body))();
 }
@@ -159,7 +159,7 @@ static void runArrayMember() {
       [X = proteus::jit_variable(71)] __host__ __device__ {
         printf("inserted array member %d\n", X);
       });
-  kernel_array_member<<<1, 1>>>(Body, 0x1111111111111111ULL,
+  kernelArrayMember<<<1, 1>>>(Body, 0x1111111111111111ULL,
                                 0x2222222222222222ULL);
   gpuErrCheck(gpuDeviceSynchronize());
 }
@@ -169,7 +169,7 @@ static void runOffsetMemcpy() {
       [X = proteus::jit_variable(83)] __host__ __device__ {
         printf("offset memcpy %d\n", X);
       });
-  kernel_offset_memcpy<<<1, 1>>>(Body);
+  kernelOffsetMemcpy<<<1, 1>>>(Body);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
@@ -178,7 +178,7 @@ static void runReturnedInteriorPointer() {
       [X = proteus::jit_variable(97)] __host__ __device__ {
         printf("returned interior pointer %d\n", X);
       });
-  kernel_returned_interior_pointer<<<1, 1>>>(Body);
+  kernelReturnedInteriorPointer<<<1, 1>>>(Body);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
@@ -192,14 +192,14 @@ static auto makePartialCopyBody(int Value) {
 static void runPartialMemcpy() {
   auto DestinationBody = makePartialCopyBody(109);
   auto SourceBody = makePartialCopyBody(113);
-  kernel_partial_memcpy<<<1, 1>>>(DestinationBody, SourceBody);
+  kernelPartialMemcpy<<<1, 1>>>(DestinationBody, SourceBody);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
 static void runMemcpySource() {
   auto SourceBody = makePartialCopyBody(127);
   auto DestinationBody = makePartialCopyBody(131);
-  kernel_memcpy_source<<<1, 1>>>(SourceBody, DestinationBody);
+  kernelMemcpySource<<<1, 1>>>(SourceBody, DestinationBody);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
@@ -208,7 +208,7 @@ static void runNegativeGep() {
       [X = proteus::jit_variable(137)] __host__ __device__ {
         printf("negative gep %d\n", X);
       });
-  kernel_negative_gep<<<1, 1>>>(Body);
+  kernelNegativeGep<<<1, 1>>>(Body);
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
