@@ -414,6 +414,8 @@ public:
   // todo: these three methods may need to be changed to find a dominating store
   // particularly for the case of mutable lambdas.
   void visitAllocaInst(AllocaInst &Alloca) {
+    // This analysis should only ever encounter an AllocaInst as the first
+    // instruction We assert this below and log a failure otherwise
     if (Def) {
       AnalysisFailed = true;
       AnalysisSuccess = false;
@@ -422,8 +424,15 @@ public:
                "non-null def\n");
       return;
     }
+    if (!ValueOffsetMap.contains(&Alloca)) {
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
+      DEBUG(Logger::logs("proteus-pass")
+            << "    Value offset map not correctly initialized with "
+               "AllocaInst\n");
+      return;
+    }
 
-    ValueOffsetMap[&Alloca] = Offset;
     pushPointerUsers(&Alloca);
   }
 
