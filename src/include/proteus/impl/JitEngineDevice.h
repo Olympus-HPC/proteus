@@ -599,17 +599,12 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   Dispatcher &Dispatch = getDispatcher();
 
-  auto Launch = [&](void *KernelFunc) {
-    return static_cast<DeviceError_t>(Dispatch
-                                          .launch(KernelFunc, GridDim, BlockDim,
-                                                  KernelArgs, ShmemSize,
-                                                  static_cast<void *>(Stream))
-                                          .Ret);
-  };
-
   if (void *KernelFunc =
           Dispatch.lookupFunction(KernelInfo.getName(), HashValue))
-    return Launch(KernelFunc);
+    return static_cast<DeviceError_t>(Dispatch
+                                          .launch(KernelFunc, GridDim, BlockDim,
+                                                  KernelArgs, ShmemSize, Stream)
+                                          .Ret);
 
   // NOTE: we don't need a suffix to differentiate kernels, each
   // specialization will be in its own module uniquely identify by HashValue.
@@ -624,7 +619,11 @@ JitEngineDevice<ImplT>::compileAndRun(
   };
 
   if (auto CompiledLib = Dispatch.lookupCompiledLibrary(HashValue))
-    return Launch(LoadKernel(*CompiledLib));
+    return static_cast<DeviceError_t>(Dispatch
+                                          .launch(LoadKernel(*CompiledLib),
+                                                  GridDim, BlockDim, KernelArgs,
+                                                  ShmemSize, Stream)
+                                          .Ret);
 
   MemoryBufferRef KernelBitcode = getBitcode(KernelInfo);
   std::unique_ptr<MemoryBuffer> ObjBuf = nullptr;
@@ -682,7 +681,11 @@ JitEngineDevice<ImplT>::compileAndRun(
   CompiledLibrary Library{std::move(ObjBuf)};
   Library.GlobalsRelinked = true;
 
-  return Launch(LoadKernel(Library));
+  return static_cast<DeviceError_t>(Dispatch
+                                        .launch(LoadKernel(Library), GridDim,
+                                                BlockDim, KernelArgs, ShmemSize,
+                                                Stream)
+                                        .Ret);
 }
 
 template <typename ImplT>
