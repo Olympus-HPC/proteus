@@ -233,7 +233,7 @@ void *JitEngineHost::compileAndLink(StringRef FnName, char *IR, int IRSize,
   DispatcherHost &Dispatch = getDispatcher();
 
   // Lookup the function pointer in the code cache.
-  void *JitFnPtr = Dispatch.lookupFunction(Name, HashValue);
+  void *JitFnPtr = Dispatch.lookupFunction(Name.base(), HashValue);
   if (JitFnPtr) {
     if (FunctorID)
       LambdaRegistry::instance().eraseHostJitVariables(*FunctorID);

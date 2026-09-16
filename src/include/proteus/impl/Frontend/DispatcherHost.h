@@ -36,9 +36,8 @@ public:
     reportFatalError("Host dispatcher does not implement getDeviceArch");
   }
 
-  void *lookupFunction(const KernelName &Name,
-                       const HashT &ModuleHash) override {
-    HashT FuncHash = hash(Name.mangled(), ModuleHash);
+  void *lookupFunction(StringRef BaseName, const HashT &ModuleHash) override {
+    HashT FuncHash = hash(BaseName, ModuleHash);
     return CodeCache.lookup(FuncHash);
   }
 
@@ -46,7 +45,7 @@ public:
                        CompiledLibrary &Library) override {
     TIMESCOPE(DispatcherHost, insertFunction);
     const std::string MangledName = Name.mangled();
-    HashT FuncHash = hash(MangledName, ModuleHash);
+    HashT FuncHash = hash(StringRef(Name.base()), ModuleHash);
 
     if (!Library.IsLoaded) {
       Jit.loadCompiledLibrary(Library);

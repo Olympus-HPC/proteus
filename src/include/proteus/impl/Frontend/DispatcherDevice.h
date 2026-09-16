@@ -75,16 +75,15 @@ public:
 
   StringRef getDeviceArch() const override { return Jit.getDeviceArch(); }
 
-  void *lookupFunction(const KernelName &Name,
-                       const HashT &ModuleHash) override {
-    HashT HashValue = hash(Name.mangled(), ModuleHash);
+  void *lookupFunction(StringRef BaseName, const HashT &ModuleHash) override {
+    HashT HashValue = hash(BaseName, ModuleHash);
     return CodeCache.lookup(HashValue);
   }
 
   void *insertFunction(const KernelName &Name, const HashT &ModuleHash,
                        CompiledLibrary &Library) override {
     TIMESCOPE(DispatcherDevice, insertFunction);
-    HashT HashValue = hash(Name.mangled(), ModuleHash);
+    HashT HashValue = hash(StringRef(Name.base()), ModuleHash);
 
     static const std::unordered_map<std::string, GlobalVarInfo> NoGlobals;
     const auto &VarNameToGlobalInfo =

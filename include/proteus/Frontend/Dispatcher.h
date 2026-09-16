@@ -135,7 +135,7 @@ public:
       return Fn(std::forward<ArgT>(Args)...);
   }
 
-  virtual void *lookupFunction(const KernelName &Name,
+  virtual void *lookupFunction(llvm::StringRef BaseName,
                                const HashT &ModuleHash) = 0;
 
   virtual void *insertFunction(const KernelName &Name, const HashT &ModuleHash,

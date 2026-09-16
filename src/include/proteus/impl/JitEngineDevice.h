@@ -599,12 +599,6 @@ JitEngineDevice<ImplT>::compileAndRun(
 
   Dispatcher &Dispatch = getDispatcher();
 
-  // NOTE: we don't need a suffix to differentiate kernels, each
-  // specialization will be in its own module uniquely identify by HashValue.
-  // It exists only for debugging purposes to verify that the jitted kernel
-  // executes.
-  KernelName Name{KernelInfo.getName(), HashValue};
-
   auto Launch = [&](void *KernelFunc) {
     return static_cast<DeviceError_t>(Dispatch
                                           .launch(KernelFunc, GridDim, BlockDim,
@@ -613,14 +607,21 @@ JitEngineDevice<ImplT>::compileAndRun(
                                           .Ret);
   };
 
+  if (void *KernelFunc =
+          Dispatch.lookupFunction(KernelInfo.getName(), HashValue))
+    return Launch(KernelFunc);
+
+  // NOTE: we don't need a suffix to differentiate kernels, each
+  // specialization will be in its own module uniquely identify by HashValue.
+  // It exists only for debugging purposes to verify that the jitted kernel
+  // executes.
+  KernelName Name{KernelInfo.getName(), HashValue};
+
   auto LoadKernel = [&](CompiledLibrary &Library) {
     Library.VarNameToGlobalInfo = &BinInfo.getVarNameToGlobalInfo();
     Library.RelinkGlobalsByCopy = Config::get().ProteusRelinkGlobalsByCopy;
     return Dispatch.insertFunction(Name, HashValue, Library);
   };
-
-  if (void *KernelFunc = Dispatch.lookupFunction(Name, HashValue))
-    return Launch(KernelFunc);
 
   if (auto CompiledLib = Dispatch.lookupCompiledLibrary(HashValue))
     return Launch(LoadKernel(*CompiledLib));

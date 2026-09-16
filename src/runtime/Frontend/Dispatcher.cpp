@@ -133,7 +133,7 @@ KernelName::KernelName(std::string Base, const HashT &Hash)
 void *Dispatcher::getOrInsertFunction(const KernelName &Name,
                                       const HashT &ModuleHash,
                                       CompiledLibrary &Library) {
-  if (void *FuncPtr = lookupFunction(Name, ModuleHash))
+  if (void *FuncPtr = lookupFunction(Name.base(), ModuleHash))
     return FuncPtr;
   return insertFunction(Name, ModuleHash, Library);
 }
