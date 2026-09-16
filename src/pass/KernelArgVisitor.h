@@ -16,6 +16,7 @@
 #include <llvm/ADT/SmallVector.h>
 
 #include <llvm/Analysis/ValueTracking.h>
+#include <llvm/IR/CFG.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DebugInfo.h>
@@ -41,33 +42,136 @@ std::optional<ReturnInst *> getRetInst(Function &F) {
   return std::nullopt;
 }
 
-inline std::optional<int64_t>
-getAggregateIndicesOffset(const DataLayout &DL, Type *AggTy,
-                          ArrayRef<unsigned> Indices) {
-  int64_t Offset = 0;
-  Type *CurTy = AggTy;
-  for (unsigned Idx : Indices) {
-    if (auto *ST = dyn_cast<StructType>(CurTy)) {
-      if (Idx >= ST->getNumElements())
-        return std::nullopt;
-      const StructLayout *SL = DL.getStructLayout(ST);
-      Offset += static_cast<int64_t>(SL->getElementOffset(Idx));
-      CurTy = ST->getElementType(Idx);
-      continue;
-    }
+inline int64_t getValueIndicesOffset(const DataLayout &DL, Type *AggTy,
+                                     ArrayRef<unsigned> Indices) {
+  LLVMContext &Ctx = AggTy->getContext();
+  SmallVector<Value *, 8> GEPIndices;
+  GEPIndices.push_back(ConstantInt::get(Type::getInt32Ty(Ctx), 0));
+  for (unsigned Idx : Indices)
+    GEPIndices.push_back(ConstantInt::get(Type::getInt32Ty(Ctx), Idx));
+  return DL.getIndexedOffsetInType(AggTy, GEPIndices);
+}
 
-    if (auto *AT = dyn_cast<ArrayType>(CurTy)) {
-      if (Idx >= AT->getNumElements())
-        return std::nullopt;
-      Offset +=
-          static_cast<int64_t>(DL.getTypeAllocSize(AT->getElementType())) * Idx;
-      CurTy = AT->getElementType();
-      continue;
-    }
+struct ReachingPointerStores {
+  SmallVector<Value *, 4> Values;
+  bool Complete = true;
+};
 
-    return std::nullopt;
+// Return whether LHS and RHS name exactly the same byte address after peeling
+// constant-offset pointer arithmetic and casts.
+inline bool isSamePointerAddress(const DataLayout &DL, Value *LHS, Value *RHS) {
+  int64_t LHSOffset = 0;
+  int64_t RHSOffset = 0;
+  Value *LHSBase = GetPointerBaseWithConstantOffset(LHS, LHSOffset, DL);
+  Value *RHSBase = GetPointerBaseWithConstantOffset(RHS, RHSOffset, DL);
+  return LHSBase && RHSBase && LHSBase == RHSBase && LHSOffset == RHSOffset;
+}
+
+// Collect the closest pointer-valued store to Address on every CFG path that
+// reaches Before. A path with no store, or a revisited block (such as a loop),
+// marks the result incomplete so callers conservatively decline rather than
+// infer a store that is not guaranteed to reach the load.
+inline void collectReachingPointerStores(const DataLayout &DL, BasicBlock *BB,
+                                         Instruction *Before, Value *Address,
+                                         SmallPtrSetImpl<BasicBlock *> &Visited,
+                                         ReachingPointerStores &Result) {
+  if (!Visited.insert(BB).second) {
+    Result.Complete = false;
+    return;
   }
-  return Offset;
+
+  for (Instruction *I = Before ? Before->getPrevNode() : BB->getTerminator(); I;
+       I = I->getPrevNode()) {
+    auto *SI = dyn_cast<StoreInst>(I);
+    if (SI && SI->getValueOperand()->getType()->isPointerTy() &&
+        isSamePointerAddress(DL, SI->getPointerOperand(), Address)) {
+      Result.Values.push_back(SI->getValueOperand());
+      return;
+    }
+  }
+
+  if (pred_empty(BB)) {
+    Result.Complete = false;
+    return;
+  }
+  for (BasicBlock *Pred : predecessors(BB))
+    collectReachingPointerStores(DL, Pred, nullptr, Address, Visited, Result);
+}
+
+// Resolve pointer spills by walking backwards from the load through the CFG.
+// This finds the nearest store on every incoming path instead of depending on
+// the arbitrary order in which Value::users() happens to enumerate writes.
+// The result is complete only when every incoming path contributes a store.
+inline ReachingPointerStores getReachingPointerStores(const DataLayout &DL,
+                                                      LoadInst &LI) {
+  ReachingPointerStores Result;
+  SmallPtrSet<BasicBlock *, 8> Visited;
+  collectReachingPointerStores(DL, LI.getParent(), &LI, LI.getPointerOperand(),
+                               Visited, Result);
+  return Result;
+}
+
+inline Value *getPointerLoadOrigin(const DataLayout &DL, Value *V,
+                                   SmallPtrSetImpl<Value *> &Visited);
+
+// Return one source pointer when every reaching store has the same origin.
+// Nested pointer-spill loads are recursively resolved; distinct origins or
+// cycles are ambiguous and return nullptr.
+inline Value *getUniqueReachingPointer(const DataLayout &DL,
+                                       const ReachingPointerStores &Stores,
+                                       SmallPtrSetImpl<Value *> &Visited) {
+  if (!Stores.Complete || Stores.Values.empty())
+    return nullptr;
+
+  Value *First = getPointerLoadOrigin(DL, Stores.Values.front(), Visited);
+  if (!First)
+    return nullptr;
+  for (Value *V : drop_begin(Stores.Values)) {
+    Value *Origin = getPointerLoadOrigin(DL, V, Visited);
+    if (Origin != First)
+      return nullptr;
+  }
+  return First;
+}
+
+// Resolve a pointer value through nested pointer-spill loads. Non-load pointer
+// values are already origins. Visited prevents cyclic spill graphs from being
+// mistaken for a unique source.
+inline Value *getPointerLoadOrigin(const DataLayout &DL, Value *V,
+                                   SmallPtrSetImpl<Value *> &Visited) {
+  auto *LI = dyn_cast<LoadInst>(V);
+  if (!LI || !LI->getType()->isPointerTy())
+    return V;
+  if (!Visited.insert(V).second)
+    return nullptr;
+
+  ReachingPointerStores Stores = getReachingPointerStores(DL, *LI);
+  return getUniqueReachingPointer(DL, Stores, Visited);
+}
+
+// Report ambiguity only for complete reaching-store sets. Incomplete sets can
+// still be handled by ordinary backward memory-use analysis.
+inline bool hasAmbiguousReachingPointers(const DataLayout &DL,
+                                         const ReachingPointerStores &Stores) {
+  if (!Stores.Complete || Stores.Values.empty())
+    return false;
+  SmallPtrSet<Value *, 8> Visited;
+  return !getUniqueReachingPointer(DL, Stores, Visited);
+}
+
+// A compiler spill is a temporary local slot the compiler uses to save an SSA
+// pointer value (for example, `alloca ptr`, followed by `store ptr` and a
+// later `load ptr`).  A pointer-valued load is not necessarily such a spill:
+// it can instead read an ordinary pointer field from a closure/context
+// aggregate.  The reaching-store recovery below is only valid for a local
+// `alloca ptr` slot; aggregate fields must be traced backwards through their
+// address.
+inline bool isPointerSpillLoad(const LoadInst &LI) {
+  if (!LI.getType()->isPointerTy())
+    return false;
+  const Value *Storage = getUnderlyingObject(LI.getPointerOperand());
+  auto *Slot = dyn_cast_or_null<AllocaInst>(Storage);
+  return Slot && Slot->getAllocatedType()->isPointerTy();
 }
 
 struct LambdaKernelArgAnalysis {
@@ -110,9 +214,9 @@ private:
   bool AnalysisFailed = false;
 
   // Constructor used for cloning and merging branches of phi node analysis
-  LambdaArgVisitor(Value *Start, Value *LastSeen, int64_t Off,
-                   const DataLayout &Dl)
-      : DL(Dl), Offset(Off) {
+  LambdaArgVisitor(Value *Start, Value *LastSeen, CallBase *LambdaCBArg,
+                   int64_t Off, const DataLayout &Dl)
+      : LambdaCB(LambdaCBArg), DL(Dl), Offset(Off) {
     WorkList.push_back({Start, LastSeen});
   }
 
@@ -160,7 +264,8 @@ private:
   inline std::optional<LambdaKernelArgAnalysis>
   cloneAndAnalyze(Value *Start, Value *MemoryAnalysisPtrUse,
                   int64_t StartOffset) {
-    LambdaArgVisitor Visitor(Start, MemoryAnalysisPtrUse, StartOffset, DL);
+    LambdaArgVisitor Visitor(Start, MemoryAnalysisPtrUse, LambdaCB, StartOffset,
+                             DL);
     while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {
       auto [V, AccessedFrom] = Visitor.back();
       Visitor.MemoryAnalysisPtrUse = AccessedFrom;
@@ -190,7 +295,7 @@ private:
     if (!RetInstOpt)
       return std::nullopt;
     LambdaArgVisitor Visitor(RetInstOpt.value()->getReturnValue(),
-                             MemoryAnalysisPtrUse, StartOffset, DL);
+                             MemoryAnalysisPtrUse, LambdaCB, StartOffset, DL);
     while (!Visitor.empty() && !Visitor.success() && !Visitor.failed()) {
       auto [V, AccessedFrom] = Visitor.back();
       DEBUG(Logger::logs("proteus-pass")
@@ -226,8 +331,8 @@ private:
   }
 
 public:
-  LambdaArgVisitor(CallBase *LambdaCb, Module &M)
-      : LambdaCB(LambdaCb), DL(M.getDataLayout()), Offset(0) {
+  LambdaArgVisitor(CallBase *LambdaCB, Module &M)
+      : LambdaCB(LambdaCB), DL(M.getDataLayout()), Offset(0) {
     auto *ClosurePtr = LambdaCB->getArgOperand(0);
     WorkList.push_back({ClosurePtr, LambdaCB});
   }
@@ -237,6 +342,15 @@ public:
   }
 
   void visitCallBase(CallBase &CB) {
+    if (!CB.getCalledFunction() || CB.getCalledFunction()->isDeclaration()) {
+      DEBUG(Logger::logs("proteus-pass")
+            << "[Lambda arg analysis]: Cannot trace indirect or declaration "
+               "call "
+            << CB << "\n");
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
+      return;
+    }
     // Clone the visitor to determine if this function (a) returns a ptr
     // and (b) which arg determines the value of that ptr, and at which offset
     auto SubAnalysis = analyzeFunction(CB, Offset);
@@ -253,209 +367,129 @@ public:
   }
 
   void visitLoadInst(LoadInst &LI) {
-    // TODO: Delete this?  We shouldn't reach this from a use-def
-    if (!LI.getType()->isPointerTy()) {
-      AnalysisFailed = true;
-      return;
-    }
-
-    int64_t LoadOff = 0;
-    Value *LoadBase =
-        GetPointerBaseWithConstantOffset(LI.getPointerOperand(), LoadOff, DL);
-    if (!LoadBase) {
-      AnalysisFailed = true;
-      return;
-    }
-    LoadBase = LoadBase->stripPointerCasts();
-
-    SmallVector<Value *, 8> PtrWorkList;
-    SmallPtrSet<Value *, 16> LocalSeen;
-    PtrWorkList.push_back(LoadBase);
-
-    Value *CommonStoredVal = nullptr;
-    bool FoundStore = false;
-
-    while (!PtrWorkList.empty()) {
-      Value *Cur = PtrWorkList.pop_back_val();
-      if (!LocalSeen.insert(Cur).second)
-        continue;
-
-      for (User *U : Cur->users()) {
-        if (auto *SI = dyn_cast<StoreInst>(U)) {
-          int64_t StoreOff = 0;
-          Value *StoreBase = GetPointerBaseWithConstantOffset(
-              SI->getPointerOperand(), StoreOff, DL);
-          if (!StoreBase)
-            continue;
-          StoreBase = StoreBase->stripPointerCasts();
-
-          if (StoreBase != LoadBase || StoreOff != LoadOff)
-            continue;
-
-          Value *V = SI->getValueOperand();
-          if (!V->getType()->isPointerTy())
-            continue;
-
-          V = V->stripPointerCasts();
-          if (!FoundStore) {
-            CommonStoredVal = V;
-            FoundStore = true;
-          } else if (CommonStoredVal != V) {
-            AnalysisFailed = true;
-            return;
-          }
-          continue;
-        }
-
-        if (isa<GetElementPtrInst>(U) || isa<BitCastInst>(U) ||
-            isa<AddrSpaceCastInst>(U) || isa<PHINode>(U) ||
-            isa<SelectInst>(U)) {
-          PtrWorkList.push_back(cast<Value>(U));
-          continue;
-        }
-
-        if (auto *II = dyn_cast<IntrinsicInst>(U)) {
-          switch (II->getIntrinsicID()) {
-          case Intrinsic::dbg_declare:
-          case Intrinsic::dbg_value:
-          case Intrinsic::lifetime_start:
-          case Intrinsic::lifetime_end:
-            continue;
-          default:
-            break;
-          }
-        }
+    DEBUG(Logger::logs("proteus-pass") << "Load inst analysis \n")
+    // Loading a pointer from a spill slot does not change the offset within
+    // the pointee.  Resolve the pointer-sized store at offset zero in the slot,
+    // then continue with the original pointee-relative Offset.
+    if (isPointerSpillLoad(LI)) {
+      ReachingPointerStores Stores = getReachingPointerStores(DL, LI);
+      SmallPtrSet<Value *, 8> Visited;
+      if (Value *StoredPointer =
+              getUniqueReachingPointer(DL, Stores, Visited)) {
+        WorkList.push_back({StoredPointer, &LI});
+        return;
       }
-    }
-
-    if (!FoundStore) {
-      AnalysisFailed = true;
+      if (hasAmbiguousReachingPointers(DL, Stores)) {
+        DEBUG(Logger::logs("proteus-pass")
+              << "[Lambda arg analysis]: Pointer spill load has ambiguous "
+                 "reaching stores: "
+              << LI << "\n");
+        AnalysisFailed = true;
+        AnalysisSuccess = false;
+        return;
+      }
+      auto Res = getDominatingUse(DL, LI.getPointerOperand(), &LI, 0, LambdaCB);
+      if (!Res) {
+        AnalysisFailed = true;
+        AnalysisSuccess = false;
+        return;
+      }
+      WorkList.push_back({Res->DominatingWrite, &LI});
       return;
     }
 
-    WorkList.push_back({CommonStoredVal, &LI});
+    WorkList.push_back({LI.getPointerOperand(), &LI});
   }
 
   void visitGetElementPtrInst(GetElementPtrInst &GEP) {
-    int64_t GEPOffset = 0;
-    GetPointerBaseWithConstantOffset(&GEP, GEPOffset, DL);
-    Offset += GEPOffset;
+    APInt StepOffset(DL.getIndexTypeSizeInBits(GEP.getType()), 0);
+    if (!GEP.accumulateConstantOffset(DL, StepOffset)) {
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
+      return;
+    }
+    Offset += StepOffset.getSExtValue();
     WorkList.push_back({GEP.getPointerOperand(), &GEP});
   }
 
   void visitExtractValueInst(ExtractValueInst &EVI) {
-    auto EVIOffset = getAggregateIndicesOffset(
+    int64_t EVIOffset = getValueIndicesOffset(
         DL, EVI.getAggregateOperand()->getType(), EVI.getIndices());
-    if (!EVIOffset) {
-      AnalysisFailed = true;
-      AnalysisSuccess = false;
-      return;
-    }
-    Offset += *EVIOffset;
+    Offset += EVIOffset;
     WorkList.push_back({EVI.getAggregateOperand(), &EVI});
   }
 
+  // The analysis always encounters IVI chains in a backwards direction, meaning
+  // we always see the final IVI in a chain of writes. We assert this shape in
+  // our analysis, stopping at the location within the aggregate where we know
+  // our closure ptr lives
   void visitInsertValueInst(InsertValueInst &IVI) {
-    // Check if all inserted values derive from the same base ptr and match the
-    // aggregate field offsets they reconstruct.
-    auto IVIAggOffset =
-        getAggregateIndicesOffset(DL, IVI.getType(), IVI.getIndices());
-    if (!IVIAggOffset) {
-      AnalysisFailed = true;
-      AnalysisSuccess = false;
-      return;
-    }
+    auto *AggregateOperand = IVI.getAggregateOperand();
+    auto *Cur = &IVI;
 
-    int64_t IVIOffset = 0;
-    auto *BaseLoad = dyn_cast<LoadInst>(IVI.getInsertedValueOperand());
-    Value *BasePtrToCheck = BaseLoad ? BaseLoad->getPointerOperand()
-                                     : IVI.getInsertedValueOperand();
-    auto *InsertedValueBase =
-        GetPointerBaseWithConstantOffset(BasePtrToCheck, IVIOffset, DL);
-    if (!InsertedValueBase || IVIOffset != *IVIAggOffset) {
-      AnalysisFailed = true;
-      AnalysisSuccess = false;
-      return;
-    }
-
-    auto *IVINext = dyn_cast<InsertValueInst>(IVI.getAggregateOperand());
-    while (IVINext) {
-      auto NextAggOffset = getAggregateIndicesOffset(DL, IVINext->getType(),
-                                                     IVINext->getIndices());
-      if (!NextAggOffset) {
-        AnalysisFailed = true;
-        AnalysisSuccess = false;
+    while (Cur && AggregateOperand) {
+      int64_t CurOffset = getValueIndicesOffset(
+          DL, Cur->getAggregateOperand()->getType(), Cur->getIndices());
+      TypeSize InsertedSize =
+          DL.getTypeAllocSize(Cur->getInsertedValueOperand()->getType());
+      DEBUG(Logger::logs("proteus-pass")
+            << "Curr offset " << CurOffset << "\nOffset " << Offset << "\n");
+      if (!InsertedSize.isScalable() && Offset >= CurOffset &&
+          static_cast<uint64_t>(Offset - CurOffset) <
+              InsertedSize.getFixedValue()) {
+        // We are now following the value inserted into this aggregate field,
+        // so make the tracked offset relative to that value.  Leaving the
+        // aggregate-field offset in place causes it to be counted again when
+        // the inserted value came from a GEP into another aggregate.
+        Offset -= CurOffset;
+        WorkList.push_back({Cur->getInsertedValueOperand(), &IVI});
         return;
       }
-
-      int64_t NextOff = 0;
-      auto *Load = dyn_cast<LoadInst>(IVINext->getInsertedValueOperand());
-      Value *PtrToCheck =
-          Load ? Load->getPointerOperand() : IVINext->getInsertedValueOperand();
-      auto *NextAggregateBase =
-          GetPointerBaseWithConstantOffset(PtrToCheck, NextOff, DL);
-      if (NextAggregateBase != InsertedValueBase || NextOff != *NextAggOffset) {
-        // todo: are there IR examples where this actually matters?
-        AnalysisFailed = true;
-        AnalysisSuccess = false;
-        return;
-      }
-      // Go up the chain
-      IVINext = dyn_cast<InsertValueInst>(IVINext->getAggregateOperand());
+      Cur = dyn_cast<InsertValueInst>(AggregateOperand);
+      if (Cur)
+        AggregateOperand = Cur->getAggregateOperand();
     }
-
-    DEBUG(Logger::logs("proteus-pass")
-          << "Insert value analysis found common base ptr : \n"
-          << *InsertedValueBase << "\n");
-
-    WorkList.push_back({InsertedValueBase, IVI.getInsertedValueOperand()});
+    AnalysisFailed = true;
+    AnalysisSuccess = false;
   }
 
   // todo: these three methods need to be changed to find a dominating store
   void visitAllocaInst(AllocaInst &Alloca) {
-    auto Res = getDominatingUse(DL, &Alloca, MemoryAnalysisPtrUse);
-    if (!Res) {
+    auto Res =
+        getDominatingUse(DL, &Alloca, MemoryAnalysisPtrUse, Offset, LambdaCB);
+    if (!Res)
       return;
-      // AnalysisFailed = true;
-      // AnalysisSuccess = false;
-      // DEBUG(Logger::logs("proteus-pass")
-      //     << "Analysis failed at = \n"
-      //     << Alloca << "\n");
-    }
+
     WorkList.push_back({Res->DominatingWrite, &Alloca});
-    // Default is zero so we can safely add it
-    Offset += Res->Offset;
+    // Res->Offset converts the current allocation-relative byte offset into
+    // the coordinate system of DominatingWrite. For a field store it removes
+    // the field displacement; for a memory transfer it translates destination
+    // displacement into the corresponding source displacement.
+    Offset -= Res->Offset;
   }
 
   void visitBitCastInst(BitCastInst &BC) {
-    auto Res = getDominatingUse(DL, &BC, MemoryAnalysisPtrUse);
-    if (!Res) {
+    auto Res =
+        getDominatingUse(DL, &BC, MemoryAnalysisPtrUse, Offset, LambdaCB);
+    if (!Res)
       return;
-      // AnalysisFailed = true;
-      // AnalysisSuccess = false;
-      // DEBUG(Logger::logs("proteus-pass")
-      //     << "Analysis failed at = \n"
-      //     << BC << "\n");
-    }
     WorkList.push_back({Res->DominatingWrite, &BC});
-    // Default is zero so we can safely add it
-    Offset += Res->Offset;
+    // Res->Offset converts the current cast-relative byte offset into the
+    // coordinate system of DominatingWrite.
+    Offset -= Res->Offset;
   }
 
   void visitAddrSpaceCastInst(AddrSpaceCastInst &ASC) {
     WorkList.push_back({ASC.getPointerOperand(), &ASC});
-    auto Res = getDominatingUse(DL, &ASC, MemoryAnalysisPtrUse);
-    if (!Res) {
+    auto Res =
+        getDominatingUse(DL, &ASC, MemoryAnalysisPtrUse, Offset, LambdaCB);
+    if (!Res)
       return;
-      // AnalysisFailed = true;
-      // AnalysisSuccess = false;
-      // DEBUG(Logger::logs("proteus-pass")
-      //     << "Analysis failed at = \n"
-      //     << ASC << "\n");
-    }
+
     WorkList.push_back({Res->DominatingWrite, &ASC});
-    // Default is zero so we can safely add it
-    Offset += Res->Offset;
+    // Res->Offset converts the current cast-relative byte offset into the
+    // coordinate system of DominatingWrite.
+    Offset -= Res->Offset;
   }
 
   void visitIntToPtr(IntToPtrInst &ITP) {
@@ -508,6 +542,10 @@ public:
     return;
   }
 
+  void visitTruncInst(TruncInst &TI) {
+    WorkList.push_back({TI.getOperand(0), &TI});
+  }
+
   void visitArgument(Argument &A) {
     Function *F = A.getParent();
     DEBUG(Logger::logs("proteus-pass")
@@ -543,7 +581,10 @@ public:
     }
   }
 
-  void visitInstruction(Instruction &) {
+  void visitInstruction(Instruction &I) {
+    DEBUG(Logger::logs("proteus-pass")
+          << "[Lambda arg analysis]: Unhandled instruction "
+          << I.getOpcodeName() << ": " << I << "\n");
     AnalysisFailed = true;
     return;
   }
@@ -583,22 +624,34 @@ public:
   }
 
   void visitSelectInst(SelectInst &S) {
-    int64_t TOff = 0;
-    int64_t FOff = 0;
-
-    Value *TBase = GetPointerBaseWithConstantOffset(S.getTrueValue(), TOff, DL);
-    Value *FBase =
-        GetPointerBaseWithConstantOffset(S.getFalseValue(), FOff, DL);
-    TBase = TBase->stripPointerCasts();
-    FBase = FBase->stripPointerCasts();
-
-    if (TBase != FBase || TOff != FOff) {
-      AnalysisFailed = true; // would need path-sensitive offsets to proceed
+    // A select can merge call results or loads as well as simple GEPs.  Base
+    // pointer equality rejects semantically identical paths in those shapes,
+    // so analyze both arms exactly as we do for a PHI and retain the result
+    // only when they resolve to one kernel argument and byte offset.
+    auto TrueAnalysis =
+        cloneAndAnalyze(S.getTrueValue(), MemoryAnalysisPtrUse, Offset);
+    auto FalseAnalysis =
+        cloneAndAnalyze(S.getFalseValue(), MemoryAnalysisPtrUse, Offset);
+    if (!TrueAnalysis || !FalseAnalysis ||
+        TrueAnalysis->KernelFunction != FalseAnalysis->KernelFunction ||
+        TrueAnalysis->KernelArgIndex != FalseAnalysis->KernelArgIndex ||
+        TrueAnalysis->Offset != FalseAnalysis->Offset ||
+        TrueAnalysis->ChangedRCLayout != FalseAnalysis->ChangedRCLayout) {
+      DEBUG(Logger::logs("proteus-pass")
+            << "[Lambda arg analysis]: Select arms do not resolve to the "
+               "same kernel argument and offset: "
+            << S << "\n");
+      AnalysisFailed = true;
+      AnalysisSuccess = false;
       return;
     }
 
-    WorkList.push_back({TBase, &S});
-    Offset += TOff; // select == TBase + TOff
+    KernelFunction = TrueAnalysis->KernelFunction;
+    KernelArg = TrueAnalysis->KernelArgIndex;
+    Offset = TrueAnalysis->Offset;
+    ChangedRC = TrueAnalysis->ChangedRCLayout;
+    AnalysisSuccess = true;
+    AnalysisFailed = false;
   }
 };
 

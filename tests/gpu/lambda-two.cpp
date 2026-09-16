@@ -11,13 +11,12 @@
 #include "proteus/JitInterface.h"
 
 #include "gpu_common.h"
-#include "raja_style_launch.h"
 #include <proteus/JitInterface.h>
 
-__device__ void printInt(int I) { printf("Integer = %d\n", I); }
+__device__ static void printInt(int I) { printf("Integer = %d\n", I); }
 
 template <typename T, typename L>
-__global__ __attribute__((annotate("jit"))) void kernel(T LB, L LB2) {
+__global__ __attribute__((annotate("jit"))) static void kernel(T LB, L LB2) {
   std::size_t I = blockIdx.x + threadIdx.x;
   if (I == 0) {
     LB(I);
@@ -32,7 +31,7 @@ public:
   __host__ __device__ auto operator()(size_t I) { return Lambda(I); }
 };
 
-template <typename T, typename L> void registerRun(T &&LB, L &&LB2) {
+template <typename T, typename L> static void registerRun(T &&LB, L &&LB2) {
   constexpr int BlockSize = 256;
   constexpr int N = 1000;
   const int NumBlocks = (N + BlockSize - 1) / BlockSize;
@@ -42,15 +41,15 @@ template <typename T, typename L> void registerRun(T &&LB, L &&LB2) {
   gpuErrCheck(gpuDeviceSynchronize());
 }
 
-auto declareLambda(int rc1, int rc2) {
-  return [=, rc1 = proteus::jit_variable(rc1), rc2 = proteus::jit_variable(rc2)]
+static auto declareLambda(int Rc1, int Rc2) {
+  return [=, Rc1 = proteus::jit_variable(Rc1), Rc2 = proteus::jit_variable(Rc2)]
       __attribute__((annotate("jit"))) (size_t) {
-        printInt(rc1);
-        printInt(rc2);
+        printInt(Rc1);
+        printInt(Rc2);
       };
 }
 
-inline void launch(int C, int D) {
+inline static void launch(int C, int D) {
   registerRun([=, C = proteus::jit_variable(C)] __device__ __attribute__((
                   annotate("jit"))) (size_t) { printf("Integer = %d\n", C); },
               [=, D = proteus::jit_variable(D)] __device__ __attribute__((
