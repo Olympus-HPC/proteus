@@ -12,11 +12,12 @@ var searchData=
   ['codegenoptlevel_9',['CodegenOptLevel',['../structproteus_1_1OptimizationPipelineConfig.html#a314e28e6696980c461d437cb9340ac63',1,'proteus::OptimizationPipelineConfig']]],
   ['commhandle_10',['CommHandle',['../classproteus_1_1MPIStorageCache.html#a906bbf3ecea0fbe03f7d6abaaede165f',1,'proteus::MPIStorageCache']]],
   ['commthread_11',['CommThread',['../classproteus_1_1MPIStorageCache.html#ad838e5c83cac2c86e6e252bfe7b17578',1,'proteus::MPIStorageCache']]],
-  ['constantargs_12',['ConstantArgs',['../structproteus_1_1JitFunctionInfo.html#ab274b2aaec96388dd52c393b6eaa52c2',1,'proteus::JitFunctionInfo']]],
-  ['context_13',['Context',['../structproteus_1_1MLIRCodeBuilder_1_1Impl.html#ad0eb55262d52c1ec345410177e21718e',1,'proteus::MLIRCodeBuilder::Impl']]],
-  ['contip_14',['ContIP',['../structproteus_1_1LLVMCodeBuilder_1_1Impl_1_1Scope.html#ad16b106757e7c3320a497e2a7b81a41b',1,'proteus::LLVMCodeBuilder::Impl::Scope']]],
-  ['ctx_15',['ctx',['../structproteus_1_1CppJitArtifact.html#a8794acc9a305725e608cecca7e9a0be1',1,'proteus::CppJitArtifact::Ctx'],['../structproteus_1_1MLIRLoweringResult.html#a0e5b203239e3fc96254392c643b0cb0f',1,'proteus::MLIRLoweringResult::Ctx']]],
-  ['currentfuncop_16',['CurrentFuncOp',['../structproteus_1_1MLIRCodeBuilder_1_1Impl.html#a27028ac5cadebab3df0210304c438770',1,'proteus::MLIRCodeBuilder::Impl']]],
-  ['currentiskernel_17',['CurrentIsKernel',['../structproteus_1_1MLIRCodeBuilder_1_1Impl.html#ad25e5c136f66184b39dfac0a2b6da5ec',1,'proteus::MLIRCodeBuilder::Impl']]],
-  ['curval_18',['CurVal',['../structproteus_1_1WorkItem.html#a540780e4af6f30d51eec1c0dafe3db8b',1,'proteus::WorkItem']]]
+  ['complete_12',['Complete',['../structproteus_1_1ReachingPointerStores.html#a472bc2420d7cb360b38eced568ea9752',1,'proteus::ReachingPointerStores']]],
+  ['constantargs_13',['ConstantArgs',['../structproteus_1_1JitFunctionInfo.html#ab274b2aaec96388dd52c393b6eaa52c2',1,'proteus::JitFunctionInfo']]],
+  ['context_14',['Context',['../structproteus_1_1MLIRCodeBuilder_1_1Impl.html#ad0eb55262d52c1ec345410177e21718e',1,'proteus::MLIRCodeBuilder::Impl']]],
+  ['contip_15',['ContIP',['../structproteus_1_1LLVMCodeBuilder_1_1Impl_1_1Scope.html#ad16b106757e7c3320a497e2a7b81a41b',1,'proteus::LLVMCodeBuilder::Impl::Scope']]],
+  ['ctx_16',['ctx',['../structproteus_1_1CppJitArtifact.html#a8794acc9a305725e608cecca7e9a0be1',1,'proteus::CppJitArtifact::Ctx'],['../structproteus_1_1MLIRLoweringResult.html#a0e5b203239e3fc96254392c643b0cb0f',1,'proteus::MLIRLoweringResult::Ctx']]],
+  ['currentfuncop_17',['CurrentFuncOp',['../structproteus_1_1MLIRCodeBuilder_1_1Impl.html#a27028ac5cadebab3df0210304c438770',1,'proteus::MLIRCodeBuilder::Impl']]],
+  ['currentiskernel_18',['CurrentIsKernel',['../structproteus_1_1MLIRCodeBuilder_1_1Impl.html#ad25e5c136f66184b39dfac0a2b6da5ec',1,'proteus::MLIRCodeBuilder::Impl']]],
+  ['curval_19',['curval',['../structproteus_1_1UseEdge.html#ae9022f810a2c17d5a6e160783037e97d',1,'proteus::UseEdge::CurVal'],['../structproteus_1_1WorkItem.html#a540780e4af6f30d51eec1c0dafe3db8b',1,'proteus::WorkItem::CurVal']]]
 ];

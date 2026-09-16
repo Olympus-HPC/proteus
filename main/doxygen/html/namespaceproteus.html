@@ -186,8 +186,6 @@ Classes</h2></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1FunctionAnalysis.html">FunctionAnalysis</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1FunctionMemorySSAResolver.html">FunctionMemorySSAResolver</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1GlobalVarInfo.html">GlobalVarInfo</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1HashT.html">HashT</a></td></tr>
@@ -297,6 +295,8 @@ Classes</h2></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1ProteusTypes.html">ProteusTypes</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1ReachingPointerStores.html">ReachingPointerStores</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1RegisterFatBinaryInfo.html">RegisterFatBinaryInfo</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1RegisterFunctionInfo.html">RegisterFunctionInfo</a></td></tr>
@@ -388,6 +388,8 @@ Classes</h2></td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1TypeMap_3_01unsigned_01int_0f_0e_4.html">TypeMap&lt; unsigned int[]&gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1TypeMap_3_01void_01_4.html">TypeMap&lt; void &gt;</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1UseEdge.html">UseEdge</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1Var.html">Var</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -743,14 +745,34 @@ Functions</h2></td></tr>
 <tr class="separator:a37fee433b41b26fb71cc7314983da196"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a393ddb296d5fcabc2edade89b2a96f65" id="r_a393ddb296d5fcabc2edade89b2a96f65"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a393ddb296d5fcabc2edade89b2a96f65">needsDefUseAnalysis</a> (Value *Val)</td></tr>
 <tr class="separator:a393ddb296d5fcabc2edade89b2a96f65"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a11063542adcca4a17f8f17219657fb1d" id="r_a11063542adcca4a17f8f17219657fb1d"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a11063542adcca4a17f8f17219657fb1d">offsetCoveredByRange</a> (int64_t TargetOffset, int64_t RangeOffset, uint64_t RangeSize)</td></tr>
+<tr class="separator:a11063542adcca4a17f8f17219657fb1d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad5205245df1a224163358a6461f7ba42" id="r_ad5205245df1a224163358a6461f7ba42"><td class="memItemLeft" align="right" valign="top">std::optional&lt; uint64_t &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#ad5205245df1a224163358a6461f7ba42">getTypeStoreSize</a> (const DataLayout &amp;DL, <a class="el" href="CompilerInterfaceDevice_8cpp.html#a135c078c3e3abc27b76a03c726d28c61">Type</a> *Ty)</td></tr>
+<tr class="separator:ad5205245df1a224163358a6461f7ba42"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a1a954980676c42b2f46c692bbb6f12b9" id="r_a1a954980676c42b2f46c692bbb6f12b9"><td class="memItemLeft" align="right" valign="top">std::optional&lt; MemoryLocation &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a1a954980676c42b2f46c692bbb6f12b9">getTrackedPointerLocation</a> (const DataLayout &amp;DL, Value *Ptr)</td></tr>
 <tr class="separator:a1a954980676c42b2f46c692bbb6f12b9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa9b479400b5e3e76a87480be4bc9ddcc" id="r_aa9b479400b5e3e76a87480be4bc9ddcc"><td class="memItemLeft" align="right" valign="top">std::optional&lt; <a class="el" href="structproteus_1_1LambdaPtrUseAnalysis.html">LambdaPtrUseAnalysis</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#aa9b479400b5e3e76a87480be4bc9ddcc">getDominatingUse</a> (const DataLayout &amp;DL, Value *ValueNeedingAnalysis, Value *SeenUse)</td></tr>
-<tr class="separator:aa9b479400b5e3e76a87480be4bc9ddcc"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a46a94d554d1b3b5e30d11d16c84e9cc0" id="r_a46a94d554d1b3b5e30d11d16c84e9cc0"><td class="memItemLeft" align="right" valign="top">std::optional&lt; <a class="el" href="structproteus_1_1LambdaPtrUseAnalysis.html">LambdaPtrUseAnalysis</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a46a94d554d1b3b5e30d11d16c84e9cc0">getPreviousCoveringStore</a> (const DataLayout &amp;DL, Value *Ptr, Value *UseBoundary, int64_t TargetOffset)</td></tr>
+<tr class="separator:a46a94d554d1b3b5e30d11d16c84e9cc0"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0363a855fb83d28676998d3b00e68f10" id="r_a0363a855fb83d28676998d3b00e68f10"><td class="memItemLeft" align="right" valign="top">std::optional&lt; <a class="el" href="structproteus_1_1LambdaPtrUseAnalysis.html">LambdaPtrUseAnalysis</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a0363a855fb83d28676998d3b00e68f10">getDominatingUse</a> (const DataLayout &amp;DL, Value *ValueNeedingAnalysis, Value *SeenUse, int64_t TargetOffset, CallBase *LambdaCB=nullptr)</td></tr>
+<tr class="separator:a0363a855fb83d28676998d3b00e68f10"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aea2c01a94bf31509638a6ad6a95c6594" id="r_aea2c01a94bf31509638a6ad6a95c6594"><td class="memItemLeft" align="right" valign="top">std::optional&lt; ReturnInst * &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#aea2c01a94bf31509638a6ad6a95c6594">getRetInst</a> (Function &amp;F)</td></tr>
 <tr class="separator:aea2c01a94bf31509638a6ad6a95c6594"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a299b8d5c4523f0d085faf0d4a508a948" id="r_a299b8d5c4523f0d085faf0d4a508a948"><td class="memItemLeft" align="right" valign="top">std::optional&lt; int64_t &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a299b8d5c4523f0d085faf0d4a508a948">getAggregateIndicesOffset</a> (const DataLayout &amp;DL, <a class="el" href="CompilerInterfaceDevice_8cpp.html#a135c078c3e3abc27b76a03c726d28c61">Type</a> *AggTy, ArrayRef&lt; unsigned &gt; Indices)</td></tr>
-<tr class="separator:a299b8d5c4523f0d085faf0d4a508a948"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a597cfedba0d7e1033d572501580853db" id="r_a597cfedba0d7e1033d572501580853db"><td class="memItemLeft" align="right" valign="top">int64_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a597cfedba0d7e1033d572501580853db">getValueIndicesOffset</a> (const DataLayout &amp;DL, <a class="el" href="CompilerInterfaceDevice_8cpp.html#a135c078c3e3abc27b76a03c726d28c61">Type</a> *AggTy, ArrayRef&lt; unsigned &gt; Indices)</td></tr>
+<tr class="separator:a597cfedba0d7e1033d572501580853db"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aace78fcea56e4a3d9dff6e430703eeeb" id="r_aace78fcea56e4a3d9dff6e430703eeeb"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#aace78fcea56e4a3d9dff6e430703eeeb">isSamePointerAddress</a> (const DataLayout &amp;DL, Value *LHS, Value *RHS)</td></tr>
+<tr class="separator:aace78fcea56e4a3d9dff6e430703eeeb"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa9ecf365554521cb171f921902c275e2" id="r_aa9ecf365554521cb171f921902c275e2"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#aa9ecf365554521cb171f921902c275e2">collectReachingPointerStores</a> (const DataLayout &amp;DL, BasicBlock *BB, Instruction *Before, Value *Address, SmallPtrSetImpl&lt; BasicBlock * &gt; &amp;Visited, <a class="el" href="structproteus_1_1ReachingPointerStores.html">ReachingPointerStores</a> &amp;Result)</td></tr>
+<tr class="separator:aa9ecf365554521cb171f921902c275e2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aeb582542010c2a674a6f215deb7b3930" id="r_aeb582542010c2a674a6f215deb7b3930"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structproteus_1_1ReachingPointerStores.html">ReachingPointerStores</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#aeb582542010c2a674a6f215deb7b3930">getReachingPointerStores</a> (const DataLayout &amp;DL, LoadInst &amp;LI)</td></tr>
+<tr class="separator:aeb582542010c2a674a6f215deb7b3930"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a37bc47a1e75e28cbd6ee9341e7da54c6" id="r_a37bc47a1e75e28cbd6ee9341e7da54c6"><td class="memItemLeft" align="right" valign="top">Value *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a37bc47a1e75e28cbd6ee9341e7da54c6">getPointerLoadOrigin</a> (const DataLayout &amp;DL, Value *V, SmallPtrSetImpl&lt; Value * &gt; &amp;Visited)</td></tr>
+<tr class="separator:a37bc47a1e75e28cbd6ee9341e7da54c6"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3010d448be26fd01ed10bf111d3a42fd" id="r_a3010d448be26fd01ed10bf111d3a42fd"><td class="memItemLeft" align="right" valign="top">Value *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a3010d448be26fd01ed10bf111d3a42fd">getUniqueReachingPointer</a> (const DataLayout &amp;DL, const <a class="el" href="structproteus_1_1ReachingPointerStores.html">ReachingPointerStores</a> &amp;Stores, SmallPtrSetImpl&lt; Value * &gt; &amp;Visited)</td></tr>
+<tr class="separator:a3010d448be26fd01ed10bf111d3a42fd"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae0e3710aedcd0f3cb0bfc4368477c09d" id="r_ae0e3710aedcd0f3cb0bfc4368477c09d"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#ae0e3710aedcd0f3cb0bfc4368477c09d">hasAmbiguousReachingPointers</a> (const DataLayout &amp;DL, const <a class="el" href="structproteus_1_1ReachingPointerStores.html">ReachingPointerStores</a> &amp;Stores)</td></tr>
+<tr class="separator:ae0e3710aedcd0f3cb0bfc4368477c09d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af304613bfe1bd8a82f44133803cdafb3" id="r_af304613bfe1bd8a82f44133803cdafb3"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#af304613bfe1bd8a82f44133803cdafb3">isPointerSpillLoad</a> (const LoadInst &amp;LI)</td></tr>
+<tr class="separator:af304613bfe1bd8a82f44133803cdafb3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a330e1153e4b7df7dec18d6c6a7f701cc" id="r_a330e1153e4b7df7dec18d6c6a7f701cc"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a330e1153e4b7df7dec18d6c6a7f701cc">analyzeLambdaUses</a> (llvm::Module &amp;M, DenseMap&lt; CallBase *, <a class="el" href="structproteus_1_1LambdaKernelArgAnalysis.html">LambdaKernelArgAnalysis</a> &gt; &amp;CallBaseToArgOffset, const SmallVector&lt; CallBase * &gt; &amp;CBToAnalyze)</td></tr>
 <tr class="separator:a330e1153e4b7df7dec18d6c6a7f701cc"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a89c4be2e9818ac02d8c21477f389da00" id="r_a89c4be2e9818ac02d8c21477f389da00"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceproteus.html#a89c4be2e9818ac02d8c21477f389da00">runLambdaAnalysis</a> (llvm::Module &amp;M)</td></tr>
@@ -1926,6 +1948,66 @@ template&lt;typename T , typename U &gt; </div>
 
 </div>
 </div>
+<a id="aa9ecf365554521cb171f921902c275e2" name="aa9ecf365554521cb171f921902c275e2"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa9ecf365554521cb171f921902c275e2">&#9670;&#160;</a></span>collectReachingPointerStores()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void proteus::collectReachingPointerStores </td>
+          <td>(</td>
+          <td class="paramtype">const DataLayout &amp;&#160;</td>
+          <td class="paramname"><em>DL</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">BasicBlock *&#160;</td>
+          <td class="paramname"><em>BB</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">Instruction *&#160;</td>
+          <td class="paramname"><em>Before</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">Value *&#160;</td>
+          <td class="paramname"><em>Address</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">SmallPtrSetImpl&lt; BasicBlock * &gt; &amp;&#160;</td>
+          <td class="paramname"><em>Visited</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="structproteus_1_1ReachingPointerStores.html">ReachingPointerStores</a> &amp;&#160;</td>
+          <td class="paramname"><em>Result</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
 <a id="a1691eaae6ba38315998ebfc1efe05c69" name="a1691eaae6ba38315998ebfc1efe05c69"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a1691eaae6ba38315998ebfc1efe05c69">&#9670;&#160;</a></span>compoundAssignConst()</h2>
 
@@ -2396,48 +2478,6 @@ template&lt;typename T &gt; </div>
 
 </div>
 </div>
-<a id="a299b8d5c4523f0d085faf0d4a508a948" name="a299b8d5c4523f0d085faf0d4a508a948"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a299b8d5c4523f0d085faf0d4a508a948">&#9670;&#160;</a></span>getAggregateIndicesOffset()</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">std::optional&lt; int64_t &gt; proteus::getAggregateIndicesOffset </td>
-          <td>(</td>
-          <td class="paramtype">const DataLayout &amp;&#160;</td>
-          <td class="paramname"><em>DL</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype"><a class="el" href="CompilerInterfaceDevice_8cpp.html#a135c078c3e3abc27b76a03c726d28c61">Type</a> *&#160;</td>
-          <td class="paramname"><em>AggTy</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">ArrayRef&lt; unsigned &gt;&#160;</td>
-          <td class="paramname"><em>Indices</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-</div>
-</div>
 <a id="a5438380988808f63bea4d1a6e5032486" name="a5438380988808f63bea4d1a6e5032486"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a5438380988808f63bea4d1a6e5032486">&#9670;&#160;</a></span>getCanonicalSourceFileName()</h2>
 
@@ -2536,8 +2576,8 @@ template&lt;typename T &gt; </div>
 
 </div>
 </div>
-<a id="aa9b479400b5e3e76a87480be4bc9ddcc" name="aa9b479400b5e3e76a87480be4bc9ddcc"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aa9b479400b5e3e76a87480be4bc9ddcc">&#9670;&#160;</a></span>getDominatingUse()</h2>
+<a id="a0363a855fb83d28676998d3b00e68f10" name="a0363a855fb83d28676998d3b00e68f10"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a0363a855fb83d28676998d3b00e68f10">&#9670;&#160;</a></span>getDominatingUse()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -2561,7 +2601,19 @@ template&lt;typename T &gt; </div>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">Value *&#160;</td>
-          <td class="paramname"><em>SeenUse</em>&#160;</td>
+          <td class="paramname"><em>SeenUse</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int64_t&#160;</td>
+          <td class="paramname"><em>TargetOffset</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">CallBase *&#160;</td>
+          <td class="paramname"><em>LambdaCB</em> = <code>nullptr</code>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -3025,6 +3077,132 @@ template&lt;typename T &gt; </div>
 
 </div>
 </div>
+<a id="a37bc47a1e75e28cbd6ee9341e7da54c6" name="a37bc47a1e75e28cbd6ee9341e7da54c6"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a37bc47a1e75e28cbd6ee9341e7da54c6">&#9670;&#160;</a></span>getPointerLoadOrigin()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">Value * proteus::getPointerLoadOrigin </td>
+          <td>(</td>
+          <td class="paramtype">const DataLayout &amp;&#160;</td>
+          <td class="paramname"><em>DL</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">Value *&#160;</td>
+          <td class="paramname"><em>V</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">SmallPtrSetImpl&lt; Value * &gt; &amp;&#160;</td>
+          <td class="paramname"><em>Visited</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="a46a94d554d1b3b5e30d11d16c84e9cc0" name="a46a94d554d1b3b5e30d11d16c84e9cc0"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a46a94d554d1b3b5e30d11d16c84e9cc0">&#9670;&#160;</a></span>getPreviousCoveringStore()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::optional&lt; <a class="el" href="structproteus_1_1LambdaPtrUseAnalysis.html">LambdaPtrUseAnalysis</a> &gt; proteus::getPreviousCoveringStore </td>
+          <td>(</td>
+          <td class="paramtype">const DataLayout &amp;&#160;</td>
+          <td class="paramname"><em>DL</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">Value *&#160;</td>
+          <td class="paramname"><em>Ptr</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">Value *&#160;</td>
+          <td class="paramname"><em>UseBoundary</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int64_t&#160;</td>
+          <td class="paramname"><em>TargetOffset</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="aeb582542010c2a674a6f215deb7b3930" name="aeb582542010c2a674a6f215deb7b3930"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aeb582542010c2a674a6f215deb7b3930">&#9670;&#160;</a></span>getReachingPointerStores()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structproteus_1_1ReachingPointerStores.html">ReachingPointerStores</a> proteus::getReachingPointerStores </td>
+          <td>(</td>
+          <td class="paramtype">const DataLayout &amp;&#160;</td>
+          <td class="paramname"><em>DL</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">LoadInst &amp;&#160;</td>
+          <td class="paramname"><em>LI</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
 <a id="aea2c01a94bf31509638a6ad6a95c6594" name="aea2c01a94bf31509638a6ad6a95c6594"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#aea2c01a94bf31509638a6ad6a95c6594">&#9670;&#160;</a></span>getRetInst()</h2>
 
@@ -3151,6 +3329,42 @@ template&lt;typename T &gt; </div>
 
 </div>
 </div>
+<a id="ad5205245df1a224163358a6461f7ba42" name="ad5205245df1a224163358a6461f7ba42"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad5205245df1a224163358a6461f7ba42">&#9670;&#160;</a></span>getTypeStoreSize()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::optional&lt; uint64_t &gt; proteus::getTypeStoreSize </td>
+          <td>(</td>
+          <td class="paramtype">const DataLayout &amp;&#160;</td>
+          <td class="paramname"><em>DL</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="CompilerInterfaceDevice_8cpp.html#a135c078c3e3abc27b76a03c726d28c61">Type</a> *&#160;</td>
+          <td class="paramname"><em>Ty</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
 <a id="a7a5d04a863a17546e68d3f9d53aa5c05" name="a7a5d04a863a17546e68d3f9d53aa5c05"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a7a5d04a863a17546e68d3f9d53aa5c05">&#9670;&#160;</a></span>getUniqueFileID()</h2>
 
@@ -3166,6 +3380,48 @@ template&lt;typename T &gt; </div>
           <td class="paramtype">Module &amp;&#160;</td>
           <td class="paramname"><em>M</em></td><td>)</td>
           <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="a3010d448be26fd01ed10bf111d3a42fd" name="a3010d448be26fd01ed10bf111d3a42fd"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a3010d448be26fd01ed10bf111d3a42fd">&#9670;&#160;</a></span>getUniqueReachingPointer()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">Value * proteus::getUniqueReachingPointer </td>
+          <td>(</td>
+          <td class="paramtype">const DataLayout &amp;&#160;</td>
+          <td class="paramname"><em>DL</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="structproteus_1_1ReachingPointerStores.html">ReachingPointerStores</a> &amp;&#160;</td>
+          <td class="paramname"><em>Stores</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">SmallPtrSetImpl&lt; Value * &gt; &amp;&#160;</td>
+          <td class="paramname"><em>Visited</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
         </tr>
       </table>
   </td>
@@ -3193,6 +3449,84 @@ template&lt;typename T &gt; </div>
           <td></td>
         </tr>
       </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="a597cfedba0d7e1033d572501580853db" name="a597cfedba0d7e1033d572501580853db"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a597cfedba0d7e1033d572501580853db">&#9670;&#160;</a></span>getValueIndicesOffset()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">int64_t proteus::getValueIndicesOffset </td>
+          <td>(</td>
+          <td class="paramtype">const DataLayout &amp;&#160;</td>
+          <td class="paramname"><em>DL</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="CompilerInterfaceDevice_8cpp.html#a135c078c3e3abc27b76a03c726d28c61">Type</a> *&#160;</td>
+          <td class="paramname"><em>AggTy</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">ArrayRef&lt; unsigned &gt;&#160;</td>
+          <td class="paramname"><em>Indices</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="ae0e3710aedcd0f3cb0bfc4368477c09d" name="ae0e3710aedcd0f3cb0bfc4368477c09d"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae0e3710aedcd0f3cb0bfc4368477c09d">&#9670;&#160;</a></span>hasAmbiguousReachingPointers()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool proteus::hasAmbiguousReachingPointers </td>
+          <td>(</td>
+          <td class="paramtype">const DataLayout &amp;&#160;</td>
+          <td class="paramname"><em>DL</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="structproteus_1_1ReachingPointerStores.html">ReachingPointerStores</a> &amp;&#160;</td>
+          <td class="paramname"><em>Stores</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
 </div><div class="memdoc">
 
 </div>
@@ -3967,6 +4301,74 @@ template&lt;typename Key , typename Value &gt; </div>
 
 </div>
 </div>
+<a id="af304613bfe1bd8a82f44133803cdafb3" name="af304613bfe1bd8a82f44133803cdafb3"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af304613bfe1bd8a82f44133803cdafb3">&#9670;&#160;</a></span>isPointerSpillLoad()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool proteus::isPointerSpillLoad </td>
+          <td>(</td>
+          <td class="paramtype">const LoadInst &amp;&#160;</td>
+          <td class="paramname"><em>LI</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="aace78fcea56e4a3d9dff6e430703eeeb" name="aace78fcea56e4a3d9dff6e430703eeeb"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aace78fcea56e4a3d9dff6e430703eeeb">&#9670;&#160;</a></span>isSamePointerAddress()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool proteus::isSamePointerAddress </td>
+          <td>(</td>
+          <td class="paramtype">const DataLayout &amp;&#160;</td>
+          <td class="paramname"><em>DL</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">Value *&#160;</td>
+          <td class="paramname"><em>LHS</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">Value *&#160;</td>
+          <td class="paramname"><em>RHS</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
 <a id="ab7f10d71b72f695284a36f84bdc9de88" name="ab7f10d71b72f695284a36f84bdc9de88"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ab7f10d71b72f695284a36f84bdc9de88">&#9670;&#160;</a></span>isScalarRuntimeConstantType()</h2>
 
@@ -4409,6 +4811,48 @@ template&lt;typename T &gt; </div>
           <td></td>
         </tr>
       </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="a11063542adcca4a17f8f17219657fb1d" name="a11063542adcca4a17f8f17219657fb1d"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a11063542adcca4a17f8f17219657fb1d">&#9670;&#160;</a></span>offsetCoveredByRange()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool proteus::offsetCoveredByRange </td>
+          <td>(</td>
+          <td class="paramtype">int64_t&#160;</td>
+          <td class="paramname"><em>TargetOffset</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">int64_t&#160;</td>
+          <td class="paramname"><em>RangeOffset</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint64_t&#160;</td>
+          <td class="paramname"><em>RangeSize</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
 </div><div class="memdoc">
 
 </div>

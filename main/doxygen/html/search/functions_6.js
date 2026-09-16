@@ -16,6 +16,5 @@ var searchData=
   ['funcsetattribute_13',['funcSetAttribute',['../namespaceproteus_1_1hipdyn.html#a52b806bc8b81053ec2465d9ddc84a6d9',1,'proteus::hipdyn']]],
   ['function_14',['function',['../classproteus_1_1FuncBase.html#ac75a13f38f494799e5321587ded63e92',1,'proteus::FuncBase']]],
   ['functionhandle_15',['functionhandle',['../structproteus_1_1MLIRJitModule_1_1FunctionHandle_3_01RetT_07ArgT_8_8_8_08_4.html#aaca59a0af2eef215f01410ced13735e1',1,'proteus::MLIRJitModule::FunctionHandle&lt; RetT(ArgT...)&gt;::FunctionHandle()'],['../structproteus_1_1LLVMIRJitModule_1_1FunctionHandle_3_01RetT_07ArgT_8_8_8_08_4.html#a5c7a67c6055cb96c9a6df774672b4be3',1,'proteus::LLVMIRJitModule::FunctionHandle&lt; RetT(ArgT...)&gt;::FunctionHandle()'],['../structproteus_1_1CppJitModule_1_1FunctionHandle_3_01RetT_07ArgT_8_8_8_08_4.html#a1274d5a106736c640814fbfb3194d7bc',1,'proteus::CppJitModule::FunctionHandle&lt; RetT(ArgT...)&gt;::FunctionHandle()']]],
-  ['functionmemoryssaresolver_16',['FunctionMemorySSAResolver',['../classproteus_1_1FunctionMemorySSAResolver.html#ae25ac9bf207c722b8193929b9d8582be',1,'proteus::FunctionMemorySSAResolver']]],
-  ['functor_5fid_17',['functor_id',['../namespaceproteus_1_1detail.html#ac378e4fc85e7685f97268783f949e2d1',1,'proteus::detail']]]
+  ['functor_5fid_16',['functor_id',['../namespaceproteus_1_1detail.html#ac378e4fc85e7685f97268783f949e2d1',1,'proteus::detail']]]
 ];

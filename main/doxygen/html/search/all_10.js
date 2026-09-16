@@ -12,7 +12,7 @@ var searchData=
   ['pendinglambdacallsitelocationinfo_9',['PendingLambdaCallsiteLocationInfo',['../classproteus_1_1JitEngineDevice.html#a69b66849cc1c6a79a65a99b13a163823',1,'proteus::JitEngineDevice']]],
   ['pipeline_10',['Pipeline',['../structproteus_1_1JITPassPluginInsertion.html#aef77d139541a1812c2daa6edf8040992',1,'proteus::JITPassPluginInsertion']]],
   ['pointer_11',['Pointer',['../namespaceproteus.html#ad44857f031a4f66111485d3db4210016a61cf8510205077b6f5491d38cd44c0f7',1,'proteus']]],
-  ['popback_12',['popback',['../classproteus_1_1LambdaInstUseVisitor.html#ab64968229158e46d47c5875b76bdcbb4',1,'proteus::LambdaInstUseVisitor::popBack()'],['../classproteus_1_1LambdaArgVisitor.html#a9abe9aa810ad7d5b1824da9c1d545bc9',1,'proteus::LambdaArgVisitor::popBack()']]],
+  ['popback_12',['popback',['../classproteus_1_1LambdaInstUseVisitor.html#a596ab93d4e869ef006d454e43ea716ef',1,'proteus::LambdaInstUseVisitor::popBack()'],['../classproteus_1_1LambdaArgVisitor.html#a9abe9aa810ad7d5b1824da9c1d545bc9',1,'proteus::LambdaArgVisitor::popBack()']]],
   ['populatelambdaregistrationcodecache_13',['populatelambdaregistrationcodecache',['../classproteus_1_1LambdaRegistry.html#a1fe1c816baf24fc5ff306fef51814894',1,'proteus::LambdaRegistry::populateLambdaRegistrationCodeCache()'],['../CompilerInterfaceDevice_8cpp.html#a01c80f652b671de226373f0d75a16d5b',1,'populateLambdaRegistrationCodeCache(Kernel, RegistrationFunc):&#160;CompilerInterfaceDevice.cpp']]],
   ['pos_14',['pos',['../CompilerInterfaceDevice_8cpp.html#a64997eee1663726edc4dcbefefc24765',1,'Pos:&#160;CompilerInterfaceDevice.cpp'],['../JitInterface_8h.html#afd47502f0ef909c167afbf93c32c7a3d',1,'Pos:&#160;JitInterface.h'],['../structproteus_1_1RuntimeConstantArgInfo.html#a06176c5feda3b86b03fa1edf349ad630',1,'proteus::RuntimeConstantArgInfo::Pos'],['../structproteus_1_1RuntimeConstant.html#ae3f8d7803a0ab5702aad4a7cb4ea7e7b',1,'proteus::RuntimeConstant::Pos']]],
   ['position_15',['Position',['../structproteus_1_1JITPassPluginInsertion.html#a32ed5f2267a84614114d235514a88ee8',1,'proteus::JITPassPluginInsertion']]],
@@ -79,5 +79,6 @@ var searchData=
   ['ptrty_76',['PtrTy',['../structproteus_1_1ProteusTypes.html#ac2854a36c97cef336066857a8476f903',1,'proteus::ProteusTypes']]],
   ['ptrval_77',['PtrVal',['../unionproteus_1_1RuntimeConstantValue.html#a3e1059682f397e06c33ee292f115f8e4',1,'proteus::RuntimeConstantValue']]],
   ['pushback_78',['pushBack',['../classproteus_1_1LambdaInstUseVisitor.html#aa55fbb1426eabf2924bc4c099fc9a239',1,'proteus::LambdaInstUseVisitor']]],
-  ['pushscope_79',['pushScope',['../classproteus_1_1LLVMCodeBuilder.html#acf27449d90740e4429f5955c0c1536c6',1,'proteus::LLVMCodeBuilder']]]
+  ['pushpointerusers_79',['pushPointerUsers',['../classproteus_1_1LambdaInstUseVisitor.html#abe8de1a22e1bcbcac93f037e91388577',1,'proteus::LambdaInstUseVisitor']]],
+  ['pushscope_80',['pushScope',['../classproteus_1_1LLVMCodeBuilder.html#acf27449d90740e4429f5955c0c1536c6',1,'proteus::LLVMCodeBuilder']]]
 ];

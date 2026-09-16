@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=11"/>
 <meta name="generator" content="Doxygen 1.9.8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Proteus: proteus::FunctionMemorySSAResolver Class Reference</title>
+<title>Proteus: proteus::ReachingPointerStores Struct Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -93,93 +93,57 @@ var searchBox = new SearchBox("searchBox", "search/",'.html');
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="namespaceproteus.html">proteus</a></li><li class="navelem"><a class="el" href="classproteus_1_1FunctionMemorySSAResolver.html">FunctionMemorySSAResolver</a></li>  </ul>
+<li class="navelem"><a class="el" href="namespaceproteus.html">proteus</a></li><li class="navelem"><a class="el" href="structproteus_1_1ReachingPointerStores.html">ReachingPointerStores</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
   <div class="summary">
-<a href="#nested-classes">Classes</a> &#124;
-<a href="#pub-methods">Public Member Functions</a> &#124;
-<a href="classproteus_1_1FunctionMemorySSAResolver-members.html">List of all members</a>  </div>
-  <div class="headertitle"><div class="title">proteus::FunctionMemorySSAResolver Class Reference</div></div>
+<a href="#pub-attribs">Public Attributes</a> &#124;
+<a href="structproteus_1_1ReachingPointerStores-members.html">List of all members</a>  </div>
+  <div class="headertitle"><div class="title">proteus::ReachingPointerStores Struct Reference</div></div>
 </div><!--header-->
 <div class="contents">
 
-<p><code>#include &lt;<a class="el" href="KernelArgPtrUseVisitor_8h_source.html">KernelArgPtrUseVisitor.h</a>&gt;</code></p>
+<p><code>#include &lt;<a class="el" href="KernelArgVisitor_8h_source.html">KernelArgVisitor.h</a>&gt;</code></p>
 <table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
-Public Member Functions</h2></td></tr>
-<tr class="memitem:ae25ac9bf207c722b8193929b9d8582be" id="r_ae25ac9bf207c722b8193929b9d8582be"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1FunctionMemorySSAResolver.html#ae25ac9bf207c722b8193929b9d8582be">FunctionMemorySSAResolver</a> (const DataLayout &amp;Dl)</td></tr>
-<tr class="separator:ae25ac9bf207c722b8193929b9d8582be"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5bb132cad84a5dcb655dc4b399295155" id="r_a5bb132cad84a5dcb655dc4b399295155"><td class="memItemLeft" align="right" valign="top">std::optional&lt; <a class="el" href="structproteus_1_1LambdaPtrUseAnalysis.html">LambdaPtrUseAnalysis</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1FunctionMemorySSAResolver.html#a5bb132cad84a5dcb655dc4b399295155">resolve</a> (Value *TrackedPtr, Instruction *UseI)</td></tr>
-<tr class="separator:a5bb132cad84a5dcb655dc4b399295155"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
+Public Attributes</h2></td></tr>
+<tr class="memitem:a0a969fadcab59fe2ada89809ef92f46b" id="r_a0a969fadcab59fe2ada89809ef92f46b"><td class="memItemLeft" align="right" valign="top">SmallVector&lt; Value *, 4 &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1ReachingPointerStores.html#a0a969fadcab59fe2ada89809ef92f46b">Values</a></td></tr>
+<tr class="separator:a0a969fadcab59fe2ada89809ef92f46b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a472bc2420d7cb360b38eced568ea9752" id="r_a472bc2420d7cb360b38eced568ea9752"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1ReachingPointerStores.html#a472bc2420d7cb360b38eced568ea9752">Complete</a> = true</td></tr>
+<tr class="separator:a472bc2420d7cb360b38eced568ea9752"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
-<h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
-<a id="ae25ac9bf207c722b8193929b9d8582be" name="ae25ac9bf207c722b8193929b9d8582be"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ae25ac9bf207c722b8193929b9d8582be">&#9670;&#160;</a></span>FunctionMemorySSAResolver()</h2>
+<h2 class="groupheader">Member Data Documentation</h2>
+<a id="a472bc2420d7cb360b38eced568ea9752" name="a472bc2420d7cb360b38eced568ea9752"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a472bc2420d7cb360b38eced568ea9752">&#9670;&#160;</a></span>Complete</h2>
 
 <div class="memitem">
 <div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">proteus::FunctionMemorySSAResolver::FunctionMemorySSAResolver </td>
-          <td>(</td>
-          <td class="paramtype">const DataLayout &amp;&#160;</td>
-          <td class="paramname"><em>Dl</em></td><td>)</td>
-          <td></td>
+          <td class="memname">bool proteus::ReachingPointerStores::Complete = true</td>
         </tr>
       </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">explicit</span></span>  </td>
-  </tr>
-</table>
 </div><div class="memdoc">
 
 </div>
 </div>
-<h2 class="groupheader">Member Function Documentation</h2>
-<a id="a5bb132cad84a5dcb655dc4b399295155" name="a5bb132cad84a5dcb655dc4b399295155"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a5bb132cad84a5dcb655dc4b399295155">&#9670;&#160;</a></span>resolve()</h2>
+<a id="a0a969fadcab59fe2ada89809ef92f46b" name="a0a969fadcab59fe2ada89809ef92f46b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a0a969fadcab59fe2ada89809ef92f46b">&#9670;&#160;</a></span>Values</h2>
 
 <div class="memitem">
 <div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">std::optional&lt; <a class="el" href="structproteus_1_1LambdaPtrUseAnalysis.html">LambdaPtrUseAnalysis</a> &gt; proteus::FunctionMemorySSAResolver::resolve </td>
-          <td>(</td>
-          <td class="paramtype">Value *&#160;</td>
-          <td class="paramname"><em>TrackedPtr</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Instruction *&#160;</td>
-          <td class="paramname"><em>UseI</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
+          <td class="memname">SmallVector&lt;Value *, 4&gt; proteus::ReachingPointerStores::Values</td>
         </tr>
       </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
-  </tr>
-</table>
 </div><div class="memdoc">
 
 </div>
 </div>
-<hr/>The documentation for this class was generated from the following file:<ul>
-<li>src/pass/<a class="el" href="KernelArgPtrUseVisitor_8h_source.html">KernelArgPtrUseVisitor.h</a></li>
+<hr/>The documentation for this struct was generated from the following file:<ul>
+<li>src/pass/<a class="el" href="KernelArgVisitor_8h_source.html">KernelArgVisitor.h</a></li>
 </ul>
 </div><!-- contents -->
 <!-- start footer part -->
