@@ -3,7 +3,7 @@
 		"CodeGen" : "RTC",
 		"LaunchBounds" : true,
 		"SpecializeDims" : true,
-		"SpecializeDimsRange" : true,
+		"SpecializeDimsRange" : false,
 		"OptLevel" : 1,
 		"CodeGenOptLevel" : 2,
 		"TunedMaxThreads" : 4,
