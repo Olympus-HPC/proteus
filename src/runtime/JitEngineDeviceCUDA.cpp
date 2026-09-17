@@ -10,6 +10,7 @@
 
 #include "proteus/impl/JitEngineDeviceCUDA.h"
 #include "proteus/impl/CoreLLVM.h"
+#include "proteus/impl/Frontend/DispatcherCUDA.h"
 #include "proteus/impl/JitEngineDevice.h"
 #include "proteus/impl/Utils.h"
 #include "proteus/impl/UtilsCUDA.h"
@@ -163,19 +164,18 @@ JitEngineDeviceCUDA::JitEngineDeviceCUDA() {
   DeviceArch = "sm_" + std::to_string(CCMajor * 10 + CCMinor);
 
   PROTEUS_DBG(Logger::logs("proteus") << "CUDA Arch " << DeviceArch << "\n");
+
+  Dispatch = createDispatcher();
 }
 
-std::unique_ptr<MemoryBuffer>
-JitEngineDeviceCUDA::compileOnly(Module &M, bool DisableIROpt) {
-  TIMESCOPE(JitEngineDeviceCUDA, compileOnly);
-  if (!DisableIROpt) {
-    const auto &CGConfig = Config::get().getCGConfig();
-    proteus::optimizeIR(M, DeviceArch, OptimizationPipelineConfig(CGConfig));
-  } else {
-    if (Config::get().traceSpecializations())
-      Logger::trace("[SkipOpt] Skipping JitEngine IR optimization\n");
-  }
-  auto DeviceObject =
-      proteus::codegenObject(M, DeviceArch, GlobalLinkedBinaries);
-  return DeviceObject;
+std::unique_ptr<MemoryBuffer> JitEngineDeviceCUDA::codegenObject(
+    Module &M, SmallPtrSetImpl<void *> &GlobalLinkedBinaries,
+    const CodeGenerationConfig &CGConfig) {
+  TIMESCOPE(JitEngineDeviceCUDA, codegenObject);
+  return proteus::codegenObject(M, DeviceArch, GlobalLinkedBinaries,
+                                CGConfig.codeGenOption());
+}
+
+std::unique_ptr<Dispatcher> JitEngineDeviceCUDA::createDispatcher() {
+  return std::make_unique<DispatcherCUDA>("JitEngineDevice", *this);
 }

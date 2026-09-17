@@ -87,7 +87,7 @@ void CppJitModule::setFuncAttribute(void *KernelFunc, JitFuncAttribute Attr,
 
 void *CppJitModule::getFunctionAddress(const std::string &Name) {
   TIMESCOPE(CppJitModule, getFunctionAddress);
-  return Dispatch.getFunctionAddress(Name, *ModuleHash, getLibrary());
+  return Dispatch.getOrInsertFunction(Name, *ModuleHash, getLibrary());
 }
 
 DispatchResult CppJitModule::launch(void *KernelFunc, LaunchDims GridDim,

@@ -48,8 +48,14 @@ public:
 
   HashT getModuleHash(BinaryInfo &BinInfo);
 
-  std::unique_ptr<MemoryBuffer> compileOnly(Module &M,
-                                            bool DisableIROpt = false);
+  // CUDA codegen never runs the Proteus pipeline itself.
+  static bool optimizesBeforeCodegen(CodegenOption) { return true; }
+
+  std::unique_ptr<MemoryBuffer>
+  codegenObject(Module &M, SmallPtrSetImpl<void *> &GlobalLinkedBinaries,
+                const CodeGenerationConfig &CGConfig);
+
+  std::unique_ptr<Dispatcher> createDispatcher();
 
 private:
   JitEngineDeviceCUDA();

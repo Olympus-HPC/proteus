@@ -20,10 +20,10 @@ public:
   }
 
 private:
-  DispatcherHostHIP() : DispatcherHost("DispatcherHostHIP") {
-    // Preserve HIP cache labels when the implementation goes through host JIT.
-    TargetModel = TargetModelType::HOST_HIP;
-  }
+  // Preserve HIP cache labels when the implementation goes through host JIT.
+  DispatcherHostHIP()
+      : DispatcherHost("DispatcherHostHIP", JitEngineHost::instance(),
+                       TargetModelType::HOST_HIP) {}
 };
 
 } // namespace proteus
