@@ -132,6 +132,12 @@ Public Attributes</h2></td></tr>
 <tr class="separator:aeb862b3d58a28c69702747ebd877ae00"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a73aa37998b23ab680b4d9539738cf123" id="r_a73aa37998b23ab680b4d9539738cf123"><td class="memItemLeft" align="right" valign="top">llvm::orc::JITDylib *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1CompiledLibrary.html#a73aa37998b23ab680b4d9539738cf123">JitDyLib</a> = nullptr</td></tr>
 <tr class="separator:a73aa37998b23ab680b4d9539738cf123"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:addd40676deb9dbcd85e94233348a9630" id="r_addd40676deb9dbcd85e94233348a9630"><td class="memItemLeft" align="right" valign="top">const std::unordered_map&lt; std::string, <a class="el" href="structproteus_1_1GlobalVarInfo.html">GlobalVarInfo</a> &gt; *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1CompiledLibrary.html#addd40676deb9dbcd85e94233348a9630">VarNameToGlobalInfo</a></td></tr>
+<tr class="separator:addd40676deb9dbcd85e94233348a9630"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab9bd709b4e5e45a523252590ba0c1add" id="r_ab9bd709b4e5e45a523252590ba0c1add"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1CompiledLibrary.html#ab9bd709b4e5e45a523252590ba0c1add">RelinkGlobalsByCopy</a> = false</td></tr>
+<tr class="separator:ab9bd709b4e5e45a523252590ba0c1add"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af600dc3d6ce3ded0ae141d540fb03d12" id="r_af600dc3d6ce3ded0ae141d540fb03d12"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structproteus_1_1CompiledLibrary.html#af600dc3d6ce3ded0ae141d540fb03d12">GlobalsRelinked</a> = false</td></tr>
+<tr class="separator:af600dc3d6ce3ded0ae141d540fb03d12"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
 <a id="a7b61084ba0f9cd4e9c10a10e1db3b6ff" name="a7b61084ba0f9cd4e9c10a10e1db3b6ff"></a>
@@ -261,6 +267,20 @@ Public Attributes</h2></td></tr>
 
 </div>
 </div>
+<a id="af600dc3d6ce3ded0ae141d540fb03d12" name="af600dc3d6ce3ded0ae141d540fb03d12"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af600dc3d6ce3ded0ae141d540fb03d12">&#9670;&#160;</a></span>GlobalsRelinked</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool proteus::CompiledLibrary::GlobalsRelinked = false</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
 <a id="a4405b31c4164c92161f3e0cf5fed5904" name="a4405b31c4164c92161f3e0cf5fed5904"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a4405b31c4164c92161f3e0cf5fed5904">&#9670;&#160;</a></span>IsDynLib</h2>
 
@@ -315,6 +335,36 @@ Public Attributes</h2></td></tr>
       </table>
 </div><div class="memdoc">
 
+</div>
+</div>
+<a id="ab9bd709b4e5e45a523252590ba0c1add" name="ab9bd709b4e5e45a523252590ba0c1add"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab9bd709b4e5e45a523252590ba0c1add">&#9670;&#160;</a></span>RelinkGlobalsByCopy</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool proteus::CompiledLibrary::RelinkGlobalsByCopy = false</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="addd40676deb9dbcd85e94233348a9630" name="addd40676deb9dbcd85e94233348a9630"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#addd40676deb9dbcd85e94233348a9630">&#9670;&#160;</a></span>VarNameToGlobalInfo</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const std::unordered_map&lt;std::string, <a class="el" href="structproteus_1_1GlobalVarInfo.html">GlobalVarInfo</a>&gt;* proteus::CompiledLibrary::VarNameToGlobalInfo</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<b>Initial value:</b><div class="fragment"><div class="line">=</div>
+<div class="line">      <span class="keyword">nullptr</span></div>
+</div><!-- fragment -->
 </div>
 </div>
 <hr/>The documentation for this struct was generated from the following files:<ul>

@@ -7,11 +7,12 @@ var searchData=
   ['registerfunctionname_4',['RegisterFunctionName',['../Helpers_8h.html#ac25b0461f65ecdfd88731decbbb00f8f',1,'Helpers.h']]],
   ['registervarname_5',['RegisterVarName',['../Helpers_8h.html#acf8423a8b72fd7fb73609cf18a486d59',1,'Helpers.h']]],
   ['registrationfunc_6',['RegistrationFunc',['../CompilerInterfaceDevice_8cpp.html#a09e9ef949da2835999d4be8f52b7449f',1,'CompilerInterfaceDevice.cpp']]],
-  ['resolvedmap_7',['ResolvedMap',['../structproteus_1_1LinkingCloner.html#ae48543488cbf39a8cecde4cb4d0867fb',1,'proteus::LinkingCloner']]],
-  ['ret_8',['Ret',['../structproteus_1_1DispatchResult.html#afc9a9f746c6d2d57a253b4a2c11e805e',1,'proteus::DispatchResult']]],
-  ['retty_9',['RetTy',['../classproteus_1_1MLIRIRFunction.html#ac8bfa25a4b3444df6ef32fabdb82d98d',1,'proteus::MLIRIRFunction']]],
-  ['rocmroot_10',['RocmRoot',['../structproteus_1_1ResolvedHIPToolchain.html#a0171df138cf26e284ae90b24ba868e63',1,'proteus::ResolvedHIPToolchain']]],
-  ['root_11',['Root',['../structproteus_1_1ResolvedCUDAToolchain.html#a2558b5497d5ff1cf047f7cdbfc194aad',1,'proteus::ResolvedCUDAToolchain']]],
-  ['runtimelibdir_12',['RuntimeLibDir',['../structproteus_1_1ResolvedCUDAToolchain.html#a3de048d1a19a4632d6d0172c80858a2e',1,'proteus::ResolvedCUDAToolchain']]],
-  ['runtimeversion_13',['RuntimeVersion',['../structproteus_1_1ResolvedHIPToolchain.html#a0ebcda03148dc4e244d6fb4f74701879',1,'proteus::ResolvedHIPToolchain']]]
+  ['relinkglobalsbycopy_7',['RelinkGlobalsByCopy',['../structproteus_1_1CompiledLibrary.html#ab9bd709b4e5e45a523252590ba0c1add',1,'proteus::CompiledLibrary']]],
+  ['resolvedmap_8',['ResolvedMap',['../structproteus_1_1LinkingCloner.html#ae48543488cbf39a8cecde4cb4d0867fb',1,'proteus::LinkingCloner']]],
+  ['ret_9',['Ret',['../structproteus_1_1DispatchResult.html#afc9a9f746c6d2d57a253b4a2c11e805e',1,'proteus::DispatchResult']]],
+  ['retty_10',['RetTy',['../classproteus_1_1MLIRIRFunction.html#ac8bfa25a4b3444df6ef32fabdb82d98d',1,'proteus::MLIRIRFunction']]],
+  ['rocmroot_11',['RocmRoot',['../structproteus_1_1ResolvedHIPToolchain.html#a0171df138cf26e284ae90b24ba868e63',1,'proteus::ResolvedHIPToolchain']]],
+  ['root_12',['Root',['../structproteus_1_1ResolvedCUDAToolchain.html#a2558b5497d5ff1cf047f7cdbfc194aad',1,'proteus::ResolvedCUDAToolchain']]],
+  ['runtimelibdir_13',['RuntimeLibDir',['../structproteus_1_1ResolvedCUDAToolchain.html#a3de048d1a19a4632d6d0172c80858a2e',1,'proteus::ResolvedCUDAToolchain']]],
+  ['runtimeversion_14',['RuntimeVersion',['../structproteus_1_1ResolvedHIPToolchain.html#a0ebcda03148dc4e244d6fb4f74701879',1,'proteus::ResolvedHIPToolchain']]]
 ];

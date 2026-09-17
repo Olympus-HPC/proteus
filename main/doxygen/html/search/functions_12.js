@@ -46,6 +46,7 @@ var searchData=
   ['storevalue_43',['storevalue',['../structproteus_1_1Var_3_01T_00_01std_1_1enable__if__t_3_01is__scalar__arithmetic__v_3_01T_01_4_01_4_01_4.html#a66445314d0bf03667761cbcc074936f5',1,'proteus::Var&lt; T, std::enable_if_t&lt; is_scalar_arithmetic_v&lt; T &gt; &gt; &gt;::storeValue()'],['../structproteus_1_1Var_3_01T_00_01std_1_1enable__if__t_3_01is__pointer__unref__v_3_01T_01_4_01_4_01_4.html#ae861beac8d831ded758a531461e5937c',1,'proteus::Var&lt; T, std::enable_if_t&lt; is_pointer_unref_v&lt; T &gt; &gt; &gt;::storeValue()'],['../structproteus_1_1Var_3_01T_00_01std_1_1enable__if__t_3_01std_1_1is__array__v_3_01T_01_4_01_4_01_4.html#ad76c86813554c0acaa33c8edfb6888c2',1,'proteus::Var&lt; T, std::enable_if_t&lt; std::is_array_v&lt; T &gt; &gt; &gt;::storeValue()']]],
   ['strtocg_44',['strToCG',['../namespaceproteus.html#ae111b3c2d5b0cbfb712dc76a485e5cd2',1,'proteus']]],
   ['success_45',['success',['../classproteus_1_1LambdaArgVisitor.html#abc8a5b407e12480ea368b1d85f9f90ee',1,'proteus::LambdaArgVisitor::success()'],['../classproteus_1_1LambdaInstUseVisitor.html#a3c2221e638b72d349fb474efa3b10206',1,'proteus::LambdaInstUseVisitor::success()']]],
-  ['switch_46',['switch',['../CompilerInterfaceDevice_8cpp.html#af51c07e134b06f6d3010b7210a464615',1,'CompilerInterfaceDevice.cpp']]],
-  ['syncthreads_47',['syncThreads',['../namespaceproteus_1_1builtins_1_1gpu.html#aecd2c6ff1d049982fc7a7c9e399701d7',1,'proteus::builtins::gpu']]]
+  ['suffix_46',['suffix',['../classproteus_1_1KernelName.html#a4eaa974374766e2b3e2048f620a72353',1,'proteus::KernelName']]],
+  ['switch_47',['switch',['../CompilerInterfaceDevice_8cpp.html#af51c07e134b06f6d3010b7210a464615',1,'CompilerInterfaceDevice.cpp']]],
+  ['syncthreads_48',['syncThreads',['../namespaceproteus_1_1builtins_1_1gpu.html#aecd2c6ff1d049982fc7a7c9e399701d7',1,'proteus::builtins::gpu']]]
 ];

@@ -124,13 +124,11 @@ Collaboration diagram for proteus::JitEngineDevice&lt; ImplT &gt;:</div>
 <div class="dyncontent">
 <div class="center"><img src="classproteus_1_1JitEngineDevice__coll__graph.png" border="0" usemap="#aproteus_1_1JitEngineDevice_3_01ImplT_01_4_coll__map" alt="Collaboration graph"/></div>
 <map name="aproteus_1_1JitEngineDevice_3_01ImplT_01_4_coll__map" id="aproteus_1_1JitEngineDevice_3_01ImplT_01_4_coll__map">
-<area shape="rect" title=" " alt="" coords="139,196,320,236"/>
-<area shape="rect" href="classproteus_1_1JitEngine.html" title=" " alt="" coords="28,101,164,126"/>
-<area shape="poly" title=" " alt="" coords="124,132,206,194,203,198,120,136"/>
+<area shape="rect" title=" " alt="" coords="5,168,187,208"/>
+<area shape="rect" href="classproteus_1_1JitEngine.html" title=" " alt="" coords="28,93,164,119"/>
+<area shape="poly" title=" " alt="" coords="99,132,99,168,93,168,93,132"/>
 <area shape="rect" href="structproteus_1_1InitLLVMTargets.html" title=" " alt="" coords="5,5,187,31"/>
-<area shape="poly" title=" " alt="" coords="99,44,99,101,93,101,93,44"/>
-<area shape="rect" href="classproteus_1_1MemoryCache.html" title=" " alt="" coords="188,93,361,133"/>
-<area shape="poly" title=" " alt="" coords="263,147,240,197,235,195,258,145"/>
+<area shape="poly" title=" " alt="" coords="99,45,99,93,93,93,93,45"/>
 </map>
 <center><span class="legend">[<a href="graph_legend.html">legend</a>]</span></center></div>
 <table class="memberdecls">
@@ -147,7 +145,7 @@ Public Types</h2></td></tr>
 Public Member Functions</h2></td></tr>
 <tr class="memitem:ad681915e2cfc71faea71407fd4bb7e86" id="r_ad681915e2cfc71faea71407fd4bb7e86"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classproteus_1_1JitEngineDevice.html#a1f02cecb46e4de0e20c7d4092b3a3ba6">DeviceError_t</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineDevice.html#ad681915e2cfc71faea71407fd4bb7e86">compileAndRun</a> (<a class="el" href="classproteus_1_1JITKernelInfo.html">JITKernelInfo</a> &amp;KernelInfo, dim3 GridDim, dim3 BlockDim, void **KernelArgs, uint64_t ShmemSize, typename <a class="el" href="structproteus_1_1DeviceTraits.html">DeviceTraits</a>&lt; ImplT &gt;<a class="el" href="classproteus_1_1JitEngineDevice.html#a5962bc884867ec347ba7e0e5cda18649">::DeviceStream_t</a> Stream)</td></tr>
 <tr class="separator:ad681915e2cfc71faea71407fd4bb7e86"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a78e8c702088e00c8f8d475cc745450c1" id="r_a78e8c702088e00c8f8d475cc745450c1"><td class="memItemLeft" align="right" valign="top">std::pair&lt; std::unique_ptr&lt; Module &gt;, std::unique_ptr&lt; MemoryBuffer &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineDevice.html#a78e8c702088e00c8f8d475cc745450c1">extractKernelModule</a> (<a class="el" href="classproteus_1_1BinaryInfo.html">BinaryInfo</a> &amp;BinInfo, StringRef <a class="el" href="CompilerInterfaceDevice_8cpp.html#a7a4bfe63d50718131003cf5b4d2bb0d8">KernelName</a>, LLVMContext &amp;Ctx)</td></tr>
+<tr class="memitem:a78e8c702088e00c8f8d475cc745450c1" id="r_a78e8c702088e00c8f8d475cc745450c1"><td class="memItemLeft" align="right" valign="top">std::pair&lt; std::unique_ptr&lt; Module &gt;, std::unique_ptr&lt; MemoryBuffer &gt; &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineDevice.html#a78e8c702088e00c8f8d475cc745450c1">extractKernelModule</a> (<a class="el" href="classproteus_1_1BinaryInfo.html">BinaryInfo</a> &amp;BinInfo, StringRef <a class="el" href="classproteus_1_1KernelName.html">KernelName</a>, LLVMContext &amp;Ctx)</td></tr>
 <tr class="separator:a78e8c702088e00c8f8d475cc745450c1"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a36a24a97b5f49db05da4037dca00a031" id="r_a36a24a97b5f49db05da4037dca00a031"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineDevice.html#a36a24a97b5f49db05da4037dca00a031">extractModuleAndBitcode</a> (<a class="el" href="classproteus_1_1JITKernelInfo.html">JITKernelInfo</a> &amp;KernelInfo)</td></tr>
 <tr class="separator:a36a24a97b5f49db05da4037dca00a031"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -165,7 +163,7 @@ Public Member Functions</h2></td></tr>
 <tr class="separator:ad5baa9003cccbc222185abfd7864f803"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6540643f77b5c2d785f445fe12dc1b2a" id="r_a6540643f77b5c2d785f445fe12dc1b2a"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineDevice.html#a6540643f77b5c2d785f445fe12dc1b2a">finalizeRegistration</a> ()</td></tr>
 <tr class="separator:a6540643f77b5c2d785f445fe12dc1b2a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a82f52ffdf306c802fe083ec012c9b902" id="r_a82f52ffdf306c802fe083ec012c9b902"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineDevice.html#a82f52ffdf306c802fe083ec012c9b902">registerFunction</a> (void *Handle, void *<a class="el" href="CompilerInterfaceDevice_8cpp.html#a85044d213393723d1b4ee267cd7e1d57">Kernel</a>, char *<a class="el" href="CompilerInterfaceDevice_8cpp.html#a7a4bfe63d50718131003cf5b4d2bb0d8">KernelName</a>, ArrayRef&lt; <a class="el" href="structproteus_1_1RuntimeConstantInfo.html">RuntimeConstantInfo</a> * &gt; RCInfoArray)</td></tr>
+<tr class="memitem:a82f52ffdf306c802fe083ec012c9b902" id="r_a82f52ffdf306c802fe083ec012c9b902"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineDevice.html#a82f52ffdf306c802fe083ec012c9b902">registerFunction</a> (void *Handle, void *<a class="el" href="CompilerInterfaceDevice_8cpp.html#a85044d213393723d1b4ee267cd7e1d57">Kernel</a>, char *<a class="el" href="classproteus_1_1KernelName.html">KernelName</a>, ArrayRef&lt; <a class="el" href="structproteus_1_1RuntimeConstantInfo.html">RuntimeConstantInfo</a> * &gt; RCInfoArray)</td></tr>
 <tr class="separator:a82f52ffdf306c802fe083ec012c9b902"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a58c02d9331bd4cb89b0e5542c888a83b" id="r_a58c02d9331bd4cb89b0e5542c888a83b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineDevice.html#a58c02d9331bd4cb89b0e5542c888a83b">registerLambdaCallsiteLocation</a> (void *<a class="el" href="CompilerInterfaceDevice_8cpp.html#a85044d213393723d1b4ee267cd7e1d57">Kernel</a>, uint64_t <a class="el" href="CompilerInterfaceDevice_8cpp.html#a47cd70d25244738dc6068ed25f6272c2">LambdaID</a>, uint32_t <a class="el" href="CompilerInterfaceDevice_8cpp.html#a18204ea9e58ad72ebae0099b0789662a">CallsiteIndex</a>, uint32_t <a class="el" href="CompilerInterfaceDevice_8cpp.html#a9ac00a5d27db68a6d042dc5fc32fe2c2">KernelArgIndex</a>, int64_t <a class="el" href="CompilerInterfaceDevice_8cpp.html#a542784c8885cda173ab30a4a3eaef3fc">Offset</a>, <a class="el" href="namespaceproteus.html#a321b5206e698d88e9dbf55b4c1c69ee1">RuntimeConstantType</a> <a class="el" href="CompilerInterfaceDevice_8cpp.html#af853e06352945001bc2dc151f7cd9291">StorageType</a>)</td></tr>
 <tr class="separator:a58c02d9331bd4cb89b0e5542c888a83b"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -203,6 +201,8 @@ Protected Member Functions</h2></td></tr>
 <tr class="separator:a4585270191120ebe54ee6b83561bf56d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a1132b5bc245ed7bd2c9a51cd31b65884" id="r_a1132b5bc245ed7bd2c9a51cd31b65884"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineDevice.html#a1132b5bc245ed7bd2c9a51cd31b65884">~JitEngineDevice</a> ()</td></tr>
 <tr class="separator:a1132b5bc245ed7bd2c9a51cd31b65884"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab8d7944c8943a22de5dbcb65ea39f57b" id="r_ab8d7944c8943a22de5dbcb65ea39f57b"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classproteus_1_1Dispatcher.html">Dispatcher</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineDevice.html#ab8d7944c8943a22de5dbcb65ea39f57b">getDispatcher</a> ()</td></tr>
+<tr class="separator:ab8d7944c8943a22de5dbcb65ea39f57b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pro_methods_classproteus_1_1JitEngine"><td colspan="2" onclick="javascript:toggleInherit('pro_methods_classproteus_1_1JitEngine')"><img src="closed.png" alt="-"/>&#160;Protected Member Functions inherited from <a class="el" href="classproteus_1_1JitEngine.html">proteus::JitEngine</a></td></tr>
 <tr class="memitem:a6aa61854e18dd9f06a0a71e9470faf84 inherit pro_methods_classproteus_1_1JitEngine" id="r_a6aa61854e18dd9f06a0a71e9470faf84"><td class="memItemLeft" align="right" valign="top">SmallVector&lt; <a class="el" href="structproteus_1_1RuntimeConstant.html">RuntimeConstant</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngine.html#a6aa61854e18dd9f06a0a71e9470faf84">getRuntimeConstantValues</a> (void **KernelArgs, ArrayRef&lt; <a class="el" href="structproteus_1_1RuntimeConstantInfo.html">RuntimeConstantInfo</a> * &gt; RCInfoArray)</td></tr>
 <tr class="separator:a6aa61854e18dd9f06a0a71e9470faf84 inherit pro_methods_classproteus_1_1JitEngine"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -211,10 +211,8 @@ Protected Member Functions</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pro-attribs" name="pro-attribs"></a>
 Protected Attributes</h2></td></tr>
-<tr class="memitem:a6a83f95f1bdeeb03a80fa83ad4613df9" id="r_a6a83f95f1bdeeb03a80fa83ad4613df9"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classproteus_1_1MemoryCache.html">MemoryCache</a>&lt; <a class="el" href="classproteus_1_1JitEngineDevice.html#ae373f6f0cb3acffe8aaf6f71ad127921">KernelFunction_t</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineDevice.html#a6a83f95f1bdeeb03a80fa83ad4613df9">CodeCache</a> {&quot;JitEngineDevice&quot;}</td></tr>
-<tr class="separator:a6a83f95f1bdeeb03a80fa83ad4613df9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acb05a82d758718064db2ddab084d0baf" id="r_acb05a82d758718064db2ddab084d0baf"><td class="memItemLeft" align="right" valign="top">std::optional&lt; <a class="el" href="classproteus_1_1ObjectCacheChain.html">ObjectCacheChain</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineDevice.html#acb05a82d758718064db2ddab084d0baf">CacheChain</a></td></tr>
-<tr class="separator:acb05a82d758718064db2ddab084d0baf"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6acbadd7ffcd484a4674ec45f3fcc1cf" id="r_a6acbadd7ffcd484a4674ec45f3fcc1cf"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; <a class="el" href="classproteus_1_1Dispatcher.html">Dispatcher</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineDevice.html#a6acbadd7ffcd484a4674ec45f3fcc1cf">Dispatch</a></td></tr>
+<tr class="separator:a6acbadd7ffcd484a4674ec45f3fcc1cf"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aef1089cea5468fa379fc8ab28a8a55c8" id="r_aef1089cea5468fa379fc8ab28a8a55c8"><td class="memItemLeft" align="right" valign="top">std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineDevice.html#aef1089cea5468fa379fc8ab28a8a55c8">DeviceArch</a></td></tr>
 <tr class="separator:aef1089cea5468fa379fc8ab28a8a55c8"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4bebe1e3e252de179bf5f0924611294f" id="r_a4bebe1e3e252de179bf5f0924611294f"><td class="memItemLeft" align="right" valign="top">DenseMap&lt; const void *, <a class="el" href="classproteus_1_1JITKernelInfo.html">JITKernelInfo</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineDevice.html#a4bebe1e3e252de179bf5f0924611294f">JITKernelInfoMap</a></td></tr>
@@ -551,6 +549,33 @@ template&lt;typename ImplT &gt; </div>
   </td>
   <td class="mlabels-right">
 <span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="ab8d7944c8943a22de5dbcb65ea39f57b" name="ab8d7944c8943a22de5dbcb65ea39f57b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab8d7944c8943a22de5dbcb65ea39f57b">&#9670;&#160;</a></span>getDispatcher()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename ImplT &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="classproteus_1_1Dispatcher.html">Dispatcher</a> &amp; <a class="el" href="classproteus_1_1JitEngineDevice.html">proteus::JitEngineDevice</a>&lt; ImplT &gt;::getDispatcher </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">protected</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
@@ -922,54 +947,6 @@ template&lt;typename ImplT &gt; </div>
 
 </div>
 </div>
-<a id="acb05a82d758718064db2ddab084d0baf" name="acb05a82d758718064db2ddab084d0baf"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#acb05a82d758718064db2ddab084d0baf">&#9670;&#160;</a></span>CacheChain</h2>
-
-<div class="memitem">
-<div class="memproto">
-<div class="memtemplate">
-template&lt;typename ImplT &gt; </div>
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">std::optional&lt;<a class="el" href="classproteus_1_1ObjectCacheChain.html">ObjectCacheChain</a>&gt; <a class="el" href="classproteus_1_1JitEngineDevice.html">proteus::JitEngineDevice</a>&lt; ImplT &gt;::CacheChain</td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">protected</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-</div>
-</div>
-<a id="a6a83f95f1bdeeb03a80fa83ad4613df9" name="a6a83f95f1bdeeb03a80fa83ad4613df9"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a6a83f95f1bdeeb03a80fa83ad4613df9">&#9670;&#160;</a></span>CodeCache</h2>
-
-<div class="memitem">
-<div class="memproto">
-<div class="memtemplate">
-template&lt;typename ImplT &gt; </div>
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname"><a class="el" href="classproteus_1_1MemoryCache.html">MemoryCache</a>&lt;<a class="el" href="classproteus_1_1JitEngineDevice.html#ae373f6f0cb3acffe8aaf6f71ad127921">KernelFunction_t</a>&gt; <a class="el" href="classproteus_1_1JitEngineDevice.html">proteus::JitEngineDevice</a>&lt; ImplT &gt;::CodeCache {&quot;JitEngineDevice&quot;}</td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">protected</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-</div>
-</div>
 <a id="aef1089cea5468fa379fc8ab28a8a55c8" name="aef1089cea5468fa379fc8ab28a8a55c8"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#aef1089cea5468fa379fc8ab28a8a55c8">&#9670;&#160;</a></span>DeviceArch</h2>
 
@@ -983,6 +960,30 @@ template&lt;typename ImplT &gt; </div>
       <table class="memname">
         <tr>
           <td class="memname">std::string <a class="el" href="classproteus_1_1JitEngineDevice.html">proteus::JitEngineDevice</a>&lt; ImplT &gt;::DeviceArch</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">protected</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a id="a6acbadd7ffcd484a4674ec45f3fcc1cf" name="a6acbadd7ffcd484a4674ec45f3fcc1cf"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a6acbadd7ffcd484a4674ec45f3fcc1cf">&#9670;&#160;</a></span>Dispatch</h2>
+
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename ImplT &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::unique_ptr&lt;<a class="el" href="classproteus_1_1Dispatcher.html">Dispatcher</a>&gt; <a class="el" href="classproteus_1_1JitEngineDevice.html">proteus::JitEngineDevice</a>&lt; ImplT &gt;::Dispatch</td>
         </tr>
       </table>
   </td>

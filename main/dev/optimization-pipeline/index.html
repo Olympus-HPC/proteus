@@ -1313,8 +1313,8 @@ the helper appends the pipeline fragment by default.
 <td>DSL <code>JitModule</code>, LLVM backend</td>
 <td>HIP device</td>
 <td>DSL -&gt; LLVM IR -&gt; HIP dispatcher</td>
-<td>Yes</td>
-<td>HIP dispatcher reaches <code>JitEngineDeviceHIP::compileOnly()</code>. Module hash includes codegen config.</td>
+<td>Serial and parallel only</td>
+<td>HIP dispatcher optimizes before serial codegen or forwards the pipeline to LTO for parallel codegen. Under <code>PROTEUS_CODEGEN=rtc</code> HIPRTC optimizes instead, see HIP RTC below. Module hash includes codegen config.</td>
 </tr>
 <tr>
 <td>DSL <code>JitModule</code>, MLIR backend</td>
@@ -1334,7 +1334,7 @@ the helper appends the pipeline fragment by default.
 <td>DSL <code>JitModule</code>, MLIR backend</td>
 <td>HIP device</td>
 <td>MLIR -&gt; LLVM IR -&gt; HIP dispatcher</td>
-<td>Yes</td>
+<td>Serial and parallel only</td>
 <td>Same HIP dispatcher path. Module hash includes codegen config.</td>
 </tr>
 <tr>
@@ -1355,8 +1355,8 @@ the helper appends the pipeline fragment by default.
 <td>Direct <code>MLIRJitModule</code></td>
 <td>HIP device</td>
 <td>MLIR source -&gt; LLVM IR -&gt; HIP dispatcher</td>
-<td>Yes</td>
-<td>Uses dispatcher compile path. Module hash includes codegen config.</td>
+<td>Serial and parallel only</td>
+<td>Same HIP dispatcher path. Module hash includes codegen config.</td>
 </tr>
 <tr>
 <td><code>CppJitModule</code>, Clang backend</td>
@@ -1376,8 +1376,8 @@ the helper appends the pipeline fragment by default.
 <td><code>CppJitModule</code>, Clang backend</td>
 <td>HIP device-only</td>
 <td>Clang emits device LLVM IR -&gt; HIP dispatcher</td>
-<td>Yes</td>
-<td>Proteus optimizes the emitted LLVM IR. Module hash includes codegen config.</td>
+<td>Serial and parallel only</td>
+<td>Same HIP dispatcher path. Module hash includes codegen config.</td>
 </tr>
 <tr>
 <td><code>CppJitModule</code>, Clang backend</td>
@@ -1443,6 +1443,14 @@ interface accepts some compiler options, but it does not expose a documented
 LLVM textual pass pipeline interface equivalent to <code>opt</code>/PassBuilder or LLVM
 LTO's <code>OptPipeline</code>.
 JIT pass-plugin registration does not change this exclusion.</p>
+<p>This applies to every HIP path, including the DSL and <code>CppJitModule</code> HIP
+dispatcher paths. HIPRTC runs its own full optimization pipeline on the
+bitcode it receives, so Proteus skips <code>optimizeIR()</code> before RTC codegen
+rather than optimizing the module twice. Since <code>rtc</code> is the default HIP
+codegen mode, <code>PROTEUS_OPT_PIPELINE</code>, <code>PROTEUS_OPT_LEVEL</code>,
+<code>PROTEUS_CODEGEN_OPT_LEVEL</code>, and JIT pass plugins are ignored on HIP unless
+<code>PROTEUS_CODEGEN=serial</code> or <code>PROTEUS_CODEGEN=parallel</code> is set. Proteus prints a
+one-time warning when any of these is configured under <code>rtc</code>.</p>
 <h3 id="cppjit-hostcuda-hosthip">CppJit Host+CUDA / Host+HIP</h3>
 <p>The Clang backend currently compiles mixed host/device C++ offload source
 directly into a shared library for <code>HOST_CUDA</code> and <code>HOST_HIP</code>. Proteus receives

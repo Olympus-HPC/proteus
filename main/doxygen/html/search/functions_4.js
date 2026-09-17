@@ -10,7 +10,7 @@ var searchData=
   ['devicebinary_7',['deviceBinary',['../structproteus_1_1CppJitArtifact.html#a9b99de6709689329703079e983a0ab17',1,'proteus::CppJitArtifact']]],
   ['disable_8',['disable',['../classproteus_1_1JitEngine.html#a8df30224a63042b923da71432727d41d',1,'proteus::JitEngine::disable()'],['../namespaceproteus.html#a8bb39f5810f6d04eda164df11f1ebe6a',1,'proteus::disable()']]],
   ['dispatcher_9',['Dispatcher',['../classproteus_1_1Dispatcher.html#af5755c5d77823e85becd004fa7fa9d87',1,'proteus::Dispatcher']]],
-  ['dispatcherhost_10',['DispatcherHost',['../classproteus_1_1DispatcherHost.html#ab412e976dfd8c9d65f4b41f82743466e',1,'proteus::DispatcherHost']]],
+  ['dispatcherhost_10',['dispatcherhost',['../classproteus_1_1DispatcherHost.html#a8df99acce5a400d7f56d9bd2175af716',1,'proteus::DispatcherHost::DispatcherHost(const std::string &amp;Label, JitEngineHost &amp;Jit)'],['../classproteus_1_1DispatcherHost.html#acb93044f6be634f68cef99072a25c82b',1,'proteus::DispatcherHost::DispatcherHost(const std::string &amp;Label, JitEngineHost &amp;Jit, TargetModelType TM)']]],
   ['dispatchgetruntimeconstantvalue_11',['dispatchGetRuntimeConstantValue',['../namespaceproteus.html#af2e1d2801041e0ee26e55165dcf3aa7d',1,'proteus']]],
   ['dispatchresult_12',['DispatchResult',['../structproteus_1_1DispatchResult.html#a5d06b77b074b4ee086119e8b9157ee97',1,'proteus::DispatchResult']]],
   ['dump_13',['dump',['../classproteus_1_1CodeGenerationConfig.html#a18becaeaa7be4977dd71d7c5057c2b0c',1,'proteus::CodeGenerationConfig::dump()'],['../classproteus_1_1Config.html#a9973134e8b3af8f03645649360e70ae1',1,'proteus::Config::dump()']]],

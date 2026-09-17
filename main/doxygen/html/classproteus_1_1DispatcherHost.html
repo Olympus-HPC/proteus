@@ -130,28 +130,48 @@ Collaboration diagram for proteus::DispatcherHost:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:ae61a5abfcc533c32aac4e4f36a5fea18" id="r_ae61a5abfcc533c32aac4e4f36a5fea18"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; MemoryBuffer &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1DispatcherHost.html#ae61a5abfcc533c32aac4e4f36a5fea18">compile</a> (std::unique_ptr&lt; LLVMContext &gt; Ctx, std::unique_ptr&lt; Module &gt; Mod, const <a class="el" href="classproteus_1_1HashT.html">HashT</a> &amp;ModuleHash, bool DisableIROpt=false) override</td></tr>
-<tr class="separator:ae61a5abfcc533c32aac4e4f36a5fea18"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3f409cb7495e36537c7a2d497222f310" id="r_a3f409cb7495e36537c7a2d497222f310"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; <a class="el" href="structproteus_1_1CompiledLibrary.html">CompiledLibrary</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1DispatcherHost.html#a3f409cb7495e36537c7a2d497222f310">lookupCompiledLibrary</a> (const <a class="el" href="classproteus_1_1HashT.html">HashT</a> &amp;ModuleHash) override</td></tr>
-<tr class="separator:a3f409cb7495e36537c7a2d497222f310"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8df99acce5a400d7f56d9bd2175af716" id="r_a8df99acce5a400d7f56d9bd2175af716"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1DispatcherHost.html#a8df99acce5a400d7f56d9bd2175af716">DispatcherHost</a> (const std::string &amp;<a class="el" href="classproteus_1_1Dispatcher.html#a39b8ae81affe3fc4ed6a3469b8861147">Label</a>, <a class="el" href="classproteus_1_1JitEngineHost.html">JitEngineHost</a> &amp;Jit)</td></tr>
+<tr class="separator:a8df99acce5a400d7f56d9bd2175af716"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1eda0487e438b28a4df96ae27dbf365f" id="r_a1eda0487e438b28a4df96ae27dbf365f"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; MemoryBuffer &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1DispatcherHost.html#a1eda0487e438b28a4df96ae27dbf365f">compileModule</a> (Module &amp;M, const <a class="el" href="classproteus_1_1CodeGenerationConfig.html">CodeGenerationConfig</a> &amp;CGConfig) override</td></tr>
+<tr class="separator:a1eda0487e438b28a4df96ae27dbf365f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a71616d3bc8b5f9ebfc927224e5b46b4b" id="r_a71616d3bc8b5f9ebfc927224e5b46b4b"><td class="memItemLeft" align="right" valign="top"><a class="el" href="structproteus_1_1DispatchResult.html">DispatchResult</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1DispatcherHost.html#a71616d3bc8b5f9ebfc927224e5b46b4b">launch</a> (void *, <a class="el" href="structLaunchDims.html">LaunchDims</a>, <a class="el" href="structLaunchDims.html">LaunchDims</a>, void *[], uint64_t, void *) override</td></tr>
 <tr class="separator:a71616d3bc8b5f9ebfc927224e5b46b4b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a50fe673748e6108ded8becb14382685e" id="r_a50fe673748e6108ded8becb14382685e"><td class="memItemLeft" align="right" valign="top">StringRef&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1DispatcherHost.html#a50fe673748e6108ded8becb14382685e">getDeviceArch</a> () const override</td></tr>
 <tr class="separator:a50fe673748e6108ded8becb14382685e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9db0812e8cf565dd147a1a666d61511a" id="r_a9db0812e8cf565dd147a1a666d61511a"><td class="memItemLeft" align="right" valign="top">void *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1DispatcherHost.html#a9db0812e8cf565dd147a1a666d61511a">getFunctionAddress</a> (const std::string &amp;FnName, const <a class="el" href="classproteus_1_1HashT.html">HashT</a> &amp;ModuleHash, <a class="el" href="structproteus_1_1CompiledLibrary.html">CompiledLibrary</a> &amp;Library) override</td></tr>
-<tr class="separator:a9db0812e8cf565dd147a1a666d61511a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4a99fde4db34f11492dfb7ee11134fb3" id="r_a4a99fde4db34f11492dfb7ee11134fb3"><td class="memItemLeft" align="right" valign="top">void *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1DispatcherHost.html#a4a99fde4db34f11492dfb7ee11134fb3">lookupFunction</a> (StringRef BaseName, const <a class="el" href="classproteus_1_1HashT.html">HashT</a> &amp;ModuleHash) override</td></tr>
+<tr class="separator:a4a99fde4db34f11492dfb7ee11134fb3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8c9cfaeeab2d4d364d47804abf0f8e1a" id="r_a8c9cfaeeab2d4d364d47804abf0f8e1a"><td class="memItemLeft" align="right" valign="top">void *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1DispatcherHost.html#a8c9cfaeeab2d4d364d47804abf0f8e1a">insertFunction</a> (const <a class="el" href="classproteus_1_1KernelName.html">KernelName</a> &amp;Name, const <a class="el" href="classproteus_1_1HashT.html">HashT</a> &amp;ModuleHash, <a class="el" href="structproteus_1_1CompiledLibrary.html">CompiledLibrary</a> &amp;Library) override</td></tr>
+<tr class="separator:a8c9cfaeeab2d4d364d47804abf0f8e1a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aeaac0a9a60fc6addcbea0fabb6b2fcfd" id="r_aeaac0a9a60fc6addcbea0fabb6b2fcfd"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1DispatcherHost.html#aeaac0a9a60fc6addcbea0fabb6b2fcfd">registerDynamicLibrary</a> (const <a class="el" href="classproteus_1_1HashT.html">HashT</a> &amp;HashValue, const std::string &amp;Path) override</td></tr>
 <tr class="separator:aeaac0a9a60fc6addcbea0fabb6b2fcfd"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a887f16a010fccf9ece430ed16a1fb8fc" id="r_a887f16a010fccf9ece430ed16a1fb8fc"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1DispatcherHost.html#a887f16a010fccf9ece430ed16a1fb8fc">registerObject</a> (const <a class="el" href="classproteus_1_1HashT.html">HashT</a> &amp;HashValue, const llvm::MemoryBufferRef &amp;Obj) override</td></tr>
-<tr class="separator:a887f16a010fccf9ece430ed16a1fb8fc"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa3cbd97686613b85dd40949f4d9ec378" id="r_aa3cbd97686613b85dd40949f4d9ec378"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1DispatcherHost.html#aa3cbd97686613b85dd40949f4d9ec378">~DispatcherHost</a> ()</td></tr>
+<tr class="separator:aa3cbd97686613b85dd40949f4d9ec378"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_classproteus_1_1Dispatcher"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_classproteus_1_1Dispatcher')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="classproteus_1_1Dispatcher.html">proteus::Dispatcher</a></td></tr>
-<tr class="memitem:a860df94d80e827827021600e2a1d44a4 inherit pub_methods_classproteus_1_1Dispatcher" id="r_a860df94d80e827827021600e2a1d44a4"><td class="memItemLeft" align="right" valign="top">virtual&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1Dispatcher.html#a860df94d80e827827021600e2a1d44a4">~Dispatcher</a> ()=default</td></tr>
-<tr class="separator:a860df94d80e827827021600e2a1d44a4 inherit pub_methods_classproteus_1_1Dispatcher"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a40120d917f8ecd68e41f0eaee048cee6 inherit pub_methods_classproteus_1_1Dispatcher" id="r_a40120d917f8ecd68e41f0eaee048cee6"><td class="memItemLeft" align="right" valign="top">virtual std::unique_ptr&lt; llvm::MemoryBuffer &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1Dispatcher.html#a40120d917f8ecd68e41f0eaee048cee6">compile</a> (std::unique_ptr&lt; llvm::LLVMContext &gt; Ctx, std::unique_ptr&lt; llvm::Module &gt; M, const <a class="el" href="classproteus_1_1HashT.html">HashT</a> &amp;ModuleHash, bool DisableIROpt=false)=0</td></tr>
-<tr class="separator:a40120d917f8ecd68e41f0eaee048cee6 inherit pub_methods_classproteus_1_1Dispatcher"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a83d41d7ac698090dc845a56fddb987b9 inherit pub_methods_classproteus_1_1Dispatcher" id="r_a83d41d7ac698090dc845a56fddb987b9"><td class="memItemLeft" align="right" valign="top">virtual&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1Dispatcher.html#a83d41d7ac698090dc845a56fddb987b9">~Dispatcher</a> ()</td></tr>
+<tr class="separator:a83d41d7ac698090dc845a56fddb987b9 inherit pub_methods_classproteus_1_1Dispatcher"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa349a7fc26f3e994a28282660f0f706c inherit pub_methods_classproteus_1_1Dispatcher" id="r_aa349a7fc26f3e994a28282660f0f706c"><td class="memItemLeft" align="right" valign="top">const std::string &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1Dispatcher.html#aa349a7fc26f3e994a28282660f0f706c">getLabel</a> () const</td></tr>
+<tr class="separator:aa349a7fc26f3e994a28282660f0f706c inherit pub_methods_classproteus_1_1Dispatcher"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad262fbe7fded103c56374317f2268c3e inherit pub_methods_classproteus_1_1Dispatcher" id="r_ad262fbe7fded103c56374317f2268c3e"><td class="memItemLeft" align="right" valign="top">virtual std::unique_ptr&lt; llvm::MemoryBuffer &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1Dispatcher.html#ad262fbe7fded103c56374317f2268c3e">compileModule</a> (llvm::Module &amp;M, const <a class="el" href="classproteus_1_1CodeGenerationConfig.html">CodeGenerationConfig</a> &amp;CGConfig)=0</td></tr>
+<tr class="separator:ad262fbe7fded103c56374317f2268c3e inherit pub_methods_classproteus_1_1Dispatcher"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a76e7b58235b5b241781de3b9b4e04e26 inherit pub_methods_classproteus_1_1Dispatcher" id="r_a76e7b58235b5b241781de3b9b4e04e26"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1Dispatcher.html#a76e7b58235b5b241781de3b9b4e04e26">optimizeModule</a> (llvm::Module &amp;M, const <a class="el" href="classproteus_1_1CodeGenerationConfig.html">CodeGenerationConfig</a> &amp;CGConfig)</td></tr>
+<tr class="separator:a76e7b58235b5b241781de3b9b4e04e26 inherit pub_methods_classproteus_1_1Dispatcher"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad8c669d565e6d9d7f11a01a7a2a542ec inherit pub_methods_classproteus_1_1Dispatcher" id="r_ad8c669d565e6d9d7f11a01a7a2a542ec"><td class="memItemLeft" align="right" valign="top">virtual std::unique_ptr&lt; llvm::MemoryBuffer &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1Dispatcher.html#ad8c669d565e6d9d7f11a01a7a2a542ec">codegenModule</a> (llvm::Module &amp;M, const <a class="el" href="classproteus_1_1CodeGenerationConfig.html">CodeGenerationConfig</a> &amp;CGConfig)</td></tr>
+<tr class="separator:ad8c669d565e6d9d7f11a01a7a2a542ec inherit pub_methods_classproteus_1_1Dispatcher"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae68538bdd949bf27e7f0e0b34586bf79 inherit pub_methods_classproteus_1_1Dispatcher" id="r_ae68538bdd949bf27e7f0e0b34586bf79"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; llvm::MemoryBuffer &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1Dispatcher.html#ae68538bdd949bf27e7f0e0b34586bf79">compile</a> (std::unique_ptr&lt; llvm::LLVMContext &gt; Ctx, std::unique_ptr&lt; llvm::Module &gt; M, const <a class="el" href="classproteus_1_1HashT.html">HashT</a> &amp;ModuleHash, const <a class="el" href="classproteus_1_1CodeGenerationConfig.html">CodeGenerationConfig</a> &amp;CGConfig)</td></tr>
+<tr class="separator:ae68538bdd949bf27e7f0e0b34586bf79 inherit pub_methods_classproteus_1_1Dispatcher"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae4422d33a5ff060316ac7e7a40f36709 inherit pub_methods_classproteus_1_1Dispatcher" id="r_ae4422d33a5ff060316ac7e7a40f36709"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; llvm::MemoryBuffer &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1Dispatcher.html#ae4422d33a5ff060316ac7e7a40f36709">compile</a> (std::unique_ptr&lt; llvm::LLVMContext &gt; Ctx, std::unique_ptr&lt; llvm::Module &gt; M, const <a class="el" href="classproteus_1_1HashT.html">HashT</a> &amp;ModuleHash)</td></tr>
+<tr class="separator:ae4422d33a5ff060316ac7e7a40f36709 inherit pub_methods_classproteus_1_1Dispatcher"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3d1fd90a43c44551b427bb78d1d85a1e inherit pub_methods_classproteus_1_1Dispatcher" id="r_a3d1fd90a43c44551b427bb78d1d85a1e"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; <a class="el" href="structproteus_1_1CompiledLibrary.html">CompiledLibrary</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1Dispatcher.html#a3d1fd90a43c44551b427bb78d1d85a1e">lookupCompiledLibrary</a> (const <a class="el" href="classproteus_1_1HashT.html">HashT</a> &amp;ModuleHash)</td></tr>
+<tr class="separator:a3d1fd90a43c44551b427bb78d1d85a1e inherit pub_methods_classproteus_1_1Dispatcher"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aec28fc68e1a4050f29b49fcdea601204 inherit pub_methods_classproteus_1_1Dispatcher" id="r_aec28fc68e1a4050f29b49fcdea601204"><td class="memTemplParams" colspan="2">template&lt;typename Sig , typename... ArgT&gt; </td></tr>
 <tr class="memitem:aec28fc68e1a4050f29b49fcdea601204 inherit pub_methods_classproteus_1_1Dispatcher"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="structproteus_1_1sig__traits.html">sig_traits</a>&lt; Sig &gt;::return_type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="classproteus_1_1Dispatcher.html#aec28fc68e1a4050f29b49fcdea601204">run</a> (void *FuncPtr, ArgT &amp;&amp;...<a class="el" href="CompilerInterfaceHost_8cpp.html#a79deec49595e60116c9539e1d7ea029c">Args</a>)</td></tr>
 <tr class="separator:aec28fc68e1a4050f29b49fcdea601204 inherit pub_methods_classproteus_1_1Dispatcher"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a315d430401eb892d28b8bc48a477436a inherit pub_methods_classproteus_1_1Dispatcher" id="r_a315d430401eb892d28b8bc48a477436a"><td class="memItemLeft" align="right" valign="top">virtual void *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1Dispatcher.html#a315d430401eb892d28b8bc48a477436a">lookupFunction</a> (llvm::StringRef BaseName, const <a class="el" href="classproteus_1_1HashT.html">HashT</a> &amp;ModuleHash)=0</td></tr>
+<tr class="separator:a315d430401eb892d28b8bc48a477436a inherit pub_methods_classproteus_1_1Dispatcher"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4b58327aceb319ba3d5be9efef9e611b inherit pub_methods_classproteus_1_1Dispatcher" id="r_a4b58327aceb319ba3d5be9efef9e611b"><td class="memItemLeft" align="right" valign="top">void *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1Dispatcher.html#a4b58327aceb319ba3d5be9efef9e611b">getOrInsertFunction</a> (const <a class="el" href="classproteus_1_1KernelName.html">KernelName</a> &amp;Name, const <a class="el" href="classproteus_1_1HashT.html">HashT</a> &amp;ModuleHash, <a class="el" href="structproteus_1_1CompiledLibrary.html">CompiledLibrary</a> &amp;Library)</td></tr>
+<tr class="separator:a4b58327aceb319ba3d5be9efef9e611b inherit pub_methods_classproteus_1_1Dispatcher"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4e728e17da2b2b3c9eb740ae10ea85a7 inherit pub_methods_classproteus_1_1Dispatcher" id="r_a4e728e17da2b2b3c9eb740ae10ea85a7"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1Dispatcher.html#a4e728e17da2b2b3c9eb740ae10ea85a7">registerObject</a> (const <a class="el" href="classproteus_1_1HashT.html">HashT</a> &amp;HashValue, const llvm::MemoryBufferRef &amp;Obj)</td></tr>
+<tr class="separator:a4e728e17da2b2b3c9eb740ae10ea85a7 inherit pub_methods_classproteus_1_1Dispatcher"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-static-methods" name="pub-static-methods"></a>
 Static Public Member Functions</h2></td></tr>
@@ -163,25 +183,27 @@ Static Public Member Functions</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pro-methods" name="pro-methods"></a>
 Protected Member Functions</h2></td></tr>
-<tr class="memitem:ab412e976dfd8c9d65f4b41f82743466e" id="r_ab412e976dfd8c9d65f4b41f82743466e"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1DispatcherHost.html#ab412e976dfd8c9d65f4b41f82743466e">DispatcherHost</a> (const std::string &amp;Label=&quot;DispatcherHost&quot;)</td></tr>
-<tr class="separator:ab412e976dfd8c9d65f4b41f82743466e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa3cbd97686613b85dd40949f4d9ec378" id="r_aa3cbd97686613b85dd40949f4d9ec378"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1DispatcherHost.html#aa3cbd97686613b85dd40949f4d9ec378">~DispatcherHost</a> ()</td></tr>
-<tr class="separator:aa3cbd97686613b85dd40949f4d9ec378"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:acb93044f6be634f68cef99072a25c82b" id="r_acb93044f6be634f68cef99072a25c82b"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1DispatcherHost.html#acb93044f6be634f68cef99072a25c82b">DispatcherHost</a> (const std::string &amp;<a class="el" href="classproteus_1_1Dispatcher.html#a39b8ae81affe3fc4ed6a3469b8861147">Label</a>, <a class="el" href="classproteus_1_1JitEngineHost.html">JitEngineHost</a> &amp;Jit, <a class="el" href="namespaceproteus.html#a08485a05eb684e821e1004eefb75362f">TargetModelType</a> TM)</td></tr>
+<tr class="separator:acb93044f6be634f68cef99072a25c82b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pro_methods_classproteus_1_1Dispatcher"><td colspan="2" onclick="javascript:toggleInherit('pro_methods_classproteus_1_1Dispatcher')"><img src="closed.png" alt="-"/>&#160;Protected Member Functions inherited from <a class="el" href="classproteus_1_1Dispatcher.html">proteus::Dispatcher</a></td></tr>
 <tr class="memitem:af5755c5d77823e85becd004fa7fa9d87 inherit pro_methods_classproteus_1_1Dispatcher" id="r_af5755c5d77823e85becd004fa7fa9d87"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1Dispatcher.html#af5755c5d77823e85becd004fa7fa9d87">Dispatcher</a> (const std::string &amp;Name, <a class="el" href="namespaceproteus.html#a08485a05eb684e821e1004eefb75362f">TargetModelType</a> TM)</td></tr>
 <tr class="separator:af5755c5d77823e85becd004fa7fa9d87 inherit pro_methods_classproteus_1_1Dispatcher"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a85a8b9dd4cce00967e299d4734700c8c inherit pro_methods_classproteus_1_1Dispatcher" id="r_a85a8b9dd4cce00967e299d4734700c8c"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1Dispatcher.html#a85a8b9dd4cce00967e299d4734700c8c">printObjectCacheStats</a> ()</td></tr>
+<tr class="separator:a85a8b9dd4cce00967e299d4734700c8c inherit pro_methods_classproteus_1_1Dispatcher"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="inherited" name="inherited"></a>
 Additional Inherited Members</h2></td></tr>
 <tr class="inherit_header pro_attribs_classproteus_1_1Dispatcher"><td colspan="2" onclick="javascript:toggleInherit('pro_attribs_classproteus_1_1Dispatcher')"><img src="closed.png" alt="-"/>&#160;Protected Attributes inherited from <a class="el" href="classproteus_1_1Dispatcher.html">proteus::Dispatcher</a></td></tr>
 <tr class="memitem:a163aa6e63da33507b9eefbb4cfb4bad3 inherit pro_attribs_classproteus_1_1Dispatcher" id="r_a163aa6e63da33507b9eefbb4cfb4bad3"><td class="memItemLeft" align="right" valign="top"><a class="el" href="namespaceproteus.html#a08485a05eb684e821e1004eefb75362f">TargetModelType</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1Dispatcher.html#a163aa6e63da33507b9eefbb4cfb4bad3">TargetModel</a></td></tr>
 <tr class="separator:a163aa6e63da33507b9eefbb4cfb4bad3 inherit pro_attribs_classproteus_1_1Dispatcher"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a39b8ae81affe3fc4ed6a3469b8861147 inherit pro_attribs_classproteus_1_1Dispatcher" id="r_a39b8ae81affe3fc4ed6a3469b8861147"><td class="memItemLeft" align="right" valign="top">const std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1Dispatcher.html#a39b8ae81affe3fc4ed6a3469b8861147">Label</a></td></tr>
+<tr class="separator:a39b8ae81affe3fc4ed6a3469b8861147 inherit pro_attribs_classproteus_1_1Dispatcher"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6c1985c1dc01a07ecd9de533feb68d1a inherit pro_attribs_classproteus_1_1Dispatcher" id="r_a6c1985c1dc01a07ecd9de533feb68d1a"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; <a class="el" href="classproteus_1_1ObjectCacheChain.html">ObjectCacheChain</a> &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1Dispatcher.html#a6c1985c1dc01a07ecd9de533feb68d1a">ObjectCache</a></td></tr>
 <tr class="separator:a6c1985c1dc01a07ecd9de533feb68d1a inherit pro_attribs_classproteus_1_1Dispatcher"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
-<a id="ab412e976dfd8c9d65f4b41f82743466e" name="ab412e976dfd8c9d65f4b41f82743466e"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ab412e976dfd8c9d65f4b41f82743466e">&#9670;&#160;</a></span>DispatcherHost()</h2>
+<a id="a8df99acce5a400d7f56d9bd2175af716" name="a8df99acce5a400d7f56d9bd2175af716"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a8df99acce5a400d7f56d9bd2175af716">&#9670;&#160;</a></span>DispatcherHost() <span class="overload">[1/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -193,13 +215,23 @@ Additional Inherited Members</h2></td></tr>
           <td class="memname">proteus::DispatcherHost::DispatcherHost </td>
           <td>(</td>
           <td class="paramtype">const std::string &amp;&#160;</td>
-          <td class="paramname"><em>Label</em> = <code>&quot;DispatcherHost&quot;</code></td><td>)</td>
+          <td class="paramname"><em>Label</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
           <td></td>
+          <td class="paramtype"><a class="el" href="classproteus_1_1JitEngineHost.html">JitEngineHost</a> &amp;&#160;</td>
+          <td class="paramname"><em>Jit</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
         </tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">explicit</span><span class="mlabel">protected</span></span>  </td>
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
@@ -224,16 +256,15 @@ Additional Inherited Members</h2></td></tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">protected</span></span>  </td>
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
 
 </div>
 </div>
-<h2 class="groupheader">Member Function Documentation</h2>
-<a id="ae61a5abfcc533c32aac4e4f36a5fea18" name="ae61a5abfcc533c32aac4e4f36a5fea18"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ae61a5abfcc533c32aac4e4f36a5fea18">&#9670;&#160;</a></span>compile()</h2>
+<a id="acb93044f6be634f68cef99072a25c82b" name="acb93044f6be634f68cef99072a25c82b"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#acb93044f6be634f68cef99072a25c82b">&#9670;&#160;</a></span>DispatcherHost() <span class="overload">[2/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -242,28 +273,59 @@ Additional Inherited Members</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">std::unique_ptr&lt; MemoryBuffer &gt; proteus::DispatcherHost::compile </td>
+          <td class="memname">proteus::DispatcherHost::DispatcherHost </td>
           <td>(</td>
-          <td class="paramtype">std::unique_ptr&lt; LLVMContext &gt;&#160;</td>
-          <td class="paramname"><em>Ctx</em>, </td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
+          <td class="paramname"><em>Label</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">std::unique_ptr&lt; Module &gt;&#160;</td>
-          <td class="paramname"><em>Mod</em>, </td>
+          <td class="paramtype"><a class="el" href="classproteus_1_1JitEngineHost.html">JitEngineHost</a> &amp;&#160;</td>
+          <td class="paramname"><em>Jit</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const <a class="el" href="classproteus_1_1HashT.html">HashT</a> &amp;&#160;</td>
-          <td class="paramname"><em>ModuleHash</em>, </td>
+          <td class="paramtype"><a class="el" href="namespaceproteus.html#a08485a05eb684e821e1004eefb75362f">TargetModelType</a>&#160;</td>
+          <td class="paramname"><em>TM</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">explicit</span><span class="mlabel">protected</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a id="a1eda0487e438b28a4df96ae27dbf365f" name="a1eda0487e438b28a4df96ae27dbf365f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1eda0487e438b28a4df96ae27dbf365f">&#9670;&#160;</a></span>compileModule()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::unique_ptr&lt; MemoryBuffer &gt; proteus::DispatcherHost::compileModule </td>
+          <td>(</td>
+          <td class="paramtype">Module &amp;&#160;</td>
+          <td class="paramname"><em>M</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">bool&#160;</td>
-          <td class="paramname"><em>DisableIROpt</em> = <code>false</code>&#160;</td>
+          <td class="paramtype">const <a class="el" href="classproteus_1_1CodeGenerationConfig.html">CodeGenerationConfig</a> &amp;&#160;</td>
+          <td class="paramname"><em>CGConfig</em>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -307,8 +369,8 @@ Additional Inherited Members</h2></td></tr>
 
 </div>
 </div>
-<a id="a9db0812e8cf565dd147a1a666d61511a" name="a9db0812e8cf565dd147a1a666d61511a"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a9db0812e8cf565dd147a1a666d61511a">&#9670;&#160;</a></span>getFunctionAddress()</h2>
+<a id="a8c9cfaeeab2d4d364d47804abf0f8e1a" name="a8c9cfaeeab2d4d364d47804abf0f8e1a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a8c9cfaeeab2d4d364d47804abf0f8e1a">&#9670;&#160;</a></span>insertFunction()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -317,10 +379,10 @@ Additional Inherited Members</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">void * proteus::DispatcherHost::getFunctionAddress </td>
+          <td class="memname">void * proteus::DispatcherHost::insertFunction </td>
           <td>(</td>
-          <td class="paramtype">const std::string &amp;&#160;</td>
-          <td class="paramname"><em>FnName</em>, </td>
+          <td class="paramtype">const <a class="el" href="classproteus_1_1KernelName.html">KernelName</a> &amp;&#160;</td>
+          <td class="paramname"><em>Name</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -347,7 +409,7 @@ Additional Inherited Members</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p>Implements <a class="el" href="classproteus_1_1Dispatcher.html#af2b2140aaadb84d1d965bd45948eae14">proteus::Dispatcher</a>.</p>
+<p>Implements <a class="el" href="classproteus_1_1Dispatcher.html#a5ddc15c21533e143d5904f47c7fc0d94">proteus::Dispatcher</a>.</p>
 
 </div>
 </div>
@@ -438,8 +500,8 @@ Additional Inherited Members</h2></td></tr>
 
 </div>
 </div>
-<a id="a3f409cb7495e36537c7a2d497222f310" name="a3f409cb7495e36537c7a2d497222f310"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a3f409cb7495e36537c7a2d497222f310">&#9670;&#160;</a></span>lookupCompiledLibrary()</h2>
+<a id="a4a99fde4db34f11492dfb7ee11134fb3" name="a4a99fde4db34f11492dfb7ee11134fb3"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4a99fde4db34f11492dfb7ee11134fb3">&#9670;&#160;</a></span>lookupFunction()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -448,21 +510,29 @@ Additional Inherited Members</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">std::unique_ptr&lt; <a class="el" href="structproteus_1_1CompiledLibrary.html">CompiledLibrary</a> &gt; proteus::DispatcherHost::lookupCompiledLibrary </td>
+          <td class="memname">void * proteus::DispatcherHost::lookupFunction </td>
           <td>(</td>
-          <td class="paramtype">const <a class="el" href="classproteus_1_1HashT.html">HashT</a> &amp;&#160;</td>
-          <td class="paramname"><em>ModuleHash</em></td><td>)</td>
+          <td class="paramtype">StringRef&#160;</td>
+          <td class="paramname"><em>BaseName</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
           <td></td>
+          <td class="paramtype">const <a class="el" href="classproteus_1_1HashT.html">HashT</a> &amp;&#160;</td>
+          <td class="paramname"><em>ModuleHash</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
         </tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">override</span><span class="mlabel">virtual</span></span>  </td>
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">override</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
-
-<p>Implements <a class="el" href="classproteus_1_1Dispatcher.html#a8b3c27e407b484be4b1a3d79e8a695b8">proteus::Dispatcher</a>.</p>
 
 </div>
 </div>
@@ -501,44 +571,6 @@ Additional Inherited Members</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Implements <a class="el" href="classproteus_1_1Dispatcher.html#a1a8a11b2db328abb3c9ffefce635b564">proteus::Dispatcher</a>.</p>
-
-</div>
-</div>
-<a id="a887f16a010fccf9ece430ed16a1fb8fc" name="a887f16a010fccf9ece430ed16a1fb8fc"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a887f16a010fccf9ece430ed16a1fb8fc">&#9670;&#160;</a></span>registerObject()</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void proteus::DispatcherHost::registerObject </td>
-          <td>(</td>
-          <td class="paramtype">const <a class="el" href="classproteus_1_1HashT.html">HashT</a> &amp;&#160;</td>
-          <td class="paramname"><em>HashValue</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">const llvm::MemoryBufferRef &amp;&#160;</td>
-          <td class="paramname"><em>Obj</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">override</span><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Implements <a class="el" href="classproteus_1_1Dispatcher.html#aecdf55735f396ae9aea215eb9ebd098c">proteus::Dispatcher</a>.</p>
 
 </div>
 </div>

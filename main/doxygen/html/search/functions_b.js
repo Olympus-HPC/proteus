@@ -1,5 +1,6 @@
 var searchData=
 [
   ['kernelhandle_0',['kernelhandle',['../structproteus_1_1CppJitModule_1_1KernelHandle_3_01RetT_07ArgT_8_8_8_08_4.html#aa12ce7d8fac37caa26b98f2131092558',1,'proteus::CppJitModule::KernelHandle&lt; RetT(ArgT...)&gt;::KernelHandle()'],['../structproteus_1_1LLVMIRJitModule_1_1KernelHandle_3_01RetT_07ArgT_8_8_8_08_4.html#a36045f3b6baf2e8aa9212656a1ad4cbf',1,'proteus::LLVMIRJitModule::KernelHandle&lt; RetT(ArgT...)&gt;::KernelHandle()'],['../structproteus_1_1MLIRJitModule_1_1KernelHandle_3_01RetT_07ArgT_8_8_8_08_4.html#a73db1d45074ac3b3645ff2080e6fc13f',1,'proteus::MLIRJitModule::KernelHandle&lt; RetT(ArgT...)&gt;::KernelHandle()']]],
-  ['kernelmetadata_1',['KernelMetadata',['../classproteus_1_1runtime_1_1KernelMetadata.html#a72d035e1c26fbf1a273e5a1d3c22c48b',1,'proteus::runtime::KernelMetadata']]]
+  ['kernelmetadata_1',['KernelMetadata',['../classproteus_1_1runtime_1_1KernelMetadata.html#a72d035e1c26fbf1a273e5a1d3c22c48b',1,'proteus::runtime::KernelMetadata']]],
+  ['kernelname_2',['kernelname',['../classproteus_1_1KernelName.html#ad2bcbf7d0cf3c8f3d2bc8ddfa36d58b1',1,'proteus::KernelName::KernelName(std::string Base)'],['../classproteus_1_1KernelName.html#ae2712414a2f8539a3815ca945f072bd2',1,'proteus::KernelName::KernelName(const char *Base)'],['../classproteus_1_1KernelName.html#aa3f748463fdf27fb62000298f546dfbe',1,'proteus::KernelName::KernelName(const llvm::StringRef &amp;Base)'],['../classproteus_1_1KernelName.html#a21df3720b86f8c34b5ccf3022934cd3b',1,'proteus::KernelName::KernelName(std::string Base, const HashT &amp;Hash)']]]
 ];

@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['label_0',['Label',['../classproteus_1_1MPIStorageCache.html#a71472ae1d0637f917dadf0b5c7644842',1,'proteus::MPIStorageCache']]],
+  ['label_0',['label',['../classproteus_1_1Dispatcher.html#a39b8ae81affe3fc4ed6a3469b8861147',1,'proteus::Dispatcher::Label'],['../classproteus_1_1MPIStorageCache.html#a71472ae1d0637f917dadf0b5c7644842',1,'proteus::MPIStorageCache::Label']]],
   ['lambda_1',['lambda',['../structproteus_1_1detail_1_1LambdaFunctorWrapper.html#a6283ebd2cac2a18663e56d1559e4c74e',1,'proteus::detail::LambdaFunctorWrapper']]],
   ['lambdacalleeinfo_2',['LambdaCalleeInfo',['../structproteus_1_1LambdaRegistry_1_1DeviceLaunchInfo.html#af9c4e47442b83d92a17e4dd447d720e4',1,'proteus::LambdaRegistry::DeviceLaunchInfo']]],
   ['lambdacallsitemetadataname_3',['LambdaCallsiteMetadataName',['../namespaceproteus.html#a00a206644ffb3544114a6ee564fb0b07',1,'proteus']]],

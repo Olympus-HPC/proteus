@@ -138,8 +138,8 @@ Public Member Functions</h2></td></tr>
 <tr class="separator:a28d48e8cefc3af5f342a6aff3ffc0474"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af093b6ef2f8861eeddd397f2dd54128a" id="r_af093b6ef2f8861eeddd397f2dd54128a"><td class="memItemLeft" align="right" valign="top">void *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineHost.html#af093b6ef2f8861eeddd397f2dd54128a">compileAndLink</a> (StringRef FnName, char *<a class="el" href="CompilerInterfaceHost_8cpp.html#a6cae0f6a75928b59f85f67f1089dba63">IR</a>, int <a class="el" href="CompilerInterfaceHost_8cpp.html#af65e6606290845b468eb03c50980ee74">IRSize</a>, void **<a class="el" href="CompilerInterfaceHost_8cpp.html#a79deec49595e60116c9539e1d7ea029c">Args</a>, ArrayRef&lt; <a class="el" href="structproteus_1_1RuntimeConstantInfo.html">RuntimeConstantInfo</a> * &gt; RCInfoArray, uint64_t *FunctorIDPtr)</td></tr>
 <tr class="separator:af093b6ef2f8861eeddd397f2dd54128a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a750ec72f6371ec02ac47ff25b055d3bb" id="r_a750ec72f6371ec02ac47ff25b055d3bb"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; MemoryBuffer &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineHost.html#a750ec72f6371ec02ac47ff25b055d3bb">compileOnly</a> (Module &amp;M, bool DisableIROpt=false)</td></tr>
-<tr class="separator:a750ec72f6371ec02ac47ff25b055d3bb"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a02a78a257667cd03dfec0f5d20d10de4" id="r_a02a78a257667cd03dfec0f5d20d10de4"><td class="memItemLeft" align="right" valign="top">std::unique_ptr&lt; MemoryBuffer &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineHost.html#a02a78a257667cd03dfec0f5d20d10de4">compileOnly</a> (Module &amp;M, const <a class="el" href="classproteus_1_1CodeGenerationConfig.html">CodeGenerationConfig</a> &amp;CGConfig)</td></tr>
+<tr class="separator:a02a78a257667cd03dfec0f5d20d10de4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a8226be298aeea1768d4257d44fd45cc2" id="r_a8226be298aeea1768d4257d44fd45cc2"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineHost.html#a8226be298aeea1768d4257d44fd45cc2">loadCompiledLibrary</a> (<a class="el" href="structproteus_1_1CompiledLibrary.html">CompiledLibrary</a> &amp;Library)</td></tr>
 <tr class="separator:a8226be298aeea1768d4257d44fd45cc2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a852772dc59597edc9c144ee370217141" id="r_a852772dc59597edc9c144ee370217141"><td class="memItemLeft" align="right" valign="top">void *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classproteus_1_1JitEngineHost.html#a852772dc59597edc9c144ee370217141">getFunctionAddress</a> (StringRef FnName, <a class="el" href="structproteus_1_1CompiledLibrary.html">CompiledLibrary</a> &amp;Library)</td></tr>
@@ -185,6 +185,9 @@ Additional Inherited Members</h2></td></tr>
 
 <div class="memitem">
 <div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
       <table class="memname">
         <tr>
           <td class="memname">JitEngineHost::~JitEngineHost </td>
@@ -193,6 +196,11 @@ Additional Inherited Members</h2></td></tr>
           <td></td>
         </tr>
       </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">default</span></span>  </td>
+  </tr>
+</table>
 </div><div class="memdoc">
 
 </div>
@@ -250,8 +258,8 @@ Additional Inherited Members</h2></td></tr>
 
 </div>
 </div>
-<a id="a750ec72f6371ec02ac47ff25b055d3bb" name="a750ec72f6371ec02ac47ff25b055d3bb"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a750ec72f6371ec02ac47ff25b055d3bb">&#9670;&#160;</a></span>compileOnly()</h2>
+<a id="a02a78a257667cd03dfec0f5d20d10de4" name="a02a78a257667cd03dfec0f5d20d10de4"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a02a78a257667cd03dfec0f5d20d10de4">&#9670;&#160;</a></span>compileOnly()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -265,8 +273,8 @@ Additional Inherited Members</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">bool&#160;</td>
-          <td class="paramname"><em>DisableIROpt</em> = <code>false</code>&#160;</td>
+          <td class="paramtype">const <a class="el" href="classproteus_1_1CodeGenerationConfig.html">CodeGenerationConfig</a> &amp;&#160;</td>
+          <td class="paramname"><em>CGConfig</em>&#160;</td>
         </tr>
         <tr>
           <td></td>

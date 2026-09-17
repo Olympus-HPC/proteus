@@ -7,7 +7,7 @@ var searchData=
   ['_7ecppjitartifact_4',['~CppJitArtifact',['../structproteus_1_1CppJitArtifact.html#a6f4a04725f8ce37be4ffc6bec7fe8965',1,'proteus::CppJitArtifact']]],
   ['_7ecppjitcompiler_5',['~CppJitCompiler',['../classproteus_1_1CppJitCompiler.html#a1a8c76f42e1c8be681a4c5537f640bc7',1,'proteus::CppJitCompiler']]],
   ['_7ecppjitmodule_6',['~CppJitModule',['../classproteus_1_1CppJitModule.html#a4871f09f9eda39472c00de448e905024',1,'proteus::CppJitModule']]],
-  ['_7edispatcher_7',['~Dispatcher',['../classproteus_1_1Dispatcher.html#a860df94d80e827827021600e2a1d44a4',1,'proteus::Dispatcher']]],
+  ['_7edispatcher_7',['~Dispatcher',['../classproteus_1_1Dispatcher.html#a83d41d7ac698090dc845a56fddb987b9',1,'proteus::Dispatcher']]],
   ['_7edispatcherhost_8',['~DispatcherHost',['../classproteus_1_1DispatcherHost.html#aa3cbd97686613b85dd40949f4d9ec378',1,'proteus::DispatcherHost']]],
   ['_7efuncbase_9',['~FuncBase',['../classproteus_1_1FuncBase.html#ae156cee303073ba6cba3eb1e8bf00136',1,'proteus::FuncBase']]],
   ['_7eirfunction_10',['~IRFunction',['../classproteus_1_1IRFunction.html#ae32d7f6f22bc0574bf38bdd23426b1a3',1,'proteus::IRFunction']]],

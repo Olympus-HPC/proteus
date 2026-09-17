@@ -1,16 +1,24 @@
 <map id="include/proteus/Frontend/Dispatcher.h" name="include/proteus/Frontend/Dispatcher.h">
-<area shape="rect" id="Node000001" title=" " alt="" coords="342,5,525,45"/>
+<area shape="rect" id="Node000001" title=" " alt="" coords="473,5,655,45"/>
 <area shape="rect" id="Node000002" href="$Error_8h.html" title=" " alt="" coords="5,93,123,119"/>
-<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="345,48,132,93,131,88,344,43"/>
-<area shape="rect" id="Node000004" href="$TargetModel_8h.html" title=" " alt="" coords="147,93,375,119"/>
-<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="393,48,300,90,298,85,391,43"/>
-<area shape="rect" id="Node000005" title=" " alt="" coords="400,93,467,119"/>
-<area shape="poly" id="edge5_Node000001_Node000005" title=" " alt="" coords="436,46,436,79,431,79,431,46"/>
-<area shape="rect" id="Node000006" title=" " alt="" coords="491,93,568,119"/>
-<area shape="poly" id="edge6_Node000001_Node000006" title=" " alt="" coords="458,43,506,82,503,87,455,48"/>
-<area shape="rect" id="Node000007" title=" " alt="" coords="593,93,685,119"/>
-<area shape="poly" id="edge7_Node000001_Node000007" title=" " alt="" coords="483,43,596,86,595,91,482,48"/>
-<area shape="rect" id="Node000003" title=" " alt="" coords="133,167,192,192"/>
-<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="81,117,137,156,134,161,78,121"/>
-<area shape="poly" id="edge4_Node000004_Node000003" title=" " alt="" coords="247,121,191,161,188,156,244,117"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="473,44,137,96,136,91,472,38"/>
+<area shape="rect" id="Node000003" title=" " alt="" coords="207,167,265,192"/>
+<area shape="poly" id="edge11_Node000001_Node000003" title=" " alt="" coords="473,32,391,39,305,50,232,69,205,81,187,95,182,109,186,125,197,141,212,156,208,159,193,144,181,127,177,109,183,92,202,76,230,64,304,45,390,33,472,27"/>
+<area shape="rect" id="Node000004" href="$KernelName_8h.html" title=" " alt="" coords="450,93,678,119"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="567,46,567,79,561,79,561,46"/>
+<area shape="rect" id="Node000007" href="$TargetModel_8h.html" title=" " alt="" coords="198,93,426,119"/>
+<area shape="poly" id="edge7_Node000001_Node000007" title=" " alt="" coords="504,48,363,92,361,87,503,43"/>
+<area shape="rect" id="Node000008" title=" " alt="" coords="703,93,769,119"/>
+<area shape="poly" id="edge9_Node000001_Node000008" title=" " alt="" coords="606,43,699,85,697,90,604,48"/>
+<area shape="rect" id="Node000009" title=" " alt="" coords="793,93,871,119"/>
+<area shape="poly" id="edge10_Node000001_Node000009" title=" " alt="" coords="629,43,781,87,780,92,627,48"/>
+<area shape="rect" id="Node000010" title=" " alt="" coords="895,93,987,119"/>
+<area shape="poly" id="edge12_Node000001_Node000010" title=" " alt="" coords="655,43,883,90,881,95,654,48"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="93,116,196,159,194,164,91,121"/>
+<area shape="poly" id="edge5_Node000004_Node000003" title=" " alt="" coords="512,121,279,171,278,166,511,116"/>
+<area shape="rect" id="Node000005" title=" " alt="" coords="480,167,555,192"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="559,120,535,157,530,154,554,118"/>
+<area shape="rect" id="Node000006" title=" " alt="" coords="579,167,639,192"/>
+<area shape="poly" id="edge6_Node000004_Node000006" title=" " alt="" coords="574,118,597,154,592,157,569,120"/>
+<area shape="poly" id="edge8_Node000007_Node000003" title=" " alt="" coords="302,121,260,159,257,155,298,117"/>
 </map>

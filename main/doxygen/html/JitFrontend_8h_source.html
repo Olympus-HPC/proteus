@@ -200,8 +200,8 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00094" name="l00094"></a><span class="lineno">   94</span>        <span class="comment">// Func object to avoid cache lookups.</span></div>
 <div class="line"><a id="l00095" name="l00095"></a><span class="lineno">   95</span>        <span class="comment">// TODO: Re-think caching and dispatchers.</span></div>
 <div class="line"><a id="l00096" name="l00096"></a><span class="lineno">   96</span>        <span class="keyword">auto</span> KernelFunc = <span class="keyword">reinterpret_cast&lt;</span>decltype(F.getCompiledFunc())<span class="keyword">&gt;</span>(</div>
-<div class="line"><a id="l00097" name="l00097"></a><span class="lineno">   97</span>            M.Dispatch.<a class="code hl_function" href="classproteus_1_1Dispatcher.html#af2b2140aaadb84d1d965bd45948eae14">getFunctionAddress</a>(F.getName(), M.<a class="code hl_function" href="classproteus_1_1JitModule.html#acc12eafd979379c9e2b0fc27458fabc4">getModuleHash</a>(),</div>
-<div class="line"><a id="l00098" name="l00098"></a><span class="lineno">   98</span>                                          M.<a class="code hl_function" href="classproteus_1_1JitModule.html#aa2887784a0ff0edcad86d2af6fa5b0f5">getLibrary</a>()));</div>
+<div class="line"><a id="l00097" name="l00097"></a><span class="lineno">   97</span>            M.Dispatch.<a class="code hl_function" href="classproteus_1_1Dispatcher.html#a4b58327aceb319ba3d5be9efef9e611b">getOrInsertFunction</a>(F.getName(), M.<a class="code hl_function" href="classproteus_1_1JitModule.html#acc12eafd979379c9e2b0fc27458fabc4">getModuleHash</a>(),</div>
+<div class="line"><a id="l00098" name="l00098"></a><span class="lineno">   98</span>                                           M.<a class="code hl_function" href="classproteus_1_1JitModule.html#aa2887784a0ff0edcad86d2af6fa5b0f5">getLibrary</a>()));</div>
 <div class="line"><a id="l00099" name="l00099"></a><span class="lineno">   99</span> </div>
 <div class="line"><a id="l00100" name="l00100"></a><span class="lineno">  100</span>        F.setCompiledFunc(KernelFunc);</div>
 <div class="line"><a id="l00101" name="l00101"></a><span class="lineno">  101</span> </div>
@@ -295,8 +295,8 @@ $(document).ready(function() { init_codefold(0); });
 <div class="line"><a id="l00181" name="l00181"></a><span class="lineno">  181</span> </div>
 <div class="line"><a id="l00182" name="l00182"></a><span class="lineno">  182</span>  <span class="keywordflow">if</span> (!CompiledFunc) {</div>
 <div class="line"><a id="l00183" name="l00183"></a><span class="lineno">  183</span>    CompiledFunc = <span class="keyword">reinterpret_cast&lt;</span>decltype(CompiledFunc)<span class="keyword">&gt;</span>(</div>
-<div class="line"><a id="l00184" name="l00184"></a><span class="lineno">  184</span>        J.getDispatcher().getFunctionAddress(getName(), J.getModuleHash(),</div>
-<div class="line"><a id="l00185" name="l00185"></a><span class="lineno">  185</span>                                             J.getLibrary()));</div>
+<div class="line"><a id="l00184" name="l00184"></a><span class="lineno">  184</span>        J.getDispatcher().getOrInsertFunction(getName(), J.getModuleHash(),</div>
+<div class="line"><a id="l00185" name="l00185"></a><span class="lineno">  185</span>                                              J.getLibrary()));</div>
 <div class="line"><a id="l00186" name="l00186"></a><span class="lineno">  186</span>  }</div>
 <div class="line"><a id="l00187" name="l00187"></a><span class="lineno">  187</span> </div>
 <div class="line"><a id="l00188" name="l00188"></a><span class="lineno">  188</span>  <span class="keywordflow">if</span> (J.getTargetModel() != <a class="code hl_enumvalue" href="namespaceproteus.html#a08485a05eb684e821e1004eefb75362fab9361011891280a44d85b967739cc6a5">TargetModelType::HOST</a>)</div>
@@ -323,9 +323,9 @@ $(document).ready(function() { init_codefold(0); });
 <div class="ttc" id="aInit_8h_html"><div class="ttname"><a href="Init_8h.html">Init.h</a></div></div>
 <div class="ttc" id="aLLVMCodeBuilder_8h_html"><div class="ttname"><a href="LLVMCodeBuilder_8h.html">LLVMCodeBuilder.h</a></div></div>
 <div class="ttc" id="aLoopNest_8h_html"><div class="ttname"><a href="LoopNest_8h.html">LoopNest.h</a></div></div>
-<div class="ttc" id="aclassproteus_1_1Dispatcher_html"><div class="ttname"><a href="classproteus_1_1Dispatcher.html">proteus::Dispatcher</a></div><div class="ttdef"><b>Definition</b> Dispatcher.h:75</div></div>
+<div class="ttc" id="aclassproteus_1_1Dispatcher_html"><div class="ttname"><a href="classproteus_1_1Dispatcher.html">proteus::Dispatcher</a></div><div class="ttdef"><b>Definition</b> Dispatcher.h:79</div></div>
+<div class="ttc" id="aclassproteus_1_1Dispatcher_html_a4b58327aceb319ba3d5be9efef9e611b"><div class="ttname"><a href="classproteus_1_1Dispatcher.html#a4b58327aceb319ba3d5be9efef9e611b">proteus::Dispatcher::getOrInsertFunction</a></div><div class="ttdeci">void * getOrInsertFunction(const KernelName &amp;Name, const HashT &amp;ModuleHash, CompiledLibrary &amp;Library)</div><div class="ttdef"><b>Definition</b> Dispatcher.cpp:133</div></div>
 <div class="ttc" id="aclassproteus_1_1Dispatcher_html_abc74e35838b113c6286cf047f651022f"><div class="ttname"><a href="classproteus_1_1Dispatcher.html#abc74e35838b113c6286cf047f651022f">proteus::Dispatcher::launch</a></div><div class="ttdeci">virtual DispatchResult launch(void *KernelFunc, LaunchDims GridDim, LaunchDims BlockDim, void *KernelArgs[], uint64_t ShmemSize, void *Stream)=0</div></div>
-<div class="ttc" id="aclassproteus_1_1Dispatcher_html_af2b2140aaadb84d1d965bd45948eae14"><div class="ttname"><a href="classproteus_1_1Dispatcher.html#af2b2140aaadb84d1d965bd45948eae14">proteus::Dispatcher::getFunctionAddress</a></div><div class="ttdeci">virtual void * getFunctionAddress(const std::string &amp;FunctionName, const HashT &amp;ModuleHash, CompiledLibrary &amp;Library)=0</div></div>
 <div class="ttc" id="aclassproteus_1_1FuncBase_html"><div class="ttname"><a href="classproteus_1_1FuncBase.html">proteus::FuncBase</a></div><div class="ttdef"><b>Definition</b> Func.h:45</div></div>
 <div class="ttc" id="aclassproteus_1_1Func_html"><div class="ttname"><a href="classproteus_1_1Func.html">proteus::Func</a></div><div class="ttdef"><b>Definition</b> Func.h:296</div></div>
 <div class="ttc" id="aclassproteus_1_1Func_html_a71fa272b160543b44daf9646afa20825"><div class="ttname"><a href="classproteus_1_1Func.html#a71fa272b160543b44daf9646afa20825">proteus::Func::operator()</a></div><div class="ttdeci">RetT operator()(ArgT... Args)</div><div class="ttdef"><b>Definition</b> JitFrontend.h:178</div></div>
@@ -353,9 +353,9 @@ $(document).ready(function() { init_codefold(0); });
 <div class="ttc" id="anamespaceproteus_html_a08485a05eb684e821e1004eefb75362faa33b7755e5f9b504d2d038eaca4ff28d"><div class="ttname"><a href="namespaceproteus.html#a08485a05eb684e821e1004eefb75362faa33b7755e5f9b504d2d038eaca4ff28d">proteus::TargetModelType::CUDA</a></div><div class="ttdeci">@ CUDA</div></div>
 <div class="ttc" id="anamespaceproteus_html_a08485a05eb684e821e1004eefb75362fab9361011891280a44d85b967739cc6a5"><div class="ttname"><a href="namespaceproteus.html#a08485a05eb684e821e1004eefb75362fab9361011891280a44d85b967739cc6a5">proteus::TargetModelType::HOST</a></div><div class="ttdeci">@ HOST</div></div>
 <div class="ttc" id="anamespaceproteus_html_a650a5e86664ceef3bc70535384175cee"><div class="ttname"><a href="namespaceproteus.html#a650a5e86664ceef3bc70535384175cee">proteus::reportFatalError</a></div><div class="ttdeci">void reportFatalError(const llvm::Twine &amp;Reason, const char *FILE, unsigned Line)</div><div class="ttdef"><b>Definition</b> Error.cpp:14</div></div>
-<div class="ttc" id="astructLaunchDims_html"><div class="ttname"><a href="structLaunchDims.html">LaunchDims</a></div><div class="ttdef"><b>Definition</b> Dispatcher.h:22</div></div>
+<div class="ttc" id="astructLaunchDims_html"><div class="ttname"><a href="structLaunchDims.html">LaunchDims</a></div><div class="ttdef"><b>Definition</b> Dispatcher.h:25</div></div>
 <div class="ttc" id="astructproteus_1_1ArgTypeList_html"><div class="ttname"><a href="structproteus_1_1ArgTypeList.html">proteus::ArgTypeList</a></div><div class="ttdef"><b>Definition</b> Func.h:24</div></div>
-<div class="ttc" id="astructproteus_1_1CompiledLibrary_html"><div class="ttname"><a href="structproteus_1_1CompiledLibrary.html">proteus::CompiledLibrary</a></div><div class="ttdef"><b>Definition</b> CompiledLibrary.h:18</div></div>
+<div class="ttc" id="astructproteus_1_1CompiledLibrary_html"><div class="ttname"><a href="structproteus_1_1CompiledLibrary.html">proteus::CompiledLibrary</a></div><div class="ttdef"><b>Definition</b> CompiledLibrary.h:21</div></div>
 <div class="ttc" id="astructproteus_1_1FnSig_html"><div class="ttname"><a href="structproteus_1_1FnSig.html">proteus::FnSig</a></div><div class="ttdef"><b>Definition</b> Func.h:25</div></div>
 </div><!-- fragment --></div><!-- contents -->
 <!-- start footer part -->
