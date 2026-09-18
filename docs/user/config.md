@@ -28,5 +28,26 @@ through environment variables.
 | `PROTEUS_OPT_PIPELINE` | String (default: unset) | String describing a middle-end `opt` pipeline, for example `default<O2>` |
 | `PROTEUS_OPT_LEVEL` | `'0'`, `'1'`, `'2'`, `'3'`, `'s'`, `'z'` (default: `'3'`) | Default middle-end `opt` pipeline level; when unset, optimization defaults to `O3` |
 | `PROTEUS_CODEGEN_OPT_LEVEL` | `'0'`, `'1'`, `'2'`, `'3'` (default: `'3'`) | Default back-end `llc` pipeline level; when unset, optimization defaults to `O3` |
+| `PROTEUS_TUNED_KERNELS` | JSON file path (default: unset) | Per-kernel tuning options, including GPU launch dimensions described below |
 | `PROTEUS_OBJECT_CACHE_CHAIN` | Comma-separated cache names: `"storage"`, `"mpi-local-lookup"`, `"mpi-remote-lookup"` (default: `"storage"`) | Configure the object cache chain. Valid caches: `storage` (persistent file cache), `mpi-local-lookup` (rank 0 writes, all ranks read from a shared filesystem, requires MPI build), `mpi-remote-lookup` (rank 0 writes and serves lookups over MPI, requires MPI build) |
 | `PROTEUS_COMM_THREAD_POLL_MS` | Integer milliseconds (default: `25`) | Poll interval for the MPI remote-cache communication thread |
+
+## Tuned GPU launch dimensions
+
+`PROTEUS_TUNED_KERNELS` can point to a JSON file keyed by annotated GPU kernel
+name. `GridDim` and `BlockDim` independently override the dimensions supplied
+at the launch site. Each dimension requires positive integer `x`, `y`, and `z`
+coordinates.
+
+```json
+{
+  "foo": {
+    "GridDim": { "x": 128, "y": 1, "z": 1 },
+    "BlockDim": { "x": 256, "y": 1, "z": 1 }
+  }
+}
+```
+
+The effective dimensions determine JIT specialization, launch bounds, and the
+actual GPU launch. A kernel without a tuned dimension uses the value from its
+launch site.
