@@ -9,6 +9,9 @@
 #include <llvm/Support/MemoryBuffer.h>
 
 #include <algorithm>
+#include <array>
+#include <cstdint>
+#include <limits>
 #include <sstream>
 #include <string>
 namespace proteus {
@@ -162,6 +165,8 @@ inline KernelCloneOption getEnvOrDefaultKC(const char *VarName,
 }
 
 class CodeGenerationConfig {
+  using LaunchDim = std::array<unsigned int, 3>;
+
   static CodegenOption getCodeGen(CodegenOption ProteusCodegen) {
     constexpr bool SupportOnlyRTC =
 #if defined(PROTEUS_ENABLE_CUDA)
@@ -178,6 +183,32 @@ class CodeGenerationConfig {
     return ProteusCodegen;
   }
 
+  static std::optional<LaunchDim> getTunedDim(const llvm::json::Object &Config,
+                                              llvm::StringRef Key) {
+    const auto *Value = Config.get(Key);
+    if (!Value)
+      return std::nullopt;
+
+    const auto *Object = Value->getAsObject();
+    if (!Object)
+      reportFatalError("Invalid tuned " + Key.str() +
+                       ": expected an object with x, y, z");
+
+    LaunchDim Dim;
+    const char *Axes[] = {"x", "y", "z"};
+    for (unsigned I = 0; I < Dim.size(); ++I) {
+      const char *Axis = Axes[I];
+      auto Coordinate = Object->getInteger(Axis);
+      if (!Coordinate || *Coordinate <= 0 ||
+          static_cast<uint64_t>(*Coordinate) >
+              std::numeric_limits<unsigned int>::max())
+        reportFatalError("Invalid tuned " + Key.str() + "." + Axis +
+                         ": expected a positive 32-bit integer");
+      Dim[I] = static_cast<unsigned int>(*Coordinate);
+    }
+    return Dim;
+  }
+
   std::optional<const std::string> ProteusOptPipeline;
   CodegenOption ProteusCodegen;
   bool ProteusSpecializeArgs;
@@ -188,6 +219,8 @@ class CodeGenerationConfig {
   int ProteusCodeGenOptLevel;
   int TunedMaxThreads;
   int MinBlocksPerSM;
+  std::optional<LaunchDim> TunedGridDim;
+  std::optional<LaunchDim> TunedBlockDim;
 
   CodeGenerationConfig(std::optional<const std::string> ProteusOptPipeline,
                        CodegenOption ProteusCodegen, bool ProteusSpecializeArgs,
@@ -195,7 +228,9 @@ class CodeGenerationConfig {
                        bool ProteusSpecializeDims,
                        bool ProteusSpecializeDimsRange, char ProteusOptLevel,
                        int ProteusCodeGenOptLevel, int TunedMaxThreads = -1,
-                       int MinBlocksPerSM = 0)
+                       int MinBlocksPerSM = 0,
+                       std::optional<LaunchDim> TunedGridDim = std::nullopt,
+                       std::optional<LaunchDim> TunedBlockDim = std::nullopt)
       : ProteusOptPipeline(ProteusOptPipeline), ProteusCodegen(ProteusCodegen),
         ProteusSpecializeArgs(ProteusSpecializeArgs),
         ProteusSpecializeLaunchBounds(ProteusSpecializeLaunchBounds),
@@ -203,7 +238,8 @@ class CodeGenerationConfig {
         ProteusSpecializeDimsRange(ProteusSpecializeDimsRange),
         ProteusOptLevel(ProteusOptLevel),
         ProteusCodeGenOptLevel(ProteusCodeGenOptLevel),
-        TunedMaxThreads(TunedMaxThreads), MinBlocksPerSM(MinBlocksPerSM) {}
+        TunedMaxThreads(TunedMaxThreads), MinBlocksPerSM(MinBlocksPerSM),
+        TunedGridDim(TunedGridDim), TunedBlockDim(TunedBlockDim) {}
 
 public:
   static CodeGenerationConfig createFromEnv() {
@@ -245,7 +281,8 @@ public:
         getDefaultValueFromOptional(Config.getInteger("TunedMaxThreads"),
                                     static_cast<int64_t>(-1L)),
         getDefaultValueFromOptional(Config.getInteger("MinBlocksPerSM"),
-                                    static_cast<int64_t>(0L)));
+                                    static_cast<int64_t>(0L)),
+        getTunedDim(Config, "GridDim"), getTunedDim(Config, "BlockDim"));
   }
 
   CodegenOption codeGenOption() const { return ProteusCodegen; }
@@ -258,6 +295,8 @@ public:
   std::optional<const std::string> optPipeline() const {
     return ProteusOptPipeline;
   }
+  const std::optional<LaunchDim> &gridDim() const { return TunedGridDim; }
+  const std::optional<LaunchDim> &blockDim() const { return TunedBlockDim; }
 
   int minBlocksPerSM(int MaxThreads) const {
     // NOTE: We only return the tuned value when the current LBMaxThreads is
@@ -282,6 +321,12 @@ public:
     OS << "CGL:" << ProteusCodeGenOptLevel << " ";
     OS << "TMT:" << TunedMaxThreads << " ";
     OS << "BPSM:" << MinBlocksPerSM << " ";
+    if (TunedGridDim)
+      OS << "GridDim:(" << (*TunedGridDim)[0] << "," << (*TunedGridDim)[1]
+         << "," << (*TunedGridDim)[2] << ") ";
+    if (TunedBlockDim)
+      OS << "BlockDim:(" << (*TunedBlockDim)[0] << "," << (*TunedBlockDim)[1]
+         << "," << (*TunedBlockDim)[2] << ") ";
   }
 };
 
