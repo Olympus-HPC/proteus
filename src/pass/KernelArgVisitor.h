@@ -219,16 +219,38 @@ class PointerClobberResolver final : public PointerClobberAnalysis {
 
   std::optional<std::pair<Value *, int64_t>>
   getReturnedPointerOrigin(Value *V, CallBase &RootCall,
-                           SmallPtrSetImpl<Value *> &Active,
-                           bool &IsAmbiguous) {
-    if (!V || !V->getType()->isPointerTy() || !Active.insert(V).second) {
+                           SmallPtrSetImpl<Value *> &Active, bool &IsAmbiguous,
+                           bool &SawCycle) {
+    if (!V || !V->getType()->isPointerTy()) {
       IsAmbiguous = true;
+      return std::nullopt;
+    }
+    if (!Active.insert(V).second) {
+      SawCycle = true;
       return std::nullopt;
     }
 
     int64_t LocalOffset = 0;
     Value *Base = GetPointerBaseWithConstantOffset(V, LocalOffset, DL);
     std::optional<std::pair<Value *, int64_t>> Result;
+
+    auto ComposeChild = [&](Value *Child, int64_t AddedOffset) {
+      bool ChildCycle = false;
+      auto ChildResult = getReturnedPointerOrigin(Child, RootCall, Active,
+                                                  IsAmbiguous, ChildCycle);
+      if (ChildResult && (!ChildCycle || AddedOffset == 0)) {
+        ChildResult->second += AddedOffset;
+        SawCycle |= ChildCycle;
+        return ChildResult;
+      }
+      if (ChildCycle && AddedOffset == 0) {
+        SawCycle = true;
+        return std::optional<std::pair<Value *, int64_t>>{};
+      }
+      if (ChildCycle)
+        IsAmbiguous = true;
+      return std::optional<std::pair<Value *, int64_t>>{};
+    };
 
     if (auto *A = dyn_cast_or_null<Argument>(Base)) {
       Function *RootCallee = RootCall.getCalledFunction();
@@ -238,39 +260,57 @@ class PointerClobberResolver final : public PointerClobberAnalysis {
     } else if (auto *LI = dyn_cast_or_null<LoadInst>(Base)) {
       SmallPtrSet<Value *, 8> VisitedLoads;
       Value *Origin = getPointerLoadOrigin(DL, LI, VisitedLoads);
-      if (Origin && Origin != LI) {
-        Result =
-            getReturnedPointerOrigin(Origin, RootCall, Active, IsAmbiguous);
-        if (Result)
-          Result->second += LocalOffset;
-      }
+      if (Origin && Origin != LI)
+        Result = ComposeChild(Origin, LocalOffset);
     } else if (auto *CB = dyn_cast_or_null<CallBase>(Base)) {
       bool NestedAmbiguous = false;
       auto Origin = getCallReturnOrigin(*CB, &NestedAmbiguous);
-      if (Origin) {
-        Result = getReturnedPointerOrigin(Origin->first, RootCall, Active,
-                                          IsAmbiguous);
-        if (Result)
-          Result->second += LocalOffset + Origin->second;
-      } else if (NestedAmbiguous) {
+      if (Origin)
+        Result = ComposeChild(Origin->first, LocalOffset + Origin->second);
+      else if (NestedAmbiguous)
         IsAmbiguous = true;
-      }
     } else if (auto *Select = dyn_cast_or_null<SelectInst>(Base)) {
-      auto TrueOrigin = getReturnedPointerOrigin(Select->getTrueValue(),
-                                                 RootCall, Active, IsAmbiguous);
-      auto FalseOrigin = getReturnedPointerOrigin(
-          Select->getFalseValue(), RootCall, Active, IsAmbiguous);
-      if (TrueOrigin && FalseOrigin && *TrueOrigin == *FalseOrigin) {
-        Result = TrueOrigin;
-        Result->second += LocalOffset;
-      } else {
+      bool TrueAmbiguous = false, FalseAmbiguous = false;
+      bool TrueCycle = false, FalseCycle = false;
+      auto TrueOrigin = getReturnedPointerOrigin(
+          Select->getTrueValue(), RootCall, Active, TrueAmbiguous, TrueCycle);
+      auto FalseOrigin =
+          getReturnedPointerOrigin(Select->getFalseValue(), RootCall, Active,
+                                   FalseAmbiguous, FalseCycle);
+      if (TrueAmbiguous || FalseAmbiguous ||
+          (TrueOrigin && FalseOrigin && *TrueOrigin != *FalseOrigin)) {
         IsAmbiguous = true;
+      } else if (TrueOrigin || FalseOrigin) {
+        Result = TrueOrigin ? TrueOrigin : FalseOrigin;
+        if ((TrueCycle || FalseCycle) && LocalOffset != 0) {
+          Result.reset();
+          IsAmbiguous = true;
+        } else {
+          Result->second += LocalOffset;
+          SawCycle |= TrueCycle || FalseCycle;
+        }
+      } else if (TrueCycle || FalseCycle) {
+        if (LocalOffset == 0)
+          SawCycle = true;
+        else
+          IsAmbiguous = true;
       }
     } else if (auto *Phi = dyn_cast_or_null<PHINode>(Base)) {
       for (Value *Incoming : Phi->incoming_values()) {
-        auto IncomingOrigin =
-            getReturnedPointerOrigin(Incoming, RootCall, Active, IsAmbiguous);
+        bool IncomingAmbiguous = false;
+        bool IncomingCycle = false;
+        auto IncomingOrigin = getReturnedPointerOrigin(
+            Incoming, RootCall, Active, IncomingAmbiguous, IncomingCycle);
+        if (IncomingAmbiguous) {
+          IsAmbiguous = true;
+          Result.reset();
+          break;
+        }
         if (!IncomingOrigin) {
+          if (IncomingCycle) {
+            SawCycle = true;
+            continue;
+          }
           IsAmbiguous = true;
           Result.reset();
           break;
@@ -283,12 +323,16 @@ class PointerClobberResolver final : public PointerClobberAnalysis {
           break;
         }
       }
-      if (Result)
+      if (Result && SawCycle && LocalOffset != 0) {
+        Result.reset();
+        IsAmbiguous = true;
+      } else if (Result) {
         Result->second += LocalOffset;
+      }
     }
 
     Active.erase(V);
-    if (!Result)
+    if (!Result && !SawCycle)
       IsAmbiguous = true;
     return Result;
   }
@@ -310,9 +354,10 @@ class PointerClobberResolver final : public PointerClobberAnalysis {
 
       SawReturn = true;
       bool ReturnAmbiguous = false;
+      bool ReturnCycle = false;
       SmallPtrSet<Value *, 16> Active;
-      auto Candidate = getReturnedPointerOrigin(Ret->getReturnValue(), CB,
-                                                Active, ReturnAmbiguous);
+      auto Candidate = getReturnedPointerOrigin(
+          Ret->getReturnValue(), CB, Active, ReturnAmbiguous, ReturnCycle);
       if (!Candidate) {
         Valid = false;
         if (IsAmbiguous)
