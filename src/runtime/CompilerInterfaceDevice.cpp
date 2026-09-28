@@ -131,6 +131,18 @@ __proteus_push_device_lambda_callsite_constant(uint64_t LambdaID,
 }
 
 extern "C" __attribute__((used)) void
+__proteus_push_device_lambda_callsite_auto_constant(uint64_t LambdaID,
+                                                    uint32_t CallsiteIndex,
+                                                    int32_t Type, int32_t Pos,
+                                                    int32_t Offset,
+                                                    const void *ValuePtr) {
+  if (!Config::get().ProteusAutoReadOnlyCaptures)
+    return;
+  __proteus_push_device_lambda_callsite_constant(LambdaID, CallsiteIndex, Type,
+                                                 Pos, Offset, ValuePtr);
+}
+
+extern "C" __attribute__((used)) void
 __proteus_finalize_device_lambda_launch() {
   auto &LR = LambdaRegistry::instance();
   LR.finalizeDeviceLaunch();

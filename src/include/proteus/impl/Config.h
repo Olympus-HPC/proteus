@@ -330,6 +330,7 @@ public:
   const CodeGenerationConfig GlobalCodeGenConfig;
   const llvm::StringMap<const CodeGenerationConfig> TunedConfigs;
   bool ProteusUseStoredCache;
+  bool ProteusAutoReadOnlyCaptures;
   bool ProteusDisable;
   bool ProteusDumpLLVMIR;
   bool ProteusRelinkGlobalsByCopy;
@@ -385,6 +386,8 @@ public:
     };
 
     OS << "PROTEUS_USE_STORED_CACHE " << ProteusUseStoredCache << "\n";
+    OS << "PROTEUS_AUTO_READONLY_CAPTURES " << ProteusAutoReadOnlyCaptures
+       << "\n";
     OS << "PROTEUS_CACHE_DIR " << Config::get().ProteusCacheDir << "\n";
     OS << "PROTEUS_CLANGXX_BIN " << Config::get().ProteusClangxxBin << "\n";
     OS << "PROTEUS_NVCC_BIN " << Config::get().ProteusNvccBin << "\n";
@@ -405,6 +408,8 @@ private:
         ProteusNvccBin(getEnvOrDefaultString("PROTEUS_NVCC_BIN")) {
     ProteusUseStoredCache =
         getEnvOrDefaultBool("PROTEUS_USE_STORED_CACHE", true);
+    ProteusAutoReadOnlyCaptures =
+        getEnvOrDefaultBool("PROTEUS_AUTO_READONLY_CAPTURES", true);
     ProteusDisable = getEnvOrDefaultBool("PROTEUS_DISABLE", false);
     ProteusDumpLLVMIR = getEnvOrDefaultBool("PROTEUS_DUMP_LLVM_IR", false);
     ProteusRelinkGlobalsByCopy =

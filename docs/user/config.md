@@ -8,6 +8,7 @@ through environment variables.
 | `PROTEUS_CACHE_DIR` | Directory path (default: `.proteus`) | Directory where cached JIT-compiled objects are stored |
 | `PROTEUS_USE_STORED_CACHE` | `0` or `1` (default: `1`) | Enable the persistent storage cache |
 | `PROTEUS_SPECIALIZE_LAUNCH_BOUNDS` | `0` or `1` (default: `1`) | Enable launch-bounds specialization on JIT kernels |
+| `PROTEUS_AUTO_READONLY_CAPTURES` | `0` or `1` (default: `1`) | Specialize registered lambdas for scalar captures they only read, in addition to `jit_variable` captures |
 | `PROTEUS_SPECIALIZE_ARGS` | `0` or `1` (default: `1`) | Specialize JIT functions for input arguments |
 | `PROTEUS_SPECIALIZE_DIMS` | `0` or `1` (default: `1`) | Specialize JIT kernels for launch dimensions |
 | `PROTEUS_SPECIALIZE_DIMS_RANGE` | `0` or `1` (default: `0` on CUDA builds, `1` otherwise) | Specialize JIT kernels for launch-dimension ranges |

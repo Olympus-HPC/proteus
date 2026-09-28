@@ -72,6 +72,16 @@ __proteus_register_lambda_runtime_constant(int32_t Type, int32_t Pos,
   LR.appendHostJitVariable(ID, RC);
 }
 
+extern "C" __attribute__((used)) void
+__proteus_register_lambda_auto_runtime_constant(int32_t Type, int32_t Pos,
+                                                int32_t Offset,
+                                                const void *ValuePtr,
+                                                uint64_t ID) {
+  if (!Config::get().ProteusAutoReadOnlyCaptures)
+    return;
+  __proteus_register_lambda_runtime_constant(Type, Pos, Offset, ValuePtr, ID);
+}
+
 extern "C" void __proteus_enable_host() {
   JitEngineHost &Jit = JitEngineHost::instance();
   Jit.enable();
