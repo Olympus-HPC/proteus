@@ -219,6 +219,8 @@ public:
     if (isCUDAModule(M))
       emitProteusCUDARuntimeBuiltinsInit(M);
 
+    instrumentHostLambdaAutoCaptures(M);
+
     SmallVector<decltype(JitFunctionInfoMap)::value_type *, 16> JitWorkList;
     for (auto &JFI : JitFunctionInfoMap) {
       Function *JITFn = JFI.first;
@@ -876,6 +878,75 @@ private:
       Builder.CreateRetVoid();
 
       LambdaRegistrationHelpers[LaunchCB->getArgOperand(0)] = RegFunc;
+    }
+  }
+
+  FunctionCallee getRegisterLambdaAutoRuntimeConstantFn(Module &M) {
+    FunctionType *FnTy =
+        FunctionType::get(Types.VoidTy,
+                          {Types.Int32Ty, Types.Int32Ty, Types.Int32Ty,
+                           Types.PtrTy, Types.Int64Ty},
+                          /*isVarArg=*/false);
+    return M.getOrInsertFunction(
+        "__proteus_register_lambda_auto_runtime_constant", FnTy);
+  }
+
+  FunctionCallee getFinalizeRegisterFn(Module &M) {
+    FunctionType *FnTy = FunctionType::get(Types.VoidTy, {Types.Int64Ty},
+                                           /*isVarArg=*/false);
+    return M.getOrInsertFunction("__proteus_finalize_register", FnTy);
+  }
+
+  static CallBase *findCall(Function &Caller,
+                            function_ref<bool(Function &Callee)> Pred) {
+    for (Instruction &I : instructions(Caller)) {
+      auto *CB = dyn_cast<CallBase>(&I);
+      Function *Callee = CB ? CB->getCalledFunction() : nullptr;
+      if (Callee && Pred(*Callee))
+        return CB;
+    }
+    return nullptr;
+  }
+
+  /// Register the auto read-only captures of each host JIT lambda in its
+  /// wrapper right before the lambda call, next to the jit_variable captures
+  /// that LambdaAnalysis registers there.
+  void instrumentHostLambdaAutoCaptures(Module &M) {
+    SmallVector<std::pair<Function *, uint64_t>, 16> Wrappers;
+    findFunctionsWithU64Metadata(M, "proteus.wrapper_call", Wrappers);
+    auto LambdaSchema = parseLambdaSchemaMetadata(M);
+    for (auto &[Wrapper, ID] : Wrappers) {
+      CallBase *LambdaCall = findCall(*Wrapper, [ID = ID](Function &Callee) {
+        return getFunctionU64Metadata(Callee, "proteus.registered_lambda") ==
+               ID;
+      });
+      if (!LambdaCall ||
+          !JitFunctionInfoMap.contains(LambdaCall->getCalledFunction()))
+        continue;
+
+      auto Captures = getUncoveredAutoCaptures(
+          analyzeAutoReadOnlyCaptures(*LambdaCall->getCalledFunction()),
+          getLambdaSchema(LambdaSchema, ID));
+      if (Captures.empty())
+        continue;
+
+      // Finalize commits the registered values, so they must precede it.
+      CallBase *FinalizeCall = findCall(*Wrapper, [](Function &Callee) {
+        return Callee.getName() == "__proteus_finalize_register";
+      });
+      IRBuilder<> Builder(FinalizeCall ? FinalizeCall : LambdaCall);
+      Value *Closure = LambdaCall->getArgOperand(0);
+      for (const auto &Capture : Captures) {
+        Value *FieldPtr = Builder.CreateConstInBoundsGEP1_64(
+            Types.Int8Ty, Closure, Capture.Offset);
+        Builder.CreateCall(
+            getRegisterLambdaAutoRuntimeConstantFn(M),
+            {Builder.getInt32(static_cast<int32_t>(Capture.Type)),
+             Builder.getInt32(Capture.Pos), Builder.getInt32(Capture.Offset),
+             FieldPtr, Builder.getInt64(ID)});
+      }
+      if (!FinalizeCall)
+        Builder.CreateCall(getFinalizeRegisterFn(M), {Builder.getInt64(ID)});
     }
   }
 

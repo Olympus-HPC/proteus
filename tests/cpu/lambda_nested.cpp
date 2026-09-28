@@ -1,6 +1,6 @@
 // clang-format off
 // RUN: rm -rf "%t.$$.proteus"
-// RUN: PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="specialization;kernel-trace" %build/lambda_nested | %FILECHECK %s
+// RUN: PROTEUS_AUTO_READONLY_CAPTURES=0 PROTEUS_CACHE_DIR="%t.$$.proteus" PROTEUS_TRACE_OUTPUT="specialization;kernel-trace" %build/lambda_nested | %FILECHECK %s
 // RUN: rm -rf "%t.$$.proteus"
 // A lambda registered inside a JIT'd lambda body specializes on its own
 // runtime constants: the outer region is compiled once for V, and the inner one
