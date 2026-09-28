@@ -19,9 +19,11 @@
 #include "proteus/impl/LambdaRegistry.h"
 #include "proteus/impl/Utils.h"
 
+#include <llvm/ADT/APInt.h>
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/Demangle/Demangle.h>
 #include <llvm/IR/Attributes.h>
+#include <llvm/IR/DataLayout.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/LLVMContext.h>
@@ -92,20 +94,12 @@ private:
   }
 
   static const RuntimeConstant *findArgByOffset(const JitVariantMap &RCMap,
-                                                int32_t Offset) {
+                                                int64_t Offset) {
     for (auto &[_, Arg] : RCMap) {
       if (Arg.Offset == Offset)
         return &Arg;
     }
     return nullptr;
-  };
-
-  static const RuntimeConstant *findArgByPos(const JitVariantMap &RCMap,
-                                             int32_t Pos) {
-    auto It = RCMap.find(Pos);
-    if (It == RCMap.end())
-      return nullptr;
-    return &It->second;
   };
 
   static auto traceOut(int Slot, Constant *C) {
@@ -116,41 +110,61 @@ private:
     return S;
   };
 
-  static void handleLoad(Module &M, LoadInst *LI, const JitVariantMap &RCVec) {
-    auto *Arg = findArgByPos(RCVec, 0);
-    if (!Arg)
+  static bool isLoadTypeOf(Type *Ty, RuntimeConstantType RCType) {
+    switch (RCType) {
+    case RuntimeConstantType::BOOL:
+      return Ty->isIntegerTy(1) || Ty->isIntegerTy(8);
+    case RuntimeConstantType::INT8:
+      return Ty->isIntegerTy(8);
+    case RuntimeConstantType::INT32:
+      return Ty->isIntegerTy(32);
+    case RuntimeConstantType::INT64:
+      return Ty->isIntegerTy(64);
+    case RuntimeConstantType::FLOAT:
+      return Ty->isFloatTy();
+    case RuntimeConstantType::DOUBLE:
+      return Ty->isDoubleTy();
+    case RuntimeConstantType::LONG_DOUBLE:
+      return Ty->isX86_FP80Ty() || Ty->isFP128Ty() || Ty->isPPC_FP128Ty();
+    case RuntimeConstantType::PTR:
+      return Ty->isPointerTy();
+    default:
+      return false;
+    }
+  }
+
+  static void replaceLoad(Module &M, LoadInst *LI, const RuntimeConstant &RC) {
+    // A load of another type, such as a vector load spanning several
+    // captures, stays as is.
+    if (!isLoadTypeOf(LI->getType(), RC.Type))
       return;
 
-    Constant *C = getConstant(M.getContext(), LI->getType(), *Arg);
+    Constant *C = getConstant(M.getContext(), LI->getType(), RC);
     LI->replaceAllUsesWith(C);
-    PROTEUS_DBG(Logger::logs("proteus") << traceOut(Arg->Pos, C));
+    PROTEUS_DBG(Logger::logs("proteus") << traceOut(RC.Pos, C));
     if (Config::get().traceSpecializations())
-      Logger::trace(traceOut(Arg->Pos, C));
+      Logger::trace(traceOut(RC.Pos, C));
+  }
+
+  static void handleLoad(Module &M, LoadInst *LI, const JitVariantMap &RCVec) {
+    if (auto *Arg = findArgByOffset(RCVec, 0))
+      replaceLoad(M, LI, *Arg);
   }
 
   static void handleGEP(Module &M, GetElementPtrInst *GEP,
                         const JitVariantMap &RCVec) {
-    auto *GEPSlot = GEP->getOperand(GEP->getNumOperands() - 1);
-    ConstantInt *CI = dyn_cast<ConstantInt>(GEPSlot);
-    int Slot = CI->getZExtValue();
-    Type *SrcTy = GEP->getSourceElementType();
+    const DataLayout &DL = M.getDataLayout();
+    APInt Offset(DL.getIndexTypeSizeInBits(GEP->getType()), 0);
+    if (!GEP->accumulateConstantOffset(DL, Offset))
+      return;
 
-    auto *Arg = SrcTy->isStructTy() ? findArgByPos(RCVec, Slot)
-                                    : findArgByOffset(RCVec, Slot);
+    auto *Arg = findArgByOffset(RCVec, Offset.getSExtValue());
     if (!Arg)
       return;
 
-    for (auto *GEPUser : GEP->users()) {
-      auto *LI = dyn_cast<LoadInst>(GEPUser);
-      if (!LI)
-        reportFatalError("Expected load instruction");
-      Type *LoadType = LI->getType();
-      Constant *C = getConstant(M.getContext(), LoadType, *Arg);
-      LI->replaceAllUsesWith(C);
-      PROTEUS_DBG(Logger::logs("proteus") << traceOut(Arg->Pos, C));
-      if (Config::get().traceSpecializations())
-        Logger::trace(traceOut(Arg->Pos, C));
-    }
+    for (auto *GEPUser : GEP->users())
+      if (auto *LI = dyn_cast<LoadInst>(GEPUser))
+        replaceLoad(M, LI, *Arg);
   }
 
   static Function *findLambdaOperatorForFunctor(Module &M, uint64_t FunctorID) {
