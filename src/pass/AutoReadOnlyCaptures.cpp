@@ -81,8 +81,10 @@ SmallVector<AutoCapture, 4> analyzeAutoReadOnlyCaptures(Function &LambdaOp) {
   if (LambdaOp.isDeclaration() || LambdaOp.arg_empty())
     return {};
 
+  // With an sret return the closure is not the first argument, which the
+  // runtime lambda transform assumes.
   Argument *Closure = LambdaOp.getArg(0);
-  if (!Closure->getType()->isPointerTy())
+  if (!Closure->getType()->isPointerTy() || Closure->hasStructRetAttr())
     return {};
 
   // Slot 0 is often accessed through the closure pointer itself because a
@@ -113,8 +115,7 @@ SmallVector<AutoCapture, 4> analyzeAutoReadOnlyCaptures(Function &LambdaOp) {
     }
 
     ClosureTy = GEPTy;
-    auto &Users = SlotUsers[*Slot];
-    Users.append(GEP->user_begin(), GEP->user_end());
+    SlotUsers[*Slot].append(GEP->user_begin(), GEP->user_end());
   }
 
   const DataLayout &DL = LambdaOp.getParent()->getDataLayout();
