@@ -26,6 +26,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "AnnotationHandler.h"
+#include "AutoReadOnlyCaptures.h"
 #include "Helpers.h"
 #include "KernelArgVisitor.h"
 #include "LambdaAnalysis.h"
@@ -153,6 +154,7 @@ struct LambdaManifestRecord {
   uint32_t KernelArgIndex;
   int64_t Offset;
   RuntimeConstantType StorageType;
+  SmallVector<AutoCapture, 4> AutoCaptures;
 };
 
 struct LambdaSchemaRecord {
@@ -403,6 +405,13 @@ private:
         CallsiteObject["offset"] = Record.Offset;
         CallsiteObject["storage-type"] =
             static_cast<int64_t>(Record.StorageType);
+        json::Array AutoCaptureArray;
+        for (const auto &Capture : Record.AutoCaptures)
+          AutoCaptureArray.push_back(
+              json::Object{{"pos", Capture.Pos},
+                           {"offset", Capture.Offset},
+                           {"type", static_cast<int64_t>(Capture.Type)}});
+        CallsiteObject["auto-captures"] = std::move(AutoCaptureArray);
         CallsiteArray.push_back(std::move(CallsiteObject));
       }
 
@@ -413,6 +422,31 @@ private:
     ManifestInfo["manifest"] = std::move(KernelArray);
     OS << formatv("{0:2}", json::Value(std::move(ManifestInfo)));
     OS.close();
+  }
+
+  static SmallVector<AutoCapture, 4>
+  parseLambdaManifestAutoCaptures(json::Object &CallsiteObject) {
+    json::Array *AutoCaptureArray = CallsiteObject.getArray("auto-captures");
+    if (!AutoCaptureArray)
+      reportFatalError("Failed parsing lambda manifest auto-capture array");
+
+    SmallVector<AutoCapture, 4> AutoCaptures;
+    for (auto &Entry : *AutoCaptureArray) {
+      json::Object *CaptureObject = Entry.getAsObject();
+      if (!CaptureObject)
+        reportFatalError("Failed parsing lambda manifest auto-capture object");
+
+      auto Pos = CaptureObject->getInteger("pos");
+      auto Offset = CaptureObject->getInteger("offset");
+      auto Type = CaptureObject->getInteger("type");
+      if (!Pos || !Offset || !Type)
+        reportFatalError("Failed parsing lambda manifest auto-capture payload");
+
+      AutoCaptures.push_back(AutoCapture{
+          static_cast<uint32_t>(*Pos), static_cast<uint32_t>(*Offset),
+          static_cast<RuntimeConstantType>(*Type)});
+    }
+    return AutoCaptures;
   }
 
   StringMap<SmallVector<LambdaManifestRecord, 4>>
@@ -475,7 +509,8 @@ private:
             static_cast<uint32_t>(*CallsiteIndex),
             static_cast<uint32_t>(*KernelArgIndex),
             static_cast<int64_t>(*Offset),
-            static_cast<RuntimeConstantType>(*StorageType)});
+            static_cast<RuntimeConstantType>(*StorageType),
+            parseLambdaManifestAutoCaptures(*CallsiteObject)});
       }
     }
 
@@ -540,6 +575,9 @@ private:
     SmallVector<std::pair<Function *, uint64_t>, 16> FunctorOperatorMethods;
     findFunctionsWithU64Metadata(M, "proteus.wrapper_call",
                                  FunctorOperatorMethods);
+    SmallVector<std::pair<Function *, uint64_t>, 16> LambdaOperators;
+    findFunctionsWithU64Metadata(M, "proteus.registered_lambda",
+                                 LambdaOperators);
     uint32_t NextCallsiteIndex = 0;
     // Iterate through user-registered functors wrapping lambdas and analyze
     // their callsites.
@@ -555,6 +593,11 @@ private:
       if (!analyzeLambdaUses(M, CallBaseToArgOffset, CBToAnalyze))
         continue;
 
+      SmallVector<AutoCapture, 4> AutoCaptures;
+      for (auto &[LambdaOperator, LambdaId] : LambdaOperators)
+        if (LambdaId == FunctorId)
+          AutoCaptures = analyzeAutoReadOnlyCaptures(*LambdaOperator);
+
       for (CallBase *CB : CBToAnalyze) {
         auto It = CallBaseToArgOffset.find(CB);
         if (It == CallBaseToArgOffset.end() || !It->second.KernelFunction)
@@ -566,7 +609,8 @@ private:
         Records.push_back(LambdaManifestRecord{
             FunctorId, CallsiteIndex, It->second.KernelArgIndex,
             It->second.Offset,
-            It->second.ChangedRCLayout.value_or(RuntimeConstantType::NONE)});
+            It->second.ChangedRCLayout.value_or(RuntimeConstantType::NONE),
+            AutoCaptures});
       }
     }
 
@@ -633,6 +677,15 @@ private:
         "__proteus_push_device_lambda_callsite_constant", FnTy);
   }
 
+  FunctionCallee getPushDeviceLambdaCallsiteAutoConstantFn(Module &M) {
+    auto *FnTy = FunctionType::get(Types.VoidTy,
+                                   {Types.Int64Ty, Types.Int32Ty, Types.Int32Ty,
+                                    Types.Int32Ty, Types.Int32Ty, Types.PtrTy},
+                                   /*isVarArg=*/false);
+    return M.getOrInsertFunction(
+        "__proteus_push_device_lambda_callsite_auto_constant", FnTy);
+  }
+
   FunctionCallee getRegisterLambdaRegisterFunc(Module &M) {
     auto *FnTy = FunctionType::get(Types.VoidTy, {Types.PtrTy, Types.PtrTy},
                                    /*isVarArg=*/false);
@@ -649,7 +702,7 @@ private:
   Value *materializeDeviceLambdaValuePtr(IRBuilder<> &Builder,
                                          Value *KernelArgs,
                                          const LambdaManifestRecord &Manifest,
-                                         const LambdaSchemaRecord &Schema) {
+                                         uint32_t CaptureOffset) {
     Value *KernelArgsCast = Builder.CreateBitCast(KernelArgs, Types.PtrTy);
     Value *ArgSlotPtr = Builder.CreateInBoundsGEP(
         Types.PtrTy, KernelArgsCast,
@@ -680,7 +733,48 @@ private:
     }
 
     return Builder.CreateInBoundsGEP(Builder.getInt8Ty(), StorageBase,
-                                     {Builder.getInt64(Schema.Offset)});
+                                     {Builder.getInt64(CaptureOffset)});
+  }
+
+  void emitPushDeviceLambdaConstant(IRBuilder<> &Builder, FunctionCallee PushFn,
+                                    Value *KernelArgs,
+                                    const LambdaManifestRecord &Manifest,
+                                    uint32_t Pos, uint32_t Offset,
+                                    RuntimeConstantType Type) {
+    // Use the results of the analyzeLambdaUses to deduce the location of
+    // the closure ptr within the void** kernel args
+    Value *ValuePtr =
+        materializeDeviceLambdaValuePtr(Builder, KernelArgs, Manifest, Offset);
+    Builder.CreateCall(PushFn, {Builder.getInt64(Manifest.LambdaID),
+                                Builder.getInt32(Manifest.CallsiteIndex),
+                                Builder.getInt32(static_cast<int32_t>(Type)),
+                                Builder.getInt32(Pos), Builder.getInt32(Offset),
+                                ValuePtr});
+  }
+
+  static ArrayRef<LambdaSchemaRecord> getLambdaSchema(
+      const DenseMap<uint64_t, SmallVector<LambdaSchemaRecord, 4>> &Schema,
+      uint64_t LambdaID) {
+    auto It = Schema.find(LambdaID);
+    if (It == Schema.end())
+      return {};
+    return It->second;
+  }
+
+  // Explicit jit_variable captures take precedence over auto captures of the
+  // same slot.
+  static SmallVector<AutoCapture, 4>
+  getUncoveredAutoCaptures(ArrayRef<AutoCapture> AutoCaptures,
+                           ArrayRef<LambdaSchemaRecord> Schema) {
+    SmallVector<AutoCapture, 4> Uncovered;
+    for (const auto &Capture : AutoCaptures) {
+      bool Covered = llvm::any_of(Schema, [&](const LambdaSchemaRecord &R) {
+        return R.Pos == Capture.Pos || R.Offset == Capture.Offset;
+      });
+      if (!Covered)
+        Uncovered.push_back(Capture);
+    }
+    return Uncovered;
   }
 
   /// clang-format off
@@ -704,7 +798,9 @@ private:
   ///         the runtime constant type (deduced in LambdaAnalysis) to memcpy
   ///         the runtime constant off the kernel blob.  The value pointer
   ///         (indexed from the void** kernel arg pointer) is deduced by
-  ///         materializeDeviceLambdaValuePtr.
+  ///         materializeDeviceLambdaValuePtr.  Read-only captures found by
+  ///         analyzeAutoReadOnlyCaptures use
+  ///         __proteus_push_device_lambda_callsite_auto_constant instead.
   ///     (c) Inject __proteus_finalize_device_lambda_launch to finalize
   /// (3) Populate LambdaRegistrationHelpers with a pointer to the new
   /// registration function. The LambdaRegistry holds
@@ -723,7 +819,7 @@ private:
       Module &M, const DenseMap<Value *, GlobalVariable *> &StubToKernelMap) {
     auto KernelManifest = parseLambdaManifestFile(M);
     auto LambdaSchema = parseLambdaSchemaMetadata(M);
-    if (KernelManifest.empty() || LambdaSchema.empty())
+    if (KernelManifest.empty())
       return;
     for (auto It = StubToKernelMap.begin(); It != StubToKernelMap.end(); ++It) {
       auto [Stub, KernelGV] = *It;
@@ -733,6 +829,13 @@ private:
 
       auto ManifestIt = KernelManifest.find(KernelSym);
       if (ManifestIt == KernelManifest.end())
+        continue;
+
+      auto HasCaptures = [&](const LambdaManifestRecord &Record) {
+        return !Record.AutoCaptures.empty() ||
+               !getLambdaSchema(LambdaSchema, Record.LambdaID).empty();
+      };
+      if (llvm::none_of(ManifestIt->getValue(), HasCaptures))
         continue;
 
       Function *StubFn = dyn_cast<Function>(Stub);
@@ -756,25 +859,18 @@ private:
       RuntimeConstantType KernelArgsStorageType = getKernelArgLayout(M, StubFn);
 
       for (const auto &Record : ManifestIt->getValue()) {
-        auto SchemaIt = LambdaSchema.find(Record.LambdaID);
-        if (SchemaIt == LambdaSchema.end())
-          continue;
-
         LambdaManifestRecord EffectiveRecord = Record;
         EffectiveRecord.StorageType = KernelArgsStorageType;
-        for (const auto &Schema : SchemaIt->second) {
-          // Use the results of the analyzeLambdaUses to deduce the location of
-          // the closure ptr within the void** kernel args
-          Value *ClosurePtr = materializeDeviceLambdaValuePtr(
-              Builder, KernelArgs, EffectiveRecord, Schema);
-          Builder.CreateCall(
-              getPushDeviceLambdaCallsiteConstantFn(M),
-              {Builder.getInt64(Record.LambdaID),
-               Builder.getInt32(Record.CallsiteIndex),
-               Builder.getInt32(static_cast<int32_t>(Schema.Type)),
-               Builder.getInt32(Schema.Pos), Builder.getInt32(Schema.Offset),
-               ClosurePtr});
-        }
+        auto Schema = getLambdaSchema(LambdaSchema, Record.LambdaID);
+        for (const auto &Entry : Schema)
+          emitPushDeviceLambdaConstant(
+              Builder, getPushDeviceLambdaCallsiteConstantFn(M), KernelArgs,
+              EffectiveRecord, Entry.Pos, Entry.Offset, Entry.Type);
+        for (const auto &Capture :
+             getUncoveredAutoCaptures(Record.AutoCaptures, Schema))
+          emitPushDeviceLambdaConstant(
+              Builder, getPushDeviceLambdaCallsiteAutoConstantFn(M), KernelArgs,
+              EffectiveRecord, Capture.Pos, Capture.Offset, Capture.Type);
       }
       Builder.CreateCall(getFinalizeDeviceLambdaLaunchFn(M), {});
       Builder.CreateRetVoid();
