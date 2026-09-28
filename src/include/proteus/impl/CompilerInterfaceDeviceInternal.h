@@ -33,6 +33,12 @@ inline auto __proteus_launch_kernel_internal(void *Kernel, dim3 GridDim,
   }
 
   auto &KernelInfo = OptionalKernelInfo.value().get();
+  const auto &CGConfig = Config::get().getCGConfig(KernelInfo.getName());
+  if (const auto &TunedGridDim = CGConfig.gridDim())
+    GridDim = dim3((*TunedGridDim)[0], (*TunedGridDim)[1], (*TunedGridDim)[2]);
+  if (const auto &TunedBlockDim = CGConfig.blockDim())
+    BlockDim =
+        dim3((*TunedBlockDim)[0], (*TunedBlockDim)[1], (*TunedBlockDim)[2]);
 
   if (Config::get().ProteusDebugOutput) {
     Logger::logs("proteus") << "JIT Launch Kernel\n";

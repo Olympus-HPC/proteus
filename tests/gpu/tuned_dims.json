@@ -1,0 +1,8 @@
+{
+  "tuned_dims": {
+    "GridDim": { "x": 2, "y": 3, "z": 1 },
+    "BlockDim": { "x": 4, "y": 2, "z": 1 },
+    "TunedMaxThreads": 8,
+    "MinBlocksPerSM": 2
+  }
+}
