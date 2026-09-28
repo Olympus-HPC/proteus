@@ -66,8 +66,13 @@ captured variables rather than the argument list.
 
 Proteus therefore requires lambda functions to be **registered** with the
 runtime using `proteus::register_lambda`.
-To mark captured variables for specialization, they must be explicitly wrapped
-with `proteus::jit_variable`.
+To mark captured variables for specialization, wrap them with
+`proteus::jit_variable`.
+Proteus also specializes, without `jit_variable`, scalar captures (`bool`, 8-,
+32- and 64-bit integers, `float`, `double`) that the lambda only reads and whose
+address does not escape the lambda.
+Set `PROTEUS_AUTO_READONLY_CAPTURES=0` to specialize only `jit_variable`
+captures.
 
 Here is a simple example:
 
