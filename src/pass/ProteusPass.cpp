@@ -633,36 +633,38 @@ private:
     return LaunchKernelCB;
   }
 
-  /// Calling conventions for cuda/hiplaunchkernel can vary slightly.  Sometimes
-  /// a ptr to ptr is passed, sometimes a ptr to struct.  We need to check how
-  /// the arg blob is created to tell the difference.
-  RuntimeConstantType getKernelArgLayout(Module &M, Function *Stub) {
+  /// Calling conventions for cuda/hiplaunchkernel can vary slightly.  The
+  /// kernel args entry of the lambda may point to the lambda storage or to a
+  /// pointer to it.  Check what the stub stores in that entry to tell the
+  /// difference.
+  RuntimeConstantType getKernelArgLayout(Module &M, Function *Stub,
+                                         uint32_t KernelArgIndex) {
     CallBase *LaunchKernelCB = getStubLaunchCB(M, Stub);
-    RuntimeConstantType LayoutType = RuntimeConstantType::NONE;
-    SmallVector<std::pair<Value *, size_t>> WorkList;
     Value *KernelArgPack =
         LaunchKernelCB->getArgOperand(LaunchKernelCB->arg_size() - 3);
-    WorkList.push_back({KernelArgPack, 0});
-    SmallDenseSet<Value *> Discovered;
-    while (!WorkList.empty()) {
-      auto [V, Depth] = WorkList.back();
-      WorkList.pop_back();
-      if (Discovered.contains(V))
+    const DataLayout &DL = M.getDataLayout();
+    int64_t PackOffset = 0;
+    Value *PackBase =
+        GetPointerBaseWithConstantOffset(KernelArgPack, PackOffset, DL);
+    int64_t EntryOffset =
+        PackOffset + static_cast<int64_t>(KernelArgIndex) * DL.getPointerSize();
+    for (Instruction &I : instructions(*Stub)) {
+      auto *Store = dyn_cast<StoreInst>(&I);
+      if (!Store)
         continue;
-      Discovered.insert(V);
-      if (AllocaInst *Alloca = dyn_cast<AllocaInst>(V)) {
-        for (auto *Usr : Alloca->users())
-          WorkList.push_back({Usr, Depth + 1});
-        // Ptr to ptr type pack
-        if (Depth == 2 && Alloca->getAllocatedType()->isPointerTy())
-          return RuntimeConstantType::PTR;
-        if (Depth == 2 && Alloca->getAllocatedType()->isStructTy())
-          return RuntimeConstantType::NONE;
-      } else if (StoreInst *Store = dyn_cast<StoreInst>(V)) {
-        WorkList.push_back({Store->getValueOperand(), Depth + 1});
-      }
+
+      int64_t Offset = 0;
+      Value *Base = GetPointerBaseWithConstantOffset(Store->getPointerOperand(),
+                                                     Offset, DL);
+      if (Base != PackBase || Offset != EntryOffset)
+        continue;
+
+      auto *Storage = dyn_cast<AllocaInst>(Store->getValueOperand());
+      if (Storage && Storage->getAllocatedType()->isPointerTy())
+        return RuntimeConstantType::PTR;
+      return RuntimeConstantType::NONE;
     }
-    return LayoutType;
+    return RuntimeConstantType::NONE;
   }
 
   FunctionCallee getBeginDeviceLambdaLaunchFn(Module &M) {
@@ -858,11 +860,11 @@ private:
       IRBuilder<> Builder(Entry);
       Value *KernelArgs = RegFunc->getArg(0);
       Builder.CreateCall(getBeginDeviceLambdaLaunchFn(M), {});
-      RuntimeConstantType KernelArgsStorageType = getKernelArgLayout(M, StubFn);
 
       for (const auto &Record : ManifestIt->getValue()) {
         LambdaManifestRecord EffectiveRecord = Record;
-        EffectiveRecord.StorageType = KernelArgsStorageType;
+        EffectiveRecord.StorageType =
+            getKernelArgLayout(M, StubFn, Record.KernelArgIndex);
         auto Schema = getLambdaSchema(LambdaSchema, Record.LambdaID);
         for (const auto &Entry : Schema)
           emitPushDeviceLambdaConstant(
