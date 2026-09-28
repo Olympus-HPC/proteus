@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
 project(Proteus
-  VERSION 0.1.0
+  VERSION 2026.10.0
   LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "")
