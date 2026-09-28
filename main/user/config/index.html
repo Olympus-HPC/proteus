@@ -628,6 +628,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Runtime Configuration
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -644,6 +662,36 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tuned-gpu-launch-dimensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tuned GPU launch dimensions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -1166,6 +1214,11 @@ through environment variables.</p>
 <td>Default back-end <code>llc</code> pipeline level; when unset, optimization defaults to <code>O3</code></td>
 </tr>
 <tr>
+<td><code>PROTEUS_TUNED_KERNELS</code></td>
+<td>JSON file path (default: unset)</td>
+<td>Per-kernel tuning options, including GPU launch dimensions described below</td>
+</tr>
+<tr>
 <td><code>PROTEUS_OBJECT_CACHE_CHAIN</code></td>
 <td>Comma-separated cache names: <code>"storage"</code>, <code>"mpi-local-lookup"</code>, <code>"mpi-remote-lookup"</code> (default: <code>"storage"</code>)</td>
 <td>Configure the object cache chain. Valid caches: <code>storage</code> (persistent file cache), <code>mpi-local-lookup</code> (rank 0 writes, all ranks read from a shared filesystem, requires MPI build), <code>mpi-remote-lookup</code> (rank 0 writes and serves lookups over MPI, requires MPI build)</td>
@@ -1177,6 +1230,21 @@ through environment variables.</p>
 </tr>
 </tbody>
 </table>
+<h2 id="tuned-gpu-launch-dimensions">Tuned GPU launch dimensions</h2>
+<p><code>PROTEUS_TUNED_KERNELS</code> can point to a JSON file keyed by annotated GPU kernel
+name. <code>GridDim</code> and <code>BlockDim</code> independently override the dimensions supplied
+at the launch site. Each dimension requires positive integer <code>x</code>, <code>y</code>, and <code>z</code>
+coordinates.</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"foo"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"GridDim"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"x"</span><span class="p">:</span><span class="w"> </span><span class="mi">128</span><span class="p">,</span><span class="w"> </span><span class="nt">"y"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"z"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">"BlockDim"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">"x"</span><span class="p">:</span><span class="w"> </span><span class="mi">256</span><span class="p">,</span><span class="w"> </span><span class="nt">"y"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"z"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">}</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>The effective dimensions determine JIT specialization, launch bounds, and the
+actual GPU launch. A kernel without a tuned dimension uses the value from its
+launch site.</p>
 
 
 
