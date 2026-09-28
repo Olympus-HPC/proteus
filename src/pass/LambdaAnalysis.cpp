@@ -243,7 +243,9 @@ private:
     if (!F)
       return;
     // We want tbe lambda clone to be inlined into the body of the operator()
-    // ultimately
+    // ultimately. optnone requires noinline, e.g., at -O0.
+    if (F->hasOptNone())
+      return;
     F->removeFnAttr(Attribute::NoInline);
     F->addFnAttr(Attribute::AlwaysInline);
   }
