@@ -2,6 +2,7 @@
 # dependencies for building tests.
 set(PROTEUS_PASS_SOURCES
   ${PROJECT_SOURCE_DIR}/src/pass/AnnotationHandler.cpp
+  ${PROJECT_SOURCE_DIR}/src/pass/AutoReadOnlyCaptures.cpp
   ${PROJECT_SOURCE_DIR}/src/pass/LambdaAnalysis.cpp
   ${PROJECT_SOURCE_DIR}/src/pass/ProteusPass.cpp
   ${PROJECT_SOURCE_DIR}/src/runtime/Error.cpp
