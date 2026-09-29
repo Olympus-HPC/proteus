@@ -1,0 +1,28 @@
+<map id="src/include/proteus/impl/CoreDeviceHIP.h" name="src/include/proteus/impl/CoreDeviceHIP.h">
+<area shape="rect" id="Node000001" title=" " alt="" coords="381,5,547,45"/>
+<area shape="rect" id="Node000002" href="$Error_8h.html" title=" " alt="" coords="5,93,123,119"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="381,46,136,93,135,88,380,40"/>
+<area shape="rect" id="Node000004" href="$GlobalVarInfo_8h.html" title=" " alt="" coords="147,93,355,119"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="414,48,296,91,294,86,412,43"/>
+<area shape="rect" id="Node000006" href="$UtilsHIP_8h.html" title=" " alt="" coords="379,93,549,119"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="467,46,467,79,461,79,461,46"/>
+<area shape="rect" id="Node000011" title=" " alt="" coords="573,93,731,119"/>
+<area shape="poly" id="edge13_Node000001_Node000011" title=" " alt="" coords="510,43,613,85,611,90,508,48"/>
+<area shape="rect" id="Node000012" title=" " alt="" coords="755,93,879,119"/>
+<area shape="poly" id="edge14_Node000001_Node000012" title=" " alt="" coords="548,43,753,88,752,93,547,48"/>
+<area shape="rect" id="Node000003" title=" " alt="" coords="35,167,93,192"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="67,119,67,153,61,153,61,119"/>
+<area shape="rect" id="Node000005" title=" " alt="" coords="217,167,284,192"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="253,119,253,153,248,153,248,119"/>
+<area shape="rect" id="Node000007" href="$HIPRuntimeAPI_8h.html" title=" " alt="" coords="455,167,673,192"/>
+<area shape="poly" id="edge6_Node000006_Node000007" title=" " alt="" coords="482,117,538,156,535,161,479,121"/>
+<area shape="rect" id="Node000008" title=" " alt="" coords="633,240,769,265"/>
+<area shape="poly" id="edge10_Node000006_Node000008" title=" " alt="" coords="539,116,626,136,663,149,687,165,697,179,702,195,706,226,701,227,697,196,692,181,683,169,661,154,625,141,538,121"/>
+<area shape="rect" id="Node000009" title=" " alt="" coords="307,240,469,265"/>
+<area shape="poly" id="edge11_Node000006_Node000009" title=" " alt="" coords="447,121,422,141,401,168,392,197,389,226,384,226,387,196,396,165,418,137,443,117"/>
+<area shape="rect" id="Node000010" title=" " alt="" coords="505,240,599,265"/>
+<area shape="poly" id="edge12_Node000006_Node000010" title=" " alt="" coords="458,120,442,154,440,173,445,191,468,215,498,232,495,237,465,220,440,193,435,173,437,152,453,118"/>
+<area shape="poly" id="edge7_Node000007_Node000008" title=" " alt="" coords="587,190,668,231,666,236,585,194"/>
+<area shape="poly" id="edge8_Node000007_Node000009" title=" " alt="" coords="537,194,431,237,429,232,535,190"/>
+<area shape="poly" id="edge9_Node000007_Node000010" title=" " alt="" coords="565,193,559,227,554,226,559,192"/>
+</map>
