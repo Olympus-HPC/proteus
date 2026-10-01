@@ -4,7 +4,7 @@ set -e
 
 echo "CI_COMMIT_REF_NAME ${CI_COMMIT_REF_NAME}"
 # Fetch the PR ID from the branch name.
-PR_INFO=$(curl --retry 5 --retry-connrefused --retry-delay 5 -s -L -H "Authorization: Bearer $GITHUB_TOKEN" \
+PR_INFO=$(curl --retry 5 --retry-connrefused --retry-delay 5 -s -L \
                -H "Accept: application/vnd.github+json" \
                -H "X-GitHub-Api-Version: 2022-11-28" \
                "https://api.github.com/repos/LLNL/proteus/pulls?head=LLNL:${CI_COMMIT_REF_NAME}")
@@ -21,7 +21,6 @@ echo "Processing PR ${PR_ID}"
 
 COMMENTS_INFO=$(curl --retry 5 --retry-connrefused --retry-delay 5 -L \
   -H "Accept: application/vnd.github+json" \
-  -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
   "https://api.github.com/repos/LLNL/proteus/issues/${PR_ID}/comments")
 COMMENTS_BODY=$(echo ${COMMENTS_INFO} | jq -r '.[].body')
