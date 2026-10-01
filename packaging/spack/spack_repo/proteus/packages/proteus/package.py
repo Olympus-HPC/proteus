@@ -16,9 +16,9 @@ class Proteus(CMakePackage, CudaPackage, ROCmPackage):
     CUDA, HIP, and host-only C/C++ applications.
     """
 
-    homepage = "https://github.com/Olympus-HPC/proteus"
-    url = "https://github.com/Olympus-HPC/proteus/archive/refs/tags/v2026.10.0.tar.gz"
-    git = "https://github.com/Olympus-HPC/proteus.git"
+    homepage = "https://github.com/LLNL/proteus"
+    url = "https://github.com/LLNL/proteus/archive/refs/tags/v2026.10.0.tar.gz"
+    git = "https://github.com/LLNL/proteus.git"
 
     maintainers("ggeorgakoudis")
 
