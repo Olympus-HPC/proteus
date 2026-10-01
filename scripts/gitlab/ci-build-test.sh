@@ -185,3 +185,4 @@ if [ "${ENABLE_CODECOV_UPLOAD}" = "1" ]; then
     --git-service github 2>&1 | tee "${ARTIFACT_DIR}/codecov-upload.log"
   popd
 fi
+# dummy
