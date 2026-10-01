@@ -7,7 +7,7 @@ echo "CI_COMMIT_REF_NAME ${CI_COMMIT_REF_NAME}"
 PR_INFO=$(curl --retry 5 --retry-connrefused --retry-delay 5 -s -L -H "Authorization: Bearer $GITHUB_TOKEN" \
                -H "Accept: application/vnd.github+json" \
                -H "X-GitHub-Api-Version: 2022-11-28" \
-               "https://api.github.com/repos/Olympus-HPC/proteus/pulls?head=Olympus-HPC:${CI_COMMIT_REF_NAME}")
+               "https://api.github.com/repos/LLNL/proteus/pulls?head=LLNL:${CI_COMMIT_REF_NAME}")
 
 # Check if PR exists.
 if [ -z "${PR_INFO}" ] || [ "$(echo "$PR_INFO" | jq length)" = "0" ]; then
@@ -23,7 +23,7 @@ COMMENTS_INFO=$(curl --retry 5 --retry-connrefused --retry-delay 5 -L \
   -H "Accept: application/vnd.github+json" \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
-  "https://api.github.com/repos/Olympus-HPC/proteus/issues/${PR_ID}/comments")
+  "https://api.github.com/repos/LLNL/proteus/issues/${PR_ID}/comments")
 COMMENTS_BODY=$(echo ${COMMENTS_INFO} | jq -r '.[].body')
 if [[ "${COMMENTS_BODY}" == *"/run-benchmarks-hecbench"* ]]; then
   echo "=> Run hecbench benchmarks triggered <=";
@@ -184,7 +184,7 @@ curl --retry 5 --retry-connrefused --retry-delay 5 -L -X POST \
   -H "Accept: application/vnd.github+json" \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
-  "https://api.github.com/repos/Olympus-HPC/proteus/issues/${PR_ID}/comments" \
+  "https://api.github.com/repos/LLNL/proteus/issues/${PR_ID}/comments" \
   -d "{\"body\": \"${COMMENT}\"}"
 
 conda deactivate
